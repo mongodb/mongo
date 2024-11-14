@@ -315,7 +315,6 @@ void setupSignalHandlers() {
 }
 
 #ifndef _WIN32
-namespace {
 void maskSignals(const std::vector<int>& blocked) {
     // The signals that should be handled by the SignalProcessingThread, once it is started via
     // startSignalProcessingThread().
@@ -346,7 +345,6 @@ void resetSignalHandlers(const std::vector<int>& blocked) {
         }
     }
 }
-}  // namespace
 #endif
 
 void startSignalProcessingThread(LogFileStatus rotate) {

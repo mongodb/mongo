@@ -515,6 +515,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
         shardFilter,
         projection);
 }
+}  // namespace
 
 // Returns true if the given query is exactly the shape {_id: <value>}. So, we check if the
 // following conditions are met:
@@ -545,7 +546,6 @@ bool isExactMatchOnId(const BSONObj& queryObj) {
     // field (violates case 2 above), return false.
     return false;
 }
-}  // namespace
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindById(
     OperationContext* opCtx,
@@ -652,7 +652,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
         coll.get());
 }
 
-namespace {
+
 /**
  * Determine appropriate recovery policy for write operations in express based on the
  * PlanYieldPolicy from the request. Applies appropriate overrides for multi-statement transactions,
@@ -673,7 +673,6 @@ const express::ExceptionRecoveryPolicy* getExpressRecoveryPolicy(
         return &recoveryPolicyForSecondary;
     }
 }
-}  // namespace
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdate(
     OperationContext* opCtx,

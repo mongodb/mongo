@@ -3933,12 +3933,10 @@ intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* c
         expCtx, std::move(fieldExpr), PrfBlockfromCDR(serverTokenPair.second));
 }
 
-namespace {
 Value toValue(const std::array<std::uint8_t, 32>& buf) {
     auto vec = toEncryptedVector(EncryptedBinDataType::kFLE2TransientRaw, buf);
     return Value(BSONBinData(vec.data(), vec.size(), BinDataType::Encrypt));
 }
-}  // namespace
 
 Value ExpressionInternalFLEEqual::serialize(const SerializationOptions& options) const {
     return Value(
@@ -6101,7 +6099,6 @@ Value ExpressionTrim::serialize(const SerializationOptions& options) const {
 
 /* ------------------------- ExpressionRound and ExpressionTrunc -------------------------- */
 
-namespace {
 void assertFlagsValid(uint32_t flags,
                       const std::string& opName,
                       long long numericValue,
@@ -6113,12 +6110,12 @@ void assertFlagsValid(uint32_t flags,
             !Decimal128::hasFlag(flags, Decimal128::kInvalid));
 }
 
-Value evaluateRoundOrTrunc(const Document& root,
-                           const std::vector<boost::intrusive_ptr<Expression>>& children,
-                           const std::string& opName,
-                           Decimal128::RoundingMode roundingMode,
-                           double (*doubleOp)(double),
-                           Variables* variables) {
+static Value evaluateRoundOrTrunc(const Document& root,
+                                  const std::vector<boost::intrusive_ptr<Expression>>& children,
+                                  const std::string& opName,
+                                  Decimal128::RoundingMode roundingMode,
+                                  double (*doubleOp)(double),
+                                  Variables* variables) {
     constexpr auto maxPrecision = 100LL;
     constexpr auto minPrecision = -20LL;
     auto numericArg = Value(children[0]->evaluate(root, variables));
@@ -6186,7 +6183,6 @@ Value evaluateRoundOrTrunc(const Document& root,
             MONGO_UNREACHABLE;
     }
 }
-}  // namespace
 
 Value ExpressionRound::evaluate(const Document& root, Variables* variables) const {
     return evaluateRoundOrTrunc(
@@ -8856,11 +8852,11 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
 
 /* --------------------------------- Parenthesis --------------------------------------------- */
 
+REGISTER_STABLE_EXPRESSION(expr, parseParenthesisExprObj);
 static intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* const expCtx,
                                                          BSONElement bsonExpr,
                                                          const VariablesParseState& vpsIn) {
     return Expression::parseOperand(expCtx, bsonExpr, vpsIn);
 }
-REGISTER_STABLE_EXPRESSION(expr, parseParenthesisExprObj);
 
 }  // namespace mongo

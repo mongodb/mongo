@@ -44,7 +44,6 @@
 
 namespace mongo::sbe {
 
-namespace {
 class SbeValueTest : public SbeStageBuilderTestFixture {};
 
 // This is just a made up example, and is not actually a valid bucket. There's no min/max and
@@ -109,7 +108,6 @@ std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, Str
                                             min,
                                             max);
 }
-}  // namespace
 
 TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
     // A TsCellBlockForTopLevelField can be created in an "unowned" state.

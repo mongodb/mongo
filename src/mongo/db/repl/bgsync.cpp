@@ -171,6 +171,11 @@ ChangeSyncSourceAction DataReplicatorExternalStateBackgroundSync::shouldStopFetc
 
     return DataReplicatorExternalStateImpl::shouldStopFetchingOnError(source, lastOpTimeFetched);
 }
+
+size_t getSize(const BSONObj& o) {
+    // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
+    return static_cast<size_t>(o.objsize());
+}
 }  // namespace
 
 // Failpoint which causes rollback to hang before starting.

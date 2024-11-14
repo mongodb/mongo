@@ -181,7 +181,6 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
     return writerVectors;
 }
 
-namespace {
 struct SessionOpsList {
     TxnNumber txnNum = kUninitializedTxnNumber;
     std::vector<const repl::OplogEntry*> ops;
@@ -252,7 +251,6 @@ void unrollApplyOpsAndUpdateSessionTracker(LogicalSessionIdMap<SessionOpsList>& 
         updateSessionTracker(sessionTracker, &derivedOp);
     }
 }
-}  // namespace
 
 WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
     const OplogBatchToPrepare& batch, std::list<OplogEntry>& derivedOps) const {

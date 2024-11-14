@@ -302,6 +302,19 @@ bool opReplicatedEnough(OperationContext* opCtx,
 }
 
 /**
+ * Create the migration clone request BSON object to send to the source shard.
+ *
+ * 'sessionId' unique identifier for this migration.
+ */
+BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
+    BSONObjBuilder builder;
+    builder.append("_migrateClone",
+                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+    sessionId.append(&builder);
+    return builder.obj();
+}
+
+/**
  * Create the migration transfer mods request BSON object to send to the source shard.
  *
  * 'sessionId' unique identifier for this migration.

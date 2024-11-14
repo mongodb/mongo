@@ -159,6 +159,8 @@ std::string filterLinesWithRegex(const std::string& input, const std::regex& pat
     return result.str();
 }
 
+}  // namespace
+
 // Output up to BSONObjMaxUserSize characters of the most recent log output.
 //
 // Users must send a regex as the only argument, which will be passed as a string.
@@ -599,7 +601,6 @@ BSONObj ConvertTrafficRecordingToBSON(const BSONObj& a, void* data) {
     auto arr = trafficRecordingFileToBSONArr(a.firstElement().String());
     return BSON("" << arr);
 }
-}  // namespace
 
 int KillMongoProgramInstances(int signal) {
     vector<ProcessId> pids;
@@ -618,7 +619,6 @@ int KillMongoProgramInstances(int signal) {
     return returnCode;
 }
 
-namespace {
 /**
  * Reads a set of test named pipes. 'args' BSONObj should contain one or more fields like:
  *   "0": string; relative path of the first pipe
@@ -721,6 +721,8 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
     return {};
 }
 
+namespace {
+
 /**
  * Attempts to read the requested number of bytes from the given input stream to the given buffer
  * and returns the number of bytes actually read.
@@ -729,6 +731,8 @@ int32_t readBytes(char* buf, int32_t count, std::ifstream& ifs) {
     ifs.read(buf, count);
     return ifs.gcount();
 }
+
+}  // namespace
 
 /**
  * Writes a test named pipe of BSONobj's that are first read into memory from a BSON file, then
@@ -916,7 +920,6 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
 
     return {};
 }
-}  // namespace
 
 std::vector<ProcessId> getRunningMongoChildProcessIds() {
     std::vector<ProcessId> registeredPids, outPids;
@@ -935,7 +938,6 @@ std::vector<ProcessId> getRunningMongoChildProcessIds() {
     return outPids;
 }
 
-namespace {
 BSONObj RunningMongoChildProcessIds(const BSONObj&, void*) {
     std::vector<ProcessId> pids = getRunningMongoChildProcessIds();
     BSONObjBuilder bob;
@@ -961,8 +963,6 @@ BSONObj GetFCVConstants(const BSONObj&, void*) {
 
     return bob.obj();
 }
-
-}  // namespace
 
 MongoProgramScope::~MongoProgramScope() {
     DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), nullptr))

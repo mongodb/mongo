@@ -160,7 +160,8 @@ CollectionMetadata QueryShardServerTestFixture::prepareTestData(
         scopedCsr->setFilteringMetadata(operationContext(), CollectionMetadata(cm, curShard));
     }
 
-    _manager = std::make_shared<MetadataManager>(_testNss, CollectionMetadata(cm, curShard));
+    _manager = std::make_shared<MetadataManager>(
+        getServiceContext(), _testNss, CollectionMetadata(cm, curShard));
 
     return CollectionMetadata(std::move(cm), curShard);
 }

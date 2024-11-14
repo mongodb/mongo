@@ -142,6 +142,19 @@ namespace mongo {
 namespace repl {
 namespace {
 
+auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
+    BSONElement tsArray;
+    Status status =
+        bsonExtractTypedField(obj, OpTime::kTimestampFieldName, BSONType::Array, &tsArray);
+    ASSERT_OK(status);
+
+    BSONElement termArray;
+    status = bsonExtractTypedField(obj, OpTime::kTermFieldName, BSONType::Array, &termArray);
+    ASSERT_OK(status);
+
+    return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());
+};
+
 template <typename T, bool enable>
 class SetSteadyStateConstraints : public T {
 protected:

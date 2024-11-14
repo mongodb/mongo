@@ -146,6 +146,73 @@ ServiceContext::ConstructorActionRegisterer setClusterNetworkRestrictionManager{
             std::make_unique<ClusterNetworkRestrictionManagerImpl>();
         ClusterNetworkRestrictionManager::set(service, std::move(manager));
     }};
+
+bool isAuthzNamespace(const NamespaceString& nss) {
+    return (nss == NamespaceString::kAdminRolesNamespace ||
+            nss == NamespaceString::kAdminUsersNamespace ||
+            nss == NamespaceString::kServerConfigurationNamespace);
+}
+
+bool isAuthzCollection(StringData coll) {
+    return (coll == NamespaceString::kAdminRolesNamespace.coll() ||
+            coll == NamespaceString::kAdminUsersNamespace.coll() ||
+            coll == NamespaceString::kServerConfigurationNamespace.coll());
+}
+
+bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj& cmdObj) {
+    if (nss != NamespaceString::kAdminCommandNamespace)
+        return false;
+
+    const StringData cmdName(cmdObj.firstElement().fieldNameStringData());
+
+    if (cmdName == "drop") {
+        return isAuthzCollection(cmdObj.firstElement().valueStringData());
+    } else if (cmdName == "dropDatabase") {
+        return true;
+    } else if (cmdName == "renameCollection") {
+        auto context = SerializationContext::stateStorageRequest();
+
+        const NamespaceString fromNamespace = NamespaceStringUtil::deserialize(
+            nss.tenantId(), cmdObj.firstElement().valueStringDataSafe(), context);
+        const NamespaceString toNamespace =
+            NamespaceStringUtil::deserialize(nss.tenantId(), cmdObj.getStringField("to"), context);
+
+        if (fromNamespace.isAdminDB() || toNamespace.isAdminDB()) {
+            return isAuthzCollection(fromNamespace.coll()) || isAuthzCollection(toNamespace.coll());
+        } else {
+            return false;
+        }
+    } else if (cmdName == "dropIndexes" || cmdName == "deleteIndexes") {
+        return false;
+    } else if (cmdName == "create") {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+bool appliesToAuthzData(StringData op, const NamespaceString& nss, const BSONObj& o) {
+    if (op.empty()) {
+        return true;
+    }
+
+    switch (op[0]) {
+        case 'i':
+        case 'u':
+        case 'd':
+            if (op.size() != 1) {
+                return false;  // "db" op type
+            }
+            return isAuthzNamespace(nss);
+        case 'c':
+            return loggedCommandOperatesOnAuthzData(nss, o);
+        case 'n':
+            return false;
+        default:
+            return true;
+    }
+}
+
 }  // namespace
 
 AuthorizationManagerImpl::AuthorizationManagerImpl(Service* service,

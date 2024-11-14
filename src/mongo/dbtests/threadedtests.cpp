@@ -55,7 +55,6 @@
 
 namespace mongo {
 namespace ThreadedTests {
-namespace {
 
 template <int nthreads_param = 10>
 class ThreadedTest {
@@ -325,7 +324,6 @@ public:
         add<TicketHolderWaits<TicketHolder>>();
     }
 };
-}  // namespace
 
 unittest::OldStyleSuiteInitializer<All> myall;
 

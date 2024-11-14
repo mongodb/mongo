@@ -64,6 +64,22 @@ std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& poss
                                        const DatabaseName& dbname);
 
 //
+// checkAuthorizedTo* methods
+//
+
+Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
+                                   const std::vector<RoleName>& roles);
+
+Status checkAuthorizedToGrantPrivileges(AuthorizationSession* authzSession,
+                                        const PrivilegeVector& privileges);
+
+Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
+                                    const std::vector<RoleName>& roles);
+
+Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
+                                         const PrivilegeVector& privileges);
+
+//
 // checkAuthFor*Command methods
 //
 

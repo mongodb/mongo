@@ -50,7 +50,6 @@
 namespace mongo {
 namespace clustered_util {
 
-namespace {
 void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
     if (!indexSpec.getName()) {
         auto clusterKey = indexSpec.getKey().firstElement().fieldNameStringData();
@@ -61,7 +60,6 @@ void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
         }
     }
 }
-}  // namespace
 
 ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat() {
     auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true /* unique */};

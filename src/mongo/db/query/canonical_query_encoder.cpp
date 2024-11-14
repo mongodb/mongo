@@ -1225,7 +1225,6 @@ void encodeKeyForAutoParameterizedMatchSBE(const boost::intrusive_ptr<Expression
 
 namespace canonical_query_encoder {
 
-namespace {
 /**
  * Encode the stages pushed down to SBE via CanonicalQuery::cqPipeline.
  * Also encodes pipelines that are eligible for the Bonsai plan cache.
@@ -1251,7 +1250,6 @@ void encodePipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         }
     }  // for each stage in 'cqPipeline'
 }
-}  // namespace
 
 CanonicalQuery::QueryShapeString encodePipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1259,7 +1257,7 @@ CanonicalQuery::QueryShapeString encodePipeline(
     static constexpr size_t bufferSize = 200;
     BufBuilder bufBuilder(bufferSize);
 
-    encodePipeline(expCtx, pipelineStages, &bufBuilder);
+    canonical_query_encoder::encodePipeline(expCtx, pipelineStages, &bufBuilder);
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 

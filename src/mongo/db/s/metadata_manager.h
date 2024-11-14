@@ -62,7 +62,9 @@ class RangePreserver;
  */
 class MetadataManager : public std::enable_shared_from_this<MetadataManager> {
 public:
-    MetadataManager(NamespaceString nss, CollectionMetadata initialMetadata);
+    MetadataManager(ServiceContext* serviceContext,
+                    NamespaceString nss,
+                    CollectionMetadata initialMetadata);
     ~MetadataManager() = default;
 
     MetadataManager(const MetadataManager&) = delete;
@@ -169,6 +171,9 @@ private:
      * result is usable until the lock is released.
      */
     CollectionMetadataTracker* _findNewestOverlappingMetadata(WithLock, ChunkRange const& range);
+
+    // ServiceContext from which to obtain instances of global support objects
+    ServiceContext* const _serviceContext;
 
     // Namespace for which this manager object applies
     const NamespaceString _nss;

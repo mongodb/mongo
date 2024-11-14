@@ -33,7 +33,6 @@
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/exit_code.h"
-#include "mongo/util/quick_exit.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

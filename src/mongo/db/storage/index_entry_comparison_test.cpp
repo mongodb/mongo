@@ -40,7 +40,6 @@
 
 namespace mongo {
 
-namespace {
 void buildDupKeyErrorStatusProducesExpectedErrorObject(
     DuplicateKeyErrorInfo::FoundValue&& foundValue) {
     NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
@@ -85,7 +84,6 @@ void buildDupKeyErrorStatusProducesExpectedErrorObject(
     parsedExtraInfo->serialize(&afterParseObjBuilder);
     ASSERT_BSONOBJ_EQ(afterParseObjBuilder.obj(), expectedObj);
 }
-}  // namespace
 
 TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
     buildDupKeyErrorStatusProducesExpectedErrorObject(std::monostate{});
@@ -93,7 +91,6 @@ TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
     buildDupKeyErrorStatusProducesExpectedErrorObject(BSON("c" << 1));
 }
 
-namespace {
 void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
     BSONObj keyPattern,
     BSONObj keyValue,
@@ -124,7 +121,6 @@ void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
     ASSERT_BSONOBJ_EQ(parsedDuplicatedErrorInfo->getKeyPattern(), keyPattern);
     ASSERT_BSONOBJ_EQ(parsedDuplicatedErrorInfo->getDuplicatedKeyValue(), keyValueWithFieldName);
 }
-}  // namespace
 
 TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectWithCollation) {
     auto keyPattern = BSON("a" << 1 << "b" << 1);

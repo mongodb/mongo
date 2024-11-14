@@ -286,7 +286,6 @@ void myTerminate() {
     endProcessWithSignal(SIGABRT);
 }
 
-extern "C" void abruptQuit(int signalNum);
 extern "C" void abruptQuit(int signalNum) {
     MallocFreeOStreamGuard lk(signalNum);
     printSignal(signalNum);
@@ -317,7 +316,6 @@ void myPureCallHandler() {
 
 #else
 
-extern "C" void abruptQuitAction(int signalNum, siginfo_t*, void*);
 extern "C" void abruptQuitAction(int signalNum, siginfo_t*, void*) {
     abruptQuit(signalNum);
 };
@@ -334,7 +332,6 @@ void printSigInfo(const siginfo_t* siginfo) {
     writeMallocFreeStreamToLog();
 }
 
-extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_erased);
 extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_erased) {
     // For convenient debugger access.
     [[maybe_unused]] auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);

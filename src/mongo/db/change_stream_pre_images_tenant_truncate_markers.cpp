@@ -136,7 +136,6 @@ void truncateExpiredMarkersForNsUUID(
 }  // namespace
 
 namespace pre_image_marker_initialization_internal {
-namespace {
 // Given the expected 'numRecords' and 'dataSize' of the pre-images collection, and the number of
 // 'recordsInMarkersMap' and 'bytesInMarkersMap', distributes the difference across truncate markers
 // so the resulting 'markersMap' accounts for the total 'numRecords' and 'dataSize'.
@@ -187,7 +186,6 @@ void distributeUnaccountedRecordsAndBytes(
     auto arbitraryNsUUIDMarkers = markersMap.find(arbitraryNsUUID);
     arbitraryNsUUIDMarkers->updateMarkers(remainderBytes, RecordId{}, Date_t{}, remainderRecords);
 }
-}  // namespace
 
 int64_t countTotalSamples(
     const stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash>& samplesMap) {
@@ -198,7 +196,6 @@ int64_t countTotalSamples(
     return totalSamples;
 }
 
-namespace {
 void appendSample(
     const BSONObj& preImageObj,
     const RecordId& rId,
@@ -225,7 +222,6 @@ void updateMarkersMapAggregates(
     aggNumRecords = aggNumRecords + initialSetOfMarkers.leftoverRecordsCount;
     aggDataSize = aggDataSize + initialSetOfMarkers.leftoverRecordsBytes;
 }
-}  // namespace
 
 stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNsUUID(
     OperationContext* opCtx, const CollectionAcquisition& preImagesCollection) {
@@ -439,7 +435,6 @@ void populateBySampling(
                                          markersMap);
 }
 
-namespace {
 // Populates the 'markersMap' with truncate markers covering the entire pre-images collection.
 // Only pre-images visible in the thread's initial snapshot of the pre-images collection are
 // guaranteed to be covered.
@@ -485,7 +480,6 @@ void populateMarkersMap(
             opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
     }
 }
-}  // namespace
 }  // namespace pre_image_marker_initialization_internal
 
 PreImagesTenantMarkers PreImagesTenantMarkers::createMarkers(

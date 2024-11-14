@@ -90,7 +90,6 @@ using mongo::repl::ReadConcernLevel;
 namespace mongo {
 
 namespace cluster::unsplittable {
-namespace {
 ShardsvrReshardCollection makeMoveCollectionOrUnshardCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
@@ -119,7 +118,6 @@ ShardsvrReshardCollection makeMoveCollectionOrUnshardCollectionRequest(
     shardsvrReshardCollection.setReshardCollectionRequest(std::move(reshardCollectionRequest));
     return shardsvrReshardCollection;
 }
-}  // namespace
 
 ShardsvrReshardCollection makeMoveCollectionRequest(
     const DatabaseName& dbName,
@@ -368,11 +366,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
         opCtx, dbName, readPref, retryPolicy, requests, true /* throwOnStaleShardVersionErrors */);
 }
 
-namespace {
-/**
- * Dispatches all the specified requests in parallel and waits until all complete, returning a
- * vector of the same size and positions as that of 'requests'.
- */
 std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
     const DatabaseName& dbName,
@@ -382,7 +375,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVer
     return gatherResponsesImpl(
         opCtx, dbName, readPref, retryPolicy, requests, false /* throwOnStaleShardVersionErrors */);
 }
-}  // namespace
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
     return appendDbVersionIfPresent(std::move(cmdObj), dbInfo->getVersion());
@@ -933,7 +925,6 @@ CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
     return cri;
 };
 
-namespace {
 BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto atClusterTime = readConcernArgs.getArgsAtClusterTime();
@@ -959,7 +950,6 @@ BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
 
     return bob.obj();
 }
-}  // namespace
 
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
     OperationContext* opCtx, const NamespaceString& nss, const CollectionRoutingInfo& cri) {

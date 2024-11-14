@@ -119,6 +119,32 @@ MONGO_FAIL_POINT_DEFINE(hangAfterDatabaseLock);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueFullIndexScan);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueReleaseIXLock);
 
+void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
+    try {
+        const auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+        auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
+
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
+        // Only collections that are not registered in the sharding catalog are affected by
+        // movePrimary
+        if (!collDesc.hasRoutingTable()) {
+            if (scopedDss->isMovePrimaryInProgress()) {
+                LOGV2(4945200, "assertNoMovePrimaryInProgress", logAttrs(nss));
+
+                uasserted(ErrorCodes::MovePrimaryInProgress,
+                          "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
+            }
+        }
+    } catch (const DBException& ex) {
+        if (ex.toStatus() != ErrorCodes::MovePrimaryInProgress) {
+            LOGV2(4945201, "Error when getting collection description", "what"_attr = ex.what());
+            return;
+        }
+        throw;
+    }
+}
+
 struct ParsedCollModRequest {
     ParsedCollModIndexRequest indexRequest;
     std::string viewOn = {};

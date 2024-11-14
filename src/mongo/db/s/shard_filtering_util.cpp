@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/shard_filtering_util.h"
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharding_api_d_params_gen.h"
 #include "mongo/db/transaction_resources.h"

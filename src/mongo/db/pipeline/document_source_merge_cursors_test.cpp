@@ -198,7 +198,6 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectLegacySerializationFormats) {
                        17026);
 }
 
-namespace {
 RemoteCursor makeRemoteCursor(ShardId shardId, HostAndPort host, CursorResponse response) {
     RemoteCursor remoteCursor;
     remoteCursor.setShardId(std::move(shardId));
@@ -236,7 +235,6 @@ AsyncResultsMergerParams createAsynchResultsMergerParams(const NamespaceString& 
     params.setRemotes(std::move(cursors));
     return params;
 }
-}  // namespace
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToParseSerializedARMParams) {
     AsyncResultsMergerParams params = createAsynchResultsMergerParams(getTenantIdNss());
@@ -280,14 +278,12 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldReportEOFWithNoCursors) {
     ASSERT_TRUE(mergeCursorsStage->getNext().isEOF());
 }
 
-namespace {
 BSONObj cursorResponseObj(const NamespaceString& nss,
                           CursorId cursorId,
                           std::vector<BSONObj> batch) {
     return CursorResponse{nss, cursorId, std::move(batch)}.toBSON(
         CursorResponse::ResponseType::SubsequentResponse);
 }
-}  // namespace
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToIterateCursorsUntilEOF) {
     auto expCtx = getExpCtx();

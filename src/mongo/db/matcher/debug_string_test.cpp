@@ -76,7 +76,6 @@ namespace mongo {
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/matcher"};
 
-namespace {
 void verifyDebugString(unittest::GoldenTestContext& gctx, MatchExpression* match, StringData name) {
     // Verify the untagged case.
     gctx.outStream() << "==== VARIATION: matchExpression=" << name << std::endl;
@@ -91,7 +90,6 @@ void verifyDebugString(unittest::GoldenTestContext& gctx, MatchExpression* match
     match->debugString(debug);
     gctx.outStream() << debug.str() << std::endl;
 }
-}  // namespace
 
 TEST(DebugStringTest, ExpressionAlwaysBoolean) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);

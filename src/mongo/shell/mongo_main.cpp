@@ -361,7 +361,6 @@ void killOps() {
         !shellGlobalParams.autoKillOp);
 }
 
-extern "C" void quitNicely(int sig);
 extern "C" void quitNicely(int sig) {
     shutdown(ExitCode::clean);
 }

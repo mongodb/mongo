@@ -867,7 +867,6 @@ Status ShardingCatalogManager::_initConfigCollections(OperationContext* opCtx) {
     return Status::OK();
 }
 
-namespace {
 // TODO (SERVER-83264): Move new validator to _initConfigSettings and remove old validator once 8.0
 // becomes last LTS.
 BSONObj createConfigSettingsValidator() {
@@ -899,7 +898,6 @@ BSONObj createConfigSettingsValidator() {
                         "oneOf" << BSON_ARRAY(ChunkSizeSettingsType::kSchema << noopValidator)));
     }
 }
-}  // namespace
 
 Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
     DBDirectClient client(opCtx);

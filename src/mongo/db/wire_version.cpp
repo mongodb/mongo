@@ -75,13 +75,11 @@ void WireSpec::appendInternalClientWireVersionIfNeeded(BSONObjBuilder* builder) 
     }
 }
 
-namespace {
 BSONObj specToBSON(const WireSpec::Specification& spec) {
     BSONObjBuilder bob;
     WireSpec::Specification::appendToBSON(spec, &bob);
     return bob.obj();
 }
-}  // namespace
 
 void WireSpec::initialize(Specification spec) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);

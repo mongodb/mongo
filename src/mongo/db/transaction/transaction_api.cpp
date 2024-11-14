@@ -283,7 +283,6 @@ bool Transaction::TransactionState::_isLegalTransition(StateFlag oldState, State
     MONGO_UNREACHABLE;
 }
 
-namespace {
 std::string execContextToString(Transaction::ExecutionContext execContext) {
     switch (execContext) {
         case Transaction::ExecutionContext::kOwnSession:
@@ -338,7 +337,6 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep,
 
     LOGV2(5918600, "Chose internal transaction error handling step", attr);
 }
-}  // namespace
 
 SemiFuture<CommitResult> TransactionWithRetries::run(Callback callback) noexcept {
     InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())->incrementStarted();
@@ -451,7 +449,6 @@ ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
     });
 }
 
-namespace {
 // Sets the appropriate options on the given client and operation context for running internal
 // commands.
 void primeInternalClient(Client* client) {
@@ -460,7 +457,6 @@ void primeInternalClient(Client* client) {
         as->grantInternalAuthorization();
     }
 }
-}  // namespace
 
 Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
     OperationContext* opCtx, const Message& request) const {
@@ -813,7 +809,6 @@ SemiFuture<void> Transaction::runCallback() {
         .semi();
 }
 
-namespace {
 int getMaxRetries() {
     // Allow overriding the number of retries so unit tests can exhaust them faster.
     return MONGO_unlikely(overrideTransactionApiMaxRetriesToThree.shouldFail()) ? 3
@@ -843,7 +838,6 @@ bool isRunningLocalTransaction(const TransactionClient& txnClient) {
     return !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
         !txnClient.runsClusterOperations();
 }
-}  // namespace
 
 Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitResult>& swResult,
                                                         int attemptCounter) const noexcept {

@@ -34,7 +34,6 @@
 #include "mongo/db/query/query_test_service_context.h"
 
 namespace mongo {
-namespace {
 
 constexpr auto kDbName = "testdb";
 constexpr auto kCollName = "coll";
@@ -309,7 +308,6 @@ void BM_HintedPlan(benchmark::State& state) {
         auto solns = QueryPlanner::plan(*cq, plannerParams);
     }
 }
-}  // namespace
 
 BENCHMARK(BM_NoIndexes);
 BENCHMARK(BM_SingleIndex);

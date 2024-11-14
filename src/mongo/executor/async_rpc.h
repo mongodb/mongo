@@ -298,11 +298,13 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
 }
 }  // namespace detail
 
-inline void createOperationKeyIfNeeded(GenericArguments& genericArgs) {
+namespace {
+void createOperationKeyIfNeeded(GenericArguments& genericArgs) {
     if (!genericArgs.getClientOperationKey()) {
         genericArgs.setClientOperationKey(UUID::gen());
     }
 }
+}  // namespace
 
 /**
  * Execute the command asynchronously on the given target with the provided executor.

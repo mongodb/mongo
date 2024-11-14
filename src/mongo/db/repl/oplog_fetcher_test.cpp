@@ -114,6 +114,12 @@ ReplSetConfig _createConfig() {
     return config;
 }
 
+BSONObj concatenate(BSONObj a, const BSONObj& b) {
+    auto bob = BSONObjBuilder(std::move(a));
+    bob.appendElements(b);
+    return bob.obj();
+}
+
 BSONObj makeNoopOplogEntry(OpTime opTime, std::int64_t version = repl::OplogEntry::kOplogVersion) {
     auto oplogEntry = repl::DurableOplogEntry(
         opTime,                                                    // optime

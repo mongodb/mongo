@@ -60,17 +60,6 @@ REGISTER_ACCUMULATOR(count, parseCountAccumulator);
 
 REGISTER_STABLE_WINDOW_FUNCTION(count, window_function::parseCountWindowFunction);
 
-// These are also used in accumulator_avg.cpp
-void applyPartialSum(const std::vector<Value>& arr,
-                     BSONType& nonDecimalTotalType,
-                     BSONType& totalType,
-                     DoubleDoubleSummation& nonDecimalTotal,
-                     Decimal128& decimalTotal);
-Value serializePartialSum(BSONType nonDecimalTotalType,
-                          BSONType totalType,
-                          const DoubleDoubleSummation& nonDecimalTotal,
-                          const Decimal128& decimalTotal);
-
 void applyPartialSum(const std::vector<Value>& arr,
                      BSONType& nonDecimalTotalType,
                      BSONType& totalType,

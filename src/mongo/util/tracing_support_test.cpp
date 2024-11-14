@@ -150,7 +150,6 @@ TEST(TracingSupportTest, BasicUsage) {
     ASSERT_BSONOBJ_EQ(expected, trace.value());
 }
 
-namespace {
 BSONObj beginEvent(StringData name, int64_t time) {
     return BSON("name" << name << "ph"
                        << "B"
@@ -162,7 +161,6 @@ BSONObj endEvent(int64_t time) {
                 << "E"
                 << "ts" << time << "pid" << 1 << "tid" << 1);
 }
-}  // namespace
 
 TEST(TracingSupportTest, BasicEventUsage) {
     const auto kSpanDuration = Seconds(5);

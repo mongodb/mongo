@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/chunk_operation_precondition_checks.h"
+#include <boost/optional.hpp>
+#include <utility>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_index_catalog_cache.h"

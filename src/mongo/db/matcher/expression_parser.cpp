@@ -1472,6 +1472,39 @@ StatusWithMatchExpression parseElemMatch(boost::optional<StringData> name,
         name, std::move(sub), createAnnotation(expCtx, e.fieldNameStringData(), name, e))};
 }
 
+StatusWithMatchExpression parseBetweenWithArray(
+    boost::optional<StringData> name,
+    BSONElement e,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+    mongo::BSONElement first,
+    mongo::BSONElement second) {
+    auto theAnd = std::make_unique<AndMatchExpression>(createAnnotation(expCtx, "$and", BSONObj()));
+    auto gte = parseComparison(
+        name,
+        std::make_unique<GTEMatchExpression>(
+            name, first, createAnnotation(expCtx, e.fieldNameStringData(), name, e)),
+        e,
+        expCtx,
+        allowedFeatures);
+    if (!gte.isOK()) {
+        return gte;
+    }
+    addExpressionToRoot(expCtx, theAnd.get(), std::move(gte.getValue()));
+    auto lte = parseComparison(
+        name,
+        std::make_unique<LTEMatchExpression>(
+            name, second, createAnnotation(expCtx, e.fieldNameStringData(), name, e)),
+        e,
+        expCtx,
+        allowedFeatures);
+    if (!lte.isOK()) {
+        return lte;
+    }
+    addExpressionToRoot(expCtx, theAnd.get(), std::move(lte.getValue()));
+    return theAnd;
+}
+
 StatusWithMatchExpression parseAll(boost::optional<StringData> name,
                                    BSONElement e,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,

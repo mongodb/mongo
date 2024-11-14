@@ -62,7 +62,6 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-namespace {
 AccumulationExpression parseInternalConstructStats(ExpressionContext* const expCtx,
                                                    BSONElement elem,
                                                    VariablesParseState vps) {
@@ -82,7 +81,6 @@ AccumulationExpression parseInternalConstructStats(ExpressionContext* const expC
         [expCtx, params]() { return AccumulatorInternalConstructStats::create(expCtx, params); },
         "_internalConstructStats"};
 }
-}  // namespace
 
 REGISTER_ACCUMULATOR(_internalConstructStats, parseInternalConstructStats);
 

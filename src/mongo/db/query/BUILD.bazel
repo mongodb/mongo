@@ -37,6 +37,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "canonical_distinct",
     srcs = [
+        "canonical_distinct.cpp",
         "//src/mongo/db/pipeline:document_source_replace_root.h",
     ],
     hdrs = [

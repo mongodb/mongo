@@ -3725,7 +3725,6 @@ TEST_F(ExpressionConvertTest, FormatDecimal) {
         convertExp->evaluate(negativeNaNInput, &expCtx->variables), "NaN"_sd, BSONType::String);
 }
 
-namespace {
 Value runConvertBinDataToNumeric(boost::intrusive_ptr<ExpressionContextForTest> expCtx,
                                  BSONObj spec,
                                  std::vector<unsigned char> valueBytes) {
@@ -3746,7 +3745,7 @@ void testConvertNumericToBinData(boost::intrusive_ptr<ExpressionContextForTest> 
     auto result = convertExp->evaluate({{"path1", Value(inputVal)}}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, expectedBinData, BSONType::BinData);
 }
-}  // namespace
+
 
 TEST_F(ExpressionConvertTest, ConvertBinDataToIntFourBytesBigEndian) {
     auto expCtx = getExpCtx();
@@ -4158,7 +4157,6 @@ TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleWrongLengthFails) {
                        ErrorCodes::ConversionFailure);
 }
 
-namespace {
 void assertBinaryInRange(BSONBinData actual,
                          std::vector<unsigned char> lowerBound0,
                          std::vector<unsigned char> upperBound0,
@@ -4176,7 +4174,6 @@ void assertBinaryInRange(BSONBinData actual,
 
     ASSERT(firstRange || secondRange);
 }
-}  // namespace
 
 // For signaling and quiet NaNs there is a range the binary can fall within. The following tests
 // confirm that the resulting BinData is within that range.

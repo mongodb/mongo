@@ -73,7 +73,6 @@ namespace mongo {
 
 using namespace fmt::literals;
 
-namespace {
 Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   StorageEngine* engine) {
@@ -98,6 +97,8 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
     engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
     return Status::OK();
 }
+
+namespace {
 
 /**
  * Re-opening the database can throw an InvalidIndexSpecificationOption error. This can occur if the

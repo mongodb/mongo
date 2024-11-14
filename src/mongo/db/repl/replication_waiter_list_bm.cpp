@@ -237,6 +237,7 @@ struct TestSuiteEnvironment {
         serverGlobalParams.mutableFCV.reset();
     }
 };
+}  // namespace
 
 void BM_UnfulfilledWaiter(benchmark::State& state) {
     TestSuiteEnvironment env;
@@ -261,7 +262,6 @@ void BM_AddWaiter(benchmark::State& state) {
     bm.benchmarkAddingWaiters(state);
     bm.tearDown();
 }
-}  // namespace
 
 BENCHMARK(BM_UnfulfilledWaiter)->Args({3, 1000})->MinTime(0.05);
 BENCHMARK(BM_UnfulfilledMajorityWaiter)->Args({3, 1000})->MinTime(0.05);

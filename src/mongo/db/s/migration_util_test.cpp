@@ -55,6 +55,14 @@ namespace {
 
 using MigrationUtilsTest = ShardServerTestFixture;
 
+UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+
+    ASSERT(autoColl.getCollection());
+
+    return autoColl.getCollection()->uuid();
+}
+
 template <typename ShardKey>
 RangeDeletionTask createDeletionTask(OperationContext* opCtx,
                                      const NamespaceString& nss,

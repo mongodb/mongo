@@ -62,7 +62,6 @@
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo::projection_executor {
-namespace {
 constexpr auto kProjectionPostImageVarName =
     projection_executor::ProjectionExecutor::kProjectionPostImageVarName;
 
@@ -119,7 +118,6 @@ protected:
         return executor->applyTransformation(input);
     }
 };
-}  // namespace
 
 TEST_F(PositionalProjectionExecutionTest, CanApplyPositionalWithInclusionProjection) {
     ASSERT_DOCUMENT_EQ(Document{fromjson("{foo: [6]}")},

@@ -138,6 +138,38 @@ namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
+/**
+ * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+ */
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                repl::OpTypeEnum opType,
+                                BSONObj object,
+                                OperationSessionInfo sessionInfo,
+                                Date_t wallClockTime,
+                                const std::vector<StmtId>& stmtIds,
+                                boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
+    return repl::DurableOplogEntry(
+        opTime,                        // optime
+        opType,                        // opType
+        kNss,                          // namespace
+        boost::none,                   // uuid
+        boost::none,                   // fromMigrate
+        boost::none,                   // checkExistenceForDiffInsert
+        0,                             // version
+        object,                        // o
+        boost::none,                   // o2
+        sessionInfo,                   // sessionInfo
+        boost::none,                   // upsert
+        wallClockTime,                 // wall clock time
+        stmtIds,                       // statement ids
+        prevWriteOpTimeInTransaction,  // optime of previous write within same transaction
+        boost::none,                   // pre-image optime
+        boost::none,                   // post-image optime
+        boost::none,                   // ShardId of resharding recipient
+        boost::none,                   // _id
+        boost::none);                  // needsRetryImage
+}
+
 class OpObserverMock : public OpObserverNoop {
 public:
     /**

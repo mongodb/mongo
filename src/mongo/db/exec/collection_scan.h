@@ -147,6 +147,8 @@ private:
 
     // Stats
     CollectionScanStats _specificStats;
+
+    bool _useSeek = false;
 };
 
 }  // namespace mongo

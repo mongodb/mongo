@@ -52,7 +52,6 @@ using unittest::assertGet;
 
 namespace fts {
 
-namespace {
 /**
  * Assert that fixSpec() accepts the provided text index spec.
  */
@@ -78,7 +77,6 @@ void assertFixFailure(const std::string& s) {
     BSONObj user = fromjson(s);
     ASSERT_NOT_OK(FTSSpec::fixSpec(user));
 }
-}  // namespace
 
 TEST(FTSSpec, FixNormalKey1) {
     assertFixSuccess("{key: {a: 'text'}}");

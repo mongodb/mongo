@@ -56,7 +56,7 @@
 
 namespace mongo {
 
-static bool operator==(const TopologyVersion& a, const TopologyVersion& b) {
+bool operator==(const TopologyVersion& a, const TopologyVersion& b) {
     return a.getProcessId() == b.getProcessId() && a.getCounter() == b.getCounter();
 }
 

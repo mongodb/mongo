@@ -96,6 +96,15 @@ Status getStatusFromWriteCommandResponse(const BSONObj& commandResult) {
     return batchResponse.toStatus();
 }
 
+Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
+    return updateShardCollectionsEntry(
+        opCtx,
+        BSON(ShardCollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+        BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
+        false /*upsert*/);
+}
+
 }  // namespace
 
 QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionPlacementVersion) {

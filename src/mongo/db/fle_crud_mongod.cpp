@@ -176,6 +176,11 @@ private:
     bool _yielded = false;
 };
 
+void toBinData(StringData field, PrfBlock block, BSONObjBuilder* builder) {
+    builder->appendBinData(field, block.size(), BinDataType::BinDataGeneral, block.data());
+}
+
+
 /**
  * If the collection is missing (which should not happen in practice), we create a mock reader that
  * just returns nothing rather then special case the algorithm for a missing collection.
@@ -206,8 +211,9 @@ class StorageEngineClusteredCollectionReader : public FLEStateCollectionReader {
 public:
     StorageEngineClusteredCollectionReader(OperationContext* opCtx,
                                            uint64_t count,
+                                           const NamespaceStringOrUUID& nsOrUUID,
                                            SeekableRecordCursor* cursor)
-        : _opCtx(opCtx), _count(count), _cursor(cursor) {}
+        : _opCtx(opCtx), _count(count), _nssOrUUID(nsOrUUID), _cursor(cursor) {}
 
     uint64_t getDocumentCount() const override {
         return _count;
@@ -251,6 +257,7 @@ private:
 private:
     OperationContext* _opCtx;
     const uint64_t _count;
+    const NamespaceStringOrUUID& _nssOrUUID;
     SeekableRecordCursor* _cursor;
     mutable ECStats _stats;
 };
@@ -265,10 +272,16 @@ class StorageEngineIndexCollectionReader : public FLEStateCollectionReader {
 public:
     StorageEngineIndexCollectionReader(OperationContext* opCtx,
                                        uint64_t count,
+                                       const NamespaceStringOrUUID& nsOrUUID,
                                        SeekableRecordCursor* cursor,
                                        SortedDataInterface* sdi,
                                        SortedDataInterface::Cursor* indexCursor)
-        : _opCtx(opCtx), _count(count), _sdi(sdi), _indexCursor(indexCursor), _cursor(cursor) {}
+        : _opCtx(opCtx),
+          _count(count),
+          _nssOrUUID(nsOrUUID),
+          _sdi(sdi),
+          _indexCursor(indexCursor),
+          _cursor(cursor) {}
 
     uint64_t getDocumentCount() const override {
         return _count;
@@ -321,6 +334,7 @@ private:
 private:
     OperationContext* _opCtx;
     const uint64_t _count;
+    const NamespaceStringOrUUID& _nssOrUUID;
     SortedDataInterface* _sdi;
     SortedDataInterface::Cursor* _indexCursor;
     SeekableRecordCursor* _cursor;
@@ -524,7 +538,8 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
                         .firstElement()
                         .fieldNameStringData() == "_id"_sd) {
 
-                StorageEngineClusteredCollectionReader reader(opCtx, docCount, cursor.get());
+                StorageEngineClusteredCollectionReader reader(
+                    opCtx, docCount, nsOrUUID, cursor.get());
 
                 return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
             }
@@ -553,8 +568,12 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
             auto sdi = indexCatalogEntry->accessMethod()->asSortedData();
             auto indexCursor = sdi->newCursor(opCtx, true);
 
-            StorageEngineIndexCollectionReader reader(
-                opCtx, docCount, cursor.get(), sdi->getSortedDataInterface(), indexCursor.get());
+            StorageEngineIndexCollectionReader reader(opCtx,
+                                                      docCount,
+                                                      nsOrUUID,
+                                                      cursor.get(),
+                                                      sdi->getSortedDataInterface(),
+                                                      indexCursor.get());
 
             return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
         });

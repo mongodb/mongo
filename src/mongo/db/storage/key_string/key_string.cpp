@@ -75,8 +75,11 @@ using std::string;
 template class StackBufBuilderBase<key_string::TypeBits::SmallStackSize>;
 
 namespace key_string {
-namespace CType {
+
+
 namespace {
+
+namespace CType {
 // canonical types namespace. (would be enum class CType: uint8_t in C++11)
 // Note 0-9 and 246-255 are disallowed and reserved for value encodings.
 // For types that encode value information in the ctype byte, the value in this list is
@@ -227,10 +230,8 @@ size_t numBytesForInt(uint8_t ctype) {
     dassert(ctype >= kNumericNegative8ByteInt);
     return kNumericNegative1ByteInt - ctype + 1;
 }
-}  // namespace
 }  // namespace CType
 
-namespace {
 uint8_t bsonTypeToGenericKeyStringType(BSONType type) {
     switch (type) {
         case MinKey:
@@ -339,6 +340,11 @@ const uint8_t kEnd = 0x4;
 // the encoding of NUL bytes in strings as "\x00\xff".
 const uint8_t kLess = 1;
 const uint8_t kGreater = 254;
+
+}  // namespace
+
+// some utility functions
+namespace {
 
 void memcpy_flipBits(void* dst, const void* src, size_t bytes) {
     const char* input = static_cast<const char*>(src);
@@ -2992,7 +2998,6 @@ int Value::compareWithTypeBits(const Value& other) const {
         getBuffer(), other.getBuffer(), _buffer.size(), other._buffer.size());
 }
 
-namespace {
 boost::optional<uint8_t> getAndValidateNextStoredCtype(BufReader* reader, bool inverted) {
     uint8_t ctype;
     if (!reader->remaining() || (ctype = readType<uint8_t>(reader, inverted)) == kEnd) {
@@ -3001,7 +3006,6 @@ boost::optional<uint8_t> getAndValidateNextStoredCtype(BufReader* reader, bool i
     invariant(ctype > kLess && ctype < kGreater);
     return boost::make_optional(ctype);
 }
-}  // namespace
 
 bool readValue(BufReader* reader,
                TypeBits::ReaderBase* typeBits,
@@ -3033,6 +3037,23 @@ void appendSingleFieldToBSONAs(
 
     BSONObjBuilderValueStream& stream = *builder << fieldName;
     toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, &stream, depth);
+}
+
+void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Version version) {
+    const bool inverted = false;
+
+    BufReader reader(buf, len);
+    invariant(reader.remaining());
+    uint8_t ctype = readType<uint8_t>(&reader, inverted);
+    invariant(ctype != kEnd && ctype > kLess && ctype < kGreater);
+
+    // This function only gets called for a top-level key_string::Value.
+    const uint32_t depth = 1;
+    // All users of this currently discard type bits.
+    TypeBits typeBits(version);
+    TypeBits::Reader typeBitsReader(typeBits);
+
+    toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, builder, depth);
 }
 
 void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {

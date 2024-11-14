@@ -789,7 +789,7 @@ MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWitho
 
 MongoDOperationContextSessionWithoutOplogRead::MongoDOperationContextSessionWithoutOplogRead(
     OperationContext* opCtx, MongoDSessionCatalogTransactionInterface* ti)
-    : _operationContextSession(opCtx) {
+    : _operationContextSession(opCtx), _opCtx(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
 
     ti->refreshTransactionFromStorageIfNeededNoOplogEntryFetch(opCtx);

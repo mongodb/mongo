@@ -812,7 +812,7 @@ int Backoff::getNextSleepMillis(long long lastSleepMillis,
 void jsTimeVirtualSkew(long long skew) {
     jsTime_virtual_skew = skew;
 }
-static long long getJSTimeVirtualSkew() {
+long long getJSTimeVirtualSkew() {
     return jsTime_virtual_skew;
 }
 

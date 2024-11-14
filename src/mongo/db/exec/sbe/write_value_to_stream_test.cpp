@@ -70,7 +70,6 @@ constexpr char kFlag[] = "imxs";
 
 namespace mongo::sbe {
 
-namespace {
 void writeToStream(std::ostream& os, std::pair<value::TypeTags, value::Value> value) {
     os << value;
 }
@@ -98,7 +97,6 @@ std::pair<value::TypeTags, value::Value> makeNestedObject(size_t depth,
     objV->push_back(std::to_string(depth), oTag, oVal);
     return makeNestedObject(depth - 1, oVal, topObj);
 }
-}  // namespace
 
 TEST(WriteValueToStream, ShortBSONBinDataTest) {
     auto bsonString =

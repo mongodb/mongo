@@ -157,6 +157,17 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     const std::vector<AsyncRequestsSender::Request>& requests);
 
 /**
+ * Dispatches all the specified requests in parallel and waits until all complete, returning a
+ * vector of the same size and positions as that of 'requests'.
+ */
+std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVersionErrors(
+    OperationContext* opCtx,
+    StringData dbName,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const std::vector<AsyncRequestsSender::Request>& requests);
+
+/**
  * Returns a copy of 'cmdObj' with dbVersion appended if it exists in 'dbInfo'
  *
  * Use generic_argument_util::setDbVersionIfPresent() instead if the BSON is generated from an

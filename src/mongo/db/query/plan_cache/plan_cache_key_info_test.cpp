@@ -65,16 +65,19 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-static std::ostream& operator<<(std::ostream& stream, const PlanCacheKeyInfo& key) {
+
+std::ostream& operator<<(std::ostream& stream, const PlanCacheKeyInfo& key) {
     stream << key.toString() << " settings: " << key.querySettings().toBSON().toString();
     return stream;
 }
 
-namespace {
 auto makeDbName(StringData dbName) {
     return DatabaseNameUtil::deserialize(
         boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
 }
+
+
+namespace {
 using PlanCacheKeyInfoTest = CanonicalQueryTest;
 
 PlanCacheKeyInfo makeKey(const CanonicalQuery& cq,

@@ -46,7 +46,6 @@
 
 namespace queryTester {
 
-namespace {
 struct TestSpec {
     TestSpec(std::filesystem::path path,
              size_t low = 0,
@@ -165,7 +164,6 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         return 1;
     }
 }
-}  // namespace
 }  // namespace queryTester
 
 namespace {
@@ -176,6 +174,7 @@ void assertNextArgExists(const std::vector<std::string>& args,
         queryTester::exitWithError(1, std::string{"Expected more arguments after "} + argName);
     }
 }
+}  // namespace
 
 void printHelpString() {
     std::map<std::string, std::string> helpMap = {
@@ -219,7 +218,6 @@ void printHelpString() {
         std::cout << key << ": " << val << std::endl;
     }
 }
-}  // namespace
 
 int main(const int argc, const char** const argv) {
     auto parsedArgs = std::vector<std::string>(argv, argv + argc);

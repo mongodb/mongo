@@ -54,6 +54,7 @@ namespace {
 
 const DatabaseName kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "TestDb");
 const auto kNamespace = NamespaceString::createNamespaceString_forTest(kDbName, "TestColl");
+const int kSizeOnDisk = 1;
 
 class MoveUnshardedPolicyTest : public MigrationTestFixture {
 protected:

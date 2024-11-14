@@ -185,62 +185,61 @@ void visit(DocsNeededBoundsContext* ctx, const T&) {
     ctx->applyUnknownStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceLimit& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceLimit& source) {
     ctx->applyLimit(source.getLimit());
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSkip& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSkip& source) {
     ctx->applySkip(source.getSkip());
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSample& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSample& source) {
     // Although $sample caps the cardinality of the result stream like $limit, it internally
     // acts as a blocking stage.
     ctx->applyBlockingStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceGroupBase& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceGroupBase& source) {
     ctx->applyBlockingStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceGroup& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceGroup& source) {
     ctx->applyBlockingStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceStreamingGroup& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceStreamingGroup& source) {
     ctx->applyBlockingStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceBucketAuto& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceBucketAuto& source) {
     ctx->applyBlockingStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx,
-                  const DocumentSourceInternalSetWindowFields& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalSetWindowFields& source) {
     ctx->applyBlockingStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSort& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSort& source) {
     // Even if a $sort has absorbed a limit and is a top-k sort, it still needs to consume all
     // inputs.
     ctx->applyBlockingStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceMatch& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceMatch& source) {
     ctx->applyPossibleDecreaseStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalShardFilter& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalShardFilter& source) {
     ctx->applyPossibleDecreaseStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceRedact& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceRedact& source) {
     // $redact may function like a $match if it redacts an entire document, so it may decrease
     // the number of documents in the result stream.
     ctx->applyPossibleDecreaseStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceUnwind& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceUnwind& source) {
     // It's likely an $unwind stage would increase the cardinality of the result stream.
     // If preserveNullAndEmptyArrays is false, it's possible the stage could reduce cardinality as
     // well. The order of applying possible increase or decrease doesn't matter since they only
@@ -251,22 +250,22 @@ static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceUnwind& sour
     }
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceUnionWith& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceUnionWith& source) {
     ctx->applyPossibleIncreaseStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalDensify& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalDensify& source) {
     ctx->applyPossibleIncreaseStage();
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceTeeConsumer& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceTeeConsumer& source) {
     // DocumentSourceTeeConsumer is an internal proxy stage between a pipeline within a $facet stage
     // and the buffer of incoming documents. Because a DocumentSourceTeeConsumer stage is uniquely
     // positioned after each $facet subpipeline, we should do nothing. Otherwise, the visit will not
     // recognize the document source and override the $facet bounds by applying unknown bounds.
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceFacet& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceFacet& source) {
     // Computes the DocsNeededBounds of each $facet subpipeline applied to the constraints of the
     // pipeline seen so far, and compares the constraints of each subpipeline to find the most
     // restrictive constraints of all the pipelines. After traversing all subpipelines, applies the
@@ -299,63 +298,58 @@ static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceFacet& sourc
     ctx->maxBounds = mostRestrictiveMaxBounds;
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSearch& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSearch& source) {
     // No change, since $search is the stage that populates the result stream initially.
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSearchMeta& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSearchMeta& source) {
     // No change, since $searchMeta is the stage that populates the result stream initially.
 }
 
-static void visit(DocsNeededBoundsContext* ctx,
-                  const DocumentSourceInternalSearchMongotRemote& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalSearchMongotRemote& source) {
     // No change, since $_internalSearchMongotRemote is the stage that populates the result stream
     // initially.
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceVectorSearch& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceVectorSearch& source) {
     // No change, since $vectorStage is the stage that populates the result stream initially.
 }
 
-static void visit(DocsNeededBoundsContext* ctx,
-                  const DocumentSourceSingleDocumentTransformation& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSingleDocumentTransformation& source) {
     // No change.
 }
 
-static void visit(DocsNeededBoundsContext* ctx,
-                  const DocumentSourceFindAndModifyImageLookup& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceFindAndModifyImageLookup& source) {
     // No change.
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceGraphLookUp& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceGraphLookUp& source) {
     // No change, unless it's absorbed an $unwind.
     if (source.hasUnwindSource()) {
         visit(ctx, *source.getUnwindSource());
     }
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceLookUp& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceLookUp& source) {
     // No change, unless it's absorbed an $unwind.
     if (source.hasUnwindSrc()) {
         visit(ctx, *source.getUnwindSource());
     }
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceMerge& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceMerge& source) {
     // No change.
 }
 
-static void visit(DocsNeededBoundsContext* ctx, const DocumentSourceOut& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceOut& source) {
     // No change.
 }
 
-static void visit(DocsNeededBoundsContext* ctx,
-                  const DocumentSourceSetVariableFromSubPipeline& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSetVariableFromSubPipeline& source) {
     // No change.
 }
 
-static void visit(DocsNeededBoundsContext* ctx,
-                  const DocumentSourceSequentialDocumentCache& source) {
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSequentialDocumentCache& source) {
     // No change. If the cache is in the "building" state, it acts as a no-op stage where it saves
     // each document to the cache (no change to result stream). If the cache is in the "abandoned"
     // state, it acts as a pure no-op. If the cache is in the "serving" state, this stage must be

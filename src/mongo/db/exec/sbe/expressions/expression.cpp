@@ -56,7 +56,7 @@
 namespace mongo {
 namespace sbe {
 
-namespace {
+
 /**
  * Try to convert to a variable if possible.
  */
@@ -114,7 +114,6 @@ vm::CodeFragment withNewLabels(CompileCtx& ctx,
     code.removeLabel(label2);
     return code;
 }
-}  // namespace
 
 std::unique_ptr<vm::CodeFragment> EExpression::compile(CompileCtx& ctx) const {
     ctx.lastLabelId = 0;
@@ -211,7 +210,7 @@ std::unique_ptr<EExpression> EPrimBinary::clone() const {
     }
 }
 
-namespace {
+
 /*
  * Given a vector of clauses named [lhs1,...,lhsN-1, rhs], and a boolean isDisjunctive to indicate
  * whether we are ANDing or ORing the clauses, we output the appropriate short circuiting
@@ -281,7 +280,6 @@ vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx,
         return code;
     });
 }
-}  // namespace
 
 vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
     const bool hasCollatorArg = (_nodes.size() == 3);

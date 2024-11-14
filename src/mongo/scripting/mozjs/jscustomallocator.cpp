@@ -181,7 +181,6 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
     return p;
 }
 
-namespace {
 size_t get_current(void* ptr) {
 #ifdef MONGO_NO_MALLOC_USABLE_SIZE
     if (!ptr)
@@ -198,7 +197,6 @@ size_t get_current(void* ptr) {
 #error "Should be unreachable"
 #endif
 }
-}  // namespace
 
 }  // namespace sm
 }  // namespace mongo
@@ -207,7 +205,6 @@ JS_PUBLIC_DATA arena_id_t js::MallocArena;
 JS_PUBLIC_DATA arena_id_t js::ArrayBufferContentsArena;
 JS_PUBLIC_DATA arena_id_t js::StringBufferArena;
 
-namespace {
 void* mongo_arena_malloc(arena_id_t arena, size_t bytes) {
     return std::malloc(bytes);
 }
@@ -240,7 +237,6 @@ void* mongo_arena_realloc(arena_id_t arena, void* p, size_t bytes) {
 
     return std::realloc(p, bytes);
 }
-}  // namespace
 
 void* js_arena_malloc(size_t arena, size_t bytes) {
     JS_OOM_POSSIBLY_FAIL();

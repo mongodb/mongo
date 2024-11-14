@@ -365,7 +365,6 @@ std::tuple<ShardId, int64_t> BalancerPolicy::_getMostOverloadedShard(
     return {worst, currentMax};
 }
 
-namespace {
 // Returns a random integer in [0, max) using a uniform random distribution.
 int getRandomIndex(int max) {
     std::default_random_engine gen(time(nullptr));
@@ -449,7 +448,6 @@ boost::optional<MigrateInfo> chooseRandomMigration(
     return MigrateInfo{
         recipientShard.get(), distribution.nss(), randomChunk, ForceJumbo::kDoNotForce};
 }
-}  // namespace
 
 MigrateInfosWithReason BalancerPolicy::balance(
     const ShardStatisticsVector& shardStats,

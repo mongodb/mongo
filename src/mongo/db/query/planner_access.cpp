@@ -519,7 +519,6 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
     return true;
 }
 
-namespace {
 void simplifyFilterInner(std::unique_ptr<MatchExpression>& expr,
                          const std::set<const MatchExpression*>& toRemove) {
     if (toRemove.contains(expr.get())) {
@@ -542,7 +541,6 @@ void simplifyFilterInner(std::unique_ptr<MatchExpression>& expr,
         }
     }
 }
-}  // namespace
 
 void QueryPlannerAccess::simplifyFilter(std::unique_ptr<MatchExpression>& expr,
                                         const std::set<const MatchExpression*>& toRemove) {
@@ -969,7 +967,6 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     }
 }
 
-namespace {
 void buildTextSubPlan(TextMatchNode* tn) {
     tassert(5432205, "text match node is null", tn);
     tassert(5432206, "text match node already has children", tn->children.empty());
@@ -1060,7 +1057,6 @@ void buildTextSubPlan(TextMatchNode* tn) {
         tn->children.push_back(std::move(fetchNode));
     }
 }
-}  // namespace
 
 void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntry& index) {
     auto tn = static_cast<TextMatchNode*>(node);
@@ -1348,7 +1344,6 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
     return collapsedScans;
 }
 
-namespace {
 /**
  * This helper determines if a query can be covered depending on the query projection.
  */
@@ -1407,7 +1402,6 @@ void refineTightnessForMaybeCoveredQuery(const CanonicalQuery& query,
         }
     }
 }
-}  // namespace
 
 bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                                            MatchExpression* root,

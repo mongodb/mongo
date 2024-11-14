@@ -31,9 +31,12 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
@@ -52,17 +55,17 @@ struct VisitorCtxImpl : public DocumentSourceVisitorContextBase {
     std::vector<std::string> seen;
 };
 
-static void visit(VisitorCtxImpl* ctx, const DocumentSourceMatch&) {
+void visit(VisitorCtxImpl* ctx, const DocumentSourceMatch&) {
     ctx->seen.push_back("match");
 }
 
-static void visit(VisitorCtxImpl* ctx, const DocumentSourceSingleDocumentTransformation&) {
+void visit(VisitorCtxImpl* ctx, const DocumentSourceSingleDocumentTransformation&) {
     ctx->seen.push_back("project");
 }
 
 struct VisitorCtxNoop : public DocumentSourceVisitorContextBase {};
-static void visit(VisitorCtxNoop* ctx, const DocumentSourceMatch&) {}
-static void visit(VisitorCtxNoop* ctx, const DocumentSourceSingleDocumentTransformation&) {}
+void visit(VisitorCtxNoop* ctx, const DocumentSourceMatch&) {}
+void visit(VisitorCtxNoop* ctx, const DocumentSourceSingleDocumentTransformation&) {}
 
 TEST(DocumentSourceWalker, RegisterAndUseStages) {
     DocumentSourceVisitorRegistry reg;

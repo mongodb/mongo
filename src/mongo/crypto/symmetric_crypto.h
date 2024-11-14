@@ -91,8 +91,6 @@ const std::string aes256CTRName = "AES256-CTR";
 aesMode getCipherModeFromString(const std::string& mode);
 std::string getStringFromCipherMode(aesMode);
 
-size_t aesGetIVSize(crypto::aesMode mode);
-
 /**
  * Generates a new, random, symmetric key for use with AES.
  */

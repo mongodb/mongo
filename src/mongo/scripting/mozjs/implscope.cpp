@@ -832,6 +832,13 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     return wout.toBSON();
 }
 
+bool hasFunctionIdentifier(StringData code) {
+    if (code.size() < 9 || code.find("function") != 0)
+        return false;
+
+    return code[8] == ' ' || code[8] == '(';
+}
+
 ScriptingFunction MozJSImplScope::_createFunction(const char* raw) {
     return _runSafely([&] {
         JS::RootedValue fun(_context);
@@ -929,7 +936,6 @@ int MozJSImplScope::invoke(ScriptingFunction func,
     });
 }
 
-namespace {
 bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success) {
     if (name == MozJSImplScope::kInteractiveShellName) {
         return false;
@@ -967,7 +973,6 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
         report->errorNumber == JSMSG_EXPORT_DECL_AT_TOP_LEVEL ||
         report->errorNumber == JSMSG_AWAIT_OUTSIDE_ASYNC_OR_MODULE;
 }
-}  // namespace
 
 bool MozJSImplScope::exec(StringData code,
                           const std::string& name,

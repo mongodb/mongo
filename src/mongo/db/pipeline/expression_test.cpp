@@ -80,12 +80,12 @@ using std::sort;
 using std::string;
 using std::vector;
 
-namespace {
 /**
  * Creates an expression given by 'expressionName' and evaluates it using
  * 'operands' as inputs, returning the result.
  */
-Value evaluateExpression(const string& expressionName, const vector<ImplicitValue>& operands) {
+static Value evaluateExpression(const string& expressionName,
+                                const vector<ImplicitValue>& operands) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
     const BSONObj obj = BSON(expressionName << Value(ImplicitValue::convertToValues(operands)));
@@ -99,7 +99,7 @@ Value evaluateExpression(const string& expressionName, const vector<ImplicitValu
  * expected results as its second argument, and asserts that for the given expression the arguments
  * evaluate to the expected results.
  */
-void assertExpectedResults(
+static void assertExpectedResults(
     const string& expression,
     initializer_list<pair<initializer_list<ImplicitValue>, ImplicitValue>> operations) {
     for (auto&& op : operations) {
@@ -115,7 +115,7 @@ void assertExpectedResults(
 }
 
 /** Convert BSONObj to a BSONObj with our $const wrappings. */
-BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
+static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
     BSONObjBuilder bob;
     for (BSONObjIterator itr(obj); itr.more(); itr.next()) {
         BSONElement elem = *itr;
@@ -136,15 +136,25 @@ BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
 }
 
 /** Convert Value to a wrapped BSONObj with an empty string field name. */
-BSONObj toBson(const Value& value) {
+static BSONObj toBson(const Value& value) {
     BSONObjBuilder bob;
     value.addToBsonObj(&bob, "");
     return bob.obj();
 }
 
 /** Convert Expression to BSON. */
-BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
+static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
     return BSON("" << expression->serialize()).firstElement().embeddedObject().getOwned();
+}
+
+/** Convert Document to BSON. */
+static BSONObj toBson(const Document& document) {
+    return document.toBson();
+}
+
+/** Create a Document from a BSONObj. */
+Document fromBson(BSONObj obj) {
+    return Document(obj);
 }
 
 Document fromJson(const std::string& json) {
@@ -156,6 +166,17 @@ Value valueFromBson(BSONObj obj) {
     BSONElement element = obj.firstElement();
     return Value(element);
 }
+
+/** Asserts that the Expression parsed from 'spec' returns a BSONArray and is equal to 'expected'.
+ */
+void assertExpectedArray(const BSONObj& spec, const BSONArray& expected) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto expression = Expression::parseExpression(&expCtx, spec, vps);
+    auto result = expression->evaluate({}, &expCtx.variables);
+    ASSERT_EQ(result.getType(), BSONType::Array);
+    ASSERT_VALUE_EQ(result, Value(expected));
+};
 
 /**
  * Given 'parseFn', parses and evaluates 'spec' and verifies that the result is equal to
@@ -208,7 +229,6 @@ void verifyStringDoubleConvertRoundtripsCorrectly(double doubleToConvert) {
     // Verify the conversion round-trips correctly.
     ASSERT_VALUE_EQ(stringConvertedToDouble, Value(doubleToConvert));
 }
-}  // namespace
 
 /* ------------------------- ExpressionArrayToObject -------------------------- */
 
@@ -1567,7 +1587,6 @@ namespace Parse {
 
 namespace Object {
 
-namespace {
 /**
  * Parses the object given by 'specification', with the options given by 'parseContextOptions'.
  */
@@ -1577,7 +1596,6 @@ boost::intrusive_ptr<Expression> parseObject(BSONObj specification) {
 
     return Expression::parseObject(&expCtx, specification, vps);
 };
-}  // namespace
 
 TEST(ParseObject, ShouldAcceptEmptyObject) {
     auto resultExpression = parseObject(BSONObj());
@@ -1602,7 +1620,6 @@ namespace Expression {
 
 using mongo::Expression;
 
-namespace {
 /**
  * Parses an expression from the given BSON specification.
  */
@@ -1611,7 +1628,6 @@ boost::intrusive_ptr<Expression> parseExpression(BSONObj specification) {
     VariablesParseState vps = expCtx.variablesParseState;
     return Expression::parseExpression(&expCtx, specification, vps);
 }
-}  // namespace
 
 TEST(ParseExpression, ShouldRecognizeConstExpression) {
     auto resultExpression = parseExpression(BSON("$const" << 5));
@@ -1707,7 +1723,6 @@ namespace Operand {
 
 using mongo::Expression;
 
-namespace {
 /**
  * Parses an operand from the given BSON specification. The field name is ignored, since it is
  * assumed to have come from an array, or to have been the only argument to an expression, in which
@@ -1719,7 +1734,6 @@ intrusive_ptr<Expression> parseOperand(BSONObj specification) {
     VariablesParseState vps = expCtx.variablesParseState;
     return Expression::parseOperand(&expCtx, specElement, vps);
 }
-}  // namespace
 
 TEST(ParseOperand, ShouldRecognizeFieldPath) {
     auto resultExpression = parseOperand(BSON(""
@@ -1766,7 +1780,6 @@ TEST(ParseOperand, ShouldRecognizeNestedExpression) {
 }  // namespace Parse
 
 namespace Set {
-namespace {
 Value sortSet(Value set) {
     if (set.nullish()) {
         return Value(BSONNULL);
@@ -2054,11 +2067,9 @@ class ManyArgsEqual : public ExpectedResultBase {
                                         << "$setDifference"_sd));
     }
 };
-}  // namespace
 }  // namespace Set
 
 namespace Strcasecmp {
-namespace {
 
 class ExpectedResultBase {
 public:
@@ -2151,7 +2162,7 @@ class NullMiddleGt : public ExpectedResultBase {
         return 1;
     }
 };
-}  // namespace
+
 }  // namespace Strcasecmp
 
 namespace StrLenBytes {
@@ -2203,7 +2214,6 @@ TEST(ExpressionStrLenCP, ComputesLengthOfStringWithSpecialCharacters) {
 }  // namespace StrLenCP
 
 namespace SubstrBytes {
-namespace {
 
 class ExpectedResultBase {
 public:
@@ -2340,7 +2350,7 @@ TEST(ExpressionSubstrTest, ThrowsWithNegativeStart) {
         }(),
         AssertionException);
 }
-}  // namespace
+
 }  // namespace SubstrBytes
 
 namespace SubstrCP {
@@ -3587,7 +3597,6 @@ TEST(NowAndClusterTime, BasicTest) {
 }
 }  // namespace NowAndClusterTime
 
-namespace {
 void assertRandomProperties(const std::function<double(void)>& fn) {
     double sum = 0.0;
     constexpr int N = 1000000;
@@ -3606,7 +3615,6 @@ void assertRandomProperties(const std::function<double(void)>& fn) {
     ASSERT_LT(0.5 - err, avg);
     ASSERT_GT(0.5 + err, avg);
 }
-}  // namespace
 
 TEST(ExpressionRandom, Basic) {
     auto expCtx = ExpressionContextForTest{};
@@ -5274,12 +5282,11 @@ TEST(ExpressionModTest, ModWithDoubleIntTypeButIntegralValues) {
                            {{Value(3.0), Value(2)}, Value(1.0)}});
 }
 
-namespace {
 /**
  * This helper allows the manual registration of the $sigmoid expression to add it to the parserMap
  * without guarding it behind a feature flag (note the boost::none argument below). This is required
  * for some unit tests. Normally, expressions are added at server startup time via macros and the
- * manual registration is not necessary. However, $sigmoid is gated behind a feature flag and does
+ * manual registration is not necessary. However, $sigmoid is gated beind a feature flag and does
  * not get put into the map as the flag is off by default. Changing the value of the feature flag
  * with RAIIServerParameterControllerForTest() does not solve the issue because the registration
  * logic is not re-hit.
@@ -5308,7 +5315,6 @@ void registerSigmoidExpression() {
         // expression is registered.
     }
 }
-}  // namespace
 
 class ExpressionSigmoidTest : public unittest::Test {
 public:

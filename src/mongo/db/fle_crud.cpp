@@ -399,7 +399,6 @@ void validateInsertUpdatePayloads(const std::vector<EncryptedField>& fields,
     }
 }
 
-namespace {
 std::pair<mongo::StatusWith<mongo::txn_api::CommitResult>,
           std::shared_ptr<write_ops::InsertCommandReply>>
 insertSingleDocument(OperationContext* opCtx,
@@ -474,7 +473,6 @@ insertSingleDocument(OperationContext* opCtx,
 
     return {swResult, reply};
 }
-}  // namespace
 
 std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     OperationContext* opCtx,
@@ -1101,7 +1099,6 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
     return deleteReply;
 }
 
-namespace {
 bool hasIndexedFieldsInSchema(const std::vector<EncryptedField>& fields) {
     for (const auto& field : fields) {
         if (field.getQueries().has_value()) {
@@ -1118,7 +1115,6 @@ bool hasIndexedFieldsInSchema(const std::vector<EncryptedField>& fields) {
     }
     return false;
 }
-}  // namespace
 
 /**
  * Update is the most complicated FLE operation.
@@ -1681,7 +1677,6 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     return static_cast<uint64_t>(signedDocCount);
 }
 
-namespace {
 QECountInfoQueryTypeEnum queryTypeTranslation(FLEQueryInterface::TagQueryType type) {
     switch (type) {
         case FLEQueryInterface::TagQueryType::kInsert:
@@ -1698,7 +1693,6 @@ QECountInfoQueryTypeEnum queryTypeTranslation(FLEQueryInterface::TagQueryType ty
             uasserted(7517101, "Invalid TagQueryType value.");
     }
 }
-}  // namespace
 
 std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     const NamespaceString& nss,

@@ -51,7 +51,6 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo::expression_internal_tests {
-namespace {
 constexpr auto kProjectionPostImageVarName =
     projection_executor::ProjectionExecutor::kProjectionPostImageVarName;
 
@@ -111,7 +110,6 @@ protected:
             std::move(matchExpr));
     }
 };
-}  // namespace
 
 TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
     defineAndSetProjectionPostImageVariable(getExpCtxRaw(),

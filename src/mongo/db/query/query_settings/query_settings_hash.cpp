@@ -60,7 +60,7 @@ std::size_t hash_value(const optional<T>& v) {
 }  // namespace boost
 
 namespace mongo {
-static size_t hash_value(const OptionalBool& v) {
+size_t hash_value(const OptionalBool& v) {
     // OptionalBool hash needs to be consistent with equality. OptionalBool currently relies on
     // implicit conversion to bool for ==. Thus, OptionalBool() == OptionalBool(false).
     // Thus, it is required that hash(OptionalBool()) == hash(OptionalBool(false));
@@ -68,7 +68,7 @@ static size_t hash_value(const OptionalBool& v) {
     return hf(bool(v));
 }
 
-static size_t hash_value(const NamespaceSpec& ns) {
+size_t hash_value(const NamespaceSpec& ns) {
     size_t hash = 0;
     boost::hash_combine(hash, ns.getDb());
     boost::hash_combine(hash, ns.getColl());
@@ -77,14 +77,14 @@ static size_t hash_value(const NamespaceSpec& ns) {
 }  // namespace mongo
 
 namespace mongo::query_settings {
-static size_t hash_value(const IndexHintSpec& v) {
+size_t hash_value(const IndexHintSpec& v) {
     const auto& indexes = v.getAllowedIndexes();
     size_t hash = boost::hash_range(indexes.begin(), indexes.end());
     boost::hash_combine(hash, v.getNs());
     return hash;
 }
 
-size_t hash(const QuerySettings& querySettings) {
+size_t hash_value(const QuerySettings& querySettings) {
     // The 'serialization_context' and 'comment' fields are not significant.
     static_assert(QuerySettings::fieldNames.size() == 5,
                   "A new field has been added to the QuerySettings structure, adjust the hash "
@@ -96,5 +96,11 @@ size_t hash(const QuerySettings& querySettings) {
     boost::hash_combine(hash, querySettings.getReject());
     return hash;
 }
+
+// Alias for existing usage.
+size_t hash(const QuerySettings& querySettings) {
+    return hash_value(querySettings);
+}
+
 
 }  // namespace mongo::query_settings

@@ -303,8 +303,6 @@ void Profiler::unregisterShard(Profiler::ThreadLocalShard* shard) {
     _shards.erase(shard);
 }
 
-namespace {
-#if MONGO_CONFIG_USE_TRACING_PROFILER
 /**
  * Measure the overhead of single measurement in cycles. The overhead depends on the number of
  * children the parent node has (node width), so it is measured for specific node width.
@@ -378,8 +376,6 @@ ProfilerMetrics::OverheadCycles measureOverhead() {
                "wide"_attr = formatCyclesAsNanos(overhead.wideNodeOverheadCycles));
     return overhead;
 }
-#endif  // MONGO_CONFIG_USE_TRACING_PROFILER
-}  // namespace
 
 int ProfilerBenchmark::doX5Narrow() {
     auto s1 = enterSpan(1);

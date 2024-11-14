@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <memory>
 #include <utility>
 #include <variant>
 
@@ -43,12 +44,14 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -56,6 +59,7 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -249,7 +253,6 @@ int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, siz
     return kFirstStmtId + writePos;
 }
 
-namespace {
 int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants) {
     int size = write_ops::UpdateCommandRequest::kLegacyRuntimeConstantsFieldName.size() +
         static_cast<int>(BSONObj::kMinBSONLength) + kPerElementOverhead;
@@ -293,7 +296,6 @@ int getArrayFiltersFieldSize(const std::vector<mongo::BSONObj>& arrayFilters,
     }
     return size;
 }
-}  // namespace
 
 int getUpdateSizeEstimate(const BSONObj& q,
                           const write_ops::UpdateModification& u,
@@ -305,6 +307,7 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const mongo::BSONObj& hint,
                           const boost::optional<UUID>& sampleId,
                           const bool includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+    using UpdateOpEntry = write_ops::UpdateOpEntry;
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Add the sizes of the 'multi' and 'upsert' fields.
@@ -440,6 +443,7 @@ int getDeleteSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const mongo::BSONObj& hint,
                           const boost::optional<UUID>& sampleId) {
+    using DeleteOpEntry = write_ops::DeleteOpEntry;
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Add the size of the 'q' field.
@@ -659,12 +663,10 @@ bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {
                                             deleteOp.getSampleId()) >= deleteOp.toBSON().objsize();
 }
 
-namespace {
 bool isClassicalUpdateReplacement(const BSONObj& update) {
     // An empty update object will be treated as replacement as firstElementFieldName() returns "".
     return update.firstElementFieldName()[0] != '$';
 }
-}  // namespace
 
 void checkWriteErrors(const WriteCommandReplyBase& reply) {
     if (!reply.getWriteErrors())

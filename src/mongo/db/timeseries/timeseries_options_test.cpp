@@ -41,15 +41,14 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/time_support.h"
 
+
 namespace mongo {
 
-namespace {
 auto createTimeseriesOptionsWithGranularity(BucketGranularityEnum granularity) {
     auto options = TimeseriesOptions{};
     options.setGranularity(granularity);
     return options;
 }
-}  // namespace
 
 TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
     TimeseriesOptions optionsSeconds =

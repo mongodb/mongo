@@ -47,7 +47,6 @@
 #include "mongo/db/stats/top.h"
 
 namespace mongo {
-namespace {
 
 struct KillCursorsCmd {
     static constexpr bool supportsReadConcern = false;
@@ -70,5 +69,5 @@ struct KillCursorsCmd {
     }
 };
 MONGO_REGISTER_COMMAND(KillCursorsCmdBase<KillCursorsCmd>).forShard();
-}  // namespace
+
 }  // namespace mongo

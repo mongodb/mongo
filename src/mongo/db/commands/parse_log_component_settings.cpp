@@ -64,6 +64,8 @@ StatusWith<int> tryCoerceVerbosity(BSONElement elem, StringData parentComponentD
     return newVerbosityLevel;
 }
 
+}  // namespace
+
 /*
  * Looks up a component by its short name, or returns kNumLogComponents
  * if the shortName is invalid
@@ -76,8 +78,6 @@ logv2::LogComponent _getComponentForShortName(StringData shortName) {
     }
     return static_cast<logv2::LogComponent::Value>(logv2::LogComponent::kNumLogComponents);
 }
-
-}  // namespace
 
 StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSONObj& settings) {
     typedef std::vector<LogComponentSetting> Result;

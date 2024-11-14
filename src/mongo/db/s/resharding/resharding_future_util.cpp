@@ -55,7 +55,6 @@ ExecutorFuture<void> whenAllSucceedOn(const std::vector<SharedSemiFuture<void>>&
                             : ExecutorFuture(executor);
 }
 
-namespace {
 std::vector<Future<void>> runAllInlineUnsafe(const std::vector<SharedSemiFuture<void>>& futures) {
     std::vector<Future<void>> result;
     result.reserve(futures.size());
@@ -66,7 +65,6 @@ std::vector<Future<void>> runAllInlineUnsafe(const std::vector<SharedSemiFuture<
 
     return result;
 }
-}  // namespace
 
 ExecutorFuture<void> cancelWhenAnyErrorThenQuiesce(
     const std::vector<SharedSemiFuture<void>>& futures,

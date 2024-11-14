@@ -782,7 +782,6 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     MONGO_UNREACHABLE
 }
 
-namespace {
 /**
  * Validates that the lsid on the OperationContext matches that on the cursor, returning it to the
  * ClusterClusterCursor manager if it does not.
@@ -856,7 +855,6 @@ void validateOperationSessionInfo(OperationContext* opCtx,
     validateTxnNumber(opCtx, cursorId, *cursor);
     returnCursorGuard.dismiss();
 }
-}  // namespace
 
 StatusWith<std::unique_ptr<FindCommandRequest>> ClusterFind::transformQueryForShards(
     const CanonicalQuery& query) {

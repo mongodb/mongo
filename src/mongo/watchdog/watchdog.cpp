@@ -439,7 +439,6 @@ std::int64_t WatchdogMonitor::getMonitorGeneration() {
 }
 
 #ifdef _WIN32
-namespace {
 /**
  * Check a directory is ok
  * 1. Open up a direct_io to a new file
@@ -555,7 +554,6 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
         fassertNoTrace(4079, !ec);
     }
 }
-}  // namespace
 
 void watchdogTerminate() {
     ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(ExitCode::watchdog));
@@ -563,7 +561,6 @@ void watchdogTerminate() {
 
 #else
 
-namespace {
 /**
  * Check a directory is ok
  * 1. Open up a direct_io to a new file
@@ -685,7 +682,6 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
         fassertNoTrace(4084, !ec);
     }
 }
-}  // namespace
 
 void watchdogTerminate() {
     // This calls the exit_group syscall on Linux

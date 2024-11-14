@@ -56,7 +56,6 @@ const Status CatalogCacheLoaderMock::kDatabaseInternalErrorStatus = {
 
 void CatalogCacheLoaderMock::shutDown() {}
 
-namespace {
 CollectionAndChangedChunks getCollectionRefresh(
     const StatusWith<CollectionType>& swCollectionReturnValue,
     StatusWith<std::vector<ChunkType>> swChunksReturnValue,
@@ -82,7 +81,6 @@ CollectionAndChangedChunks getCollectionRefresh(
                                       swCollectionReturnValue.getValue().getAllowMigrations(),
                                       std::move(chunks)};
 }
-}  // namespace
 
 SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {

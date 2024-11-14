@@ -812,7 +812,6 @@ TEST(MockDBClientConnTest, SimulateCallErrors) {
     ASSERT_TRUE(cursor.isDead());
 }
 
-namespace {
 void runUntilExhaustRecv(MockDBClientConnection* conn, mongo::DBClientCursor* cursor) {
     cursor->setBatchSize(1);
 
@@ -833,7 +832,6 @@ void runUntilExhaustRecv(MockDBClientConnection* conn, mongo::DBClientCursor* cu
     ASSERT_BSONOBJ_EQ(docObj(2), cursor->next());
     ASSERT_FALSE(cursor->moreInCurrentBatch());
 }
-}  // namespace
 
 TEST(MockDBClientConnTest, SimulateRecvErrors) {
     MockRemoteDBServer server("test");
@@ -866,7 +864,6 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
     ASSERT_TRUE(cursor.isDead());
 }
 
-namespace {
 bool blockedOnNetworkSoon(MockDBClientConnection* conn) {
     // Wait up to 10 seconds.
     for (auto i = 0; i < 100; i++) {
@@ -877,7 +874,6 @@ bool blockedOnNetworkSoon(MockDBClientConnection* conn) {
     }
     return false;
 }
-}  // namespace
 
 TEST(MockDBClientConnTest, BlockingNetwork) {
     MockRemoteDBServer server("test");

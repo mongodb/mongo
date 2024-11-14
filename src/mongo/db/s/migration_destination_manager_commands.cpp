@@ -82,6 +82,13 @@
 namespace mongo {
 namespace {
 
+// This shard version is used as the received version in StaleConfigInfo since we do not have
+// information about the received version of the operation.
+ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                     boost::optional<CollectionIndexes>(boost::none));
+}
+
 class RecvChunkStartCommand : public ErrmsgCommandDeprecated {
 public:
     RecvChunkStartCommand() : ErrmsgCommandDeprecated("_recvChunkStart") {}

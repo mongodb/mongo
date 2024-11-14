@@ -40,6 +40,10 @@ const auto defaultSrc = EstimationSource::Code;
 // Minimum non-zero CE
 const auto kMinNZCE = CardinalityType(std::numeric_limits<double>::min());
 
+CardinalityEstimate makeCE(double ce) {
+    return CardinalityEstimate(CardinalityType{ce}, defaultSrc);
+}
+
 // Test invalid inputs, and calculations that produce invalid estimates.
 // Since the principle of checking validity is the same for all estimates, here we check only
 // few typical cases.

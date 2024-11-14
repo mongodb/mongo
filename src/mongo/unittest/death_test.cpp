@@ -101,7 +101,6 @@ public:
 
 #define LOG_AND_THROW_WITH_ERRNO(expr) logAndThrowWithErrnoAt(expr, __FILE__, __LINE__)
 
-namespace {
 void logAndThrowWithErrnoAt(StringData expr, StringData file, unsigned line) {
     auto ec = lastPosixError();
     LOGV2_ERROR(24138,
@@ -131,7 +130,6 @@ void initDeathTest() {
 #define DEATH_TEST_ENABLED
 #endif
 }
-}  // namespace
 
 #ifdef DEATH_TEST_ENABLED
 struct DeathTestBase::Subprocess {

@@ -42,7 +42,7 @@
 namespace mongo {
 namespace bson_bin_util {
 
-inline std::string toHex(const char* data, std::size_t len) {
+std::string toHex(const char* data, std::size_t len) {
     auto rawString = mongo::StringData(data, len);
     std::ostringstream hexString;
     hexString << std::hex << std::uppercase;
@@ -53,15 +53,15 @@ inline std::string toHex(const char* data, std::size_t len) {
     return hexString.str();
 }
 
-inline std::string toHex(const BufBuilder& bldr) {
+std::string toHex(const BufBuilder& bldr) {
     return toHex(static_cast<const char*>(bldr.buf()), static_cast<std::size_t>(bldr.len()));
 }
 
-inline std::string toHex(const BSONBinData& binData) {
+std::string toHex(const BSONBinData& binData) {
     return toHex(static_cast<const char*>(binData.data), static_cast<std::size_t>(binData.length));
 }
 
-inline std::string toHex(const BSONObj& obj) {
+std::string toHex(const BSONObj& obj) {
     return toHex(obj.objdata(), static_cast<std::size_t>(obj.objsize()));
 }
 

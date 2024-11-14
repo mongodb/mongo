@@ -40,7 +40,7 @@
 
 namespace mongo {
 namespace repl {
-namespace {
+
 class OplogWriterBufferMock : public OplogBuffer {
     OplogWriterBufferMock(const OplogBufferMock&) = delete;
     OplogWriterBufferMock& operator=(const OplogBufferMock&) = delete;
@@ -214,7 +214,6 @@ ReplicationCoordinatorMock* OplogWriterBatcherTest::getReplCoord() const {
 OperationContext* OplogWriterBatcherTest::opCtx() const {
     return _opCtxHolder.get();
 }
-}  // namespace
 
 TEST_F(OplogWriterBatcherTest, EmptyBuffer) {
     OplogWriterBufferMock writerBuffer;

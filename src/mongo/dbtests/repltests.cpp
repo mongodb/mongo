@@ -113,7 +113,37 @@
 namespace mongo {
 namespace repl {
 namespace ReplTests {
-namespace {
+
+/**
+ * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+ */
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                repl::OpTypeEnum opType,
+                                NamespaceString nss,
+                                BSONObj object,
+                                boost::optional<BSONObj> object2) {
+    return {
+        repl::DurableOplogEntry(opTime,                     // optime
+                                opType,                     // opType
+                                nss,                        // namespace
+                                boost::none,                // uuid
+                                boost::none,                // fromMigrate
+                                boost::none,                // checkExistenceForDiffInsert
+                                OplogEntry::kOplogVersion,  // version
+                                object,                     // o
+                                object2,                    // o2
+                                {},                         // sessionInfo
+                                boost::none,                // upsert
+                                Date_t(),                   // wall clock time
+                                {},                         // statement ids
+                                boost::none,    // optime of previous write within same transaction
+                                boost::none,    // pre-image optime
+                                boost::none,    // post-image optime
+                                boost::none,    // ShardId of resharding recipient
+                                boost::none,    // _id
+                                boost::none)};  // needsRetryImage
+}
+
 BSONObj f(const char* s) {
     return fromjson(s);
 }
@@ -1429,7 +1459,6 @@ public:
         add<DeleteOpIsIdBased>();
     }
 };
-}  // namespace
 
 unittest::OldStyleSuiteInitializer<All> myall;
 

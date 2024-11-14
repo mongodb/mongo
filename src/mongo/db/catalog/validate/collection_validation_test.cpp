@@ -291,6 +291,19 @@ TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErro
 }
 
 /**
+ * Waits for a parallel running collection validation operation to start and then hang at a
+ * failpoint.
+ *
+ * A failpoint in the validate() code should have been set prior to calling this function.
+ */
+void waitUntilValidateFailpointHasBeenReached() {
+    while (!CollectionValidation::getIsValidationPausedForTest()) {
+        sleepmillis(100);  // a fairly arbitrary sleep period.
+    }
+    ASSERT(CollectionValidation::getIsValidationPausedForTest());
+}
+
+/**
  * Generates a KeyString suitable for positioning a cursor at the beginning of an index.
  */
 key_string::Value makeFirstKeyString(const SortedDataInterface& sortedDataInterface) {
@@ -299,6 +312,21 @@ key_string::Value makeFirstKeyString(const SortedDataInterface& sortedDataInterf
                                               sortedDataInterface.getOrdering(),
                                               key_string::Discriminator::kExclusiveBefore);
     return firstKeyStringBuilder.getValueCopy();
+}
+
+/**
+ * Extracts KeyString without RecordId.
+ */
+key_string::Value makeKeyStringWithoutRecordId(const key_string::Value& keyStringWithRecordId,
+                                               key_string::Version version) {
+    BufBuilder bufBuilder;
+    keyStringWithRecordId.serializeWithoutRecordIdLong(bufBuilder);
+    auto builderSize = bufBuilder.len();
+
+    auto buffer = bufBuilder.release();
+
+    BufReader bufReader(buffer.get(), builderSize);
+    return key_string::Value::deserialize(bufReader, version, boost::none /* ridFormat */);
 }
 
 // Verify calling validate() on a collection with old (pre-4.2) keys in a WT unique index.

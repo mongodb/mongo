@@ -68,6 +68,10 @@ namespace {
 
 using namespace fmt::literals;
 
+constexpr absl::string_view toStringView(StringData s) {
+    return {s.data(), s.size()};
+}
+
 StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& newValueElement) {
     if (!newValueElement.isNumber()) {
         return {ErrorCodes::TypeMismatch,
@@ -149,18 +153,16 @@ template <typename T>
 constexpr StringData kParameterName;
 
 template <>
-[[maybe_unused]] constexpr StringData kParameterName<TCMallocMaxPerCPUCacheSizeServerParameter> =
+constexpr StringData kParameterName<TCMallocMaxPerCPUCacheSizeServerParameter> =
     kMaxPerCPUCacheSizePropertyName;
 
 template <>
-[[maybe_unused]] constexpr StringData
-    kParameterName<TCMallocMaxTotalThreadCacheBytesServerParameter> =
-        kMaxTotalThreadCacheBytesPropertyName;
+constexpr StringData kParameterName<TCMallocMaxTotalThreadCacheBytesServerParameter> =
+    kMaxTotalThreadCacheBytesPropertyName;
 
 template <>
-[[maybe_unused]] constexpr StringData
-    kParameterName<TCMallocAggressiveMemoryDecommitServerParameter> =
-        kAggressiveMemoryDecommitPropertyName;
+constexpr StringData kParameterName<TCMallocAggressiveMemoryDecommitServerParameter> =
+    kAggressiveMemoryDecommitPropertyName;
 
 template <typename T>
 void doAppendProperty(BSONObjBuilder* b, StringData name) {

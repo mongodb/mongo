@@ -198,4 +198,10 @@ void setWindowsUnhandledExceptionFilter() {
 
 }  // namespace mongo
 
+#else
+
+namespace mongo {
+void setWindowsUnhandledExceptionFilter() {}
+}  // namespace mongo
+
 #endif  // _WIN32

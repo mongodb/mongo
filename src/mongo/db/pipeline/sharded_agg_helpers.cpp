@@ -842,7 +842,6 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                  shardCommand);
 }
 
-namespace {
 TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const Pipeline* pipeline,
                                 PipelineDataSource pipelineDataSource,
@@ -1169,7 +1168,6 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                                         shardCount,
                                         exchangeSpec};
 }
-}  // namespace
 
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
@@ -1218,7 +1216,6 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                          std::move(resumeTokenMap));
 }
 
-namespace {
 /**
  * Build the AsyncResultsMergerParams from the cursor set and sort spec.
  */
@@ -1256,6 +1253,8 @@ AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> 
     return armParams;
 }
 
+// Anonymous namespace for helpers of partitionCursorsAndAddMergeCursors.
+namespace {
 /**
  * Given the owned cursors vector, partitions the cursors into either one or two vectors. If
  * untyped cursors are present, returned pair will be {results, boost::none}. If results or meta are
@@ -1558,7 +1557,6 @@ bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pi
          pipelineDataSource == PipelineDataSource::kChangeStream);
 }
 
-namespace {
 std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest aggRequest,
@@ -1615,7 +1613,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCu
                                       requestQueryStatsFromRemotes);
     return mergePipeline;
 }
-}  // namespace
 
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

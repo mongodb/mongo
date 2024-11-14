@@ -812,6 +812,22 @@ TEST(OIDType, nullOID) {
     ASSERT_EQUALS(withNull, recovered);
 }
 
+static const char jsonSample[] =
+    "{_id:ObjectId(\"47cc67093475061e3d95369d\"),"
+    "query:\"kate hudson\","
+    "owner:1234567887654321,"
+    "date:\"2011-05-13T14:22:46.777Z\","
+    "score:123.456,"
+    "field1:Infinity,"
+    "\"field2\":-Infinity,"
+    "\"field3\":NaN,"
+    "users:["
+    "{uname:\"@aaaa\",editid:\"123\",date:1303959350,yes_votes:0,no_votes:0},"
+    "{uname:\"@bbbb\",editid:\"456\",date:1303959350,yes_votes:0,no_votes:0},"
+    "{uname:\"@cccc\",editid:\"789\",date:1303959350,yes_votes:0,no_votes:0}],"
+    "pattern:/match.*this/,"
+    "lastfield:\"last\"}";
+
 static const char jsonSampleWithDecimal[] =
     "{_id:ObjectId(\"47cc67093475061e3d95369d\"),"
     "query:\"kate hudson\","

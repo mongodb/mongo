@@ -1609,7 +1609,6 @@ bool PipelineD::sortAndKeyPatternPartAgreeAndOnMeta(
     return (keyPatternFieldPath.tail() == sortFieldPath.tail());
 }
 
-namespace {
 boost::optional<TraversalPreference> createTimeSeriesTraversalPreference(
     DocumentSourceInternalUnpackBucket* unpack, DocumentSourceSort* sort) {
     const auto metaField = unpack->bucketUnpacker().getMetaField();
@@ -1644,7 +1643,6 @@ boost::optional<TraversalPreference> createTimeSeriesTraversalPreference(
     traversalPreference.direction = -1;
     return traversalPreference;
 }
-}  // namespace
 
 PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
     const MultipleCollectionAccessor& collections,

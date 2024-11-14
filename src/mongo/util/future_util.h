@@ -234,6 +234,7 @@ private:
                     return;
                 }
 
+                using BodyCallableResult = std::invoke_result_t<BodyCallable>;
                 // Convert the result of the loop body into an ExecutorFuture, even if the
                 // loop body is not future-returning. This isn't strictly necessary but it
                 // makes implementation easier.

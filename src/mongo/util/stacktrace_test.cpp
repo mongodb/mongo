@@ -91,8 +91,6 @@
 // "C" so it doesn't get mangled so we can name it with EXPORT_SYMBOLS
 // in SConscript.
 extern "C" MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_EXPORT void
-mongo_stacktrace_test_detail_testFunctionWithLinkage();
-extern "C" MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_EXPORT void
 mongo_stacktrace_test_detail_testFunctionWithLinkage() {
     printf("...");
 }
@@ -106,8 +104,7 @@ struct RecursionParam {
     std::function<void()> f;
 };
 
-MONGO_COMPILER_NOINLINE int recurseWithLinkage(RecursionParam& p, std::uint64_t i = 0);
-MONGO_COMPILER_NOINLINE int recurseWithLinkage(RecursionParam& p, std::uint64_t i) {
+MONGO_COMPILER_NOINLINE int recurseWithLinkage(RecursionParam& p, std::uint64_t i = 0) {
     if (i == p.n) {
         p.f();
     } else {
@@ -545,7 +542,6 @@ public:
     }
 };
 
-extern "C" void stackTraceSigAltStackMinimalAction(int sig, siginfo_t*, void*);
 extern "C" void stackTraceSigAltStackMinimalAction(int sig, siginfo_t*, void*) {
     StackTraceSigAltStackTest::handlerPreamble(sig);
 }
@@ -554,7 +550,6 @@ TEST_F(StackTraceSigAltStackTest, Minimal) {
     StackTraceSigAltStackTest::tryHandler(stackTraceSigAltStackMinimalAction);
 }
 
-extern "C" void stackTraceSigAltStackPrintAction(int sig, siginfo_t*, void*);
 extern "C" void stackTraceSigAltStackPrintAction(int sig, siginfo_t*, void*) {
     StackTraceSigAltStackTest::handlerPreamble(sig);
     printStackTrace();
@@ -564,7 +559,6 @@ TEST_F(StackTraceSigAltStackTest, Print) {
     StackTraceSigAltStackTest::tryHandler(&stackTraceSigAltStackPrintAction);
 }
 
-extern "C" void stackTraceSigAltStackBacktraceAction(int sig, siginfo_t*, void*);
 extern "C" void stackTraceSigAltStackBacktraceAction(int sig, siginfo_t*, void*) {
     StackTraceSigAltStackTest::handlerPreamble(sig);
     std::array<void*, kStackTraceFrameMax> addrs;

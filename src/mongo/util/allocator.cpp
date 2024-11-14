@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/util/allocator.h"
-
 #include <cstdlib>
 
 #include "mongo/util/signal_handlers_synchronous.h"

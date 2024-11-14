@@ -39,13 +39,11 @@
 namespace mongo {
 namespace repl {
 
-namespace {
 ReplSettings makeDefaultReplSettings() {
     ReplSettings settings;
     settings.setReplSetString("ReplicationCoordinatorNoOpDefaultSetName");
     return settings;
 }
-}  // namespace
 
 ReplicationCoordinatorNoOp::ReplicationCoordinatorNoOp(ServiceContext* service)
     : _service(service), _settings(makeDefaultReplSettings()) {}

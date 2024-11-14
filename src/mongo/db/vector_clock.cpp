@@ -165,11 +165,9 @@ public:
     }
 };
 
-namespace {
 LogicalTime fromOptionalTimestamp(const boost::optional<Timestamp>& time) {
     return time ? LogicalTime(*time) : LogicalTime();
 }
-}  // namespace
 
 class VectorClock::ConfigTimeComponent : public VectorClock::PlainComponentFormat {
 public:

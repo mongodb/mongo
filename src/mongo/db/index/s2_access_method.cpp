@@ -98,7 +98,6 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
     }
 }
 
-namespace {
 StatusWith<BSONObj> cannotCreateIndexStatus(BSONElement indexVersionElt,
                                             const std::string& message,
                                             const std::string& expectedVersions = str::stream()
@@ -110,7 +109,6 @@ StatusWith<BSONObj> cannotCreateIndexStatus(BSONElement indexVersionElt,
                           << " }, only versions: [" << expectedVersions << "] are supported"
                           << extraMessage};
 }
-}  // namespace
 
 StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(const BSONObj& specObj,
                                                    boost::optional<long long> expectedVersion) {

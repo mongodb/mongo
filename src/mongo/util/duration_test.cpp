@@ -254,6 +254,7 @@ TEST(DurationArithmetic, DivideOverflowThrows) {
 template <typename Period = void, typename In, typename Equivalent>
 auto validateDeduce(In in, Equivalent equivalent) {
     static constexpr bool useDefaultPeriod = std::is_same_v<Period, void>;
+    using OutPeriod = std::conditional_t<useDefaultPeriod, std::ratio<1>, Period>;
     auto deduced = [&] {
         if constexpr (useDefaultPeriod) {
             return deduceChronoDuration(in);

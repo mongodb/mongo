@@ -55,6 +55,14 @@ namespace {
 namespace value = sbe::value;
 using namespace fmt::literals;
 
+std::string printDistribution(const DataDistribution& distr, size_t nElems) {
+    std::ostringstream os;
+    for (size_t i = 0; i < std::min(nElems, distr._freq.size()); ++i) {
+        os << "{val: " << distr._bounds[i].get() << ", " << distr._freq[i].toString() << "}\n";
+    }
+    return os.str();
+}
+
 double valueSpread(value::TypeTags tag1,
                    value::Value val1,
                    value::TypeTags tag2,

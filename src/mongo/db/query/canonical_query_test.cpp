@@ -224,6 +224,21 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                               .allowedFeatures = allowedFeatures}});
 }
 
+std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
+                                             const char* sortStr,
+                                             const char* projStr) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(fromjson(queryStr));
+    findCommand->setSort(fromjson(sortStr));
+    findCommand->setProjection(fromjson(projStr));
+    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+}
+
 /**
  * Test function for CanonicalQuery::normalize.
  */

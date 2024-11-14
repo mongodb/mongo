@@ -39,7 +39,6 @@
 #include "mongo/util/tracking_context.h"
 
 namespace mongo::timeseries::bucket_catalog {
-namespace {
 const std::string testDbName = "db_timeseries_measurement_map_test";
 const TimeseriesOptions kTimeseriesOptions("time");
 
@@ -52,6 +51,40 @@ protected:
     MeasurementMap measurementMap;
 };
 
+BSONObj genBucketDoc(int timestampSecondsField) {
+    std::string seconds = std::to_string(timestampSecondsField);
+    BSONObj bucketDocDataFields = fromjson(
+        R"({"data":{"time":{"0":{"$date":"2022-06-06T15:34:" + seconds + ".000Z"},
+                            "1":{"$date":"2022-06-06T15:34:" + seconds + ".000Z"},
+                            "2":{"$date":"2022-06-06T15:34:" + seconds + ".000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    return bucketDocDataFields;
+}
+
+BSONObj genBucketDoc() {
+    BSONObj bucketDocDataFields = fromjson(
+        R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1},
+                    "b":{"0":1}})");
+    return bucketDocDataFields;
+}
+
+void genMeasurement(std::vector<BSONElement>& elems) {
+    BSONObj bucketDocDataFields = genBucketDoc().getOwned();
+    for (auto dataField : bucketDocDataFields) {
+        elems.push_back(dataField);
+    }
+}
+
+std::vector<BSONElement> genMeasurementsFromObj(BSONObj obj) {
+    std::vector<BSONElement> elems;
+    for (auto& dataField : obj) {
+        elems.push_back(dataField);
+    }
+    return elems;
+}
+
 std::vector<BSONElement> genMeasurementFieldsFromObj(BSONObj obj) {
     std::vector<BSONElement> elems;
     for (auto& dataField : obj) {
@@ -59,7 +92,15 @@ std::vector<BSONElement> genMeasurementFieldsFromObj(BSONObj obj) {
     }
     return elems;
 }
-}  // namespace
+
+std::vector<BSONElement> genMessyMeasurements() {
+    std::vector<BSONElement> elems;
+    BSONObj bucketDocDataFields = genBucketDoc();
+    for (auto& dataField : bucketDocDataFields) {
+        elems.push_back(dataField);
+    }
+    return elems;
+}
 
 TEST_F(MeasurementMapTest, IterationBasic) {
     std::vector<BSONElement> elems;

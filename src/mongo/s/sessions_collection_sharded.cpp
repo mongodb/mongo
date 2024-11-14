@@ -72,6 +72,14 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+namespace {
+
+BSONObj lsidQuery(const LogicalSessionId& lsid) {
+    return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
+}
+
+}  // namespace
+
 std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwningShard(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     const auto [cm, _] = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(

@@ -35,7 +35,6 @@
 
 namespace mongo {
 
-namespace {
 // Test from old Aladdin MD5 library we used to vendor
 int do_md5_test(void) {
     static const char* const test[7 * 2] = {
@@ -76,7 +75,6 @@ int do_md5_test(void) {
     }
     return status;
 }
-}  // namespace
 
 TEST(MD5, BuiltIn1) {
     ASSERT_EQUALS(0, do_md5_test());

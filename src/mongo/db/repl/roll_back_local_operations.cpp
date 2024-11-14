@@ -55,6 +55,10 @@ namespace {
 
 constexpr int kMaxConnectionAttempts = 3;
 
+OpTime getOpTime(const OplogInterface::Iterator::Value& oplogValue) {
+    return fassert(40298, OpTime::parseFromOplogEntry(oplogValue.first));
+}
+
 long long getTerm(const BSONObj& operation) {
     return operation["t"].numberLong();
 }

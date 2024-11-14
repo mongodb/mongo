@@ -152,7 +152,6 @@ bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechNam
     return sequenceContains(_enabledMechanisms, mechName);
 }
 
-namespace {
 void appendMechs(const std::vector<std::unique_ptr<ServerFactoryBase>>& mechs,
                  std::vector<std::string>* pNames) {
     std::transform(mechs.cbegin(),
@@ -162,7 +161,6 @@ void appendMechs(const std::vector<std::unique_ptr<ServerFactoryBase>>& mechs,
                        return factory->mechanismName().toString();
                    });
 }
-}  // namespace
 
 std::vector<std::string> SASLServerMechanismRegistry::getMechanismNames() const {
     std::vector<std::string> names;

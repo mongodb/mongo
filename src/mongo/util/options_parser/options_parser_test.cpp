@@ -4931,7 +4931,7 @@ TEST(YAMLConfigFile, OutputConfig) {
               "  path: /tmp/mongod.log");
 }
 
-[[maybe_unused]] void TestFile(std::vector<unsigned char> contents, bool valid) {
+void TestFile(std::vector<unsigned char> contents, bool valid) {
     mongo::unittest::TempDir tempdir("options_testpath");
     boost::filesystem::path p(tempdir.path());
     p /= "config.yaml";

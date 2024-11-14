@@ -38,7 +38,6 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace {
 
 // First arg is the number of operations.  Second arg is the length of runs of contiguous statement
 // IDs, or 0 for "all are contiguous".
@@ -70,7 +69,6 @@ void BM_AddOperations(benchmark::State& state) {
             invariantStatusOK(transactionOperations.addOperation(op));
     }
 }
-}  // namespace
 
 BENCHMARK(BM_AddOperations)
     ->ArgsProduct({{1, 10, 100, 1000, 10000}, {0}})

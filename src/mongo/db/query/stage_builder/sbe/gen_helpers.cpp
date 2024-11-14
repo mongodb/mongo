@@ -143,7 +143,6 @@ uint32_t dateTypeMask() {
             getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
 }
 
-namespace {
 /**
  * Callback function that logs a message and uasserts if it detects a corrupt index key. An index
  * key is considered corrupt if it has no corresponding Record.
@@ -323,7 +322,6 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
 
     return true;
 }
-}  // namespace
 
 std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     SbStage inputStage,

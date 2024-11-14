@@ -164,7 +164,8 @@ protected:
                                             CollectionMetadata(cm, ShardId("0")));
         }
 
-        _manager = std::make_shared<MetadataManager>(kNss, CollectionMetadata(cm, ShardId("0")));
+        _manager = std::make_shared<MetadataManager>(
+            getServiceContext(), kNss, CollectionMetadata(cm, ShardId("0")));
 
         return CollectionMetadata(std::move(cm), ShardId("0"));
     }

@@ -131,7 +131,6 @@ DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     }
 }
 
-namespace {
 void validateUnionWithCollectionlessPipeline(
     const boost::optional<std::vector<mongo::BSONObj>>& pipeline) {
     const auto errMsg =
@@ -153,7 +152,6 @@ void validateUnionWithCollectionlessPipeline(
 
     );
 }
-}  // namespace
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {

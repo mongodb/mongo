@@ -81,6 +81,18 @@ MONGO_FAIL_POINT_DEFINE(sleepToWaitForHealthLogWrite);
 
 namespace {
 
+/*
+ * Some utilities for dealing with the expected/found documents in health log entries.
+ */
+
+bool operator==(const std::vector<BSONObj>& lhs, const std::vector<BSONObj>& rhs) {
+    return std::equal(lhs.cbegin(),
+                      lhs.cend(),
+                      rhs.cbegin(),
+                      rhs.cend(),
+                      [](const auto& x, const auto& y) -> bool { return x.woCompare(y) == 0; });
+}
+
 /**
  * Get whether the expected and found objects match, plus an expected/found object to report to the
  * health log.
@@ -92,7 +104,10 @@ std::pair<bool, BSONObj> expectedFound(const T& expected, const T& found) {
 }
 
 template <>
-std::pair<bool, BSONObj> expectedFound(const BSONObj& expected, const BSONObj& found) = delete;
+std::pair<bool, BSONObj> expectedFound(const BSONObj& expected, const BSONObj& found) {
+    auto obj = BSON("expected" << expected << "found" << found);
+    return std::pair<bool, BSONObj>(expected.woCompare(found) == 0, obj);
+}
 
 /**
  * An overload for boost::optionals, which omits boost::none fields.
@@ -327,7 +342,6 @@ bool isIndexOrderAndUniquenessPreserved(const KeyStringEntry& curr,
     return true;
 }
 
-namespace {
 template <typename T>
 const md5_byte_t* md5Cast(const T* ptr) {
     return reinterpret_cast<const md5_byte_t*>(ptr);
@@ -348,7 +362,6 @@ DataCorruptionDetectionMode swapDataCorruptionMode(OperationContext* opCtx,
     ru->setDataCorruptionDetectionMode(dataCorruptionMode);
     return prevMode;
 }
-}  // namespace
 
 DbCheckAcquisition::DbCheckAcquisition(OperationContext* opCtx,
                                        const NamespaceString& nss,
@@ -448,6 +461,12 @@ DbCheckHasher::DbCheckHasher(
 
             _indexes.push_back(entry);
         }
+    }
+}
+
+void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
+    if (uuid) {
+        md5_append(state, md5Cast(uuid->toCDR().data()), uuid->toCDR().length());
     }
 }
 

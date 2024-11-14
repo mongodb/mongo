@@ -1795,7 +1795,6 @@ TEST(Accumulators, PushRespectsMaxMemoryConstraint) {
 
 /* ------------------------- AccumulatorCorvariance(Samp/Pop) -------------------------- */
 
-namespace {
 // Calculate covariance using the offline algorithm.
 double offlineCovariance(const std::vector<Value>& input, bool isSamp) {
     // Edge cases return 0 though 'input' should not be empty. Empty input is tested elsewhere.
@@ -1827,9 +1826,9 @@ double offlineCovariance(const std::vector<Value>& input, bool isSamp) {
 // covariance calculated based on the offline algorithm (cov(x,y) = Σ((xi-avg(x))*(yi-avg(y)))/n)).
 // If 'result' is given, the covariance should also be tested against the given result.
 template <typename AccName>
-void assertCovariance(ExpressionContext* const expCtx,
-                      const std::vector<Value>& input,
-                      boost::optional<double> result = boost::none) {
+static void assertCovariance(ExpressionContext* const expCtx,
+                             const std::vector<Value>& input,
+                             boost::optional<double> result = boost::none) {
     auto accum = AccName::create(expCtx);
     for (auto&& val : input) {
         accum->process(val, false);
@@ -1843,7 +1842,6 @@ void assertCovariance(ExpressionContext* const expCtx,
         ASSERT_LTE(fabs(onlineCov - *result), 1e-5);
     }
 }
-}  // namespace
 
 TEST(Accumulators, CovarianceEdgeCases) {
     auto expCtx = ExpressionContextForTest{};
@@ -1919,7 +1917,6 @@ TEST(Accumulators, SampleCovariance) {
     assertCovariance<AccumulatorCovarianceSamp>(&expCtx, multiplePoints, 2.483334);
 }
 
-namespace {
 std::vector<Value> generateRandomVariables() {
     auto seed = Date_t::now().asInt64();
     LOGV2(5424001, "Generated new seed is {seed}", "seed"_attr = seed);
@@ -1937,7 +1934,6 @@ std::vector<Value> generateRandomVariables() {
 
     return output;
 }
-}  // namespace
 
 TEST(Accumulators, CovarianceWithRandomVariables) {
     auto expCtx = ExpressionContextForTest{};
@@ -1949,7 +1945,6 @@ TEST(Accumulators, CovarianceWithRandomVariables) {
     assertCovariance<AccumulatorCovarianceSamp>(&expCtx, randomVariables, boost::none);
 }
 
-namespace {
 Value parseAndSerializeAccumExpr(
     const BSONObj& obj,
     std::function<boost::intrusive_ptr<Expression>(
@@ -1985,7 +1980,6 @@ Document parseAndSerializeAccumRepresentative(
     auto accum = expr.factory();
     return accum->serialize(expr.initializer, expr.argument, options);
 }
-}  // namespace
 
 TEST(Accumulators, SerializeWithRedaction) {
     auto jsReduce =

@@ -343,7 +343,6 @@ void createIndexForApplyOps(OperationContext* opCtx,
     }
 }
 
-namespace {
 /**
  * @param dataImage can be BSONObj::isEmpty to signal the node is in initial sync and must
  *                  invalidate relevant image collection data.
@@ -392,7 +391,6 @@ void writeToImageCollection(OperationContext* opCtx,
     // This code path can also be hit by things such as `applyOps` and tenant migrations.
     ::mongo::update(opCtx, collection, request);
 }
-}  // namespace
 
 /* we write to local.oplog.rs:
      { ts : ..., v: ..., op: ..., etc }

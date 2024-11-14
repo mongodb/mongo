@@ -687,27 +687,6 @@ def _impl(ctx):
         ],
     )
 
-    # Warn about global functions being defined without a definition, which
-    # usually indicates an unintentionally extern helper. Note that clang's
-    # `-Wmissing-declarations` is a very different warning.
-    if ctx.attr.compiler == "clang":
-        missing_proto_flag = [flag_group(flags = ["-Wmissing-prototypes"])]
-    elif ctx.attr.compiler == "gcc":
-        missing_proto_flag = [flag_group(flags = ["-Wmissing-declarations"])]
-    else:
-        missing_proto_flag = []
-
-    missing_prototypes_feature = feature(
-        name = "missing_prototypes_warning",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_cpp_compile_actions,
-                flag_groups = missing_proto_flag,
-            ),
-        ],
-    )
-
     features = [
         bin_dirs_feature,
         default_compile_flags_feature,
@@ -746,7 +725,6 @@ def _impl(ctx):
         overloaded_virtual_warning_feature,
         no_overloaded_virtual_warning_feature,
         pessimizing_move_warning_feature,
-        missing_prototypes_feature,
     ]
 
     return [

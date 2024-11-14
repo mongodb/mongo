@@ -1267,7 +1267,6 @@ void SortedDataIndexAccessMethod::validateDocument(const CollectionPtr& collecti
                                                    const BSONObj& obj,
                                                    const BSONObj& keyPattern) const {}
 
-namespace {
 /**
  * Generates a new file name on each call using a static, atomic and monotonically increasing
  * number. Each name is suffixed with a random number generated at startup, to prevent name
@@ -1284,7 +1283,6 @@ std::string nextFileName() {
     return str::stream() << "extsort-index." << indexAccessMethodFileCounter.fetchAndAdd(1) << '-'
                          << randomSuffix;
 }
-}  // namespace
 
 Status SortedDataIndexAccessMethod::_handleDuplicateKey(
     OperationContext* opCtx,

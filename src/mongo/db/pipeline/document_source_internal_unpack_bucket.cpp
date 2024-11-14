@@ -288,6 +288,15 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
     return newGroup;
 }
 
+// Optimize the section of the pipeline before the $_internalUnpackBucket stage.
+void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    auto prefix = Pipeline::SourceContainer(container->begin(), itr);
+    Pipeline::optimizeContainer(&prefix);
+    Pipeline::optimizeEachStage(&prefix);
+    container->erase(container->begin(), itr);
+    container->splice(itr, prefix);
+}
+
 boost::intrusive_ptr<Expression> handleDateTruncRewrite(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     boost::intrusive_ptr<Expression> expr,
@@ -1643,7 +1652,6 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
 }
 
 
-namespace {
 bool findSequentialDocumentCache(Pipeline::SourceContainer::iterator start,
                                  Pipeline::SourceContainer::iterator end) {
     while (start != end && !dynamic_cast<DocumentSourceSequentialDocumentCache*>(start->get())) {
@@ -1651,7 +1659,6 @@ bool findSequentialDocumentCache(Pipeline::SourceContainer::iterator start,
     }
     return start != end;
 }
-}  // namespace
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAtRestOfPipeline(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {

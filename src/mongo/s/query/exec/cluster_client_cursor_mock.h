@@ -175,6 +175,8 @@ private:
 
     Date_t _lastUseDate;
 
+    std::uint64_t _nBatchesReturned = 0;
+
     APIParameters _apiParameters = APIParameters();
 };
 

@@ -79,8 +79,9 @@ struct BSONObjCompare {
         return SimpleBSONObjComparator::kInstance.compare(lhs, rhs) < 0;
     }
 };
+}  // namespace
 
-const NamespaceString kTestNamespace =
+static const NamespaceString kTestNamespace =
     NamespaceString::createNamespaceString_forTest("unittests", "deferred_writer_tests");
 
 /**
@@ -237,6 +238,10 @@ private:
     static const int kNWorkers = 20;
     static const int kDocsPerWorker = 100;
 };
+
+bool compareBsonObjects(const BSONObj& lhs, const BSONObj& rhs) {
+    return SimpleBSONObjComparator::kInstance.compare(lhs, rhs) < 0;
+}
 
 /**
  * Test that the documents make it through the writer unchanged.
@@ -402,8 +407,8 @@ public:
         add<DeferredWriterTestAsync>();
     }
 };
-}  // namespace
 
 unittest::OldStyleSuiteInitializer<DeferredWriterTests> deferredWriterTests;
+
 }  // namespace deferred_writer_tests
 }  // namespace mongo

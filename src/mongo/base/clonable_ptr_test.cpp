@@ -842,7 +842,6 @@ TEST(ClonablePtrTest, ownershipStabilityTest) {
     }
 }
 
-namespace {
 class ClonableObject {
 private:
     int value = 0;
@@ -868,7 +867,6 @@ bool operator==(const ClonableObject& lhs, const ClonableObject& rhs) {
 bool operator!=(const ClonableObject& lhs, const ClonableObject& rhs) {
     return !(lhs == rhs);
 }
-}  // namespace
 
 TEST(ClonablePtrTest, noObjectCopySemanticTest) {
     mongo::clonable_ptr<ClonableObject> p;

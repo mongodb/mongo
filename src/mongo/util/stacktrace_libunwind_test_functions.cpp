@@ -52,7 +52,6 @@ MONGO_COMPILER_NOINLINE void anonymousNamespaceFunction(std::ostream& s) {
 }
 }  // namespace
 
-MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_HIDDEN_FUNCTION void hiddenFunction(std::ostream& s);
 MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_HIDDEN_FUNCTION void hiddenFunction(std::ostream& s) {
     anonymousNamespaceFunction(s);
     PREVENT_TAIL_CALL;

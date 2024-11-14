@@ -212,6 +212,24 @@ auto makeTaskExecutor(ServiceContext* service,
         makeThreadPool(poolName, threadName),
         executor::makeNetworkInterface(networkName, nullptr, std::move(hookList)));
 }
+
+/**
+ * Schedules a task using the executor. This task is always run unless the task executor is
+ * shutting down.
+ */
+void scheduleWork(executor::TaskExecutor* executor, executor::TaskExecutor::CallbackFn work) {
+    auto cbh = executor->scheduleWork(
+        [work = std::move(work)](const executor::TaskExecutor::CallbackArgs& args) {
+            if (args.status == ErrorCodes::CallbackCanceled) {
+                return;
+            }
+            work(args);
+        });
+    if (cbh == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(40460, cbh);
+}
 }  // namespace
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(

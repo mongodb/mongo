@@ -258,7 +258,6 @@ void WriteConcernResult::appendTo(BSONObjBuilder* result) const {
         result->append("err", err);
 }
 
-namespace {
 /**
  * Write concern with {j: true} on single voter replica set primaries must wait for no oplog holes
  * behind a write, before flushing to disk (not done in this function), in order to guarantee that
@@ -284,7 +283,6 @@ void waitForNoOplogHolesIfNeeded(OperationContext* opCtx) {
             opCtx, /*primaryOnly*/ true);
     }
 }
-}  // namespace
 
 Status waitForWriteConcern(OperationContext* opCtx,
                            const OpTime& replOpTime,

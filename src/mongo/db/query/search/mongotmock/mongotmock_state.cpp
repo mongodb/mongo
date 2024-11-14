@@ -35,6 +35,7 @@ namespace mongotmock {
 
 namespace {
 const auto getMongotMockStateDecoration = ServiceContext::declareDecoration<MongotMockState>();
+}
 
 /**
  * Fields that will only be validated if explicitly mocked as part of the expected command. If not
@@ -61,7 +62,6 @@ bool isParentPathOfAnIgnoredField(std::string fieldName) {
     }
     return false;
 }
-}  // namespace
 
 MongotMockStateGuard getMongotMockState(ServiceContext* svc) {
     auto& mockState = getMongotMockStateDecoration(svc);

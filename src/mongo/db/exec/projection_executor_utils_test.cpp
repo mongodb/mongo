@@ -52,7 +52,6 @@
 
 namespace mongo::projection_executor_utils {
 namespace positional_projection_tests {
-namespace {
 /**
  * Applies a find()-style positional projection at the given 'path' using 'matchSpec' to create
  * a 'MatchExpression' to match an element on the first array in the 'path'. If no value for
@@ -67,7 +66,6 @@ auto applyPositional(const BSONObj& matchSpec,
     return projection_executor_utils::applyFindPositionalProjection(
         preImage, postImage.value_or(preImage), *matchExpr, path);
 }
-}  // namespace
 
 TEST(PositionalProjection, CorrectlyProjectsSimplePath) {
     ASSERT_DOCUMENT_EQ(Document{fromjson("{bar: 1, foo: [6]}")},
@@ -149,14 +147,12 @@ TEST(PositionalProjection, AppliesMatchExpressionToPreImageAndStoresResultInPost
 }  // namespace positional_projection_tests
 
 namespace elem_match_projection_tests {
-namespace {
 auto applyElemMatch(const BSONObj& match, const std::string& path, const Document& input) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matchObj = BSON(path << BSON("$elemMatch" << match));
     auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchObj, expCtx));
     return projection_executor_utils::applyFindElemMatchProjection(input, *matchExpr, path);
 }
-}  // namespace
 
 TEST(ElemMatchProjection, CorrectlyProjectsNonObjectElement) {
     ASSERT_VALUE_EQ(

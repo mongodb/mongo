@@ -76,6 +76,8 @@ void createCollections(OperationContext* opCtx, int numCollections) {
     }
 }
 
+}  // namespace
+
 void BM_CollectionCatalogWrite(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
     ThreadClient threadClient(serviceContext->getService());
@@ -186,8 +188,6 @@ void BM_CollectionCatalogIterateCollections(benchmark::State& state) {
         }
     }
 }
-
-}  // namespace
 
 BENCHMARK(BM_CollectionCatalogWrite)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_CollectionCatalogCreateDropCollection)->Ranges({{{1}, {100'000}}});

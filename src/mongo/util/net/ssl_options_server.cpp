@@ -58,7 +58,6 @@ using std::string;
 // Export these to the process space for the sake of ssl_options_test.cpp
 // but don't provide a header because we don't want to encourage use from elsewhere.
 namespace mongo {
-Status storeTLSLogVersion(const std::string& loggedProtocols);
 Status storeTLSLogVersion(const std::string& loggedProtocols) {
     // The tlsLogVersion field is composed of a comma separated list of protocols to
     // log. First, tokenize the field.

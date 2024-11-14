@@ -84,7 +84,6 @@ Status errorCodeToStatus(const std::error_code& ec, StringData context) {
     return makeStatus(errorCode, ec.message());
 }
 
-namespace {
 template <typename T>
 auto toUnsignedEquivalent(T x) {
     return static_cast<std::make_unsigned_t<T>>(x);
@@ -107,7 +106,6 @@ BSONObj errorDescription(const std::system_error& ex) {
         .append("value", ex.code().value())
         .obj();
 }
-}  // namespace
 
 asio::generic::stream_protocol::endpoint getLocalEndpoint(
     asio::generic::stream_protocol::socket& sock, StringData errorLogNote, logv2::LogSeverity sev) {

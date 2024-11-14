@@ -74,6 +74,7 @@ BSONObj buildSampleObj(long long unsigned int i) {
                        << "random" << random << "phone_no" << phone_no << "long_string"
                        << long_string);
 }
+}  // namespace
 
 void BM_arrayBuilder(benchmark::State& state) {
     size_t totalBytes = 0;
@@ -250,7 +251,6 @@ void BM_validate_contents(benchmark::State& state) {
     }
     state.SetBytesProcessed(totalSize);
 }
-}  // namespace
 
 BENCHMARK(BM_arrayBuilder)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_arrayLookup)->Ranges({{{1}, {100'000}}});

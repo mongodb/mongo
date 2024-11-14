@@ -37,12 +37,10 @@
 
 namespace mongo::query_settings::index_hints {
 
-namespace {
 auto makeDbName(StringData dbName) {
     return DatabaseNameUtil::deserialize(
         boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
 }
-}  // namespace
 
 TEST(IndexHintSpecsSerialization, TestSerialization) {
     IndexHintSpecs indexHints;

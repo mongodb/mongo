@@ -33,11 +33,17 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <exception>
 #include <fstream>  // IWYU pragma: keep
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <queue>
 #include <string>
+#include <system_error>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -47,6 +53,8 @@
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/shared_buffer_fragment.h"
@@ -674,6 +682,13 @@ private:
     template class ::mongo::Sorter<Key, Value>;                                                \
     template class ::mongo::SortIteratorInterface<Key, Value>;                                 \
     template class ::mongo::SortedFileWriter<Key, Value>;                                      \
+    /* internal classes */                                                                     \
+    template class ::mongo::sorter::NoLimitSorter<Key, Value, Comparator>;                     \
+    template class ::mongo::sorter::LimitOneSorter<Key, Value, Comparator>;                    \
+    template class ::mongo::sorter::TopKSorter<Key, Value, Comparator>;                        \
+    template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>;                     \
+    template class ::mongo::sorter::InMemIterator<Key, Value>;                                 \
+    template class ::mongo::sorter::FileIterator<Key, Value>;                                  \
     /* factory functions */                                                                    \
     template ::mongo::SortIteratorInterface<Key, Value>* ::mongo::                             \
         SortIteratorInterface<Key, Value>::merge<Comparator>(                                  \

@@ -35,6 +35,7 @@
 #include "mongo/util/immutable/unordered_map.h"
 
 namespace mongo {
+
 namespace {
 
 constexpr StringData kMapCollName = "CollName"_sd;
@@ -71,6 +72,7 @@ std::vector<std::pair<DatabaseName, std::shared_ptr<int>>> createDataVectorForMa
 
     return data;
 }
+}  // namespace
 
 void BM_NamespaceStringCreation(benchmark::State& state) {
     const StringData dbName =
@@ -185,7 +187,6 @@ void BM_NamespaceStringIsShardLocalCollection_UserDb(benchmark::State& state) {
         benchmark::DoNotOptimize(discardValue(ns.isShardLocalNamespace()));
     }
 }
-}  // namespace
 
 BENCHMARK(BM_NamespaceStringCreation)->DenseRange(1, 63);
 

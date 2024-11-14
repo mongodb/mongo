@@ -59,7 +59,6 @@ std::string generateFieldName() {
 }
 
 namespace request_generator {
-namespace {
 
 enum class QueryClass : int { kSmall = 0, kMedium, kLarge };
 
@@ -211,7 +210,6 @@ std::unique_ptr<ParsedFindCommand> generateParsedFindRequest(
             MONGO_UNREACHABLE;
     }
 }
-}  // namespace
 };  // namespace request_generator
 
 class QuerySettingsLookupBenchmark : public benchmark::Fixture {

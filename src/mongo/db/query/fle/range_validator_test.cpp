@@ -153,10 +153,9 @@ std::string stub(StringData path,
     toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayloadV2, ffp, &builder);
     return builder.obj().firstElement().jsonString(ExtendedCanonicalV2_0_0, false, false);
 }
-}  // namespace
+
 
 namespace match {
-namespace {
 /**
  * Generate a one-sided range predicate with the given range comparison operator.
  */
@@ -204,10 +203,8 @@ std::string dollarAnd(std::initializer_list<std::string> filters) {
 std::string eq(std::string field, std::string rhs) {
     return str::stream() << "{" << field << ": {$eq: " << rhs << "}}";
 }
-}  // namespace
 }  // namespace match
 namespace agg {
-namespace {
 std::string queryOp(std::string op, std::initializer_list<std::string> children) {
     auto ss = std::move(str::stream() << "{" << op << ": [");
     for (auto it = children.begin(); it != children.end(); ++it) {
@@ -262,8 +259,8 @@ std::string dollar(std::string s) {
 std::string eq(std::string field, std::string rhs) {
     return queryOp("$eq", {quote(dollar(field)), rhs});
 }
-}  // namespace
 }  // namespace agg
+}  // namespace
 
 ///////////////////////////////
 //// HAPPY PATH TEST CASES ////

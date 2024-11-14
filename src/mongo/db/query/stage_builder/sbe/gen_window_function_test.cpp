@@ -322,7 +322,6 @@ TEST_F(SBESetWindowFieldsTest, LastTestConstantValueNegativeWindow) {
                    << BSON("a" << 4 << "b" << 7 << "last" << 1000)));
 }
 
-namespace {
 /**
  * This helper allows the manual registration of the $setUnion window function to add it to the
  * parserMap without guarding it behind a feature flag (note the boost::none argument below). This
@@ -363,7 +362,6 @@ public:
         registerSetUnionWindowFunction();
     }
 };
-}  // namespace
 
 TEST_F(SetUnionSBESetWindowFieldsTest, SetUnionWindowNoRemoval) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2))),

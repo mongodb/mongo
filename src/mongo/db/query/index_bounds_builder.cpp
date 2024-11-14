@@ -121,6 +121,9 @@ const Interval kHashedUndefinedInterval = IndexBoundsBuilder::makePointInterval(
 const Interval kHashedNullInterval =
     IndexBoundsBuilder::makePointInterval(ExpressionMapping::hash(kNullElementObj.firstElement()));
 
+Interval makeUndefinedPointInterval(bool isHashed) {
+    return isHashed ? kHashedUndefinedInterval : IndexBoundsBuilder::kUndefinedPointInterval;
+}
 Interval makeNullPointInterval(bool isHashed) {
     return isHashed ? kHashedNullInterval : IndexBoundsBuilder::kNullPointInterval;
 }
@@ -222,7 +225,6 @@ Interval IndexBoundsBuilder::allValues() {
     return makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys);
 }
 
-namespace {
 bool IntervalComparison(const Interval& lhs, const Interval& rhs) {
     int wo = lhs.start.woCompare(rhs.start, false);
     if (0 != wo) {
@@ -238,7 +240,6 @@ bool IntervalComparison(const Interval& lhs, const Interval& rhs) {
     // Put the bound that's inclusive to the left.
     return lhs.startInclusive;
 }
-}  // namespace
 
 // static
 void IndexBoundsBuilder::translateAndIntersect(const MatchExpression* expr,
@@ -280,7 +281,6 @@ void IndexBoundsBuilder::translateAndUnion(const MatchExpression* expr,
     }
 }
 
-namespace {
 bool typeMatch(const BSONObj& obj) {
     BSONObjIterator it(obj);
     MONGO_verify(it.more());
@@ -289,7 +289,6 @@ bool typeMatch(const BSONObj& obj) {
     BSONElement second = it.next();
     return first.canonicalType() == second.canonicalType();
 }
-}  // namespace
 
 bool IndexBoundsBuilder::canUseCoveredMatching(const MatchExpression* expr,
                                                const IndexEntry& index) {
@@ -473,7 +472,6 @@ const Interval IndexBoundsBuilder::kNullPointInterval =
 const Interval IndexBoundsBuilder::kEmptyArrayPointInterval =
     IndexBoundsBuilder::makePointInterval(kEmptyArrayElementObj);
 
-namespace {
 bool detectIfEntireNullIntervalMatchesPredicate(const InMatchExpression* ime,
                                                 const IndexEntry& index) {
     if (!ime->hasNull()) {
@@ -510,7 +508,6 @@ bool detectIfEntireNullIntervalMatchesPredicate(const InMatchExpression* ime,
 
     return true;
 }
-}  // namespace
 
 void IndexBoundsBuilder::_mergeTightness(const BoundsTightness& tightness,
                                          BoundsTightness& tightnessOut) {

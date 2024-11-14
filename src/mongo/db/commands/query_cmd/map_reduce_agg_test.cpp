@@ -75,6 +75,7 @@ using namespace map_reduce_agg;
 
 // The translator treats Javascript objects as black boxes so there's no need for realistic examples
 // here.
+constexpr auto initJavascript = "init!"_sd;
 constexpr auto mapJavascript = "map!"_sd;
 constexpr auto reduceJavascript = "reduce!"_sd;
 constexpr auto finalizeJavascript = "finalize!"_sd;

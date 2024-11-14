@@ -46,7 +46,6 @@
 #include "mongo/unittest/assert.h"
 
 namespace mongo {
-namespace {
 
 const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("plan_cache_classic_test.coll");
@@ -58,8 +57,7 @@ enum AvailableIndexType {
     kSingleFieldIndex,       // {a: 1}
     kTwoFieldCompoundIndex,  // {a: 1, b: 1}
     kTwoIndexes,             // {a: 1} and {b: 1}
-    kManyFieldCompoundIndex  // {a: 1, a<long string>0: 1, a<long string>1: 1, ... /* repeated
-                             // */}
+    kManyFieldCompoundIndex  // {a: 1, a<long string>0: 1, a<long string>1: 1, ... /* repeated */}
 };
 
 // The type of filter that will be part of the generated find command for the test case.
@@ -126,8 +124,7 @@ void populateIn(BSONObjBuilder& bob) {
     bob.done();
 }
 
-// Produces a filter of the shape {{a: {$in: [<large in list>]}}, {b: {$in: [<large in
-// list>]}}}.
+// Produces a filter of the shape {{a: {$in: [<large in list>]}}, {b: {$in: [<large in list>]}}}.
 BSONObj createTwoLargeInObj() {
     BSONObjBuilder bob;
     BSONObjBuilder subA(bob.subobjStart("a"));
@@ -312,9 +309,9 @@ std::unique_ptr<QueryPlannerParams> extractFromBmParams(
 }
 
 /**
- * Benchmarks for classic plan cache retrieval and parameter binding. Templated so that the
- * stdout for the benchmark is descriptive (i.e. we see metrics for each template instantiation
- * of the Query type) and so that flamegraphs have distinct stacks for each test case.
+ * Benchmarks for classic plan cache retrieval and parameter binding. Templated so that the stdout
+ * for the benchmark is descriptive (i.e. we see metrics for each template instantiation of the
+ * Query type) and so that flamegraphs have distinct stacks for each test case.
  */
 template <typename Query>
 void BM_PlanCacheClassic(benchmark::State& state) {
@@ -342,10 +339,10 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     auto solns = std::move(statusWithMultiPlanSolns.getValue());
     size_t indexToGet = -1;
     if (bmParams.index == kTwoIndexes && bmParams.filter == kAndFilter) {
-        // In the test case for an AND stage of two indexes, there will be 3 plans that come out
-        // of QueryPlanner::plan(): one that uses just the index on {a: 1}, one that uses just
-        // the index on {b: 1}, and one that is {a: 1} AND {b: 1}. For this test case, we want
-        // to explicitly use the third case, so we extract that plan from the result.
+        // In the test case for an AND stage of two indexes, there will be 3 plans that come out of
+        // QueryPlanner::plan(): one that uses just the index on {a: 1}, one that uses just
+        // the index on {b: 1}, and one that is {a: 1} AND {b: 1}. For this test case, we want to
+        // explicitly use the third case, so we extract that plan from the result.
         ASSERT(solns.size() == 3);
         for (size_t i = 0; i < solns.size(); i++) {
             if (solns[i]->hasNode(STAGE_AND_SORTED)) {
@@ -354,11 +351,11 @@ void BM_PlanCacheClassic(benchmark::State& state) {
             }
         }
     } else {
-        // For the rest of the test cases in this benchmark there should only ever be one
-        // solution that comes out of QueryPlanner::plan(). This is because in the case where
-        // there are no specified indexes, we will always generate just a collection scan plan.
-        // If there is an index, we will only generate the relevant index scan plan but not the
-        // collection scan plan.
+        // For the rest of the test cases in this benchmark there should only ever be one solution
+        // that comes out of QueryPlanner::plan(). This is because in the case where there are no
+        // specified indexes, we will always generate just a collection scan plan. If there is an
+        // index, we will only generate the relevant index scan plan but not the collection scan
+        // plan.
         ASSERT(solns.size() == 1);
         indexToGet = 0;
     }
@@ -462,7 +459,6 @@ void BM_PlanCacheClassic(benchmark::State& state) {
         state.ResumeTiming();
     }
 }
-}  // namespace
 
 // Eq filter.
 class EqFilter;

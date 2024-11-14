@@ -34,11 +34,13 @@
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo::mongot_cursor {
-inline auto makeRetryOnNetworkErrorPolicy() {
+namespace {
+auto makeRetryOnNetworkErrorPolicy() {
     return [retried = false](const Status& st) mutable {
         return std::exchange(retried, true) ? false : ErrorCodes::isNetworkError(st);
     };
 }
+}  // namespace
 
 static constexpr StringData kSearchField = "search"_sd;
 static constexpr StringData kVectorSearchCmd = "vectorSearch"_sd;

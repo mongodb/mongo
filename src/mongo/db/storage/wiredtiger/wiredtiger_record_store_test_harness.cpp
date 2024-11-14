@@ -184,12 +184,10 @@ std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {
     return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());
 }
 
-namespace {
 std::unique_ptr<RecordStoreHarnessHelper> makeWTRSHarnessHelper(
     RecordStoreHarnessHelper::Options options) {
     return std::make_unique<WiredTigerHarnessHelper>(options);
 }
-}  // namespace
 
 MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
     mongo::registerRecordStoreHarnessHelperFactory(makeWTRSHarnessHelper);

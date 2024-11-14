@@ -569,7 +569,6 @@ bool ietsArePointInterval(const std::vector<interval_evaluation_tree::IET>& iets
     return canGenerateSingleIntervalIndexScan(iets) == IntervalsRequired::EqualityInterval;
 }
 
-namespace {
 std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScanImpl(
     StageBuilderState& state,
     const CollectionPtr& collection,
@@ -816,7 +815,6 @@ std::pair<SbStage, PlanStageSlots> setResultAndAdditionalFieldSlots(SbStage stag
 
     return {std::move(stage), std::move(outputs)};
 }
-}  // namespace
 
 std::tuple<SbStage, PlanStageSlots, boost::optional<std::pair<SbSlot, SbSlot>>>
 generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
@@ -878,7 +876,6 @@ std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderS
         std::move(stage), std::move(outputs), keyPattern, reqs, state, nodeId);
 }
 
-namespace {
 std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& state,
                                                          const CollectionPtr& collection,
                                                          const IndexScanNode* ixn,
@@ -961,7 +958,6 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& stat
 
     return {std::move(stage), std::move(outputs)};
 }
-}  // namespace
 
 std::pair<SbStage, PlanStageSlots> generateIndexScan(StageBuilderState& state,
                                                      const CollectionPtr& collection,
@@ -1038,7 +1034,6 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
     return {boundsTag, boundsVal};
 }
 
-namespace {
 std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
     StageBuilderState& state,
     const CollectionPtr& collection,
@@ -1166,7 +1161,6 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
 
     return {std::move(stage), std::move(outputs)};
 }
-}  // namespace
 
 std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBounds(
     StageBuilderState& state,

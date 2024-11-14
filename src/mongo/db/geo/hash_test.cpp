@@ -74,6 +74,15 @@ static string makeRandomBitString(int length) {
     return ss.str();
 }
 
+// splitBinStr("0000111100001111") -> "0000 1111 0000 1111"
+string splitBinStr(string bin) {
+    string split = "";
+    for (unsigned i = 0; i < bin.length(); i += 4) {
+        split += bin.substr(i, 4) + ' ';
+    }
+    return split.substr(0, split.size() - 1);
+}
+
 TEST(GeoHash, MakeRandomValidHashes) {
     int maxStringLength = 64;
     for (int i = 0; i < maxStringLength; i += 2) {

@@ -49,14 +49,12 @@ TEST(StringUtilsTest, Simple1) {
     ASSERT_EQUALS(0, LexNumCmp::cmp("a.b.c", "a.b.c", false));
 }
 
-namespace {
 void assertCmp(int expected, StringData s1, StringData s2, bool lexOnly = false) {
     LexNumCmp cmp(lexOnly);
     ASSERT_EQUALS(expected, cmp.cmp(s1, s2, lexOnly));
     ASSERT_EQUALS(expected, cmp.cmp(s1, s2));
     ASSERT_EQUALS(expected < 0, cmp(s1, s2));
 }
-}  // namespace
 
 TEST(StringUtilsTest, Simple2) {
     ASSERT(!ctype::isDigit((char)255));

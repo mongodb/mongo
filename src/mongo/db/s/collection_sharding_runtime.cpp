@@ -339,7 +339,8 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
     _metadataType = MetadataType::kTracked;
 
     if (!_metadataManager || !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
-        _metadataManager = std::make_shared<MetadataManager>(_nss, newMetadata);
+        _metadataManager =
+            std::make_shared<MetadataManager>(opCtx->getServiceContext(), _nss, newMetadata);
         ++_numMetadataManagerChanges;
     } else {
         _metadataManager->setFilteringMetadata(std::move(newMetadata));

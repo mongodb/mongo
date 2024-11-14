@@ -62,7 +62,7 @@ namespace mongo {
  * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
  * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
  */
-static std::string nextFileName() {
+std::string nextFileName() {
     static AtomicWord<unsigned> sorterTestFileCounter;
     return "extsort-sorter-test." + std::to_string(sorterTestFileCounter.fetchAndAdd(1));
 }
@@ -76,8 +76,8 @@ static std::string nextFileName() {
 
 
 namespace mongo {
-namespace {
 namespace sorter {
+namespace {
 
 //
 // Sorter framework testing utilities
@@ -1984,8 +1984,8 @@ TEST_F(BoundedSorterTest, CompoundSpill) {
     ASSERT_EQ(sorter->stats().spilledRanges(), 1);
 }
 
-}  // namespace sorter
 }  // namespace
+}  // namespace sorter
 }  // namespace mongo
 
 template class ::mongo::Sorter<::mongo::sorter::BoundedSorterTest::Key,

@@ -44,7 +44,6 @@ mongo_cc_library(
     copts = BOOST_COPTS,
     features = [
         "no_warn_non_virtual_detour",
-        "-missing_prototypes_warning",
     ],
     includes = ["."],
     local_defines = BOOST_DEFINES,
@@ -71,7 +70,6 @@ mongo_cc_library(
     copts = BOOST_COPTS,
     features = [
         "no_warn_non_virtual_detour",
-        "-missing_prototypes_warning",
     ],
     includes = ["."],
     local_defines = BOOST_DEFINES,
@@ -118,7 +116,6 @@ mongo_cc_library(
     copts = BOOST_COPTS,
     features = [
         "no_warn_non_virtual_detour",
-        "-missing_prototypes_warning",
     ],
     includes = ["."],
     local_defines = BOOST_DEFINES,
@@ -160,7 +157,6 @@ mongo_cc_library(
     copts = BOOST_COPTS,
     features = [
         "no_warn_non_virtual_detour",
-        "-missing_prototypes_warning",
     ],
     includes = ["."],
     local_defines = BOOST_DEFINES + ["BOOST_THREAD_BUILD_LIB"] + select({
@@ -228,7 +224,6 @@ mongo_cc_library(
     }),
     features = [
         "no_warn_non_virtual_detour",
-        "-missing_prototypes_warning",
     ],
     includes = ["."],
     linkopts = select({

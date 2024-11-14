@@ -307,6 +307,7 @@ protected:
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     repl::StorageInterfaceImpl _storage;
+    bool _origWildcardKnob{false};
     int _id{1};
 };
 

@@ -491,6 +491,27 @@ bool pastEndOfRange(const CollectionScanParams& params, const WorkingSetMember& 
             (member.recordId == endRecord && !shouldIncludeEndRecord(params));
     }
 }
+
+bool beforeStartOfRange(const CollectionScanParams& params, const WorkingSetMember& member) {
+    if (params.direction == CollectionScanParams::FORWARD) {
+        // A forward scan begins with the minRecord when it is specified.
+        if (!params.minRecord) {
+            return false;
+        }
+
+        const auto& startRecord = params.minRecord->recordId();
+        return member.recordId < startRecord ||
+            (member.recordId == startRecord && !shouldIncludeStartRecord(params));
+    } else {
+        // A backward scan begins with the maxRecord when specified.
+        if (!params.maxRecord) {
+            return false;
+        }
+        const auto& startRecord = params.maxRecord->recordId();
+        return member.recordId > startRecord ||
+            (member.recordId == startRecord && !shouldIncludeStartRecord(params));
+    }
+}
 }  // namespace
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,

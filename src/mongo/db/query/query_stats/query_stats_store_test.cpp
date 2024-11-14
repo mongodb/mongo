@@ -76,14 +76,13 @@
 
 namespace mongo::query_stats {
 
-namespace {
 int countAllEntries(const QueryStatsStore& store) {
     int numKeys = 0;
     store.forEach([&](auto&& key, auto&& entry) { numKeys++; });
     return numKeys;
 }
 
-const NamespaceStringOrUUID kDefaultTestNss =
+static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
@@ -135,7 +134,6 @@ public:
             expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
     }
 };
-}  // namespace
 
 TEST_F(QueryStatsStoreTest, BasicUsage) {
     QueryStatsStore queryStatsStore{5000000, 1000};
@@ -1453,7 +1451,6 @@ TEST_F(QueryStatsStoreTest,
         shapified);
 }
 
-namespace {
 BSONObj intMetricBson(int64_t sum, int64_t min, int64_t max, int64_t sumOfSquares) {
     return BSON("sum" << sum << "max" << max << "min" << min << "sumOfSquares" << sumOfSquares);
 }
@@ -1474,7 +1471,6 @@ BSONObj toBSON(AggregatedMetric<T>& am) {
     am.appendTo(builder, "m");
     return builder.obj();
 }
-}  // namespace
 
 TEST(AggBool, Basic) {
 

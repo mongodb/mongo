@@ -118,7 +118,6 @@ struct StackLocationTestChildThreadInfo {
 };
 static StackLocationTestChildThreadInfo stackLocationTestChildInfo{};
 
-extern "C" void stackLocationTestAction(int, siginfo_t*, void*);
 extern "C" void stackLocationTestAction(int, siginfo_t*, void*) {
     char n;
     stackLocationTestChildInfo.handlerLocal = &n;
@@ -164,7 +163,6 @@ int stackLocationTest() {
 
 static sigjmp_buf sigjmp;
 
-extern "C" void siglongjmpAction(int, siginfo_t*, void*);
 extern "C" void siglongjmpAction(int, siginfo_t*, void*) {
     siglongjmp(sigjmp, 1);
 }

@@ -304,7 +304,6 @@ private:
     stdx::condition_variable _condvar;
 };
 
-namespace {
 std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult& r) {
     if (r.isOK()) {
         if (r.getValue()) {
@@ -318,7 +317,6 @@ std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult
         return r.getStatus().toString();
     }
 }
-}  // namespace
 
 StringData WiredTigerKVEngine::kTableUriPrefix = "table:"_sd;
 

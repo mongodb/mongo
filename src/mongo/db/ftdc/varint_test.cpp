@@ -37,7 +37,6 @@
 
 namespace mongo {
 
-namespace {
 // Test integer packing and unpacking
 void TestInt(std::uint64_t i) {
     char buf[11];
@@ -52,7 +51,6 @@ void TestInt(std::uint64_t i) {
 
     ASSERT_EQUALS(i, d);
 }
-}  // namespace
 
 // Test various integer combinations compress and uncompress correctly
 TEST(FTDCVarIntTest, TestIntCompression) {

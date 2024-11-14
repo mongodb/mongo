@@ -84,9 +84,20 @@ static BSONObj expressionToBson(const boost::intrusive_ptr<Expression>& expressi
     return BSON("" << expression->serialize()).firstElement().embeddedObject().getOwned();
 }
 
+/** Convert Document to BSON. */
+static BSONObj toBson(const Document& document) {
+    return document.toBson();
+}
+
 /** Create a Document from a BSONObj. */
 Document fromBson(BSONObj obj) {
     return Document(obj);
+}
+
+/** Create a Value from a BSONObj. */
+Value valueFromBson(BSONObj obj) {
+    BSONElement element = obj.firstElement();
+    return Value(element);
 }
 
 namespace And {

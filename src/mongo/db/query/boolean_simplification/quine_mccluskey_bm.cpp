@@ -37,7 +37,6 @@
 #include "mongo/db/query/boolean_simplification/quine_mccluskey.h"
 
 namespace mongo::boolean_simplification {
-namespace {
 
 /**
  * Benchmarks maxterm 'A' which simplifies to 'A'.
@@ -163,5 +162,4 @@ BENCHMARK(quineMcCluskey_4predicates_complex);
 BENCHMARK(quineMcCluskey_noSimplifications)->DenseRange(5, 50, 5);
 BENCHMARK(quineMcCluskey_someSimplifications)->DenseRange(5, 50, 5);
 
-}  // namespace
 }  // namespace mongo::boolean_simplification

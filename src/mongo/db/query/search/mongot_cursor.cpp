@@ -152,6 +152,7 @@ long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>&
                  bounds.getMinBounds(),
                  bounds.getMaxBounds());
 }
+}  // namespace
 
 HostAndPort getMongotAddress() {
     auto swHostAndPort = HostAndPort::parse(globalMongotParams.host);
@@ -160,7 +161,6 @@ HostAndPort getMongotAddress() {
 
     return swHostAndPort.getValue();
 }
-}  // namespace
 
 executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
                                                        const NamespaceString& nss,
@@ -171,7 +171,6 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
     rcr.sslMode = transport::ConnectSSLMode::kDisableSSL;
     return rcr;
 }
-namespace {
 // TODO SERVER-91594 makeTaskExecutorCursorForExplain() can be removed when mongot will always
 // return a cursor.
 std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
@@ -214,7 +213,6 @@ std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
     }
     MONGO_UNREACHABLE;
 }
-}  // namespace
 
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

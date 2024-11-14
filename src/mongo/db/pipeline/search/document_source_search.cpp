@@ -155,7 +155,6 @@ StageConstraints DocumentSourceSearch::constraints(Pipeline::SplitState pipeStat
     }
     return constraints;
 }
-namespace {
 bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
                                       Pipeline::SourceContainer* container) {
     DepsTracker deps = DepsTracker::kNoMetadata;
@@ -166,7 +165,6 @@ bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
     }
     return deps.searchMetadataDeps()[DocumentMetadataFields::kSearchSequenceToken];
 }
-}  // namespace
 
 Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {

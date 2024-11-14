@@ -58,7 +58,6 @@
 namespace mongo {
 namespace update {
 
-namespace {
 const char idFieldName[] = "_id";
 const FieldRef idFieldRef(idFieldName);
 
@@ -67,7 +66,6 @@ void addObjectIDIdField(mutablebson::Document* doc) {
     uassert(17268, "Could not create new ObjectId '_id' field.", idElem.ok());
     uassertStatusOK(doc->root().pushFront(idElem));
 }
-}  // namespace
 
 void generateNewDocumentFromUpdateOp(OperationContext* opCtx,
                                      const FieldRefSet& immutablePaths,

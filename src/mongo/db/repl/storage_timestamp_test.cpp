@@ -305,6 +305,7 @@ public:
 private:
     OperationContext* _opCtx;
 };
+}  // namespace
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -905,7 +906,6 @@ private:
         return queryCollection(NamespaceString::kSessionTransactionsTableNamespace, txnsFilter);
     }
 };
-}  // namespace
 
 TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
     Lock::GlobalWrite lk{_opCtx};  // avoid global lock upgrade during applyOps.

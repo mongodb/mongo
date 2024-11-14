@@ -68,7 +68,6 @@
 
 namespace mongo {
 
-namespace {
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     try {
         Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
@@ -78,7 +77,6 @@ bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
         return false;
     }
 }
-}  // namespace
 
 void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two set allow migrations on the same namespace, then the arguments must be the

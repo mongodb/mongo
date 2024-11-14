@@ -57,6 +57,18 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+
+namespace {
+
+// Return a value in the set {-1, 0, 1} to represent the sign of parameter i.
+int sgn(int i) {
+    if (i == 0)
+        return 0;
+    return i > 0 ? 1 : -1;
+}
+
+}  // namespace
+
 namespace mongo {
 
 // static

@@ -157,6 +157,17 @@ void ObjectWrapper::Key::define(JSContext* cx,
     throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to define value on a JSObject");
 }
 
+/*
+ * Wrapper functions to create wrappers with no corresponding JSJitInfo from API
+ * function arguments.
+ */
+static JSNativeWrapper NativeOpWrapper(JSNative native) {
+    JSNativeWrapper ret;
+    ret.op = native;
+    ret.info = nullptr;
+    return ret;
+}
+
 void ObjectWrapper::Key::define(
     JSContext* cx, JS::HandleObject o, unsigned attrs, JSNative getter, JSNative setter) {
     switch (_type) {

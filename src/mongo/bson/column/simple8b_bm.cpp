@@ -42,7 +42,6 @@
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo {
-namespace {
 
 BufBuilder generateIntegers() {
     std::mt19937_64 seedGen(1337);
@@ -282,7 +281,6 @@ void BM_prefixSumUnoptimized(benchmark::State& state) {
 
     state.SetBytesProcessed(totalBytes);
 }
-}  // namespace
 
 BENCHMARK(BM_increasingValues)->Arg(100);
 BENCHMARK(BM_rle)->Arg(100);

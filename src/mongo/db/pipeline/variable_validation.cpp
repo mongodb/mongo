@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

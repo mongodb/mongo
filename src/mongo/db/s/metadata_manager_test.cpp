@@ -74,7 +74,8 @@ class MetadataManagerTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
-        _manager = std::make_shared<MetadataManager>(kNss, makeEmptyMetadata());
+        _manager =
+            std::make_shared<MetadataManager>(getServiceContext(), kNss, makeEmptyMetadata());
         orphanCleanupDelaySecs.store(1);
     }
 

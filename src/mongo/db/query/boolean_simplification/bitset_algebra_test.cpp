@@ -31,6 +31,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::boolean_simplification {
+constexpr size_t nbits = 64;
 
 TEST(BitsetTermOperationsTest, CanAbsorb) {
     ASSERT_TRUE(BitsetTerm("001", "001").canAbsorb({"011", "011"}));

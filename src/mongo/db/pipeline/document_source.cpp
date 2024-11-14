@@ -335,6 +335,16 @@ void DocumentSource::serializeToArray(vector<Value>& array,
     }
 }
 
+namespace {
+std::list<boost::intrusive_ptr<DocumentSource>> throwOnParse(
+    BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uasserted(6047400, spec.fieldNameStringData() + " stage is only allowed on MongoDB Atlas");
+}
+std::unique_ptr<LiteParsedDocumentSource> throwOnParseLite(NamespaceString nss,
+                                                           const BSONElement& spec) {
+    uasserted(6047401, spec.fieldNameStringData() + " stage is only allowed on MongoDB Atlas");
+}
+}  // namespace
 MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,
                         ("default"),
                         ("EndDocumentSourceRegistration"))

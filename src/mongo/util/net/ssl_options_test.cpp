@@ -86,7 +86,7 @@ namespace test {
 struct Vector : public std::vector<uint8_t> {
     Vector(std::vector<uint8_t> v) : std::vector<uint8_t>(std::move(v)) {}
 };
-static std::ostream& operator<<(std::ostream& ss, const Vector& val) {
+std::ostream& operator<<(std::ostream& ss, const Vector& val) {
     ss << '{';
     std::string comma;
     for (const auto& b : val) {

@@ -86,7 +86,6 @@ constexpr auto expiredTokenSignature =
     "MUpgtWg8XaJK65wK3jmEHWfr2QE5mLNpLQBzifBKqhXCqR69VWyFm9FSKyYXLMgk-yH3mIFNBdZxutvWg_PZFECwdcjl-"
     "rtZX-VvzXUtNZl7Dcnn7PbtOEmSISpCdd797we4iwfAHduf5tUykiYn7_NwHD_fxCyfI8HgtRJ9VmVEQ";
 
-namespace {
 BSONObj getTestJWKSet() {
     BSONObjBuilder set;
     BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
@@ -124,7 +123,6 @@ BSONObj getTestJWKSet() {
     keys.doneFast();
     return set.obj();
 }
-}  // namespace
 
 TEST_F(JWKManagerTest, validateTokenFromKeys) {
     RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);

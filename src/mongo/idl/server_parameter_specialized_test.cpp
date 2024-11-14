@@ -63,7 +63,6 @@
 
 namespace mongo {
 namespace test {
-namespace {
 
 template <typename T = ServerParameter>
 T* getServerParameter(StringData name) {
@@ -108,7 +107,6 @@ void ASSERT_APPENDED_OBJECT(ServerParameter* sp, const BSONObj& exp) {
         ASSERT(comparator.evaluate(elem.Obj() == exp));
     });
 }
-}  // namespace
 
 // specializedDummy
 

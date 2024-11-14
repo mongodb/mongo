@@ -34,7 +34,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::ce {
-namespace {
 
 enum DataType { kInt, kStringSmall, kString, kDouble };
 
@@ -312,5 +311,4 @@ BENCHMARK(BM_RunHistogramEstimations)
             /*dataType*/ kString,
             /*queryType*/ kRange});
 
-}  // namespace
 }  // namespace mongo::ce

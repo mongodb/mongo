@@ -146,6 +146,10 @@ NamespaceString rolesNSS(const boost::optional<TenantId>& tenant) {
     }
 }
 
+NamespaceString getRolesCollection(const boost::optional<TenantId>& tenant) {
+    return NamespaceString::makeTenantRolesCollection(tenant);
+}
+
 void serializeResolvedRoles(BSONObjBuilder* user,
                             const ResolvedRoleData& data,
                             boost::optional<const BSONObj&> roleDoc = boost::none) {

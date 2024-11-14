@@ -41,7 +41,6 @@
 namespace mongo {
 namespace fts {
 
-namespace {
 std::vector<std::string> tokenizeString(const char* str, const char* language) {
     // To retrieve the FTSBasicTokenizer, use TEXT_INDEX_VERSION_2
     auto tokenizer = FTSLanguage::make(language, TEXT_INDEX_VERSION_2).createTokenizer();
@@ -56,7 +55,6 @@ std::vector<std::string> tokenizeString(const char* str, const char* language) {
 
     return terms;
 }
-}  // namespace
 
 // Ensure punctuation is filtered out of the indexed document
 // and the 's is not separated

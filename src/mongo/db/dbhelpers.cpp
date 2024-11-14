@@ -206,7 +206,6 @@ RecordId Helpers::findById(OperationContext* opCtx,
         opCtx, collection, entry, idquery["_id"].wrap());
 }
 
-namespace {
 // Acquires necessary locks to read the collection with the given namespace. If this is an oplog
 // read, use AutoGetOplogFastPath for simplified locking.
 const CollectionPtr& getCollectionForRead(
@@ -223,7 +222,6 @@ const CollectionPtr& getCollectionForRead(
         return autoColl->getCollection();
     }
 }
-}  // namespace
 
 bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
     boost::optional<AutoGetCollectionForReadCommand> autoColl;

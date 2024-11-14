@@ -49,6 +49,7 @@ namespace mongo {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(simulateAvailableDiskSpace);
+}
 
 int64_t getAvailableDiskSpaceBytes(const std::string& path) {
     boost::filesystem::path fsPath(path);
@@ -64,7 +65,6 @@ int64_t getAvailableDiskSpaceBytes(const std::string& path) {
     }
     return static_cast<int64_t>(spaceInfo.available);
 }
-}  // namespace
 
 int64_t getAvailableDiskSpaceBytesInDbPath(const std::string& dbpath) {
     if (auto fp = simulateAvailableDiskSpace.scoped(); fp.isActive()) {

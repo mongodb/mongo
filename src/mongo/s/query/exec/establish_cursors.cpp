@@ -452,6 +452,17 @@ void CursorEstablisher::killOpOnShards(ServiceContext* srvCtx,
 } catch (const AssertionException& ex) {
     LOGV2_DEBUG(4625503, 2, "Failed to cleanup remote operations", "error"_attr = ex.toStatus());
 }
+/**
+ * Returns a copy of 'cmdObj' with the $readPreference mode set to secondaryPreferred.
+ */
+BSONObj appendReadPreferenceNearest(BSONObj cmdObj) {
+    BSONObjBuilder cmdWithReadPrefBob(std::move(cmdObj));
+    cmdWithReadPrefBob.append("$readPreference",
+                              BSON("mode"
+                                   << "nearest"));
+    return cmdWithReadPrefBob.obj();
+}
+
 }  // namespace
 
 // Attach our OperationKey to a request. This will allow us to kill any outstanding
@@ -515,7 +526,6 @@ void killRemoteCursor(OperationContext* opCtx,
         .ignore();
 }
 
-namespace {
 std::pair<std::vector<HostAndPort>, StringMap<ShardId>> getHostInfos(
     OperationContext* opCtx, const std::set<ShardId>& shardIds) {
     std::vector<HostAndPort> servers;
@@ -534,7 +544,6 @@ std::pair<std::vector<HostAndPort>, StringMap<ShardId>> getHostInfos(
     }
     return {std::move(servers), hostToShardId};
 }
-}  // namespace
 
 std::vector<RemoteCursor> establishCursorsOnAllHosts(
     OperationContext* opCtx,

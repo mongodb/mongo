@@ -67,6 +67,11 @@ static BSONObj toBson(const Value& value) {
     return bob.obj();
 }
 
+/** Convert Document to BSON. */
+static BSONObj toBson(const Document& document) {
+    return document.toBson();
+}
+
 /** Create a Document from a BSONObj. */
 Document fromBson(BSONObj obj) {
     return Document(obj);

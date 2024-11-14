@@ -93,6 +93,7 @@ public:
      */
     template <typename Callable>
     auto spawn(Callable&& cb) -> Future<typename std::invoke_result<Callable>::type> {
+        using ReturnType = typename std::invoke_result<Callable>::type;
         auto task = PackagedTask([cb = std::move(cb)] { return cb(); });
         auto taskFuture = task.getFuture();
         _pool->schedule([runTask = std::move(task)](Status s) mutable {

@@ -262,6 +262,15 @@ repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
     return oplogEntry;
 }
 
+repl::MutableOplogEntry makePrePostImageOplog(const NamespaceString& nss,
+                                              const Timestamp& timestamp,
+                                              const UUID& uuid,
+                                              const ShardId& shardId,
+                                              const ReshardingDonorOplogId& _id,
+                                              const BSONObj& prePostImage) {
+    return makeOplog(nss, timestamp, uuid, shardId, repl::OpTypeEnum::kNoop, prePostImage, {}, _id);
+}
+
 repl::DurableOplogEntry makeApplyOpsOplog(std::vector<BSONObj> operations,
                                           repl::OpTime opTime,
                                           repl::OpTime prevOpTime,

@@ -93,14 +93,12 @@
 
 
 #if OPENSSL_VERSION_NUMBER < 0x1010100FL
-namespace {
 int SSL_CTX_set_ciphersuites(SSL_CTX*, const char*) {
     uasserted(
         4877400,
         "Setting OpenSSL cipher suites is not allowed for OpenSSL versions older than 1.1.1.");
     return 0;
 }
-}  // namespace
 #endif
 
 using namespace fmt::literals;
@@ -195,17 +193,17 @@ UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
     return rv;
 }
 
-#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
 // Attempts to set a hard coded curve (prime256v1) for ECDHE if the version of OpenSSL supports it.
 bool useDefaultECKey(SSL_CTX* const ctx) {
+#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
     UniqueEC_KEY key(EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
 
     if (key) {
         return SSL_CTX_set_tmp_ecdh(ctx, key.get()) == 1;
     }
+#endif
     return false;
 }
-#endif
 
 // If the underlying SSL supports auto-configuration of ECDH parameters, this function will select
 // it. If not, this function will attempt to use a hard-coded but widely supported elliptic curve.
@@ -1640,12 +1638,10 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
         params, boost::optional<TransientSSLParams>{}, isServer);
 }
 
-namespace {
 SSLX509Name getCertificateSubjectX509Name(X509* cert) {
     auto name = X509_get_subject_name(cert);
     return convertX509ToSSLX509Name(name);
 }
-}  // namespace
 
 int verifyDHParameters(const UniqueDHParams& dhparams) {
     int codes = 0;
@@ -1918,7 +1914,6 @@ int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     return status;
 }
 
-namespace {
 int ocspServerCallback(SSL* ssl, void* arg) {
     std::shared_ptr<OCSPStaplingContext> context =
         static_cast<SSLManagerOpenSSL*>(arg)->getOcspStaplingContext();
@@ -2045,7 +2040,6 @@ int ocspClientCallback(SSL* ssl, void* arg) {
 
     return OCSP_CLIENT_RESPONSE_ACCEPTABLE;
 }
-}  // namespace
 
 /*
  * According to policy decided with drivers, the shell should verify the peer certificate with the
@@ -2168,7 +2162,6 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
 
 using StoreCtxVerifiedChain = std::unique_ptr<STACK_OF(X509), X509StackDeleter>;
 
-namespace {
 /** getCertificateForContext provides access to the X509* used by the provided SSL_CTX*.
  * OpenSSL 1.0.2 provides SSL_CTX_get0_certificate, which provides direct access to the pointer.
  * OpenSSL 1.0.1 only exposes the pointer on a per-connection basis via SSL_get_certificate.
@@ -2187,7 +2180,6 @@ std::tuple<X509*> getCertificateForContext(SSL_CTX* context) {
     return std::make_tuple(SSL_CTX_get0_certificate(context));
 }
 #endif
-}  // namespace
 
 #ifdef MONGO_CONFIG_OCSP_STAPLING_ENABLED
 Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPStaple) {
@@ -2267,7 +2259,6 @@ Status OCSPFetcher::start(SSL_CTX* context, bool asyncOCSPStaple) {
     return Status::OK();
 }
 
-namespace {
 Milliseconds getPeriodForStapleJob(StatusWith<Milliseconds> swDuration) {
     if (!swDuration.isOK()) {
         return kOCSPUnknownStatusRefreshRate;
@@ -2275,7 +2266,6 @@ Milliseconds getPeriodForStapleJob(StatusWith<Milliseconds> swDuration) {
         return swDuration.getValue();
     }
 }
-}  // namespace
 
 void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
     stdx::lock_guard<stdx::mutex> lock(_staplingMutex);
@@ -2348,7 +2338,6 @@ bool OCSPFetcher::_isShutdownConditionLocked(WithLock lock) {
     return false;
 }
 
-namespace {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 void sslContextGetOtherCerts(SSL_CTX* ctx, STACK_OF(X509) * *sk) {
     SSL_CTX_get_extra_chain_certs(ctx, sk);
@@ -2358,7 +2347,6 @@ void sslContextGetOtherCerts(SSL_CTX* ctx, STACK_OF(X509) * *sk) {
     SSL_CTX_get0_chain_certs(ctx, sk);
 }
 #endif
-}  // namespace
 
 Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
 

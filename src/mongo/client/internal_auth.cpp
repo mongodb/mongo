@@ -127,7 +127,6 @@ BSONObj getInternalAuthParams(size_t idx, StringData mechanism) {
                 << false);
 }
 
-namespace {
 std::string getBSONString(const BSONObj& container, StringData field) {
     auto elem = container[field];
     uassert(ErrorCodes::BadValue,
@@ -135,7 +134,7 @@ std::string getBSONString(const BSONObj& container, StringData field) {
             elem.type() == String);
     return elem.String();
 }
-}  // namespace
+
 
 std::string getInternalAuthDB() {
     stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);

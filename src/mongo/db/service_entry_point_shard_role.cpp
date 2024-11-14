@@ -2426,6 +2426,8 @@ void HandleRequest::completeOperation(DbResponse& response) {
     }
 }
 
+}  // namespace
+
 void logHandleRequestFailure(const Status& status) {
     LOGV2_INFO(4879802, "Failed to handle request", "error"_attr = redact(status));
 }
@@ -2446,8 +2448,6 @@ void onHandleRequestException(const HandleRequest::ExecutionContext& context,
 
     logHandleRequestFailure(status);
 }
-
-}  // namespace
 
 Future<DbResponse> ServiceEntryPointShardRole::handleRequest(OperationContext* opCtx,
                                                              const Message& m) noexcept try {

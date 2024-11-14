@@ -52,6 +52,13 @@
 
 namespace mongo {
 
+namespace {
+
+BSONObj lsidQuery(const LogicalSessionId& lsid) {
+    return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
+}
+}  // namespace
+
 void SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opCtx) {
     try {
         checkSessionsCollectionExists(opCtx);

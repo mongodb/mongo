@@ -53,11 +53,12 @@ class OperationContext;
  */
 class CanonicalDistinct {
 public:
-    static constexpr const char kKeyField[] = "key";
-    static constexpr const char kQueryField[] = "query";
-    static constexpr const char kCollationField[] = "collation";
-    static constexpr const char kUnwoundArrayFieldForViewUnwind[] = "_internalUnwoundArray";
-    static constexpr const char kHintField[] = "hint";
+    static const char kKeyField[];
+    static const char kQueryField[];
+    static const char kCollationField[];
+    static const char kCommentField[];
+    static const char kUnwoundArrayFieldForViewUnwind[];
+    static const char kHintField[];
 
     CanonicalDistinct(std::string key,
                       bool mirrored = false,

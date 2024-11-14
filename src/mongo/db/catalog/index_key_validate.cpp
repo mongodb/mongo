@@ -771,7 +771,6 @@ Status validateIdIndexSpec(const BSONObj& indexSpec) {
     return Status::OK();
 }
 
-namespace {
 /**
  * Top-level index spec field names for a "clustered" index are specified here.
  */
@@ -788,7 +787,6 @@ Status validateClusteredSpecFieldNames(const BSONObj& indexSpec) {
     }
     return Status::OK();
 }
-}  // namespace
 
 /**
  * Top-level index spec field names are validated here. When adding a new field with a document as

@@ -114,6 +114,46 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeUpdatingChunks);
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeCommit);
 
+void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
+                                        Shard* configShard,
+                                        ShardingCatalogClient* catalogClient,
+                                        const CollectionType& coll) {
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto allShards = uassertStatusOK(catalogClient->getAllShards(
+                                               opCtx, repl::ReadConcernLevel::kLocalReadConcern))
+                               .value;
+    for (const auto& shardEntry : allShards) {
+        const auto query = BSON(ChunkType::collectionUUID
+                                << coll.getUuid() << ChunkType::shard(shardEntry.getName()));
+
+        const auto chunk = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                               opCtx,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               repl::ReadConcernLevel::kLocalReadConcern,
+                                               NamespaceString::kConfigsvrChunksNamespace,
+                                               query,
+                                               BSONObj(),
+                                               1LL))
+                               .docs;
+
+        invariant(chunk.size() == 0 || chunk.size() == 1);
+
+        if (chunk.size() == 1) {
+            const auto shard =
+                uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
+
+            // This is a best-effort attempt to refresh the shard 'shardEntry'. Fire and forget an
+            // asynchronous '_flushRoutingTableCacheUpdates' request.
+            shard->runFireAndForgetCommand(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                DatabaseName::kAdmin,
+                BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(
+                         coll.getNss(), SerializationContext::stateDefault())));
+        }
+    }
+}
+
 // Returns the pipeline updates to be used for updating a refined collection's chunk and tag
 // documents.
 //

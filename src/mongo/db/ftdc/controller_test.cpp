@@ -206,6 +206,7 @@ public:
 private:
     bool _multiService;
     boost::filesystem::path _dir;
+    size_t _numFiles = 1;
 
     // Cache is cleared when a value changes or when a rotate occurs.
     std::string _nameCache = "-1";

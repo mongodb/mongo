@@ -67,6 +67,7 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 
 private:
+    ServiceContext* _serviceContext;
     std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> _externalStateFactory;
 };
 

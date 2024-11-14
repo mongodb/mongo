@@ -220,7 +220,6 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     invariant(db == _clientContext->db());
 }
 
-namespace {
 int dbtestsMain(int argc, char** argv) {
     ::mongo::setTestCommandsEnabled(true);
     ::mongo::TestingProctor::instance().setEnabled(true);
@@ -271,7 +270,7 @@ int dbtestsMain(int argc, char** argv) {
     ScriptEngine::setup(ExecutionEnvironment::Server);
     return mongo::dbtests::runDbTests(argc, argv);
 }
-}  // namespace
+
 }  // namespace dbtests
 }  // namespace mongo
 

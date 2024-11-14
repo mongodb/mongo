@@ -40,7 +40,6 @@
 
 using namespace mongo;
 
-namespace {
 // Asserts that we can cast to uint128_t and cast back as well that the expected high and low bits
 // after cast are following 2's complement.
 void assertCastIsValid(int128_t val, uint64_t expectedHi, uint64_t expectedLo) {
@@ -50,7 +49,6 @@ void assertCastIsValid(int128_t val, uint64_t expectedHi, uint64_t expectedLo) {
     int128_t backToSigned = static_cast<int128_t>(castedInt);
     ASSERT_EQUALS(val, backToSigned);
 }
-}  // namespace
 
 TEST(Int128, TestCastingPositive) {
     assertCastIsValid(12345, 0, 12345);

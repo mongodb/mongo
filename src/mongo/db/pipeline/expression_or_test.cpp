@@ -85,6 +85,11 @@ static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
     return BSON("" << expression->serialize()).firstElement().embeddedObject().getOwned();
 }
 
+/** Convert Document to BSON. */
+static BSONObj toBson(const Document& document) {
+    return document.toBson();
+}
+
 /** Create a Document from a BSONObj. */
 Document fromBson(BSONObj obj) {
     return Document(obj);

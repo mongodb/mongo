@@ -115,6 +115,100 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
     return constraints;
 }
 
+namespace {
+
+template <typename T>
+void serializeSpecField(BSONObjBuilder* builder,
+                        const SerializationOptions& opts,
+                        StringData fieldName,
+                        const boost::optional<T>& value) {
+    if (value) {
+        opts.serializeLiteral((*value).toBSON()).addToBsonObj(builder, fieldName);
+    }
+}
+
+template <>
+void serializeSpecField(BSONObjBuilder* builder,
+                        const SerializationOptions& opts,
+                        StringData fieldName,
+                        const boost::optional<Timestamp>& value) {
+    if (value) {
+        opts.serializeLiteral(*value).addToBsonObj(builder, fieldName);
+    }
+}
+
+template <typename T>
+void serializeSpecField(BSONObjBuilder* builder,
+                        const SerializationOptions& opts,
+                        StringData fieldName,
+                        const T& value) {
+    opts.appendLiteral(builder, fieldName, value);
+}
+
+template <>
+void serializeSpecField(BSONObjBuilder* builder,
+                        const SerializationOptions& opts,
+                        StringData fieldName,
+                        const mongo::OptionalBool& value) {
+    if (value.has_value()) {
+        opts.appendLiteral(builder, fieldName, value.value_or(true));
+    }
+}
+
+void serializeSpec(const DocumentSourceChangeStreamSpec& spec,
+                   const SerializationOptions& opts,
+                   BSONObjBuilder* builder) {
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kResumeAfterFieldName,
+                       spec.getResumeAfter());
+    serializeSpecField(
+        builder, opts, DocumentSourceChangeStreamSpec::kStartAfterFieldName, spec.getStartAfter());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName,
+                       spec.getStartAtOperationTime());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kFullDocumentFieldName,
+                       ::mongo::FullDocumentMode_serializer(spec.getFullDocument()));
+    serializeSpecField(
+        builder,
+        opts,
+        DocumentSourceChangeStreamSpec::kFullDocumentBeforeChangeFieldName,
+        ::mongo::FullDocumentBeforeChangeMode_serializer(spec.getFullDocumentBeforeChange()));
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kAllChangesForClusterFieldName,
+                       spec.getAllChangesForCluster());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowMigrationEventsFieldName,
+                       spec.getShowMigrationEvents());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName,
+                       spec.getShowSystemEvents());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName,
+                       spec.getAllowToRunOnConfigDB());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kAllowToRunOnSystemNSFieldName,
+                       spec.getAllowToRunOnSystemNS());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName,
+                       spec.getShowExpandedEvents());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName,
+                       spec.getShowRawUpdateDescription());
+}
+
+}  // namespace
+
 Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions& opts) const {
     if (opts.verbosity) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,

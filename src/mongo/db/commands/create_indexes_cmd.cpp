@@ -126,6 +126,7 @@ MONGO_FAIL_POINT_DEFINE(hangCreateIndexesBeforeStartingIndexBuild);
 
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
 
+constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"_sd;
 constexpr auto kIndexAlreadyExists = "index already exists"_sd;
 

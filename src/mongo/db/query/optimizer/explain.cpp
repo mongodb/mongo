@@ -85,8 +85,6 @@ static constexpr ExplainVersion kDefaultExplainVersion = ExplainVersion::V2;
 
 enum class CommandType { Indent, Unindent, AddLine };
 
-namespace {
-
 struct CommandStruct {
     CommandStruct() = default;
     CommandStruct(const CommandType type, std::string str) : _type(type), _str(std::move(str)) {}
@@ -960,7 +958,6 @@ public:
 
 using ExplainGeneratorV2 = ExplainGeneratorTransporter<ExplainVersion::V2>;
 using ExplainGeneratorV3 = ExplainGeneratorTransporter<ExplainVersion::V3>;
-}  // namespace
 
 std::string ExplainGenerator::explainV2(const ABT::reference_type node) {
     ExplainGeneratorV2 gen;

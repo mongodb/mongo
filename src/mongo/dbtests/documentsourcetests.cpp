@@ -103,6 +103,13 @@ static const NamespaceString nss =
 static const BSONObj metaTextScore = BSON("$meta"
                                           << "textScore");
 
+BSONObj toBson(const intrusive_ptr<DocumentSource>& source) {
+    vector<Value> arr;
+    source->serializeToArray(arr);
+    ASSERT_EQUALS(arr.size(), 1UL);
+    return arr[0].getDocument().toBson();
+}
+
 class DocumentSourceCursorTest : public unittest::Test {
 public:
     DocumentSourceCursorTest()

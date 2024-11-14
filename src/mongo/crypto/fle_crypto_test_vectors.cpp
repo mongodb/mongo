@@ -137,7 +137,6 @@ TEST(EdgeCalcTest, Int64_TestVectors) {
     }
 }
 
-namespace {
 std::unique_ptr<Edges> getEdgesDoubleForTest(double value,
                                              boost::optional<double> min,
                                              boost::optional<double> max,
@@ -146,7 +145,6 @@ std::unique_ptr<Edges> getEdgesDoubleForTest(double value,
     // The non-precision test vectors set min/max which is not allowed
     return getEdgesDouble(value, boost::none, boost::none, boost::none, sparsity, trimFactor);
 }
-}  // namespace
 
 TEST(EdgeCalcTest, Double_TestVectors) {
     std::vector<EdgeCalcTestVector<double>> testVectors = {
@@ -157,7 +155,7 @@ TEST(EdgeCalcTest, Double_TestVectors) {
     }
 }
 
-namespace {
+
 std::unique_ptr<Edges> getEdgesDecimal128ForTest(Decimal128 value,
                                                  boost::optional<Decimal128> min,
                                                  boost::optional<Decimal128> max,
@@ -167,7 +165,7 @@ std::unique_ptr<Edges> getEdgesDecimal128ForTest(Decimal128 value,
     // The non-precision test vectors set min/max which is not allowed
     return getEdgesDecimal128(value, boost::none, boost::none, boost::none, sparsity, trimFactor);
 }
-}  // namespace
+
 
 TEST(EdgeCalcTest, Decimal128_TestVectors) {
     std::vector<EdgeCalcTestVector<Decimal128>> testVectors = {
@@ -235,7 +233,6 @@ TEST(MinCoverCalcTest, Int64_TestVectors) {
     }
 }
 
-namespace {
 std::vector<std::string> minCoverDoubleForTest(double lowerBound,
                                                bool includeLowerBound,
                                                double upperBound,
@@ -255,7 +252,6 @@ std::vector<std::string> minCoverDoubleForTest(double lowerBound,
                           sparsity,
                           trimFactor);
 }
-}  // namespace
 
 TEST(MinCoverCalcTest, Double_TestVectors) {
     MinCoverTestVector<double> testVectors[] = {
@@ -266,7 +262,6 @@ TEST(MinCoverCalcTest, Double_TestVectors) {
     }
 }
 
-namespace {
 std::vector<std::string> minCoverDecimal128ForTest(Decimal128 lowerBound,
                                                    bool includeLowerBound,
                                                    Decimal128 upperBound,
@@ -287,7 +282,7 @@ std::vector<std::string> minCoverDecimal128ForTest(Decimal128 lowerBound,
                               sparsity,
                               trimFactor);
 }
-}  // namespace
+
 
 TEST(MinCoverCalcTest, Decimal128_TestVectors) {
     MinCoverTestVector<Decimal128> testVectors[] = {

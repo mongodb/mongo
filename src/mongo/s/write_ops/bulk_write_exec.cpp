@@ -320,7 +320,6 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
     return replyInfo;
 }
 
-namespace {
 BatchedCommandRequest makeFLECommandRequest(OperationContext* opCtx,
                                             const BulkWriteCommandRequest& clientRequest,
                                             const std::vector<BulkWriteOpVariant>& ops) {
@@ -365,7 +364,6 @@ BatchedCommandRequest makeFLECommandRequest(OperationContext* opCtx,
         return BatchedCommandRequest(deleteCommand);
     }
 }
-}  // namespace
 
 void BulkWriteExecStats::noteTargetedShard(const BulkWriteCommandRequest& clientRequest,
                                            const TargetedWriteBatch& targetedBatch) {
@@ -480,7 +478,6 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
     }
 }
 
-namespace {
 void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
                                       TargetedBatchMap& childBatches,
                                       BulkWriteOp& bulkWriteOp) {
@@ -728,7 +725,6 @@ void coordinateMultiUpdate(OperationContext* opCtx,
         ShardWCError(childBatches.begin()->first, WriteConcernErrorDetail{}),
         bulkWriteResponse.getRetriedStmtIds());
 }
-}  // namespace
 
 BulkWriteReplyInfo execute(OperationContext* opCtx,
                            const std::vector<std::unique_ptr<NSTargeter>>& targeters,
@@ -1175,7 +1171,6 @@ void BulkWriteOp::noteErrorForRemainingWrites(const Status& status) {
     dassert(isFinished());
 }
 
-namespace {
 /**
  * Checks if an error reply has the TransientTransactionError label. We use this in cases where we
  * want to defer to whether a shard attached the label to an error it gave us.
@@ -1259,7 +1254,6 @@ std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
 
     return result;
 }
-}  // namespace
 
 void BulkWriteOp::processChildBatchResponseFromRemote(
     const TargetedWriteBatch& writeBatch,

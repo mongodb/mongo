@@ -156,7 +156,6 @@ TEST(FTSIndexFormat, StopWords1) {
     ASSERT_EQUALS(1U, keys2.size());
 }
 
-namespace {
 /**
  * Helper function to compare keys returned in getKeys() result
  * with expected values.
@@ -181,7 +180,6 @@ void assertEqualsIndexKeys(std::set<std::string>& expectedKeys, const KeyStringS
         }
     }
 }
-}  // namespace
 
 /**
  * Tests keys for long terms using text index version 1.

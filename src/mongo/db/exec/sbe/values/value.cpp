@@ -211,6 +211,11 @@ std::pair<TypeTags, Value> makeCopyRecordId(const RecordId& rid) {
     return {TypeTags::RecordId, copy};
 }
 
+std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& bounds) {
+    auto boundsCopy = bitcastFrom<IndexBounds*>(new IndexBounds(bounds));
+    return {TypeTags::indexBounds, boundsCopy};
+}
+
 void releaseValueDeep(TypeTags tag, Value val) noexcept {
     switch (tag) {
         case TypeTags::RecordId:

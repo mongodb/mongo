@@ -109,7 +109,6 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectReturnsConnectionError);
 SSLConnectionContext::~SSLConnectionContext() = default;
 #endif
 
-namespace {
 class AsioReactorTimer final : public ReactorTimer {
 public:
     using TimerType = synchronized_value<asio::system_timer, RawSynchronizedValueMutexPolicy>;
@@ -181,7 +180,6 @@ private:
 
     std::shared_ptr<TimerType> _timer;
 };
-}  // namespace
 
 class AsioReactor final : public Reactor {
 public:
@@ -388,7 +386,6 @@ struct AsioTransportLayer::AcceptorRecord {
     AtomicWord<int> backlogQueueDepth{0};
 };
 
-namespace {
 class WrappedEndpoint {
 public:
     using Endpoint = asio::generic::stream_protocol::endpoint;
@@ -566,7 +563,7 @@ Status makeConnectError(Status status, const HostAndPort& peer, const WrappedEnd
 
     return status.withContext(errmsg);
 }
-}  // namespace
+
 
 StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     HostAndPort peer,

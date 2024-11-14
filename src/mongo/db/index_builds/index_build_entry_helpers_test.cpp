@@ -69,6 +69,36 @@ std::vector<std::string> generateIndexes(size_t numIndexes) {
     return indexes;
 }
 
+std::vector<HostAndPort> generateCommitReadyMembers(size_t numMembers) {
+    std::vector<HostAndPort> members;
+    for (size_t i = 0; i < numMembers; i++) {
+        members.push_back(HostAndPort("localhost:27017"));
+    }
+    return members;
+}
+
+void checkIfEqual(IndexBuildEntry lhs, IndexBuildEntry rhs) {
+    ASSERT_EQ(lhs.getBuildUUID(), rhs.getBuildUUID());
+    ASSERT_EQ(lhs.getCollectionUUID(), rhs.getCollectionUUID());
+
+    BSONObj commitQuorumOptionsBsonLHS = lhs.getCommitQuorum().toBSON();
+    BSONObj commitQuorumOptionsBsonRHS = rhs.getCommitQuorum().toBSON();
+    ASSERT_BSONOBJ_EQ(commitQuorumOptionsBsonLHS, commitQuorumOptionsBsonRHS);
+
+    auto lhsIndexNames = lhs.getIndexNames();
+    auto rhsIndexNames = rhs.getIndexNames();
+    ASSERT_TRUE(std::equal(lhsIndexNames.begin(), lhsIndexNames.end(), rhsIndexNames.begin()));
+
+    if (lhs.getCommitReadyMembers() && rhs.getCommitReadyMembers()) {
+        auto lhsMembers = lhs.getCommitReadyMembers().value();
+        auto rhsMembers = rhs.getCommitReadyMembers().value();
+        ASSERT_TRUE(std::equal(lhsMembers.begin(), lhsMembers.end(), rhsMembers.begin()));
+    } else {
+        ASSERT_FALSE(lhs.getCommitReadyMembers());
+        ASSERT_FALSE(rhs.getCommitReadyMembers());
+    }
+}
+
 Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
     return indexbuildentryhelpers::removeIndexBuildEntry(opCtx, *autoColl, indexBuildUUID);

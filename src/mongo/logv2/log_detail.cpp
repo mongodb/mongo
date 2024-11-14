@@ -210,7 +210,6 @@ static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs
     }
 }
 
-namespace {
 void doSafeLog(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
@@ -268,7 +267,6 @@ void _doLogImpl(int32_t id,
         source.push_record(std::move(record));
     }
 }
-}  // namespace
 
 void doLogImpl(int32_t id,
                LogSeverity const& severity,

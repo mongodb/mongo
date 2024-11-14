@@ -1469,7 +1469,6 @@ TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualitie
     ASSERT(in.contains(obj2.firstElement()));
 }
 
-namespace {
 // Serializes expression 'expression' into the query shape format.
 BSONObj serializeToQueryShape(const MatchExpression& expression) {
     BSONObjBuilder objBuilder;
@@ -1477,7 +1476,6 @@ BSONObj serializeToQueryShape(const MatchExpression& expression) {
                          SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     return objBuilder.obj();
 }
-}  // namespace
 
 TEST(InMatchExpression, SerializeToQueryShapeEmptyList) {
     InMatchExpression matchExpression("a"_sd);
@@ -1499,7 +1497,6 @@ TEST(InMatchExpression, SerializeToQueryShapeSingleElementList) {
     ASSERT_BSONOBJ_EQ(serializeToQueryShape(matchExpression), fromjson("{ a: { $in: [1] } }"));
 }
 
-namespace {
 std::vector<uint32_t> bsonArrayToBitPositions(const BSONArray& ba) {
     std::vector<uint32_t> bitPositions;
 
@@ -1510,7 +1507,6 @@ std::vector<uint32_t> bsonArrayToBitPositions(const BSONArray& ba) {
 
     return bitPositions;
 }
-}  // namespace
 
 TEST(BitTestMatchExpression, DoesNotMatchOther) {
     std::vector<uint32_t> bitPositions;
