@@ -297,11 +297,37 @@ void moveResultsFile(const std::filesystem::path& actualPath,
         }
     }
 }
+}  // namespace
 
-bool textBasedCompare(const std::filesystem::path& expectedPath,
-                      const std::filesystem::path& actualPath) {
-    if (auto result = fileHelpers::gitDiff(expectedPath, actualPath); !result.empty()) {
-        std::cout << result << std::endl;
+void QueryFile::printFailedQueries(const std::vector<size_t>& failedTestNums) const {
+    std::cout << applyRed() << "------------------------------------------------------------"
+              << applyReset() << std::endl
+              << applyCyan() << "FAIL: " << fileHelpers::getTestNameFromFilePath(_filePath)
+              << applyReset() << std::endl;
+    for (const auto& testNum : failedTestNums) {
+        uassert(9699600,
+                mongo::str::stream() << "Test " << testNum << " does not exist.",
+                _testNumToQuery.find(testNum) != _testNumToQuery.end());
+        std::cout << applyBold() << "TestNum: " << applyReset() << testNum << std::endl
+                  << applyBold() << "Query: " << applyReset() << _testNumToQuery.at(testNum)
+                  << std::endl
+                  << std::endl;
+    }
+}
+
+bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
+                                 const std::filesystem::path& actualPath) {
+    if (const auto& diffOutput = fileHelpers::gitDiff(expectedPath, actualPath);
+        !diffOutput.empty()) {
+        // Write out the diff output.
+        std::cout << diffOutput << std::endl;
+
+        const auto& failedTestNums = fileHelpers::getFailedTestNums(diffOutput);
+        if (!failedTestNums.empty()) {
+            printFailedQueries(failedTestNums);
+            _failedQueryCount += failedTestNums.size();
+        }
+
         // No cleanup on failure.
         return false;
     } else {
@@ -311,7 +337,6 @@ bool textBasedCompare(const std::filesystem::path& expectedPath,
         return true;
     }
 }
-}  // namespace
 
 bool QueryFile::writeAndValidate(const ModeOption mode, const WriteOutOptions writeOutOpts) {
     // Set up the text-based diff environment.
@@ -374,12 +399,12 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
     fs << std::endl;
 
     // Write out each test.
-    for (size_t i = 0; i < _tests.size(); ++i) {
-        _tests[i].writeToStream(fs, opt);
+    for (const auto& test : _tests) {
+        _testNumToQuery[test.getTestNum()] = test.getTestLine();
+        test.writeToStream(fs, opt);
+
         // There should be one empty line after every test.
-        if (i != _tests.size() - 1) {
-            fs << std::endl;
-        }
+        fs << (&test == &_tests.back() ? "" : "\n");
     }
 
     return true;

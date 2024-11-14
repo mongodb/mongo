@@ -31,13 +31,70 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
+
+#ifdef _WIN32
+#include <io.h>
+#define isatty _isatty
+#define STDOUT_FILENO _fileno(stdout)
+#else
+#include <unistd.h>
+#endif
 
 #include "mongo/bson/bsonelement.h"
 
 namespace queryTester {
 enum class WriteOutOptions { kNone, kResult, kOnelineResult };
 WriteOutOptions stringToWriteOutOpt(std::string opt);
+
+inline bool isTerminal() {
+    static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
+    return isTerminal;
+}
+
+namespace ColorCodes {
+constexpr std::string_view RED = "\033[1;31m";
+constexpr std::string_view YELLOW = "\033[1;33m";
+constexpr std::string_view CYAN = "\033[1;36m";
+constexpr std::string_view BROWN = "\033[33m";
+constexpr std::string_view BOLD = "\033[1m";
+constexpr std::string_view RESET = "\033[m";
+}  // namespace ColorCodes
+
+class ConditionalColor {
+public:
+    explicit ConditionalColor(std::string_view colorCode) : _colorCode(colorCode) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const ConditionalColor& cc) {
+        if (isTerminal()) {
+            os << cc._colorCode;
+        }
+        return os;
+    }
+
+private:
+    std::string_view _colorCode;
+};
+
+inline ConditionalColor applyRed() {
+    return ConditionalColor(ColorCodes::RED);
+}
+inline ConditionalColor applyYellow() {
+    return ConditionalColor(ColorCodes::YELLOW);
+}
+inline ConditionalColor applyCyan() {
+    return ConditionalColor(ColorCodes::CYAN);
+}
+inline ConditionalColor applyBrown() {
+    return ConditionalColor(ColorCodes::BROWN);
+}
+inline ConditionalColor applyBold() {
+    return ConditionalColor(ColorCodes::BOLD);
+}
+inline ConditionalColor applyReset() {
+    return ConditionalColor(ColorCodes::RESET);
+}
 
 namespace fileHelpers {
 void verifyFileStreamGood(std::fstream& fs,
@@ -48,7 +105,19 @@ std::vector<std::string> readAndAssertNewline(std::fstream& fs, std::string cont
 std::vector<std::string> readLine(std::fstream& fs, std::string& lineFromFile);
 // Returns a {collName, fileName} tuple.
 std::tuple<std::string, std::filesystem::path> getCollAndFileName(const std::string&);
+/**
+ * Extracts the test numbers associated with failing queries from hunk headers in the git diff
+ * output and stores them in a vector.
+ */
+std::vector<size_t> getFailedTestNums(const std::string& diffOutput);
+/**
+ * Performs a text-based diff between the expected and actual result test files and returns the diff
+ * output.
+ */
 std::string gitDiff(const std::filesystem::path&, const std::filesystem::path&);
+void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
+                         size_t failedQueryCount,
+                         size_t totalTestsRun);
 
 template <typename T, bool Multiline>
 class TestResult {
