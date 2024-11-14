@@ -132,11 +132,11 @@ void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
         } else {
             b = e.embeddedObject();
         }
-        BSONObjIterator i(b);
-        while (i.moreWithEOO()) {
-            BSONElement el = i.next();
+        for (auto&& el : b) {
             recursiveHash(h, el, true);
         }
+        // Handle EOO case
+        recursiveHash(h, BSONElement{}, true);
     }
 }
 

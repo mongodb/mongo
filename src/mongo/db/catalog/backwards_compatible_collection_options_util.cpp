@@ -33,9 +33,21 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace backwards_compatible_collection_options {
+namespace {
+/**
+ * Backwards incompatible catalog parameters for which the actual value may have been missing or
+ * incorrect in previous mongod [sub-]versions.
+ */
+const StringDataSet kBackwardsCompatibleCollectionOptions{
+    kTimeseriesBucketsMayHaveMixedSchemaData,
+    kTimeseriesBucketingParametersHaveChanged,
+};
+}  // namespace
+
 std::pair<BSONObj, BSONObj> getCollModCmdAndAdditionalO2Field(const BSONObj& collModCmd) {
     const BSONObj collModCmdStrippedBackwardsIncompatibleParams =
         collModCmd.removeFields(kBackwardsCompatibleCollectionOptions);
@@ -47,7 +59,7 @@ std::pair<BSONObj, BSONObj> getCollModCmdAndAdditionalO2Field(const BSONObj& col
     const BSONObj backwardsIncompatibleFields = [&]() {
         BSONObjBuilder bob;
         for (auto [fieldName, elem] : collModCmd) {
-            if (kBackwardsCompatibleCollectionOptions.contains(fieldName.toString())) {
+            if (kBackwardsCompatibleCollectionOptions.contains(fieldName)) {
                 bob.append(elem);
             }
         }
@@ -74,7 +86,7 @@ BSONObj parseCollModCmdFromOplogEntry(const repl::OplogEntry& entry) {
 
     // Only consider backwards incompatible fields supported in the current [sub-]version
     for (auto [fieldName, elem] : incompatibleFields) {
-        if (!kBackwardsCompatibleCollectionOptions.contains(fieldName.toString())) {
+        if (!kBackwardsCompatibleCollectionOptions.contains(fieldName)) {
             incompatibleFields = incompatibleFields.removeField(fieldName);
         }
     }

@@ -193,7 +193,7 @@ MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
 StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {
     StringBuilder ss;
-    BSONForEach(elem, options) {
+    for (auto&& elem : options) {
         if (elem.fieldNameStringData() == WiredTigerUtil::kConfigStringField) {
             Status status = WiredTigerUtil::checkTableCreationOptions(elem);
             if (!status.isOK()) {

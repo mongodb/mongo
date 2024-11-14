@@ -3079,7 +3079,7 @@ TEST_F(ReplCoordTest, NodeIncludesOtherMembersProgressInUpdatePositionCommand) {
     ASSERT_EQUALS(UpdatePositionArgs::kCommandFieldName, cmd.firstElement().fieldNameStringData());
 
     std::set<long long> memberIds;
-    BSONForEach(entryElement, cmd[UpdatePositionArgs::kUpdateArrayFieldName].Obj()) {
+    for (auto&& entryElement : cmd[UpdatePositionArgs::kUpdateArrayFieldName].Obj()) {
         OpTime durableOpTime;
         OpTime appliedOpTime;
         BSONObj entry = entryElement.Obj();
@@ -7630,7 +7630,7 @@ TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelieve
     // Check that we have two entries in our UpdatePosition (us and node 1).
     BSONObj cmd = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand());
     std::set<long long> memberIds;
-    BSONForEach(entryElement, cmd[UpdatePositionArgs::kUpdateArrayFieldName].Obj()) {
+    for (auto&& entryElement : cmd[UpdatePositionArgs::kUpdateArrayFieldName].Obj()) {
         BSONObj entry = entryElement.Obj();
         long long memberId = entry[UpdatePositionArgs::kMemberIdFieldName].Number();
         memberIds.insert(memberId);
@@ -7661,7 +7661,7 @@ TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelieve
     // DOWN node.
     BSONObj cmd2 = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand());
     std::set<long long> memberIds2;
-    BSONForEach(entryElement, cmd2[UpdatePositionArgs::kUpdateArrayFieldName].Obj()) {
+    for (auto&& entryElement : cmd2[UpdatePositionArgs::kUpdateArrayFieldName].Obj()) {
         BSONObj entry = entryElement.Obj();
         long long memberId = entry[UpdatePositionArgs::kMemberIdFieldName].Number();
         memberIds2.insert(memberId);

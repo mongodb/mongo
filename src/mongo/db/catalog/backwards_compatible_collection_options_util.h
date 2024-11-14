@@ -29,6 +29,7 @@
 
 // TODO SERVER-92265 evaluate getting rid of this file
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
@@ -47,19 +48,12 @@ namespace mongo {
  */
 namespace backwards_compatible_collection_options {
 
-const std::string kTimeseriesBucketsMayHaveMixedSchemaData =
-    "timeseriesBucketsMayHaveMixedSchemaData";
-const std::string kTimeseriesBucketingParametersHaveChanged =
-    "timeseriesBucketingParametersHaveChanged";
+constexpr inline auto kTimeseriesBucketsMayHaveMixedSchemaData =
+    "timeseriesBucketsMayHaveMixedSchemaData"_sd;
+constexpr inline auto kTimeseriesBucketingParametersHaveChanged =
+    "timeseriesBucketingParametersHaveChanged"_sd;
 
-const std::string additionalCollModO2Field = "backwardsIncompatibleCollModParameters";
-
-/**
- * Backwards incompatible catalog parameters for which the actual value may have been missing or
- * incorrect in previous mongod [sub-]versions.
- */
-const std::set<std::string> kBackwardsCompatibleCollectionOptions{
-    kTimeseriesBucketsMayHaveMixedSchemaData, kTimeseriesBucketingParametersHaveChanged};
+constexpr inline auto additionalCollModO2Field = "backwardsIncompatibleCollModParameters"_sd;
 
 /**
  * Strips backwards incompatible fields from a collMod command and places them into a

@@ -494,30 +494,6 @@ BSONObj BSONObj::filterFieldsUndotted(const BSONObj& filter, bool inFilter) cons
     return b.obj();
 }
 
-BSONElement BSONObj::getFieldUsingIndexNames(StringData fieldName, const BSONObj& indexKey) const {
-    BSONObjIterator i(indexKey);
-    int j = 0;
-    while (i.moreWithEOO()) {
-        BSONElement f = i.next();
-        if (f.eoo())
-            return BSONElement();
-        if (f.fieldNameStringData() == fieldName)
-            break;
-        ++j;
-    }
-    BSONObjIterator k(*this);
-    while (k.moreWithEOO()) {
-        BSONElement g = k.next();
-        if (g.eoo())
-            return BSONElement();
-        if (j == 0) {
-            return g;
-        }
-        --j;
-    }
-    return BSONElement();
-}
-
 bool BSONObj::couldBeArray() const {
     BSONObjIterator i(*this);
     int index = 0;
@@ -561,7 +537,7 @@ BSONObj BSONObj::replaceFieldNames(const BSONObj& names) const {
     BSONObjBuilder b;
     BSONObjIterator i(*this);
     BSONObjIterator j(names);
-    BSONElement f = j.moreWithEOO() ? j.next() : BSONObj().firstElement();
+    BSONElement f = j.next();
     while (i.more()) {
         BSONElement e = i.next();
         if (!f.eoo()) {
@@ -697,15 +673,6 @@ StringData BSONObj::getStringField(StringData name) const {
     return e.valueStringDataSafe();
 }
 
-bool BSONObj::getObjectID(BSONElement& e) const {
-    BSONElement f = getField("_id");
-    if (!f.eoo()) {
-        e = f;
-        return true;
-    }
-    return false;
-}
-
 BSONObj BSONObj::addField(const BSONElement& field) const {
     if (!field.ok())
         return copy();
@@ -759,17 +726,6 @@ BSONObj BSONObj::removeField(StringData name) const {
             b.append(e);
     }
     return b.obj();
-}
-
-BSONObj BSONObj::removeFields(const std::set<std::string>& fields) const {
-    BSONObjBuilder bob;
-    for (auto&& field : *this) {
-        if (fields.count(field.fieldName())) {
-            continue;
-        }
-        bob.append(field);
-    }
-    return bob.obj();
 }
 
 BSONObj BSONObj::removeFields(const StringDataSet& fields) const {
@@ -840,11 +796,10 @@ void BSONObj::toString(
     }
 
     s << (isArray ? "[ " : "{ ");
-    BSONObjIterator i(*this);
     bool first = true;
-    while (1) {
-        massert(10327, "Object does not end with EOO", i.moreWithEOO());
-        BSONElement e = i.next();
+    for (auto i = begin();; ++i) {
+        BSONElement e = *i;
+        massert(10327, "Object does not end with EOO", i != end() || e.eoo());
         massert(10328, "Invalid element size", e.size() > 0);
         massert(10329, "Element too large", e.size() < (1 << 30));
         int offset = (int)(e.rawdata() - this->objdata());

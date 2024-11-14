@@ -155,7 +155,7 @@ void WiredTigerIndex::getKey(WT_CURSOR* cursor,
 // static
 StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& options) {
     StringBuilder ss;
-    BSONForEach(elem, options) {
+    for (auto&& elem : options) {
         if (elem.fieldNameStringData() == WiredTigerUtil::kConfigStringField) {
             Status status = WiredTigerUtil::checkTableCreationOptions(elem);
             if (!status.isOK()) {

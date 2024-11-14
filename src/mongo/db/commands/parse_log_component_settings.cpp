@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <deque>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -83,21 +84,22 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
     typedef std::vector<LogComponentSetting> Result;
 
     std::vector<LogComponentSetting> levelsToSet;
-    std::vector<BSONObjIterator> iterators;
 
     logv2::LogComponent parentComponent = logv2::LogComponent::kDefault;
-    BSONObjIterator iter(settings);
+    struct Progress {
+        BSONObj obj;
+        BSONObjStlIterator iter = obj.begin();
+    };
+    std::deque<Progress> parseStack{{settings}};
 
-    while (iter.moreWithEOO()) {
-        BSONElement elem = iter.next();
-        if (elem.eoo()) {
-            if (!iterators.empty()) {
-                iter = iterators.back();
-                iterators.pop_back();
-                parentComponent = parentComponent.parent();
-            }
+    while (!parseStack.empty()) {
+        auto& [obj, iter] = parseStack.back();
+        if (iter == obj.end()) {
+            parseStack.pop_back();
+            parentComponent = parentComponent.parent();
             continue;
         }
+        BSONElement elem = *iter++;
         if (elem.fieldNameStringData() == "verbosity") {
             auto swVerbosity = tryCoerceVerbosity(elem, parentComponent.getDottedName());
             if (!swVerbosity.isOK()) {
@@ -130,9 +132,8 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
                 str::stream() << "Invalid type " << typeName(elem.type()) << "for component "
                               << parentComponent.getDottedName() << "." << shortName);
         }
-        iterators.push_back(iter);
         parentComponent = curr;
-        iter = BSONObjIterator(elem.Obj());
+        parseStack.push_back({elem.Obj()});
     }
 
     // Done walking settings

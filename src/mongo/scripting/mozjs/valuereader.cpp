@@ -260,7 +260,7 @@ void ValueReader::fromBSON(const BSONObj& obj, const BSONObj* parent, bool readO
 void ValueReader::fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool readOnly) {
     JS::RootedValueVector avv(_context);
 
-    BSONForEach(elem, obj) {
+    for (auto&& elem : obj) {
         JS::RootedValue member(_context);
 
         ValueReader(_context, &member).fromBSONElement(elem, parent ? *parent : obj, readOnly);

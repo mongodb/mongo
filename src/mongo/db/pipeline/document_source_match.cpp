@@ -238,7 +238,7 @@ Document redactSafePortionTopLevel(BSONObj query);  // mutually recursive with n
 // expression can safely be promoted in front of a $redact.
 Document redactSafePortionDollarOps(BSONObj expr) {
     MutableDocument output;
-    BSONForEach(field, expr) {
+    for (auto&& field : expr) {
         if (field.fieldName()[0] != '$')
             continue;
 
@@ -273,7 +273,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             // $in must be all-or-nothing (like $or). Can't include subset of elements.
             case PathAcceptingKeyword::IN_EXPR: {
                 bool allOk = true;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     if (!isTypeRedactSafeInComparison(elem.type())) {
                         allOk = false;
                         break;
@@ -289,7 +289,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::ALL: {
                 // $all can include subset of elements (like $and).
                 vector<Value> matches;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     // NOTE this currently doesn't allow {$all: [{$elemMatch: {...}}]}
                     if (isTypeRedactSafeInComparison(elem.type())) {
                         matches.push_back(Value(elem));
@@ -360,7 +360,7 @@ Document redactSafePortionTopLevel(BSONObj query) {
             if (fieldName == "$or") {
                 // $or must be all-or-nothing (line $in). Can't include subset of elements.
                 vector<Value> okClauses;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     Document clause = redactSafePortionTopLevel(elem.Obj());
                     if (clause.empty()) {
                         okClauses.clear();
@@ -374,7 +374,7 @@ Document redactSafePortionTopLevel(BSONObj query) {
             } else if (fieldName == "$and") {
                 // $and can include subset of elements (like $all).
                 vector<Value> okClauses;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     Document clause = redactSafePortionTopLevel(elem.Obj());
                     if (!clause.empty())
                         okClauses.push_back(Value(clause));
@@ -420,7 +420,7 @@ BSONObj DocumentSourceMatch::redactSafePortion() const {
 }
 
 bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
-    BSONForEach(e, query) {
+    for (auto&& e : query) {
         const StringData fieldName = e.fieldNameStringData();
         if (fieldName == "$text"_sd)
             return true;

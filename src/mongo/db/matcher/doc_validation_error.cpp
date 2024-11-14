@@ -2312,8 +2312,8 @@ void assertHasErrorAnnotations(const MatchExpression& validatorExpr) {
  * Appends the object id of 'doc' to 'builder' under the 'failingDocumentId' field.
  */
 void appendDocumentId(const BSONObj& doc, BSONObjBuilder* builder) {
-    BSONElement objectIdElement;
-    invariant(doc.getObjectID(objectIdElement));
+    BSONElement objectIdElement = doc["_id"];
+    invariant(objectIdElement);
     builder->appendAs(objectIdElement, "failingDocumentId"_sd);
 }
 

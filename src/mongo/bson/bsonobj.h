@@ -371,7 +371,6 @@ public:
     /**
      * Remove specified fields and return a new object with the remaining fields.
      */
-    BSONObj removeFields(const std::set<std::string>& fields) const;
     BSONObj removeFields(const StringDataSet& fields) const;
 
     /**
@@ -471,8 +470,6 @@ public:
 
     BSONObj filterFieldsUndotted(const BSONObj& filter, bool inFilter) const;
     void filterFieldsUndotted(BSONObjBuilder* b, const BSONObj& filter, bool inFilter) const;
-
-    BSONElement getFieldUsingIndexNames(StringData fieldName, const BSONObj& indexKey) const;
 
     /**
      * arrays are bson objects with numeric and increasing field names
@@ -634,14 +631,6 @@ public:
         const char* p = objdata() + 4;
         return BSONType(*p);
     }
-
-    /**
-     * Get the _id field from the object.  For good performance drivers should
-     * assure that _id is the first element of the object; however, correct operation
-     * is assured regardless.
-     * @return true if found
-     */
-    bool getObjectID(BSONElement& e) const;
 
     /**
      * Return a version of this object where top level elements of types
@@ -853,8 +842,8 @@ private:
  *
  * For simple loops over BSONObj, do this instead: for (auto&& elem : obj) { ... }
  *
- * Note each BSONObj ends with an EOO element: so you will get moreWithEOO() on an empty
- * object, although more() will be false and next().eoo() will be true.
+ * Note each BSONObj ends with an EOO element.
+ * For iterator over an empty object, `more() == false`, and `next().eoo() == true`.
  *
  * The BSONObj must stay in scope for the duration of the iterator's execution.
  */
@@ -889,8 +878,6 @@ public:
 
     /**
      * Return true if the current element is equal to 'otherElement'.
-     * Do *not* use with moreWithEOO() as the function will return false if the current element and
-     * 'otherElement' are EOO.
      */
     bool currentElementBinaryEqual(const BSONElement& otherElement) {
         auto sz = otherElement.size();
@@ -902,14 +889,6 @@ public:
      */
     bool more() const {
         return _pos < _theend;
-    }
-
-    /**
-     * @return true if more elements exist to be enumerated INCLUDING the EOO element which is
-     * always at the end.
-     */
-    bool moreWithEOO() const {
-        return _pos <= _theend;
     }
 
     BSONElement next() {
@@ -1011,13 +990,6 @@ inline BSONObj::iterator BSONObj::begin() const {
 inline BSONObj::iterator BSONObj::end() const {
     return BSONObj::iterator::endOf(*this);
 }
-
-/**
- * Similar to BOOST_FOREACH
- *
- * DEPRECATED: Use range-based for loops now.
- */
-#define BSONForEach(elemName, obj) for (BSONElement elemName : (obj))
 
 template <>
 struct DataType::Handler<BSONObj> {

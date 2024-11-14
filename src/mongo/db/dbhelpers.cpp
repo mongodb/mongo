@@ -351,7 +351,7 @@ void Helpers::putSingleton(OperationContext* opCtx, CollectionAcquisition& coll,
 
 BSONObj Helpers::toKeyFormat(const BSONObj& o) {
     BSONObjBuilder keyObj(o.objsize());
-    BSONForEach(e, o) {
+    for (auto&& e : o) {
         keyObj.appendAs(e, "");
     }
     return keyObj.obj();
@@ -359,7 +359,7 @@ BSONObj Helpers::toKeyFormat(const BSONObj& o) {
 
 BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     BSONObjBuilder kpBuilder;
-    BSONForEach(e, o) {
+    for (auto&& e : o) {
         kpBuilder.append(e.fieldName(), 1);
     }
     return kpBuilder.obj();

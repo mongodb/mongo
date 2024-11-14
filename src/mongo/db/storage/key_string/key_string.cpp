@@ -1268,7 +1268,7 @@ template <class BufferT>
 void BuilderBase<BufferT>::_appendBson(const BSONObj& obj,
                                        bool invert,
                                        const StringTransformFn& f) {
-    BSONForEach(elem, obj) {
+    for (auto&& elem : obj) {
         // Force the order to be based on (ctype, name, value).
         _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
         StringData name = elem.fieldNameStringData();

@@ -1919,7 +1919,7 @@ public:
         BSONObj obj = BSON("a" << 1 << "a" << 2 << "a" << 3);
 
         int count = 0;
-        BSONForEach(e, obj) {
+        for (auto&& e : obj) {
             ASSERT_EQUALS(e.fieldName(), std::string("a"));
             count += e.Int();
         }

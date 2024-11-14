@@ -80,11 +80,8 @@ TEST(Decimal128BSONTest, TestsConstructingDecimalWithBsonDump) {
     BSONObj data = allData.getObjectField("valid");
     BSONObjIterator it(data);
 
-    while (it.moreWithEOO()) {
+    while (it.more()) {
         BSONElement testCase = it.next();
-        if (testCase.eoo()) {
-            break;
-        }
         if (testCase.type() == Object) {
             BSONObj b = testCase.Obj();
             BSONElement desc = b.getField("description");

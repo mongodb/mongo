@@ -309,7 +309,7 @@ Expression::ExpressionVector ExpressionNary::parseArguments(ExpressionContext* c
                                                             const VariablesParseState& vps) {
     ExpressionVector out;
     if (exprElement.type() == Array) {
-        BSONForEach(elem, exprElement.Obj()) {
+        for (auto&& elem : exprElement.Obj()) {
             out.push_back(Expression::parseOperand(expCtx, elem, vps));
         }
     } else {  // Assume it's an operand that accepts a single argument.
@@ -1249,7 +1249,7 @@ intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
     ret->_children.resize(3);
 
     const BSONObj args = expr.embeddedObject();
-    BSONForEach(arg, args) {
+    for (auto&& arg : args) {
         if (arg.fieldNameStringData() == "if") {
             ret->_children[0] = parseOperand(expCtx, arg, vps);
         } else if (arg.fieldNameStringData() == "then") {
@@ -2986,7 +2986,7 @@ intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const expCtx,
     BSONElement asElem;
     BSONElement inElem;
     const BSONObj args = expr.embeddedObject();
-    BSONForEach(arg, args) {
+    for (auto&& arg : args) {
         if (arg.fieldNameStringData() == "input") {
             inputElem = arg;
         } else if (arg.fieldNameStringData() == "as") {
