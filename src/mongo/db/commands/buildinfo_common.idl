@@ -44,7 +44,7 @@ enums:
 server_parameters:
   buildInfoAuthMode:
     description: "Control the level of authorization required to run the buildInfo command"
-    set_at: runtime
+    set_at: [ startup, runtime ]
     cpp_class: BuildInfoAuthModeServerParameter
     redact: false
 

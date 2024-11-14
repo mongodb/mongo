@@ -1,11 +1,14 @@
 // Confirm that implicitly created profile collections are successful and do not trigger assertions.
 // In order to implicitly create a profile collection with a read, we must set up the server with
 // some data to read without the profiler being active.
-// @tags: [requires_persistence]
+// @tags: [
+//   requires_fcv_81,
+//   requires_persistence,
+// ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let rst = new ReplSetTest({nodes: {n0: {profile: "0"}}});
-rst.startSet();
+rst.startSet({setParameter: {buildInfoAuthMode: "allowedPreAuth"}});
 rst.initiate();
 let primary = rst.getPrimary();
 let primaryDB = primary.getDB('test');
