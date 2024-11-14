@@ -159,6 +159,39 @@ TEST(ExpressionGeoTest, GeoNearEquivalent) {
     }
 }
 
+TEST(ExpressionGeoTest, SerializeGeoNearUnchanged) {
+    {
+        BSONObj query = fromjson("{$geoNear: [0, 0, 100]}");
+        std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoNear":[0, 0, 100]})",
+            gne->getSerializedRightHandSide());
+    }
+    {
+        BSONObj query = fromjson("{$geoNear: [0, 10], $maxDistance: 80 }");
+        std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoNear": [0,10],"$maxDistance": 80})",
+            gne->getSerializedRightHandSide());
+    }
+    {
+        BSONObj query = fromjson("{$geoNear: {x: 5, y: 10}}");
+        std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoNear": {x: 5, y: 10}})",
+            gne->getSerializedRightHandSide());
+    }
+    {
+        // Although this is very misleading, this is a legal way to query near the point [5,10]
+        // since we allow any field names when representing a point as an embedded document.
+        BSONObj query = fromjson("{$geoNear: {$geometry: 5, $minDistance: 10}}");
+        std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoNear": {$geometry: 5, $minDistance: 10}})",
+            gne->getSerializedRightHandSide());
+    }
+}
+
 
 TEST(ExpressionGeoTest, SerializeGeoExpressions) {
     SerializationOptions opts = {};
@@ -277,6 +310,13 @@ TEST(ExpressionGeoTest, SerializeGeoExpressions) {
         std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
             R"({"$geoNear":"?array<?number>","$maxDistance":"?number"})",
+            gne->getSerializedRightHandSide(opts));
+    }
+    {
+        BSONObj query = fromjson("{$geoNear: {x: 5, y: 10}}");
+        std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoNear":"?array<?number>"})",
             gne->getSerializedRightHandSide(opts));
     }
     {
@@ -605,6 +645,12 @@ TEST(ExpressionGeoTest, RoundTripSerializeGeoExpressions) {
                     }
                 }
             })"));
+
+    assertRepresentativeGeoNearShapeIsStable(fromjson("{$near: {x: 100, y: 0.1}}"),
+                                             fromjson("{$near: [1,1]}"));
+
+    assertRepresentativeGeoNearShapeIsStable(
+        fromjson("{$near: {$maxDistance: 100, $geometry: 0.1}}"), fromjson("{$near: [1,1]}"));
 }
 
 }  // namespace mongo

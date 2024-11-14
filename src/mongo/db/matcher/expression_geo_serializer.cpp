@@ -286,25 +286,28 @@ void appendGeoNearOperator(BSONObjBuilder& bob,
     if (geoNearElem.type() == mongo::Array) {
         appendGeoNearLegacyArray(bob, geoNearElem, opts);
     } else {
-        BSONObjBuilder subObj = BSONObjBuilder(bob.subobjStart(fieldName));
         auto geoNearObj = geoNearElem.Obj();
         BSONObjIterator embedded_it(geoNearObj);
         tassert(8548501, "Expected non-empty geometry object.", embedded_it.more());
 
         // If the first element of the embedded object is numeric, we could be dealing
-        // with a legacy style embedded coordinate pair.
+        // with a legacy style embedded coordinate pair (a coordinate pair modeled like {<field1>:
+        // <x>, <field2>: <y>}).
         if (geoNearObj.firstElement().isNumber()) {
             BSONElement x, y;
-            auto status = GeoParser::parseFlatPointCoordinates(geoNearObj.firstElement(), x, y);
+            auto status = GeoParser::parseFlatPointCoordinates(geoNearElem, x, y);
             // If we successfully parsed a legacy flat point as an embedded object, we
             // can return as we are done parsing the geometry.
             if (status.isOK()) {
-                opts.appendLiteral(&subObj, x);
-                opts.appendLiteral(&subObj, y);
-                subObj.doneFast();
+                // We convert from embedded object {x: 0, y: 0} to legacy array [0, 0] so that those
+                // Point formats have the same query shape.
+                BSONObj legacyCoordinates = BSON(fieldName << BSON_ARRAY(x.number() << y.number()));
+                appendGeoNearLegacyArray(bob, legacyCoordinates.firstElement(), opts);
                 return;
             }
         }
+
+        BSONObjBuilder subObj = BSONObjBuilder(bob.subobjStart(fieldName));
         // We couldn't parse a legacy coordinate pair expressed as an embedded object, so we
         // enumerate the embedded geometry obj and parse the internals. Typically we expect to find
         // $geometry, a GeoJSONPoint or $minDistance/$maxDistance/$uniqueDocs.
