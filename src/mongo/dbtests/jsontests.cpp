@@ -877,6 +877,7 @@ TEST(FromJsonTest, BinDataTypes) {
         {0x06, Encrypt},
         {0x07, Column},
         {0x08, Sensitive},
+        {0x09, Vector},
         {0x80, bdtCustom},
     };
     for (const auto& ts : specs) {

@@ -70,10 +70,11 @@ _BINDATA_SUBTYPE = {
     #     'scalar': False,
     #     'bindata_enum': 'bdtUUID'
     # },
-    "uuid": {'scalar': True, 'bindata_enum': 'newUUID'},
-    "md5": {'scalar': True, 'bindata_enum': 'MD5Type'},
-    "encrypt": {'scalar': True, 'bindata_enum': 'Encrypt'},
-    "sensitive": {'scalar': True, 'bindata_enum': 'Sensitive'},
+    "uuid": {"scalar": True, "bindata_enum": "newUUID"},
+    "md5": {"scalar": True, "bindata_enum": "MD5Type"},
+    "encrypt": {"scalar": True, "bindata_enum": "Encrypt"},
+    "sensitive": {"scalar": True, "bindata_enum": "Sensitive"},
+    "vector": {"scalar": True, "bindata_enum": "Vector"},
 }
 
 

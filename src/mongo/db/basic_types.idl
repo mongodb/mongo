@@ -186,6 +186,14 @@ types:
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
         is_view: false
+    
+    bindata_vector:
+        bson_serialization_type: bindata
+        bindata_subtype: vector
+        description: "A BSON bindata representing an array of numbers. In practice these numbers are usually floats but can also be integers."
+        cpp_type: "std::vector<std::uint8_t>"
+        deserializer: "mongo::BSONElement::_binDataVector"
+        is_view: false
 
     uuid:
         bson_serialization_type: bindata
