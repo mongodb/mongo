@@ -43,14 +43,14 @@
 #include "mongo/db/query/stats/stats_gen.h"
 
 namespace mongo::stats {
-using TypeCounts = std::map<sbe::value::TypeTags, double>;
+using TypeCounts = std::map<sbe::value::TypeTags, int64_t>;
 
 /**
  * By default, aggregates the total number of tag counts in the histogram together.
  * If 'isHistogrammable' is set to true, then only counts histogrammable types.
  * Otherwise, if 'isHistogrammable' is set to false, then only counts non-histogrammable types.
  **/
-double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable = boost::none);
+int64_t getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable = boost::none);
 
 class CEHistogram {
 public:
@@ -69,10 +69,10 @@ public:
      */
     static std::shared_ptr<const CEHistogram> make(ScalarHistogram scalar,
                                                    TypeCounts typeCounts,
-                                                   double sampleSize,
-                                                   double trueCount = 0.0,
-                                                   double falseCount = 0.0,
-                                                   double nanCount = 0.0,
+                                                   int64_t sampleSize,
+                                                   int64_t trueCount = 0,
+                                                   int64_t falseCount = 0,
+                                                   int64_t nanCount = 0,
                                                    bool validate = true);
 
     /**
@@ -85,11 +85,11 @@ public:
                                                    ScalarHistogram arrayMin,
                                                    ScalarHistogram arrayMax,
                                                    TypeCounts arrayTypeCounts,
-                                                   double sampleSize,
-                                                   double emptyArrayCount = 0.0,
-                                                   double trueCount = 0.0,
-                                                   double falseCount = 0.0,
-                                                   double nanCount = 0.0,
+                                                   int64_t sampleSize,
+                                                   int64_t emptyArrayCount = 0,
+                                                   int64_t trueCount = 0,
+                                                   int64_t falseCount = 0,
+                                                   int64_t nanCount = 0,
                                                    bool validate = true);
 
     // CEHistogram is neither copy-constructible nor copy-assignable.
@@ -117,40 +117,40 @@ public:
     bool isArray() const;
 
     // Get the total number of arrays in the histogram's path including empty arrays.
-    double getArrayCount() const;
+    int64_t getArrayCount() const;
 
     // Get the total number of empty arrays ( [] ) in the histogram's path.
-    double getEmptyArrayCount() const {
+    int64_t getEmptyArrayCount() const {
         return _emptyArrayCount;
     }
 
     // Get the count of true booleans.
-    double getTrueCount() const {
+    int64_t getTrueCount() const {
         return _trueCount;
     }
 
     // Get the count of false booleans.
-    double getFalseCount() const {
+    int64_t getFalseCount() const {
         return _falseCount;
     }
 
     // Get the count of NaNs.
-    double getNanCount() const {
+    int64_t getNanCount() const {
         return _nanCount;
     }
 
     // Returns the count of a type as known by the respective type counter. If the type is not
     // present in the TypeCounts map, returns 0.
-    double getTypeCount(sbe::value::TypeTags tag) const;
-    double getArrayTypeCount(sbe::value::TypeTags tag) const;
+    int64_t getTypeCount(sbe::value::TypeTags tag) const;
+    int64_t getArrayTypeCount(sbe::value::TypeTags tag) const;
 
     // Returns the sum of counts of all types known by the respective type counter.
-    double getTotalTypeCount() const;
-    double getTotalArrayTypeCount() const;
+    int64_t getTotalTypeCount() const;
+    int64_t getTotalArrayTypeCount() const;
 
     // Returns the proportion of the overall collection that was comprised by the sample used to
     // gnerate this histogram.
-    double getSampleSize() const {
+    int64_t getSampleSize() const {
         return _sampleSize;
     }
 
@@ -161,10 +161,10 @@ private:
     // Constructor for scalar field histograms.
     CEHistogram(ScalarHistogram scalar,
                 TypeCounts typeCounts,
-                double sampleSize,
-                double trueCount = 0.0,
-                double falseCount = 0.0,
-                double nanCount = 0.0);
+                int64_t sampleSize,
+                int64_t trueCount = 0,
+                int64_t falseCount = 0,
+                int64_t nanCount = 0);
 
     // Constructor for array field histograms. We have to initialize all array fields in this case.
     CEHistogram(ScalarHistogram scalar,
@@ -173,11 +173,11 @@ private:
                 ScalarHistogram arrayMin,
                 ScalarHistogram arrayMax,
                 TypeCounts arrayTypeCounts,
-                double sampleSize,
-                double emptyArrayCount = 0.0,
-                double trueCount = 0.0,
-                double falseCount = 0.0,
-                double nanCount = 0.0);
+                int64_t sampleSize,
+                int64_t emptyArrayCount = 0,
+                int64_t trueCount = 0,
+                int64_t falseCount = 0,
+                int64_t nanCount = 0);
 
     /* Fields for all paths. */
 
@@ -186,14 +186,14 @@ private:
     // The number of values of each type.
     TypeCounts _typeCounts;
     // The number of empty arrays - they are not accounted for in the histograms.
-    double _emptyArrayCount;
+    int64_t _emptyArrayCount;
     // The counts of true & false booleans.
-    double _trueCount;
-    double _falseCount;
+    int64_t _trueCount;
+    int64_t _falseCount;
     // The count of NaNs.
-    double _nanCount;
+    int64_t _nanCount;
     // The exact number of documents in the sample used to build the histogram.
-    double _sampleSize;
+    int64_t _sampleSize;
 
     /* Fields for array paths (only initialized if arrays are present). */
 

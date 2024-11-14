@@ -65,7 +65,7 @@ void serializeTypeCounts(const TypeCounts& typeCounts, BSONObjBuilder& bob) {
     typeCountBuilder.doneFast();
 }
 
-double getTagTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
+int64_t getTagTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
     auto tagIt = tc.find(tag);
     if (tagIt != tc.end()) {
         return tagIt->second;
@@ -73,20 +73,20 @@ double getTagTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
     return 0.0;
 }
 
-double getNumericTypeCount(const TypeCounts& tc) {
+int64_t getNumericTypeCount(const TypeCounts& tc) {
     return getTagTypeCount(tc, sbe::value::TypeTags::NumberInt32) +
         getTagTypeCount(tc, sbe::value::TypeTags::NumberInt64) +
         getTagTypeCount(tc, sbe::value::TypeTags::NumberDouble) +
         getTagTypeCount(tc, sbe::value::TypeTags::NumberDecimal);
 }
 
-double getStringTypeCount(const TypeCounts& tc) {
+int64_t getStringTypeCount(const TypeCounts& tc) {
     return getTagTypeCount(tc, sbe::value::TypeTags::StringSmall) +
         getTagTypeCount(tc, sbe::value::TypeTags::StringBig) +
         getTagTypeCount(tc, sbe::value::TypeTags::bsonString);
 }
 
-double getTypeBracketTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
+int64_t getTypeBracketTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
     if (sbe::value::isNumber(tag)) {
         return getNumericTypeCount(tc);
     } else if (sbe::value::isString(tag)) {
@@ -115,7 +115,7 @@ public:
      * Once there are no more type-brackets left in the histogram, this will return the tag Nothing
      * with a frequency of 0.0, and 'hasNext()' will return false.
      */
-    std::pair<sbe::value::TypeTags, double> getNext() {
+    std::pair<sbe::value::TypeTags, int64_t> getNext() {
         const auto& bounds = histogram.getBounds();
         const auto& buckets = histogram.getBuckets();
         if (hasNext()) {
@@ -166,8 +166,8 @@ private:
  */
 void validateHistogramTypeCounts(const TypeCounts& tc,
                                  const ScalarHistogram& s,
-                                 std::function<bool(double /*tc*/, double /*s*/)> isValid,
-                                 double nanCount = 0.0) {
+                                 std::function<bool(int64_t /*tc*/, int64_t /*s*/)> isValid,
+                                 int64_t nanCount = 0) {
 
     // Ensure that all histogrammable type brackets are accounted for in the histogram.
     TypeBracketFrequencyIterator it{s};
@@ -210,7 +210,7 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
  */
 void validateHistogramFrequencies(const ScalarHistogram& ls,
                                   const ScalarHistogram& rs,
-                                  std::function<bool(double /*ls*/, double /*rs*/)> isValid) {
+                                  std::function<bool(int64_t /*ls*/, int64_t /*rs*/)> isValid) {
     // Ensure that the total cardinality of the histograms is comparatively correct.
     const double cardL = ls.getCardinality();
     const double cardR = rs.getCardinality();
@@ -255,17 +255,17 @@ struct ArrayFields {
     const ScalarHistogram& arrayMin;
     const ScalarHistogram& arrayMax;
     const TypeCounts& typeCounts;
-    double emptyArrayCount;
+    int64_t emptyArrayCount;
 };
 
 void validate(const ScalarHistogram& scalar,
               const TypeCounts& typeCounts,
               boost::optional<ArrayFields> arrayFields,
-              double sampleSize,
-              double trueCount,
-              double falseCount,
-              double nanCount) {
-    const double numArrays = getTagTypeCount(typeCounts, sbe::value::TypeTags::Array);
+              int64_t sampleSize,
+              int64_t trueCount,
+              int64_t falseCount,
+              int64_t nanCount) {
+    const int64_t numArrays = getTagTypeCount(typeCounts, sbe::value::TypeTags::Array);
     if (arrayFields) {
         if (numArrays <= 0.0) {
             uasserted(7131010, str::stream() << "Array histogram must have at least one array.");
@@ -288,13 +288,13 @@ void validate(const ScalarHistogram& scalar,
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayMin,
                                     // Type counts are an upper bound on ArrayMin.
-                                    std::greater_equal<double>(),
+                                    std::greater_equal<int64_t>(),
                                     0.0);
 
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayMax,
                                     // Type counts are an upper bound on ArrayMax.
-                                    std::greater_equal<double>(),
+                                    std::greater_equal<int64_t>(),
                                     0.0);
 
         // Conversely, unique histograms are an upper bound on type counts, since they may count
@@ -303,17 +303,17 @@ void validate(const ScalarHistogram& scalar,
         validateHistogramTypeCounts(arrayFields->typeCounts,
                                     arrayFields->arrayUnique,
                                     // Type counts are a lower bound on ArrayUnique.
-                                    std::less_equal<double>(),
+                                    std::less_equal<int64_t>(),
                                     0.0);
 
         validateHistogramFrequencies(arrayFields->arrayMin,
                                      arrayFields->arrayUnique,
                                      // ArrayMin is a lower bound on ArrayUnique.
-                                     std::less_equal<double>());
+                                     std::less_equal<int64_t>());
         validateHistogramFrequencies(arrayFields->arrayMax,
                                      arrayFields->arrayUnique,
                                      // ArrayMax is a lower bound on ArrayUnique.
-                                     std::less_equal<double>());
+                                     std::less_equal<int64_t>());
 
     } else if (numArrays > 0) {
         uasserted(7131000, "A scalar CEHistogram should not have any arrays in its counters.");
@@ -332,7 +332,7 @@ void validate(const ScalarHistogram& scalar,
     validateHistogramTypeCounts(typeCounts,
                                 scalar,
                                 // Type-bracket type counts should equal scalar type-bracket counts.
-                                std::equal_to<double>(),
+                                std::equal_to<int64_t>(),
                                 nanCount);
 
     // Validate total count.
@@ -358,8 +358,8 @@ void validate(const ScalarHistogram& scalar,
 
 }  // namespace
 
-double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable) {
-    double total = 0.0;
+int64_t getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable) {
+    int64_t total = 0.0;
     for (const auto& [tag, count] : tc) {
         if (!isHistogrammable || (*isHistogrammable == canEstimateTypeViaHistogram(tag))) {
             total += count;
@@ -377,11 +377,11 @@ CEHistogram::CEHistogram(ScalarHistogram scalar,
                          ScalarHistogram arrayMin,
                          ScalarHistogram arrayMax,
                          TypeCounts arrayTypeCounts,
-                         double sampleSize,
-                         double emptyArrayCount,
-                         double trueCount,
-                         double falseCount,
-                         double nanCount)
+                         int64_t sampleSize,
+                         int64_t emptyArrayCount,
+                         int64_t trueCount,
+                         int64_t falseCount,
+                         int64_t nanCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(emptyArrayCount),
@@ -396,10 +396,10 @@ CEHistogram::CEHistogram(ScalarHistogram scalar,
 
 CEHistogram::CEHistogram(ScalarHistogram scalar,
                          TypeCounts typeCounts,
-                         double sampleSize,
-                         double trueCount,
-                         double falseCount,
-                         double nanCount)
+                         int64_t sampleSize,
+                         int64_t trueCount,
+                         int64_t falseCount,
+                         int64_t nanCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(0.0),
@@ -419,10 +419,10 @@ std::shared_ptr<const CEHistogram> CEHistogram::make() {
 
 std::shared_ptr<const CEHistogram> CEHistogram::make(ScalarHistogram scalar,
                                                      TypeCounts typeCounts,
-                                                     double sampleSize,
-                                                     double trueCount,
-                                                     double falseCount,
-                                                     double nanCount,
+                                                     int64_t sampleSize,
+                                                     int64_t trueCount,
+                                                     int64_t falseCount,
+                                                     int64_t nanCount,
                                                      bool doValidation) {
     if (doValidation) {
         validate(scalar, typeCounts, boost::none, sampleSize, trueCount, falseCount, nanCount);
@@ -437,11 +437,11 @@ std::shared_ptr<const CEHistogram> CEHistogram::make(ScalarHistogram scalar,
                                                      ScalarHistogram arrayMin,
                                                      ScalarHistogram arrayMax,
                                                      TypeCounts arrayTypeCounts,
-                                                     double sampleSize,
-                                                     double emptyArrayCount,
-                                                     double trueCount,
-                                                     double falseCount,
-                                                     double nanCount,
+                                                     int64_t sampleSize,
+                                                     int64_t emptyArrayCount,
+                                                     int64_t trueCount,
+                                                     int64_t falseCount,
+                                                     int64_t nanCount,
                                                      bool doValidation) {
     if (doValidation) {
         validate(scalar,
@@ -470,10 +470,10 @@ std::shared_ptr<const CEHistogram> CEHistogram::make(Statistics stats) {
     // because we already validated this histogram before inserting it.
     const auto scalar = ScalarHistogram::make(stats.getScalarHistogram());
     auto typeCounts = mapStatsTypeCountToTypeCounts(stats.getTypeCount());
-    const double trueCount = stats.getTrueCount();
-    const double falseCount = stats.getFalseCount();
-    const double nanCount = stats.getNanCount();
-    const double sampleSize = stats.getDocuments();
+    const int64_t trueCount = stats.getTrueCount();
+    const int64_t falseCount = stats.getFalseCount();
+    const int64_t nanCount = stats.getNanCount();
+    const int64_t sampleSize = stats.getDocuments();
 
     // If we have ArrayStatistics, we will need to initialize the array-only fields.
     if (auto maybeArrayStats = stats.getArrayStatistics(); maybeArrayStats) {
@@ -558,29 +558,29 @@ const TypeCounts& CEHistogram::getArrayTypeCounts() const {
     return *_arrayTypeCounts;
 }
 
-double CEHistogram::getArrayCount() const {
+int64_t CEHistogram::getArrayCount() const {
     if (isArray()) {
-        double arrayCount = getTypeCount(sbe::value::TypeTags::Array);
+        int64_t arrayCount = getTypeCount(sbe::value::TypeTags::Array);
         uassert(
-            6979503, "CEHistogram with array data must have at least one array.", arrayCount > 0.0);
+            6979503, "CEHistogram with array data must have at least one array.", arrayCount > 0);
         return arrayCount;
     }
-    return 0.0;
+    return 0;
 }
 
-double CEHistogram::getTypeCount(sbe::value::TypeTags tag) const {
+int64_t CEHistogram::getTypeCount(sbe::value::TypeTags tag) const {
     return getTagTypeCount(getTypeCounts(), tag);
 }
 
-double CEHistogram::getArrayTypeCount(sbe::value::TypeTags tag) const {
+int64_t CEHistogram::getArrayTypeCount(sbe::value::TypeTags tag) const {
     return getTagTypeCount(getArrayTypeCounts(), tag);
 }
 
-double CEHistogram::getTotalTypeCount() const {
+int64_t CEHistogram::getTotalTypeCount() const {
     return getTotalCount(getTypeCounts());
 }
 
-double CEHistogram::getTotalArrayTypeCount() const {
+int64_t CEHistogram::getTotalArrayTypeCount() const {
     return getTotalCount(getArrayTypeCounts());
 }
 
@@ -594,7 +594,7 @@ BSONObj CEHistogram::serialize() const {
     histogramBuilder.append("nanCount", getNanCount());
 
     // Serialize empty array counts.
-    histogramBuilder.appendNumber("emptyArrayCount", getEmptyArrayCount());
+    histogramBuilder.append("emptyArrayCount", getEmptyArrayCount());
 
     // Serialize type counts.
     serializeTypeCounts(getTypeCounts(), histogramBuilder);

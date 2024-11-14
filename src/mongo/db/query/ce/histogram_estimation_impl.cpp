@@ -485,8 +485,9 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
                                                 const mongo::Interval& interval,
                                                 bool includeScalar) {
     if (interval.isFullyOpen()) {
-        return CardinalityEstimate{CardinalityType{ceHist.getSampleSize()},
-                                   EstimationSource::Histogram};
+        return CardinalityEstimate{
+            CardinalityType{static_cast<CardinalityType>(ceHist.getSampleSize())},
+            EstimationSource::Histogram};
     }
 
     bool startInclusive = interval.startInclusive;

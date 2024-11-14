@@ -60,7 +60,7 @@ structs:
             typeName:
                 type: string
             count:
-                type: double
+                type: long
 
     StatsArrayHistogram:
         description: "Array Histogram"
@@ -83,13 +83,13 @@ structs:
                 type: double
                 validator: { gte: 0.0, lte: 1.0 }
             trueCount:
-                type: double
+                type: long
             falseCount:
-                type: double
+                type: long
             nanCount:
-                type: double
+                type: long
             emptyArrayCount:
-                type: double
+                type: long
             typeCount:
                 type: array<TypeTag>
             scalarHistogram:
