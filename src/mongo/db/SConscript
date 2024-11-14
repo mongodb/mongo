@@ -90,6 +90,17 @@ env.Benchmark(
 )
 
 env.CppUnitTest(
+    target="profile_filter_test",
+    source=[
+        "profile_filter_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/profile_common",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
     target="profile_settings_test",
     source=[
         "profile_settings_test.cpp",
