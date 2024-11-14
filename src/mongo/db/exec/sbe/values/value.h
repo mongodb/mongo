@@ -85,10 +85,6 @@ namespace mongo {
  */
 class RecordId;
 
-namespace KeyString {
-class Value;
-}  // namespace KeyString
-
 class TimeZoneDatabase;
 class TimeZone;
 

@@ -60,7 +60,7 @@ class IndexDescriptor;
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
-    IndexInfo(const IndexDescriptor* descriptor);
+    IndexInfo(const IndexDescriptor& descriptor);
     // Index name.
     const std::string indexName;
     // Contains the indexes key pattern.
@@ -88,32 +88,12 @@ struct IndexInfo {
 };
 
 /**
- * Used by _missingIndexEntries to be able to easily access keyString during repairIndexEntries.
- */
-struct IndexEntryInfo {
-    IndexEntryInfo(const IndexInfo& indexInfo,
-                   RecordId entryRecordId,
-                   BSONObj entryIdKey,
-                   key_string::Value entryKeyString);
-    const std::string indexName;
-    const BSONObj keyPattern;
-    const Ordering ord;
-    RecordId recordId;
-    BSONObj idKey;
-    key_string::Value keyString;
-};
-
-
-/**
  * The IndexConsistency class provides the base class definitions for index-consistency
  * sub-classes. The base implementation in this class provides the basis for keeping track of the
  * index consistency. It does this by using the index keys from index entries and index keys
  * generated from the document to ensure there is a one-to-one mapping for each key.
  */
 class IndexConsistency {
-    using IndexInfoMap = std::map<std::string, IndexInfo>;
-    using IndexKey = std::pair<std::string, std::string>;
-
 public:
     static const long long kInterruptIntervalNumRecords;
     static const size_t kNumHashBuckets;
@@ -166,8 +146,14 @@ private:
  * to the indexes during a validation and compensate for them.
  */
 class KeyStringIndexConsistency final : protected IndexConsistency {
+    struct AlphabeticalByIndexNameComparator;
     using IndexInfoMap = std::map<std::string, IndexInfo>;
-    using IndexKey = std::pair<std::string, std::string>;
+    using IndexKey = std::pair<IndexInfo*, key_string::Value>;
+    // TODO(SERVER-62257): Drop the comparator, unfortunately we can't do that for now because there
+    // are *quite problematic* dependencies between the order that we repair inconsistencies and the
+    // order we determine discrepencies in the count.
+    template <typename T>
+    using IndexInconsistencyMap = std::map<IndexKey, T, AlphabeticalByIndexNameComparator>;
 
 public:
     KeyStringIndexConsistency(OperationContext* opCtx,
@@ -231,6 +217,12 @@ public:
     }
 
 private:
+    // Comparator used by index inconsistency maps to ensure that we traverse inconsistencies in the
+    // same order that we would traverse the indices themselves.
+    struct AlphabeticalByIndexNameComparator {
+        bool operator()(const IndexKey& lhs, const IndexKey& rhs) const;
+    };
+
     KeyStringIndexConsistency() = delete;
 
     // A vector of IndexInfo indexes by index number
@@ -238,15 +230,15 @@ private:
 
     // Populated during the second phase of validation, this map contains the index entries that
     // were pointing at an invalid document key.
-    // The map contains a IndexKey pointing at a set of BSON objects as there may be multiple
+    // The map contains a IndexKey pointing at a list of RecordIDs as there may be multiple
     // extra index entries for the same IndexKey.
-    std::map<IndexKey, SimpleBSONObjSet> _extraIndexEntries;
+    IndexInconsistencyMap<std::vector<RecordId>> _extraIndexEntries;
 
     // Populated during the second phase of validation, this map contains the index entries that
     // were missing while the document key was in place.
-    // The map contains a IndexKey pointing to a IndexEntryInfo as there can only be one missing
+    // The map contains a IndexKey pointing to a single RecordId as there can only be one missing
     // index entry for a given IndexKey for each index.
-    std::map<IndexKey, IndexEntryInfo> _missingIndexEntries;
+    IndexInconsistencyMap<RecordId> _missingIndexEntries;
 
     // The total number of index keys is stored during the first validation phase, since this
     // count may change during a second phase.
@@ -300,7 +292,8 @@ private:
     size_t getMultikeyMetadataPathCount(IndexInfo* indexInfo);
 
     /**
-     * Generates a key for the second phase of validation. The keys format is the following:
+     * Generates information about missing/extra index entries for the second phase of validation
+     * and adds it to the results. The format is the following:
      * {
      *     indexName: <string>,
      *     recordId: <number>,
@@ -311,23 +304,16 @@ private:
      *     }
      * }
      */
-    BSONObj _generateInfo(const std::string& indexName,
-                          const BSONObj& keyPattern,
-                          const RecordId& recordId,
-                          const BSONObj& indexKey,
-                          const BSONObj& idKey);
+    void _foundInconsistency(OperationContext* opCtx,
+                             const IndexKey& key,
+                             const RecordId& recordId,
+                             ValidateResults& results,
+                             bool isMissing);
 
     /**
      * Returns a hashed value from the given KeyString and index namespace.
      */
     uint32_t _hashKeyString(const key_string::Value& ks, uint32_t indexNameHash) const;
-
-    /**
-     * Prints the collection document's and index entry's metadata.
-     */
-    void _printMetadata(OperationContext* opCtx,
-                        ValidateResults* results,
-                        const IndexEntryInfo& info);
 
 };  // KeyStringIndexConsistency
 }  // namespace mongo

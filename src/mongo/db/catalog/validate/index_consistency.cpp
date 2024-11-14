@@ -98,22 +98,6 @@ MONGO_FAIL_POINT_DEFINE(failIndexKeyOrdering);
 
 StringSet::hasher hash;
 
-/**
- * Returns a key for the '_extraIndexEntries' and '_missingIndexEntries' maps. The key is a pair
- * of index name and the index key represented in KeyString form.
- * Using the index name is required as the index keys are passed in as KeyStrings which do not
- * contain field names.
- *
- * If we had the following document: { a: 1, b: 1 } with two indexes on keys "a" and "b", then
- * the KeyStrings for the index keys of the document would be identical as the field name in the
- * KeyString is not present. The BSON representation of this would look like: { : 1 } for both.
- * To distinguish these as different index keys, return a pair of index name and index key.
- */
-std::pair<std::string, std::string> _generateKeyForMap(const IndexInfo& indexInfo,
-                                                       const key_string::Value& ks) {
-    return std::make_pair(indexInfo.indexName, std::string(ks.getBuffer(), ks.getSize()));
-}
-
 BSONObj _rehydrateKey(const BSONObj& keyPattern, const BSONObj& indexKey) {
     // We need to rehydrate the indexKey for improved readability.
     // {"": ObjectId(...)} -> {"_id": ObjectId(...)}
@@ -132,27 +116,15 @@ BSONObj _rehydrateKey(const BSONObj& keyPattern, const BSONObj& indexKey) {
     return b.obj();
 }
 
-
 }  // namespace
 
-IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
-    : indexName(descriptor->indexName()),
-      keyPattern(descriptor->keyPattern()),
-      indexNameHash(hash(descriptor->indexName())),
-      ord(Ordering::make(descriptor->keyPattern())),
-      unique(descriptor->unique()),
-      accessMethod(descriptor->getEntry()->accessMethod()) {}
-
-IndexEntryInfo::IndexEntryInfo(const IndexInfo& indexInfo,
-                               RecordId entryRecordId,
-                               BSONObj entryIdKey,
-                               key_string::Value entryKeyString)
-    : indexName(indexInfo.indexName),
-      keyPattern(indexInfo.keyPattern),
-      ord(indexInfo.ord),
-      recordId(std::move(entryRecordId)),
-      idKey(entryIdKey.getOwned()),
-      keyString(entryKeyString) {}
+IndexInfo::IndexInfo(const IndexDescriptor& descriptor)
+    : indexName(descriptor.indexName()),
+      keyPattern(descriptor.keyPattern()),
+      indexNameHash(hash(descriptor.indexName())),
+      ord(Ordering::make(descriptor.keyPattern())),
+      unique(descriptor.unique()),
+      accessMethod(descriptor.getEntry()->accessMethod()) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    CollectionValidation::ValidateState* validateState,
@@ -174,7 +146,7 @@ KeyStringIndexConsistency::KeyStringIndexConsistency(
     for (const auto& indexIdent : _validateState->getIndexIdents()) {
         const IndexDescriptor* descriptor =
             validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-        _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor));
+        _indexesInfo.emplace(descriptor->indexName(), IndexInfo(*descriptor));
     }
 }
 
@@ -233,10 +205,10 @@ void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
                                                    ValidateResults* results) {
     invariant(_validateState->getIndexIdents().size() > 0);
     for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end();) {
-        const key_string::Value& ks = it->second.keyString;
+        const key_string::Value& ks = it->first.second;
         const KeyFormat keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
 
-        const std::string& indexName = it->first.first;
+        const std::string& indexName = it->first.first->indexName;
         const IndexDescriptor* descriptor =
             _validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx, indexName);
         const IndexCatalogEntry* entry = descriptor->getEntry();
@@ -276,25 +248,17 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
     // Inform which indexes have inconsistencies and add the BSON objects of the inconsistent index
     // entries to the results vector.
     int numMissingIndexEntryErrors = _missingIndexEntries.size();
-    for (const auto& missingIndexEntry : _missingIndexEntries) {
-        const IndexEntryInfo& entryInfo = missingIndexEntry.second;
-        key_string::Value ks = entryInfo.keyString;
-        auto indexKey =
-            key_string::toBsonSafe(ks.getBuffer(), ks.getSize(), entryInfo.ord, ks.getTypeBits());
-        const BSONObj entry = _generateInfo(entryInfo.indexName,
-                                            entryInfo.keyPattern,
-                                            entryInfo.recordId,
-                                            indexKey,
-                                            entryInfo.idKey);
-        results->addMissingIndexEntry(entry);
+    for (const auto& [missingIndexKey, missingRecordId] : _missingIndexEntries) {
+        _foundInconsistency(opCtx,
+                            missingIndexKey,
+                            missingRecordId,
+                            *results,
+                            /*isMissing=*/true);
 
-        _printMetadata(opCtx, results, entryInfo);
-
-        std::string indexName = entry["indexName"].String();
+        const std::string& indexName = missingIndexKey.first->indexName;
         if (!results->getIndexResultsMap().at(indexName).isValid()) {
             continue;
         }
-
         StringBuilder ss;
         ss << "Index with name '" << indexName << "' has inconsistencies.";
         results->getIndexResultsMap().at(indexName).addError(ss.str());
@@ -304,9 +268,13 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
     for (const auto& item : _extraIndexEntries) {
         numExtraIndexEntryErrors += item.second.size();
         for (const auto& entry : item.second) {
-            results->addExtraIndexEntry(entry);
+            _foundInconsistency(opCtx,
+                                item.first,
+                                entry,
+                                *results,
+                                /*isMissing=*/false);
 
-            std::string indexName = entry["indexName"].String();
+            const std::string& indexName = item.first.first->indexName;
             if (!results->getIndexResultsMap().at(indexName).isValid()) {
                 continue;
             }
@@ -375,23 +343,8 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
         }
     } else if (lower.indexKeyCount || upper.indexKeyCount) {
         // Found a document key for a hash bucket that had mismatches.
-
-        // Get the documents _id index key.
-        auto record = _validateState->getSeekRecordStoreCursor()->seekExact(opCtx, recordId);
-        invariant(record);
-
-        BSONObj data = record->data.toBson();
-
-        BSONObjBuilder idKeyBuilder;
-        if (data.hasField("_id")) {
-            idKeyBuilder.append(data["_id"]);
-        }
-
         // Cannot have duplicate KeyStrings during the document scan phase for the same index.
-        IndexKey key = _generateKeyForMap(*indexInfo, ks);
-        invariant(_missingIndexEntries.count(key) == 0);
-        _missingIndexEntries.insert(
-            std::make_pair(key, IndexEntryInfo(*indexInfo, recordId, idKeyBuilder.obj(), ks)));
+        invariant(_missingIndexEntries.insert({{indexInfo, ks}, recordId}).second);
     }
 }
 
@@ -432,12 +385,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
         // If there is a corresponding document key for the index entry key, we remove the key from
         // the '_missingIndexEntries' map. However if there was no document key for the index entry
         // key, we add the key to the '_extraIndexEntries' map.
-        auto indexKey =
-            key_string::toBsonSafe(ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
-        BSONObj info = _generateInfo(
-            indexInfo->indexName, indexInfo->keyPattern, recordId, indexKey, BSONObj());
-
-        IndexKey key = _generateKeyForMap(*indexInfo, ks);
+        IndexKey key{indexInfo, ks};
         if (_missingIndexEntries.count(key) == 0) {
             if (_validateState->fixErrors()) {
                 // Removing extra index entries.
@@ -460,20 +408,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
             }
 
             // We may have multiple extra index entries for a given KeyString.
-            auto search = _extraIndexEntries.find(key);
-            if (search == _extraIndexEntries.end()) {
-                SimpleBSONObjSet infoSet = {info};
-                _extraIndexEntries.insert(std::make_pair(key, infoSet));
-
-                // Prints the collection document's and index entry's metadata.
-                _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-                    opCtx, recordId, results->getRecordTimestampsPtr());
-                indexInfo->accessMethod->asSortedData()
-                    ->getSortedDataInterface()
-                    ->printIndexEntryMetadata(opCtx, ks);
-                return;
-            }
-            search->second.insert(info);
+            _extraIndexEntries[key].emplace_back(recordId);
         } else {
             _missingIndexEntries.erase(key);
         }
@@ -992,24 +927,43 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
     }
 }
 
-BSONObj KeyStringIndexConsistency::_generateInfo(const std::string& indexName,
-                                                 const BSONObj& keyPattern,
-                                                 const RecordId& recordId,
-                                                 const BSONObj& indexKey,
-                                                 const BSONObj& idKey) {
-    BSONObj rehydratedKey = _rehydrateKey(keyPattern, indexKey);
+void KeyStringIndexConsistency::_foundInconsistency(OperationContext* opCtx,
+                                                    const IndexKey& key,
+                                                    const RecordId& recordId,
+                                                    ValidateResults& results,
+                                                    bool isMissing) {
+    const IndexInfo& info = *key.first;
+    const key_string::Value& ks = key.second;
+
+    // Print the metadata associated with the inconsistency.
+    _validateState->getCollection()->getRecordStore()->printRecordMetadata(
+        opCtx, recordId, results.getRecordTimestampsPtr());
+    info.accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(opCtx, ks);
+
+    const BSONObj& indexKey =
+        key_string::toBsonSafe(ks.getBuffer(), ks.getSize(), info.ord, ks.getTypeBits());
+    BSONObj rehydratedKey = _rehydrateKey(info.keyPattern, indexKey);
 
     BSONObjBuilder infoBuilder;
-    infoBuilder.append("indexName", indexName);
+    infoBuilder.append("indexName", info.indexName);
     recordId.serializeToken("recordId", &infoBuilder);
-
-    if (!idKey.isEmpty()) {
-        infoBuilder.append("idKey", idKey);
-    }
-
     infoBuilder.append("indexKey", rehydratedKey);
 
-    return infoBuilder.obj();
+    if (isMissing) {
+        // Get the documents _id index key.
+        auto record = _validateState->getSeekRecordStoreCursor()->seekExact(opCtx, recordId);
+        invariant(record);
+        BSONObj data = record->data.toBson();
+        BSONObjBuilder idKeyBuilder;
+        if (data.hasField("_id")) {
+            idKeyBuilder.append(data.getField("_id"));
+            infoBuilder.append("idKey", idKeyBuilder.obj());
+        }
+
+        results.addMissingIndexEntry(infoBuilder.obj());
+    } else {
+        results.addExtraIndexEntry(infoBuilder.obj());
+    }
 }
 
 uint32_t KeyStringIndexConsistency::_hashKeyString(const key_string::Value& ks,
@@ -1017,15 +971,14 @@ uint32_t KeyStringIndexConsistency::_hashKeyString(const key_string::Value& ks,
     return ks.hash(indexNameHash);
 }
 
-void KeyStringIndexConsistency::_printMetadata(OperationContext* opCtx,
-                                               ValidateResults* results,
-                                               const IndexEntryInfo& entryInfo) {
-    _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-        opCtx, entryInfo.recordId, results->getRecordTimestampsPtr());
-    getIndexInfo(entryInfo.indexName)
-        .accessMethod->asSortedData()
-        ->getSortedDataInterface()
-        ->printIndexEntryMetadata(opCtx, entryInfo.keyString);
+bool KeyStringIndexConsistency::AlphabeticalByIndexNameComparator::operator()(
+    const IndexKey& lhs, const IndexKey& rhs) const {
+    if (lhs.first->indexName < rhs.first->indexName) {
+        return true;
+    } else if (rhs.first->indexName < lhs.first->indexName) {
+        return false;
+    }
+    return lhs.second < rhs.second;
 }
 
 }  // namespace mongo
