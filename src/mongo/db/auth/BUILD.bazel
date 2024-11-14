@@ -528,6 +528,7 @@ mongo_cc_library(
     hdrs = [
         "authorization_backend_mock.h",
         "authorization_manager_factory_mock.h",
+        "authorization_router_impl_for_test.h",
         "authz_session_external_state_mock.h",
     ],
     deps = [

@@ -89,27 +89,23 @@ public:
         auto opCtx = cc().makeOperationContext();
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
 
-        // Set up ReplicationCoordinator and create oplog.
+        authzManager = AuthorizationManager::get(getService());
+
+        // This is the only test that needs to access the AuthorizationRouter directly.
+        auto impl = reinterpret_cast<AuthorizationManagerImpl*>(authzManager);
+        invariant(impl);
+        impl->setAuthEnabled(true);
+        mockRouter = reinterpret_cast<AuthorizationRouterImplForTest*>(
+            impl->getAuthorizationRouter_forTest());
+        invariant(mockRouter);
+
+        // Ensure that we are primary.
         repl::ReplicationCoordinator::set(
             service,
             std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
         repl::createOplog(opCtx.get());
 
-        auto authzRouter = std::make_unique<AuthorizationRouterImplForTest>(
-            getService(), std::make_unique<AuthorizationClientHandleShard>());
-        mockRouter = authzRouter.get();
-
-        auto localAuthzManager =
-            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(authzRouter));
-        localAuthzManager->setAuthEnabled(true);
-        authzManager = localAuthzManager.get();
-        AuthorizationManager::set(getService(), std::move(localAuthzManager));
-
-        auth::AuthorizationBackendInterface::set(
-            getService(), std::make_unique<auth::AuthorizationBackendMock>());
-
-        // Ensure that we are primary.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+        auto replCoord = repl::ReplicationCoordinator::get(service);
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
         // Create test and users collections.
@@ -260,7 +256,7 @@ public:
 
     NamespaceString testNss;
     NamespaceString usersNss;
-    AuthorizationManagerImpl* authzManager;
+    AuthorizationManager* authzManager;
     AuthorizationRouterImplForTest* mockRouter;
     BSONObj userDocument;
     BSONObj credentials;

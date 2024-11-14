@@ -64,11 +64,6 @@ deadlock:mongo::executor::ConnectionPool::dropConnections
 deadlock:mongo::ReplicaSetMonitorManager::getOrCreateMonitor
 deadlock:mongo::ShardingTaskExecutorPoolController::ReplicaSetChangeListener::onDroppedSet
 
-# TODO SERVER-91871
-# Unittest authz manager race between main thread setting and background job getting via observer
-race:mongo::AuthorizationManager::set
-race:mongo::AuthorizationManager::get
-
 # TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
 deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 

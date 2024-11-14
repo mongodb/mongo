@@ -172,6 +172,10 @@ OID AuthorizationManagerImpl::getCacheGeneration() {
     return _authzRouter->getCacheGeneration();
 }
 
+AuthorizationRouter* AuthorizationManagerImpl::getAuthorizationRouter_forTest() {
+    return _authzRouter.get();
+}
+
 void AuthorizationManagerImpl::setAuthEnabled(bool enabled) {
     if (_authEnabled == enabled) {
         return;

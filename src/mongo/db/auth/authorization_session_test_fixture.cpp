@@ -148,6 +148,7 @@ void AuthorizationSessionTestFixture::assertSecurityToken(const ResourcePattern&
 
 void AuthorizationSessionTestFixture::assertNotAuthorized(const ResourcePattern& resource,
                                                           ActionType action) {
+    authzManager->setAuthEnabled(true);
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(resource, action));
 }
 

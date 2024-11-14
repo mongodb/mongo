@@ -1273,6 +1273,7 @@ TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithNobody) {
 }
 
 TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsNotCoauthorizedWithAnybody) {
+    authzManager->setAuthEnabled(true);
     ASSERT_FALSE(authzSession->isCoauthorizedWith(kSpencerTest));
 }
 
@@ -1283,6 +1284,7 @@ TEST_F(AuthorizationSessionTestWithoutAuth,
 }
 
 TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedNobody) {
+    authzManager->setAuthEnabled(true);
     ASSERT_OK(createUser(kSpencerTest, {}));
     ASSERT_OK(
         authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
@@ -1418,6 +1420,7 @@ const std::unique_ptr<UserRequest> kGMarksAdminRequest =
     std::make_unique<UserRequestGeneral>(kGMarksAdmin, boost::none);
 
 TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
+    authzManager->setAuthEnabled(true);
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 
     // Add a user without the restore role and ensure we can't bypass
@@ -2125,6 +2128,7 @@ TEST_F(AuthorizationSessionTest, ClusterActionsTestInternal) {
 }
 
 TEST_F(AuthorizationSessionTest, ClusterActionsTestAdmin) {
+    authzManager->setAuthEnabled(true);
     authzSession->assumePrivilegesForBuiltinRole(RoleName{"root", "admin"});
     ASSERT_FALSE(
         authzSession->isAuthorizedForClusterAction(ActionType::advanceClusterTime, boost::none));
@@ -2138,6 +2142,7 @@ TEST_F(AuthorizationSessionTest, ClusterActionsTestAdmin) {
 }
 
 TEST_F(AuthorizationSessionTest, ClusterActionsTestUser) {
+    authzManager->setAuthEnabled(true);
     authzSession->assumePrivilegesForBuiltinRole(RoleName{"read", "admin"});
     ASSERT_FALSE(
         authzSession->isAuthorizedForClusterAction(ActionType::advanceClusterTime, boost::none));
