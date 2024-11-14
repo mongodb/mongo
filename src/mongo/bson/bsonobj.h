@@ -243,7 +243,7 @@ public:
      */
     BSONObj& shareOwnershipWith(ConstSharedBuffer buffer) & {
         invariant(buffer);
-        _ownedBuffer = buffer;
+        _ownedBuffer = std::move(buffer);
         return *this;
     }
     BSONObj& shareOwnershipWith(const BSONObj& other) & {
@@ -251,7 +251,7 @@ public:
         return *this;
     }
     BSONObj&& shareOwnershipWith(ConstSharedBuffer buffer) && {
-        return std::move(shareOwnershipWith(buffer));
+        return std::move(shareOwnershipWith(std::move(buffer)));
     }
     BSONObj&& shareOwnershipWith(const BSONObj& other) && {
         return std::move(shareOwnershipWith(other));
