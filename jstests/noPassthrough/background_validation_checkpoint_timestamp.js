@@ -24,6 +24,11 @@ const collName = jsTestName();
 const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
 
+// Set write concern such that we ensure the stable timestamp advances to include our most recent
+// writes before we take a checkpoint. This is to avoid running into a possible race.
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: true}}));
+
 // Validate errors if the collection doesn't exist.
 (function() {
 assert.commandFailedWithCode(db.runCommand({validate: collName, background: false}),
