@@ -164,7 +164,7 @@ public:
     UUID uuid2 = UUID::gen();
     UUID uuid3 = UUID::gen();
     BSONElement elem;
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     BucketMetadata bucketMetadata{trackingContext, elem, boost::none};
     BucketKey bucketKey1{uuid1, bucketMetadata};
     BucketKey bucketKey2{uuid2, bucketMetadata};

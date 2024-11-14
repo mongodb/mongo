@@ -62,7 +62,7 @@
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str_basic.h"
-#include "mongo/util/tracking_allocator.h"
+#include "mongo/util/tracking/allocator.h"
 
 namespace mongo {
 
@@ -644,7 +644,7 @@ public:
 // declarations.
 extern template class BasicBufBuilder<allocator_aware::SharedBufferAllocator<std::allocator<void>>>;
 extern template class BasicBufBuilder<
-    allocator_aware::SharedBufferAllocator<TrackingAllocator<void>>>;
+    allocator_aware::SharedBufferAllocator<tracking::Allocator<void>>>;
 
 namespace allocator_aware {
 template <class Allocator = std::allocator<void>>

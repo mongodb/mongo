@@ -54,7 +54,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/tracking_allocator.h"
+#include "mongo/util/tracking/allocator.h"
 
 namespace mongo {
 using namespace bsoncolumn;
@@ -2353,7 +2353,7 @@ void EncodingState<Allocator>::Simple8bBlockWriter64<F>::operator()(uint64_t blo
 }
 
 template struct EncodingState<std::allocator<void>>;
-template struct EncodingState<TrackingAllocator<void>>;
+template struct EncodingState<tracking::Allocator<void>>;
 }  // namespace bsoncolumn
 
 template <class Allocator>
@@ -2733,6 +2733,6 @@ bool BSONColumnBuilder<Allocator>::isInternalStateIdentical(const BSONColumnBuil
 }
 
 template class BSONColumnBuilder<std::allocator<void>>;
-template class BSONColumnBuilder<TrackingAllocator<void>>;
+template class BSONColumnBuilder<tracking::Allocator<void>>;
 
 }  // namespace mongo

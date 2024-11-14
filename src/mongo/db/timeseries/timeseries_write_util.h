@@ -90,7 +90,7 @@ struct BucketDocument {
  * }
  */
 BSONObj makeBSONColumnDocDiff(
-    const BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff& binaryDiff);
+    const BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff& binaryDiff);
 
 /**
  * Returns the document for writing a new bucket with a write batch.

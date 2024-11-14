@@ -61,7 +61,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/tracking_context.h"
+#include "mongo/util/tracking/context.h"
 
 namespace mongo::bsoncolumn {
 namespace {
@@ -83,8 +83,8 @@ public:
         // platforms/implementations so we cannot check the exact memory usage in an platform
         // independent way. But we make sure that the memory usage is 0 when all these are torn down
         // to ensure there's no memory tracking leaks after moving.
-        BSONColumnBuilder<TrackingAllocator<void>> moveContructBuilder{std::move(cb)};
-        BSONColumnBuilder<TrackingAllocator<void>> moveAssignBuilder{
+        BSONColumnBuilder<tracking::Allocator<void>> moveContructBuilder{std::move(cb)};
+        BSONColumnBuilder<tracking::Allocator<void>> moveAssignBuilder{
             trackingContextChecker.trackingContext.makeAllocator<void>()};
         moveAssignBuilder = std::move(moveContructBuilder);
     }
@@ -1111,12 +1111,12 @@ protected:
             ASSERT_EQ(trackingContext.allocated(), 0);
         }
 
-        TrackingContext trackingContext;
+        tracking::Context trackingContext;
     };
 
     // Needs to be defined first so it is destroyed after BSONColumnBuilder
     TrackingContextChecker trackingContextChecker;
-    BSONColumnBuilder<TrackingAllocator<void>> cb{
+    BSONColumnBuilder<tracking::Allocator<void>> cb{
         trackingContextChecker.trackingContext.makeAllocator<void>()};
 
 private:

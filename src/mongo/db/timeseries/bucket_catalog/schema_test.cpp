@@ -34,7 +34,7 @@ namespace mongo::timeseries::bucket_catalog {
 namespace {
 
 TEST(Schema, UpdateValue) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     Schema schema{trackingContext};
     ASSERT_EQ(schema.update(BSON("a" << 1), boost::none, nullptr), Schema::UpdateStatus::Updated);
     ASSERT_EQ(schema.update(BSON("a" << 2), boost::none, nullptr), Schema::UpdateStatus::Updated);
@@ -50,7 +50,7 @@ TEST(Schema, UpdateValue) {
 }
 
 TEST(Schema, UpdateArray) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     Schema schema{trackingContext};
     ASSERT_EQ(schema.update(BSON("a" << BSON_ARRAY(1)), boost::none, nullptr),
               Schema::UpdateStatus::Updated);
@@ -66,7 +66,7 @@ TEST(Schema, UpdateArray) {
 }
 
 TEST(Schema, UpdateObject) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     Schema schema{trackingContext};
     ASSERT_EQ(schema.update(BSON("a" << BSON("b" << 1)), boost::none, nullptr),
               Schema::UpdateStatus::Updated);

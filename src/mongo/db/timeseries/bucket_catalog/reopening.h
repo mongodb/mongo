@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/util/tracking/string.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

@@ -27,47 +27,22 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#pragma once
 
-#include "mongo/util/tracking_allocator.h"
+#include <absl/container/inlined_vector.h>
+#include <scoped_allocator>
 
-namespace mongo {
+#include "mongo/util/tracking/allocator.h"
+#include "mongo/util/tracking/context.h"
 
-namespace {
+namespace mongo::tracking {
 
-constexpr size_t numIncsPerRead = 1000;
+template <class T, std::size_t N>
+using inlined_vector = absl::InlinedVector<T, N, std::scoped_allocator_adaptor<Allocator<T>>>;
 
-}  // namespace
-
-class AllocatorFixture : public benchmark::Fixture {
-protected:
-    std::unique_ptr<TrackingAllocatorStats> _stats;
-};
-
-BENCHMARK_DEFINE_F(AllocatorFixture, counter)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        // Setup code
-        // state.range(0) --> Number of partitions
-        _stats = std::make_unique<TrackingAllocatorStats>(state.range(0));
-    }
-
-    for (auto _ : state) {
-        for (size_t i = 0; i < numIncsPerRead; i++) {
-            _stats->bytesAllocated(1);
-        }
-        benchmark::DoNotOptimize(_stats->allocated());
-    }
-
-    if (state.thread_index == 0) {
-        // Teardown code
-        state.counters["numIncrements"] = _stats->allocated();
-    }
+template <class T, std::size_t N>
+inlined_vector<T, N> make_inlined_vector(Context& Context) {
+    return inlined_vector<T, N>(Context.makeAllocator<T>());
 }
 
-BENCHMARK_REGISTER_F(AllocatorFixture, counter)
-    ->RangeMultiplier(2)
-    ->Ranges({{1, 64}})
-    ->ThreadRange(1, 64)
-    ->UseRealTime();
-
-}  // namespace mongo
+}  // namespace mongo::tracking

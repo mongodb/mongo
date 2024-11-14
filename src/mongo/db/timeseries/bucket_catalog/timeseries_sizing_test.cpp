@@ -51,10 +51,10 @@ static constexpr uint64_t kExpectedBSONColumnBuilderPerElement = 552;
     !__has_feature(address_sanitizer)
 TEST(TimeseriesSizingConstants, OpenBucket) {
     TrackingContexts contexts;
-    TrackingContext registryContext;
+    tracking::Context registryContext;
 
     BucketStateRegistry registry(registryContext);
-    [[maybe_unused]] auto bucket = make_unique_tracked<Bucket>(
+    [[maybe_unused]] auto bucket = tracking::make_unique<Bucket>(
         contexts.global,
         contexts,
         BucketId{UUID::gen(), OID{}, BucketKey::Signature{}},
@@ -90,7 +90,7 @@ TEST(TimeseriesSizingConstants, ArchivedBucket) {
 }
 
 TEST(TimeseriesSizingConstants, Schema) {
-    TrackingContext context;
+    tracking::Context context;
     Schema schema(context);
     uint64_t empty = context.allocated();
 
@@ -107,7 +107,7 @@ TEST(TimeseriesSizingConstants, Schema) {
 }
 
 TEST(TimeseriesSizingConstants, MinMax) {
-    TrackingContext context;
+    tracking::Context context;
     MinMax mm(context);
     uint64_t empty = context.allocated();
 
@@ -124,9 +124,9 @@ TEST(TimeseriesSizingConstants, MinMax) {
 }
 
 TEST(TimeseriesSizingConstants, BSONColumnBuilder) {
-    TrackingContext context;
+    tracking::Context context;
 
-    BSONColumnBuilder<TrackingAllocator<void>> column(context.makeAllocator<void>());
+    BSONColumnBuilder<tracking::Allocator<void>> column(context.makeAllocator<void>());
 
     // Estimate internal usage for BSONColumnBuilder. This depends on what data has been appended.
     // We use a fairly small delta for this estimation.

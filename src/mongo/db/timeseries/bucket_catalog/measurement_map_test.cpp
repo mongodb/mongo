@@ -36,7 +36,7 @@
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/util/tracking_context.h"
+#include "mongo/util/tracking/context.h"
 
 namespace mongo::timeseries::bucket_catalog {
 const std::string testDbName = "db_timeseries_measurement_map_test";
@@ -47,7 +47,7 @@ public:
     MeasurementMapTest() : measurementMap(trackingContext) {}
 
 protected:
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MeasurementMap measurementMap;
 };
 

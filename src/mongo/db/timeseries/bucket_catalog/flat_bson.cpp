@@ -57,7 +57,7 @@ int typeComp(const BSONElement& elem, BSONType type) {
 }  // namespace
 
 template <class Element, class Value>
-FlatBSONStore<Element, Value>::Data::Data(TrackingContext& trackingContext)
+FlatBSONStore<Element, Value>::Data::Data(tracking::Context& trackingContext)
     : _value(trackingContext) {}
 
 template <class Element, class Value>
@@ -112,7 +112,7 @@ void FlatBSONStore<Element, Value>::Data::setValue(const BSONElement& elem) {
 }
 
 template <class Element, class Value>
-FlatBSONStore<Element, Value>::Entry::Entry(TrackingContext& trackingContext)
+FlatBSONStore<Element, Value>::Entry::Entry(tracking::Context& trackingContext)
     : _element(trackingContext) {}
 
 template <class Element, class Value>
@@ -188,7 +188,7 @@ bool FlatBSONStore<Element, Value>::ConstIterator::operator!=(
 
 template <class Element, class Value>
 FlatBSONStore<Element, Value>::Obj::Obj(
-    TrackingContext& trackingContext,
+    tracking::Context& trackingContext,
     FlatBSONStore<Element, Value>::Entries& entries,
     typename FlatBSONStore<Element, Value>::Entries::iterator pos)
     : _entries(entries), _pos(pos), _trackingContext(trackingContext) {}
@@ -267,12 +267,12 @@ typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::
 
     // We've exhausted the linear search limit, create a map to speedup future searches. Populate it
     // with all current subelements.
-    _pos->_fieldNameToIndex = makeTrackedStringMap<uint32_t>(_trackingContext);
+    _pos->_fieldNameToIndex = tracking::makeStringMap<uint32_t>(_trackingContext);
     auto it = begin();
     auto itEnd = end();
     for (; it != itEnd; ++it) {
         _pos->_fieldNameToIndex->try_emplace(
-            make_tracked_string(_trackingContext, it->fieldName().data(), it->fieldName().size()),
+            tracking::make_string(_trackingContext, it->fieldName().data(), it->fieldName().size()),
             it._pos->_offsetParent);
     }
 
@@ -304,9 +304,9 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
     // Also store our offset in the fast lookup map if it is available.
     if (_pos->_fieldNameToIndex) {
         _pos->_fieldNameToIndex->try_emplace(
-            make_tracked_string(_trackingContext,
-                                inserted->_element.fieldName().data(),
-                                inserted->_element.fieldName().size()),
+            tracking::make_string(_trackingContext,
+                                  inserted->_element.fieldName().data(),
+                                  inserted->_element.fieldName().size()),
             inserted->_offsetParent);
     }
 
@@ -359,8 +359,8 @@ typename FlatBSONStore<Element, Value>::ConstIterator FlatBSONStore<Element, Val
 }
 
 template <class Element, class Value>
-FlatBSONStore<Element, Value>::FlatBSONStore(TrackingContext& trackingContext)
-    : entries(make_tracked_vector<Entry>(trackingContext)), _trackingContext(trackingContext) {
+FlatBSONStore<Element, Value>::FlatBSONStore(tracking::Context& trackingContext)
+    : entries(tracking::make_vector<Entry>(trackingContext)), _trackingContext(trackingContext) {
     auto& entry = entries.emplace_back(trackingContext);
     entry._offsetEnd = 1;
     entry._offsetParent = 0;
@@ -368,7 +368,7 @@ FlatBSONStore<Element, Value>::FlatBSONStore(TrackingContext& trackingContext)
 }
 
 template <class Derived, class Element, class Value>
-FlatBSON<Derived, Element, Value>::FlatBSON(TrackingContext& trackingContext)
+FlatBSON<Derived, Element, Value>::FlatBSON(tracking::Context& trackingContext)
     : _store(trackingContext), _trackingContext(trackingContext) {}
 
 template <class Derived, class Element, class Value>
@@ -717,8 +717,8 @@ void FlatBSON<Derived, Element, Value>::_setTypeArray(
     }
 }
 
-BSONElementValueBuffer::BSONElementValueBuffer(TrackingContext& trackingContext)
-    : _buffer(make_tracked_vector<char>(trackingContext)) {}
+BSONElementValueBuffer::BSONElementValueBuffer(tracking::Context& trackingContext)
+    : _buffer(tracking::make_vector<char>(trackingContext)) {}
 
 BSONElement BSONElementValueBuffer::get() const {
     return BSONElement(_buffer.data(), 1, BSONElement::TrustedInitTag{});
@@ -760,8 +760,8 @@ int64_t BSONTypeValue::size() const {
     return 0;
 }
 
-Element::Element(TrackingContext& trackingContext)
-    : _fieldName(make_tracked_string(trackingContext)) {}
+Element::Element(tracking::Context& trackingContext)
+    : _fieldName(tracking::make_string(trackingContext)) {}
 
 StringData Element::fieldName() const {
     return {_fieldName.data(), _fieldName.size()};
@@ -780,7 +780,7 @@ void Element::claimArrayFieldNameForObject(std::string name) {
     _fieldName = std::move(name);
 }
 
-MinMaxElement::MinMaxElement(TrackingContext& trackingContext)
+MinMaxElement::MinMaxElement(tracking::Context& trackingContext)
     : Element(trackingContext), _min(trackingContext), _max(trackingContext) {}
 
 void MinMaxElement::initializeRoot() {
@@ -804,7 +804,7 @@ const MinMaxStore::Data& MinMaxElement::max() const {
     return _max;
 }
 
-MinMax::MinMax(TrackingContext& trackingContext)
+MinMax::MinMax(tracking::Context& trackingContext)
     : FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>(trackingContext) {}
 
 std::pair<MinMax::UpdateStatus, MinMaxElement::UpdateContext> MinMax::_shouldUpdateObj(
@@ -907,7 +907,7 @@ BSONObj MinMax::maxUpdates() {
     return builder.obj();
 }
 
-MinMax MinMax::parseFromBSON(TrackingContext& trackingContext,
+MinMax MinMax::parseFromBSON(tracking::Context& trackingContext,
                              const BSONObj& min,
                              const BSONObj& max,
                              const StringDataComparator* stringComparator) {
@@ -931,7 +931,7 @@ MinMax MinMax::parseFromBSON(TrackingContext& trackingContext,
     return minmax;
 }
 
-SchemaElement::SchemaElement(TrackingContext& trackingContext)
+SchemaElement::SchemaElement(tracking::Context& trackingContext)
     : Element(trackingContext), _data(trackingContext) {}
 
 void SchemaElement::initializeRoot() {
@@ -946,10 +946,10 @@ const SchemaStore::Data& SchemaElement::data() const {
     return _data;
 }
 
-Schema::Schema(TrackingContext& trackingContext)
+Schema::Schema(tracking::Context& trackingContext)
     : FlatBSON<Schema, SchemaElement, BSONTypeValue>(trackingContext) {}
 
-Schema Schema::parseFromBSON(TrackingContext& trackingContext,
+Schema Schema::parseFromBSON(tracking::Context& trackingContext,
                              const BSONObj& min,
                              const BSONObj& max,
                              const StringDataComparator* stringComparator) {

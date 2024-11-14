@@ -51,6 +51,8 @@
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/tracking/list.h"
+#include "mongo/util/tracking/set.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -145,14 +147,14 @@ public:
     std::shared_ptr<WriteBatch> preparedBatch;
 
     // If the bucket is in idleBuckets, then its position is recorded here.
-    using IdleList = tracked_list<Bucket*>;
+    using IdleList = tracking::list<Bucket*>;
     boost::optional<IdleList::iterator> idleListEntry = boost::none;
 
     // The bucket ID for the underlying document
     const BucketId bucketId;
 
     // Time field for the measurements that have been inserted into the bucket.
-    const tracked_string timeField;
+    const tracking::string timeField;
 
     // The key (i.e. (namespace, metadata)) for this bucket.
     const BucketKey key;
@@ -160,13 +162,13 @@ public:
     // Top-level hashed field names of the measurements that have been inserted into the bucket.
     // TODO(SERVER-70605): Remove to avoid extra overhead. These are stored as keys in
     // measurementMap.
-    TrackedStringSet fieldNames;
+    tracking::StringSet fieldNames;
 
     // Top-level hashed new field names that have not yet been committed into the bucket.
-    TrackedStringSet uncommittedFieldNames;
+    tracking::StringSet uncommittedFieldNames;
 
     // Batches, per operation, that haven't been committed or aborted yet.
-    tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
+    tracking::unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
 
     // The minimum and maximum values for each field in the bucket.
     MinMax minmax;

@@ -115,12 +115,12 @@ void markIndividualBucketCleared(BucketStateRegistry& registry,
 }
 }  // namespace
 
-BucketStateRegistry::BucketStateRegistry(TrackingContext& trackingContext)
-    : bucketsPerEra(make_tracked_map<Era, uint64_t>(trackingContext)),
-      bucketStates(make_tracked_unordered_map<BucketId,
-                                              std::variant<BucketState, DirectWriteCounter>,
-                                              BucketHasher>(trackingContext)),
-      clearedSets(make_tracked_map<Era, tracked_vector<UUID>>(trackingContext)) {}
+BucketStateRegistry::BucketStateRegistry(tracking::Context& trackingContext)
+    : bucketsPerEra(tracking::make_map<Era, uint64_t>(trackingContext)),
+      bucketStates(tracking::make_unordered_map<BucketId,
+                                                std::variant<BucketState, DirectWriteCounter>,
+                                                BucketHasher>(trackingContext)),
+      clearedSets(tracking::make_map<Era, tracking::vector<UUID>>(trackingContext)) {}
 
 BucketStateRegistry::Era getCurrentEra(const BucketStateRegistry& registry) {
     stdx::lock_guard lk{registry.mutex};
@@ -149,7 +149,8 @@ BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
     }
 }
 
-void clearSetOfBuckets(BucketStateRegistry& registry, tracked_vector<UUID> clearedCollectionUUIDs) {
+void clearSetOfBuckets(BucketStateRegistry& registry,
+                       tracking::vector<UUID> clearedCollectionUUIDs) {
     stdx::lock_guard lk{registry.mutex};
     registry.clearedSets[++registry.currentEra] = std::move(clearedCollectionUUIDs);
 }

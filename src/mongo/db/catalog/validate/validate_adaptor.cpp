@@ -409,7 +409,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                                         int version,
                                         int* bucketCount,
                                         bool shouldDecompressBSON) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     timeseries::bucket_catalog::MinMax minmax{trackingContext};
     if (version == timeseries::kTimeseriesControlUncompressedVersion) {
         for (const auto& metric : timeField.Obj()) {
@@ -513,7 +513,7 @@ Status _validateTimeSeriesDataField(const CollectionPtr& coll,
                                     int version,
                                     int bucketCount,
                                     bool shouldDecompressBSON) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     timeseries::bucket_catalog::MinMax minmax{trackingContext};
     if (version == timeseries::kTimeseriesControlUncompressedVersion) {
         // Checks that indices are in increasing order and within the correct range.

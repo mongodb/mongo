@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,48 +29,20 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-#include <absl/strings/string_view.h>
+#include <scoped_allocator>
+#include <set>
 
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/util/shared_buffer.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 
-namespace mongo::timeseries::bucket_catalog {
+namespace mongo::tracking {
 
-struct BucketMetadata {
-public:
-    BucketMetadata(tracking::Context&,
-                   BSONElement elem,
-                   boost::optional<StringData> trueMetaFieldName);
+template <class Key>
+using set = std::set<Key, std::less<Key>, std::scoped_allocator_adaptor<Allocator<Key>>>;
 
-    bool operator==(const BucketMetadata& other) const;
-    bool operator!=(const BucketMetadata& other) const;
+template <class Key>
+set<Key> make_set(Context& Context) {
+    return set<Key>(Context.makeAllocator<Key>());
+}
 
-    BSONObj toBSON() const;
-    BSONElement element() const;
-
-    boost::optional<StringData> getMetaField() const;
-
-    template <typename H>
-    friend H AbslHashValue(H h, const BucketMetadata& metadata) {
-        return H::combine(
-            std::move(h),
-            absl::Hash<absl::string_view>()(absl::string_view(
-                metadata._metadataElement.value(), metadata._metadataElement.valuesize())));
-    }
-
-private:
-    // Empty if metadata field isn't present, owns a copy otherwise.
-    allocator_aware::SharedBuffer<tracking::Allocator<void>> _metadata;
-
-    // Only the value of '_metadataElement' is used for hashing and comparison.
-    BSONElement _metadataElement;
-};
-
-}  // namespace mongo::timeseries::bucket_catalog
+}  // namespace mongo::tracking

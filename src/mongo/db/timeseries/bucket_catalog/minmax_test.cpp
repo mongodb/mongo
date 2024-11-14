@@ -84,7 +84,7 @@ int64_t emptyMinMaxSize() {
 }
 
 TEST(MinMax, Insert) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMaxStore minmax{trackingContext};
 
     // No subelements to start
@@ -148,7 +148,7 @@ TEST(MinMax, Insert) {
 }
 
 TEST(MinMax, MinMaxNoUpdatesAfterFullMinMax) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMax minMaxObj{trackingContext};
     const auto* strCmp = &simpleStringDataComparator;
     minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
@@ -162,7 +162,7 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMax) {
 }
 
 TEST(MinMax, MinMaxNoUpdatesAfterFullMinMaxNested) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMax minMaxObj{trackingContext};
     const auto* strCmp = &simpleStringDataComparator;
 
@@ -185,7 +185,7 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMaxNested) {
 }
 
 TEST(MinMax, MinMaxInitialUpdates) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMax minMaxObj{trackingContext};
     const auto* strCmp = &simpleStringDataComparator;
     minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
@@ -196,7 +196,7 @@ TEST(MinMax, MinMaxInitialUpdates) {
 }
 
 TEST(MinMax, MinMaxMixedUpdates) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMax minMaxObj{trackingContext};
     const auto* strCmp = &simpleStringDataComparator;
     minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
@@ -211,7 +211,7 @@ TEST(MinMax, MinMaxMixedUpdates) {
 }
 
 TEST(MinMax, SubObjInsert) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMaxStore minmax{trackingContext};
     auto obj = minmax.root();
     auto [inserted, _] = obj.insert(obj.end(), "b");
@@ -264,7 +264,7 @@ TEST(MinMax, SubObjInsert) {
 }
 
 TEST(MinMax, Search) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMaxStore minmax{trackingContext};
     auto obj = minmax.root();
     obj.insert(obj.end(), "a");
@@ -284,7 +284,7 @@ TEST(MinMax, Search) {
 }
 
 TEST(MinMax, SearchLookupMap) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     MinMaxStore minmax{trackingContext};
     auto obj = minmax.root();
 

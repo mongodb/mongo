@@ -68,16 +68,16 @@ Bucket::Bucket(TrackingContexts& trackingContexts,
       lastChecked(getCurrentEraAndIncrementBucketCount(bsr)),
       bucketStateRegistry(bsr),
       bucketId(bId),
-      timeField(
-          make_tracked_string(getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById),
-                              tf.data(),
-                              tf.size())),
+      timeField(tracking::make_string(
+          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById),
+          tf.data(),
+          tf.size())),
       key(std::move(k)),
-      fieldNames(makeTrackedStringSet(
+      fieldNames(tracking::makeStringSet(
           getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
-      uncommittedFieldNames(makeTrackedStringSet(
+      uncommittedFieldNames(tracking::makeStringSet(
           getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
-      batches(make_tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(
+      batches(tracking::make_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(
           getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
       minmax(getTrackingContext(trackingContexts, TrackingScope::kSummaries)),
       schema(getTrackingContext(trackingContexts, TrackingScope::kSummaries)),
@@ -128,7 +128,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts& trackingContexts,
             continue;
         }
 
-        auto hashedKey = TrackedStringSet::hasher().hashed_key(
+        auto hashedKey = tracking::StringSet::hasher().hashed_key(
             getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById), fieldName);
         if (!bucket.fieldNames.contains(hashedKey)) {
             // Record the new field name only if it hasn't been committed yet. There could

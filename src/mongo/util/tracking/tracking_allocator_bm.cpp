@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,50 +27,47 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <benchmark/benchmark.h>
 
-#include <absl/hash/hash.h>
-#include <absl/strings/string_view.h>
-
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/util/shared_buffer.h"
 #include "mongo/util/tracking/allocator.h"
-#include "mongo/util/tracking/context.h"
 
-namespace mongo::timeseries::bucket_catalog {
+namespace mongo::tracking {
 
-struct BucketMetadata {
-public:
-    BucketMetadata(tracking::Context&,
-                   BSONElement elem,
-                   boost::optional<StringData> trueMetaFieldName);
+namespace {
 
-    bool operator==(const BucketMetadata& other) const;
-    bool operator!=(const BucketMetadata& other) const;
+constexpr size_t numIncsPerRead = 1000;
 
-    BSONObj toBSON() const;
-    BSONElement element() const;
+}  // namespace
 
-    boost::optional<StringData> getMetaField() const;
-
-    template <typename H>
-    friend H AbslHashValue(H h, const BucketMetadata& metadata) {
-        return H::combine(
-            std::move(h),
-            absl::Hash<absl::string_view>()(absl::string_view(
-                metadata._metadataElement.value(), metadata._metadataElement.valuesize())));
-    }
-
-private:
-    // Empty if metadata field isn't present, owns a copy otherwise.
-    allocator_aware::SharedBuffer<tracking::Allocator<void>> _metadata;
-
-    // Only the value of '_metadataElement' is used for hashing and comparison.
-    BSONElement _metadataElement;
+class AllocatorFixture : public benchmark::Fixture {
+protected:
+    std::unique_ptr<AllocatorStats> _stats;
 };
 
-}  // namespace mongo::timeseries::bucket_catalog
+BENCHMARK_DEFINE_F(AllocatorFixture, counter)(benchmark::State& state) {
+    if (state.thread_index == 0) {
+        // Setup code
+        // state.range(0) --> Number of partitions
+        _stats = std::make_unique<AllocatorStats>(state.range(0));
+    }
+
+    for (auto _ : state) {
+        for (size_t i = 0; i < numIncsPerRead; i++) {
+            _stats->bytesAllocated(1);
+        }
+        benchmark::DoNotOptimize(_stats->allocated());
+    }
+
+    if (state.thread_index == 0) {
+        // Teardown code
+        state.counters["numIncrements"] = _stats->allocated();
+    }
+}
+
+BENCHMARK_REGISTER_F(AllocatorFixture, counter)
+    ->RangeMultiplier(2)
+    ->Ranges({{1, 64}})
+    ->ThreadRange(1, 64)
+    ->UseRealTime();
+
+}  // namespace mongo::tracking

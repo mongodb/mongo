@@ -1716,6 +1716,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/util/tracing_profiler/OWNERS.yml
 /src/mongo/util/tracing_profiler/**/* @10gen/query @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/util/tracking/OWNERS.yml
+/src/mongo/util/tracking/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/watchdog/OWNERS.yml
 /src/mongo/watchdog/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 

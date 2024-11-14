@@ -173,7 +173,7 @@ std::vector<BSONObj> generateReopeningPipeline(const Date_t& time,
     return pipeline;
 }
 
-StatusWith<MinMax> generateMinMaxFromBucketDoc(TrackingContext& trackingContext,
+StatusWith<MinMax> generateMinMaxFromBucketDoc(tracking::Context& trackingContext,
                                                const BSONObj& bucketDoc,
                                                const StringDataComparator* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);
@@ -190,7 +190,7 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(TrackingContext& trackingContext,
     }
 }
 
-StatusWith<Schema> generateSchemaFromBucketDoc(TrackingContext& trackingContext,
+StatusWith<Schema> generateSchemaFromBucketDoc(tracking::Context& trackingContext,
                                                const BSONObj& bucketDoc,
                                                const StringDataComparator* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);

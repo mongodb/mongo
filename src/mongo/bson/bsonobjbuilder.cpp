@@ -237,13 +237,13 @@ template class BSONObjBuilderBase<BSONObjBuilder, BufBuilder>;
 template class BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder>;
 template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<std::allocator<void>>,
                                   allocator_aware::BufBuilder<std::allocator<void>>>;
-template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<TrackingAllocator<void>>,
-                                  allocator_aware::BufBuilder<TrackingAllocator<void>>>;
+template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<tracking::Allocator<void>>,
+                                  allocator_aware::BufBuilder<tracking::Allocator<void>>>;
 template class BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>;
 template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<std::allocator<void>>,
                                     allocator_aware::BSONObjBuilder<std::allocator<void>>>;
-template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<TrackingAllocator<void>>,
-                                    allocator_aware::BSONObjBuilder<TrackingAllocator<void>>>;
+template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<tracking::Allocator<void>>,
+                                    allocator_aware::BSONObjBuilder<tracking::Allocator<void>>>;
 template class BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>;
 
 }  // namespace mongo

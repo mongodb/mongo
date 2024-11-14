@@ -47,7 +47,7 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/tracked_types.h"
+#include "mongo/util/tracking/vector.h"
 
 namespace mongo {
 
@@ -185,7 +185,7 @@ void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
 
     auto& bucketCatalog =
         timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-    tracked_vector<UUID> clearedCollectionUUIDs = make_tracked_vector<UUID>(
+    tracking::vector<UUID> clearedCollectionUUIDs = tracking::make_vector<UUID>(
         timeseries::bucket_catalog::getTrackingContext(
             bucketCatalog.trackingContexts,
             timeseries::bucket_catalog::TrackingScope::kBucketStateRegistry),

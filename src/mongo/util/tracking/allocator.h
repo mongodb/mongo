@@ -38,15 +38,15 @@
 #include "mongo/util/aligned.h"
 #include "mongo/util/shared_buffer.h"
 
-namespace mongo {
+namespace mongo::tracking {
 
 /**
  * A minimal implementation of a partitioned counter for incrementing and decrementing allocations
  * across multiple threads.
  */
-class TrackingAllocatorStats {
+class AllocatorStats {
 public:
-    explicit TrackingAllocatorStats(size_t numPartitions)
+    explicit AllocatorStats(size_t numPartitions)
         : _numPartitions(numPartitions), _bytesAllocated(_numPartitions) {}
 
     void bytesAllocated(size_t n) {
@@ -91,19 +91,19 @@ private:
  * A minimal allocator that keeps track of the number of bytes allocated and deallocated.
  */
 template <class T>
-class TrackingAllocator {
+class Allocator {
 public:
     using value_type = T;
     using propagate_on_container_move_assignment = std::true_type;
 
-    TrackingAllocator() = delete;
-    explicit TrackingAllocator(TrackingAllocatorStats& stats) noexcept : _stats(stats){};
-    TrackingAllocator(const TrackingAllocator&) noexcept = default;
+    Allocator() = delete;
+    explicit Allocator(AllocatorStats& stats) noexcept : _stats(stats){};
+    Allocator(const Allocator&) noexcept = default;
 
-    ~TrackingAllocator() = default;
+    ~Allocator() = default;
 
     template <class U>
-    TrackingAllocator(const TrackingAllocator<U>& ta) noexcept : _stats{ta.stats()} {};
+    Allocator(const Allocator<U>& ta) noexcept : _stats{ta.stats()} {};
 
     T* allocate(size_t n) {
         const size_t allocation = n * sizeof(T);
@@ -117,22 +117,22 @@ public:
         ::operator delete(p, size);
     }
 
-    TrackingAllocatorStats& stats() const {
+    AllocatorStats& stats() const {
         return _stats;
     }
 
 private:
-    std::reference_wrapper<TrackingAllocatorStats> _stats;
+    std::reference_wrapper<AllocatorStats> _stats;
 };
 
 template <class T, class U>
-bool operator==(const TrackingAllocator<T>& lhs, const TrackingAllocator<U>& rhs) noexcept {
+bool operator==(const Allocator<T>& lhs, const Allocator<U>& rhs) noexcept {
     return &lhs.stats() == &rhs.stats();
 }
 
 template <class T, class U>
-bool operator!=(const TrackingAllocator<T>& lhs, const TrackingAllocator<U>& rhs) noexcept {
+bool operator!=(const Allocator<T>& lhs, const Allocator<U>& rhs) noexcept {
     return &lhs.stats() != &rhs.stats();
 }
 
-}  // namespace mongo
+}  // namespace mongo::tracking

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/util/tracking_context.h"
+#include "mongo/util/tracking/context.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -50,31 +50,31 @@ enum class TrackingScope {
 };
 
 /**
- * A slight abstraction around the TrackingContext to allow us to extract the correct context for
+ * A slight abstraction around the tracking::Context to allow us to extract the correct context for
  * the scope chosen when running with detailed diagnostics in debug mode. Still allows us to extract
  * the single context when running normally for release builds.
  */
 struct TrackingContexts {
 #ifndef MONGO_CONFIG_DEBUG_BUILD
-    TrackingContext global;
+    tracking::Context global;
 #else
-    TrackingContext archivedBuckets;
-    TrackingContext bucketStateRegistry;
-    TrackingContext columnBuilders;
-    TrackingContext idleBuckets;
-    TrackingContext miscellaneous;
-    TrackingContext openBucketsById;
-    TrackingContext openBucketsByKey;
-    TrackingContext reopeningRequests;
-    TrackingContext stats;
-    TrackingContext summaries;
+    tracking::Context archivedBuckets;
+    tracking::Context bucketStateRegistry;
+    tracking::Context columnBuilders;
+    tracking::Context idleBuckets;
+    tracking::Context miscellaneous;
+    tracking::Context openBucketsById;
+    tracking::Context openBucketsByKey;
+    tracking::Context reopeningRequests;
+    tracking::Context stats;
+    tracking::Context summaries;
 #endif
 };
 
 /**
  * Selects the correct tracking context for the specified scope.
  */
-constexpr TrackingContext& getTrackingContext(TrackingContexts& contexts, TrackingScope scope) {
+constexpr tracking::Context& getTrackingContext(TrackingContexts& contexts, TrackingScope scope) {
 #ifndef MONGO_CONFIG_DEBUG_BUILD
     return contexts.global;
 #else

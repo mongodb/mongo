@@ -29,24 +29,19 @@
 
 #pragma once
 
-#include <absl/container/btree_map.h>
-#include <memory>
 #include <scoped_allocator>
+#include <string>
 
-#include "mongo/util/tracking_allocator.h"
-#include "mongo/util/tracking_context.h"
+#include "mongo/util/tracking/allocator.h"
+#include "mongo/util/tracking/context.h"
 
-namespace mongo {
+namespace mongo::tracking {
 
-// TODO use std::scoped_allocator_adaptor. In v4 toolchain its copy-constructor is not nothrow which
-// is a requirement for the absl btree_map.
-template <class Key, class T, class Compare = std::less<Key>>
-using tracked_btree_map =
-    absl::btree_map<Key, T, Compare, TrackingAllocator<std::pair<const Key, T>>>;
+using string = std::basic_string<char, std::char_traits<char>, Allocator<char>>;
 
-template <class Key, class T, class Compare = std::less<Key>>
-tracked_btree_map<Key, T, Compare> make_tracked_btree_map(TrackingContext& trackingContext) {
-    return tracked_btree_map<Key, T, Compare>(trackingContext.makeAllocator<T>());
+template <class... Args>
+string make_string(Context& Context, Args... args) {
+    return string(args..., Context.makeAllocator<char>());
 }
 
-}  // namespace mongo
+}  // namespace mongo::tracking

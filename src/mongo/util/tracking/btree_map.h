@@ -29,37 +29,22 @@
 
 #pragma once
 
-#include <functional>
+#include <absl/container/btree_map.h>
+#include <scoped_allocator>
 
-#include "mongo/util/processinfo.h"
-#include "mongo/util/tracking_allocator.h"
+#include "mongo/util/tracking/allocator.h"
+#include "mongo/util/tracking/context.h"
 
-namespace mongo {
+namespace mongo::tracking {
 
-/**
- * A TrackingContext is a factory style class that constructs TrackingAllocator objects under a
- * single instance of TrackingAllocatorStats and provides access to these stats.
- */
-class TrackingContext {
-public:
-    TrackingContext() = default;
-    ~TrackingContext() = default;
+// TODO use std::scoped_allocator_adaptor. In v4 toolchain its copy-constructor is not nothrow which
+// is a requirement for the absl btree_map.
+template <class Key, class T, class Compare = std::less<Key>>
+using btree_map = absl::btree_map<Key, T, Compare, Allocator<std::pair<const Key, T>>>;
 
-    template <class T>
-    TrackingAllocator<T> makeAllocator() {
-        return TrackingAllocator<T>(_stats);
-    }
+template <class Key, class T, class Compare = std::less<Key>>
+btree_map<Key, T, Compare> make_btree_map(Context& Context) {
+    return btree_map<Key, T, Compare>(Context.makeAllocator<T>());
+}
 
-    TrackingAllocatorStats& stats() {
-        return _stats;
-    }
-
-    uint64_t allocated() const {
-        return _stats.allocated();
-    }
-
-private:
-    TrackingAllocatorStats _stats{ProcessInfo::getNumLogicalCores() * 2};
-};
-
-}  // namespace mongo
+}  // namespace mongo::tracking

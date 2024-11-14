@@ -1,5 +1,5 @@
-load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -382,7 +382,6 @@ mongo_cc_library(
         "//src/mongo/util:tick_source.h",
         "//src/mongo/util:time_support.h",
         "//src/mongo/util:timer.h",
-        "//src/mongo/util:tracking_allocator.h",
         "//src/mongo/util:uuid.h",
         "//src/mongo/util:version.h",
         "//src/mongo/util:versioned_value.h",
@@ -390,6 +389,7 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:idle_thread_block.h",
         "//src/mongo/util/concurrency:thread_name.h",
         "//src/mongo/util/concurrency:with_lock.h",
+        "//src/mongo/util/tracking:allocator.h",
     ],
     linkopts = select({
         "//bazel/config:ssl_enabled_linux": ["-lcrypto"],

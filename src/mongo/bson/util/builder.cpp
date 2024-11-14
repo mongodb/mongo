@@ -32,7 +32,7 @@
 namespace mongo {
 
 template class BasicBufBuilder<SharedBufferAllocator>;
-template class BasicBufBuilder<allocator_aware::SharedBufferAllocator<TrackingAllocator<void>>>;
+template class BasicBufBuilder<allocator_aware::SharedBufferAllocator<tracking::Allocator<void>>>;
 template class BasicBufBuilder<SharedBufferFragmentAllocator>;
 template class BasicBufBuilder<UniqueBufferAllocator>;
 template class StackBufBuilderBase<StackSizeDefault>;

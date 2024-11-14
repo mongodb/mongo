@@ -35,8 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
-#include "mongo/util/tracked_types.h"
-#include "mongo/util/tracking_context.h"
+#include "mongo/util/tracking/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -46,7 +45,7 @@ namespace mongo::timeseries::bucket_catalog {
  */
 class MeasurementMap {
 public:
-    explicit MeasurementMap(TrackingContext& trackingContext);
+    explicit MeasurementMap(tracking::Context& trackingContext);
 
     /**
      * Inserts one measurement. Vector should contain every data field, including the time field,
@@ -70,7 +69,7 @@ public:
      * Calls BSONColumnBuilder::intermediate() for all builders. Updates the compressed size both
      * internally as well as the one passed in.
      */
-    std::vector<std::pair<StringData, BSONColumnBuilder<TrackingAllocator<void>>::BinaryDiff>>
+    std::vector<std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
     intermediate(int32_t& compressedSizeDelta);
 
     /**
@@ -91,10 +90,10 @@ private:
 
     void _insertNewKey(StringData key,
                        const BSONElement& elem,
-                       BSONColumnBuilder<TrackingAllocator<void>> builder);
+                       BSONColumnBuilder<tracking::Allocator<void>> builder);
 
-    std::reference_wrapper<TrackingContext> _trackingContext;
-    TrackedStringMap<BSONColumnBuilder<TrackingAllocator<void>>> _builders;
+    std::reference_wrapper<tracking::Context> _trackingContext;
+    tracking::StringMap<BSONColumnBuilder<tracking::Allocator<void>>> _builders;
     size_t _measurementCount{0};
 
     // The size of the compressed binary data across all builders since the last call to

@@ -31,7 +31,7 @@
 
 #include <boost/container/small_vector.hpp>
 
-#include "mongo/util/tracking_allocator.h"
+#include "mongo/util/tracking/allocator.h"
 
 namespace mongo::timeseries::metadata {
 namespace {
@@ -134,7 +134,7 @@ template void normalize(const BSONElement& elem,
                         allocator_aware::BSONObjBuilder<std::allocator<void>>& builder,
                         boost::optional<StringData> as);
 template void normalize(const BSONElement& elem,
-                        allocator_aware::BSONObjBuilder<TrackingAllocator<void>>& builder,
+                        allocator_aware::BSONObjBuilder<tracking::Allocator<void>>& builder,
                         boost::optional<StringData> as);
 
 }  // namespace mongo::timeseries::metadata

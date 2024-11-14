@@ -60,7 +60,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/tracking_allocator.h"
+#include "mongo/util/tracking/allocator.h"
 
 namespace mongo {
 
@@ -863,8 +863,8 @@ class BSONObjBuilder;
 
 extern template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<std::allocator<void>>,
                                          allocator_aware::BufBuilder<std::allocator<void>>>;
-extern template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<TrackingAllocator<void>>,
-                                         allocator_aware::BufBuilder<TrackingAllocator<void>>>;
+extern template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<tracking::Allocator<void>>,
+                                         allocator_aware::BufBuilder<tracking::Allocator<void>>>;
 
 namespace allocator_aware {
 template <class Allocator = std::allocator<void>>
@@ -1164,8 +1164,8 @@ class BSONArrayBuilder;
 extern template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<std::allocator<void>>,
                                            allocator_aware::BSONObjBuilder<std::allocator<void>>>;
 extern template class BSONArrayBuilderBase<
-    allocator_aware::BSONArrayBuilder<TrackingAllocator<void>>,
-    allocator_aware::BSONObjBuilder<TrackingAllocator<void>>>;
+    allocator_aware::BSONArrayBuilder<tracking::Allocator<void>>,
+    allocator_aware::BSONObjBuilder<tracking::Allocator<void>>>;
 
 namespace allocator_aware {
 template <class Allocator>

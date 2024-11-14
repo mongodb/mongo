@@ -233,7 +233,7 @@ TEST_F(TimeseriesWriteOpsTest, CommitTimeseriesBucketNoCollection) {
     auto opCtx = operationContext();
     auto uuid = UUID::gen();
 
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     timeseries::bucket_catalog::TrackingContexts trackingContexts;
     timeseries::bucket_catalog::BucketId bucketId{uuid, OID::gen(), 0};
     timeseries::bucket_catalog::BucketKey key{uuid, {trackingContext, {}, boost::none}};

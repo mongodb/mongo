@@ -173,7 +173,7 @@ boost::optional<InsertWaiter> checkForWait(const Stripe& stripe,
     return boost::none;
 }
 
-shared_tracked_ptr<ExecutionStats> getEmptyStats() {
+tracking::shared_ptr<ExecutionStats> getEmptyStats() {
     static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
     return kEmptyStats;
 }
@@ -195,7 +195,7 @@ StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucke
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
-    TrackingContext& trackingContext,
+    tracking::Context& trackingContext,
     const UUID& collectionUUID,
     const StringDataComparator* comparator,
     const TimeseriesOptions& options,
@@ -371,14 +371,14 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
     return nullptr;
 }
 
-StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
-                                                       ExecutionStatsController& stats,
-                                                       const UUID& collectionUUID,
-                                                       const StringDataComparator* comparator,
-                                                       const TimeseriesOptions& options,
-                                                       const BucketToReopen& bucketToReopen,
-                                                       const uint64_t catalogEra,
-                                                       const BucketKey* expectedKey) {
+StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
+                                                         ExecutionStatsController& stats,
+                                                         const UUID& collectionUUID,
+                                                         const StringDataComparator* comparator,
+                                                         const TimeseriesOptions& options,
+                                                         const BucketToReopen& bucketToReopen,
+                                                         const uint64_t catalogEra,
+                                                         const BucketKey* expectedKey) {
     ScopeGuard updateStatsOnError([&stats] { stats.incNumBucketReopeningsFailed(); });
 
     const auto& [bucketDoc, validator] = bucketToReopen;
@@ -426,7 +426,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                        .getField(options.getTimeField())
                        .Date();
     BucketId bucketId{key.collectionUUID, bucketIdElem.OID(), key.signature()};
-    unique_tracked_ptr<Bucket> bucket = make_unique_tracked<Bucket>(
+    tracking::unique_ptr<Bucket> bucket = tracking::make_unique<Bucket>(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
         catalog.trackingContexts,
         bucketId,
@@ -454,7 +454,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     // Populate the top-level data field names.
     const BSONObj& dataObj = bucketDoc.getObjectField(kBucketDataFieldName);
     for (const BSONElement& dataElem : dataObj) {
-        bucket->fieldNames.emplace(make_tracked_string(
+        bucket->fieldNames.emplace(tracking::make_string(
             getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
             dataElem.fieldName(),
             dataElem.fieldNameSize() - 1));
@@ -535,7 +535,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         WithLock stripeLock,
                                                         ExecutionStatsController& stats,
                                                         const BucketKey& key,
-                                                        unique_tracked_ptr<Bucket>&& bucket,
+                                                        tracking::unique_ptr<Bucket>&& bucket,
                                                         std::uint64_t targetEra,
                                                         ClosedBuckets& closedBuckets) {
     invariant(bucket.get());
@@ -707,7 +707,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     batch->measurements.push_back(doc);
     for (auto&& field : newFieldNamesToBeInserted) {
         batch->newFieldNamesToBeInserted[field] = field.hash();
-        bucket.uncommittedFieldNames.emplace(TrackedStringMapHashedKey{
+        bucket.uncommittedFieldNames.emplace(tracking::StringMapHashedKey{
             getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
             field.key(),
             field.hash()});
@@ -1123,7 +1123,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
         StringData timeField;
         auto timeFieldIt = stripe.collectionTimeFields.find(uuid);
         if (timeFieldIt != stripe.collectionTimeFields.end()) {
-            const tracked_string& tf = std::get<tracked_string>(timeFieldIt->second);
+            const tracking::string& tf = std::get<tracking::string>(timeFieldIt->second);
             timeField = {tf.data(), tf.size()};
         }
 
@@ -1205,7 +1205,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     auto maxRetries = gTimeseriesInsertMaxRetriesOnDuplicates.load();
     OID oid;
     Date_t roundedTime;
-    tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>::iterator it;
+    tracking::unordered_map<BucketId, tracking::unique_ptr<Bucket>, BucketHasher>::iterator it;
     bool successfullyCreatedId = false;
     for (int retryAttempts = 0; !successfullyCreatedId && retryAttempts < maxRetries;
          ++retryAttempts) {
@@ -1213,7 +1213,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
         auto bucketId = BucketId{info.key.collectionUUID, oid, info.key.signature()};
         std::tie(it, successfullyCreatedId) = stripe.openBucketsById.try_emplace(
             bucketId,
-            make_unique_tracked<Bucket>(
+            tracking::make_unique<Bucket>(
                 getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
                 catalog.trackingContexts,
                 bucketId,
@@ -1383,7 +1383,7 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
 
     auto res =
         catalog.executionStats.emplace(collectionUUID,
-                                       make_shared_tracked<ExecutionStats>(getTrackingContext(
+                                       tracking::make_shared<ExecutionStats>(getTrackingContext(
                                            catalog.trackingContexts, TrackingScope::kStats)));
     return {res.first->second, catalog.globalExecutionStats};
 }
@@ -1401,8 +1401,8 @@ ExecutionStatsController getExecutionStats(BucketCatalog& catalog, const UUID& c
     return {emptyStats, *emptyStats};
 }
 
-shared_tracked_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCatalog& catalog,
-                                                               const UUID& collectionUUID) {
+tracking::shared_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCatalog& catalog,
+                                                                 const UUID& collectionUUID) {
     stdx::lock_guard catalogLock{catalog.mutex};
 
     auto it = catalog.executionStats.find(collectionUUID);
@@ -1412,7 +1412,7 @@ shared_tracked_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCatal
     return nullptr;
 }
 
-std::pair<UUID, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+std::pair<UUID, tracking::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
     BucketCatalog& sideBucketCatalog) {
     stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
     invariant(sideBucketCatalog.executionStats.size() == 1);
@@ -1420,15 +1420,15 @@ std::pair<UUID, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollecti
 }
 
 void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
-                                        shared_tracked_ptr<ExecutionStats> collStats,
+                                        tracking::shared_ptr<ExecutionStats> collStats,
                                         const UUID& collectionUUID) {
     ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, collectionUUID);
     addCollectionExecutionCounters(stats, *collStats);
 }
 
-std::vector<shared_tracked_ptr<ExecutionStats>> releaseExecutionStatsFromBucketCatalog(
+std::vector<tracking::shared_ptr<ExecutionStats>> releaseExecutionStatsFromBucketCatalog(
     BucketCatalog& catalog, std::span<const UUID> collectionUUIDs) {
-    std::vector<shared_tracked_ptr<ExecutionStats>> out;
+    std::vector<tracking::shared_ptr<ExecutionStats>> out;
     out.reserve(collectionUUIDs.size());
 
     stdx::lock_guard catalogLock{catalog.mutex};

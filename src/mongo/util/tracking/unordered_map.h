@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,48 +29,31 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-#include <absl/strings/string_view.h>
+#include <scoped_allocator>
 
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/util/shared_buffer.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 
-namespace mongo::timeseries::bucket_catalog {
+namespace mongo::tracking {
 
-struct BucketMetadata {
-public:
-    BucketMetadata(tracking::Context&,
-                   BSONElement elem,
-                   boost::optional<StringData> trueMetaFieldName);
+template <class Key,
+          class Value,
+          class Hasher = DefaultHasher<Key>,
+          class KeyEqual = std::equal_to<Key>>
+using unordered_map =
+    stdx::unordered_map<Key,
+                        Value,
+                        Hasher,
+                        KeyEqual,
+                        std::scoped_allocator_adaptor<Allocator<std::pair<const Key, Value>>>>;
 
-    bool operator==(const BucketMetadata& other) const;
-    bool operator!=(const BucketMetadata& other) const;
+template <class Key,
+          class Value,
+          class Hasher = DefaultHasher<Key>,
+          class KeyEqual = std::equal_to<Key>>
+unordered_map<Key, Value, Hasher> make_unordered_map(Context& Context) {
+    return unordered_map<Key, Value, Hasher, KeyEqual>(Context.makeAllocator<Value>());
+}
 
-    BSONObj toBSON() const;
-    BSONElement element() const;
-
-    boost::optional<StringData> getMetaField() const;
-
-    template <typename H>
-    friend H AbslHashValue(H h, const BucketMetadata& metadata) {
-        return H::combine(
-            std::move(h),
-            absl::Hash<absl::string_view>()(absl::string_view(
-                metadata._metadataElement.value(), metadata._metadataElement.valuesize())));
-    }
-
-private:
-    // Empty if metadata field isn't present, owns a copy otherwise.
-    allocator_aware::SharedBuffer<tracking::Allocator<void>> _metadata;
-
-    // Only the value of '_metadataElement' is used for hashing and comparison.
-    BSONElement _metadataElement;
-};
-
-}  // namespace mongo::timeseries::bucket_catalog
+}  // namespace mongo::tracking

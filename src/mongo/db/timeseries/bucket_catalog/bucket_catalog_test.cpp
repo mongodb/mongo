@@ -2325,14 +2325,14 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     auto& stripe = *sideBucketCatalog->stripes[0];
     stripe.openBucketsById.try_emplace(
         dummyBucketId,
-        make_unique_tracked<Bucket>(getTrackingContext(sideBucketCatalog->trackingContexts,
-                                                       TrackingScope::kOpenBucketsById),
-                                    sideBucketCatalog->trackingContexts,
-                                    dummyBucketId,
-                                    dummyBucketKey,
-                                    "time",
-                                    Date_t(),
-                                    sideBucketCatalog->bucketStateRegistry));
+        tracking::make_unique<Bucket>(getTrackingContext(sideBucketCatalog->trackingContexts,
+                                                         TrackingScope::kOpenBucketsById),
+                                      sideBucketCatalog->trackingContexts,
+                                      dummyBucketId,
+                                      dummyBucketKey,
+                                      "time",
+                                      Date_t(),
+                                      sideBucketCatalog->bucketStateRegistry));
     stripe.openBucketsByKey[dummyBucketKey].emplace(dummyBucket.get());
     stripe.idleBuckets.push_front(dummyBucket.get());
     dummyBucket->idleListEntry = stripe.idleBuckets.begin();

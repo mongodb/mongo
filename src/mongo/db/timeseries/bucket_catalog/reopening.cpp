@@ -58,14 +58,14 @@ boost::optional<OID> initializeRequest(BucketCatalog& catalog,
         // are not open yet which means they are not already being tracked.
         std::tie(it, inserted) = stripe.outstandingReopeningRequests.try_emplace(
             key,
-            make_tracked_inlined_vector<shared_tracked_ptr<ReopeningRequest>,
-                                        Stripe::kInlinedVectorSize>(
+            tracking::make_inlined_vector<tracking::shared_ptr<ReopeningRequest>,
+                                          Stripe::kInlinedVectorSize>(
                 getTrackingContext(catalog.trackingContexts, TrackingScope::kReopeningRequests)));
         invariant(inserted);
     }
     auto& list = it->second;
 
-    list.push_back(make_shared_tracked<ReopeningRequest>(
+    list.push_back(tracking::make_shared<ReopeningRequest>(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kReopeningRequests),
         ExecutionStatsController{
             internal::getOrInitializeExecutionStats(catalog, key.collectionUUID)},

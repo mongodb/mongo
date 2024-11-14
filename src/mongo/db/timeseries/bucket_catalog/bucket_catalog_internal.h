@@ -101,7 +101,7 @@ StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucke
  * Extracts the information from the input 'doc' that is used to map the document to a bucket.
  */
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
-    TrackingContext&,
+    tracking::Context&,
     const UUID& collectionUUID,
     const StringDataComparator* comparator,
     const TimeseriesOptions& options,
@@ -163,14 +163,14 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
  * validate that the bucket is expected (i.e. to help resolve hash collisions for archived buckets).
  * Does *not* hand ownership of the bucket to the catalog.
  */
-StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
-                                                       ExecutionStatsController& stats,
-                                                       const UUID& collectionUUID,
-                                                       const StringDataComparator* comparator,
-                                                       const TimeseriesOptions& options,
-                                                       const BucketToReopen& bucketToReopen,
-                                                       uint64_t catalogEra,
-                                                       const BucketKey* expectedKey);
+StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
+                                                         ExecutionStatsController& stats,
+                                                         const UUID& collectionUUID,
+                                                         const StringDataComparator* comparator,
+                                                         const TimeseriesOptions& options,
+                                                         const BucketToReopen& bucketToReopen,
+                                                         uint64_t catalogEra,
+                                                         const BucketKey* expectedKey);
 
 /**
  * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the bucket
@@ -181,7 +181,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         WithLock stripeLock,
                                                         ExecutionStatsController& stats,
                                                         const BucketKey& key,
-                                                        unique_tracked_ptr<Bucket>&& bucket,
+                                                        tracking::unique_ptr<Bucket>&& bucket,
                                                         std::uint64_t targetEra,
                                                         ClosedBuckets& closedBuckets);
 
@@ -386,27 +386,27 @@ ExecutionStatsController getExecutionStats(BucketCatalog& catalog, const UUID& c
 /**
  * Retrieves the execution stats for the given namespace, if they have already been initialized.
  */
-shared_tracked_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCatalog& catalog,
-                                                               const UUID& collectionUUID);
+tracking::shared_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCatalog& catalog,
+                                                                 const UUID& collectionUUID);
 
 /**
  * Release the execution stats of a collection from the bucket catalog.
  */
-std::vector<shared_tracked_ptr<ExecutionStats>> releaseExecutionStatsFromBucketCatalog(
+std::vector<tracking::shared_ptr<ExecutionStats>> releaseExecutionStatsFromBucketCatalog(
     BucketCatalog& catalog, std::span<const UUID> collectionUUIDs);
 
 /**
  * Retrieves the execution stats from the side bucket catalog.
  * Assumes the side bucket catalog has the stats of one collection.
  */
-std::pair<UUID, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+std::pair<UUID, tracking::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
     BucketCatalog& sideBucketCatalog);
 
 /**
  * Merges the execution stats of a collection into the bucket catalog.
  */
 void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
-                                        shared_tracked_ptr<ExecutionStats> collStats,
+                                        tracking::shared_ptr<ExecutionStats> collStats,
                                         const UUID& collectionUUID);
 
 /**

@@ -33,29 +33,30 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/tracked_types.h"
-#include "mongo/util/tracking_allocator.h"
+#include "mongo/util/tracking/allocator.h"
+#include "mongo/util/tracking/map.h"
+#include "mongo/util/tracking/memory.h"
+#include "mongo/util/tracking/string.h"
 
-namespace mongo {
+namespace mongo::tracking {
 
-class TrackingAllocatorTest : public unittest::Test {};
+class AllocatorTest : public unittest::Test {};
 
-TEST_F(TrackingAllocatorTest, STLContainerSimple) {
+TEST_F(AllocatorTest, STLContainerSimple) {
 #if _ITERATOR_DEBUG_LEVEL >= 2
     // If iterator debugging is on, skip this test as additional memory gets allocated.
     return;
 #endif
 
-    TrackingContext trackingContext;
-    ASSERT_EQ(0, trackingContext.allocated());
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
 
     {
-        std::vector<int64_t, TrackingAllocator<int64_t>> vec(
-            trackingContext.makeAllocator<int64_t>());
-        ASSERT_EQ(0, trackingContext.allocated());
+        std::vector<int64_t, Allocator<int64_t>> vec(Context.makeAllocator<int64_t>());
+        ASSERT_EQ(0, Context.allocated());
 
         vec.push_back(1);
-        ASSERT_EQ(sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(sizeof(int64_t), Context.allocated());
 
         vec.push_back(2);
         vec.push_back(3);
@@ -63,131 +64,128 @@ TEST_F(TrackingAllocatorTest, STLContainerSimple) {
         // Different compilers allocate capacity in different ways. Use shrink_to_fit() to reduce
         // capacity to the size.
         vec.shrink_to_fit();
-        ASSERT_EQ(3 * sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(3 * sizeof(int64_t), Context.allocated());
 
         vec.pop_back();
         vec.shrink_to_fit();
-        ASSERT_EQ(2 * sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(2 * sizeof(int64_t), Context.allocated());
 
         vec.clear();
         vec.shrink_to_fit();
-        ASSERT_EQ(0, trackingContext.allocated());
+        ASSERT_EQ(0, Context.allocated());
     }
 
-    ASSERT_EQ(0, trackingContext.allocated());
+    ASSERT_EQ(0, Context.allocated());
 }
 
-TEST_F(TrackingAllocatorTest, STLContainerCopy) {
+TEST_F(AllocatorTest, STLContainerCopy) {
 #if _ITERATOR_DEBUG_LEVEL >= 2
     // If iterator debugging is on, skip this test as additional memory gets allocated.
     return;
 #endif
 
-    TrackingContext trackingContext;
-    ASSERT_EQ(0, trackingContext.allocated());
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
 
     {
-        std::vector<int64_t, TrackingAllocator<int64_t>> vec(
-            trackingContext.makeAllocator<int64_t>());
-        ASSERT_EQ(0, trackingContext.allocated());
+        std::vector<int64_t, Allocator<int64_t>> vec(Context.makeAllocator<int64_t>());
+        ASSERT_EQ(0, Context.allocated());
 
         vec.push_back(1);
-        ASSERT_EQ(sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(sizeof(int64_t), Context.allocated());
 
-        std::vector<int64_t, TrackingAllocator<int64_t>> vecCopy = vec;
+        std::vector<int64_t, Allocator<int64_t>> vecCopy = vec;
         vecCopy.shrink_to_fit();
-        ASSERT_EQ(2 * sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(2 * sizeof(int64_t), Context.allocated());
 
         vecCopy.push_back(2);
         vecCopy.shrink_to_fit();
-        ASSERT_EQ(3 * sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(3 * sizeof(int64_t), Context.allocated());
     }
 
-    ASSERT_EQ(0, trackingContext.allocated());
+    ASSERT_EQ(0, Context.allocated());
 }
 
-TEST_F(TrackingAllocatorTest, STLContainerMove) {
+TEST_F(AllocatorTest, STLContainerMove) {
 #if _ITERATOR_DEBUG_LEVEL >= 2
     // If iterator debugging is on, skip this test as additional memory gets allocated.
     return;
 #endif
 
-    TrackingContext trackingContext;
-    ASSERT_EQ(0, trackingContext.allocated());
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
 
     {
-        std::vector<int64_t, TrackingAllocator<int64_t>> vec(
-            trackingContext.makeAllocator<int64_t>());
-        ASSERT_EQ(0, trackingContext.allocated());
+        std::vector<int64_t, Allocator<int64_t>> vec(Context.makeAllocator<int64_t>());
+        ASSERT_EQ(0, Context.allocated());
 
         vec.push_back(1);
-        ASSERT_EQ(sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(sizeof(int64_t), Context.allocated());
 
-        std::vector<int64_t, TrackingAllocator<int64_t>> vecMove = std::move(vec);
+        std::vector<int64_t, Allocator<int64_t>> vecMove = std::move(vec);
         vecMove.shrink_to_fit();
-        ASSERT_EQ(sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(sizeof(int64_t), Context.allocated());
 
         vecMove.push_back(2);
         vecMove.shrink_to_fit();
-        ASSERT_EQ(2 * sizeof(int64_t), trackingContext.allocated());
+        ASSERT_EQ(2 * sizeof(int64_t), Context.allocated());
     }
 
-    ASSERT_EQ(0, trackingContext.allocated());
+    ASSERT_EQ(0, Context.allocated());
 }
 
-TEST_F(TrackingAllocatorTest, STLContainerNested) {
+TEST_F(AllocatorTest, STLContainerNested) {
 #if _ITERATOR_DEBUG_LEVEL >= 2
     // If iterator debugging is on, skip this test as additional memory gets allocated.
     return;
 #endif
 
-    TrackingContext trackingContext;
-    ASSERT_EQ(0, trackingContext.allocated());
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
 
     {
         // The scoped_allocator_adaptor is necessary for multilevel containers to use the same
         // allocator.
         using Key = int64_t;
-        using Value = std::vector<int64_t, TrackingAllocator<int64_t>>;
-        tracked_map<Key, Value> map(make_tracked_map<Key, Value>(trackingContext));
+        using Value = std::vector<int64_t, Allocator<int64_t>>;
+        map<Key, Value> map(make_map<Key, Value>(Context));
 
         map[1].emplace_back(1);
-        ASSERT_GT(trackingContext.allocated(), sizeof(std::pair<const Key, Value>));
+        ASSERT_GT(Context.allocated(), sizeof(std::pair<const Key, Value>));
 
         // Adding elements into the vector results in the top-level allocators allocation count
         // being increased.
-        uint64_t prevAllocated = trackingContext.allocated();
+        uint64_t prevAllocated = Context.allocated();
         for (int i = 0; i < 100; i++) {
             map[1].push_back(i);
         }
-        ASSERT_GT(trackingContext.allocated(), prevAllocated);
+        ASSERT_GT(Context.allocated(), prevAllocated);
 
-        prevAllocated = trackingContext.allocated();
+        prevAllocated = Context.allocated();
         map[1].clear();
         map[1].shrink_to_fit();
-        ASSERT_LT(trackingContext.allocated(), prevAllocated);
+        ASSERT_LT(Context.allocated(), prevAllocated);
     }
 
-    ASSERT_EQ(0, trackingContext.allocated());
+    ASSERT_EQ(0, Context.allocated());
 
     {
-        using Key = tracked_string;
-        using Value = std::vector<tracked_string>;
-        tracked_map<Key, Value> map(make_tracked_map<Key, Value>(trackingContext));
+        using Key = string;
+        using Value = std::vector<string>;
+        map<Key, Value> map(make_map<Key, Value>(Context));
 
         // Use a long string to avoid small-string optimization which would have no allocation.
-        const tracked_string str = make_tracked_string(
-            trackingContext,
+        const string str = make_string(
+            Context,
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         map[str].emplace_back(str);
-        ASSERT_GT(trackingContext.allocated(),
-                  sizeof(std::pair<const Key, Value>) + 2 * str.capacity());
+        ASSERT_GT(Context.allocated(), sizeof(std::pair<const Key, Value>) + 2 * str.capacity());
     }
 
-    ASSERT_EQ(0, trackingContext.allocated());
+    ASSERT_EQ(0, Context.allocated());
 }
 
-TEST_F(TrackingAllocatorTest, ManagedObject) {
+TEST_F(AllocatorTest, ManagedObject) {
     class MockClass {
     private:
         int64_t u;
@@ -198,22 +196,22 @@ TEST_F(TrackingAllocatorTest, ManagedObject) {
         int64_t z;
     };
 
-    TrackingContext trackingContext;
-    ASSERT_EQ(0, trackingContext.allocated());
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
 
     {
-        shared_tracked_ptr<MockClass> mockClass = make_shared_tracked<MockClass>(trackingContext);
-        ASSERT_GTE(trackingContext.allocated(), sizeof(MockClass));
+        shared_ptr<MockClass> mockClass = tracking::make_shared<MockClass>(Context);
+        ASSERT_GTE(Context.allocated(), sizeof(MockClass));
     }
 
-    ASSERT_EQ(0, trackingContext.allocated());
+    ASSERT_EQ(0, Context.allocated());
 
     {
-        unique_tracked_ptr<MockClass> mockClass = make_unique_tracked<MockClass>(trackingContext);
-        ASSERT_GTE(trackingContext.allocated(), sizeof(MockClass));
+        unique_ptr<MockClass> mockClass = tracking::make_unique<MockClass>(Context);
+        ASSERT_GTE(Context.allocated(), sizeof(MockClass));
     }
 
-    ASSERT_EQ(0, trackingContext.allocated());
+    ASSERT_EQ(0, Context.allocated());
 }
 
-}  // namespace mongo
+}  // namespace mongo::tracking

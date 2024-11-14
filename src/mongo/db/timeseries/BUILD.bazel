@@ -106,15 +106,13 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog:rollover.h",
         "//src/mongo/db/timeseries/bucket_catalog:tracking_contexts.h",
         "//src/mongo/db/timeseries/bucket_catalog:write_batch.h",
-        "//src/mongo/util/tracking:tracked_btree_map.h",
-        "//src/mongo/util:tracked_types.h",
-        "//src/mongo/util:tracking_context.h",
         "//src/mongo/db/catalog:collection.h",
         "//src/mongo/db/catalog:index_catalog.h",
         "//src/mongo/db/catalog:index_catalog_entry.h",
     ],
     header_deps = [
         "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/util/tracking",
     ],
     deps = [
         "//src/mongo/bson/column",

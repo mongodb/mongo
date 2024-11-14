@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,48 +29,37 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-#include <absl/strings/string_view.h>
+#include <functional>
 
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/util/shared_buffer.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/tracking/allocator.h"
-#include "mongo/util/tracking/context.h"
 
-namespace mongo::timeseries::bucket_catalog {
+namespace mongo::tracking {
 
-struct BucketMetadata {
+/**
+ * A Context is a factory style class that constructs Allocator objects under a
+ * single instance of AllocatorStats and provides access to these stats.
+ */
+class Context {
 public:
-    BucketMetadata(tracking::Context&,
-                   BSONElement elem,
-                   boost::optional<StringData> trueMetaFieldName);
+    Context() = default;
+    ~Context() = default;
 
-    bool operator==(const BucketMetadata& other) const;
-    bool operator!=(const BucketMetadata& other) const;
+    template <class T>
+    Allocator<T> makeAllocator() {
+        return Allocator<T>(_stats);
+    }
 
-    BSONObj toBSON() const;
-    BSONElement element() const;
+    AllocatorStats& stats() {
+        return _stats;
+    }
 
-    boost::optional<StringData> getMetaField() const;
-
-    template <typename H>
-    friend H AbslHashValue(H h, const BucketMetadata& metadata) {
-        return H::combine(
-            std::move(h),
-            absl::Hash<absl::string_view>()(absl::string_view(
-                metadata._metadataElement.value(), metadata._metadataElement.valuesize())));
+    uint64_t allocated() const {
+        return _stats.allocated();
     }
 
 private:
-    // Empty if metadata field isn't present, owns a copy otherwise.
-    allocator_aware::SharedBuffer<tracking::Allocator<void>> _metadata;
-
-    // Only the value of '_metadataElement' is used for hashing and comparison.
-    BSONElement _metadataElement;
+    AllocatorStats _stats{ProcessInfo::getNumLogicalCores() * 2};
 };
 
-}  // namespace mongo::timeseries::bucket_catalog
+}  // namespace mongo::tracking

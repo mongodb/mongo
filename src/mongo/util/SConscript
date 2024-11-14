@@ -42,6 +42,7 @@ env.SConscript(
         "net",
         "options_parser",
         "tracing_profiler",
+        "tracking",
     ],
     exports=[
         "env",
@@ -211,23 +212,6 @@ env.Benchmark(
 
 pcre_env = env.Clone()
 pcre_env.InjectThirdParty(libraries=["pcre2"])
-env.Benchmark(
-    target="tracking_allocator_bm",
-    source=[
-        "tracking_allocator_bm.cpp",
-    ],
-    LIBDEPS=[],
-)
-
-env.CppUnitTest(
-    target="tracking_allocator_test",
-    source=[
-        "tracking_allocator_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-    ],
-)
 
 env.Benchmark(
     target="hash_table_bm",

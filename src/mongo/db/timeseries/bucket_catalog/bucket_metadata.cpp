@@ -39,16 +39,16 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-BucketMetadata::BucketMetadata(TrackingContext& trackingContext,
+BucketMetadata::BucketMetadata(tracking::Context& trackingContext,
                                BSONElement elem,
                                boost::optional<StringData> trueMetaFieldName)
     : _metadata([&] {
           if (!elem) {
-              return allocator_aware::SharedBuffer<TrackingAllocator<void>>{
+              return allocator_aware::SharedBuffer<tracking::Allocator<void>>{
                   trackingContext.makeAllocator<void>()};
           }
 
-          allocator_aware::BSONObjBuilder<TrackingAllocator<void>> builder{
+          allocator_aware::BSONObjBuilder<tracking::Allocator<void>> builder{
               trackingContext.makeAllocator<void>()};
           // We will get an object of equal size, just with reordered fields.
           builder.bb().reserveBytes(elem.size());

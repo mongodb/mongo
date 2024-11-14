@@ -41,8 +41,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/tracked_types.h"
-#include "mongo/util/tracking_context.h"
+#include "mongo/util/tracking/map.h"
+#include "mongo/util/tracking/unordered_map.h"
+#include "mongo/util/tracking/vector.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -127,17 +128,17 @@ struct BucketStateRegistry {
     Era currentEra = 0;
 
     // Mapping of era to counts of how many buckets are associated with that era.
-    tracked_map<Era, uint64_t> bucketsPerEra;
+    tracking::map<Era, uint64_t> bucketsPerEra;
 
     // Bucket state for synchronization with direct writes.
-    tracked_unordered_map<BucketId, std::variant<BucketState, DirectWriteCounter>, BucketHasher>
+    tracking::unordered_map<BucketId, std::variant<BucketState, DirectWriteCounter>, BucketHasher>
         bucketStates;
 
     // Registry storing 'clearSetOfBuckets' operations. Maps from era to a list of cleared
     // collection UUIDS.
-    tracked_map<Era, tracked_vector<UUID>> clearedSets;
+    tracking::map<Era, tracking::vector<UUID>> clearedSets;
 
-    BucketStateRegistry(TrackingContext& trackingContext);
+    BucketStateRegistry(tracking::Context& trackingContext);
 };
 
 BucketStateRegistry::Era getCurrentEra(const BucketStateRegistry& registry);
@@ -149,7 +150,8 @@ BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
 /**
  * Asynchronously clears all buckets belonging to cleared collection UUIDs.
  */
-void clearSetOfBuckets(BucketStateRegistry& registry, tracked_vector<UUID> clearedCollectionUUIDs);
+void clearSetOfBuckets(BucketStateRegistry& registry,
+                       tracking::vector<UUID> clearedCollectionUUIDs);
 
 /**
  * Returns the number of clear operations currently stored in the clear registry.

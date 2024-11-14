@@ -49,7 +49,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/tracking_context.h"
+#include "mongo/util/tracking/context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -75,7 +75,7 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
     // by someone else.
     for (auto it = batch.newFieldNamesToBeInserted.begin();
          it != batch.newFieldNamesToBeInserted.end();) {
-        TrackedStringMapHashedKey fieldName(
+        tracking::StringMapHashedKey fieldName(
             getTrackingContext(trackingContexts, TrackingScope::kMiscellaneous),
             it->first,
             it->second);
@@ -148,21 +148,23 @@ SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b, Closed
 
 Stripe::Stripe(TrackingContexts& trackingContexts)
     : openBucketsById(
-          make_tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>(
+          tracking::make_unordered_map<BucketId, tracking::unique_ptr<Bucket>, BucketHasher>(
               getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
-      openBucketsByKey(make_tracked_unordered_map<BucketKey, tracked_set<Bucket*>, BucketHasher>(
-          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsByKey))),
-      idleBuckets(make_tracked_list<Bucket*>(
+      openBucketsByKey(
+          tracking::make_unordered_map<BucketKey, tracking::set<Bucket*>, BucketHasher>(
+              getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsByKey))),
+      idleBuckets(tracking::make_list<Bucket*>(
           getTrackingContext(trackingContexts, TrackingScope::kIdleBuckets))),
       archivedBuckets(
-          make_tracked_btree_map<ArchivedKey, ArchivedBucket, std::greater<ArchivedKey>>(
+          tracking::make_btree_map<ArchivedKey, ArchivedBucket, std::greater<ArchivedKey>>(
               getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
-      collectionTimeFields(make_tracked_unordered_map<UUID, std::tuple<tracked_string, int64_t>>(
-          getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
+      collectionTimeFields(
+          tracking::make_unordered_map<UUID, std::tuple<tracking::string, int64_t>>(
+              getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
       outstandingReopeningRequests(
-          make_tracked_unordered_map<
+          tracking::make_unordered_map<
               BucketKey,
-              tracked_inlined_vector<shared_tracked_ptr<ReopeningRequest>, kInlinedVectorSize>,
+              tracking::inlined_vector<tracking::shared_ptr<ReopeningRequest>, kInlinedVectorSize>,
               BucketHasher>(
               getTrackingContext(trackingContexts, TrackingScope::kReopeningRequests))) {}
 
@@ -170,14 +172,14 @@ BucketCatalog::BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> m
     : bucketStateRegistry(
           getTrackingContext(trackingContexts, TrackingScope::kBucketStateRegistry)),
       numberOfStripes(numberOfStripes),
-      stripes(make_tracked_vector<unique_tracked_ptr<Stripe>>(
+      stripes(tracking::make_vector<tracking::unique_ptr<Stripe>>(
           getTrackingContext(trackingContexts, TrackingScope::kMiscellaneous))),
-      executionStats(make_tracked_unordered_map<UUID, shared_tracked_ptr<ExecutionStats>>(
+      executionStats(tracking::make_unordered_map<UUID, tracking::shared_ptr<ExecutionStats>>(
           getTrackingContext(trackingContexts, TrackingScope::kStats))),
       memoryUsageThreshold(memoryUsageThreshold) {
     stripes.reserve(numberOfStripes);
     std::generate_n(std::back_inserter(stripes), numberOfStripes, [&]() {
-        return make_unique_tracked<Stripe>(
+        return tracking::make_unique<Stripe>(
             getTrackingContext(trackingContexts, TrackingScope::kMiscellaneous), trackingContexts);
     });
 }
@@ -372,7 +374,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                     reopeningContext.bucketToReopen.value(),
                                     reopeningContext.catalogEra,
                                     &insertContext.key)
-        : StatusWith<unique_tracked_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
+        : StatusWith<tracking::unique_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
     if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
         return rehydratedBucket.getStatus();
     }
@@ -700,7 +702,7 @@ void directWriteFinish(BucketStateRegistry& registry, const BucketId& bucketId) 
     removeDirectWrite(registry, bucketId);
 }
 
-void drop(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs) {
+void drop(BucketCatalog& catalog, tracking::vector<UUID> clearedCollectionUUIDs) {
     auto stats = internal::releaseExecutionStatsFromBucketCatalog(catalog, clearedCollectionUUIDs);
     clearSetOfBuckets(catalog.bucketStateRegistry, std::move(clearedCollectionUUIDs));
 
@@ -720,7 +722,7 @@ void drop(BucketCatalog& catalog, const UUID& collectionUUID) {
 }
 
 void clear(BucketCatalog& catalog, const UUID& collectionUUID) {
-    tracked_vector<UUID> clearedCollectionUUIDs = make_tracked_vector<UUID>(
+    tracking::vector<UUID> clearedCollectionUUIDs = tracking::make_vector<UUID>(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kBucketStateRegistry));
     clearedCollectionUUIDs.push_back(collectionUUID);
     clearSetOfBuckets(catalog.bucketStateRegistry, std::move(clearedCollectionUUIDs));
@@ -758,7 +760,7 @@ BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
                                      const StringDataComparator* comparator,
                                      const UUID& collectionUUID,
                                      const BSONObj& metadataObj) {
-    TrackingContext trackingContext;
+    tracking::Context trackingContext;
     auto metaField = options.getMetaField();
     const BSONElement metadata = metaField ? metadataObj[metaField.value()] : BSONElement();
     const BucketKey key{collectionUUID,
@@ -773,7 +775,7 @@ void resetBucketOIDCounter() {
 void appendExecutionStats(const BucketCatalog& catalog,
                           const UUID& collectionUUID,
                           BSONObjBuilder& builder) {
-    const shared_tracked_ptr<ExecutionStats> stats =
+    const tracking::shared_ptr<ExecutionStats> stats =
         internal::getCollectionExecutionStats(catalog, collectionUUID);
     if (stats) {
         appendExecutionStatsToBuilder(*stats, builder);
