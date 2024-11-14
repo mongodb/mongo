@@ -1065,7 +1065,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--release={env.GetOption("release") == "on"}',
         f'--build_enterprise={"MONGO_ENTERPRISE_VERSION" in env}',
         f'--visibility_support={env.GetOption("visibility-support")}',
-        f'--disable_warnings_as_errors={env.GetOption("disable-warnings-as-errors") == "source"}',
+        f'--disable_warnings_as_errors={"source" in env.GetOption("disable-warnings-as-errors")}',
         f'--gcov={env.GetOption("gcov") is not None}',
         f'--pgo_profile={env.GetOption("pgo-profile") is not None}',
         f'--server_js={env.GetOption("server-js") == "on"}',
