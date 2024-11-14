@@ -117,9 +117,18 @@ public:
         _keysRemovedFromRecordStore += keysRemovedFromRecordStore;
     }
 
+    bool hasStructuralDamage() {
+        return _hasStructuralDamage;
+    }
+
+    void setHasStructuralDamage(bool hasStructuralDamage) {
+        _hasStructuralDamage = hasStructuralDamage;
+    }
+
 private:
     int64_t _keysTraversed = 0;
     int64_t _keysRemovedFromRecordStore = 0;
+    bool _hasStructuralDamage = false;
 };
 
 using ValidateResultsMap = std::map<std::string, IndexValidateResults>;
@@ -168,6 +177,14 @@ public:
     }
     void setRepaired(bool repaired) {
         _repaired = repaired;
+    }
+
+    bool hasStructuralDamage() const {
+        return _hasStructuralDamage;
+    }
+
+    void setHasStructuralDamage(bool hasStructuralDamage) {
+        _hasStructuralDamage = hasStructuralDamage;
     }
 
     boost::optional<Timestamp> getReadTimestamp() const {
@@ -264,6 +281,7 @@ private:
     std::vector<RecordId> _corruptRecords;
 
     bool _repaired = false;
+    bool _hasStructuralDamage = false;
     boost::optional<Timestamp> _readTimestamp = boost::none;
 
     // Collection stats.

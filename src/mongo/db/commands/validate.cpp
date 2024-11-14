@@ -455,6 +455,19 @@ public:
             result.append("advice",
                           "A corrupt namespace has been detected. See "
                           "http://dochub.mongodb.org/core/data-recovery for recovery steps.");
+            // Errors stemming from structural damage of the index or record store make it unsafe to
+            // open a cursor.
+            bool indexHasStructuralDamage =
+                std::any_of(validateResults.getIndexResultsMap().begin(),
+                            validateResults.getIndexResultsMap().end(),
+                            [](auto& indexPair) { return indexPair.second.hasStructuralDamage(); });
+
+            if (validateResults.hasStructuralDamage() || indexHasStructuralDamage) {
+                LOGV2_WARNING(
+                    9635600,
+                    "Skipping logCollStats due to structural damage detected in collection");
+                return true;
+            }
             logCollStats(opCtx, nss);
         }
 

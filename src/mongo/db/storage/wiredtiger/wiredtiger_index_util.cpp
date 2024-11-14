@@ -174,6 +174,7 @@ void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
         std::string msg = str::stream() << "verify() returned an error. "
                                         << "This indicates structural damage. "
                                         << "Not examining individual index entries.";
+        results.setHasStructuralDamage(true);
         results.addError(msg);
         return;
     }
@@ -200,6 +201,7 @@ void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
                     "examining individual index entries.",
                     "error"_attr = wiredtiger_strerror(err));
 
+        results.setHasStructuralDamage(true);
         results.addError(msg);
     }
 }
