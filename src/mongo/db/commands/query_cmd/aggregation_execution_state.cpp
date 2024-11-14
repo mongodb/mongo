@@ -30,9 +30,11 @@
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 
 namespace mongo {
@@ -142,7 +144,7 @@ private:
 
 protected:
     /**
-     * Contructor used by Oplog subclass.
+     * Constructor used by Oplog subclass.
      */
     DefaultAggCatalogState(const AggExState& aggExState, auto_get_collection::ViewMode viewMode)
         : AggCatalogState{aggExState} {
@@ -438,7 +440,6 @@ ScopedSetShardRole AggExState::setShardRole(const CollectionRoutingInfo& cri) {
         return originalShardVersion ? originalShardVersion->placementConflictTime() : boost::none;
     }();
 
-
     if (cri.cm.hasRoutingTable()) {
         const auto myShardId = ShardingState::get(_opCtx)->shardId();
 
@@ -477,8 +478,13 @@ bool AggExState::canReadUnderlyingCollectionLocally(const CollectionRoutingInfo&
 }
 
 Status AggExState::collatorCompatibleWithPipeline(const CollatorInterface* collator) const {
+    const auto pipelineInvolvedNamespaces = getInvolvedNamespaces();
+    if (pipelineInvolvedNamespaces.empty()) {
+        return Status::OK();
+    }
+
     auto catalog = CollectionCatalog::get(_opCtx);
-    for (const auto& potentialViewNs : getInvolvedNamespaces()) {
+    for (const auto& potentialViewNs : pipelineInvolvedNamespaces) {
         if (catalog->lookupCollectionByNamespace(_opCtx, potentialViewNs)) {
             continue;
         }
@@ -571,6 +577,30 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
 
     collectionState->validate();
     return collectionState;
+}
+
+boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext() {
+    auto [collator, collationMatchesDefault] = resolveCollator();
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(_aggExState.getOpCtx(),
+                                   _aggExState.getRequest(),
+                                   allowDiskUseByDefault.load())
+                      .collator(std::move(collator))
+                      .collUUID(getUUID())
+                      .mongoProcessInterface(MongoProcessInterface::create(_aggExState.getOpCtx()))
+                      .mayDbProfile(CurOp::get(_aggExState.getOpCtx())->dbProfileLevel() > 0)
+                      .resolvedNamespace(uassertStatusOK(_aggExState.resolveInvolvedNamespaces()))
+                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                      .collationMatchesDefault(collationMatchesDefault)
+                      .build();
+    // If any involved collection contains extended-range data, set a flag which individual
+    // DocumentSource parsers can check.
+    getCollections().forEach([&](const CollectionPtr& coll) {
+        if (coll->getRequiresTimeseriesExtendedRangeSupport())
+            expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+    });
+
+    return expCtx;
 }
 
 /**

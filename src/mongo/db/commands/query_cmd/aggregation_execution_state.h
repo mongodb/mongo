@@ -28,7 +28,6 @@
  */
 #pragma once
 
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
@@ -38,12 +37,10 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/util/string_map.h"
 #include <boost/optional.hpp>
 
 namespace mongo {
@@ -69,7 +66,7 @@ using DeferredCmd = DeferredFn<BSONObj>;
  * share some common context. This class factors out the most commonly used referenced pieces of
  * state that are central to the execution of the aggregation.
  *
- * This class also holds some member functions that soley, or nearly, rely on state held within the
+ * This class also holds some member functions that solely, or nearly, rely on state held within the
  * class, that also assists in the execution of the aggregation.
  */
 class AggExState {
@@ -259,7 +256,7 @@ public:
 
 private:
     /**
-     * Upconverts the read concern for a change stream aggregation, if necesssary.
+     * Upconverts the read concern for a change stream aggregation, if necessary.
      *
      * If there is no given read concern level on the given object, upgrades the level to 'majority'
      * and waits for read concern. If a read concern level is already specified on the given read
@@ -420,6 +417,13 @@ public:
     virtual void relinquishLocks() = 0;
 
     query_shape::CollectionType determineCollectionType() const;
+
+    /**
+     * Create an ExpressionContext instance for this pipeline, which involves first resolving the
+     * collation.  The expression context is used to store state that is useful to access throughout
+     * the lifespan of this query.
+     */
+    boost::intrusive_ptr<ExpressionContext> createExpressionContext();
 
     virtual ~AggCatalogState() {}
 

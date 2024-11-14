@@ -527,7 +527,6 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
             // cannot be shared between threads. There is no synchronization for pieces of
             // the execution machinery above the Exchange, so nothing above the Exchange can be
             // shared between different exchange-producer cursors.
-
             auto collator = expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr;
             expCtx = ExpressionContextBuilder{}
                          .fromRequest(aggExState.getOpCtx(),
@@ -662,20 +661,19 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 // TODO SERVER-93539 take a ResolvedViewAggExState instead of a AggExState that gets set as a view.
 Status runAggregateOnView(AggExState& aggExState,
                           std::unique_ptr<AggCatalogState> aggCatalogState,
-                          boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse,
                           rpc::ReplyBuilderInterface* result) {
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
             !aggExState.getRequest().getIsMapReduceCommand());
 
-    // Check that the default collation of 'view' is compatible with the operation's
-    // collation. The check is skipped if the request did not specify a collation.
+    // Resolve the request's collation and check that the default collation of 'view' is compatible
+    // with the operation's collation. The collation resolution and check are both skipped if the
+    // request did not specify a collation.
     const ViewDefinition* view = aggCatalogState->getCtx().getView();
     if (!aggExState.getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
-        invariant(collatorToUse);  // Should already be resolved at this point.
-        if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collatorToUse->get()) &&
+        auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
+        if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collatorToUse.get()) &&
             !view->timeseries()) {
-
             return {ErrorCodes::OptionNotSupportedOnView,
                     "Cannot override a view's default collation"};
         }
@@ -758,30 +756,10 @@ Status runAggregateOnView(AggExState& aggExState,
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     const AggExState& aggExState,
     const AggCatalogState& aggCatalogState,
-    std::unique_ptr<CollatorInterface> collator,
-    ExpressionContextCollationMatchesDefault collationMatchesDefault) {
+    boost::intrusive_ptr<ExpressionContext> expCtx) {
     // If we're operating over a view, we first parse just the original user-given request
     // for the sake of registering query stats. Then, we'll parse the view pipeline and stitch
     // the two pipelines together below.
-    auto expCtx = ExpressionContextBuilder{}
-                      .fromRequest(aggExState.getOpCtx(),
-                                   aggExState.getRequest(),
-                                   allowDiskUseByDefault.load())
-                      .collator(std::move(collator))
-                      .collUUID(aggCatalogState.getUUID())
-                      .mongoProcessInterface(MongoProcessInterface::create(aggExState.getOpCtx()))
-                      .mayDbProfile(CurOp::get(aggExState.getOpCtx())->dbProfileLevel() > 0)
-                      .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
-                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
-                      .collationMatchesDefault(collationMatchesDefault)
-                      .build();
-    // If any involved collection contains extended-range data, set a flag which individual
-    // DocumentSource parsers can check.
-    aggCatalogState.getCollections().forEach([&](const CollectionPtr& coll) {
-        if (coll->getRequiresTimeseriesExtendedRangeSupport())
-            expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
-    });
-
     auto requestForQueryStats = aggExState.getOriginalRequest();
     expCtx->startExpressionCounters();
     auto pipeline = Pipeline::parse(requestForQueryStats.getPipeline(), expCtx);
@@ -841,6 +819,78 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     return pipeline;
 }
 
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> preparePipeline(
+    const AggExState& aggExState,
+    const AggCatalogState& aggCatalogState,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
+        parsePipelineAndRegisterQueryStats(aggExState, aggCatalogState, expCtx);
+
+    // Start the query planning timer right after parsing.
+    CurOp::get(aggExState.getOpCtx())->beginQueryPlanningTimer();
+
+    if (expCtx->getServerSideJsConfig().accumulator && _samplerAccumulatorJs.tick()) {
+        LOGV2_WARNING(
+            8996502,
+            "$accumulator is deprecated. For more information, see "
+            "https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/");
+    }
+
+    if (expCtx->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
+        LOGV2_WARNING(
+            8996503,
+            "$function is deprecated. For more information, see "
+            "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
+    }
+
+    // Only allow the use of runtime constants when 'fromRouter' is true.
+    uassert(463840,
+            "Manually setting 'runtimeConstants' is not supported. Use 'let' for user-defined "
+            "constants.",
+            expCtx->getFromRouter() || !aggExState.getRequest().getLegacyRuntimeConstants());
+
+    if (!aggExState.getRequest().getAllowDiskUse().value_or(true)) {
+        allowDiskUseFalseCounter.increment();
+    }
+
+    auto pipelineCollationStatus = aggExState.collatorCompatibleWithPipeline(expCtx->getCollator());
+    if (!pipelineCollationStatus.isOK()) {
+        return pipelineCollationStatus;
+    }
+
+    // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
+    // support querying against encrypted fields.
+    if (prepareForFLERewrite(aggExState.getOpCtx(),
+                             aggExState.getRequest().getEncryptionInformation())) {
+        pipeline = processFLEPipelineD(aggExState.getOpCtx(),
+                                       aggExState.getExecutionNss(),
+                                       aggExState.getRequest().getEncryptionInformation().value(),
+                                       std::move(pipeline));
+        aggExState.getRequest().getEncryptionInformation()->setCrudProcessed(true);
+    }
+
+    pipeline->optimizePipeline();
+
+    constexpr bool alreadyOptimized = true;
+    pipeline->validateCommon(alreadyOptimized);
+
+    if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+            aggExState.getOpCtx(),
+            expCtx->getNamespaceString(),
+            analyze_shard_key::SampledCommandNameEnum::kAggregate,
+            aggExState.getRequest())) {
+        analyze_shard_key::QueryAnalysisWriter::get(aggExState.getOpCtx())
+            ->addAggregateQuery(*sampleId,
+                                expCtx->getNamespaceString(),
+                                pipeline->getInitialQuery(),
+                                expCtx->getCollatorBSON(),
+                                aggExState.getRequest().getLet())
+            .getAsync([](auto) {});
+    }
+
+    return std::move(pipeline);
+}
+
 Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result) {
     // Perform the validation checks on the request and its derivatives before proceeding.
     aggExState.performValidationChecks();
@@ -895,11 +945,8 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(aggExState.getOpCtx());
-    auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
 
     {
-        const auto& pipelineInvolvedNamespaces = aggExState.getInvolvedNamespaces();
-
         // If this is a collectionless aggregation, we won't create 'ctx' but will still need an
         // AutoStatsTracker to record CurOp and Top entries.
         boost::optional<AutoStatsTracker> statsTracker;
@@ -935,83 +982,21 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         if (aggCatalogState->lockAcquired() && aggCatalogState->getCtx().getView() &&
             (!aggExState.startsWithCollStats() ||
              aggCatalogState->getCtx().getView()->timeseries())) {
-            return runAggregateOnView(
-                aggExState, std::move(aggCatalogState), std::move(collatorToUse), result);
+            return runAggregateOnView(aggExState, std::move(aggCatalogState), result);
         }
 
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline = parsePipelineAndRegisterQueryStats(
-            aggExState, *aggCatalogState, std::move(collatorToUse), collatorToUseMatchesDefault);
-        expCtx = pipeline->getContext();
+        expCtx = aggCatalogState->createExpressionContext();
 
-        // Start the query planning timer right after parsing.
-        CurOp::get(aggExState.getOpCtx())->beginQueryPlanningTimer();
-
-        if (expCtx->getServerSideJsConfig().accumulator && _samplerAccumulatorJs.tick()) {
-            LOGV2_WARNING(
-                8996502,
-                "$accumulator is deprecated. For more information, see "
-                "https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/");
+        // Prepare the parsed pipeline for execution. This involves parsing the pipeline,
+        // registering query stats, rewriting the pipeline to support queryable encryption, and
+        // optimizing and rewriting the pipeline if necessary.
+        StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> swPipeline =
+            preparePipeline(aggExState, *aggCatalogState, expCtx);
+        if (!swPipeline.isOK()) {
+            return swPipeline.getStatus();
         }
 
-        if (expCtx->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
-            LOGV2_WARNING(
-                8996503,
-                "$function is deprecated. For more information, see "
-                "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
-        }
-
-        // Only allow the use of runtime constants when 'fromRouter' is true.
-        uassert(463840,
-                "Manually setting 'runtimeConstants' is not supported. Use 'let' for user-defined "
-                "constants.",
-                expCtx->getFromRouter() || !aggExState.getRequest().getLegacyRuntimeConstants());
-
-        if (!aggExState.getRequest().getAllowDiskUse().value_or(true)) {
-            allowDiskUseFalseCounter.increment();
-        }
-
-        // Check that the view's collation matches the collation of any views involved in the
-        // pipeline.
-        if (!pipelineInvolvedNamespaces.empty()) {
-            auto pipelineCollationStatus =
-                aggExState.collatorCompatibleWithPipeline(expCtx->getCollator());
-            if (!pipelineCollationStatus.isOK()) {
-                return pipelineCollationStatus;
-            }
-        }
-
-        // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
-        // support querying against encrypted fields.
-        if (prepareForFLERewrite(aggExState.getOpCtx(),
-                                 aggExState.getRequest().getEncryptionInformation())) {
-            pipeline =
-                processFLEPipelineD(aggExState.getOpCtx(),
-                                    aggExState.getExecutionNss(),
-                                    aggExState.getRequest().getEncryptionInformation().value(),
-                                    std::move(pipeline));
-            aggExState.getRequest().getEncryptionInformation()->setCrudProcessed(true);
-        }
-
-        pipeline->optimizePipeline();
-
-        constexpr bool alreadyOptimized = true;
-        pipeline->validateCommon(alreadyOptimized);
-
-        if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
-                aggExState.getOpCtx(),
-                expCtx->getNamespaceString(),
-                analyze_shard_key::SampledCommandNameEnum::kAggregate,
-                aggExState.getRequest())) {
-            analyze_shard_key::QueryAnalysisWriter::get(aggExState.getOpCtx())
-                ->addAggregateQuery(*sampleId,
-                                    expCtx->getNamespaceString(),
-                                    pipeline->getInitialQuery(),
-                                    expCtx->getCollatorBSON(),
-                                    aggExState.getRequest().getLet())
-                .getAsync([](auto) {});
-        }
-
-        execs = createExecutor(aggExState, *aggCatalogState, std::move(pipeline));
+        execs = createExecutor(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
 
         tassert(6624353, "No executors", !execs.empty());
 
