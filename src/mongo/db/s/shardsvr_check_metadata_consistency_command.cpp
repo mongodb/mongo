@@ -28,6 +28,7 @@
  */
 
 
+#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <string>
@@ -64,6 +65,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/member_state.h"
@@ -82,6 +84,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -91,10 +94,12 @@
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
@@ -106,15 +111,6 @@ namespace mongo {
 namespace {
 
 constexpr StringData kDDLLockReason = "checkMetadataConsistency"_sd;
-
-auto getBackoffStrategy() {
-    static const size_t retryCount{60};
-    static const size_t baseWaitTimeMs{50};
-    static const size_t maxWaitTimeMs{1000};
-
-    return DDLLockManager::
-        TruncatedExponentialBackoffStrategy<retryCount, baseWaitTimeMs, maxWaitTimeMs>();
-}
 
 /*
  * Retrieve from config server the list of databases for which this shard is primary for.
@@ -226,10 +222,8 @@ public:
 
                 auto checkMetadataForDb = [&]() {
                     try {
-                        auto backoffStrategy = getBackoffStrategy();
-
                         DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                            opCtx, dbNss.dbName(), kDDLLockReason, MODE_S, backoffStrategy};
+                            opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
 
                         auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
                         cursors.insert(cursors.end(),
@@ -284,11 +278,8 @@ public:
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
             auto dbCursors = [&]() {
-                auto backoffStrategy = getBackoffStrategy();
-
                 DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                    opCtx, nss.dbName(), kDDLLockReason, MODE_S, backoffStrategy};
-
+                    opCtx, nss.dbName(), kDDLLockReason, MODE_S};
                 return _establishCursorOnParticipants(opCtx, nss);
             }();
 
@@ -297,11 +288,8 @@ public:
 
         Response _runCollectionLevel(OperationContext* opCtx, const NamespaceString& nss) {
             auto collCursors = [&]() {
-                auto backoffStrategy = getBackoffStrategy();
-
                 DDLLockManager::ScopedCollectionDDLLock dbDDLLock{
-                    opCtx, nss, kDDLLockReason, MODE_S, backoffStrategy};
-
+                    opCtx, nss, kDDLLockReason, MODE_S};
                 return _establishCursorOnParticipants(opCtx, nss);
             }();
 
