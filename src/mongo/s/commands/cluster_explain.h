@@ -52,8 +52,9 @@ class ClusterExplain {
 public:
     /**
      * Returns an explain command request wrapping the passed in command at the given verbosity
-     * level, propagating generic top-level command arguments. Additionally passed command is
-     * appended with query settings.
+     * level, pruning any generic arguments in the inner command as they should already be provided
+     * on the top-level outer commmand. Additionally, the passed command is appended with query
+     * settings.
      */
     static BSONObj wrapAsExplain(const BSONObj& cmdObj,
                                  ExplainOptions::Verbosity verbosity,

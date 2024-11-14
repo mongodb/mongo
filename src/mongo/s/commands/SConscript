@@ -290,6 +290,7 @@ env.CppUnitTest(
         'cluster_command_test_fixture.cpp',
         'cluster_delete_test.cpp',
         'cluster_distinct_test.cpp',
+        'cluster_explain_test.cpp',
         'cluster_find_and_modify_test.cpp',
         'cluster_find_test.cpp',
         'cluster_insert_test.cpp',
