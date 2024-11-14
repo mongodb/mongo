@@ -17,7 +17,10 @@ filters:
       - 10gen/devprod-build
   - ".clang-format":
     approvers:
-      - 10gen/devprod-build
+      - 10gen/server-programmability
+  - ".clang-tidy.in":
+    approvers:
+      - 10gen/server-programmability
   - ".eslintignore":
     approvers:
       - 10gen/devprod-correctness

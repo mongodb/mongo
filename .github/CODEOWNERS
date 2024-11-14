@@ -11,7 +11,8 @@ OWNERS.yml @10gen/server-root-ownership @svc-auto-approve-bot
 .bazelignore @10gen/devprod-build @svc-auto-approve-bot
 .bazelrc @10gen/devprod-build @svc-auto-approve-bot
 .bazelversion @10gen/devprod-build @svc-auto-approve-bot
-.clang-format @10gen/devprod-build @svc-auto-approve-bot
+.clang-format @10gen/server-programmability @svc-auto-approve-bot
+.clang-tidy.in @10gen/server-programmability @svc-auto-approve-bot
 .eslintignore @10gen/devprod-correctness @svc-auto-approve-bot
 .eslintrc.yml @10gen/devprod-correctness @svc-auto-approve-bot
 .gitignore @10gen/devprod-build @svc-auto-approve-bot
