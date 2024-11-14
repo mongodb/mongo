@@ -36,12 +36,15 @@ let csCursor = testCollection.watch();
 for (let i = 0; i < 5; ++i) {
     assert.commandWorked(testCollection.insert({_id: docId++}));
 }
+
+assert.soon(() => csCursor.hasNext());
 const resumeTokenFromDoc = csCursor.next()._id;
 csCursor.close();
 
 // Test that postBatchResumeToken is present on a non-empty initial aggregate batch.
 assert.soon(() => {
     csCursor = testCollection.watch([], {resumeAfter: resumeTokenFromDoc});
+    assert.soon(() => csCursor.hasNext());
     csCursor.close();  // We don't need any results after the initial batch.
     return csCursor.objsLeftInBatch();
 });
@@ -110,6 +113,7 @@ assertCompare(bsonWoCompare, getMorePBRT, txnEvent3._id, "eq", 0);
 
 // Confirm that resuming from the PBRT of the first batch gives us the third transaction write.
 csCursor = testCollection.watch([], {resumeAfter: resumePBRT});
+assert.soon(() => csCursor.hasNext());
 assert.docEq(csCursor.next(), txnEvent3);
 assert(!csCursor.hasNext());
 

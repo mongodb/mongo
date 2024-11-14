@@ -140,7 +140,7 @@ if (!FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
 
     if (TestData.testingReplicaSetEndpoint) {
         // GetMore on mongos doesn't respect batch size due to SERVER-31992.
-        assert(changeStreamCursor.hasNext());
+        assert.soon(() => changeStreamCursor.hasNext());
     }
     // Check the first batch.
     assert.eq(changeStreamCursor.objsLeftInBatch(), 2);
@@ -153,14 +153,14 @@ if (!FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     assert.eq(changeStreamCursor.objsLeftInBatch(), 0);
 
     // Check the batch returned by getMore.
-    assert(changeStreamCursor.hasNext());
+    assert.soon(() => changeStreamCursor.hasNext());
     assert.eq(changeStreamCursor.objsLeftInBatch(), 2);
     changeStreamCursor.next();
     assert(changeStreamCursor.hasNext());
     changeStreamCursor.next();
     assert.eq(changeStreamCursor.objsLeftInBatch(), 0);
     // There are more changes coming, just not in the batch.
-    assert(changeStreamCursor.hasNext());
+    assert.soon(() => changeStreamCursor.hasNext());
 }
 
 jsTestLog("Testing watch() with maxAwaitTimeMS");
@@ -228,3 +228,19 @@ if (invalidateDoc) {
 
     assert.eq(firstChangeAfterDrop.documentKey._id, "After drop", tojson(change));
 }
+
+jsTestLog("Test hasNext/next behavior when there is no more data");
+let cs = coll.watch([]);
+assert(!cs.hasNext(), "hasNext() should return false because there is no more data available");
+assert.throws(() => cs.next(), [], "next() should throw because there is no more data available");
+
+// Make more data available on the server side.
+coll.insert({_id: "next"});
+
+// Temporarily override hasNext() to always return false.
+const hasNext = DBCommandCursor.prototype.hasNext;
+DBCommandCursor.prototype.hasNext = () => false;
+assert.throws(() => cs.next(), [], "next() should always throw");
+DBCommandCursor.prototype.hasNext = hasNext;
+assert.soon(() => cs.hasNext());
+assert.eq("next", cs.next().fullDocument._id);

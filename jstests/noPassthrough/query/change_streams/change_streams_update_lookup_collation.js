@@ -54,6 +54,7 @@ assert.soon(() => changeStreamDefaultCollation.hasNext());
 assert.docEq({_id: "abc", x: "abc", updated: true},
              changeStreamDefaultCollation.next().fullDocument);
 assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 1);
+assert.soon(() => strengthOneChangeStream.hasNext());
 assert.docEq({_id: "abc", x: "abc", updated: true}, strengthOneChangeStream.next().fullDocument);
 assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 2);
 
@@ -65,6 +66,7 @@ assert.soon(() => changeStreamDefaultCollation.hasNext());
 assert.docEq({_id: "abç", x: "ABC", updated: true},
              changeStreamDefaultCollation.next().fullDocument);
 assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 4);
+assert.soon(() => strengthOneChangeStream.hasNext());
 assert.docEq({_id: "abç", x: "ABC", updated: true}, strengthOneChangeStream.next().fullDocument);
 assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 5);
 

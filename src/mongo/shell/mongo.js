@@ -599,6 +599,13 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
         delete options.showRawUpdateDescription;
     }
 
+    // If no maxAwaitTimeMS is set in the options, we set a high wait timeout, so that there won't
+    // be any issues with no data being available on the server side due to limited processing
+    // resources during testing.
+    if (!options.hasOwnProperty("maxAwaitTimeMS") && TestData && TestData.inEvergreen) {
+        options.maxAwaitTimeMS = 15 * 1000;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 
