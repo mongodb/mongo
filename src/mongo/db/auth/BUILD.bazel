@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@poetry//:dependencies.bzl", "dependency")
 
@@ -154,6 +154,7 @@ mongo_cc_library(
         ":user",
         ":user_acquisition_stats",
         ":user_document_parser",
+        ":user_request_x509",
         "//src/mongo/base:secure_allocator",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:api_parameters",
@@ -169,10 +170,7 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:thread_pool",
         "//src/mongo/util/net:ssl_manager",
         "//src/mongo/util/net:ssl_types",
-    ] + select({
-        "//bazel/config:ssl_enabled": [":user_request_x509"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 idl_generator(
@@ -779,18 +777,14 @@ mongo_cc_library(
         ":sasl_options",
         ":sasl_options_init",
         ":user",
+        ":user_request_x509",
         "//src/mongo/db:connection_health_metrics_parameter",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/util/net:ssl_manager",
         ":cluster_auth_mode",
         "//src/mongo/crypto:sha_block",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            ":user_request_x509",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 mongo_cc_library(
@@ -828,6 +822,77 @@ mongo_cc_library(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+mongo_cc_library(
+    name = "authorization_session_test_fixture",
+    srcs = [
+        "authorization_session_for_test.cpp",
+        "authorization_session_test_fixture.cpp",
+    ],
+    hdrs = [
+        "authorization_session_for_test.h",
+        "authorization_session_test_fixture.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal",
+        ":authmocks",
+        "//src/mongo/db:service_context_d",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_auth_test",
+    srcs = [
+        "action_set_test.cpp",
+        "address_restriction_test.cpp",
+        "auth_identifier_test.cpp",
+        "auth_op_observer_test.cpp",
+        "authentication_session_test.cpp",
+        "authorization_contract_test.cpp",
+        "authorization_manager_test.cpp",
+        "authorization_router_impl_for_test.h",
+        "authorization_session_test.cpp",
+        "builtin_roles_test.cpp",
+        "oauth_discovery_factory_test.cpp",
+        "privilege_parser_test.cpp",
+        "resolve_role_option_test.cpp",
+        "resource_pattern_search_list_test.cpp",
+        "restriction_mock.h",
+        "restriction_test.cpp",
+        "sasl_authentication_session_test.cpp",
+        "sasl_mechanism_registry_test.cpp",
+        "sasl_scram_test.cpp",
+        "security_key_test.cpp",
+        "user_acquisition_stats_test.cpp",
+        "user_document_parser_test.cpp",
+        "validated_tenancy_scope_test.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": ["sasl_x509_test.cpp"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":address_restriction",
+        ":auth_op_observer",
+        ":authentication_session",
+        ":authorization_session_test_fixture",
+        ":cluster_auth_mode",
+        ":sasl_mechanism_protocol",
+        ":saslauth",
+        ":security_file",
+        ":security_key",
+        ":security_token_auth",
+        ":user",
+        ":user_request_x509",
+        "//src/mongo:base",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/util:tick_source_mock",
+        "//src/mongo/util/net:mock_http_client",
     ],
 )
 

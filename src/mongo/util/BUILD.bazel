@@ -520,16 +520,24 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "tick_source_mock",
+    srcs = [],
+    hdrs = [
+        "tick_source_mock.h",
+    ],
+)
+
+mongo_cc_library(
     name = "mock_periodic_runner",
     srcs = [
         "mock_periodic_runner.cpp",
     ],
     hdrs = [
         "mock_periodic_runner.h",
-        "tick_source_mock.h",
     ],
     deps = [
-        "periodic_runner",
+        ":periodic_runner",
+        ":tick_source_mock",
         "//src/mongo:base",
     ],
 )

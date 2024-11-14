@@ -241,6 +241,15 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "server_parameter_test_util",
+    srcs = [],
+    hdrs = [
+        "server_parameter_test_util.h",
+        "//src/mongo/db:server_parameter.h",
+    ],
+)
+
 # TODO(SERVER-96851): Remove cycle created by moving //src/mongo/idl:command_generic_argument.h to //src/mongo/db:server_base
 filegroup(
     name = "command_generic_argument_hdrs",

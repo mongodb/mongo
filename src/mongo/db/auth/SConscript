@@ -1,77 +1,10 @@
 # -*- mode: python -*-
 
-Import("env", "get_option")
+Import("env")
 
 env = env.Clone()
-
-env.Library(
-    target="authorization_session_test_fixture",
-    source=[
-        "authorization_session_for_test.cpp",
-        "authorization_session_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/transport/transport_layer_mock",
-        "auth",
-        "auth_impl_internal",
-        "authmocks",
-    ],
-)
-
 env.CppUnitTest(
     target="db_auth_test",
-    source=[
-        "action_set_test.cpp",
-        "address_restriction_test.cpp",
-        "auth_identifier_test.cpp",
-        "authorization_contract_test.cpp",
-        "auth_op_observer_test.cpp",
-        "authentication_session_test.cpp",
-        "authorization_manager_test.cpp",
-        "authorization_session_test.cpp",
-        "builtin_roles_test.cpp",
-        "oauth_discovery_factory_test.cpp",
-        "privilege_parser_test.cpp",
-        "resolve_role_option_test.cpp",
-        "resource_pattern_search_list_test.cpp",
-        "restriction_test.cpp",
-        "sasl_authentication_session_test.cpp",
-        "sasl_mechanism_registry_test.cpp",
-        "sasl_scram_test.cpp",
-        "sasl_x509_test.cpp" if get_option("ssl") == "on" else [],
-        "security_key_test.cpp",
-        "user_acquisition_stats_test.cpp",
-        "user_document_parser_test.cpp",
-        "validated_tenancy_scope_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/native_sasl_client",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-        "$BUILD_DIR/mongo/db/repl/oplog",
-        "$BUILD_DIR/mongo/db/repl/oplog_interface_local",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/util/net/mock_http_client",
-        "$BUILD_DIR/mongo/util/net/network",
-        "address_restriction",
-        "auth_op_observer",
-        "authentication_session",
-        "authorization_session_test_fixture",
-        "cluster_auth_mode",
-        "sasl_mechanism_protocol",
-        "saslauth",
-        "security_file",
-        "security_key",
-        "security_token_auth",
-        "user",
-        "user_request_x509" if get_option("ssl") == "on" else [],
-    ],
+    source=[],
+    LIBDEPS=[],
 )
