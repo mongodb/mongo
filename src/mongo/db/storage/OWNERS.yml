@@ -4,9 +4,6 @@ filters:
     approvers:
       - 10gen/server-storage-execution
       - 10gen/server-rss-sydney
-  - "named_pipe*":
-    approvers:
-      - 10gen/query-integration-staff-leads
   - "durable_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/external_record_store.h"
+#include "mongo/db/query/virtual_collection/external_record_store.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/multi_bson_stream_cursor.h"
+#include "mongo/db/query/virtual_collection/multi_bson_stream_cursor.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {

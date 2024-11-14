@@ -1,7 +1,7 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library")
 load("//bazel/config:render_template.bzl", "render_template")
-load("@poetry//:dependencies.bzl", "dependency")
-load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -171,9 +171,10 @@ mongo_cc_library(
         "//src/mongo/db:traffic_reader",
         "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/collation:collator_icu",
-        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/query/virtual_collection",
         "//src/mongo/scripting",
         "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport/named_pipe",
         "//src/mongo/unittest:golden_test_base",
         "//src/mongo/util:buildinfo",
         "//src/mongo/util:icu",  # TODO(SERVER-93876): Remove.

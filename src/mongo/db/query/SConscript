@@ -28,6 +28,7 @@ env.SConscript(
         "search",
         "stage_builder/sbe",
         "stats",
+        "virtual_collection",
         "write_ops",
     ],
     exports=[

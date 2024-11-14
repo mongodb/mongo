@@ -36,7 +36,8 @@
 #endif
 #include <string>
 
-#include "mongo/db/storage/input_object.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/transport/named_pipe/input_object.h"
 
 namespace mongo {
 #ifndef _WIN32

@@ -153,7 +153,6 @@ env.CppUnitTest(
     target="db_storage_test",
     source=[
         "collection_truncate_markers_test.cpp",
-        "external_record_store_test.cpp",
         "disk_space_monitor_test.cpp",
         "flow_control_test.cpp",
         "index_entry_comparison_test.cpp",

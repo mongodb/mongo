@@ -40,12 +40,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/storage/io_error_message.h"
-#include "mongo/db/storage/named_pipe.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/named_pipe/io_error_message.h"
+#include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -71,7 +71,7 @@ void removeNamedPipe(bool ignoreNoEntError, const char* pipeAbsolutePath) {
 
         LOGV2_ERROR(7097000,
                     "Failed to remove",
-                    "error"_attr = getErrorMessage("remove", pipeAbsolutePath));
+                    "error"_attr = getLastSystemErrorMessageFormatted("remove", pipeAbsolutePath));
     }
 }
 }  // namespace
@@ -86,7 +86,7 @@ NamedPipeOutput::NamedPipeOutput(const std::string& pipeDir,
         removeNamedPipe(true /*ignoreNoEntError*/, _pipeAbsolutePath.c_str());
         uassert(7005005,
                 "Failed to create a named pipe, error: {}"_format(
-                    getErrorMessage("mkfifo", _pipeAbsolutePath)),
+                    getLastSystemErrorMessageFormatted("mkfifo", _pipeAbsolutePath)),
                 hasSucceeded(mkfifo(_pipeAbsolutePath.c_str(), 0664)));
     }
 }
@@ -104,7 +104,7 @@ void NamedPipeOutput::open() {
     if (!_ofs.is_open() || !_ofs.good()) {
         LOGV2_ERROR(7005009,
                     "Failed to open a named pipe",
-                    "error"_attr = getErrorMessage("open", _pipeAbsolutePath));
+                    "error"_attr = getLastSystemErrorMessageFormatted("open", _pipeAbsolutePath));
     }
 }
 
@@ -114,7 +114,7 @@ int NamedPipeOutput::write(const char* data, int size) {
     if (_ofs.fail()) {
         uasserted(7239300,
                   "Failed to write to a named pipe, error: {}"_format(
-                      getErrorMessage("write", _pipeAbsolutePath)));
+                      getLastSystemErrorMessageFormatted("write", _pipeAbsolutePath)));
         return -1;
     }
     return size;
@@ -160,9 +160,10 @@ void NamedPipeInput::doOpen() {
         _ifs.open(_pipeAbsolutePath.c_str(), std::ios::binary | std::ios::in);
         opened = _ifs.is_open();
         if (!opened) {
-            uassert(ErrorCodes::FileNotOpen,
-                    "error = {}"_format(getErrorMessage("open", _pipeAbsolutePath)),
-                    errno == ENOENT);
+            uassert(
+                ErrorCodes::FileNotOpen,
+                "error = {}"_format(getLastSystemErrorMessageFormatted("open", _pipeAbsolutePath)),
+                errno == ENOENT);
             stdx::this_thread::sleep_for(stdx::chrono::milliseconds(sleepMs));
             ++retries;
             if (retries % 1000 == 0) {

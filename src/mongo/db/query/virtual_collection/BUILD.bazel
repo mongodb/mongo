@@ -1,0 +1,27 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "virtual_collection",
+    srcs = [
+        "external_record_store.cpp",
+        "multi_bson_stream_cursor.cpp",
+    ],
+    hdrs = [
+        "external_record_store.h",
+        "input_stream.h",
+        "multi_bson_stream_cursor.h",
+    ],
+    deps = [
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/transport/named_pipe",
+    ],
+)

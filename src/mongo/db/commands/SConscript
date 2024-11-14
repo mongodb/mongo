@@ -86,6 +86,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/op_observer/op_observer",
         "$BUILD_DIR/mongo/db/query/query_planner",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/query/virtual_collection/virtual_collection",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/repl/dbcheck_test_fixture",
         "$BUILD_DIR/mongo/db/repl/replmocks",

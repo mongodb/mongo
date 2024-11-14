@@ -46,25 +46,14 @@ mongo_cc_library(
     name = "record_store_base",
     srcs = [
         "collection_truncate_markers.cpp",
-        "external_record_store.cpp",
-        "input_object.h",
-        "io_error_message.h",
-        "multi_bson_stream_cursor.cpp",
         "record_store.cpp",
         "record_store_base.cpp",
         "//src/mongo/db/exec:headers",
         "//src/mongo/db/query:internal_plans.h",
         "//src/mongo/db/s:shard_key_index_util.h",
-    ] + select({
-        "@platforms//os:windows": ["named_pipe_windows.cpp"],
-        "//conditions:default": ["named_pipe_posix.cpp"],
-    }),
+    ],
     hdrs = [
         "collection_truncate_markers.h",
-        "external_record_store.h",
-        "input_stream.h",
-        "multi_bson_stream_cursor.h",
-        "named_pipe.h",
         "record_store.h",
         "record_store_base.h",
         "//src/mongo/db/catalog:virtual_collection_options.h",
@@ -77,10 +66,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
-    ] + select({
-        "@platforms//os:windows": [],
-        "//conditions:default": ["//src/mongo/db/query:query_knobs"],
-    }),
+    ],
 )
 
 mongo_cc_library(

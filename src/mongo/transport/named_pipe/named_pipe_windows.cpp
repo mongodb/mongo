@@ -34,9 +34,9 @@
 #include <string>
 #include <system_error>
 
-#include "mongo/db/storage/io_error_message.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/named_pipe/io_error_message.h"
 #include "mongo/util/errno_util.h"
 
 namespace mongo {
@@ -61,7 +61,7 @@ NamedPipeOutput::NamedPipeOutput(const std::string&,
       _isOpen(false) {
     uassert(7005006,
             "Failed to create a named pipe, error: {}"_format(
-                getErrorMessage("CreateNamedPipe", _pipeAbsolutePath)),
+                getLastSystemErrorMessageFormatted("CreateNamedPipe", _pipeAbsolutePath)),
             _pipe != INVALID_HANDLE_VALUE);
 }
 
@@ -80,7 +80,8 @@ void NamedPipeOutput::open() {
         if (auto ec = lastSystemError().value(); ec != ERROR_PIPE_CONNECTED) {
             LOGV2_ERROR(7005007,
                         "Failed to connect a named pipe",
-                        "error"_attr = getErrorMessage("ConnectNamedPipe", _pipeAbsolutePath));
+                        "error"_attr = getLastSystemErrorMessageFormatted("ConnectNamedPipe",
+                                                                          _pipeAbsolutePath));
             return;
         }
     }
@@ -100,7 +101,7 @@ int NamedPipeOutput::write(const char* data, int size) {
     if (!succeeded || size != nWritten) {
         uasserted(7239301,
                   "Failed to write to a named pipe, error: {}"_format(
-                      getErrorMessage("write", _pipeAbsolutePath)));
+                      getLastSystemErrorMessageFormatted("write", _pipeAbsolutePath)));
         return -1;
     }
 

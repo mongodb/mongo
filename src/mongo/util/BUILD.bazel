@@ -1,6 +1,6 @@
 load("//bazel:mongo_src_rules.bzl", "MONGO_GLOBAL_COPTS", "MONGO_GLOBAL_DEFINES", "MONGO_GLOBAL_LINKFLAGS", "idl_generator", "mongo_cc_library")
-load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
 

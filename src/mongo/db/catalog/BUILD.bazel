@@ -574,6 +574,7 @@ mongo_cc_library(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/query/virtual_collection",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:repl_settings",

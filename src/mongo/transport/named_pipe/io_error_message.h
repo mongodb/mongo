@@ -35,11 +35,9 @@
 #include "mongo/util/errno_util.h"
 
 namespace mongo {
-namespace {
-inline std::string getErrorMessage(StringData op, const std::string& path) {
+inline std::string getLastSystemErrorMessageFormatted(StringData op, const std::string& path) {
     using namespace fmt::literals;
     std::error_code ec = lastSystemError();
     return "Failed to {} {}: error code = {}, {}"_format(op, path, ec.value(), errorMessage(ec));
 }
-}  // namespace
 }  // namespace mongo

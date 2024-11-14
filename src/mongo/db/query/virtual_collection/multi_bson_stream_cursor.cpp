@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/multi_bson_stream_cursor.h"
+#include "mongo/db/query/virtual_collection/multi_bson_stream_cursor.h"
 
 #include <cstring>
 #include <utility>

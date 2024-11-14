@@ -41,10 +41,10 @@
 
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/virtual_collection/input_stream.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/input_stream.h"
-#include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

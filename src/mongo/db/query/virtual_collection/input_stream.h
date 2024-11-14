@@ -32,8 +32,8 @@
 #include <fmt/format.h>
 #include <utility>
 
-#include "mongo/db/storage/io_error_message.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/named_pipe/io_error_message.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -61,7 +61,7 @@ public:
         InputT::open();
         uassert(ErrorCodes::FileNotOpen,
                 "Named pipe still not open for read after exhausting retries. Error: {}"_format(
-                    getErrorMessage("open"_sd, InputT::getAbsolutePath())),
+                    getLastSystemErrorMessageFormatted("open"_sd, InputT::getAbsolutePath())),
                 InputT::isOpen());
     }
 
@@ -105,7 +105,8 @@ public:
         tassert(7005002, "Expected an error condition but succeeded", InputT::isFailed());
         LOGV2_ERROR(7005003,
                     "Failed to read a named pipe",
-                    "error"_attr = getErrorMessage("read", InputT::getAbsolutePath()));
+                    "error"_attr =
+                        getLastSystemErrorMessageFormatted("read", InputT::getAbsolutePath()));
 
         return -1;
     }

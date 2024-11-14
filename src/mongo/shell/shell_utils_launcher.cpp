@@ -74,7 +74,6 @@
 #include "mongo/client/dbclient_connection.h"  // IWYU pragma: keep
 #include "mongo/config.h"                      // IWYU pragma: keep
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -85,6 +84,7 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/errno_util.h"
