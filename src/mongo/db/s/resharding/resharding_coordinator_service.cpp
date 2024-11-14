@@ -150,6 +150,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransitio
 MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
 MONGO_FAIL_POINT_DEFINE(pauseAfterInsertCoordinatorDoc);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
+MONGO_FAIL_POINT_DEFINE(pauseAfterEngagingCriticalSection);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const int kReshardingNumInitialChunksDefault = 90;
@@ -322,6 +323,14 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                         // If the quiescePeriodEnd exists, include it in the update.
                         setBuilder.append(ReshardingCoordinatorDocument::kQuiescePeriodEndFieldName,
                                           *quiescePeriodEnd);
+                    }
+
+                    if (auto criticalSectionExpiresAt =
+                            coordinatorDoc.getCriticalSectionExpiresAt()) {
+                        // If the criticalSectionExpiresAt exists, include it in the update.
+                        setBuilder.append(
+                            ReshardingCoordinatorDocument::kCriticalSectionExpiresAtFieldName,
+                            *criticalSectionExpiresAt);
                     }
 
                     buildStateDocumentMetricsForUpdate(setBuilder, nextState, timestamp);
@@ -2469,8 +2478,16 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
                     opCtx.get(), _ctHolder->getAbortToken());
             }
 
+            // set the criticalSectionExpiresAt on the coordinator doc
+            const auto criticalSectionTimeout =
+                Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
+            const auto criticalSectionExpiresAt = (*executor)->now() + criticalSectionTimeout;
+
+            ReshardingCoordinatorDocument updatedCSExpirationDoc = _coordinatorDoc;
+            updatedCSExpirationDoc.setCriticalSectionExpiresAt(criticalSectionExpiresAt);
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
-                                                              _coordinatorDoc);
+                                                              updatedCSExpirationDoc);
+
             _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                   getCurrentTime());
         })
@@ -2480,23 +2497,13 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
             const auto criticalSectionTimeout =
                 Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
             const auto criticalSectionExpiresAt = (*executor)->now() + criticalSectionTimeout;
+
             LOGV2_INFO(
                 5573001, "Engaging critical section", "timeoutAt"_attr = criticalSectionExpiresAt);
 
-            auto swCbHandle = (*executor)->scheduleWorkAt(
-                criticalSectionExpiresAt,
-                [this](const executor::TaskExecutor::CallbackArgs& cbData) {
-                    if (!cbData.status.isOK()) {
-                        return;
-                    }
-                    _reshardingCoordinatorObserver->onCriticalSectionTimeout();
-                });
+            _setCriticalSectionTimeoutCallback(executor, criticalSectionExpiresAt);
 
-            if (!swCbHandle.isOK()) {
-                _reshardingCoordinatorObserver->interrupt(swCbHandle.getStatus());
-            }
-
-            _criticalSectionTimeoutCbHandle = swCbHandle.getValue();
+            pauseAfterEngagingCriticalSection.pauseWhileSet();
         });
 }
 
@@ -2508,11 +2515,36 @@ ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency(
         return ExecutorFuture<ReshardingCoordinatorDocument>(**executor, _coordinatorDoc);
     }
 
+    // ensure that the critical section timeout handler is still set
+    if (!_criticalSectionTimeoutCbHandle &&
+        _coordinatorDoc.getCriticalSectionExpiresAt().has_value()) {
+        _setCriticalSectionTimeoutCallback(executor,
+                                           _coordinatorDoc.getCriticalSectionExpiresAt().value());
+    }
     return future_util::withCancellation(
                _reshardingCoordinatorObserver->awaitAllRecipientsInStrictConsistency(),
                _ctHolder->getAbortToken())
         .thenRunOn(**executor);
 }
+
+void ReshardingCoordinator::_setCriticalSectionTimeoutCallback(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    Date_t criticalSectionExpiresAt) {
+    auto swCbHandle = (*executor)->scheduleWorkAt(
+        criticalSectionExpiresAt, [this](const executor::TaskExecutor::CallbackArgs& cbData) {
+            if (!cbData.status.isOK()) {
+                return;
+            }
+            _reshardingCoordinatorObserver->onCriticalSectionTimeout();
+        });
+
+    if (!swCbHandle.isOK()) {
+        _reshardingCoordinatorObserver->interrupt(swCbHandle.getStatus());
+    }
+
+    _criticalSectionTimeoutCbHandle = swCbHandle.getValue();
+}
+
 
 void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordinatorDoc) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kBlockingWrites) {

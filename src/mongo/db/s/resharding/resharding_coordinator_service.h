@@ -497,6 +497,14 @@ private:
     ExecutorFuture<ReshardingCoordinatorDocument> _awaitAllRecipientsInStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
+
+    /**
+     * Sets the callback handle for scheduled work to handle critical section timeout.
+     */
+    void _setCriticalSectionTimeoutCallback(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        Date_t criticalSectionExpiresAt);
+
     /**
      * Does the following writes:
      * 1. Updates the config.collections entry for the new sharded collection

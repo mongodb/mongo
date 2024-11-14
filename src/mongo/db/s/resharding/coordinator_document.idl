@@ -173,3 +173,7 @@ structs:
                     "Runs the cloner aggregation without specifying a collection
                     UUID to avoid errors in a scenario where the collection UUIDs
                     are inconsistent among shards."
+            criticalSectionExpiresAt:
+                type: date
+                description: "When to timeout after the critical session is initiated."
+                optional: true
