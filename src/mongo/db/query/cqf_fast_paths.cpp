@@ -364,6 +364,11 @@ struct EExprBuilder {
         return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(false));
     }
 
+    static std::unique_ptr<sbe::EExpression> makeFillEmptyNull(
+        std::unique_ptr<sbe::EExpression> e) {
+        return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeNullConstant());
+    }
+
     static std::unique_ptr<sbe::EExpression> makeLocalLambda(
         sbe::FrameId frameId, std::unique_ptr<sbe::EExpression> expr) {
         return sbe::makeE<sbe::ELocalLambda>(frameId, std::move(expr));

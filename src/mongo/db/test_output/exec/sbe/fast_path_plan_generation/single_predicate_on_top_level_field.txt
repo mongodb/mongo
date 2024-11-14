@@ -96,7 +96,7 @@ filter = { a: { $lt: MinKey } }
 -- INPUT:
 filter = { a: { $lt: MaxKey } }
 -- OUTPUT:
-[0] filter {traverseF(s2, lambda(l0.0) { (!(isMaxKey(move(l0.0))) ?: false) }, true)} 
+[0] filter {traverseF(s2, lambda(l0.0) { !(isMaxKey((move(l0.0) ?: null))) }, true)} 
 [0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
 
 ==== VARIATION: $lte int ====
@@ -135,12 +135,12 @@ filter = { a: { $lte: [ 1 ] } }
 -- INPUT:
 filter = { a: { $lte: MinKey } }
 -- OUTPUT:
-[0] filter {traverseF(s2, lambda(l0.0) { (isMinKey(move(l0.0)) ?: false) }, true)} 
+[0] filter {traverseF(s2, lambda(l0.0) { isMinKey((move(l0.0) ?: null)) }, true)} 
 [0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
 
 ==== VARIATION: $lte MaxKey ====
 -- INPUT:
 filter = { a: { $lte: MaxKey } }
 -- OUTPUT:
-[0] filter {traverseF(s2, lambda(l0.0) { exists(move(l0.0)) }, true)} 
+[0] filter {traverseF(s2, lambda(l0.0) { true }, true)} 
 [0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 

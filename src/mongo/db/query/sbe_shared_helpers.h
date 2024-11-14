@@ -57,14 +57,14 @@ ExpressionType generateComparisonExpr(BuilderType& b,
             case sbe::EPrimBinary::neq:
                 break;
             case sbe::EPrimBinary::greater:
-                return b.makeFillEmptyFalse(
-                    b.makeNot(b.makeFunction("isMinKey", std::move(inputExpr))));
+                return b.makeNot(
+                    b.makeFunction("isMinKey", b.makeFillEmptyNull(std::move(inputExpr))));
             case sbe::EPrimBinary::greaterEq:
-                return b.makeFunction("exists", std::move(inputExpr));
+                return b.makeBoolConstant(true);
             case sbe::EPrimBinary::less:
                 return b.makeBoolConstant(false);
             case sbe::EPrimBinary::lessEq:
-                return b.makeFillEmptyFalse(b.makeFunction("isMinKey", std::move(inputExpr)));
+                return b.makeFunction("isMinKey", b.makeFillEmptyNull(std::move(inputExpr)));
             default:
                 MONGO_UNREACHABLE_TASSERT(8217105);
         }
@@ -76,12 +76,12 @@ ExpressionType generateComparisonExpr(BuilderType& b,
             case sbe::EPrimBinary::greater:
                 return b.makeBoolConstant(false);
             case sbe::EPrimBinary::greaterEq:
-                return b.makeFillEmptyFalse(b.makeFunction("isMaxKey", std::move(inputExpr)));
+                return b.makeFunction("isMaxKey", b.makeFillEmptyNull(std::move(inputExpr)));
             case sbe::EPrimBinary::less:
-                return b.makeFillEmptyFalse(
-                    b.makeNot(b.makeFunction("isMaxKey", std::move(inputExpr))));
+                return b.makeNot(
+                    b.makeFunction("isMaxKey", b.makeFillEmptyNull(std::move(inputExpr))));
             case sbe::EPrimBinary::lessEq:
-                return b.makeFunction("exists", std::move(inputExpr));
+                return b.makeBoolConstant(true);
             default:
                 MONGO_UNREACHABLE_TASSERT(8217101);
         }
