@@ -257,8 +257,9 @@ boost::optional<EstimationResult> estimateCardinalityEqViaTypeCounts(
         auto nTypeCounts = ceHist.getTypeCounts().find(tag);
         if (nTypeCounts != ceHist.getTypeCounts().end()) {
             estimation.card = nTypeCounts->second;
-            return estimation;
         }
+        // If the type was not found in the typeCounts, means that there are no instances;
+        return estimation;
     } else if (sbe::value::isNumber(tag) && sbe::value::isNaN(tag, val)) {
         estimation.card = ceHist.getNanCount();
         return estimation;

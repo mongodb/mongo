@@ -42,8 +42,6 @@ using mongo::Interval;
 using stats::CEHistogram;
 using stats::ScalarHistogram;
 using stats::TypeCounts;
-using TypeProbability = std::pair<sbe::value::TypeTags, size_t>;
-using TypeCombination = std::vector<TypeProbability>;
 
 auto NumberInt64 = sbe::value::TypeTags::NumberInt64;
 auto StringSmall = sbe::value::TypeTags::StringSmall;
@@ -693,7 +691,8 @@ TEST(HistogramPredicateEstimationTest, IntHistogramIntervalEstimation) {
     }
 
     {  //  {a: {$gte: 20, $lte: 25}}, bucket interpolation.
-        Interval interval(BSON("" << 20 << "" << 25), true /*startIncluded*/, true /*endIncluded*/);
+        Interval interval(BSON("" << 20 << "" << 25), true /*startIncluded*/, true
+                          /*endIncluded*/);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
                                                       true /*lowInclusive*/,
                                                       NumberInt64,
@@ -709,7 +708,8 @@ TEST(HistogramPredicateEstimationTest, IntHistogramIntervalEstimation) {
     }
 
     {  // {a: {$gte: 30, $lte: 40}}
-        Interval interval(BSON("" << 30 << "" << 40), true /*startIncluded*/, true /*endIncluded*/);
+        Interval interval(BSON("" << 30 << "" << 40), true /*startIncluded*/, true
+                          /*endIncluded*/);
         ASSERT_EQ(3.0,
                   HistogramEstimator::estimateCardinality(
                       *ceHist, intCnt, interval, true /*includeScalar*/)

@@ -40,23 +40,45 @@ using namespace mongo::ce;
  */
 int main(int argc, char* argv[]) {
 
-    // the TypeCombination pair defines the probability of this specific type appearing in the
-    // dataset
+    // the TypeCombination struct defines the probability of this specific type appearing in the
+    // dataset and the probability of NaN value (only applicable to numerical types).
     const TypeCombinations typeCombinationsData{
+        // Single types
+        TypeCombination{{TypeTags::Nothing, 100}},
+        TypeCombination{{TypeTags::Null, 100}},
+        TypeCombination{{TypeTags::NumberDouble,
+                         100 /*Type probability [0,100]*/,
+                         1 /*Probability of NaN Value [0,1]*/}},  // NaN
+        TypeCombination{{TypeTags::Boolean, 100}},
         TypeCombination{{TypeTags::NumberInt64, 100}},
+        TypeCombination{{TypeTags::NumberDouble}},
         TypeCombination{{TypeTags::StringSmall, 100}},
-        TypeCombination{{TypeTags::NumberDouble, 100}},
+        TypeCombination{{TypeTags::StringBig, 100}},
         TypeCombination{{TypeTags::Array, 100}},
-        TypeCombination{{TypeTags::NumberInt64, 30}, {TypeTags::StringSmall, 70}},
-        TypeCombination{
-            {TypeTags::NumberInt64, 40}, {TypeTags::StringSmall, 30}, {TypeTags::NumberDouble, 30}},
+        // Type combinations
+        TypeCombination{{TypeTags::NumberInt64, 50}, {TypeTags::NumberDouble, 50}},
+        TypeCombination{{TypeTags::NumberInt64, 30},
+                        {TypeTags::NumberDouble, 40, 0.3},
+                        {TypeTags::Nothing, 15},
+                        {TypeTags::Null, 15}},
+        TypeCombination{{TypeTags::StringSmall, 30}, {TypeTags::StringBig, 70}},
         TypeCombination{
             {TypeTags::NumberInt64, 30}, {TypeTags::NumberDouble, 40}, {TypeTags::Array, 30}},
-        TypeCombination{{TypeTags::NumberInt64, 10}, {TypeTags::Array, 90}}};
+        // All types
+        TypeCombination{{TypeTags::Nothing, 5},
+                        {TypeTags::Null, 5},
+                        {TypeTags::NumberDouble, 5, 1},  // NaN
+                        {TypeTags::Boolean, 5},
+                        {TypeTags::NumberInt64, 20},
+                        {TypeTags::NumberDouble, 20},
+                        {TypeTags::StringSmall, 10},
+                        {TypeTags::StringBig, 20},
+                        {TypeTags::Array, 10}}};
 
-    const std::vector<int> numberOfBuckets{10, 50, 100, 200};
+    const std::vector<int> numberOfBuckets{10, 50, 100, 200, 400};
     const size_t size = 50000;
     const int numberOfQueries = 1000;
+    const int arrayTypeLength = 10;
     bool printResults = true;
     const size_t seed = 1724178214;
 
@@ -64,291 +86,204 @@ int main(int argc, char* argv[]) {
         printHeader();
     }
 
-    // Point queries
+    auto dataDistributions = {kUniform, kNormal, kZipfian};
+    auto queryTypes = {kPoint, kRange};
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::StringSmall, 100},
-                                                      {TypeTags::NumberDouble, 100}};
+    for (auto queryType : queryTypes) {
+        for (auto dataDistribution : dataDistributions) {
 
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kUniform;
-        QueryType queryType = kPoint;
+            // Query on "Nothing"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::Nothing, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     true /*includeScalar*/,
-                                     false /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults,
+                                             arrayTypeLength);
+            }
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::StringSmall, 100},
-                                                      {TypeTags::NumberDouble, 100}};
+            // Query on "Null"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::Null, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kUniform;
-        QueryType queryType = kPoint;
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     false /*includeScalar*/,
-                                     false /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
+            // Query on "NaN"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::NumberDouble, 100, 1.0}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::StringSmall, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kNormal;
-        QueryType queryType = kPoint;
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     true /*includeScalar*/,
-                                     false /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
+            // Query on "Boolean"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::Boolean, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 2});
+                const std::pair<size_t, size_t> queryInterval({0, 2});
+                QueryType queryType = kPoint;
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::StringSmall, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kNormal;
-        QueryType queryType = kPoint;
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     false /*includeScalar*/,
-                                     false /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
+            // Query on "NumberInt64"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::StringSmall, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kZipfian;
-        QueryType queryType = kPoint;
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     true /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
+            // Query on "NumberDouble"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::NumberDouble, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::StringSmall, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kZipfian;
-        QueryType queryType = kPoint;
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     false /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
+            // Query on "StringSmall"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::StringSmall, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-    // Range queries
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kUniform;
-        QueryType queryType = kRange;
+            // Query on "StringBig"
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::StringBig, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     true /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             true /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
 
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kUniform;
-        QueryType queryType = kRange;
+            // Query on variety of types
+            {
+                const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
+                                                              {TypeTags::StringBig, 100},
+                                                              {TypeTags::NumberDouble, 100}};
+                const std::pair<size_t, size_t> dataInterval({0, 1000});
+                const std::pair<size_t, size_t> queryInterval({0, 1000});
 
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     false /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
-
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kNormal;
-        QueryType queryType = kRange;
-
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     true /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
-
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kNormal;
-        QueryType queryType = kRange;
-
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     false /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
-
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kZipfian;
-        QueryType queryType = kRange;
-
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     true /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
-    }
-
-    {
-        const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
-                                                      {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
-        const std::pair<size_t, size_t> queryInterval({0, 1000});
-        const DataDistributionEnum dataDistribution = kZipfian;
-        QueryType queryType = kRange;
-
-        runAccuracyTestConfiguration(dataDistribution,
-                                     typeCombinationsData,
-                                     typeCombinationsQueries,
-                                     numberOfBuckets,
-                                     size,
-                                     dataInterval,
-                                     queryInterval,
-                                     numberOfQueries,
-                                     queryType,
-                                     false /*includeScalar*/,
-                                     true /*useE2EAPI*/,
-                                     seed,
-                                     printResults);
+                runAccuracyTestConfiguration(dataDistribution,
+                                             typeCombinationsData,
+                                             typeCombinationsQueries,
+                                             numberOfBuckets,
+                                             size,
+                                             dataInterval,
+                                             queryInterval,
+                                             numberOfQueries,
+                                             queryType,
+                                             false /*includeScalar*/,
+                                             false /*useE2EAPI*/,
+                                             seed,
+                                             printResults);
+            }
+        }
     }
 }

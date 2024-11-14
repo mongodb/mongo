@@ -143,10 +143,10 @@ void printHeader() {
 }
 
 void printResult(const DataDistributionEnum dataDistribution,
-                 const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
+                 const TypeCombination& typeCombination,
                  const int size,
                  const int numberOfBuckets,
-                 const std::pair<sbe::value::TypeTags, size_t>& typeCombinationQuery,
+                 const TypeProbability& typeCombinationQuery,
                  const int numberOfQueries,
                  QueryType queryType,
                  const std::pair<size_t, size_t>& dataInterval,
@@ -176,7 +176,7 @@ void printResult(const DataDistributionEnum dataDistribution,
 
     // Data types
     for (auto type : typeCombination) {
-        ss << type.first << "." << type.second << " ";
+        ss << type.typeTag << "." << type.typeProbability << "." << type.nanProb << " ";
     }
     ss << ", ";
 
@@ -195,7 +195,7 @@ void printResult(const DataDistributionEnum dataDistribution,
             queryTypeStr = "Range";
             break;
     }
-    ss << queryTypeStr << ", " << typeCombinationQuery.first << ", ";
+    ss << queryTypeStr << ", " << typeCombinationQuery.typeTag << ", ";
 
     // Number of Queries:
     ss << numberOfQueries << ", ";
@@ -224,9 +224,12 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                                                    stats::MixedDistributionDescriptor& mdd,
                                                    int arrayLength = 0) {
     for (auto type : typeCombination) {
-        switch (type.first) {
+
+        switch (type.typeTag) {
+            case sbe::value::TypeTags::Nothing:
             case sbe::value::TypeTags::Null:
-                td.push_back(std::make_unique<stats::NullDistribution>(mdd, type.second, ndv));
+                td.push_back(
+                    std::make_unique<stats::NullDistribution>(mdd, type.typeProbability, ndv));
                 break;
             case sbe::value::TypeTags::Boolean: {
                 bool includeFalse = false, includeTrue = false;
@@ -237,27 +240,37 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                     includeTrue = true;
                 }
                 td.push_back(std::make_unique<stats::BooleanDistribution>(
-                    mdd, type.second, ndv, includeFalse, includeTrue));
+                    mdd, type.typeProbability, ndv, includeFalse, includeTrue));
                 break;
             }
             case sbe::value::TypeTags::NumberInt32:
             case sbe::value::TypeTags::NumberInt64:
-                td.push_back(std::make_unique<stats::IntDistribution>(
-                    mdd, type.second, ndv, interval.first, interval.second));
+                td.push_back(std::make_unique<stats::IntDistribution>(mdd,
+                                                                      type.typeProbability,
+                                                                      ndv,
+                                                                      interval.first,
+                                                                      interval.second,
+                                                                      0,
+                                                                      type.nanProb));
                 break;
             case sbe::value::TypeTags::NumberDouble:
-                td.push_back(std::make_unique<stats::DoubleDistribution>(
-                    mdd, type.second, ndv, interval.first, interval.second));
+                td.push_back(std::make_unique<stats::DoubleDistribution>(mdd,
+                                                                         type.typeProbability,
+                                                                         ndv,
+                                                                         interval.first,
+                                                                         interval.second,
+                                                                         0,
+                                                                         type.nanProb));
                 break;
             case sbe::value::TypeTags::StringSmall:
             case sbe::value::TypeTags::StringBig:
                 td.push_back(std::make_unique<stats::StrDistribution>(
-                    mdd, type.second, ndv, interval.first, interval.second));
+                    mdd, type.typeProbability, ndv, interval.first, interval.second));
                 break;
             case sbe::value::TypeTags::Array: {
                 stats::TypeDistrVector arrayData;
                 arrayData.push_back(std::make_unique<stats::IntDistribution>(
-                    mdd, type.second, ndv, interval.first, interval.second));
+                    mdd, type.typeProbability, ndv, interval.first, interval.second));
                 auto arrayDataDesc =
                     std::make_unique<stats::DatasetDescriptorNew>(std::move(arrayData), seedArray);
                 td.push_back(std::make_unique<stats::ArrDistribution>(mdd,
@@ -269,6 +282,7 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                 break;
             }
             default:
+                MONGO_UNREACHABLE;
                 break;
         }
     }
@@ -357,7 +371,7 @@ ErrorCalculationSummary runQueries(size_t size,
                                    size_t numberOfQueries,
                                    QueryType queryType,
                                    const std::pair<size_t, size_t> interval,
-                                   const std::pair<sbe::value::TypeTags, size_t> queryTypeInfo,
+                                   const TypeProbability queryTypeInfo,
                                    const std::vector<stats::SBEValue>& data,
                                    const std::shared_ptr<const stats::CEHistogram> ceHist,
                                    bool includeScalar,
@@ -368,14 +382,13 @@ ErrorCalculationSummary runQueries(size_t size,
 
     // 'sbeValLow' stores also the values for the equality comparison.
     std::vector<stats::SBEValue> sbeValLow, sbeValHigh;
-    TypeCombination typeCombination{{queryTypeInfo.first, 100}};
     switch (queryType) {
         case kPoint: {
             // For ndv we set the number of values in the provided data interval. This may lead to
             // re-running values the same values if the number of queries is larger than the size of
             // the interval.
             auto ndv = interval.second - interval.first;
-            generateDataUniform(numberOfQueries, interval, typeCombination, seed, ndv, sbeValLow);
+            generateDataUniform(numberOfQueries, interval, {queryTypeInfo}, seed, ndv, sbeValLow);
             break;
         }
         case kRange: {
@@ -391,10 +404,10 @@ ErrorCalculationSummary runQueries(size_t size,
             // the interval.
             auto ndv = intervalLow.second - intervalLow.first;
             generateDataUniform(
-                numberOfQueries, intervalLow, typeCombination, seed, ndv, sbeValLow);
+                numberOfQueries, intervalLow, {queryTypeInfo}, seed, ndv, sbeValLow);
 
             generateDataUniform(
-                numberOfQueries, intervalHigh, typeCombination, seed, ndv, sbeValHigh);
+                numberOfQueries, intervalHigh, {queryTypeInfo}, seed, ndv, sbeValHigh);
             break;
         }
     }
@@ -409,7 +422,7 @@ ErrorCalculationSummary runQueries(size_t size,
 
                 // Find actual frequency.
                 actualCard = calculateFrequencyFromDataVectorEq(
-                    data, queryTypeInfo.first, sbeValLow[i], includeScalar);
+                    data, queryTypeInfo.typeTag, sbeValLow[i], includeScalar);
 
                 if (useE2EAPI) {
                     BSONObj bsonInterval = sbeValuesToInterval(sbeValLow[i], "", sbeValLow[i], "");
@@ -426,7 +439,7 @@ ErrorCalculationSummary runQueries(size_t size,
                 } else {
                     // Estimate result.
                     estimatedCard = estimateCardinalityEq(
-                        *ceHist, queryTypeInfo.first, sbeValLow[i].getValue(), includeScalar);
+                        *ceHist, queryTypeInfo.typeTag, sbeValLow[i].getValue(), includeScalar);
                 }
 
                 break;
@@ -441,7 +454,7 @@ ErrorCalculationSummary runQueries(size_t size,
 
                 // Find actual frequency.
                 actualCard = calculateFrequencyFromDataVectorRange(
-                    data, queryTypeInfo.first, sbeValLow[i], sbeValHigh[i]);
+                    data, queryTypeInfo.typeTag, sbeValLow[i], sbeValHigh[i]);
 
                 if (useE2EAPI) {
                     BSONObj bsonInterval = sbeValuesToInterval(sbeValLow[i], "", sbeValHigh[i], "");
@@ -458,10 +471,10 @@ ErrorCalculationSummary runQueries(size_t size,
                     // Estimate result.
                     estimatedCard = estimateCardinalityRange(*ceHist,
                                                              true /*lowInclusive*/,
-                                                             queryTypeInfo.first,
+                                                             queryTypeInfo.typeTag,
                                                              sbeValLow[i].getValue(),
                                                              true /*highInclusive*/,
-                                                             queryTypeInfo.first,
+                                                             queryTypeInfo.typeTag,
                                                              sbeValHigh[i].getValue(),
                                                              includeScalar);
                 }
@@ -507,10 +520,10 @@ bool checkTypeExistence(const TypeProbability& typeCombinationQuery,
 
     bool typeExists = false;
     for (const auto& typeCombinationData : typeCombinationsData) {
-        if (typeCombinationQuery.first == typeCombinationData.first) {
+        if (typeCombinationQuery.typeTag == typeCombinationData.typeTag) {
             typeExists = true;
-        } else if (typeCombinationData.first == TypeTags::Array &&
-                   typeCombinationQuery.first == TypeTags::NumberInt64) {
+        } else if (typeCombinationData.typeTag == TypeTags::Array &&
+                   typeCombinationQuery.typeTag == TypeTags::NumberInt64) {
             // If the data type is array, we accept queries on integers. (the default data type in
             // arrays is integer.)
             typeExists = true;
@@ -532,30 +545,29 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                   bool includeScalar,
                                   bool useE2EAPI,
                                   const size_t seed,
-                                  bool printResults) {
+                                  bool printResults,
+                                  int arrayTypeLength) {
 
-    auto ndv = (dataInterval.second - dataInterval.first) / 2;
-
+    auto ndv = std::max((size_t)1, (size_t)((dataInterval.second - dataInterval.first) / 2));
     for (auto numberOfBuckets : numberOfBucketsVector) {
         for (const auto& typeCombinationData : typeCombinationsData) {
             // Random value generator for actual data in histogram.
             std::vector<stats::SBEValue> data;
             std::map<stats::SBEValue, double> insertedData;
-            int arrayLength = 1000;
 
             // Create one by one the values.
             switch (dataDistribution) {
                 case kUniform:
                     generateDataUniform(
-                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayLength);
+                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayTypeLength);
                     break;
                 case kNormal:
                     generateDataNormal(
-                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayLength);
+                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayTypeLength);
                     break;
                 case kZipfian:
                     generateDataZipfian(
-                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayLength);
+                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayTypeLength);
                     break;
             }
 

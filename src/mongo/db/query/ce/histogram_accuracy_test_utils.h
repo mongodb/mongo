@@ -33,7 +33,17 @@ namespace mongo::ce {
 
 using stats::TypeCounts;
 using TypeTags = sbe::value::TypeTags;
-using TypeProbability = std::pair<sbe::value::TypeTags, size_t>;
+
+struct TypeProbability {
+    sbe::value::TypeTags typeTag;
+
+    // Type probability [0,100]
+    size_t typeProbability;
+
+    // Probability of NaN Value [0,1]
+    double nanProb = 0.0;
+};
+
 using TypeCombination = std::vector<TypeProbability>;
 using TypeCombinations = std::vector<TypeCombination>;
 
@@ -94,10 +104,10 @@ static std::pair<boost::optional<double>, boost::optional<double>> computeErrors
 void printHeader();
 
 void printResult(DataDistributionEnum dataDistribution,
-                 const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
+                 const TypeCombination& typeCombination,
                  int size,
                  int numberOfBuckets,
-                 const std::pair<sbe::value::TypeTags, size_t>& typeCombinationQuery,
+                 const TypeProbability& typeCombinationQuery,
                  int numberOfQueries,
                  QueryType queryType,
                  const std::pair<size_t, size_t>& dataInterval,
@@ -132,7 +142,7 @@ ErrorCalculationSummary runQueries(size_t size,
                                    size_t numberOfQueries,
                                    QueryType queryType,
                                    std::pair<size_t, size_t> interval,
-                                   std::pair<sbe::value::TypeTags, size_t> queryTypeInfo,
+                                   TypeProbability queryTypeInfo,
                                    const std::vector<stats::SBEValue>& data,
                                    std::shared_ptr<const stats::CEHistogram> ceHist,
                                    bool includeScalar,
@@ -154,6 +164,7 @@ void runAccuracyTestConfiguration(DataDistributionEnum dataDistribution,
                                   bool includeScalar,
                                   bool useE2EAPI,
                                   size_t seed,
-                                  bool printResults);
+                                  bool printResults,
+                                  int arrayTypeLength = 1000);
 
 }  // namespace mongo::ce

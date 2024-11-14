@@ -18,6 +18,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="sampling_estimator",
+    source=[
+        "sampling_estimator.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/cost_based_ranker/estimates",
+        "$BUILD_DIR/mongo/db/query_exec",
+    ],
+)
+
 env.CppUnitTest(
     target="histogram_estimation_test",
     source=[
@@ -50,6 +61,18 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="sampling_estimator_test",
+    source=[
+        "sampling_estimator_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/query/cost_based_ranker/estimates",
+        "sampling_estimator",
+    ],
+)
+
 env.Benchmark(
     target="histogram_bm",
     source=["ce_histogram_bm.cpp"],
@@ -61,32 +84,9 @@ env.Benchmark(
 )
 
 env.Program(
-    target="histogram_estimation_accuracy_test",
+    target="histogram_estimation_accuracy_analysis_program",
     source=["histogram_accuracy_test.cpp"],
     LIBDEPS=[
         "ce_test_utils",
-    ],
-)
-
-env.Library(
-    target="sampling_estimator",
-    source=[
-        "sampling_estimator.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/cost_based_ranker/estimates",
-        "$BUILD_DIR/mongo/db/query_exec",
-    ],
-)
-
-env.CppUnitTest(
-    target="sampling_estimator_test",
-    source=[
-        "sampling_estimator_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/query/cost_based_ranker/estimates",
-        "sampling_estimator",
     ],
 )

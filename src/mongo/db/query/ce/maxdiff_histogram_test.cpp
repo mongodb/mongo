@@ -41,9 +41,6 @@ namespace value = sbe::value;
 
 using stats::TypeCounts;
 using TypeTags = value::TypeTags;
-using TypeProbability = std::pair<value::TypeTags, size_t>;
-using TypeCombination = std::vector<TypeProbability>;
-using TypeCombinations = std::vector<TypeCombination>;
 
 using stats::DataDistribution;
 using stats::genFixedValueArray;
