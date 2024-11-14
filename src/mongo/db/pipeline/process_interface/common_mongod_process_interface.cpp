@@ -401,11 +401,10 @@ void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
             (collection && collection->getCollectionOptions().encryptedFieldConfig) ||
             nss.isFLE2StateCollection();
         if (!redactForQE) {
-            Top::get(opCtx->getServiceContext())
-                .appendLatencyStats(nss, includeHistograms, builder);
+            Top::getDecoration(opCtx).appendLatencyStats(nss, includeHistograms, builder);
         }
     } else {
-        Top::get(opCtx->getServiceContext()).appendLatencyStats(nss, includeHistograms, builder);
+        Top::getDecoration(opCtx).appendLatencyStats(nss, includeHistograms, builder);
     }
 }
 
@@ -440,10 +439,10 @@ void CommonMongodProcessInterface::appendOperationStats(OperationContext* opCtx,
             (collection && collection->getCollectionOptions().encryptedFieldConfig) ||
             nss.isFLE2StateCollection();
         if (!redactForQE) {
-            Top::get(opCtx->getServiceContext()).appendOperationStats(nss, builder);
+            Top::getDecoration(opCtx).appendOperationStats(nss, builder);
         }
     } else {
-        Top::get(opCtx->getServiceContext()).appendOperationStats(nss, builder);
+        Top::getDecoration(opCtx).appendOperationStats(nss, builder);
     }
 }
 

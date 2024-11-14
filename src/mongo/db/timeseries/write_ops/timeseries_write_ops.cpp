@@ -1004,14 +1004,13 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
         // This is the only part of finishCurOp we need to do for inserts because they reuse
         // the top-level curOp. The rest is handled by the top-level entrypoint.
         curOp.done();
-        Top::get(opCtx->getServiceContext())
-            .record(opCtx,
-                    ns(request),
-                    LogicalOp::opInsert,
-                    Top::LockType::WriteLocked,
-                    durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
-                    curOp.isCommand(),
-                    curOp.getReadWriteType());
+        Top::getDecoration(opCtx).record(opCtx,
+                                         ns(request),
+                                         LogicalOp::opInsert,
+                                         Top::LockType::WriteLocked,
+                                         curOp.elapsedTimeExcludingPauses(),
+                                         curOp.isCommand(),
+                                         curOp.getReadWriteType());
     });
 
     {

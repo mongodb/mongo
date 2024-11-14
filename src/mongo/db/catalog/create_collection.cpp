@@ -303,9 +303,7 @@ Status _createView(OperationContext* opCtx,
         // If the view creation rolls back, ensure that the Top entry created for the view is
         // deleted.
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
-                Top::get(serviceContext).collectionDropped(nss);
-            });
+            [nss](OperationContext* opCtx) { Top::getDecoration(opCtx).collectionDropped(nss); });
 
         if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail([&nss](const BSONObj& data) {
                 const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
@@ -570,8 +568,8 @@ Status _createTimeseries(OperationContext* opCtx,
         // If the buckets collection and time-series view creation roll back, ensure that their
         // Top entries are deleted.
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [serviceContext = opCtx->getServiceContext(), bucketsNs](OperationContext*) {
-                Top::get(serviceContext).collectionDropped(bucketsNs);
+            [bucketsNs](OperationContext* opCtx) {
+                Top::getDecoration(opCtx).collectionDropped(bucketsNs);
             });
 
 
@@ -728,9 +726,7 @@ Status _createCollection(
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
-                Top::get(serviceContext).collectionDropped(nss);
-            });
+            [nss](OperationContext* opCtx) { Top::getDecoration(opCtx).collectionDropped(nss); });
 
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.

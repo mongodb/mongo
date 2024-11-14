@@ -450,14 +450,13 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp, LogicalOp logicalOp) {
         curOp->debug().additiveMetrics.executionTime = executionTimeMicros;
 
         recordCurOpMetrics(opCtx);
-        Top::get(opCtx->getServiceContext())
-            .record(opCtx,
-                    curOp->getNSS(),
-                    logicalOp,
-                    Top::LockType::WriteLocked,
-                    durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
-                    curOp->isCommand(),
-                    curOp->getReadWriteType());
+        Top::getDecoration(opCtx).record(opCtx,
+                                         curOp->getNSS(),
+                                         logicalOp,
+                                         Top::LockType::WriteLocked,
+                                         curOp->elapsedTimeExcludingPauses(),
+                                         curOp->isCommand(),
+                                         curOp->getReadWriteType());
 
         if (!curOp->debug().errInfo.isOK()) {
             LOGV2_DEBUG(7276600,

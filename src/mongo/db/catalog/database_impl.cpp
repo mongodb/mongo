@@ -353,7 +353,7 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName)
         NamespaceString(_viewsName), MODE_X));
 
     Status status = CollectionCatalog::get(opCtx)->dropView(opCtx, viewName);
-    Top::get(opCtx->getServiceContext()).collectionDropped(viewName);
+    Top::getDecoration(opCtx).collectionDropped(viewName);
     return status;
 }
 
@@ -418,7 +418,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     audit::logDropCollection(opCtx->getClient(), nss);
 
     auto serviceContext = opCtx->getServiceContext();
-    Top::get(serviceContext).collectionDropped(nss);
+    Top::getDecoration(opCtx).collectionDropped(nss);
 
     // Drop unreplicated collections immediately.
     // If 'dropOpTime' is provided, we should proceed to rename the collection.
@@ -528,7 +528,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
           "fromName"_attr = fromNss,
           "toName"_attr = toNss);
 
-    Top::get(opCtx->getServiceContext()).collectionDropped(fromNss);
+    Top::getDecoration(opCtx).collectionDropped(fromNss);
 
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
     // because the CollectionCatalog manages the necessary isolation for this Collection until the

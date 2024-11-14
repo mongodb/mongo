@@ -49,15 +49,52 @@
 
 namespace mongo {
 
-class ServiceContext;
+/**
+ * Tracks cumulative latency statistics for a Service (shard-role or router-role).
+ */
+class ServiceLatencyTracker {
+public:
+    static ServiceLatencyTracker& getDecoration(Service* service);
+
+    /**
+     * Increments the cumulative histograms only if the operation came from a user.
+     */
+    void increment(OperationContext* opCtx,
+                   Microseconds latency,
+                   Microseconds workingTime,
+                   Command::ReadWriteType readWriteType);
+    /**
+     * Increments the transactions histogram.
+     */
+    void incrementForTransaction(OperationContext* opCtx, Microseconds latency);
+
+
+    /**
+     * Appends the cumulative latency statistics for this service.
+     */
+    void appendTotalTimeStats(bool includeHistograms,
+                              bool slowMSBucketsOnly,
+                              BSONObjBuilder* builder);
+
+    /**
+     * Appends the cumulative working time statistics for this service.
+     */
+    void appendWorkingTimeStats(bool includeHistograms,
+                                bool slowMSBucketsOnly,
+                                BSONObjBuilder* builder);
+
+
+private:
+    AtomicOperationLatencyHistogram _totalTime;
+    AtomicOperationLatencyHistogram _workingTime;
+};
 
 /**
- * tracks usage by collection
+ * Tracks shard-role usage by collection.
  */
 class Top {
 public:
     struct UsageData {
-        UsageData() = default;
         long long time{0};
         long long count{0};
 
@@ -68,8 +105,6 @@ public:
     };
 
     struct CollectionData {
-        CollectionData() = default;
-
         UsageData total;
 
         UsageData readLock;
@@ -95,15 +130,13 @@ public:
 
     typedef StringMap<CollectionData> UsageMap;
 
-    Top() = default;
-
-    static Top& get(ServiceContext* service);
+    static Top& getDecoration(OperationContext* opCtx);
 
     void record(OperationContext* opCtx,
                 const NamespaceString& nss,
                 LogicalOp logicalOp,
                 LockType lockType,
-                long long micros,
+                Microseconds micros,
                 bool command,
                 Command::ReadWriteType readWriteType);
 
@@ -114,7 +147,7 @@ public:
                 std::span<const NamespaceString> nssSet,
                 LogicalOp logicalOp,
                 LockType lockType,
-                long long micros,
+                Microseconds micros,
                 bool command,
                 Command::ReadWriteType readWriteType);
 
@@ -136,7 +169,8 @@ public:
     void collectionDropped(const NamespaceString& nss);
 
     /**
-     * Appends the collection-level latency statistics.
+     * Appends the collection-level latency statistics. Used as part of $collStats and only relevant
+     * in the shard role.
      */
     void appendLatencyStats(const NamespaceString& nss,
                             bool includeHistograms,
@@ -147,37 +181,7 @@ public:
      */
     void appendOperationStats(const NamespaceString& nss, BSONObjBuilder* builder);
 
-    /**
-     * Increments the global histogram only if the operation came from a user.
-     */
-    void incrementGlobalLatencyStats(OperationContext* opCtx,
-                                     uint64_t latency,
-                                     uint64_t workingTime,
-                                     Command::ReadWriteType readWriteType);
-
-    /**
-     * Increments the global transactions histogram.
-     */
-    void incrementGlobalTransactionLatencyStats(OperationContext* opCtx, uint64_t latency);
-
-    /**
-     * Appends the global latency statistics.
-     */
-    void appendGlobalLatencyStats(bool includeHistograms,
-                                  bool slowMSBucketsOnly,
-                                  BSONObjBuilder* builder);
-
-    /**
-     * Appends the global working time statistics.
-     */
-    void appendWorkingTimeStats(bool includeHistograms,
-                                bool slowMSBucketsOnly,
-                                BSONObjBuilder* builder);
-
 private:
-    AtomicOperationLatencyHistogram _globalHistogramStats;
-    AtomicOperationLatencyHistogram _workingTimeHistogramStats;
-
     // _lockUsage should always be acquired before using _usage.
     stdx::mutex _lockUsage;
     UsageMap _usage;

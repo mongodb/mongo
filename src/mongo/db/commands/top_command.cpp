@@ -90,7 +90,7 @@ public:
         {
             BSONObjBuilder b(result.subobjStart("totals"));
             b.append("note", "all times in microseconds");
-            Top::get(opCtx->getClient()->getServiceContext()).append(b);
+            Top::getDecoration(opCtx).append(b);
             b.done();
         }
         return true;

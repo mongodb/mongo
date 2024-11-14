@@ -46,6 +46,7 @@ namespace mongo {
 namespace {
 
 const auto getTop = ServiceContext::declareDecoration<Top>();
+const auto getServiceLatencyTracker = Service::declareDecoration<ServiceLatencyTracker>();
 
 template <typename HistogramType>
 void incrementHistogram(OperationContext* opCtx,
@@ -129,15 +130,50 @@ void updateCollectionData(WithLock,
 }
 }  // namespace
 
-Top& Top::get(ServiceContext* service) {
-    return getTop(service);
+ServiceLatencyTracker& ServiceLatencyTracker::getDecoration(Service* service) {
+    return getServiceLatencyTracker(service);
+}
+
+void ServiceLatencyTracker::increment(OperationContext* opCtx,
+                                      Microseconds latency,
+                                      Microseconds workingTime,
+                                      Command::ReadWriteType readWriteType) {
+    if (!opCtx->shouldIncrementLatencyStats())
+        return;
+
+    auto latencyCount = durationCount<Microseconds>(latency);
+    auto workingTimeCount = durationCount<Microseconds>(workingTime);
+    incrementHistogramForUser(opCtx, latencyCount, _totalTime, readWriteType);
+    incrementHistogramForUser(opCtx, workingTimeCount, _workingTime, readWriteType);
+}
+
+void ServiceLatencyTracker::appendTotalTimeStats(bool includeHistograms,
+                                                 bool slowMSBucketsOnly,
+                                                 BSONObjBuilder* builder) {
+    _totalTime.append(includeHistograms, slowMSBucketsOnly, builder);
+}
+
+void ServiceLatencyTracker::appendWorkingTimeStats(bool includeHistograms,
+                                                   bool slowMSBucketsOnly,
+                                                   BSONObjBuilder* builder) {
+    _workingTime.append(includeHistograms, slowMSBucketsOnly, builder);
+}
+
+void ServiceLatencyTracker::incrementForTransaction(OperationContext* opCtx, Microseconds latency) {
+    auto latencyCount = durationCount<Microseconds>(latency);
+    incrementHistogram(opCtx, latencyCount, _totalTime, Command::ReadWriteType::kTransaction);
+}
+
+Top& Top::getDecoration(OperationContext* opCtx) {
+    invariant(opCtx->getService()->role().hasExclusively(ClusterRole::ShardServer));
+    return getTop(opCtx->getServiceContext());
 }
 
 void Top::record(OperationContext* opCtx,
                  const NamespaceString& nss,
                  LogicalOp logicalOp,
                  LockType lockType,
-                 long long micros,
+                 Microseconds micros,
                  bool command,
                  Command::ReadWriteType readWriteType) {
     const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
@@ -145,16 +181,17 @@ void Top::record(OperationContext* opCtx,
         return;
 
     auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
+    auto microsCount = durationCount<Microseconds>(micros);
     stdx::lock_guard lk(_lockUsage);
     CollectionData& coll = _usage[hashedNs];
-    updateCollectionData(lk, opCtx, coll, logicalOp, lockType, micros, readWriteType);
+    updateCollectionData(lk, opCtx, coll, logicalOp, lockType, microsCount, readWriteType);
 }
 
 void Top::record(OperationContext* opCtx,
                  std::span<const NamespaceString> nssSet,
                  LogicalOp logicalOp,
                  LockType lockType,
-                 long long micros,
+                 Microseconds micros,
                  bool command,
                  Command::ReadWriteType readWriteType) {
     std::vector<std::string> hashedSet;
@@ -167,10 +204,11 @@ void Top::record(OperationContext* opCtx,
         }
     }
 
+    auto microsCount = durationCount<Microseconds>(micros);
     stdx::lock_guard lk(_lockUsage);
     for (const auto& hashedNs : hashedSet) {
         CollectionData& coll = _usage[hashedNs];
-        updateCollectionData(lk, opCtx, coll, logicalOp, lockType, micros, readWriteType);
+        updateCollectionData(lk, opCtx, coll, logicalOp, lockType, microsCount, readWriteType);
     }
 }
 
@@ -254,32 +292,5 @@ void Top::appendOperationStats(const NamespaceString& nss, BSONObjBuilder* build
     // Appends operationStats BSONbuilder object to return output.
     builder->append("ns", nssStr);
     builder->append("operationStats", opStatsBuilder.obj());
-}
-
-void Top::incrementGlobalLatencyStats(OperationContext* opCtx,
-                                      uint64_t latency,
-                                      uint64_t workingTime,
-                                      Command::ReadWriteType readWriteType) {
-    if (!opCtx->shouldIncrementLatencyStats())
-        return;
-
-    incrementHistogramForUser(opCtx, latency, _globalHistogramStats, readWriteType);
-    incrementHistogramForUser(opCtx, workingTime, _workingTimeHistogramStats, readWriteType);
-}
-
-void Top::appendGlobalLatencyStats(bool includeHistograms,
-                                   bool slowMSBucketsOnly,
-                                   BSONObjBuilder* builder) {
-    _globalHistogramStats.append(includeHistograms, slowMSBucketsOnly, builder);
-}
-
-void Top::appendWorkingTimeStats(bool includeHistograms,
-                                 bool slowMSBucketsOnly,
-                                 BSONObjBuilder* builder) {
-    _workingTimeHistogramStats.append(includeHistograms, slowMSBucketsOnly, builder);
-}
-
-void Top::incrementGlobalTransactionLatencyStats(OperationContext* opCtx, uint64_t latency) {
-    incrementHistogram(opCtx, latency, _globalHistogramStats, Command::ReadWriteType::kTransaction);
 }
 }  // namespace mongo

@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/stats/single_transaction_stats.h"
-#include "mongo/db/stats/top.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
@@ -79,7 +78,6 @@ public:
     void onCommit(OperationContext* opCtx,
                   ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource* tickSource,
-                  Top* top,
                   size_t operationCount,
                   size_t oplogOperationBytes);
 
@@ -89,8 +87,7 @@ public:
      */
     void onAbort(OperationContext* opCtx,
                  ServerTransactionsMetrics* serverTransactionsMetrics,
-                 TickSource* tickSource,
-                 Top* top);
+                 TickSource* tickSource);
 
     /**
      * Updates relevant metrics when a transcation is prepared.
@@ -136,24 +133,21 @@ private:
     void _onAbort(OperationContext* opCtx,
                   ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource::Tick curTick,
-                  TickSource* tickSource,
-                  Top* top);
+                  TickSource* tickSource);
 
     /**
      * Updates relevant metrics when an active transaction aborts.
      */
     void _onAbortActive(OperationContext* opCtx,
                         ServerTransactionsMetrics* serverTransactionsMetrics,
-                        TickSource* tickSource,
-                        Top* top);
+                        TickSource* tickSource);
 
     /**
      * Updates relevant metrics when an inactive transaction aborts.
      */
     void _onAbortInactive(OperationContext* opCtx,
                           ServerTransactionsMetrics* serverTransactionsMetrics,
-                          TickSource* tickSource,
-                          Top* top);
+                          TickSource* tickSource);
 
     // Tracks metrics for a single multi-document transaction.
     SingleTransactionStats _singleTransactionStats;

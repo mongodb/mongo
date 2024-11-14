@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
@@ -104,7 +105,6 @@ void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTran
 void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
                                           ServerTransactionsMetrics* serverTransactionsMetrics,
                                           TickSource* tickSource,
-                                          Top* top,
                                           size_t operationCount,
                                           size_t oplogOperationBytes) {
     //
@@ -136,20 +136,19 @@ void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
         opCtx->getWriteConcern().usedDefaultConstructedWC ? BSONObj()
                                                           : opCtx->getWriteConcern().toBSON());
 
-    auto duration =
-        durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));
-    top->incrementGlobalTransactionLatencyStats(opCtx, static_cast<uint64_t>(duration));
+    auto duration = _singleTransactionStats.getDuration(tickSource, curTick);
+    ServiceLatencyTracker::getDecoration(opCtx->getService())
+        .incrementForTransaction(opCtx, duration);
 }
 
 void TransactionMetricsObserver::_onAbortActive(
     OperationContext* opCtx,
     ServerTransactionsMetrics* serverTransactionsMetrics,
-    TickSource* tickSource,
-    Top* top) {
+    TickSource* tickSource) {
 
     auto curTick = tickSource->getTicks();
     invariant(_singleTransactionStats.isActive());
-    _onAbort(opCtx, serverTransactionsMetrics, curTick, tickSource, top);
+    _onAbort(opCtx, serverTransactionsMetrics, curTick, tickSource);
     //
     // Per transaction metrics.
     //
@@ -164,11 +163,10 @@ void TransactionMetricsObserver::_onAbortActive(
 void TransactionMetricsObserver::_onAbortInactive(
     OperationContext* opCtx,
     ServerTransactionsMetrics* serverTransactionsMetrics,
-    TickSource* tickSource,
-    Top* top) {
+    TickSource* tickSource) {
     auto curTick = tickSource->getTicks();
     invariant(!_singleTransactionStats.isActive());
-    _onAbort(opCtx, serverTransactionsMetrics, curTick, tickSource, top);
+    _onAbort(opCtx, serverTransactionsMetrics, curTick, tickSource);
 
     //
     // Server wide transactions metrics.
@@ -178,12 +176,11 @@ void TransactionMetricsObserver::_onAbortInactive(
 
 void TransactionMetricsObserver::onAbort(OperationContext* opCtx,
                                          ServerTransactionsMetrics* serverTransactionsMetrics,
-                                         TickSource* tickSource,
-                                         Top* top) {
+                                         TickSource* tickSource) {
     if (_singleTransactionStats.isActive()) {
-        _onAbortActive(opCtx, serverTransactionsMetrics, tickSource, top);
+        _onAbortActive(opCtx, serverTransactionsMetrics, tickSource);
     } else {
-        _onAbortInactive(opCtx, serverTransactionsMetrics, tickSource, top);
+        _onAbortInactive(opCtx, serverTransactionsMetrics, tickSource);
     }
 }
 
@@ -220,8 +217,7 @@ void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
 void TransactionMetricsObserver::_onAbort(OperationContext* opCtx,
                                           ServerTransactionsMetrics* serverTransactionsMetrics,
                                           TickSource::Tick curTick,
-                                          TickSource* tickSource,
-                                          Top* top) {
+                                          TickSource* tickSource) {
     //
     // Per transaction metrics.
     //
@@ -238,9 +234,9 @@ void TransactionMetricsObserver::_onAbort(OperationContext* opCtx,
         serverTransactionsMetrics->decrementCurrentPrepared();
     }
 
-    auto latency =
-        durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));
-    top->incrementGlobalTransactionLatencyStats(opCtx, static_cast<uint64_t>(latency));
+    auto latency = _singleTransactionStats.getDuration(tickSource, curTick);
+    ServiceLatencyTracker::getDecoration(opCtx->getService())
+        .incrementForTransaction(opCtx, latency);
 }
 
 void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,

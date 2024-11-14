@@ -58,8 +58,8 @@ public:
             includeHistograms = configElem.Obj()["histograms"].trueValue();
             slowBuckets = configElem.Obj()["slowBuckets"].trueValue();
         }
-        Top::get(opCtx->getServiceContext())
-            .appendGlobalLatencyStats(includeHistograms, slowBuckets, &latencyBuilder);
+        ServiceLatencyTracker::getDecoration(opCtx->getService())
+            .appendTotalTimeStats(includeHistograms, slowBuckets, &latencyBuilder);
         return latencyBuilder.obj();
     }
 };
@@ -79,15 +79,19 @@ class WorkingTimeHistogramServerStatusSection final : public ServerStatusSection
             includeHistograms = configElem.Obj()["histograms"].trueValue();
             slowBuckets = configElem.Obj()["slowBuckets"].trueValue();
         }
-        Top::get(opCtx->getServiceContext())
+        ServiceLatencyTracker::getDecoration(opCtx->getService())
             .appendWorkingTimeStats(includeHistograms, slowBuckets, &latencyBuilder);
         return latencyBuilder.obj();
     }
 };
 auto globalHistogramServerStatusSection =
-    *ServerStatusSectionBuilder<GlobalHistogramServerStatusSection>("opLatencies");
+    *ServerStatusSectionBuilder<GlobalHistogramServerStatusSection>("opLatencies")
+         .forRouter()
+         .forShard();
 
-auto workingTimeHistogramServerStatusSection =
-    *ServerStatusSectionBuilder<WorkingTimeHistogramServerStatusSection>("opWorkingTime");
+auto globalWorkingTimeHistogramServerStatusSection =
+    *ServerStatusSectionBuilder<WorkingTimeHistogramServerStatusSection>("opWorkingTime")
+         .forRouter()
+         .forShard();
 }  // namespace
 }  // namespace mongo

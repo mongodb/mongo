@@ -98,7 +98,6 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
@@ -2289,7 +2288,6 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
         o(lk).transactionMetricsObserver.onCommit(opCtx,
                                                   ServerTransactionsMetrics::get(opCtx),
                                                   tickSource,
-                                                  &Top::get(opCtx->getServiceContext()),
                                                   operationCount,
                                                   oplogOperationBytes);
         o(lk).transactionMetricsObserver.onTransactionOperation(
@@ -2541,10 +2539,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onAbort(
-            opCtx,
-            ServerTransactionsMetrics::get(opCtx->getServiceContext()),
-            tickSource,
-            &Top::get(opCtx->getServiceContext()));
+            opCtx, ServerTransactionsMetrics::get(opCtx->getServiceContext()), tickSource);
     }
 
     if (o().txnResourceStash) {

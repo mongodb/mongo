@@ -240,14 +240,13 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         curOp->debug().additiveMetrics.executionTime = executionTimeMicros;
 
         recordCurOpMetrics(opCtx);
-        Top::get(opCtx->getServiceContext())
-            .record(opCtx,
-                    curOp->getNSS(),
-                    curOp->getLogicalOp(),
-                    Top::LockType::WriteLocked,
-                    durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
-                    curOp->isCommand(),
-                    curOp->getReadWriteType());
+        Top::getDecoration(opCtx).record(opCtx,
+                                         curOp->getNSS(),
+                                         curOp->getLogicalOp(),
+                                         Top::LockType::WriteLocked,
+                                         curOp->elapsedTimeExcludingPauses(),
+                                         curOp->isCommand(),
+                                         curOp->getReadWriteType());
 
         if (!curOp->debug().errInfo.isOK()) {
             LOGV2_DEBUG(20886,
@@ -1121,14 +1120,13 @@ WriteResult performInserts(OperationContext* opCtx,
             // This is the only part of finishCurOp we need to do for inserts because they
             // reuse the top-level curOp. The rest is handled by the top-level entrypoint.
             curOp.done();
-            Top::get(opCtx->getServiceContext())
-                .record(opCtx,
-                        wholeOp.getNamespace(),
-                        LogicalOp::opInsert,
-                        Top::LockType::WriteLocked,
-                        durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
-                        curOp.isCommand(),
-                        curOp.getReadWriteType());
+            Top::getDecoration(opCtx).record(opCtx,
+                                             wholeOp.getNamespace(),
+                                             LogicalOp::opInsert,
+                                             Top::LockType::WriteLocked,
+                                             curOp.elapsedTimeExcludingPauses(),
+                                             curOp.isCommand(),
+                                             curOp.getReadWriteType());
         }
     });
 

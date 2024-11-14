@@ -238,7 +238,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                 /*markFromMigrate=*/false);
         }
 
-        Top::get(serviceContext).collectionDropped(coll->ns());
+        Top::getDecoration(opCtx).collectionDropped(coll->ns());
     }
 
     // close() is called as part of the onCommit handler as it frees the memory pointed to by 'db'.

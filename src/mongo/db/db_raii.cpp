@@ -279,14 +279,14 @@ AutoStatsTracker::~AutoStatsTracker() {
 
     // Update stats for each namespace.
     auto curOp = CurOp::get(_opCtx);
-    Top::get(_opCtx->getServiceContext())
-        .record(_opCtx,
-                std::span<const NamespaceString>{_nssSet.begin(), _nssSet.end()},
-                curOp->getLogicalOp(),
-                _lockType,
-                durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
-                curOp->isCommand(),
-                curOp->getReadWriteType());
+    Top::getDecoration(_opCtx).record(
+        _opCtx,
+        std::span<const NamespaceString>{_nssSet.begin(), _nssSet.end()},
+        curOp->getLogicalOp(),
+        _lockType,
+        curOp->elapsedTimeExcludingPauses(),
+        curOp->isCommand(),
+        curOp->getReadWriteType());
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
@@ -1187,15 +1187,15 @@ OldClientContext::~OldClientContext() {
 
     invariant(shard_role_details::getLocker(_opCtx)->isLocked());
     auto currentOp = CurOp::get(_opCtx);
-    Top::get(_opCtx->getClient()->getServiceContext())
-        .record(_opCtx,
-                currentOp->getNSS(),
-                currentOp->getLogicalOp(),
-                shard_role_details::getLocker(_opCtx)->isWriteLocked() ? Top::LockType::WriteLocked
-                                                                       : Top::LockType::ReadLocked,
-                _timer.micros(),
-                currentOp->isCommand(),
-                currentOp->getReadWriteType());
+    Top::getDecoration(_opCtx).record(_opCtx,
+                                      currentOp->getNSS(),
+                                      currentOp->getLogicalOp(),
+                                      shard_role_details::getLocker(_opCtx)->isWriteLocked()
+                                          ? Top::LockType::WriteLocked
+                                          : Top::LockType::ReadLocked,
+                                      _timer.elapsed(),
+                                      currentOp->isCommand(),
+                                      currentOp->getReadWriteType());
 }
 
 LockMode getLockModeForQuery(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) {
