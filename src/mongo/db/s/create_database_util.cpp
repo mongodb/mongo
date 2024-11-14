@@ -31,8 +31,8 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/create_database_util.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/util/pcre_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -175,7 +175,7 @@ boost::optional<DatabaseType> checkForExistingDatabaseWithDifferentOptions(
 ShardId getCandidatePrimaryShard(OperationContext* opCtx,
                                  const boost::optional<ShardId>& optResolvedPrimaryShard) {
     return optResolvedPrimaryShard ? *optResolvedPrimaryShard
-                                   : shardutil::selectLeastLoadedNonDrainingShard(opCtx);
+                                   : sharding_util::selectLeastLoadedNonDrainingShard(opCtx);
 }
 
 void refreshDbVersionOnPrimaryShard(OperationContext* opCtx,

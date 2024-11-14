@@ -669,6 +669,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/commands:cluster_server_parameter_commands_invocation",
+        "//src/mongo/db/commands:list_databases_command",
         "//src/mongo/db/commands:mongod_fcv",
         "//src/mongo/db/commands:notify_sharding_event_idl",
         "//src/mongo/db/commands:set_feature_compatibility_version_idl",

@@ -142,5 +142,12 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     StringData taskDescription,
     std::function<void(OperationContext*)> doWork,
     boost::optional<Backoff> backoff = boost::none);
+
+/**
+ * Selects the shard with the least amount of data by checking the total size of each shard in the
+ * shard registry. Considers only shards that are not currently draining. Will return ShardNotFound
+ * if no shard is found.
+ */
+ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
 }  // namespace sharding_util
 }  // namespace mongo

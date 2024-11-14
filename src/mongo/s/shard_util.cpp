@@ -72,40 +72,6 @@
 namespace mongo {
 namespace shardutil {
 
-StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const ShardId& shardId) {
-    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
-    if (!shardStatus.isOK()) {
-        return shardStatus.getStatus();
-    }
-
-    // Since 'listDatabases' is potentially slow in the presence of large number of collections, use
-    // a higher maxTimeMS to prevent it from prematurely timing out
-    const Minutes maxTimeMSOverride{10};
-
-    auto listDatabasesStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        DatabaseName::kAdmin,
-        BSON("listDatabases" << 1),
-        maxTimeMSOverride,
-        Shard::RetryPolicy::kIdempotent);
-
-    if (!listDatabasesStatus.isOK()) {
-        return std::move(listDatabasesStatus.getStatus());
-    }
-
-    if (!listDatabasesStatus.getValue().commandStatus.isOK()) {
-        return std::move(listDatabasesStatus.getValue().commandStatus);
-    }
-
-    BSONElement totalSizeElem = listDatabasesStatus.getValue().response["totalSize"];
-    if (!totalSizeElem.isNumber()) {
-        return {ErrorCodes::NoSuchKey, "totalSize field not found in listDatabases"};
-    }
-
-    return totalSizeElem.numberLong();
-}
-
 StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
                                                   const ShardId& shardId,
                                                   NamespaceString const& ns,
@@ -262,33 +228,6 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
     }
 
     return Status::OK();
-}
-
-ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
-    const auto shardsAndOpTime = uassertStatusOKWithContext(
-        Grid::get(opCtx)->catalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kSnapshotReadConcern, true /* excludeDraining */),
-        "Cannot retrieve updated shard list from config server");
-
-    const auto& nonDrainingShards = shardsAndOpTime.value;
-    uassert(ErrorCodes::ShardNotFound, "No non-draining shard found", !nonDrainingShards.empty());
-
-    auto candidateShardId = ShardId{nonDrainingShards.front().getName()};
-
-    auto candidateSize = uassertStatusOK(retrieveTotalShardSize(opCtx, candidateShardId));
-
-    for (size_t i = 1; i < nonDrainingShards.size(); i++) {
-        const auto shardId = ShardId(nonDrainingShards[i].getName());
-
-        const auto currentSize = uassertStatusOK(retrieveTotalShardSize(opCtx, shardId));
-
-        if (currentSize < candidateSize) {
-            candidateSize = currentSize;
-            candidateShardId = shardId;
-        }
-    }
-
-    return candidateShardId;
 }
 
 }  // namespace shardutil

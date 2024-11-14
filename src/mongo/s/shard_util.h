@@ -64,16 +64,6 @@ namespace shardutil {
 static constexpr size_t kMaxSplitPoints = 8192;
 
 /**
- * Executes the listDatabases command against the specified shard and obtains the total data
- * size across all databases in bytes (essentially, the totalSize field).
- *
- * Returns OK with the total size or an error. Known errors are:
- *  ShardNotFound if shard by that id is not available on the registry
- *  NoSuchKey if the total shard size could not be retrieved
- */
-StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const ShardId& shardId);
-
-/**
  * Executes the dataSize command against the specified shard and obtains the total data
  * size for the collection in bytes (essentially, the dataSize field).
  *
@@ -124,13 +114,6 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                                   const Timestamp& timestamp,
                                   const ChunkRange& chunkRange,
                                   const std::vector<BSONObj>& splitPoints);
-
-/**
- * Selects the shard with the least amount of data by checking the total size of each shard in the
- * shard registry. Considers only shards that are not currently draining. Will return ShardNotFound
- * if no shard is found.
- */
-ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
 
 }  // namespace shardutil
 }  // namespace mongo

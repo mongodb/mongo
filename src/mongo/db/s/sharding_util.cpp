@@ -48,6 +48,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
@@ -373,6 +374,64 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
             }
         }
     }
+}
+
+ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
+    const auto shardsAndOpTime = uassertStatusOKWithContext(
+        Grid::get(opCtx)->catalogClient()->getAllShards(
+            opCtx, repl::ReadConcernLevel::kSnapshotReadConcern, true /* excludeDraining */),
+        "Cannot retrieve updated shard list from config server");
+
+    const auto& nonDrainingShards = shardsAndOpTime.value;
+    uassert(ErrorCodes::ShardNotFound, "No non-draining shard found", !nonDrainingShards.empty());
+
+    std::vector<ShardId> shardIds;
+    std::transform(nonDrainingShards.begin(),
+                   nonDrainingShards.end(),
+                   std::back_inserter(shardIds),
+                   [](const ShardType& shard) { return ShardId(shard.getName()); });
+
+    if (shardIds.size() == 1) {
+        return shardIds.front();
+    }
+
+    ListDatabasesCommand command;
+    command.setDbName(DatabaseName::kAdmin);
+
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto responsesFromShards = sharding_util::sendCommandToShards(opCtx,
+                                                                  DatabaseName::kAdmin,
+                                                                  command.toBSON(),
+                                                                  shardIds,
+                                                                  executor,
+                                                                  false /* throwOnError */);
+
+    auto candidateShardId = shardIds.front();
+    auto candidateSize = std::numeric_limits<long long>::max();
+
+    using namespace fmt::literals;
+    for (auto&& response : responsesFromShards) {
+        const auto& shardId = response.shardId;
+
+        auto errorContext =
+            "Failed to get the list of databases from shard '{}'"_format(shardId.toString());
+        const auto responseValue =
+            uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
+        const ListDatabasesReply reply =
+            ListDatabasesReply::parse(IDLParserContext("ListDatabasesReply"), responseValue.data);
+        const auto currentSize = reply.getTotalSize();
+        uassert(ErrorCodes::UnknownError,
+                fmt::format("Received unrecognized reply for ListDatabasesCommand : {}",
+                            responseValue.data.toString()),
+                currentSize.has_value());
+
+        if (currentSize.value() < candidateSize) {
+            candidateSize = currentSize.value();
+            candidateShardId = shardId;
+        }
+    }
+
+    return candidateShardId;
 }
 
 }  // namespace sharding_util

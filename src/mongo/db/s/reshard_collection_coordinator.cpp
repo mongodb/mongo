@@ -62,6 +62,7 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -76,7 +77,6 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -230,7 +230,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
 
                 // Pick the "to" shard if the client did not specify one.
                 if (!_doc.getShardDistribution()) {
-                    auto toShard = shardutil::selectLeastLoadedNonDrainingShard(opCtx);
+                    auto toShard = sharding_util::selectLeastLoadedNonDrainingShard(opCtx);
                     mongo::ShardKeyRange destinationRange(toShard);
                     destinationRange.setMin(cluster::unsplittable::kUnsplittableCollectionMinKey);
                     destinationRange.setMax(cluster::unsplittable::kUnsplittableCollectionMaxKey);
