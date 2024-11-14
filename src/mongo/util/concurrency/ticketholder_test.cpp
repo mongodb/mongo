@@ -26,8 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/stdx/thread.h"
-#include <concepts>
 #include <memory>
 
 #include "mongo/db/service_context_test_fixture.h"
@@ -39,14 +37,10 @@
 #include "mongo/util/packaged_task.h"
 #include "mongo/util/tick_source_mock.h"
 
-#include "mongo/unittest/assert.h"
-#include "mongo/util/assert_util.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace {
 using namespace mongo;
-using namespace std::literals;
 
 // Timeout to use to ensure that waiters get queued and/or receive tickets.
 // We use this timeout so we can bail-out early and fail with a better diagnostic when we appear to
@@ -64,8 +58,6 @@ public:
         : ServiceContextTest(
               std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
                   nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {}
-
-    static inline const Milliseconds kSleepTime{1};
 
     void setUp() override {
         ServiceContextTest::setUp();
@@ -111,15 +103,6 @@ public:
                                               TicketHolder::ResizePolicy::kImmediate);
     }
 
-    template <std::invocable Predicate>
-    void waitUntilCanceled(OperationContext& opCtx, Predicate predicate) {
-        while (opCtx.checkForInterruptNoAssert() == Status::OK()) {
-            if (predicate())
-                return;
-            sleepFor(kSleepTime);
-        }
-        ASSERT(false);
-    }
 
 protected:
     class Stats;
@@ -604,99 +587,5 @@ TEST_F(TicketHolderTest, ReleaseToPoolWakesWaiters) {
     SemiFuture<void> allDone = whenAllSucceed(std::move(eachDone));
     _opCtx->runWithDeadline(
         getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] { allDone.get(_opCtx.get()); });
-}
-
-TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax0) {
-    constexpr int initialNumTickets = 4;
-    constexpr int maxNumberOfWaiters = 0;
-    auto holder = std::make_unique<TicketHolder>(getServiceContext(),
-                                                 initialNumTickets,
-                                                 false /* trackPeakUsed */,
-                                                 TicketHolder::ResizePolicy::kImmediate,
-                                                 maxNumberOfWaiters);
-
-    // acquire 4 tickets
-    std::array<MockAdmissionContext, 6> admCtxs;
-    std::array<boost::optional<Ticket>, 4> tickets;
-    for (int i = 0; i < 4; ++i) {
-        tickets[i] = holder->waitForTicket(_opCtx.get(), &admCtxs[i + 1]);
-    }
-
-    // ensure 4 are now in-use and 0 are left available
-    ASSERT_EQ(holder->used(), 4);
-    ASSERT_EQ(holder->available(), 0);
-    ASSERT_EQ(holder->outof(), 4);
-
-    // Since no thread can be waiting for a ticket, it will cause waiting
-    ASSERT_THROWS(holder->waitForTicket(_opCtx.get(), &admCtxs[0]),
-                  ExceptionFor<ErrorCodes::AdmissionQueueOverflow>);
-
-    // Releasing the tickets, making all tickets available in the process
-    tickets = {};
-
-    // ensure 0 are now in-use and 4 are left available
-    ASSERT_EQ(holder->used(), 0);
-    ASSERT_EQ(holder->available(), 4);
-    ASSERT_EQ(holder->outof(), 4);
-}
-
-TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
-    constexpr int initialNumTickets = 4;
-    constexpr int maxNumberOfWaiters = 1;
-    auto holder = std::make_unique<TicketHolder>(getServiceContext(),
-                                                 initialNumTickets,
-                                                 false /* trackPeakUsed */,
-                                                 TicketHolder::ResizePolicy::kImmediate,
-                                                 maxNumberOfWaiters);
-
-    // acquire 4 tickets
-    std::array<MockAdmissionContext, 6> admCtxs;
-    std::array<boost::optional<Ticket>, 4> tickets;
-    for (int i = 0; i < 4; ++i) {
-        tickets[i] = holder->waitForTicket(_opCtx.get(), &admCtxs[i + 1]);
-    }
-
-    // ensure 4 are now in-use and 0 are left available
-    ASSERT_EQ(holder->used(), 4);
-    ASSERT_EQ(holder->available(), 0);
-    ASSERT_EQ(holder->outof(), 4);
-
-    // We aquire a ticket in another thread.
-    // Since no ticket available, it will cause a blocking wait on that thread.
-    Future<Ticket> ticketFuture =
-        spawn([&]() { return holder->waitForTicket(_opCtx.get(), &admCtxs[5]); });
-
-    // We wait until ticketFuture is actually waiting for the ticket or until timeout exceeded
-    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        waitUntilCanceled(*_opCtx, [&] { return holder->waiting_forTest() == 1; });
-    });
-
-    // Since the maximum amount of ticket is one, and one is already waiting, it will throw
-    ASSERT_THROWS(holder->waitForTicketUntil(_opCtx.get(), &admCtxs[0], getNextDeadline()),
-                  ExceptionFor<ErrorCodes::AdmissionQueueOverflow>);
-
-    // Releasing the tickets, resuming the waiter
-    tickets = {};
-
-    // The fifth ticket is getting aquired after waiting
-    boost::optional<Ticket> ticket;
-    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        // We can gst a ticket when one is available
-        ticket = std::move(ticketFuture).get(_opCtx.get());
-    });
-
-    // ensure 3 are now available and 1 are in-use
-    // The one in use was the waiting ticket
-    ASSERT_EQ(holder->used(), 1);
-    ASSERT_EQ(holder->available(), 3);
-    ASSERT_EQ(holder->outof(), 4);
-
-    // Releasing the fifth ticket
-    ticket.reset();
-
-    // ensure 4 are now available and 0 are in-use
-    ASSERT_EQ(holder->used(), 0);
-    ASSERT_EQ(holder->available(), 4);
-    ASSERT_EQ(holder->outof(), 4);
 }
 }  // namespace

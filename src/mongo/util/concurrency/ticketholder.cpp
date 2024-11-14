@@ -43,14 +43,12 @@ namespace mongo {
 TicketHolder::TicketHolder(ServiceContext* serviceContext,
                            int numTickets,
                            bool trackPeakUsed,
-                           ResizePolicy resizePolicy,
-                           int32_t maxQueueDepth)
+                           ResizePolicy resizePolicy)
     : _trackPeakUsed(trackPeakUsed),
       _resizePolicy(resizePolicy),
       _serviceContext(serviceContext),
       _tickets(numTickets),
-      _outof(numTickets),
-      _maxQueueDepth(maxQueueDepth) {}
+      _outof(numTickets) {}
 
 bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) {
     stdx::lock_guard<stdx::mutex> lk(_resizeMutex);
@@ -180,22 +178,13 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
     while (true) {
         if (boost::optional<Ticket> maybeTicket = _tryAcquireNormalPriorityTicket(admCtx);
             maybeTicket) {
-            return maybeTicket;
+            return std::move(*maybeTicket);
         }
 
         Date_t deadline = nextDeadline();
-        {
-            const auto previousWaiterCount = _waiterCount.fetchAndAdd(1);
-
-            // Since uassert throws, we use raii to substract the waiter count
-            ON_BLOCK_EXIT([&] { _waiterCount.fetchAndSubtract(1); });
-
-            uassert(ErrorCodes::AdmissionQueueOverflow,
-                    "MongoDB is overloaded and cannot accept new operations. Try again later.",
-                    previousWaiterCount < _maxQueueDepth);
-
-            _tickets.waitUntil(0, deadline);
-        }
+        _waiterCount.fetchAndAdd(1);
+        _tickets.waitUntil(0, deadline);
+        _waiterCount.fetchAndSubtract(1);
 
         if (interruptible) {
             opCtx->checkForInterrupt();
@@ -337,9 +326,5 @@ void TicketHolder::setNumFinishedProcessing_forTest(int32_t numFinishedProcessin
 
 void TicketHolder::setPeakUsed_forTest(int32_t used) {
     _peakUsed.store(used);
-}
-
-int32_t TicketHolder::waiting_forTest() const {
-    return _waiterCount.load();
 }
 }  // namespace mongo
