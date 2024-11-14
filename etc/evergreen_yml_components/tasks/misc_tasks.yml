@@ -1096,8 +1096,9 @@ tasks:
           # It might be optimized by doing a query upfront, which uses minimal analysis:
           #   targets=$(bazel query 'kind(".*_test", //src/...)')
           #   bazel test $targets
+          # TODO(SERVER-97069): Change to //src/... when unit tests are compatible with bazel sandboxing
           target: >-
-            //src/...
+            //src/mongo/platform:visibility_test1
           args: >-
             --test_output=all
             --config=local
