@@ -31,6 +31,7 @@
 
 #include <fstream>
 #include <ostream>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,17 @@
 #include "mongo/util/str.h"
 
 namespace queryTester {
+namespace {
+/**
+ * Regex to match the hunk header of the git diff output, which looks like @@ -lineNum, +lineNum @@
+ * <Test Number>. We check that the line contains "@@", followed by optional ANSII escape sequences
+ * for terminal color formatting, whitespace, and a number representing the test number at the end.
+ * The test number will be captured as part of the summary of failing queries.
+ */
+static const auto TEST_NUM_REGEX =
+    std::regex{R"(@@(?:\x1B\[[0-9;]*m)*[[:space:]]+(?:\x1B\[[0-9;]*m)*([0-9]+))"};
+}  // namespace
+
 WriteOutOptions stringToWriteOutOpt(std::string opt) {
     static const auto stringToWriteOutOptMap = std::map<std::string, WriteOutOptions>{
         {"result", WriteOutOptions::kResult}, {"oneline", WriteOutOptions::kOnelineResult}};
@@ -117,19 +129,32 @@ std::tuple<std::string, std::filesystem::path> fileHelpers::getCollAndFileName(
     }
 }
 
+std::vector<size_t> fileHelpers::getFailedTestNums(const std::string& diffOutput) {
+    auto failedTestNums = std::vector<size_t>{};
+    auto line = std::string{};
+    auto diffStream = std::istringstream{diffOutput};
+
+    while (std::getline(diffStream, line)) {
+        if (auto match = std::smatch{}; std::regex_search(line, match, TEST_NUM_REGEX)) {
+            failedTestNums.push_back(std::stoull(match[1]));
+        }
+    }
+    return failedTestNums;
+}
+
 std::string fileHelpers::gitDiff(const std::filesystem::path& expected,
                                  const std::filesystem::path& actual) {
     const auto gitDiffCmd =
         (std::stringstream{}
          << "git"
-         // Enrich the hunk header with the test id associated with the diff. The config option
+         // Enrich the hunk header with the test number associated with the diff. The config option
          // override allows us to specify a custom regex function with which to replace the hunk
          // header text in "@@ lines changed @@ TEXT." Files with the .actual and .results
          // extensions will use this custom function (set in the .gitattributes file).
          << " -c diff.query.xfuncname=\"^[0-9]+$\""
          << " diff"
          // The --no-index option allows us to compare files that are not in any repository. -U0
-         // removes any lines of context around the diff so that the correct test id directly
+         // removes any lines of context around the diff so that the correct test number directly
          // preceding the diff will be captured.
          << " --no-index --word-diff=color -U0 -- " << expected << " " << actual << " 2>&1")
             .str();
@@ -142,5 +167,31 @@ std::string fileHelpers::gitDiff(const std::filesystem::path& expected,
     } else {
         return std::string{};
     }
+}
+
+void fileHelpers::printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
+                                      const size_t failedQueryCount,
+                                      const size_t totalTestsRun) {
+    std::cout << applyRed()
+              << "============================================================" << applyReset()
+              << std::endl
+              << applyYellow() << "                       FAILURE SUMMARY                      "
+              << applyReset() << std::endl
+              << applyRed()
+              << "============================================================" << applyReset()
+              << std::endl
+              << applyCyan() << "SUMMARY: " << applyReset() << std::endl
+              << "  Failed tests: " << failedTestFiles.size() << "/" << totalTestsRun << std::endl
+              << "  Failed queries: " << failedQueryCount << std::endl
+              << std::endl
+              << applyRed() << "Failures:" << applyReset() << std::endl;
+
+    for (const auto& failedTestName : failedTestFiles) {
+        std::cout << failedTestName << std::endl;
+    }
+
+    std::cout << applyRed()
+              << "============================================================" << applyReset()
+              << std::endl;
 }
 }  // namespace queryTester
