@@ -31,7 +31,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/stdx/unordered_map.h"
 #include "test.h"
 
 namespace queryTester {
@@ -51,11 +50,10 @@ namespace queryTester {
 class QueryFile {
 public:
     QueryFile(std::filesystem::path filePath, std::pair<size_t, size_t> testsToRun)
-        : _filePath(filePath),
-          _testsToRun(testsToRun),
-          _expectedPath(std::filesystem::path{filePath}.replace_extension(".results")),
-          _actualPath(std::filesystem::path{filePath}.replace_extension(".actual")),
-          _failedQueryCount(0) {}
+        : _filePath(filePath), _testsToRun(testsToRun) {
+        _expectedPath = std::filesystem::path{filePath}.replace_extension(".results");
+        _actualPath = std::filesystem::path{filePath}.replace_extension(".actual");
+    }
 
     // Delete certain constructors to avoid accidental I/O races.
     QueryFile(const QueryFile&) = delete;
@@ -86,10 +84,8 @@ public:
     /**
      * If 'compare' is set, tests must have results to compare to.
      */
-    bool textBasedCompare(const std::filesystem::path&, const std::filesystem::path&);
     bool writeAndValidate(ModeOption, WriteOutOptions);
     bool writeOutAndNumber(std::fstream&, WriteOutOptions);
-    void printFailedQueries(const std::vector<size_t>& failedTestNums) const;
 
     /**
      * Write out all the non-test information to a string for debug purposes.
@@ -110,14 +106,6 @@ public:
         return _collectionsNeeded;
     }
 
-    size_t getFailedQueryCount() const {
-        return _failedQueryCount;
-    }
-
-    size_t getTestsRun() const {
-        return _testsRun;
-    }
-
 protected:
     void parseHeader(std::fstream& fs);
     const std::filesystem::path _filePath;
@@ -133,9 +121,6 @@ protected:
         std::vector<std::string> preCollName;
         std::vector<std::vector<std::string>> preCollFiles;
     } _comments;
-    // Stores a mapping between each test number and its associated query string.
-    mongo::stdx::unordered_map<size_t, std::string> _testNumToQuery;
-    size_t _failedQueryCount;
 };
 
 }  // namespace queryTester

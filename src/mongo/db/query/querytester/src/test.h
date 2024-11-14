@@ -123,14 +123,6 @@ public:
         }
     }
 
-    auto getTestLine() const {
-        return _testLine;
-    }
-
-    size_t getTestNum() const {
-        return _testNum;
-    }
-
     void setDB(const std::string& db) {
         _db = db;
     }

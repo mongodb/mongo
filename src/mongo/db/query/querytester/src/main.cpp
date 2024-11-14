@@ -129,9 +129,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     // Track collections loaded in the previous test file.
     auto prevFileCollections = std::set<std::string>{};
     // TODO(SERVER-96984): Robustify
-    auto failedTestFiles = std::vector<std::filesystem::path>{};
-    auto failedQueryCount = size_t{0};
-    auto totalTestsRun = size_t{0};
+    auto failedTests = std::vector<std::filesystem::path>{};
     for (auto [testPath, startRange, endRange] : testsToRun) {
         auto currFile = queryTester::QueryFile(testPath, {startRange, endRange});
         currFile.readInEntireFile(mode);
@@ -140,10 +138,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
             continue;
         }
         currFile.runTestFile(conn.get(), mode);
-        totalTestsRun += currFile.getTestsRun();
         if (!currFile.writeAndValidate(mode, outOpt)) {
-            failedQueryCount += currFile.getFailedQueryCount();
-            failedTestFiles.push_back(testPath);
+            failedTests.push_back(testPath);
         }
 
         // Update prevFileCollections with the collections in the current file.
@@ -156,11 +152,13 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         conn->shutdown();
     }
 
-    if (failedTestFiles.empty()) {
+    if (failedTests.size() == 0) {
         std::cout << "All tests passed!\n";
         return 0;
     } else {
-        fileHelpers::printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
+        for (const auto& failedTestName : failedTests) {
+            std::cout << failedTestName << " failed!\n";
+        }
         return 1;
     }
 }

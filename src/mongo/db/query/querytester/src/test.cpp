@@ -253,11 +253,10 @@ Test Test::parseTest(std::fstream& fs, const ModeOption mode, const size_t testN
                 !expectedResult.empty());
 
         if (intraResultSetCommentLineCount > 0) {
-            std::cout << applyBrown() << "Warning: we ignored " << intraResultSetCommentLineCount
+            std::cout << "\033[33mWarning: we ignored " << intraResultSetCommentLineCount
                       << " lines of intra-result set comments for test "
                       // Print test name or a backspace.
-                      << testNum << " " << testName.value_or("\b") << "." << applyReset()
-                      << std::endl;
+                      << testNum << " " << testName.value_or("\b") << ".\033[m" << std::endl;
         }
 
         return Test(testLine,
