@@ -321,7 +321,7 @@ private:
 class PlannerGeneratorFromClassicCacheEntry : public PlannerGeneratorFromCacheEntry {
 public:
     PlannerGeneratorFromClassicCacheEntry(PlannerDataForSBE plannerData,
-                                          const QuerySolution& qs,
+                                          std::unique_ptr<QuerySolution> qs,
                                           boost::optional<size_t> decisionReads);
 
     /**
@@ -341,7 +341,7 @@ public:
 
 private:
     PlannerDataForSBE _plannerData;
-    const QuerySolution& _solution;
+    std::unique_ptr<QuerySolution> _solution;
     boost::optional<size_t> _decisionReads;
 
     std::unique_ptr<sbe::PlanStage> _sbePlan;
@@ -357,6 +357,8 @@ std::unique_ptr<PlannerInterface> makePlannerForSbeCacheEntry(
     PlannerDataForSBE plannerData, std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder);
 
 std::unique_ptr<PlannerInterface> makePlannerForClassicCacheEntry(
-    PlannerDataForSBE plannerData, const QuerySolution& qs, boost::optional<size_t> decisionWorks);
+    PlannerDataForSBE plannerData,
+    std::unique_ptr<QuerySolution> qs,
+    boost::optional<size_t> decisionWorks);
 
 }  // namespace mongo::classic_runtime_planner_for_sbe
