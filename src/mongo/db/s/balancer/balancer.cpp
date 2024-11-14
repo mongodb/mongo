@@ -1068,8 +1068,6 @@ void Balancer::_mainThread() {
         _beginRound(opCtx.get());
 
         try {
-            shardingContext->shardRegistry()->reload(opCtx.get());
-
             uassert(13258, "oids broken after resetting!", _checkOIDs(opCtx.get()));
 
             Status refreshStatus = balancerConfig->refreshAndCheck(opCtx.get());
