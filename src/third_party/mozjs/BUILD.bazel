@@ -246,9 +246,7 @@ mongo_cc_library(
 
             # Disable warnings for third party libraries as no action will be taken to fix them
             # and they just clutter the output logs
-            "-Wno-invalid-offsetof",
             "-Wno-unused-variable",
-            "-Wno-class-memaccess",
             "-Wno-implicit-fallthrough",
 
             # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
@@ -291,6 +289,13 @@ mongo_cc_library(
             "__Wno_non_virtual_dtor__",
             "__Wno_invalid_offsetof__",
         ],
+    }),
+    features = select({
+        "@platforms//os:linux": ["no_invalid_offsetof_warning"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:compiler_type_gcc": ["no_class_memaccess_warning"],
+        "//conditions:default": [],
     }),
     includes = [
         "include",

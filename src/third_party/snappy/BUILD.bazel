@@ -34,7 +34,7 @@ mongo_cc_library(
         "//bazel/config:gcc_or_clang": [
             "-Wno-sign-compare",
             "-Wno-unused-function",
-            "-Wno-error=ignored-attributes",
+            "-Wno-ignored-attributes",
         ],
         "//conditions:default": [],
     }),

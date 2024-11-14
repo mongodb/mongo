@@ -687,6 +687,30 @@ def _impl(ctx):
         ],
     )
 
+    # -Wno-invalid-offsetof is only valid for C++ but not for C
+    no_invalid_offsetof_warning_feature = feature(
+        name = "no_invalid_offsetof_warning",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-invalid-offsetof"])],
+            ),
+        ],
+    )
+
+    # -Wno-class-memaccess is only valid for C++ but not for C
+    no_class_memaccess_warning_feature = feature(
+        name = "no_class_memaccess_warning",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-class-memaccess"])],
+            ),
+        ],
+    )
+
     features = [
         bin_dirs_feature,
         default_compile_flags_feature,
@@ -725,6 +749,8 @@ def _impl(ctx):
         overloaded_virtual_warning_feature,
         no_overloaded_virtual_warning_feature,
         pessimizing_move_warning_feature,
+        no_invalid_offsetof_warning_feature,
+        no_class_memaccess_warning_feature,
     ]
 
     return [

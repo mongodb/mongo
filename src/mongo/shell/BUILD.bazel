@@ -74,12 +74,15 @@ mongo_cc_library(
             "/wd5105",
         ],
         "//conditions:default": [
-            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
             "-Wno-unknown-warning-option",
-            "-Wno-class-memaccess",
             # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
             "-Wno-deprecated",
         ],
+    }),
+    features = select({
+        # TODO(SERVER-59992): Remove -Wno-class-memaccess where possible.
+        "//bazel/config:compiler_type_gcc": ["no_class_memaccess_warning"],
+        "//conditions:default": [],
     }),
     deps = [
         "//src/mongo:base",
@@ -213,12 +216,15 @@ mongo_cc_library(
             "/wd5105",
         ],
         "//conditions:default": [
-            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
             "-Wno-unknown-warning-option",
-            "-Wno-class-memaccess",
             # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
             "-Wno-deprecated",
         ],
+    }),
+    features = select({
+        # TODO(SERVER-59992): Remove -Wno-class-memaccess where possible.
+        "//bazel/config:compiler_type_gcc": ["no_class_memaccess_warning"],
+        "//conditions:default": [],
     }),
     target_compatible_with = select({
         "//bazel/config:js_engine_mozjs": [],

@@ -126,8 +126,6 @@ GRPC_COPTS = [
         "-Wno-stringop-overread",  # false positive: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98465#c30
         "-Wno-stringop-overflow",
         "-Wno-attributes",
-        #"-Wno-class-memaccess",
-        #"-Wno-overloaded-virtual",
         "-Wno-error",
     ],
     "//bazel/config:compiler_type_msvc": [
