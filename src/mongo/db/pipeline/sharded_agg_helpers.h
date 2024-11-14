@@ -259,7 +259,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
         targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-    boost::optional<BSONObj> readConcern = boost::none);
+    boost::optional<BSONObj> readConcern = boost::none,
+    bool shouldUseCollectionDefaultCollator = false);
 
 /**
  * For a sharded or unsharded collection, establishes a remote cursor on only the specified shard,

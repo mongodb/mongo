@@ -349,6 +349,11 @@ last-continuous:
       ticket: SERVER-95670
     - test_file: jstests/sharding/migration_after_resharding_multi_insert_session_history.js
       ticket: SERVER-95724
+    - test_file: jstests/change_streams/update_lookup_before_ddl.js
+      ticket: SERVER-95976
+    - test_file: jstests/change_streams/lookup_post_image.js
+      ticket: SERVER-95976
+    - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
   suites: null
 last-lts:
   all:
@@ -712,4 +717,10 @@ last-lts:
       ticket: SERVER-95670
     - test_file: jstests/sharding/migration_after_resharding_multi_insert_session_history.js
       ticket: SERVER-95724
+    - test_file: jstests/change_streams/update_lookup_before_ddl.js
+      ticket: SERVER-95976
+    - test_file: jstests/change_streams/lookup_post_image.js
+      ticket: SERVER-95976
+    - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
+      ticket: SERVER-95976
   suites: null

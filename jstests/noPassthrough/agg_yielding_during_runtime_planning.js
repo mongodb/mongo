@@ -3,11 +3,17 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
 const db = conn.getDB(dbName);
+
+if (checkSbeCompletelyDisabled(db)) {
+    jsTestLog(`Skipping ${jsTestName()} as SBE executor is disabled`);
+    quit();
+}
 
 assert(db.coll.drop());
 assert(db.foreignColl.drop());

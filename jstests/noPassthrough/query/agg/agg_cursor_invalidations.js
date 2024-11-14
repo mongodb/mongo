@@ -131,6 +131,7 @@ res = assert.commandWorked(testDB.runCommand({
                   from: foreignCollection.getName(),
                   localField: 'local',
                   foreignField: 'foreign',
+                  pipeline: [{$project: {a: 1}}],
                   as: 'results',
               }
             },
@@ -143,10 +144,8 @@ res = assert.commandWorked(testDB.runCommand({
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandFailedWithCode(
-    res,
-    [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound],
-    'expected getMore to fail when the foreign collection has been dropped');
+assert.commandWorked(res,
+                     'expected getMore to succeed despite the foreign collection being dropped');
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
@@ -211,10 +210,9 @@ res = assert.commandWorked(testDB.runCommand({
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandFailedWithCode(
-    res,
-    ErrorCodes.NamespaceNotFound,
-    'expected getMore to fail when the foreign collection has been dropped');
+assert.commandWorked(res,
+                     'expected getMore to succeed despite the foreign collection being dropped');
+
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
 
@@ -243,10 +241,8 @@ res = assert.commandWorked(testDB.runCommand({
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandFailedWithCode(
-    res,
-    ErrorCodes.NamespaceNotFound,
-    'expected getMore to fail when the foreign collection has been dropped');
+assert.commandWorked(res,
+                     'expected getMore to succeed despite the foreign collection being dropped');
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
