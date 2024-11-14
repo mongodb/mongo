@@ -340,8 +340,8 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
             estimateCardinalityEq(*estimatorAreaDiff, tag, val, true);
 
         ASSERT_EQ(4, actualCard);
-        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCard.card, kTolerance);
-        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCardAreaDiff.card, kTolerance);
+        ASSERT_APPROX_EQUAL(4.0, estimatedCard.card, kTolerance);
+        ASSERT_APPROX_EQUAL(4.0, estimatedCardAreaDiff.card, kTolerance);
     }
 
     {
@@ -369,8 +369,8 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
                                      true /* includeScalar */);
 
         ASSERT_EQ(6, actualCard);
-        ASSERT_CE_APPROX_EQUAL(6.0, estimatedCard.card, kTolerance);
-        ASSERT_CE_APPROX_EQUAL(7.0, estimatedCardAreaDiff.card, kTolerance);
+        ASSERT_APPROX_EQUAL(6.0, estimatedCard.card, kTolerance);
+        ASSERT_APPROX_EQUAL(7.0, estimatedCardAreaDiff.card, kTolerance);
     }
 
     {
@@ -401,8 +401,8 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
                                      false /* includeScalar */);
 
         ASSERT_EQ(2, actualCard);
-        ASSERT_CE_APPROX_EQUAL(3.15479, estimatedCard.card, kTolerance);
-        ASSERT_CE_APPROX_EQUAL(2.52383, estimatedCardAreaDiff.card, kTolerance);
+        ASSERT_APPROX_EQUAL(3.15479, estimatedCard.card, kTolerance);
+        ASSERT_APPROX_EQUAL(2.52383, estimatedCardAreaDiff.card, kTolerance);
     }
 }
 

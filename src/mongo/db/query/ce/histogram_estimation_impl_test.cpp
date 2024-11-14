@@ -581,9 +581,9 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsTimestampHistogram) {
 
     const auto valueIn = value::bitcastFrom<int64_t>((startTs.asULL() + endTs.asULL()) / 2);
     ASSERT_EQ(2.0, estimateCardinality(hist, TimeStamp, valueIn, kEqual).card);
-    ASSERT_CE_APPROX_EQUAL(
+    ASSERT_APPROX_EQUAL(
         49.0, estimateCardinality(hist, TimeStamp, valueIn, kLess).card, kErrorBound);
-    ASSERT_CE_APPROX_EQUAL(
+    ASSERT_APPROX_EQUAL(
         49.0, estimateCardinality(hist, TimeStamp, valueIn, kGreater).card, kErrorBound);
 
     const auto valueAfter = value::bitcastFrom<int64_t>(endTs.asULL() + 100);
@@ -852,7 +852,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
     auto&& [minOid, inclOid] = getMinMaxBoundForSBEType(value::TypeTags::ObjectId, true /*isMin*/);
     auto minOidTag = minOid.getTag();
     auto minOidVal = minOid.getValue();
-    ASSERT_CE_APPROX_EQUAL(
+    ASSERT_APPROX_EQUAL(
         1.9, estimateCardinality(hist, minOidTag, minOidVal, kEqual).card, kErrorBound);
 
     // Minimum date.
@@ -865,7 +865,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
     auto&& [minTs, inclTs] = getMinMaxBoundForSBEType(value::TypeTags::Timestamp, true /*isMin*/);
     auto minTsTag = minTs.getTag();
     auto minTsVal = minTs.getValue();
-    ASSERT_CE_APPROX_EQUAL(
+    ASSERT_APPROX_EQUAL(
         1.9, estimateCardinality(hist, minTsTag, minTsVal, kEqual).card, kErrorBound);
 
     // [minDate, innerDate], estimated by the half of the date bucket.
@@ -877,7 +877,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
                                                  true,
                                                  value::TypeTags::Date,
                                                  value::bitcastFrom<int64_t>(innerDate));
-    ASSERT_CE_APPROX_EQUAL(48.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(48.0, expectedCard.card, kErrorBound);
 
     // [minTs, innerTs], estimated by the half of the timestamp bucket.
     const Timestamp innerTs{Seconds(1516864323LL), 0};
@@ -888,7 +888,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
                                             true,
                                             value::TypeTags::Timestamp,
                                             value::bitcastFrom<int64_t>(innerTs.asULL()));
-    ASSERT_CE_APPROX_EQUAL(47.5, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(47.5, expectedCard.card, kErrorBound);
 }
 
 
@@ -1194,11 +1194,11 @@ TEST(CEHistogramEstimatorTest, UniformIntStrHistogram) {
                                                  tag,
                                                  value,
                                                  true /* includeScalar */);
-    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
+    ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
     expectedCard = estimateCardinalityRange(*ceHist, false, lowTag, lowVal, true, tag, value, true);
-    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
+    ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
 
     // Value towards the end of the bucket gets the same half bucket estimate.
     std::tie(tag, value) = value::makeNewString("8B5"_sd);
@@ -1206,11 +1206,11 @@ TEST(CEHistogramEstimatorTest, UniformIntStrHistogram) {
     // Query: [{$match: {a: {$lt: '8B5'}}}].
     expectedCard =
         estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, tag, value, true);
-    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
+    ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist, false, lowTag, lowVal, true, tag, value, true);
-    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
+    ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
 }
 
 TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
@@ -1239,16 +1239,16 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
     // Query: [{$match: {a: {$eq: 993}}}].
     EstimationResult expectedCard{
         estimateCardinalityScalarHistogramInteger(hist, 993, EstimationType::kEqual)};
-    ASSERT_CE_APPROX_EQUAL(7.0, expectedCard.card, 0.1);  // Actual: 9.
+    ASSERT_APPROX_EQUAL(7.0, expectedCard.card, 0.1);  // Actual: 9.
 
     // Query: [{$match: {a: {$lt: 993}}}].
     expectedCard = {estimateCardinalityScalarHistogramInteger(hist, 993, EstimationType::kLess)};
-    ASSERT_CE_APPROX_EQUAL(241.4, expectedCard.card, 0.1);  // Actual: 241.
+    ASSERT_APPROX_EQUAL(241.4, expectedCard.card, 0.1);  // Actual: 241.
 
     // Query: [{$match: {a: {$lte: 993}}}].
     expectedCard = {
         estimateCardinalityScalarHistogramInteger(hist, 993, EstimationType::kLessOrEqual)};
-    ASSERT_CE_APPROX_EQUAL(248.4, expectedCard.card, 0.1);  // Actual: 250.
+    ASSERT_APPROX_EQUAL(248.4, expectedCard.card, 0.1);  // Actual: 250.
 
     // Predicates over value inside of the first string bucket.
     auto [tag, value] = value::makeNewString("04e"_sd);
@@ -1256,7 +1256,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
 
     // Query: [{$match: {a: {$eq: '04e'}}}].
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kEqual).card};
-    ASSERT_CE_APPROX_EQUAL(2.2, expectedCard.card, 0.1);  // Actual: 3.
+    ASSERT_APPROX_EQUAL(2.2, expectedCard.card, 0.1);  // Actual: 3.
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 100000000;
@@ -1264,7 +1264,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
     // Type bracketing: low value of different type than the bucket bound.
     // Query: [{$match: {a: {$eq: 100000000}}}].
     expectedCard = estimateCardinalityEq(*ceHist, lowTag, lowVal, true /* includeScalar */);
-    ASSERT_CE_APPROX_EQUAL(0.0, expectedCard.card, 0.1);  // Actual: 0.
+    ASSERT_APPROX_EQUAL(0.0, expectedCard.card, 0.1);  // Actual: 0.
 
     // No interpolation for inequality to values inside the first string bucket, fallback to half of
     // the bucket frequency.
@@ -1278,7 +1278,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
                                             tag,
                                             value,
                                             true /* includeScalar */);
-    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
+    ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
@@ -1289,7 +1289,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
                                             tag,
                                             value,
                                             true /* includeScalar */);
-    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
+    ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
 
     // Value towards the end of the bucket gets the same half bucket estimate.
     std::tie(tag, value) = value::makeNewString("8B5"_sd);
@@ -1303,7 +1303,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
                                             tag,
                                             value,
                                             true /* includeScalar */);
-    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
+    ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
@@ -1314,7 +1314,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
                                             tag,
                                             value,
                                             true /* includeScalar */);
-    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
+    ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
 }
 
 TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
@@ -1366,14 +1366,14 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
     auto expectedCard =
         estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, false);
-    ASSERT_CE_APPROX_EQUAL(27.0, expectedCard.card, 0.1);  // actual 21.
+    ASSERT_APPROX_EQUAL(27.0, expectedCard.card, 0.1);  // actual 21.
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 600}}}].
     // Note: although there are no scalars, the estimate is different than the
     // above since we use different formulas.
     expectedCard =
         estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, true);
-    ASSERT_CE_APPROX_EQUAL(92.0, expectedCard.card, 0.1);  // actual 92.
+    ASSERT_APPROX_EQUAL(92.0, expectedCard.card, 0.1);  // actual 92.
 
     // Query at the end of the domain: more precise estimates from ArrayMin, ArrayMax histograms.
     lowVal = 10;
@@ -1382,12 +1382,12 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 10, $lt: 110}}}}].
     expectedCard =
         estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, false);
-    ASSERT_CE_APPROX_EQUAL(24.1, expectedCard.card, 0.1);  // actual 29.
+    ASSERT_APPROX_EQUAL(24.1, expectedCard.card, 0.1);  // actual 29.
 
     // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
     expectedCard =
         estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, true);
-    ASSERT_CE_APPROX_EQUAL(27.8, expectedCard.card, 0.1);  // actual 31.
+    ASSERT_APPROX_EQUAL(27.8, expectedCard.card, 0.1);  // actual 31.
 }
 
 TEST(CEHistogramEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
@@ -1446,12 +1446,12 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 550}}}].
     auto expectedCard =
         estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, true);
-    ASSERT_CE_APPROX_EQUAL(92.9, expectedCard.card, 0.1);  // Actual: 94.
+    ASSERT_APPROX_EQUAL(92.9, expectedCard.card, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
     expectedCard =
         estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, false);
-    ASSERT_CE_APPROX_EQUAL(11.0, expectedCard.card, 0.1);  // Actual: 8.
+    ASSERT_APPROX_EQUAL(11.0, expectedCard.card, 0.1);  // Actual: 8.
 }
 
 TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
@@ -1479,7 +1479,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
                                                  value::TypeTags::NumberInt32,
                                                  value::bitcastFrom<int64_t>(1),
                                                  true);
-    ASSERT_CE_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
 
     // (NaN, 5).
     expectedCard = estimateCardinalityRange(*ceHist,
@@ -1490,7 +1490,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(5),
                                             true);
-    ASSERT_CE_APPROX_EQUAL(3.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(3.0, expectedCard.card, kErrorBound);
 
     const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
@@ -1506,20 +1506,20 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
                                             tagLowStr,
                                             valLowStr,
                                             true);
-    ASSERT_CE_APPROX_EQUAL(numInts, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(numInts, expectedCard.card, kErrorBound);
 
     // ["", "a"].
     expectedCard =
         estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, true, tag, value, true);
 
-    ASSERT_CE_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
 
     std::tie(tag, value) = value::makeNewString("xyz"_sd);
     // ["", "xyz"].
     expectedCard =
         estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, true, tag, value, true);
 
-    ASSERT_CE_APPROX_EQUAL(numStrs, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(numStrs, expectedCard.card, kErrorBound);
 }
 
 TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
@@ -1573,15 +1573,15 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
 
     std::tie(tag, value) = value::makeNewString("a"_sd);
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kEqual)};
-    ASSERT_CE_APPROX_EQUAL(3.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(3.0, expectedCard.card, kErrorBound);
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kLess)};
-    ASSERT_CE_APPROX_EQUAL(54.5, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(54.5, expectedCard.card, kErrorBound);
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kLessOrEqual)};
-    ASSERT_CE_APPROX_EQUAL(57.5, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(57.5, expectedCard.card, kErrorBound);
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kGreater)};
-    ASSERT_CE_APPROX_EQUAL(42.5, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(42.5, expectedCard.card, kErrorBound);
     expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kGreaterOrEqual)};
-    ASSERT_CE_APPROX_EQUAL(45.5, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(45.5, expectedCard.card, kErrorBound);
 
     // Range estimates, including min/max values per data type.
     const auto [tagLowDbl, valLowDbl] =
@@ -1599,7 +1599,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(25),
                                             true);
-    ASSERT_CE_APPROX_EQUAL(8.49, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(8.49, expectedCard.card, kErrorBound);
 
     // [25, 1000000].
     expectedCard = estimateCardinalityRange(*ceHist,
@@ -1610,12 +1610,12 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
                                             tagHighInt,
                                             valHighInt,
                                             true);
-    ASSERT_CE_APPROX_EQUAL(13.38, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(13.38, expectedCard.card, kErrorBound);
 
     // [NaN, 1000000].
     expectedCard = estimateCardinalityRange(
         *ceHist, true, tagLowDbl, valLowDbl, true, tagHighInt, valHighInt, true);
-    ASSERT_CE_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
 
     const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
@@ -1623,7 +1623,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     // [NaN, "").
     expectedCard = estimateCardinalityRange(
         *ceHist, true, tagLowDbl, valLowDbl, false, tagLowStr, valLowStr, true);
-    ASSERT_CE_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
 
     // [25, "").
     expectedCard = estimateCardinalityRange(*ceHist,
@@ -1634,25 +1634,25 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
                                             tagLowStr,
                                             valLowStr,
                                             true);
-    ASSERT_CE_APPROX_EQUAL(13.39, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(13.39, expectedCard.card, kErrorBound);
 
     // ["", "a"].
     expectedCard =
         estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, true, tag, value, true);
 
-    ASSERT_CE_APPROX_EQUAL(37.49, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(37.49, expectedCard.card, kErrorBound);
 
     // ["", {}).
     auto [tagObj, valObj] = value::makeNewObject();
     value::ValueGuard vgObj(tagObj, valObj);
     expectedCard =
         estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, false, tagObj, valObj, true);
-    ASSERT_CE_APPROX_EQUAL(80.0, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(80.0, expectedCard.card, kErrorBound);
 
     // ["a", {}).
     expectedCard = estimateCardinalityRange(*ceHist, true, tag, value, false, tagObj, valObj, true);
 
-    ASSERT_CE_APPROX_EQUAL(45.5, expectedCard.card, kErrorBound);
+    ASSERT_APPROX_EQUAL(45.5, expectedCard.card, kErrorBound);
 }
 
 TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
@@ -1725,7 +1725,7 @@ TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.high),
                                                 true);
-        ASSERT_CE_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
+        ASSERT_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
         estCard = estimateCardinalityRange(*ceHist,
@@ -1736,7 +1736,7 @@ TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.high),
                                            false);
-        ASSERT_CE_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
+        ASSERT_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
 
         LOGV2(9163800,
               "RMSE for $match query",
@@ -1818,7 +1818,7 @@ TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.high),
                                                 true);
-        ASSERT_CE_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
+        ASSERT_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
         estCard = estimateCardinalityRange(*ceHist,
@@ -1829,7 +1829,7 @@ TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.high),
                                            false);
-        ASSERT_CE_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
+        ASSERT_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
 
         LOGV2(9163802,
               "RMSE for $match query",

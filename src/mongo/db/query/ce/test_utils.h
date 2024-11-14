@@ -45,10 +45,6 @@ constexpr bool kCETestLogOnly = false;
 
 const double kMaxCEError = 0.01;
 
-#define ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError) \
-    ASSERT_APPROX_EQUAL(                                             \
-        static_cast<double>(estimatedCE), static_cast<double>(expectedCE), kMaxCEError)
-
 template <class T1, class T2>
 constexpr double absCEDiff(const T1 v1, const T2 v2) {
     return std::abs(static_cast<double>(v1) - static_cast<double>(v2));
@@ -66,7 +62,7 @@ constexpr double absCEDiff(const T1 v1, const T2 v2) {
         }                                                               \
         ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError);                     \
     } else {                                                            \
-        ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError);   \
+        ASSERT_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError);      \
     }
 #define _PREDICATE(field, predicate) (str::stream() << "{" << field << ": " << predicate "}")
 #define _ELEMMATCH_PREDICATE(field, predicate) \

@@ -824,7 +824,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                                                       valHigh,
                                                       true /*includeScalar*/)
                                  .card;
-        ASSERT_CE_APPROX_EQUAL(6.244, estimatedCard, 0.001);
+        ASSERT_APPROX_EQUAL(6.244, estimatedCard, 0.001);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist, interval));
     }
@@ -935,7 +935,7 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
                                                       valHigh,
                                                       true /* includeScalar */)
                                  .card;
-        ASSERT_CE_APPROX_EQUAL(13.3, estimatedCard, 0.1);  // Actual: 0.
+        ASSERT_APPROX_EQUAL(13.3, estimatedCard, 0.1);  // Actual: 0.
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist, interval));
     }
@@ -999,7 +999,7 @@ TEST(HistogramPredicateEstimationTest, IntArrayOnlyIntervalEstimate) {
                                                       valHigh,
                                                       false /*includeScalar*/)
                                  .card;
-        ASSERT_CE_APPROX_EQUAL(27.0, estimatedCard, 0.1);  // actual 21.
+        ASSERT_APPROX_EQUAL(27.0, estimatedCard, 0.1);  // actual 21.
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist, interval, false /*includeScalar*/));
     }
