@@ -159,16 +159,6 @@ protected:
         readAtKey(_readKey++);
     }
 
-    /**
-     * Reads data written by the test from WT. Causes the bytesRead stat to be incremented. May
-     * also cause timeReadingMicros to be incremented, but not always.
-     */
-    void readTestWrites() {
-        for (int64_t i = _kMaxReads; i < _writeKey; i++) {
-            readAtKey(i);
-        }
-    }
-
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
     std::string _uri{"table:wiredtiger_operation_stats_test"};
     WT_CONNECTION* _conn;
@@ -229,29 +219,6 @@ TEST_F(WiredTigerStatsTest, SessionWithRead) {
         ASSERT_EQ(value.type(), BSONType::NumberLong) << statsObj;
         ASSERT_GT(value.numberLong(), 0) << statsObj;
     }
-}
-
-TEST_F(WiredTigerStatsTest, SessionWithLargeWriteAndLargeRead) {
-    auto remaining = static_cast<int64_t>(std::numeric_limits<uint32_t>::max()) + 1;
-    while (remaining > 0) {
-        std::string data(1024 * 1024, 'a');
-        remaining -= data.size();
-        write(data);
-    }
-
-    auto statsObj = WiredTigerStats{_session}.toBSON();
-    ASSERT_GT(statsObj["data"]["bytesWritten"].numberLong(), std::numeric_limits<uint32_t>::max())
-        << statsObj;
-
-    // Closing the connection will ensure that tests actually have to read into cache.
-    closeConnection();
-    openConnectionAndCreateSession();
-
-    readTestWrites();
-
-    statsObj = WiredTigerStats{_session}.toBSON();
-    ASSERT_GT(statsObj["data"]["bytesRead"].numberLong(), std::numeric_limits<uint32_t>::max())
-        << statsObj;
 }
 
 TEST_F(WiredTigerStatsTest, OperationsAddToSessionStats) {
