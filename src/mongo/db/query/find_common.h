@@ -146,8 +146,10 @@ public:
                                                      const size_t numAppended) {
             objSize = obj.objsize();
 
-            if (MONGO_unlikely(!(_alwaysAcceptFirstDoc && numAppended == 0) &&
-                               !FindCommon::fitsInBatch(_builder->bytesUsed(), objSize))) {
+            if (MONGO_unlikely(
+                    !(_alwaysAcceptFirstDoc && numAppended == 0) &&
+                    !FindCommon::fitsInBatch(_builder->bytesUsed(),
+                                             objSize + nextPostBatchResumeToken.objsize()))) {
                 // We failed to append to batch; we should stash & early out. We don't want to
                 // update the resume token here.
                 _failedToAppend = true;

@@ -753,6 +753,8 @@ last-continuous:
     ticket: SERVER-93112
   - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js
     ticket: SERVER-94151
+  - test_file: jstests/change_streams/report_post_batch_resume_token.js
+    ticket: SERVER-92904
   - test_file: jstests/core/ddl/create_indexes.js
     ticket: SERVER-90952
   - test_file: jstests/sharding/refresh_sessions.js
@@ -1586,6 +1588,8 @@ last-lts:
     ticket: SERVER-93112
   - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js
     ticket: SERVER-94151
+  - test_file: jstests/change_streams/report_post_batch_resume_token.js
+    ticket: SERVER-92904
   - test_file: jstests/core/ddl/create_indexes.js
     ticket: SERVER-90952
   - test_file: jstests/sharding/refresh_sessions.js
