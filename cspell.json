@@ -1,0 +1,22 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "words": [
+        "absl",
+        "bson",
+        "bsonobj",
+        "bufbuilder",
+        "fromjson",
+        "logv",
+        "oplog",
+        "semifuture",
+        "stdx",
+        "subarray",
+        "subobj",
+        "subobject",
+        "tailable"
+    ],
+    "ignoreRegExpList": [
+        "\\w*assert(ed)?"
+    ]
+}

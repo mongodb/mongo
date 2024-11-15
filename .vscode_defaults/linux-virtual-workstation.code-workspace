@@ -81,7 +81,9 @@
 			"charliermarsh.ruff",
 			"ms-python.pylint",
 			"ms-python.mypy-type-checker",
-			"esbenp.prettier-vscode"
+			"esbenp.prettier-vscode",
+			"redhat.vscode-yaml",
+			"streetsidesoftware.code-spell-checker",
 		]
 	}
 }
