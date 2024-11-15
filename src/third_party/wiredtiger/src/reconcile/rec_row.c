@@ -157,7 +157,7 @@ __rec_cell_build_leaf_key(
             WT_STAT_CONN_DSRC_INCR(session, rec_overflow_key_leaf);
 
             *is_ovflp = true;
-            return (__wt_rec_cell_build_ovfl(session, r, key, WT_CELL_KEY_OVFL, NULL, 0));
+            return (__wti_rec_cell_build_ovfl(session, r, key, WT_CELL_KEY_OVFL, NULL, 0));
         }
         return (__rec_cell_build_leaf_key(session, r, NULL, 0, is_ovflp));
     }
@@ -194,7 +194,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     if (cursor->value.size == 0)
         val->len = 0;
     else
-        WT_RET(__wt_rec_cell_build_val(session, r, cursor->value.data, /* Build value cell */
+        WT_RET(__wti_rec_cell_build_val(session, r, cursor->value.data, /* Build value cell */
           cursor->value.size, &tw, 0));
 
     /* Boundary: split or write the page. */
@@ -213,14 +213,14 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     }
 
     /* Copy the key/value pair onto the page. */
-    __wt_rec_image_copy(session, r, key);
+    __wti_rec_image_copy(session, r, key);
     if (val->len == 0)
         r->any_empty_value = true;
     else {
         r->all_empty_value = false;
         if (btree->dictionary)
-            WT_RET(__wt_rec_dict_replace(session, r, &tw, 0, val));
-        __wt_rec_image_copy(session, r, val);
+            WT_RET(__wti_rec_dict_replace(session, r, &tw, 0, val));
+        __wti_rec_image_copy(session, r, val);
     }
     WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
@@ -256,15 +256,15 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         r->cell_zero = false;
 
         addr = &multi->addr;
-        __wt_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, NULL);
+        __wti_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, NULL);
 
         /* Boundary: split or write the page. */
-        if (__wt_rec_need_split(r, key->len + val->len))
+        if (__wti_rec_need_split(r, key->len + val->len))
             WT_RET(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
 
         /* Copy the key and value onto the page. */
-        __wt_rec_image_copy(session, r, key);
-        __wt_rec_image_copy(session, r, val);
+        __wti_rec_image_copy(session, r, key);
+        __wti_rec_image_copy(session, r, val);
         WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
 
         /* Update compression state. */
@@ -399,13 +399,13 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         page_del = NULL;
         if (__wt_off_page(page, addr)) {
             page_del = cms.state == WT_CHILD_PROXY ? &cms.del : NULL;
-            __wt_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, page_del);
+            __wti_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, page_del);
             source_ta = &addr->ta;
         } else if (cms.state == WT_CHILD_PROXY) {
             /* Proxy cells require additional information in the address cell. */
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
             page_del = &cms.del;
-            __wt_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);
+            __wti_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);
             source_ta = &vpack->ta;
         } else {
             /*
@@ -421,7 +421,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
               "Proxy cell is selected with original child image");
 
             if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
-                __wt_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);
+                __wti_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);
             } else {
                 val->buf.data = ref->addr;
                 val->buf.size = __wt_cell_total_len(vpack);
@@ -448,12 +448,12 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         r->cell_zero = false;
 
         /* Boundary: split or write the page. */
-        if (__wt_rec_need_split(r, key->len + val->len))
+        if (__wti_rec_need_split(r, key->len + val->len))
             WT_ERR(__wti_rec_split_crossing_bnd(session, r, key->len + val->len));
 
         /* Copy the key and value onto the page. */
-        __wt_rec_image_copy(session, r, key);
-        __wt_rec_image_copy(session, r, val);
+        __wti_rec_image_copy(session, r, key);
+        __wti_rec_image_copy(session, r, val);
         if (page_del != NULL)
             WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
         WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
@@ -529,7 +529,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
              * additional size is odd, but split takes into account saved updates in a special way
              * for this case already.
              */
-            if (!upd_select.upd_saved || !__wt_rec_need_split(r, 0))
+            if (!upd_select.upd_saved || !__wti_rec_need_split(r, 0))
                 continue;
 
             WT_ERR(__wt_buf_set(session, r->cur, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
@@ -565,7 +565,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
             WT_ERR(__wt_modify_reconstruct_from_upd_list(
               session, cbt, upd, cbt->upd_value, WT_OPCTX_RECONCILATION));
             __wt_value_return(cbt, cbt->upd_value);
-            WT_ERR(__wt_rec_cell_build_val(
+            WT_ERR(__wti_rec_cell_build_val(
               session, r, cbt->iface.value.data, cbt->iface.value.size, &tw, 0));
             break;
         case WT_UPDATE_STANDARD:
@@ -573,7 +573,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 val->len = 0;
             else
                 /* Take the value from the update. */
-                WT_ERR(__wt_rec_cell_build_val(session, r, upd->data, upd->size, &tw, 0));
+                WT_ERR(__wti_rec_cell_build_val(session, r, upd->data, upd->size, &tw, 0));
             break;
         case WT_UPDATE_TOMBSTONE:
             break;
@@ -600,7 +600,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
           session, r, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &ovfl_key));
 
         /* Boundary: split or write the page. */
-        if (__wt_rec_need_split(r, key->len + val->len)) {
+        if (__wti_rec_need_split(r, key->len + val->len)) {
             /*
              * Turn off prefix compression until a full key written to the new page, and (unless
              * already working with an overflow key), rebuild the key without compression.
@@ -616,14 +616,14 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
         }
 
         /* Copy the key/value pair onto the page. */
-        __wt_rec_image_copy(session, r, key);
+        __wti_rec_image_copy(session, r, key);
         if (val->len == 0 && __rec_row_zero_len(session, &tw))
             r->any_empty_value = true;
         else {
             r->all_empty_value = false;
             if (btree->dictionary)
-                WT_ERR(__wt_rec_dict_replace(session, r, &tw, 0, val));
-            __wt_rec_image_copy(session, r, val);
+                WT_ERR(__wti_rec_dict_replace(session, r, &tw, 0, val));
+            __wti_rec_image_copy(session, r, val);
         }
         WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
@@ -653,7 +653,7 @@ __rec_cell_repack(
 
     p = vpack->data;
     size = vpack->size;
-    WT_ERR(__wt_rec_cell_build_val(session, r, p, size, tw, 0));
+    WT_ERR(__wti_rec_cell_build_val(session, r, p, size, tw, 0));
 
 err:
     __wt_scr_free(session, &tmpval);
@@ -777,7 +777,7 @@ __wti_rec_row_leaf(
         /* Build value cell. */
         if (upd == NULL) {
             /* Clear the on-disk cell time window if it is obsolete. */
-            __wt_rec_time_window_clear_obsolete(session, NULL, vpack, r);
+            __wti_rec_time_window_clear_obsolete(session, NULL, vpack, r);
 
             /*
              * When the page was read into memory, there may not have been a value item.
@@ -844,13 +844,13 @@ __wti_rec_row_leaf(
                 WT_ERR(__wt_modify_reconstruct_from_upd_list(
                   session, cbt, upd, cbt->upd_value, WT_OPCTX_RECONCILATION));
                 __wt_value_return(cbt, cbt->upd_value);
-                WT_ERR(__wt_rec_cell_build_val(
+                WT_ERR(__wti_rec_cell_build_val(
                   session, r, cbt->iface.value.data, cbt->iface.value.size, twp, 0));
                 dictionary = true;
                 break;
             case WT_UPDATE_STANDARD:
                 /* Take the value from the update. */
-                WT_ERR(__wt_rec_cell_build_val(session, r, upd->data, upd->size, twp, 0));
+                WT_ERR(__wti_rec_cell_build_val(session, r, upd->data, upd->size, twp, 0));
                 dictionary = true;
                 break;
             case WT_UPDATE_TOMBSTONE:
@@ -960,7 +960,7 @@ slow:
         }
 
         /* Boundary: split or write the page. */
-        if (__wt_rec_need_split(r, key->len + val->len)) {
+        if (__wti_rec_need_split(r, key->len + val->len)) {
             /*
              * If we copied address blocks from the page rather than building the actual key, we
              * have to build the key now because we are about to promote it.
@@ -985,14 +985,14 @@ slow:
         }
 
         /* Copy the key/value pair onto the page. */
-        __wt_rec_image_copy(session, r, key);
+        __wti_rec_image_copy(session, r, key);
         if (val->len == 0 && __rec_row_zero_len(session, twp))
             r->any_empty_value = true;
         else {
             r->all_empty_value = false;
             if (dictionary && btree->dictionary)
-                WT_ERR(__wt_rec_dict_replace(session, r, twp, 0, val));
-            __wt_rec_image_copy(session, r, val);
+                WT_ERR(__wti_rec_dict_replace(session, r, twp, 0, val));
+            __wti_rec_image_copy(session, r, val);
         }
         WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, twp);
 

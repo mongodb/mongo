@@ -1479,7 +1479,7 @@ __wti_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
      * contain the current item if we don't have enough items to split an internal page.
      */
     inuse = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
-    if (inuse < r->split_size / 2 && !__wt_rec_need_split(r, 0)) {
+    if (inuse < r->split_size / 2 && !__wti_rec_need_split(r, 0)) {
         WT_ASSERT(session, r->page->type != WT_PAGE_COL_FIX);
         goto done;
     }
@@ -1593,7 +1593,7 @@ __wti_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t n
      * the next record is large enough, just split at this point.
      */
     if (WT_CROSSING_MIN_BND(r, next_len) && !WT_CROSSING_SPLIT_BND(r, next_len) &&
-      !__wt_rec_need_split(r, 0)) {
+      !__wti_rec_need_split(r, 0)) {
         /*
          * If the first record doesn't fit into the minimum split size, we end up here. Write the
          * record without setting a boundary here. We will get the opportunity to setup a boundary
@@ -2268,7 +2268,7 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     switch (btree->type) {
     case BTREE_COL_FIX:
         if (cbulk->entry != 0) {
-            __wt_rec_incr(
+            __wti_rec_incr(
               session, r, cbulk->entry, __bitstr_size((size_t)cbulk->entry * btree->bitcnt));
             __bit_clear_end(
               WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), cbulk->entry, btree->bitcnt);
@@ -2717,11 +2717,11 @@ err:
 }
 
 /*
- * __wt_rec_cell_build_ovfl --
+ * __wti_rec_cell_build_ovfl --
  *     Store overflow items in the file, returning the address cookie.
  */
 int
-__wt_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv, uint8_t type,
+__wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv, uint8_t type,
   WT_TIME_WINDOW *tw, uint64_t rle)
 {
     WT_BM *bm;

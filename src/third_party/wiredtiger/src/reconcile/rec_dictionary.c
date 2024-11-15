@@ -142,11 +142,11 @@ __wti_rec_dictionary_reset(WT_RECONCILE *r)
 }
 
 /*
- * __wt_rec_dictionary_lookup --
+ * __wti_rec_dictionary_lookup --
  *     Check the dictionary for a matching value on this page.
  */
 int
-__wt_rec_dictionary_lookup(
+__wti_rec_dictionary_lookup(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *val, WT_REC_DICTIONARY **dpp)
 {
     WT_REC_DICTIONARY *dp, *next;
