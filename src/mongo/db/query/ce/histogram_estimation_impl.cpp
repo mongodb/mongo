@@ -185,7 +185,7 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
 
     // If the value is minimal for its type, and the operation is $lt or $lte return cardinality up
     // to the previous bucket.
-    auto&& [min, inclusive] = stats::getMinBound(tag);
+    auto&& [min, inclusive] = stats::getMinMaxBoundForSBEType(tag, true /*isMin*/);
     if (compareValues(min.getTag(), min.getValue(), tag, val) == 0) {
         return {resultCard, resultNDV};
     }
