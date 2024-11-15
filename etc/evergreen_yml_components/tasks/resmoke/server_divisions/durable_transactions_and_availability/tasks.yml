@@ -1695,6 +1695,39 @@ tasks:
   #           Storage Execution tasks            #
   ################################################
 
+  - <<: *benchmark_template
+    name: benchmarks_sorter
+    tags:
+      ["assigned_to_jira_team_server_execution", "experimental", "benchmarks"]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_sorter
+          resmoke_jobs_max: 1
+
+  - <<: *benchmark_template
+    name: benchmarks_storage
+    tags:
+      ["assigned_to_jira_team_server_execution", "experimental", "benchmarks"]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_storage
+          resmoke_jobs_max: 1
+
+  - <<: *benchmark_template
+    name: benchmarks_util
+    tags:
+      ["assigned_to_jira_team_server_execution", "experimental", "benchmarks"]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_util
+          resmoke_jobs_max: 1
+
   - <<: *gen_task_template
     name: clustered_collection_passthrough_gen
     tags:

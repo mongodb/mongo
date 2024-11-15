@@ -13,7 +13,6 @@ selector:
     # Exclude everything from benchmarks_first_half.yml:
     - build/install/bin/first_half_bm*
     - build/install/bin/path_lower_bm*
-    - build/install/bin/storage_wiredtiger_begin_transaction_block_bm*
     - build/install/bin/abt_lower_bm*
     - build/install/bin/string_bm*
     - build/install/bin/stacktrace_bm*
@@ -45,6 +44,14 @@ selector:
     - build/install/bin/immutable_std_comparison_bm*
     # These benchmarks are being run as part of the benchmarks_replication.yml test suite.
     - build/install/bin/repl_bm*
+    # These benchmarks are being run as part of the benchmarks_storage.yml test suite.
+    - build/install/bin/storage_key_string_bm*
+    - build/install/bin/write_conflict_retry_bm*
+    - build/install/bin/wt_storage_bm*
+    # These benchmarks are being run as part of the benchmarks_util.yml test suite.
+    - build/install/bin/tracking_allocator_bm*
+    # These benchmarks are being run as part of the benchmarks_sorter.yml test suite.
+    - build/install/bin/sorter_checksum_calculator_bm*
 
 executor:
   config: {}
