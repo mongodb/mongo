@@ -16,7 +16,8 @@ const shardConn = st.rs0.getPrimary();
 const shardAdminDB = shardConn.getDB("admin");
 
 // Set up connections, userTestDB will be the connection performing the direct reads and writes.
-shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
+// Give the admin user __system privileges to allow running _flushRoutingTableCacheUpdates.
+shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root", "__system"]});
 assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
 shardAdminDB.getSiblingDB(dbName).createUser({user: "user", pwd: "y", roles: ["readWrite"]});
 
@@ -51,6 +52,10 @@ function runInsertViaDirectConnection(hostName, dbName, collName) {
 
 // Create the collection initially.
 assert.commandWorked(mongosAdminUser.getSiblingDB(dbName).runCommand({create: collName}));
+
+// Trigger a refresh to ensure the filtering information is known
+assert.commandWorked(
+    shardAdminDB.runCommand({_flushRoutingTableCacheUpdates: dbName + '.' + collName}));
 
 // Begin the insertion thread via a direct connection.
 const insertThread = new Thread(runInsertViaDirectConnection, st.shard0.host, dbName, collName);
