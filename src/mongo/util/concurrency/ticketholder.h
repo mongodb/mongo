@@ -31,6 +31,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
+#include <limits>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
@@ -73,7 +74,8 @@ public:
     TicketHolder(ServiceContext* serviceContext,
                  int numTickets,
                  bool trackPeakUsed,
-                 ResizePolicy resizePolicy = ResizePolicy::kGradual);
+                 ResizePolicy resizePolicy = ResizePolicy::kGradual,
+                 int32_t maxQueueDepth = std::numeric_limits<int32_t>::max());
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
@@ -144,6 +146,11 @@ public:
      * Invariants that 'trackPeakUsed' has been passed to the TicketHolder,
      */
     int32_t getAndResetPeakUsed();
+
+    /**
+     * Exposes the amount of waiting threads for testing purpose.
+     */
+    int32_t waiting_forTest() const;
 
     /**
      * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
@@ -235,6 +242,7 @@ private:
     Atomic<int32_t> _waiterCount{0};
     AtomicWord<int32_t> _outof;
     AtomicWord<int32_t> _peakUsed;
+    int32_t _maxQueueDepth;
 };
 
 /**
