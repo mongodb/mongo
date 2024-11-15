@@ -1170,6 +1170,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/query_stats/**/* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/query/query_stats/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/querytester/OWNERS.yml
+/src/mongo/db/query/querytester/**/* @10gen/query-optimization @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/search/OWNERS.yml
 /src/mongo/db/query/search/**/* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/query/search/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
