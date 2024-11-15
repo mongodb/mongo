@@ -265,9 +265,6 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
 /** If true, safe to call next().  Requests more from server if necessary. */
 bool DBClientCursor::more() {
     tassert(9279711, "Cursor is not initialized", _isInitialized);
-    if (!_putBack.empty())
-        return true;
-
     if (_batch.pos < _batch.objs.size())
         return true;
 
@@ -280,12 +277,6 @@ bool DBClientCursor::more() {
 
 BSONObj DBClientCursor::next() {
     tassert(9279712, "Cursor is not initialized", _isInitialized);
-    if (!_putBack.empty()) {
-        BSONObj ret = _putBack.top();
-        _putBack.pop();
-        return ret;
-    }
-
     uassert(
         13422, "DBClientCursor next() called but more() is false", _batch.pos < _batch.objs.size());
 
@@ -304,7 +295,7 @@ BSONObj DBClientCursor::nextSafe() {
     return o;
 }
 
-void DBClientCursor::peek(vector<BSONObj>& v, int atMost) {
+void DBClientCursor::peek(std::vector<BSONObj>& v, int atMost) const {
     tassert(9279713, "Cursor is not initialized", _isInitialized);
     auto end = atMost >= static_cast<int>(_batch.objs.size() - _batch.pos)
         ? _batch.objs.end()
@@ -312,32 +303,27 @@ void DBClientCursor::peek(vector<BSONObj>& v, int atMost) {
     v.insert(v.end(), _batch.objs.begin() + _batch.pos, end);
 }
 
-BSONObj DBClientCursor::peekFirst() {
-    vector<BSONObj> v;
-    peek(v, 1);
-
-    if (v.size() > 0)
-        return v[0];
-    else
-        return BSONObj();
+BSONObj DBClientCursor::peekFirst() const {
+    if (_batch.pos < _batch.objs.size()) {
+        return _batch.objs[_batch.pos];
+    }
+    return BSONObj();
 }
 
-bool DBClientCursor::peekError(BSONObj* error) {
+bool DBClientCursor::peekError(BSONObj* error) const {
     tassert(9279714, "Cursor is not initialized", _isInitialized);
     if (!_wasError)
         return false;
 
-    vector<BSONObj> v;
-    peek(v, 1);
+    BSONObj peeked = peekFirst();
 
-    MONGO_verify(v.size() == 1);
     // We check both the legacy error format, and the new error format. hasErrField checks for
     // $err, and getStatusFromCommandResult checks for modern errors of the form '{ok: 0.0, code:
     // <...>, errmsg: ...}'.
-    MONGO_verify(hasErrField(v[0]) || !getStatusFromCommandResult(v[0]).isOK());
+    MONGO_verify(hasErrField(peeked) || !getStatusFromCommandResult(peeked).isOK());
 
     if (error)
-        *error = v[0].getOwned();
+        *error = peeked.getOwned();
     return true;
 }
 

@@ -114,7 +114,7 @@ public:
      */
     int objsLeftInBatch() const {
         tassert(9279701, "Cursor is not initialized", _isInitialized);
-        return _putBack.size() + _batch.objs.size() - _batch.pos;
+        return _batch.objs.size() - _batch.pos;
     }
 
     bool moreInCurrentBatch() {
@@ -132,14 +132,6 @@ public:
     virtual BSONObj next();
 
     /**
-     * Restores an object previously returned by next() to the cursor.
-     */
-    void putBack(const BSONObj& o) {
-        tassert(9279702, "Cursor is not initialized", _isInitialized);
-        _putBack.push(o.getOwned());
-    }
-
-    /**
      * Similar to 'next()', but throws an AssertionException on error.
      */
     BSONObj nextSafe();
@@ -147,20 +139,18 @@ public:
     /**
      * Peek ahead at items buffered for future next() calls. Never requests new data from the
      * server.
-     *
-     * WARNING: no support for _putBack yet!
      */
-    void peek(std::vector<BSONObj>&, int atMost);
+    void peek(std::vector<BSONObj>&, int atMost) const;
 
     /**
      * Peeks at first element. If no first element exists, returns an empty object.
      */
-    BSONObj peekFirst();
+    BSONObj peekFirst() const;
 
     /**
      * peek ahead and see if an error occurred, and get the error if so.
      */
-    bool peekError(BSONObj* error = nullptr);
+    bool peekError(BSONObj* error = nullptr) const;
 
     /**
      * Iterates the rest of the cursor and returns the resulting number if items.
@@ -329,7 +319,6 @@ private:
 
     long long _cursorId = 0;
 
-    std::stack<BSONObj> _putBack;
     std::string _scopedHost;
     bool _wasError = false;
     bool _connectionHasPendingReplies = false;
