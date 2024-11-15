@@ -453,7 +453,8 @@ bool isCompressedBucket(const BSONObj& bucketDoc) {
             "Time-series bucket documents must have 'control' object present",
             controlField && controlField.type() == BSONType::Object);
 
-    auto&& versionField = controlField.Obj()[timeseries::kBucketControlVersionFieldName];
+    auto&& controlFieldObj = controlField.Obj();
+    auto&& versionField = controlFieldObj[timeseries::kBucketControlVersionFieldName];
     uassert(6540601,
             "Time-series bucket documents must have 'control.version' field present",
             versionField && isNumericBSONType(versionField.type()));

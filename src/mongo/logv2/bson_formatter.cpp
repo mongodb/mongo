@@ -134,7 +134,7 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
     using boost::log::extract;
 
     // Build a JSON object for the user attributes.
-    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
+    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec);
 
     builder.append(constants::kTimestampFieldName,
                    extract<Date_t>(attributes::timeStamp(), rec).get());
@@ -155,9 +155,9 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
     builder.append(constants::kMessageFieldName,
                    extract<StringData>(attributes::message(), rec).get());
 
-    if (!attrs.empty()) {
+    if (!attrs.get().empty()) {
         BSONValueExtractor extractor(builder);
-        attrs.apply(extractor);
+        attrs.get().apply(extractor);
     }
     LogTag tags = extract<LogTag>(attributes::tags(), rec).get();
     if (tags != LogTag::kNone) {

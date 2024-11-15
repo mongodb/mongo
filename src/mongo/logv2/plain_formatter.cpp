@@ -161,10 +161,10 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     using boost::log::extract;
 
     StringData message = extract<StringData>(attributes::message(), rec).get();
-    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
+    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec);
 
     // Log messages logged via logd are already formatted and have the id == 0
-    if (attrs.empty()) {
+    if (attrs.get().empty()) {
         if (extract<int32_t>(attributes::id(), rec).get() == 0) {
             buffer.append(message.data(), message.data() + message.size());
             return;
@@ -172,8 +172,8 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     }
 
     TextValueExtractor extractor;
-    extractor.reserve(attrs.size());
-    attrs.apply(extractor);
+    extractor.reserve(attrs.get().size());
+    attrs.get().apply(extractor);
     fmt::vformat_to(buffer, std::string_view{message}, extractor.args());
 
     size_t attributeMaxSize = buffer.size();

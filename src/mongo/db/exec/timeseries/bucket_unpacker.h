@@ -114,7 +114,8 @@ public:
                 "The $_internalUnpackBucket stage requires 'control' object to be present",
                 controlField && controlField.type() == BSONType::Object);
 
-        auto&& versionField = controlField.Obj()[kBucketControlVersionFieldName];
+        auto&& controlFieldObj = controlField.Obj();
+        auto&& versionField = controlFieldObj[kBucketControlVersionFieldName];
         uassert(5857905,
                 "The $_internalUnpackBucket stage requires 'control.version' field to be present",
                 versionField && isNumericBSONType(versionField.type()));
@@ -123,7 +124,8 @@ public:
         if (!dataField || dataField.type() != BSONType::Object)
             return 0;
 
-        auto&& time = dataField.Obj()[timeField];
+        auto&& dataFieldObj = dataField.Obj();
+        auto&& time = dataFieldObj[timeField];
         if (!time) {
             return 0;
         }

@@ -536,16 +536,18 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
             "The $_internalUnpackBucket stage requires 'control' object to be present",
             controlField && controlField.type() == BSONType::Object);
 
-    auto&& controlClosed = controlField.Obj()[kBucketControlClosedFieldName];
+    auto&& controlFieldObj = controlField.Obj();
+    auto&& controlClosed = controlFieldObj[kBucketControlClosedFieldName];
     _closedBucket = controlClosed.booleanSafe();
 
     if (_includeMinTimeAsMetadata) {
-        auto&& controlMin = controlField.Obj()[kBucketControlMinFieldName];
+        auto&& controlMin = controlFieldObj[kBucketControlMinFieldName];
         uassert(6460203,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMinFieldNamePrefix << "' object to be present",
                 controlMin && controlMin.type() == BSONType::Object);
-        auto&& minTime = controlMin.Obj()[_spec.timeField()];
+        auto&& controlMinObj = controlMin.Obj();
+        auto&& minTime = controlMinObj[_spec.timeField()];
         uassert(6460204,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMinFieldNamePrefix << "." << _spec.timeField()
@@ -555,12 +557,13 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
     }
 
     if (_includeMaxTimeAsMetadata) {
-        auto&& controlMax = controlField.Obj()[kBucketControlMaxFieldName];
+        auto&& controlMax = controlFieldObj[kBucketControlMaxFieldName];
         uassert(6460205,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMaxFieldNamePrefix << "' object to be present",
                 controlMax && controlMax.type() == BSONType::Object);
-        auto&& maxTime = controlMax.Obj()[_spec.timeField()];
+        auto&& controlMaxObj = controlMax.Obj();
+        auto&& maxTime = controlMaxObj[_spec.timeField()];
         uassert(6460206,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMaxFieldNamePrefix << "." << _spec.timeField()
@@ -569,7 +572,7 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
         _maxTime = maxTime.date();
     }
 
-    auto&& versionField = controlField.Obj()[kBucketControlVersionFieldName];
+    auto&& versionField = controlFieldObj[kBucketControlVersionFieldName];
     uassert(5857903,
             "The $_internalUnpackBucket stage requires 'control.version' field to be present",
             versionField && isNumericBSONType(versionField.type()));
