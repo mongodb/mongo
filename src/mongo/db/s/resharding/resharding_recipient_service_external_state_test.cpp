@@ -92,7 +92,8 @@ protected:
               MongoDScopedGlobalServiceContextForTest::Options{}
                   .setCreateShardingState(false)
                   .useMockClock(true)
-                  .useMockTickSource(true))) {}
+                  .useMockTickSource(true),
+              shouldSetupTL)) {}
 
     void setUp() override {
         ShardCatalogCacheTestFixture::setUp();

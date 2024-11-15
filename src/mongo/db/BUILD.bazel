@@ -3235,6 +3235,7 @@ mongo_cc_library(
         # private libdep of mongod_initializers.
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db/auth:user_cache_invalidator",
+        "//src/mongo/db/query/search:search_task_executors",
         "//src/mongo/idl:cluster_server_parameter",
         "//src/mongo/idl:cluster_server_parameter_initializer",
         "//src/mongo/idl:cluster_server_parameter_op_observer",

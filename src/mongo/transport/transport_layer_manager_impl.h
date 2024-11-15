@@ -83,7 +83,7 @@ public:
         boost::optional<int> routerPort = {},
         std::shared_ptr<ClientTransportObserver> observer = nullptr);
 
-    static std::unique_ptr<TransportLayerManager> makeAndStartDefaultEgressTransportLayer();
+    static std::unique_ptr<TransportLayerManager> makeDefaultEgressTransportLayer();
 
     TransportLayer* getEgressLayer() override {
         return _egressLayer;

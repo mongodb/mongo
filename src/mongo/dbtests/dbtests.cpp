@@ -249,8 +249,10 @@ int dbtestsMain(int argc, char** argv) {
         ServiceContext::make(std::move(fastClock), std::move(preciseClock), std::move(tickSource));
     serviceUniq->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
-    serviceUniq->setTransportLayerManager(
-        transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer());
+    auto tl = transport::TransportLayerManagerImpl::makeDefaultEgressTransportLayer();
+    uassertStatusOK(tl->setup());
+    uassertStatusOK(tl->start());
+    serviceUniq->setTransportLayerManager(std::move(tl));
 
     setGlobalServiceContext(std::move(serviceUniq));
 

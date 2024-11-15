@@ -76,7 +76,7 @@ namespace {
 // by the instantiate method below will be greater than expected.
 TEST_F(FaultManagerTest, Registration) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return Severity::kOk; });
-    auto allObservers = HealthObserverRegistration::instantiateAllObservers(svcCtx());
+    auto allObservers = HealthObserverRegistration::instantiateAllObservers(getServiceContext());
     ASSERT_EQ(1, allObservers.size());
     ASSERT_EQ(FaultFacetType::kMock1, allObservers[0]->getType());
 }

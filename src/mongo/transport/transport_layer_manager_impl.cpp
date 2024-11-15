@@ -125,16 +125,13 @@ void TransportLayerManagerImpl::appendStatsForFTDC(BSONObjBuilder& bob) const {
 }
 
 std::unique_ptr<TransportLayerManager>
-TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer() {
+TransportLayerManagerImpl::makeDefaultEgressTransportLayer() {
     transport::AsioTransportLayer::Options opts(&serverGlobalParams);
     opts.mode = transport::AsioTransportLayer::Options::kEgress;
     opts.ipList.clear();
 
-    std::unique_ptr<TransportLayerManager> ret = std::make_unique<TransportLayerManagerImpl>(
+    return std::make_unique<TransportLayerManagerImpl>(
         std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
-    uassertStatusOK(ret->setup());
-    uassertStatusOK(ret->start());
-    return ret;
 }
 
 std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConfig(
@@ -225,6 +222,8 @@ void TransportLayerManagerImpl::checkMaxOpenSessionsAtStartup() const {
     // Check if vm.max_map_count is high enough, as per SERVER-51233
     std::size_t maxConns = std::accumulate(
         _tls.cbegin(), _tls.cend(), std::size_t{0}, [&](std::size_t acc, const auto& tl) {
+            if (!tl->getSessionManager())
+                return size_t{0};
             return std::clamp(tl->getSessionManager()->maxOpenSessions(),
                               std::size_t{0},
                               std::numeric_limits<std::size_t>::max() - acc);
@@ -249,7 +248,8 @@ void TransportLayerManagerImpl::checkMaxOpenSessionsAtStartup() const {
 
 void TransportLayerManagerImpl::endAllSessions(Client::TagMask tags) {
     std::for_each(_tls.cbegin(), _tls.cend(), [&](const auto& tl) {
-        tl->getSessionManager()->endAllSessions(tags);
+        if (auto sm = tl->getSessionManager(); sm)
+            sm->endAllSessions(tags);
     });
 }
 

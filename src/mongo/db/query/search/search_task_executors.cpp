@@ -64,7 +64,7 @@ ConnectionPool::Options makeMongotConnPoolOptions() {
 }
 
 struct State {
-    State() : mongotExecStarted(false), searchIndexMgmtExecStarted(false) {
+    State() {
         // Make the MongotExecutor and associated NetworkInterface.
         auto mongotExecutorNetworkInterface =
             makeNetworkInterface("MongotExecutor", nullptr, nullptr, makeMongotConnPoolOptions());
@@ -87,26 +87,15 @@ struct State {
 
     auto getMongotExecutorPtr() {
         invariant(mongotExecutor);
-
-        if (!mongotExecStarted.load() && !mongotExecStarted.swap(true)) {
-            mongotExecutor->startup();
-        }
         return mongotExecutor;
     }
 
     auto getSearchIndexMgmtExecutorPtr() {
         invariant(searchIndexMgmtExecutor);
-
-        if (!searchIndexMgmtExecStarted.load() && !searchIndexMgmtExecStarted.swap(true)) {
-            searchIndexMgmtExecutor->startup();
-        }
         return searchIndexMgmtExecutor;
     }
 
-    AtomicWord<bool> mongotExecStarted;
     std::shared_ptr<TaskExecutor> mongotExecutor;
-
-    AtomicWord<bool> searchIndexMgmtExecStarted;
     std::shared_ptr<TaskExecutor> searchIndexMgmtExecutor;
 };
 
@@ -133,6 +122,18 @@ std::shared_ptr<TaskExecutor> getSearchIndexManagementTaskExecutor(ServiceContex
     auto& state = getExecutorHolder(svc);
     invariant(state.searchIndexMgmtExecutor);
     return state.getSearchIndexMgmtExecutorPtr();
+}
+
+void startupSearchExecutorsIfNeeded(ServiceContext* svc) {
+    if (!globalMongotParams.host.empty()) {
+        LOGV2_INFO(8267400, "Starting up mongot task executor.");
+        getMongotTaskExecutor(svc)->startup();
+    }
+
+    if (!globalSearchIndexParams.host.empty()) {
+        LOGV2_INFO(8267401, "Starting up search index management task executor.");
+        getSearchIndexManagementTaskExecutor(svc)->startup();
+    }
 }
 
 }  // namespace executor

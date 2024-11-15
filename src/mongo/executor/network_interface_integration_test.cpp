@@ -128,9 +128,10 @@ TEST_F(NetworkInterfaceIntegrationFixture, PingWithoutStartup) {
                                  nullptr,
                                  Minutes(5)};
 
-    auto fut = runCommand(makeCallbackHandle(), request);
-    ASSERT_FALSE(fut.isReady());
+    ASSERT_THROWS_CODE(
+        runCommand(makeCallbackHandle(), request), DBException, ErrorCodes::NotYetInitialized);
     net().startup();
+    auto fut = runCommand(makeCallbackHandle(), request);
     ASSERT(fut.get(interruptible()).isOK());
 }
 

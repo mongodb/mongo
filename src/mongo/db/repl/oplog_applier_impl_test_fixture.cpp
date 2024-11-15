@@ -270,7 +270,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     const OplogEntry& op,
     const NamespaceString& targetNss,
     bool expectedApplyOpCalled) {
-    bool applyOpCalled = false;
+    auto applyOpCalled = std::make_shared<Atomic<bool>>(false);
 
     auto checkOpCtx = [&targetNss](OperationContext* opCtx) {
         ASSERT_TRUE(opCtx);
@@ -285,14 +285,15 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     };
 
     _opObserver->onInsertsFn =
-        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+        [op, targetNss, applyOpCalled, checkOpCtx](
+            OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
             // Other threads may be calling into the opObserver. Only assert if we are writing to
             // the target ns, otherwise skip these asserts.
             if (targetNss != nss) {
                 return Status::OK();
             }
 
-            applyOpCalled = true;
+            applyOpCalled->store(true);
             checkOpCtx(opCtx);
             ASSERT_EQUALS(1U, docs.size());
             // For upserts we don't know the intended value of the document.
@@ -313,7 +314,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
             return Status::OK();
         }
 
-        applyOpCalled = true;
+        applyOpCalled->store(true);
         checkOpCtx(opCtx);
         ASSERT_BSONOBJ_EQ(op.getObject(), doc);
         return Status::OK();
@@ -326,7 +327,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
             return Status::OK();
         }
 
-        applyOpCalled = true;
+        applyOpCalled->store(true);
         checkOpCtx(opCtx);
         return Status::OK();
     };
@@ -334,7 +335,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     ASSERT_EQ(_applyOplogEntryOrGroupedInsertsWrapper(
                   _opCtx.get(), ApplierOperation{&op}, OplogApplication::Mode::kSecondary),
               expectedError);
-    ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
+    ASSERT_EQ(applyOpCalled->load(), expectedApplyOpCalled);
 }
 
 Status failedApplyCommand(OperationContext* opCtx,

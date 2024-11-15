@@ -70,7 +70,6 @@ public:
     ShardingTaskExecutor(const ShardingTaskExecutor&) = delete;
     ShardingTaskExecutor& operator=(const ShardingTaskExecutor&) = delete;
 
-
     void startup() override;
     void shutdown() override;
     void join() override;

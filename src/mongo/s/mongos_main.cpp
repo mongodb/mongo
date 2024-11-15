@@ -77,6 +77,7 @@
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -796,11 +797,13 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
             boost::none,
             std::make_unique<ClientTransportObserverMongos>());
         if (auto res = tl->setup(); !res.isOK()) {
-            LOGV2_ERROR(22856, "Error setting up listener", "error"_attr = res);
+            LOGV2_ERROR(22856, "Error setting up transport layer", "error"_attr = res);
             return ExitCode::netError;
         }
         serviceContext->setTransportLayerManager(std::move(tl));
     }
+
+    executor::startupSearchExecutorsIfNeeded(serviceContext);
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     globalConnPool.addHook(new ShardingConnectionHook(makeShardingEgressHooksList(serviceContext)));

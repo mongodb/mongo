@@ -163,7 +163,8 @@ private:
     bool _doThrow{false};
 };
 
-class ReshardingOplogApplierTest : public ShardingMongoDTestFixture {
+class ReshardingOplogApplierTest : service_context_test::WithSetupTransportLayer,
+                                   public ShardingMongoDTestFixture {
 public:
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
     const std::string kOriginalShardKey = "sk";

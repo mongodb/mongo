@@ -45,7 +45,9 @@ public:
     void setUp() override {
         _serviceCtx = ServiceContext::make();
         _mongotExecutor = getMongotTaskExecutor(_serviceCtx.get());
+        _mongotExecutor->startup();
         _searchIdxMgmtExecutor = getSearchIndexManagementTaskExecutor(_serviceCtx.get());
+        _searchIdxMgmtExecutor->startup();
     }
 
     void tearDown() override {

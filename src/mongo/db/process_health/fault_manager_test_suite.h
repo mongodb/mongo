@@ -34,10 +34,12 @@
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/tick_source_mock.h"
@@ -126,25 +128,16 @@ public:
 /**
  * Test suite for fault manager.
  */
-class FaultManagerTest : public unittest::Test {
+class FaultManagerTest : service_context_test::WithSetupTransportLayer,
+                         service_context_test::RouterRoleOverride,
+                         public ClockSourceMockServiceContextTest {
 public:
     void setUp() override {
         HealthObserverRegistration::resetObserverFactoriesForTest();
 
-        createServiceContextIfNeeded();
+        advanceTime(Seconds(100));
         bumpUpLogging();
         resetManager();
-    }
-
-    void createServiceContextIfNeeded() {
-        if (!_svcCtx) {
-            // Reset only once because the Ldap connection reaper is running asynchronously
-            // and is using the simulated clock, which should not go out of scope.
-            _svcCtx = ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                                           std::make_unique<ClockSourceMock>(),
-                                           std::make_unique<TickSourceMock<Milliseconds>>());
-            advanceTime(Seconds(100));
-        }
     }
 
     void bumpUpLogging() {
@@ -158,7 +151,6 @@ public:
         LOGV2(6007905, "Clean up test resources");
         // Shutdown the executor before the context is deleted.
         resetManager();
-        serverGlobalParams.clusterRole = _saved;
     }
 
     void constructTaskExecutor() {
@@ -177,9 +169,9 @@ public:
 
     void resetManager(std::unique_ptr<FaultManagerConfig> config = nullptr) {
         constructTaskExecutor();
-        FaultManager::set(
-            _svcCtx.get(),
-            std::make_unique<FaultManagerTestImpl>(_svcCtx.get(), _executor, std::move(config)));
+        FaultManager::set(getServiceContext(),
+                          std::make_unique<FaultManagerTestImpl>(
+                              getServiceContext(), _executor, std::move(config)));
     }
 
     void registerMockHealthObserver(FaultFacetType mockType,
@@ -210,19 +202,15 @@ public:
     }
 
     FaultManagerTestImpl& manager() {
-        return *static_cast<FaultManagerTestImpl*>(FaultManager::get(_svcCtx.get()));
+        return *static_cast<FaultManagerTestImpl*>(FaultManager::get(getServiceContext()));
     }
 
     ClockSourceMock& clockSource() {
-        return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
-    }
-
-    ServiceContext* svcCtx() const {
-        return _svcCtx.get();
+        return *static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
     }
 
     TickSourceMock<Milliseconds>& tickSource() {
-        return *static_cast<TickSourceMock<Milliseconds>*>(_svcCtx->getTickSource());
+        return *static_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());
     }
 
     template <typename Observer>
@@ -245,7 +233,7 @@ public:
     template <typename Duration>
     void advanceTime(Duration d) {
         clockSource().advance(d);
-        static_cast<ClockSourceMock*>(_svcCtx->getPreciseClockSource())->advance(d);
+        static_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource())->advance(d);
         tickSource().advance(d);
     }
 
@@ -284,8 +272,6 @@ public:
     }
 
 private:
-    ServiceContext::UniqueServiceContext _svcCtx;
-    ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, ClusterRole::RouterServer)};
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
 

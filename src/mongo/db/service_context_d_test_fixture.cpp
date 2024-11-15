@@ -104,16 +104,18 @@ ServiceContext::UniqueServiceContext MongoDScopedGlobalServiceContextForTest::ma
         std::move(fastClockSource), std::move(preciseClockSource), std::move(tickSource));
 }
 
-MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest(Options options)
-    : MongoDScopedGlobalServiceContextForTest(nullptr, std::move(options)) {}
+MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest(Options options,
+                                                                                 bool shouldSetupTL)
+    : MongoDScopedGlobalServiceContextForTest(nullptr, std::move(options), shouldSetupTL) {}
 
 MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest(
-    ServiceContext::UniqueServiceContext serviceContextHolder, Options options)
+    ServiceContext::UniqueServiceContext serviceContextHolder, Options options, bool shouldSetupTL)
     : ScopedGlobalServiceContextForTest(
           serviceContextHolder ? std::move(serviceContextHolder)
                                : makeServiceContext(options._useMockClock,
                                                     options._autoAdvancingMockClockIncrement,
-                                                    std::move(options._mockTickSource))),
+                                                    std::move(options._mockTickSource)),
+          shouldSetupTL),
       _journalListener(std::move(options._journalListener)) {
     auto serviceContext = getServiceContext();
 

@@ -117,17 +117,16 @@ std::shared_ptr<executor::ShardingTaskExecutor> makeShardingTestExecutor(
 
 ShardingTestFixture::ShardingTestFixture() : ShardingTestFixture(false) {}
 
-ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache)
-    : ShardingTestFixture(withMockCatalogCache,
-                          std::make_unique<ScopedGlobalServiceContextForTest>(
-                              ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                                                   std::make_unique<ClockSourceMock>(),
-                                                   std::make_unique<TickSourceMock<>>()))) {}
-
 ShardingTestFixture::ShardingTestFixture(
     bool withMockCatalogCache,
     std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)
-    : ShardingTestFixtureCommon(std::move(scopedServiceContext)) {
+    : ShardingTestFixtureCommon(
+          scopedServiceContext ? std::move(scopedServiceContext)
+                               : std::make_unique<ScopedGlobalServiceContextForTest>(
+                                     ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                                          std::make_unique<ClockSourceMock>(),
+                                                          std::make_unique<TickSourceMock<>>()),
+                                     shouldSetupTL)) {
     const auto service = getServiceContext();
 
     CollatorFactoryInterface::set(service, std::make_unique<CollatorFactoryMock>());

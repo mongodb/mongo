@@ -61,7 +61,8 @@ namespace mongo {
 class CoreCatalogCacheTestFixture : public ShardingTestFixture {
 protected:
     CoreCatalogCacheTestFixture()
-        : CoreCatalogCacheTestFixture(std::make_unique<ScopedGlobalServiceContextForTest>()) {}
+        : ShardingTestFixture(false,  // No mock catalog cache
+                              std::make_unique<ScopedGlobalServiceContextForTest>(shouldSetupTL)) {}
 
     explicit CoreCatalogCacheTestFixture(
         std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)

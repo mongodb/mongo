@@ -56,13 +56,15 @@ class PrimaryOnlyServiceRegistry;
 
 extern FailPoint primaryOnlyServiceTestStepUpWaitForRebuildComplete;
 
-class PrimaryOnlyServiceMongoDTest : public ServiceContextMongoDTest {
+class PrimaryOnlyServiceMongoDTest : service_context_test::WithSetupTransportLayer,
+                                     public ServiceContextMongoDTest {
 public:
     void setUp() override;
     void tearDown() override;
 
 protected:
-    explicit PrimaryOnlyServiceMongoDTest(Options options = {})
+    PrimaryOnlyServiceMongoDTest() : ServiceContextMongoDTest(Options{}) {}
+    explicit PrimaryOnlyServiceMongoDTest(Options options)
         : ServiceContextMongoDTest(std::move(options)) {}
 
     void startup(OperationContext* opCtx);

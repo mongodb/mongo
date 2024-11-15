@@ -70,7 +70,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/ssl_connection_context.h"
-#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -196,55 +195,19 @@ private:
 };
 
 namespace {
-const Status kNetworkInterfaceShutdownInProgress = {ErrorCodes::ShutdownInProgress,
-                                                    "NetworkInterface shutdown in progress"};
-}
+constexpr auto kShutdownInProgressMsg = "NetworkInterface shutdown in progress"_sd;
+constexpr auto kNotYetStartedUpMsg = "NetworkInterface has not started yet"_sd;
+}  // namespace
 
 NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
                                        ConnectionPool::Options connPoolOpts,
-                                       ServiceContext* svcCtx,
                                        std::unique_ptr<NetworkConnectionHook> onConnectHook,
                                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook)
     : _instanceName(std::move(instanceName)),
-      _svcCtx(svcCtx),
       _connPoolOpts(std::move(connPoolOpts)),
       _onConnectHook(std::move(onConnectHook)),
       _metadataHook(std::move(metadataHook)),
-      _state(kDefault) {
-    if (_svcCtx) {
-        _tl = _svcCtx->getTransportLayerManager();
-    }
-
-    // Even if you have a service context, it may not have a transport layer (mostly for unittests).
-    if (!_tl) {
-        if (TestingProctor::instance().isEnabled()) {
-            LOGV2_WARNING(22601, "No TransportLayer configured during NetworkInterface startup");
-        }
-        _ownedTransportLayer =
-            transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer();
-        _tl = _ownedTransportLayer.get();
-    }
-
-    std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
-#ifdef MONGO_CONFIG_SSL
-    if (_connPoolOpts.transientSSLParams) {
-        auto statusOrContext = _tl->getEgressLayer()->createTransientSSLContext(
-            _connPoolOpts.transientSSLParams.value());
-        uassertStatusOK(statusOrContext.getStatus());
-        transientSSLContext = std::move(statusOrContext.getValue());
-    }
-#endif
-
-    _reactor = _tl->getEgressLayer()->getReactor(transport::TransportLayer::kNewReactor);
-    auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-        _reactor, _tl, std::move(_onConnectHook), _connPoolOpts, transientSSLContext);
-    _pool = std::make_shared<ConnectionPool>(
-        std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
-
-    if (TestingProctor::instance().isEnabled()) {
-        _counters = std::make_unique<SynchronizedCounters>();
-    }
-}
+      _state(kDefault) {}
 
 NetworkInterfaceTL::~NetworkInterfaceTL() {
     shutdown();
@@ -265,10 +228,18 @@ std::string NetworkInterfaceTL::getDiagnosticString() {
 }
 
 void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const {
+    if (MONGO_unlikely(!_initialized.load())) {
+        return;
+    }
+
     _pool->appendConnectionStats(stats);
 }
 
 void NetworkInterfaceTL::appendStats(BSONObjBuilder& bob) const {
+    if (MONGO_unlikely(!_initialized.load())) {
+        return;
+    }
+
     BSONObjBuilder builder = bob.subobjStart(_instanceName);
     _reactor->appendStats(builder);
 }
@@ -289,6 +260,31 @@ void NetworkInterfaceTL::startup() {
                    "Skipping NetworkInterface startup: interface is in an invalid startup state",
                    "state"_attr = toString(_state));
         return;
+    }
+
+    _svcCtx = getGlobalServiceContext();
+    auto tl = _svcCtx->getTransportLayerManager();
+    invariant(tl, "Cannot start NetworkInterface without a TransportLayer!");
+
+    std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
+#ifdef MONGO_CONFIG_SSL
+    if (_connPoolOpts.transientSSLParams) {
+        auto statusOrContext = tl->getEgressLayer()->createTransientSSLContext(
+            _connPoolOpts.transientSSLParams.value());
+        uassertStatusOK(statusOrContext.getStatus());
+        transientSSLContext = std::move(statusOrContext.getValue());
+    }
+#endif
+
+    _reactor = tl->getEgressLayer()->getReactor(transport::TransportLayer::kNewReactor);
+    auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
+        _reactor, tl, std::move(_onConnectHook), _connPoolOpts, transientSSLContext);
+    _pool = std::make_shared<ConnectionPool>(
+        std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
+    _initialized.store(true);
+
+    if (TestingProctor::instance().isEnabled()) {
+        _counters = std::make_unique<SynchronizedCounters>();
     }
 
     _ioThread = stdx::thread([this] {
@@ -354,7 +350,7 @@ void NetworkInterfaceTL::shutdown() {
             continue;
         }
 
-        cmdState->cancel(kNetworkInterfaceShutdownInProgress);
+        cmdState->cancel({ErrorCodes::ShutdownInProgress, kShutdownInProgressMsg});
     }
 
     // This prevents new timers from being set, cancels any ongoing operations on all connections,
@@ -388,6 +384,20 @@ bool NetworkInterfaceTL::_inShutdown_inlock(WithLock lk) const {
     return _state == kStopping || _state == kStopped;
 }
 
+Status NetworkInterfaceTL::_verifyRunning() const {
+    stdx::lock_guard lk(_mutex);
+    switch (_state) {
+        case kStopping:
+        case kStopped:
+            return {ErrorCodes::ShutdownInProgress, kShutdownInProgressMsg};
+        case kDefault:
+            return {ErrorCodes::NotYetInitialized, kNotYetStartedUpMsg};
+        case kStarted:
+            return Status::OK();
+    }
+    MONGO_UNREACHABLE;
+}
+
 void NetworkInterfaceTL::waitForWork() {
     // waitForWork should only be used by network-mocking code and should not be reachable in the
     // NetworkInterfaceTL.
@@ -406,7 +416,7 @@ void NetworkInterfaceTL::signalWorkAvailable() {}
 Date_t NetworkInterfaceTL::now() {
     // TODO This check is because we set up NetworkInterfaces in MONGO_INITIALIZERS and then expect
     // this method to work before the NI is started.
-    if (!_reactor) {
+    if (MONGO_unlikely(!_initialized.load())) {
         return Date_t::now();
     }
     return _reactor->now();
@@ -418,7 +428,7 @@ void NetworkInterfaceTL::_registerCommand(const TaskExecutor::CallbackHandle& cb
         stdx::lock_guard lk(_mutex);
 
         if (_inShutdown_inlock(lk)) {
-            uassertStatusOK(kNetworkInterfaceShutdownInProgress);
+            uassertStatusOK({ErrorCodes::ShutdownInProgress, kShutdownInProgressMsg});
         }
 
         _inProgress.insert({cbHandle, cmdState});
@@ -574,9 +584,7 @@ SemiFuture<RemoteCommandResponse> NetworkInterfaceTL::startCommand(
     RemoteCommandRequest& request,
     const BatonHandle& baton,
     const CancellationToken& token) {
-    if (inShutdown()) {
-        uassertStatusOK(kNetworkInterfaceShutdownInProgress);
-    }
+    uassertStatusOK(_verifyRunning());
 
     LOGV2_DEBUG(
         22596, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
@@ -593,6 +601,8 @@ void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
                                     transport::ConnectSSLMode sslMode,
                                     Milliseconds timeout,
                                     Status status) {
+    uassert(ErrorCodes::NotYetInitialized, kNotYetStartedUpMsg, _initialized.load());
+
     auto handle = _pool->get(hostAndPort, sslMode, timeout).get();
     if (status.isOK()) {
         handle->indicateSuccess();
@@ -639,9 +649,7 @@ NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHa
                                         RemoteCommandRequest& request,
                                         const BatonHandle& baton,
                                         const CancellationToken& cancelToken) {
-    if (inShutdown()) {
-        uassertStatusOK(kNetworkInterfaceShutdownInProgress);
-    }
+    uassertStatusOK(_verifyRunning());
 
     LOGV2_DEBUG(23909,
                 kDiagnosticLogLevel,
@@ -737,8 +745,8 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
 }
 
 Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {
-    if (inShutdown()) {
-        return kNetworkInterfaceShutdownInProgress;
+    if (Status running = _verifyRunning(); !running.isOK()) {
+        return running;
     }
 
     _reactor->schedule([action = std::move(action)](auto status) { action(status); });
@@ -746,9 +754,9 @@ Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {
 }
 
 SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationToken& token) {
-    if (inShutdown()) {
+    if (Status running = _verifyRunning(); !running.isOK()) {
         // Pessimistically check if we're in shutdown and save some work
-        return kNetworkInterfaceShutdownInProgress;
+        return running;
     }
 
     if (when <= now()) {
@@ -763,7 +771,7 @@ SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationTok
 
         if (_inShutdown_inlock(lk)) {
             // Check that we've won any possible race with _shutdownAllAlarms();
-            return kNetworkInterfaceShutdownInProgress;
+            return Status(ErrorCodes::ShutdownInProgress, kShutdownInProgressMsg);
         }
 
         // If a user has already scheduled an alarm with a handle, make sure they intentionally
@@ -834,6 +842,10 @@ bool NetworkInterfaceTL::onNetworkThread() {
 }
 
 void NetworkInterfaceTL::dropConnections(const HostAndPort& hostAndPort) {
+    if (MONGO_unlikely(!_initialized.load())) {
+        return;
+    }
+
     _pool->dropConnections(hostAndPort);
 }
 
@@ -855,6 +867,7 @@ void NetworkInterfaceTL::LeasedStream::indicateUsed() {
 
 SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> NetworkInterfaceTL::leaseStream(
     const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, Milliseconds timeout) {
+    invariant(_initialized.load());
 
     return _pool->lease(hostAndPort, sslMode, timeout)
         .thenRunOn(_reactor)

@@ -42,7 +42,8 @@ namespace mongo {
 namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
-using DocumentSourceRankFusionTest = AggregationContextFixture;
+class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
+                                     public AggregationContextFixture {};
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({

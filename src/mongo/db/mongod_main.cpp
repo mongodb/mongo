@@ -140,6 +140,7 @@
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -327,8 +328,25 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
         // TODO SERVER-78730: add support for load-balanced connections.
     }
 
+    // Mongod should not bind to any ports in repair mode so only allow egress.
+    if (storageGlobalParams.repair) {
+        return transport::TransportLayerManagerImpl::makeDefaultEgressTransportLayer();
+    }
+
     return transport::TransportLayerManagerImpl::createWithConfig(
         &serverGlobalParams, svcCtx, std::move(loadBalancerPort), std::move(routerPort));
+}
+
+ExitCode initializeTransportLayer(ServiceContext* serviceContext, BSONObjBuilder* timerReport) {
+    TimeElapsedBuilderScopedTimer scopedTimer(
+        serviceContext->getFastClockSource(), "Transport layer setup", timerReport);
+    auto tl = makeTransportLayer(serviceContext);
+    if (auto res = tl->setup(); !res.isOK()) {
+        LOGV2_ERROR(20568, "Error setting up transport layer", "error"_attr = res);
+        return ExitCode::netError;
+    }
+    serviceContext->setTransportLayerManager(std::move(tl));
+    return ExitCode::clean;
 }
 
 void logStartup(OperationContext* opCtx) {
@@ -555,17 +573,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 
-    if (!storageGlobalParams.repair) {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Transport layer setup",
-                                                  &startupTimeElapsedBuilder);
-        auto tl = makeTransportLayer(serviceContext);
-        if (auto res = tl->setup(); !res.isOK()) {
-            LOGV2_ERROR(20568, "Error setting up listener", "error"_attr = res);
-            return ExitCode::netError;
-        }
-        serviceContext->setTransportLayerManager(std::move(tl));
-    }
+    if (auto ec = initializeTransportLayer(serviceContext, &startupTimeElapsedBuilder);
+        ec != ExitCode::clean)
+        return ec;
 
     FlowControl::set(serviceContext,
                      std::make_unique<FlowControl>(
@@ -1141,9 +1151,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     // operation context anymore
     startupOpCtx.reset();
 
+    executor::startupSearchExecutorsIfNeeded(serviceContext);
+
     transport::ServiceExecutor::startupAll(serviceContext);
 
-    if (!storageGlobalParams.repair) {
+    {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Start transport layer",
                                                   &startupTimeElapsedBuilder);
@@ -1898,18 +1910,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2_OPTIONS(
             4784920, {LogComponent::kReplication}, "Shutting down the LogicalTimeValidator");
         validator->shutDown();
-    }
-
-    // The migrationutil executor must be shut down before shutting down the CatalogCache and the
-    // ExecutorPool. Otherwise, it may try to schedule work on those components and fail.
-    LOGV2_OPTIONS(4784921, {LogComponent::kSharding}, "Shutting down the MigrationUtilExecutor");
-    auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor(serviceContext);
-    {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Shut down the migration util executor",
-                                                  &shutdownTimeElapsedBuilder);
-        migrationUtilExecutor->shutdown();
-        migrationUtilExecutor->join();
     }
 
     if (TestingProctor::instance().isEnabled()) {
