@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <functional>
 #include <iosfwd>
 #include <typeinfo>
@@ -76,6 +77,10 @@ void clearSignalMask();
 int stackTraceSignal();
 #endif
 
+/**
+ * Returns the signal used for stress-testing of EINTR resilience.
+ */
+int interruptResilienceTestingSignal();
 
 /**
  * Analyzes the active exception, describing it to an ostream.

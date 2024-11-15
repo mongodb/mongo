@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,45 +29,27 @@
 
 #pragma once
 
-#include "mongo/util/duration.h"
+#include <functional>
+#include <string>
 
 namespace mongo {
 
-enum class LogFileStatus {
-    kNeedToRotateLogFile,
-    kNoLogFileToRotate,
-};
+#ifdef __linux__
 
-/**
- * Sets up handlers for signals and other events like terminate and new_handler.
- *
- * This must be called very early in main, before runGlobalInitializers().
- */
-void setupSignalHandlers();
+/** Calls `f(tid)` on each thread `tid` in this process except the calling thread. */
+void iterateTids(const std::function<void(int)>& f);
 
-/**
- * Starts the thread to handle asynchronous signals.
- *
- * This must be the first thread started from the main thread.
- */
-void startSignalProcessingThread(LogFileStatus rotate = LogFileStatus::kNeedToRotateLogFile);
+/** Returns true if the given tid exists in this process. */
+bool tidExists(int tid);
 
-/**
- * Starts a thread that randomly picks a victim thread at randomized intervals and sends a signal
- * to that thread in an effort to cause system calls to randomly fail with EINTR. Only works
- * on linux, does nothing on other platforms.
- *
- * The given period is the average interval at which victim threads are signalled.
- */
-void startSignalTestingThread(Milliseconds period);
+/** Returns the thread name for the given tid. */
+std::string readThreadName(int tid);
 
-/*
- * Uninstall the Control-C handler
- *
- * Windows Only
- * Used by nt services to remove the Control-C handler after the system knows it is running
- * as a service, and not as a console program.
- */
-void removeControlCHandler();
+/** Wrapper around the gettid system call. */
+int getThreadId();
+
+/** Wrapper around the tgkill system call. */
+int terminateThread(int pid, int tid, int sig);
+#endif  // __linux__
 
 }  // namespace mongo

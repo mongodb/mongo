@@ -37,7 +37,7 @@
 #include <cstring>
 #include <ctime>
 #include <memory>
-#include <sstream>
+#include <random>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -49,21 +49,27 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_util.h"
+#include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/signal_win32.h"  // IWYU pragma: keep
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/thread_util.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(enableSignalTesting);
 
 /*
  * WARNING: PLEASE READ BEFORE CHANGING THIS MODULE
@@ -160,6 +166,8 @@ void eventProcessingThread() {
 }
 
 #else
+
+void noopSignalHandler(int signalNum, siginfo_t*, void*) {}
 
 /**
  * Filled by the `waitForSignal` function.
@@ -301,6 +309,55 @@ void signalProcessingThread(LogFileStatus rotate) {
     }
 }
 
+#if defined(__linux__)
+/**
+ * Generates durations to sleep between events in order to simulate
+ * independent arrivals at an average arrival rate of 1 per `period`.
+ */
+class PoissonArrival {
+public:
+    using DurationType = Microseconds;
+    explicit PoissonArrival(DurationType period)
+        : _distro{1.0 / durationCount<DurationType>(period)} {}
+    DurationType operator()(auto& engine) {
+        return DurationType{_distro(engine)};
+    }
+
+private:
+    std::geometric_distribution<DurationType::rep> _distro;
+};
+
+boost::optional<int> chooseVictimTid(auto& engine) {
+    std::vector<int> tids;
+    iterateTids([&](int tid) { tids.push_back(tid); });
+    if (tids.empty())
+        return {};
+    std::uniform_int_distribution<std::size_t> dist{0, tids.size() - 1};
+    return tids[dist(engine)];
+}
+
+void signalTestingThread(Milliseconds period) {
+    LOGV2(9494400, "Starting signal testing thread", "period"_attr = period);
+    int signum = interruptResilienceTestingSignal();
+    XorShift128 engine{SecureRandom{}.nextUInt32()};
+    PoissonArrival arrivals{period};
+    while (true) {
+        auto sleepDuration = arrivals(engine);
+        sleepFor(sleepDuration);
+        auto victimTid = chooseVictimTid(engine);
+        if (!victimTid)
+            continue;
+        LOGV2_DEBUG(9494402,
+                    1,
+                    "Signalling thread",
+                    "tid"_attr = *victimTid,
+                    "name"_attr = readThreadName(*victimTid),
+                    "sig"_attr = signum,
+                    "slept"_attr = sleepDuration);
+        terminateThread(getpid(), *victimTid, signum);
+    }
+}
+#endif  // __linux__
 #endif
 }  // namespace
 
@@ -348,6 +405,16 @@ void resetSignalHandlers(const std::vector<int>& blocked) {
 #endif
 
 void startSignalProcessingThread(LogFileStatus rotate) {
+#if defined(__linux__)
+    enableSignalTesting.execute([](const BSONObj& data) {
+        auto periodMsElement = data["periodMs"];
+        static constexpr Milliseconds defaultPeriod = Milliseconds(25);
+        Milliseconds periodMs =
+            periodMsElement.eoo() ? defaultPeriod : Milliseconds(periodMsElement.numberInt());
+        startSignalTestingThread(periodMs);
+    });
+#endif  // __linux__
+
 #ifdef _WIN32
     stdx::thread(eventProcessingThread).detach();
 #else
@@ -384,5 +451,11 @@ void removeControlCHandler() {
             SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), FALSE));
 }
 #endif
+
+void startSignalTestingThread(Milliseconds periodMs) {
+#ifdef __linux__
+    stdx::thread(signalTestingThread, periodMs).detach();
+#endif
+}
 
 }  // namespace mongo

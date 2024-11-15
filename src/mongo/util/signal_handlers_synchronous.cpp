@@ -29,6 +29,7 @@
 
 #include "mongo/util/signal_handlers_synchronous.h"
 
+#include "signal_handlers_synchronous.h"
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
 #include <cerrno>
@@ -354,13 +355,38 @@ extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void
     endProcessWithSignal(signalNum);
 }
 
+extern "C" void noopSignalHandler(int signalNum, siginfo_t*, void*) {}
+
+extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
+
+void installSignalHandler(int signal, sigAction_t handler) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    if (handler == nullptr) {
+        sa.sa_handler = SIG_IGN;
+    } else {
+        sa.sa_sigaction = handler;
+        sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    }
+    if (sigaction(signal, &sa, nullptr) != 0) {
+        int savedErr = errno;
+        LOGV2_FATAL(31334,
+                    "Failed to install sigaction for signal",
+                    "signal"_attr = signal,
+                    "error"_attr = strerror(savedErr));
+    }
+}
+
+void setupSignalTestingHandler() {
+#ifdef __linux__
+    installSignalHandler(interruptResilienceTestingSignal(), noopSignalHandler);
+#endif
+}
+
 #endif
 
 }  // namespace
-
-#if !defined(_WIN32)
-extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
-#endif
 
 void setupSynchronousSignalHandlers() {
     stdx::set_terminate(myTerminate);
@@ -386,24 +412,12 @@ void setupSynchronousSignalHandlers() {
         {SIGILL, &abruptQuitWithAddrSignal},
         {SIGFPE, &abruptQuitWithAddrSignal},
     };
+
     for (const auto& spec : kSignalSpecs) {
-        struct sigaction sa;
-        memset(&sa, 0, sizeof(sa));
-        sigemptyset(&sa.sa_mask);
-        if (spec.function == nullptr) {
-            sa.sa_handler = SIG_IGN;
-        } else {
-            sa.sa_sigaction = spec.function;
-            sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-        }
-        if (sigaction(spec.signal, &sa, nullptr) != 0) {
-            int savedErr = errno;
-            LOGV2_FATAL(31334,
-                        "Failed to install sigaction for signal",
-                        "signal"_attr = spec.signal,
-                        "error"_attr = strerror(savedErr));
-        }
+        installSignalHandler(spec.signal, spec.function);
     }
+
+    setupSignalTestingHandler();
     setupSIGTRAPforDebugger();
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
     setupStackTraceSignalAction(stackTraceSignal());
@@ -433,6 +447,14 @@ int stackTraceSignal() {
     return SIGUSR2;
 }
 #endif
+
+int interruptResilienceTestingSignal() {
+#ifdef __linux__
+    return SIGRTMIN;
+#else
+    return 0;
+#endif
+}
 
 ActiveExceptionWitness::ActiveExceptionWitness() {
     // Later entries in the catch chain will become the innermost catch blocks, so

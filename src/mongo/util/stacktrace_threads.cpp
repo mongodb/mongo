@@ -73,6 +73,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
 #include "mongo/util/stacktrace_somap.h"
+#include "mongo/util/thread_util.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -228,47 +229,6 @@ void sleepMicros(int64_t usec) {
     nanosleep(&ts, nullptr);
 }
 
-int gettid() {
-    return syscall(SYS_gettid);
-}
-
-int tgkill(int pid, int tid, int sig) {
-    return syscall(SYS_tgkill, pid, tid, sig);
-}
-
-boost::filesystem::path taskDir() {
-    return boost::filesystem::path("/proc/self/task");
-}
-
-/** Call `f(tid)` on each thread `tid` in this process except the calling thread. */
-template <typename F>
-void iterateTids(F&& f) {
-    int selfTid = gettid();
-    auto iter = boost::filesystem::directory_iterator{taskDir()};
-    for (const auto& entry : iter) {
-        int tid;
-        if (!NumberParser{}(entry.path().filename().string(), &tid).isOK())
-            continue;  // Ignore non-integer names (e.g. "." or "..").
-        if (tid == selfTid)
-            continue;  // skip the current thread
-        f(tid);
-    }
-}
-
-bool tidExists(int tid) {
-    return exists(taskDir() / std::to_string(tid));
-}
-
-std::string readThreadName(int tid) {
-    std::string threadName;
-    try {
-        boost::filesystem::ifstream in(taskDir() / std::to_string(tid) / "comm");
-        std::getline(in, threadName);
-    } catch (...) {
-    }
-    return threadName;
-}
-
 /** Cannot yield. AS-Safe. */
 class SimpleSpinLock {
 public:
@@ -370,7 +330,7 @@ public:
     void action(siginfo_t* si);
 
     void markProcessingThread() {
-        _processingTid.store(gettid(), std::memory_order_release);
+        _processingTid.store(getThreadId(), std::memory_order_release);
     }
 
     void setSignal(int signal) {
@@ -448,7 +408,7 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
 
     for (auto iter = pendingTids.begin(); iter != pendingTids.end();) {
         errno = 0;
-        if (int r = tgkill(getpid(), *iter, _signal); r < 0) {
+        if (int r = terminateThread(getpid(), *iter, _signal); r < 0) {
             int errsv = errno;
             LOGV2(23395,
                   "Failed to signal thread",
@@ -644,7 +604,7 @@ void State::action(siginfo_t* si) {
         case SI_QUEUE:
             // Received from outside. Forward to signal processing thread if there is one.
             if (int sigTid = _processingTid.load(std::memory_order_acquire); sigTid != -1)
-                tgkill(getpid(), sigTid, si->si_signo);
+                terminateThread(getpid(), sigTid, si->si_signo);
             break;
         case SI_TKILL:
             // Users should call the toplevel printAllThreadStacks function.
@@ -652,7 +612,7 @@ void State::action(siginfo_t* si) {
             // Received from the signal processing thread.
             // Submit this thread's backtrace to the results stack.
             if (ThreadBacktrace* msg = acquireBacktraceBuffer(); msg != nullptr) {
-                msg->tid = gettid();
+                msg->tid = getThreadId();
                 msg->size = rawBacktrace(msg->addrs, msg->capacity);
                 postBacktrace(msg);
             }

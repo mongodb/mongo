@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,62 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/util/thread_util.h"
 
-#include "mongo/util/duration.h"
+#ifdef __linux__
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <unistd.h>
+
+#include "mongo/base/parse_number.h"
 
 namespace mongo {
+namespace {
 
-enum class LogFileStatus {
-    kNeedToRotateLogFile,
-    kNoLogFileToRotate,
-};
+boost::filesystem::path taskDir() {
+    return boost::filesystem::path("/proc/self/task");
+}
 
-/**
- * Sets up handlers for signals and other events like terminate and new_handler.
- *
- * This must be called very early in main, before runGlobalInitializers().
- */
-void setupSignalHandlers();
+}  // namespace
 
-/**
- * Starts the thread to handle asynchronous signals.
- *
- * This must be the first thread started from the main thread.
- */
-void startSignalProcessingThread(LogFileStatus rotate = LogFileStatus::kNeedToRotateLogFile);
+int getThreadId() {
+    return ::syscall(SYS_gettid);
+}
 
-/**
- * Starts a thread that randomly picks a victim thread at randomized intervals and sends a signal
- * to that thread in an effort to cause system calls to randomly fail with EINTR. Only works
- * on linux, does nothing on other platforms.
- *
- * The given period is the average interval at which victim threads are signalled.
- */
-void startSignalTestingThread(Milliseconds period);
+int terminateThread(int pid, int tid, int sig) {
+    return syscall(SYS_tgkill, pid, tid, sig);
+}
 
-/*
- * Uninstall the Control-C handler
- *
- * Windows Only
- * Used by nt services to remove the Control-C handler after the system knows it is running
- * as a service, and not as a console program.
- */
-void removeControlCHandler();
+void iterateTids(const std::function<void(int)>& f) {
+    int selfTid = getThreadId();
+    auto iter = boost::filesystem::directory_iterator{taskDir()};
+    for (const auto& entry : iter) {
+        int tid;
+        if (!NumberParser{}(entry.path().filename().string(), &tid).isOK())
+            continue;  // Ignore non-integer names (e.g. "." or "..").
+        if (tid == selfTid)
+            continue;  // skip the current thread
+        f(tid);
+    }
+}
+
+bool tidExists(int tid) {
+    return exists(taskDir() / std::to_string(tid));
+}
+
+std::string readThreadName(int tid) {
+    std::string threadName;
+    try {
+        boost::filesystem::ifstream in(taskDir() / std::to_string(tid) / "comm");
+        std::getline(in, threadName);
+    } catch (...) {
+    }
+    return threadName;
+}
 
 }  // namespace mongo
+
+#endif  // __linux__
