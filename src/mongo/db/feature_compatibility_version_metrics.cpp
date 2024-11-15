@@ -64,11 +64,11 @@ public:
             // (Generic FCV reference): append information to serverStatus on if we are in a state
             // of transitioning to a new FCV (upgrading or downgrading).
             if (fcvSnapshot.isUpgradingOrDowngrading()) {
-                const auto& [fromVersion, toVersion] =
-                    multiversion::getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
+                const auto transitionInfo =
+                    multiversion::getTransitionFCVInfo(fcvSnapshot.getVersion());
                 currentlyTransitioning = 1;
                 // from is greater, we are downgrading
-                if (fromVersion > toVersion) {
+                if (transitionInfo.from > transitionInfo.to) {
                     currentlyTransitioning = -1;
                 }
             }

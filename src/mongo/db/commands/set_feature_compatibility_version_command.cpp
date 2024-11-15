@@ -623,7 +623,7 @@ private:
                                  multiversion::FeatureCompatibilityVersion requestedVersion) {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
-        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
+        const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
         const auto isDowngrading = originalVersion > requestedVersion;
         const auto isUpgrading = originalVersion < requestedVersion;
 
@@ -735,8 +735,10 @@ private:
 
         std::vector<std::function<void(const Collection* collection)>> collValidationFunctions;
 
-        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
+        const auto originalVersion =
+            getTransitionFCVInfo(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
+                .from;
 
         if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
@@ -792,8 +794,10 @@ private:
     // TODO (SERVER-83704): Remove this function once 8.0 becomes last LTS.
     void _initializePlacementHistory(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
+        const auto originalVersion =
+            getTransitionFCVInfo(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
+                .from;
         if (feature_flags::gPlacementHistoryPostFCV3.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
@@ -875,8 +879,10 @@ private:
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         // There is no need to re-create this index on upgrade, as the index is no longer
         // needed to ensure resharding operations are unique.
-        const auto& [fromVersion, _] = getTransitionFCVFromAndTo(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
+        const auto fromVersion =
+            getTransitionFCVInfo(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
+                .from;
         if (resharding::gFeatureFlagReshardingImprovements
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, fromVersion)) {
             LOGV2(7760401,
@@ -1045,7 +1051,7 @@ private:
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
-        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
+        const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
 
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
@@ -1143,7 +1149,7 @@ private:
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
-        const auto& [fromVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
+        const auto fromVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
 
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
         std::vector<write_ops::DeleteOpEntry> deletes;
@@ -1185,7 +1191,7 @@ private:
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
-        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
+        const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
 
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
             if (feature_flags::gTSBucketingParametersUnchanged

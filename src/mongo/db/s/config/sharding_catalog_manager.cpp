@@ -875,7 +875,7 @@ BSONObj createConfigSettingsValidator() {
     // states, as the validator is installed during FCV upgrade.
     auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     auto targetVersion = fcvSnapshot.isUpgradingOrDowngrading()
-        ? getTransitionFCVFromAndTo(fcvSnapshot.getVersion()).second
+        ? getTransitionFCVInfo(fcvSnapshot.getVersion()).to
         : fcvSnapshot.getVersion();
 
     if (feature_flags::gBalancerSettingsSchema.isEnabledOnVersion(targetVersion)) {

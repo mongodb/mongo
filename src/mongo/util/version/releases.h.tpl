@@ -32,7 +32,6 @@
 
 #include <array>
 #include <fmt/format.h>
-#include <map>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
@@ -177,12 +176,12 @@ enum class FeatureCompatibilityVersion {
 };
 
 ## Calculate number of versions since v4.0.
-constexpr size_t kSince_$underscores(Version('4.0')) = ${bisect_left(fcvs, latest)};
+inline constexpr size_t kSince_$underscores(Version('4.0')) = ${bisect_left(fcvs, latest)};
 
 // Last LTS was "$last_lts".
-constexpr size_t kSinceLastLTS = ${bisect_left(fcvs, latest) - bisect_left(fcvs, last_lts)};
+inline constexpr size_t kSinceLastLTS = ${bisect_left(fcvs, latest) - bisect_left(fcvs, last_lts)};
 
-constexpr inline StringData kParameterName = "featureCompatibilityVersion"_sd;
+inline constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
 
 class GenericFCV {
 #def define_fcv_alias(id, v):
@@ -277,17 +276,24 @@ inline constexpr std::array standardFCVTable {
 /**
  * Maps transitional versions to their corresponding from and to versions.
  */
-const std::map<
-    FeatureCompatibilityVersion,
-    std::pair<FeatureCompatibilityVersion, FeatureCompatibilityVersion>> transitionFCVMap {
+struct TransitionFCVInfo {
+    FeatureCompatibilityVersion transitional, from, to;
+};
+inline constexpr std::array transitionFCVInfoTable {
 #for tup in transition_lookup_fcvs:
-    {FeatureCompatibilityVersion::$tup[0],
-        std::pair{FeatureCompatibilityVersion::$tup[1], FeatureCompatibilityVersion::$tup[2]}},
+    TransitionFCVInfo{FeatureCompatibilityVersion::$tup[0],
+                      FeatureCompatibilityVersion::$tup[1],
+                      FeatureCompatibilityVersion::$tup[2]},
 #end for
 };
 
-inline const auto& getTransitionFCVFromAndTo(FeatureCompatibilityVersion v) {
-    return transitionFCVMap.at(v);
+constexpr TransitionFCVInfo getTransitionFCVInfo(FeatureCompatibilityVersion v) {
+    auto iter = std::find_if(transitionFCVInfoTable.begin(), transitionFCVInfoTable.end(), [&](auto&& e) {
+        return e.transitional == v;
+    });
+    if (iter == transitionFCVInfoTable.end())
+        throw std::out_of_range("Not found in transitionFCVInfoTable");
+    return *iter;
 }
 
 /**
