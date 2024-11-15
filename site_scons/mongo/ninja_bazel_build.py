@@ -112,10 +112,17 @@ else:
     if not os.path.islink("bazel-out"):
         shutil.rmtree("bazel-out")
 
+env_flags = os.environ.get("BAZEL_FLAGS", [])
+if env_flags:
+    print(f"Using shell env BAZEL_FLAGS: {' '.join(env_flags)}")
+
 if args.verbose:
     extra_args = []
 else:
     extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
+
+extra_args += env_flags
+
 bazel_env = os.environ.copy()
 if ninja_build_info.get("USE_NATIVE_TOOLCHAIN"):
     bazel_env["CC"] = ninja_build_info.get("CC")
