@@ -331,7 +331,6 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
     std::vector<const char*> postFields;
     std::vector<BSONElement> preElems;
     std::vector<BSONElement> postElems;
-    size_t idx = 0;
     bool iteratorIsBeforeWildcard = true;
     for (auto elem : keyPattern) {
         if (WildcardNames::isWildcardFieldName(elem.fieldNameStringData())) {
@@ -343,7 +342,6 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
             postElems.push_back(BSONElement());
             postFields.push_back(elem.fieldName());
         }
-        idx++;
     }
 
     // We should initialize BtreeKeyGenerators if 'keyPattern' is compound.

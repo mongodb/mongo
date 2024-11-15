@@ -819,15 +819,12 @@ std::vector<SbExprSbSlotVector> generateAllMergingExprs(StageBuilderState& state
     // only the basic agg expressions for each accumulator, but also agg expressions that are used
     // to combine partial aggregates that have been spilled to disk.
     std::vector<SbExprSbSlotVector> mergingExprs;
-    size_t accIdx = 0;
 
     for (const auto& accStmt : groupNode.accumulators) {
         auto accOp = AccumOp{accStmt};
         size_t numAggs = accOp.getNumAggs();
 
         mergingExprs.emplace_back(generateMergingExpressions(state, accStmt, numAggs));
-
-        ++accIdx;
     }
 
     return mergingExprs;

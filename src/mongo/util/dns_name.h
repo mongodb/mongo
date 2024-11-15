@@ -99,9 +99,7 @@ public:
         ParserState parserState = kFirstLetter;
 
         std::string name;
-        int idx = -1;
         for (const char& ch : dnsName) {
-            ++idx;
             if (ch == '.') {
                 if (parserState == kPeriod) {
                     uasserted(ErrorCodes::DNSRecordTypeMismatch,

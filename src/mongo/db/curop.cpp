@@ -291,7 +291,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
 
     infoBuilder->appendBool("isFromUserConnection", client->isFromUserConnection());
 
-    if (const auto seCtx = transport::ServiceExecutorContext::get(client)) {
+    if (transport::ServiceExecutorContext::get(client)) {
         infoBuilder->append("threaded"_sd, true);
     }
 

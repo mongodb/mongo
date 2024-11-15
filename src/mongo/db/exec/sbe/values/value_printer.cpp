@@ -341,7 +341,6 @@ void ValuePrinter<T>::writeMultiMapToStream(TypeTags tag, Value val, size_t dept
     auto multiMap = getMultiMapView(val);
 
     auto first = true;
-    size_t iter = 0;
     for (const auto& [key, value] : multiMap->values()) {
         if (first) {
             first = false;
@@ -363,7 +362,6 @@ void ValuePrinter<T>::writeMultiMapToStream(TypeTags tag, Value val, size_t dept
             depth = keyDepth;
         }
         writeValueToStream(key.first, key.second, keyDepth);
-        iter++;
 
         stream << ", v : ";
 
@@ -372,7 +370,6 @@ void ValuePrinter<T>::writeMultiMapToStream(TypeTags tag, Value val, size_t dept
             depth = valueDepth;
         }
         writeValueToStream(value.first, value.second, valueDepth);
-        iter++;
 
         stream << "}";
     }
