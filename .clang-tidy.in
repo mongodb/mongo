@@ -152,7 +152,6 @@ Checks:          '-*,
                   -readability-string-compare,
                   -readability-uniqueptr-delete-release
                   '
-WarningsAsErrors: '*,-clang-diagnostic-builtin-macro-redefined'
 HeaderFilterRegex: '(mongo/.*|@MONGO_BUILD_DIR@)'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros

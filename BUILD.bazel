@@ -1,5 +1,5 @@
-load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
+load("@npm//:defs.bzl", "npm_link_all_packages")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -31,14 +31,13 @@ genrule(
 
     # Note: we use sed to substitute the known good value `build/compiledb/mongo`; testing
     # has confirmed that this is the correct value.
+    # We also use it to append a line to opt-in to warnings as errors.
     cmd = """
     cp $(location .clang-tidy.in) $@ && \
-    sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g' $@
+    sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g ; $$aWarningsAsErrors: "*"' $@
     """,
     visibility = ["//visibility:public"],
 )
-
-load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 
 refresh_compile_commands(
     name = "compiledb",

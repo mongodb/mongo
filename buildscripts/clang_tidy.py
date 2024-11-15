@@ -50,6 +50,7 @@ def _clang_tidy_executor(
         clang_tidy_filename,
         f"-export-fixes={output_filename_fixes}",
         f"-config={json.dumps(clang_tidy_cfg)}",
+        "--warnings-as-errors=*,-clang-diagnostic-builtin-macro-redefined",
     ]
     proc = subprocess.run(clang_tidy_command, capture_output=True, check=False)
     files_to_parse = None
