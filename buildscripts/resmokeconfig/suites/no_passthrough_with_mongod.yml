@@ -11,11 +11,6 @@ executor:
   config: {}
   hooks:
     - class: ValidateCollections
-      shell_options:
-        global_vars:
-          TestData:
-            # Tests in this suite modify the bucket version manually to test validation.
-            skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
     - class: CleanEveryN
       n: 20
   fixture:

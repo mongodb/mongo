@@ -20,7 +20,6 @@ executor:
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
           setParameters:
             bsonTestValidationVersion: 1
-          skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
       nodb: ""
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
       username: __system

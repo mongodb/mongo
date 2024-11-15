@@ -14,9 +14,6 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 (function() {
 "use strict";
 
-// Skipping the compression check since we are testing specifically on uncompressed format.
-TestData.skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate = true;
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();

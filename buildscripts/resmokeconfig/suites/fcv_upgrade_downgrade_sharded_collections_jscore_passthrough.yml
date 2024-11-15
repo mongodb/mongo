@@ -283,12 +283,6 @@ executor:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
-      shell_options:
-        global_vars:
-          TestData:
-            # Skip enforcing this check in FCV upgrade/downgrade suites as time-series buckets are not
-            # always compressed in a downgraded FCV.
-            skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
     - class: FCVUpgradeDowngradeInBackground
     - class: CleanEveryN
       n: 20

@@ -10,8 +10,6 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-TestData.skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate = true;
-
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "ts";
 

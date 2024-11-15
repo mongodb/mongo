@@ -179,8 +179,6 @@ function validateCollectionsThread(validatorFunc, host) {
                     // accurate.
                     enforceFastCount:
                         !TestData.skipEnforceFastCountOnValidate && !TestData.allowUncleanShutdowns,
-                    enforceTimeseriesBucketsAreAlwaysCompressed:
-                        !TestData.skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate,
                 });
                 if (validateRes.ok !== 1) {
                     return {ok: 0, host: host, validateRes: validateRes};

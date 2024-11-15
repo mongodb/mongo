@@ -31,6 +31,3 @@ executor:
         TestData:
           setParameters:
             bsonTestValidationVersion: 1
-            # Skip enforcing this check in multiversion as time-series buckets are not always
-            # compressed in older versions.
-          skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true

@@ -137,13 +137,6 @@ public:
     void addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results);
 
 private:
-    /**
-     * Test-only check to ensure time-series buckets are always compressed. Sets results->valid to
-     * false if the time-series bucket is uncompressed.
-     */
-    void _enforceTimeseriesBucketsAreAlwaysCompressed(const BSONObj& recordBson,
-                                                      ValidateResults* results);
-
     KeyStringIndexConsistency _keyBasedIndexConsistency;
     CollectionValidation::ValidateState* _validateState;
 

@@ -472,30 +472,15 @@ void _validateCatalogEntry(OperationContext* opCtx,
     }
 }
 
-bool canEnforceTimeseriesAlwaysCompressed() {
-    // Test-only check to ensure time-series buckets are always compressed.
-    if (TestingProctor::instance().isEnabled() &&
-        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return true;
-    } else {
-        LOGV2_WARNING(7735102, "Not enforcing that time-series buckets are always compressed");
-        return false;
-    }
-}
-
 }  // namespace
 
 ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      RepairMode repairMode,
                                      bool logDiagnostics,
-                                     bool enforceTimeseriesBucketsAreAlwaysCompressed,
                                      ValidationVersion validationVersion)
     : _validateMode(validateMode),
       _repairMode(repairMode),
       _logDiagnostics(logDiagnostics),
-      _enforceTimeseriesBucketsAreAlwaysCompressed(enforceTimeseriesBucketsAreAlwaysCompressed &&
-                                                   canEnforceTimeseriesAlwaysCompressed()),
       _validationVersion(validationVersion) {}
 
 Status validate(OperationContext* opCtx,

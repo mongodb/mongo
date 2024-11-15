@@ -394,7 +394,6 @@ public:
             validateMode,
             repairMode,
             logDiagnostics,
-            cmdObj["enforceTimeseriesBucketsAreAlwaysCompressed"].trueValue(),
             getTestCommandsEnabled() ? (ValidationVersion)bsonTestValidationVersion
                                      : currentValidationVersion);
 

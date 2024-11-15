@@ -181,15 +181,11 @@ def validate_database(
             "skipValidationOnInvalidViewDefinitions", False
         )
         skipValidationOnNamespaceNotFound = test_data.get("skipValidationOnNamespaceNotFound", True)
-        skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate = test_data.get(
-            "skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate", False
-        )
 
         validate_opts = {
             "full": True,
             # TODO (SERVER-24266): Always enforce fast counts, once they are always accurate
             "enforceFastCount": not skipEnforceFastCountOnValidate,
-            "enforceTimeseriesBucketsAreAlwaysCompressed": not skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate,
         }
 
         # Don't run validate on view namespaces.

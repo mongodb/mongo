@@ -104,7 +104,6 @@ public:
     ValidationOptions(ValidateMode validateMode,
                       RepairMode repairMode,
                       bool logDiagnostics,
-                      bool enforceTimeseriesBucketsAreAlwaysCompressed = false,
                       ValidationVersion validationVersion = currentValidationVersion);
 
     virtual ~ValidationOptions() = default;
@@ -156,10 +155,6 @@ public:
         return _logDiagnostics;
     }
 
-    bool enforceTimeseriesBucketsAreAlwaysCompressed() const {
-        return _enforceTimeseriesBucketsAreAlwaysCompressed;
-    }
-
     ValidationVersion validationVersion() const {
         return _validationVersion;
     }
@@ -171,8 +166,6 @@ private:
 
     // Can be set to obtain better insight into what validate sees/does.
     const bool _logDiagnostics;
-
-    const bool _enforceTimeseriesBucketsAreAlwaysCompressed;
 
     const ValidationVersion _validationVersion;
 };

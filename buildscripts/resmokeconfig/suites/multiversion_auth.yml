@@ -38,10 +38,6 @@ executor:
           #          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
-          # Skip enforcing this check in multiversion as time-series buckets are not always
-          # compressed in older versions.
-          skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
-
       authenticationDatabase: local
       #      authenticationMechanism: SCRAM-SHA-256
       password: *keyFileData

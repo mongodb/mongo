@@ -16,7 +16,6 @@ executor:
         TestData:
           setParameters:
             bsonTestValidationVersion: 1
-          skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
       nodb: ""
 matrix_suite: true
 selector:
