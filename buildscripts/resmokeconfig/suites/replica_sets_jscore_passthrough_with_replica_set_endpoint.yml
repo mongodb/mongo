@@ -98,8 +98,6 @@ selector:
     # The 'queryShapeHash' is only computed on mongos in sharded clusters, therefore the test will fail
     # as hash won't be present when running via replica set endpoint.
     - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
-    # Some TS rewrites cannot be done on mongos.
-    - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js
 
     # TODO SERVER-94428: Reenable this test.
     # This test is currently incompatible with dbcheck.

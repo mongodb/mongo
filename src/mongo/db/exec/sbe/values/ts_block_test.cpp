@@ -442,68 +442,6 @@ TEST_F(SbeValueTest, TsBlockMinMaxV3Schema) {
     }
 }
 
-// Bucket with pre-1970 dates and the control.max rounded up for time.
-const BSONObj kBucketWithMinMaxPre1970 = fromjson(R"(
-{
-        "_id" : ObjectId("64a33d9cdf56a62781061048"),
-        "control" : {
-        "version" : 1,
-        "min": {
-            "_id": 0,
-            "time": Date(-100)
-        },
-        "max": {
-            "_id": 2,
-            "time": Date(0)
-        }
-    },
-        "meta" : "A",
-        "data" : {
-                "_id" : {"0" : 0, "1": 1, "2" : 2},
-                "time" : {
-                     "0" : Date(-100),
-                     "1" : Date(-100),
-                     "2" : Date(-100)
-                }
-        }
-})");
-
-TEST_F(SbeValueTest, TsBlockMaxTimePre1970) {
-    auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxPre1970, "time");
-    auto cellBlockTime = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
-
-    auto& valBlock = cellBlockTime->getValueBlock();
-    const auto expectedLowerBoundTime =
-        bson::convertFrom<true>(kBucketWithMinMaxPre1970["control"]["min"]["time"]);
-    const auto expectedUpperBoundTime =
-        bson::convertFrom<true>(kBucketWithMinMaxPre1970["control"]["max"]["time"]);
-
-    {
-        auto [minTag, minVal] = valBlock.tryMin();
-        ASSERT_EQ(minTag, value::TypeTags::Nothing)
-            << "Expected block min of the time field to be nothing";
-    }
-
-    {
-        // Max cannot be used for dates before or equal to the unix epoch.
-        auto [maxTag, maxVal] = valBlock.tryMax();
-        ASSERT_EQ(maxTag, value::TypeTags::Nothing)
-            << "Expected block max of the time field to be nothing";
-    }
-
-    {
-        auto [lowerBoundTag, lowerBoundVal] = valBlock.tryLowerBound();
-        ASSERT_THAT(std::make_pair(lowerBoundTag, lowerBoundVal), ValueEq(expectedLowerBoundTime))
-            << "Expected block lower bound to be the bucket control.min";
-    }
-
-    {
-        auto [upperBoundTag, upperBoundVal] = valBlock.tryUpperBound();
-        ASSERT_THAT(std::make_pair(upperBoundTag, upperBoundVal), ValueEq(expectedUpperBoundTime))
-            << "Expected block upper bound to be the bucket control.max";
-    }
-}
-
 const BSONObj kBucketWithMinMaxAndArrays = fromjson(R"(
 {
         "_id" : ObjectId("64a33d9cdf56a62781061048"),

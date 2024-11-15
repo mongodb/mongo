@@ -24,7 +24,6 @@
  * ]
  */
 
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 (function() {
@@ -116,10 +115,8 @@ function setUpSmallCollection({roundingParam, startingTime}) {
 
 ///
 // These tests will validate the group stage is rewritten when the '_id' field has a $dateTrunc
-// expression. Some rewrites can only be performed if we are on mongod, since the
-// `requiresTimeseriesExtendedRangeSupport` flag may not be accurate on mongos.
+// expression.
 ///
-const isMongos = FixtureHelpers.isMongos(db);
 const groupByDateTrunc_ExpectRewrite = [
     // Validate the rewrite occurs with a simple case, where the bucket boundary and 'unit' are the
     // same.
@@ -135,8 +132,7 @@ const groupByDateTrunc_ExpectRewrite = [
             {_id: {t: ISODate("2022-09-30T15:00:00Z")}, accmin: 3, accmax: 6},
             {_id: {t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7},
             {_id: {t: ISODate("2022-09-30T14:00:00Z")}, accmin: 1, accmax: 4}
-        ],
-        rewriteExpected: true
+        ]
     },
 
     // Validate the rewrite occurs with all the optional fields present.
@@ -159,7 +155,6 @@ const groupByDateTrunc_ExpectRewrite = [
             }
         }],
         expectedResults: [{_id: {t: ISODate("2022-09-29T19:00:00Z")}, accmin: 1, accmax: 7}],
-        rewriteExpected: true
     },
 
     // Validate the rewrite occurs with multiple expressions in the '_id' field.
@@ -180,7 +175,6 @@ const groupByDateTrunc_ExpectRewrite = [
             accmin: 1,
             accmax: 7
         }],
-        rewriteExpected: !isMongos
     },
 
     // Validate the rewrite occurs with a timezone with the same hourly boundaries, and
@@ -200,7 +194,6 @@ const groupByDateTrunc_ExpectRewrite = [
             {_id: {"m": "MDB", t: ISODate("2022-09-29T16:00:00Z")}, accmin: 1, accmax: 6},
             {_id: {"m": "MDB", t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7}
         ],
-        rewriteExpected: !isMongos
     },
 
     // The 'unit' field in $dateTrunc is larger than 'week', but 'bucketMaxSpanSeconds' is less than
@@ -214,7 +207,6 @@ const groupByDateTrunc_ExpectRewrite = [
             }
         }],
         expectedResults: [{_id: {t: ISODate("2022-01-01T00:00:00Z")}, accmin: 1, accmax: 7}],
-        rewriteExpected: true
     },
 
     // Validate the rewrite occurs with the $count accumulator.
@@ -233,14 +225,13 @@ const groupByDateTrunc_ExpectRewrite = [
             accmax: 7,
             count: 7
         }],
-        rewriteExpected: true
     }
 ];
 (function testGroupByDateTrunct_ExpectRewrite() {
     setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-09-30T15:00:00.000Z")});
 
     groupByDateTrunc_ExpectRewrite.forEach(testCase => {
-        checkRewrite({pipeline: testCase.pipeline, rewriteExpected: testCase.rewriteExpected});
+        checkRewrite({pipeline: testCase.pipeline, rewriteExpected: true});
         checkResults(testCase);
     });
 })();

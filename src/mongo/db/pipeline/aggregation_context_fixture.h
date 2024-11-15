@@ -56,7 +56,6 @@ public:
     struct ExpressionContextOptionsStruct {
         bool inRouter = false;
         bool allowDiskUse = true;
-        bool requiresTimeseriesExtendedRangeSupport = false;
     };
 
     AggregationContextFixture()
@@ -85,8 +84,6 @@ public:
     void setExpCtx(ExpressionContextOptionsStruct options) {
         _expCtx->setInRouter(options.inRouter);
         _expCtx->setAllowDiskUse(options.allowDiskUse);
-        _expCtx->setRequiresTimeseriesExtendedRangeSupport(
-            options.requiresTimeseriesExtendedRangeSupport);
     }
 
     /*
