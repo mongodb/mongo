@@ -70,6 +70,7 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/tracking/btree_map.h"
+#include "mongo/util/tracking/flat_hash_set.h"
 #include "mongo/util/tracking/inlined_vector.h"
 #include "mongo/util/tracking/unordered_map.h"
 #include "mongo/util/uuid.h"
@@ -153,7 +154,8 @@ struct Stripe {
 
     // All buckets currently open in the catalog, including buckets which are full or pending
     // closure but not yet committed, indexed by BucketKey. Non-owning pointers.
-    tracking::unordered_map<BucketKey, tracking::set<Bucket*>, BucketHasher> openBucketsByKey;
+    tracking::unordered_map<BucketKey, tracking::flat_hash_set<Bucket*>, BucketHasher>
+        openBucketsByKey;
 
     // Open buckets that do not have any outstanding writes.
     using IdleList = tracking::list<Bucket*>;

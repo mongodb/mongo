@@ -101,6 +101,45 @@ OperationId getOpId(OperationId opId, CombineWithInsertsFromOtherClients combine
     MONGO_UNREACHABLE;
 }
 
+std::string rolloverActionToString(RolloverAction action) {
+    switch (action) {
+        case RolloverAction::kNone:
+            return "kNone";
+        case RolloverAction::kArchive:
+            return "kArchive";
+        case RolloverAction::kHardClose:
+            return "kHardClose";
+        case RolloverAction::kSoftClose:
+            return "kSoftClose";
+    }
+    MONGO_UNREACHABLE;
+}
+void assertNoOpenUnclearedBucketsForKey(Stripe& stripe,
+                                        BucketStateRegistry& registry,
+                                        const BucketKey& key) {
+    auto it = stripe.openBucketsByKey.find(key);
+    if (it != stripe.openBucketsByKey.end()) {
+        auto& openSet = it->second;
+        for (Bucket* bucket : openSet) {
+            auto state = materializeAndGetBucketState(registry, bucket);
+            if (bucket->rolloverAction == RolloverAction::kNone && state &&
+                !conflictsWithInsertions(state.value())) {
+                for (Bucket* b : openSet) {
+                    LOGV2_INFO(8999000,
+                               "Dumping buckets for key",
+                               "key"_attr = key.metadata,
+                               "bucketId"_attr = b->bucketId.oid,
+                               "bucketState"_attr = bucketStateToString(
+                                   materializeAndGetBucketState(registry, b).value()),
+                               "rolloverAction"_attr = rolloverActionToString(b->rolloverAction));
+                }
+            }
+            invariant(bucket->rolloverAction != RolloverAction::kNone || !state ||
+                      conflictsWithInsertions(state.value()));
+        }
+    }
+}
+
 /**
  * Abandons the write batch and notifies any waiters that the bucket has been cleared.
  */
@@ -178,6 +217,28 @@ tracking::shared_ptr<ExecutionStats> getEmptyStats() {
     return kEmptyStats;
 }
 
+void doRollover(BucketCatalog& catalog,
+                Stripe& stripe,
+                WithLock stripeLock,
+                Bucket& bucket,
+                ClosedBuckets& closedBuckets,
+                RolloverAction action) {
+    invariant(action != RolloverAction::kNone);
+    if (allCommitted(bucket)) {
+        // The bucket does not contain any measurements that are yet to be committed, so we can take
+        // action now.
+        ExecutionStatsController stats = getExecutionStats(catalog, bucket.bucketId.collectionUUID);
+        if (action == RolloverAction::kArchive) {
+            archiveBucket(catalog, stripe, stripeLock, bucket, stats, closedBuckets);
+        } else {
+            closeOpenBucket(catalog, stripe, stripeLock, bucket, stats, closedBuckets);
+        }
+    } else {
+        // We must keep the bucket around until all measurements are committed, just mark
+        // the action we chose now so it we know what to do when the last batch finishes.
+        bucket.rolloverAction = action;
+    }
+}
 }  // namespace
 
 StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketKey& key) {
@@ -287,33 +348,41 @@ Bucket* useBucket(BucketCatalog& catalog,
             : nullptr;
     }
 
+    absl::InlinedVector<Bucket*, 4> bucketsToCleanUp;
+    auto cleanupFn = [&]() {
+        ExecutionStatsController statsStorage;
+        for (Bucket* bucket : bucketsToCleanUp) {
+            statsStorage = getExecutionStats(catalog, bucket->bucketId.collectionUUID);
+            abort(catalog,
+                  stripe,
+                  stripeLock,
+                  *bucket,
+                  statsStorage,
+                  /*batch=*/nullptr,
+                  getTimeseriesBucketClearedError(bucket->bucketId.oid));
+        }
+    };
+    ScopeGuard cleanup{cleanupFn};
+
     auto& openSet = it->second;
-    Bucket* bucket = nullptr;
     for (Bucket* potentialBucket : openSet) {
         if (potentialBucket->rolloverAction == RolloverAction::kNone) {
-            bucket = potentialBucket;
-            break;
+            auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, potentialBucket);
+            if (state && !conflictsWithInsertions(state.value())) {
+                markBucketNotIdle(stripe, stripeLock, *potentialBucket);
+                return potentialBucket;
+            } else if (state) {
+                bucketsToCleanUp.push_back(potentialBucket);
+            } else {
+                // If state is missing, it was already aborted and is just waiting to be cleaned up
+                // after the prepared batch is resolved.
+                invariant(potentialBucket->preparedBatch);
+            }
         }
     }
-    if (!bucket) {
-        return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(catalog, stripe, stripeLock, info, time, comparator)
-            : nullptr;
-    }
 
-    if (auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
-        state && !conflictsWithInsertions(state.value())) {
-        markBucketNotIdle(stripe, stripeLock, *bucket);
-        return bucket;
-    }
-
-    abort(catalog,
-          stripe,
-          stripeLock,
-          *bucket,
-          info.stats,
-          nullptr,
-          getTimeseriesBucketClearedError(bucket->bucketId.oid));
+    cleanup.dismiss();
+    cleanupFn();
 
     return mode == AllowBucketCreation::kYes
         ? &allocateBucket(catalog, stripe, stripeLock, info, time, comparator)
@@ -330,6 +399,21 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
         // No open bucket for this metadata.
         return nullptr;
     }
+
+    absl::InlinedVector<Bucket*, 4> bucketsToCleanUp;
+    ScopeGuard cleanup{[&]() {
+        ExecutionStatsController statsStorage;
+        for (Bucket* bucket : bucketsToCleanUp) {
+            statsStorage = getExecutionStats(catalog, bucket->bucketId.collectionUUID);
+            abort(catalog,
+                  stripe,
+                  stripeLock,
+                  *bucket,
+                  statsStorage,
+                  /*batch=*/nullptr,
+                  getTimeseriesBucketClearedError(bucket->bucketId.oid));
+        }
+    }};
 
     auto& openSet = it->second;
     // In order to potentially erase elements of the set while we iterate it (via _abort), we need
@@ -350,8 +434,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
         }
 
         auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, potentialBucket);
-        invariant(state);
-        if (!conflictsWithInsertions(state.value())) {
+        if (state && !conflictsWithInsertions(state.value())) {
             invariant(!potentialBucket->idleListEntry.has_value());
             return potentialBucket;
         }
@@ -591,6 +674,9 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
     }
 
     // Now actually mark this bucket as open.
+    if constexpr (kDebugBuild) {
+        assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, key);
+    }
     stripe.openBucketsByKey[key].emplace(unownedBucket);
     stats.incNumBucketsReopened();
 
@@ -651,7 +737,9 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     Bucket& existingBucket,
     const Date_t& time,
     uint64_t storageCacheSize,
-    const StringDataComparator* comparator) {
+    const StringDataComparator* comparator,
+    Bucket* excludedBucket,
+    boost::optional<RolloverAction> excludedAction) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
@@ -684,7 +772,9 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                    insertContext,
                                    action,
                                    time,
-                                   comparator);
+                                   comparator,
+                                   excludedBucket,
+                                   excludedAction);
             isNewlyOpenedBucket = true;
         }
     }
@@ -830,10 +920,8 @@ void removeBucket(BucketCatalog& catalog,
             break;
         }
         case RemovalMode::kAbort:
-            stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            break;
         case RemovalMode::kArchive:
-            // No state change
+            stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
             break;
     }
 
@@ -899,34 +987,11 @@ boost::optional<OID> findArchivedCandidate(
     invariant(candidateTime <= time);
     // We need to make sure our measurement can fit without violating max span. If not, we
     // can't use this bucket.
-    if (time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
-        BucketId bucketId(uuid, it->second.oid, BucketKey::signature(hash));
-        auto bucketState = getBucketState(catalog.bucketStateRegistry, bucketId);
-        if (bucketState && !transientlyConflictsWithReopening(bucketState.value())) {
-            return bucketId.oid;
-        } else {
-            if (bucketState) {
-                // If the bucket is represented by a state in the registry, it conflicts with
-                // reopening so we can mark it as untracked to drop the state once the
-                // directWrite finishes.
-                stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
-            }
-
-            // Decrement refCount and cleanup collectionTimeFields if needed
-            if (auto timeFieldIt = stripe.collectionTimeFields.find(uuid);
-                timeFieldIt != stripe.collectionTimeFields.end()) {
-                int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
-                if (--refCount == 0) {
-                    stripe.collectionTimeFields.erase(timeFieldIt);
-                }
-            }
-
-            stripe.archivedBuckets.erase(it);
-            info.stats.decNumActiveBuckets();
-        }
+    if (time - candidateTime >= Seconds(*info.options.getBucketMaxSpanSeconds())) {
+        return boost::none;
     }
 
-    return boost::none;
+    return it->second.oid;
 }
 
 std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSize,
@@ -1239,6 +1304,9 @@ Bucket& allocateBucket(BucketCatalog& catalog,
             successfullyCreatedId);
 
     Bucket* bucket = it->second.get();
+    if constexpr (kDebugBuild) {
+        assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, info.key);
+    }
     stripe.openBucketsByKey[info.key].emplace(bucket);
 
     info.stats.incNumActiveBuckets();
@@ -1255,20 +1323,18 @@ Bucket& rollover(BucketCatalog& catalog,
                  InsertContext& info,
                  RolloverAction action,
                  const Date_t& time,
-                 const StringDataComparator* comparator) {
-    invariant(action != RolloverAction::kNone);
-    if (allCommitted(bucket)) {
-        // The bucket does not contain any measurements that are yet to be committed, so we can take
-        // action now.
-        if (action == RolloverAction::kArchive) {
-            archiveBucket(catalog, stripe, stripeLock, bucket, info.stats, info.closedBuckets);
-        } else {
-            closeOpenBucket(catalog, stripe, stripeLock, bucket, info.stats, info.closedBuckets);
-        }
-    } else {
-        // We must keep the bucket around until all measurements are committed committed, just mark
-        // the action we chose now so it we know what to do when the last batch finishes.
-        bucket.rolloverAction = action;
+                 const StringDataComparator* comparator,
+                 Bucket* additionalBucket,
+                 boost::optional<RolloverAction> additionalAction) {
+    doRollover(catalog, stripe, stripeLock, bucket, info.closedBuckets, action);
+    if (additionalBucket) {
+        invariant(additionalAction.has_value());
+        doRollover(catalog,
+                   stripe,
+                   stripeLock,
+                   *additionalBucket,
+                   info.closedBuckets,
+                   additionalAction.value());
     }
 
     return allocateBucket(catalog, stripe, stripeLock, info, time, comparator);

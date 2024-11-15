@@ -151,7 +151,7 @@ Stripe::Stripe(TrackingContexts& trackingContexts)
           tracking::make_unordered_map<BucketId, tracking::unique_ptr<Bucket>, BucketHasher>(
               getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
       openBucketsByKey(
-          tracking::make_unordered_map<BucketKey, tracking::set<Bucket*>, BucketHasher>(
+          tracking::make_unordered_map<BucketKey, tracking::flat_hash_set<Bucket*>, BucketHasher>(
               getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsByKey))),
       idleBuckets(tracking::make_list<Bucket*>(
           getTrackingContext(trackingContexts, TrackingScope::kIdleBuckets))),
@@ -329,7 +329,11 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                                *alternate,
                                                time,
                                                storageCacheSize,
-                                               comparator);
+                                               comparator,
+                                               bucket,
+                                               *reason == RolloverReason::kTimeBackward
+                                                   ? RolloverAction::kArchive
+                                                   : RolloverAction::kSoftClose);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
                 return SuccessfulInsertion{std::move(*batch),
                                            std::move(insertContext.closedBuckets)};

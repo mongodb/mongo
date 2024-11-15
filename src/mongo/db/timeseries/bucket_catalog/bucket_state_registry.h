@@ -69,7 +69,7 @@ enum class ContinueTrackingBucket { kContinue, kStop };
  * |                    | Untracked | Normal | Cleared | Frozen | Prepared | DirectWriteCounter |
  * |--------------------|-----------|--------|---------|--------|----------|--------------------|
  * | Untracked          |    nop    |   +    |   nop   |   +    |   INV    |         +          |
- * | Normal             |     +     |   +    |    +    |   +    |    +     |         +          |
+ * | Normal             |     +     |  INV   |    +    |   +    |    +     |         +          |
  * | Cleared            |     +     |   +    |    +    |   +    |   nop    |         +          |
  * | Frozen             |    nop    |  nop   |   nop   |  nop   |   nop    |        nop         |
  * | Prepared           |     +     |  INV   |    +    |   +    |   INV    |        nop         |
@@ -200,17 +200,17 @@ bool conflictsWithInsertions(std::variant<BucketState, DirectWriteCounter>& stat
  * Initializes the state of the bucket within the registry to a state of 'kNormal'. If included,
  * checks the registry Era against the 'targetEra' prior to performing the initialization to prevent
  * operating on a potentially stale bucket. Returns WriteConflict if the current bucket state
- * conflicts with reopening.
+ * conflicts with reopening. Only a valid call if the bucket is currently untracked or cleared.
  *
  * |   Current State    |         Result
  * |--------------------|------------------------
  * | Untracked          | kNormal
- * | Normal             | kNormal
+ * | Normal             | invariants
  * | Cleared            | kNormal
- * | Frozen             | kFrozen
- * | Prepared           | TimeseriesBucketFrozen
- * | PreparedAndCleared | WriteConflict
- * | PreparedAndFrozen  | WriteConflict
+ * | Frozen             | TimeseriesBucketFrozen
+ * | Prepared           | invariants
+ * | PreparedAndCleared | invariants
+ * | PreparedAndFrozen  | TimeseriesBucketFrozen
  * | DirectWriteCounter | WriteConflict
  */
 Status initializeBucketState(BucketStateRegistry& registry,

@@ -149,7 +149,7 @@ Bucket* useBucket(BucketCatalog& catalog,
 
 /**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
- * that are pending closure or archival but which are still eligible to recieve new measurements.
+ * that are pending closure or archival but which are still eligible to receive new measurements.
  */
 Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
@@ -201,7 +201,9 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
 
 /**
  * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and 'mode'
- * is set to 'kYes', we will create a new bucket and insert into that bucket.
+ * is set to 'kYes', we will create a new bucket and insert into that bucket. If `existingBucket`
+ * was selected via `useAlternateBucket`, then the previous bucket returned by `useBucket` should be
+ * passed in as `excludedBucket`.
  */
 std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     BucketCatalog& catalog,
@@ -215,7 +217,9 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     Bucket& existingBucket,
     const Date_t& time,
     uint64_t storageCacheSize,
-    const StringDataComparator* comparator);
+    const StringDataComparator* comparator,
+    Bucket* excludedBucket = nullptr,
+    boost::optional<RolloverAction> excludedAction = boost::none);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -342,7 +346,9 @@ Bucket& allocateBucket(BucketCatalog& catalog,
 /**
  * Close the existing, full bucket and open a new one for the same metadata.
  *
- * Writes information about the closed bucket to the 'info' parameter.
+ * Writes information about the closed bucket to the 'info' parameter. Optionally, if `bucket` was
+ * selected via `useAlternateBucket`, pass the current open bucket as `additionalBucket` to mark for
+ * archival and preserve the invariant of only one open bucket per key.
  */
 Bucket& rollover(BucketCatalog& catalog,
                  Stripe& stripe,
@@ -351,7 +357,9 @@ Bucket& rollover(BucketCatalog& catalog,
                  InsertContext& info,
                  RolloverAction action,
                  const Date_t& time,
-                 const StringDataComparator* comparator);
+                 const StringDataComparator* comparator,
+                 Bucket* additionalBucket,
+                 boost::optional<RolloverAction> additionalAction);
 
 /**
  * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether

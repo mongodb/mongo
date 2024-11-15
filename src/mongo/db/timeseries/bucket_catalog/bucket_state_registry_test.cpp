@@ -230,13 +230,18 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant
                 StateChangeSuccessful::kNo);
 }
 
-TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
+DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAnUnclearedBucket, "invariant") {
     // Start with a 'kNormal' bucket in the registry.
     auto& bucket = createBucket(info1, date);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
-    // We expect transition to 'kNormal' to succeed.
+    // We expect initialize to invariant.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+}
+
+TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
+    // Start with a 'kNormal' bucket in the registry.
+    auto& bucket = createBucket(info1, date);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We can stop tracking a 'kNormal' bucket.
@@ -490,7 +495,6 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndFrozenState) {
 TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
     // Start with a bucket with a direct write in the registry.
     auto& bucket = createBucket(info1, date);
-    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     auto bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
     auto originalDirectWriteCount = std::get<DirectWriteCounter>(bucketState);
@@ -605,6 +609,7 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
 
     // Sanity check that all this still works with multiple buckets in a namespace being cleared.
     auto& bucket3 = createBucket(info2, date);
+    bucket3.rolloverAction = RolloverAction::kArchive;  // Rollover before opening another bucket
     auto& bucket4 = createBucket(info2, date);
     ASSERT_EQ(bucket3.lastChecked, 1);
     ASSERT_EQ(bucket4.lastChecked, 1);
@@ -662,14 +667,22 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     // Era 2 still has bucket4 in it, so its count remains non-zero.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
     auto& bucket5 = createBucket(info1, date);
+    bucket4.rolloverAction = RolloverAction::kArchive;  // Rollover before opening another bucket
     auto& bucket6 = createBucket(info2, date);
     ASSERT_EQ(bucket5.lastChecked, 3);
     ASSERT_EQ(bucket6.lastChecked, 3);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket5);
-    // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
-    // non-zero.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
+    if constexpr (!kDebugBuild) {
+        ASSERT_EQ(bucket4.lastChecked, 2);
+        // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
+        // non-zero.
+        ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
+    } else {
+        ASSERT_EQ(bucket4.lastChecked, 3);  // Debug check advanced this while creating bucket6.
+        // Era3 still has bucket4 and bucket6, so its count remains non-zero.
+        ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
+    }
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket4);
     checkAndRemoveClearedBucket(bucket6);
@@ -728,7 +741,7 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
     ASSERT_TRUE(hasBeenCleared(bucket2));
 }
 
-TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
+TEST_F(BucketStateRegistryTest, ArchivingBucketStopsTrackingState) {
     auto& bucket = createBucket(info1, date);
     auto bucketId = bucket.bucketId;
 
@@ -740,7 +753,7 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
                             stats(bucket),
                             closedBuckets);
     auto state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
+    ASSERT_EQ(state, boost::none);
 }
 
 TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
