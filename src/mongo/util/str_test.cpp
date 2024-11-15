@@ -27,20 +27,24 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <bitset>
 #include <fmt/format.h>
 #include <limits>
-#include <memory>
 
 #include <boost/optional/optional.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
+#include "mongo/util/str_escape.h"
 
 namespace mongo::str {
+namespace {
 
 using namespace fmt::literals;
 using std::string;
@@ -351,4 +355,113 @@ TEST(StringUtilsTest, CopyAsCString) {
     ASSERT_THROWS_CODE(copyAsCString(dest, "hello\0world"_sd), DBException, 9527900);
 }
 
+/**
+ * The Unicode REPLACEMENT_CHARACTER (U+FFFD).
+ * https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+ */
+const std::string replacementCharacter = u8"\ufffd"_as_char_ptr;
+
+/** Repeat the `s` string, `x` times. */
+std::string repeat(StringData s, size_t x) {
+    std::string result;
+    result.reserve(x * s.size());
+    auto it = std::back_inserter(result);
+    for (size_t i = 0; i < x; ++i)
+        it = std::copy(s.begin(), s.end(), it);
+    return result;
+}
+
+/** Function to convert a Unicode code point to a UTF-8 encoded string */
+std::string codePointToUTF8(unsigned int codePoint) {
+    std::string result;
+    if (codePoint <= 0x7F) {
+        result += static_cast<char>(codePoint);
+    } else if (codePoint <= 0x7FF) {
+        result += static_cast<char>(0xC0 | (codePoint >> 6));
+        result += static_cast<char>(0x80 | (codePoint & 0x3F));
+    } else if (codePoint <= 0xFFFF) {
+        result += static_cast<char>(0xE0 | (codePoint >> 12));
+        result += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (codePoint & 0x3F));
+    } else if (codePoint <= 0x10FFFF) {
+        result += static_cast<char>(0xF0 | (codePoint >> 18));
+        result += static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F));
+        result += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (codePoint & 0x3F));
+    }
+    return result;
+}
+
+/** Double-check the encoding of the replacementCharacter */
+TEST(UnicodeReplacementCharacter, Bytes) {
+    ASSERT_EQ(replacementCharacter, (std::string{'\xef', '\xbf', '\xbd'}));
+}
+
+const std::vector<std::string> validUTF8Strings{
+    "A",
+    "\xc2\xa2",          // CENT SIGN: ¢
+    "\xe2\x82\xac",      // Euro: €
+    "\xf0\x9d\x90\x80",  // Blackboard A: 𝐀
+    "\n",
+    u8"こんにちは"_as_char_ptr,
+    u8"😊"_as_char_ptr,
+    "",
+};
+
+// Maps invalid UTF-8 to the appropriate scrubbed version.
+const std::map<std::string, std::string> scrubMap{
+    // Abrupt end
+    {"\xc2", repeat(replacementCharacter, 1)},
+    {"\xe2\x82", repeat(replacementCharacter, 2)},
+    {"\xf0\x9d\x90", repeat(replacementCharacter, 3)},
+
+    // Test having spaces at the end and beginning of scrubbed lines
+    {" \xc2 ", " \xef\xbf\xbd "},
+    {"\xe2\x82 ", "\xef\xbf\xbd\xef\xbf\xbd "},
+    {"\xf0\x9d\x90 ", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd "},
+
+    // Too long
+    {"\xf8\x80\x80\x80\x80", repeat(replacementCharacter, 5)},
+    {"\xfc\x80\x80\x80\x80\x80", repeat(replacementCharacter, 6)},
+    {"\xfe\x80\x80\x80\x80\x80\x80", repeat(replacementCharacter, 7)},
+    {"\xff\x80\x80\x80\x80\x80\x80\x80", repeat(replacementCharacter, 8)},
+
+    {"\x80", repeat(replacementCharacter, 1)},         // Can't start with continuation byte.
+    {"\xc3\x28", "\xef\xbf\xbd\x28"},                  // First byte indicates 2-byte sequence, but
+                                                       // second byte is not in form 10xxxxxx
+    {"\xe2\x28\xa1", "\xef\xbf\xbd\x28\xef\xbf\xbd"},  // first byte indicates 3-byte sequence, but
+                                                       // second byte is not in form 10xxxxxx
+    {"\xde\xa0\x80",
+     "\xde\xa0\xef\xbf\xbd"},  // Surrogate pairs are not valid for UTF-8 (high surrogate)
+    {"\xf0\x9d\xdc\x80", "\xef\xbf\xbd\xef\xbf\xbd\xdc\x80"},  // Surrogate pairs are not valid
+
+    // These are invalid UTF-8 strings that currently pass that shouldn't.
+    // See SERVER-95394.
+    // {"\xf5\x80\x80\x80", repeat(replacementCharacter, 4)},  // U+140000 > U+10FFFF
+    // {"\xc0\x80", repeat(replacementCharacter, 2)},          // 2-byte version of ASCII NUL
+    // {"\xc1\x80", repeat(replacementCharacter, 2)},           // 2-byte version of ASCII NUL
+    // {"\0x88\0x80"}        // Invalid start-byte (0x88 > 0x7f)
+};
+
+TEST(StringEscapeTest, ScrubInvalidUTF8) {
+    for (auto& in : validUTF8Strings)
+        assertCmp(0, str::scrubInvalidUTF8(in), in);
+    for (auto& [in, expect] : scrubMap)
+        assertCmp(0, str::scrubInvalidUTF8(in), expect);
+    for (unsigned i = 0; i < 0x1'0000; ++i) {
+        std::string s = codePointToUTF8(i);
+        assertCmp(0, scrubInvalidUTF8(s), s);
+    }
+}
+
+TEST(StringEscapeTest, ValidUTF8) {
+    for (auto& str : validUTF8Strings) {
+        ASSERT(str::validUTF8(str));
+    }
+    for (const auto& pair : scrubMap) {
+        ASSERT(!str::validUTF8(pair.first));
+    }
+}
+
+}  // namespace
 }  // namespace mongo::str

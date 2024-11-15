@@ -112,4 +112,13 @@ std::string escapeForJSON(StringData str,
  * Returns whether a string consists with valid UTF-8 encoded characters.
  */
 bool validUTF8(StringData str);
+
+/**
+ * Scrubs invalid UTF-8 characters from the input str.
+ *
+ * Handles invalid UTF-8 characters by replacing them with "\xef\xbf\xbd", which is the
+ * UTF-8 encoding of the replacement character U+FFFD.
+ * https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+ */
+std::string scrubInvalidUTF8(StringData str);
 }  // namespace mongo::str

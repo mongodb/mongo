@@ -29,11 +29,9 @@
 
 #include "mongo/db/catalog/validate/validate_results.h"
 
-#include <cstddef>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_utf8.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/namespace_string_util.h"
 
@@ -146,8 +144,19 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
                            [](const auto& results) { return results.getWarnings(); });
     appendRangeSizeLimited("errors"_sd, [](const auto& results) { return results.getErrors(); });
 
-    resultObj->append("extraIndexEntries", getExtraIndexEntries());
-    resultObj->append("missingIndexEntries", getMissingIndexEntries());
+    // appendScrubInvalidUTF8Values recursively ranges through each BSONObj and scrubs invalid UTF-8
+    // string data in the BSONObj with"\xef\xbf\xbd", which is the UTF-8 encoding of the replacement
+    // character U+FFFD.
+    // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+    auto appendScrubInvalidUTF8Values = [&](StringData fieldName, const auto& values) {
+        BSONArrayBuilder arr(resultObj->subarrayStart(fieldName));
+        for (auto&& v : values) {
+            arr.append(checkAndScrubInvalidUTF8(v));
+        }
+    };
+
+    appendScrubInvalidUTF8Values("extraIndexEntries"_sd, getExtraIndexEntries());
+    appendScrubInvalidUTF8Values("missingIndexEntries"_sd, getMissingIndexEntries());
     if (_numInvalidDocuments.has_value()) {
         resultObj->appendNumber("nInvalidDocuments", _numInvalidDocuments.value());
     }

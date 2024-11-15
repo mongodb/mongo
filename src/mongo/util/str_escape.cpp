@@ -33,7 +33,6 @@
 #include <array>
 #include <cstdint>
 #include <iterator>
-#include <type_traits>
 #include <utility>
 
 #include <fmt/format.h>
@@ -41,10 +40,14 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::str {
 namespace {
 constexpr char kHexChar[] = "0123456789abcdef";
+
+/** UTF8 encoding of Unicode REPLACEMENT CHARACTER U+FFFD, or "\xef\xbf\xbd". */
+const StringData unicodeReplacementCharacterUtf8{u8"\ufffd"_as_char_ptr};
 
 struct NoopBuffer {
     void append(const char* begin, const char* end) {}
@@ -539,5 +542,28 @@ bool validUTF8(StringData str) {
     } catch (const ExceptionFor<ErrorCodes::BadValue>&) {
         return false;
     }
+}
+
+std::string scrubInvalidUTF8(StringData str) {
+    std::string buffer;
+    auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
+    };
+    auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {
+    };
+
+    // Replace with UTF-8 encoding of Unicode replacement character.
+    auto invalidByteHandler = [](const auto& writer, uint8_t) {
+        writer(1, unicodeReplacementCharacterUtf8);
+    };
+
+    escape(buffer,
+           str,
+           std::move(singleByteHandler),
+           std::move(invalidByteHandler),
+           std::move(twoByteEscaper),
+           std::string::npos,
+           nullptr);
+
+    return buffer;
 }
 }  // namespace mongo::str
