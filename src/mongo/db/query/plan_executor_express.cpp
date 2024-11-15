@@ -439,14 +439,13 @@ template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
                                                    size_t& numWriteConflictYieldsSinceLastSuccess) {
-    handleTemporarilyUnavailableException(
-        _opCtx,
-        numUnavailabilityYieldsSinceLastSuccess++,
-        "plan executor",
-        NamespaceStringOrUUID(_nss),
-        ExceptionFor<ErrorCodes::TemporarilyUnavailable>(Status(
-            ErrorCodes::TemporarilyUnavailable, "resource contention during express execution"_sd)),
-        numWriteConflictYieldsSinceLastSuccess);
+    handleTemporarilyUnavailableException(_opCtx,
+                                          numUnavailabilityYieldsSinceLastSuccess++,
+                                          "plan executor",
+                                          NamespaceStringOrUUID(_nss),
+                                          Status(ErrorCodes::TemporarilyUnavailable,
+                                                 "resource contention during express execution"_sd),
+                                          numWriteConflictYieldsSinceLastSuccess);
 
     // TODO: Is this the desired behavior?
     _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {

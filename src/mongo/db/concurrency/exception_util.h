@@ -70,13 +70,12 @@ void logWriteConflictAndBackoff(size_t attempt,
  * conflict and handles it, because unlike user operations, the error cannot eventually escape to
  * the client.
  */
-void handleTemporarilyUnavailableException(
-    OperationContext* opCtx,
-    size_t tempUnavailAttempts,
-    StringData opStr,
-    const NamespaceStringOrUUID& nssOrUUID,
-    const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e,
-    size_t& writeConflictAttempts);
+void handleTemporarilyUnavailableException(OperationContext* opCtx,
+                                           size_t tempUnavailAttempts,
+                                           StringData opStr,
+                                           const NamespaceStringOrUUID& nssOrUUID,
+                                           const Status& e,
+                                           size_t& writeConflictAttempts);
 
 /**
  * Convert `e` into a `WriteConflictException` and throw it.
@@ -84,13 +83,6 @@ void handleTemporarilyUnavailableException(
 void convertToWCEAndRethrow(OperationContext* opCtx,
                             StringData opStr,
                             const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e);
-
-void handleTransactionTooLargeForCacheException(
-    OperationContext* opCtx,
-    StringData opStr,
-    const NamespaceStringOrUUID& nssOrUUID,
-    const ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& e,
-    size_t& writeConflictAttempts);
 
 namespace error_details {
 /**
@@ -153,7 +145,7 @@ public:
 
     /** Returns whatever `f` returns. */
     decltype(auto) operator()(auto&& f) {
-        // Always run without retries in a WuoW.
+        // Always run without retries in a WuoW because the entire WuoW needs to be retried.
         if (shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork())
             return _runWithoutRetries(f);
 
@@ -167,17 +159,11 @@ public:
             MONGO_unlikely(sfp.isActive()))
             return _runWithoutRetries(f);
 
-        // Initialized on the first failure for a faster happy path
-        boost::optional<Timer> timer;
         while (true) {
             try {
                 return f();
-            } catch (...) {
-                if (timer)
-                    _conflictTime += timer->elapsed();
-                _handleFailedAttempt();
-                if (!timer)
-                    timer.emplace();
+            } catch (const StorageUnavailableException& e) {
+                _handleStorageUnavailable(e.toStatus());
             }
         }
     }
@@ -186,29 +172,31 @@ private:
     decltype(auto) _runWithoutRetries(auto&& f) {
         try {
             return f();
-        } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
+        } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e) {
             if (_opCtx->inMultiDocumentTransaction()) {
                 convertToWCEAndRethrow(_opCtx, _opStr, e);
             }
             throw;
-        } catch (ExceptionFor<ErrorCodes::WriteConflict>&) {
+        } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
             CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             throw;
         }
     }
 
-    void _handleFailedAttempt();
     void _emitLog(StringData reason);
     void _assertRetryLimit() const;
-    void _handleWriteConflictException(const ExceptionFor<ErrorCodes::WriteConflict>& e);
+    void _handleStorageUnavailable(const Status& e);
+    void _handleWriteConflictException(const Status& e);
 
-    OperationContext* _opCtx;
-    StringData _opStr;
+    OperationContext* const _opCtx;
+    const StringData _opStr;
     const NamespaceStringOrUUID& _nssOrUUID;
-    boost::optional<size_t> _retryLimit;
+    const boost::optional<size_t> _retryLimit;
 
+    size_t _attemptCount = 0;
     size_t _wceCount = 0;
     size_t _tempUnavailableCount = 0;
+    boost::optional<Timer> _timer;
     Microseconds _conflictTime{0};
     double _backoffFactor = backoffInitial;
     logv2::SeveritySuppressor _logSeverity{

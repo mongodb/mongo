@@ -466,8 +466,7 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
             tempUnavailErrorsInARow,
             "plan executor",
             NamespaceStringOrUUID(_nss),
-            ExceptionFor<ErrorCodes::TemporarilyUnavailable>(
-                Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")),
+            Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable"),
             writeConflictsInARow);
 
     } else {
