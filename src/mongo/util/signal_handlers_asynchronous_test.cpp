@@ -88,13 +88,16 @@ private:
     std::unique_ptr<unittest::Barrier> _barrier;
 };
 
-TEST_F(LogRotateSignalTest, LogRotateSignal) {
+// We use a death test here because the asynchronous signal processing thread runs as detached
+// thread, so we kill the process in which it spawns so the thread doesn't live in other tests.
+DEATH_TEST_F(LogRotateSignalTest, LogRotateSignal, "Ending LogRotateSignalTest") {
     startCapturingLogMessages();
     kill(getpid(), SIGUSR1);
     waitUntilLogRotatorCalled();
     stopCapturingLogMessages();
     ASSERT(checkCapturedTextFormatLogMessagesForSubstr("Log rotation initiated"));
     ASSERT(checkCapturedTextFormatLogMessagesForSubstr("Test log rotator called"));
+    LOGV2_FATAL(9706300, "Ending LogRotateSignalTest");
 }
 
 void doSignalShutdownTest(int sig) {
