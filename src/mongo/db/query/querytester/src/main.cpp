@@ -152,12 +152,16 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                                    currFile.getCollectionsNeeded().end());
     }
 
+    if (populateAndExit) {
+        std::cout << std::endl << "Documents and indexes loaded from collection!" << std::endl;
+        return 0;
+    }
     if (mode != ModeOption::Normalize) {
         conn->shutdown();
     }
 
     if (failedTestFiles.empty()) {
-        std::cout << "All tests passed!\n";
+        std::cout << std::endl << "All tests passed!" << std::endl;
         return 0;
     } else {
         fileHelpers::printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
@@ -238,10 +242,9 @@ int main(const int argc, const char** const argv) {
             testsToRun.push_back({parsedArgs[argNum + 1]});
             ++argNum;  // Skip the testName
             expectingNumAt = argNum + 1;
-
         } else if (parsedArgs[argNum].compare("-h") == 0) {
             printHelpString();
-            break;
+            return 0;
         } else if (parsedArgs[argNum].compare("-n") ==
                    0) {  // TODO(DEVPROD-12147): Remove this option.
             if (expectingNumAt != argNum) {
@@ -301,6 +304,7 @@ int main(const int argc, const char** const argv) {
             queryTester::exitWithError(1, std::string("Unexpected argument ") + parsedArgs[argNum]);
         }
     }
+
     if (!mongoURIString) {
         mongoURIString = "mongodb://localhost:27017";
         std::cout << "Using default URI of " << mongoURIString.get() << "\n";
@@ -322,6 +326,13 @@ int main(const int argc, const char** const argv) {
             "--mode compare and --out are incompatible.",
             outOpt == queryTester::WriteOutOptions::kNone ||
                 mode != queryTester::ModeOption::Compare);
+
+    if (const auto numTestFiles = testsToRun.size(); populateAndExit && numTestFiles != 1) {
+        queryTester::exitWithError(1,
+                                   "--populateAndExit must be specified with a single test file.");
+    } else if (numTestFiles == 0) {
+        queryTester::exitWithError(1, "Make sure to provide QueryTester with a .test file.");
+    }
 
     try {
         auto serviceContextHolder = mongo::ServiceContext::make();
