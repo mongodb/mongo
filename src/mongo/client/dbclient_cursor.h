@@ -71,7 +71,7 @@ class DBClientCursor {
 public:
     static StatusWith<std::unique_ptr<DBClientCursor>> fromAggregationRequest(
         DBClientBase* client,
-        AggregateCommandRequest aggRequest,
+        const AggregateCommandRequest& aggRequest,
         bool secondaryOk,
         bool useExhaust);
 

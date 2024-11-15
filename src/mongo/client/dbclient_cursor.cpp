@@ -384,7 +384,10 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
 }
 
 StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationRequest(
-    DBClientBase* client, AggregateCommandRequest aggRequest, bool secondaryOk, bool useExhaust) {
+    DBClientBase* client,
+    const AggregateCommandRequest& aggRequest,
+    bool secondaryOk,
+    bool useExhaust) {
     BSONObj ret;
     try {
         if (!client->runCommand(aggRequest.getNamespace().dbName(),
@@ -396,18 +399,24 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
     } catch (...) {
         return exceptionToStatus();
     }
-    long long cursorId = ret["cursor"].Obj()["id"].Long();
-    std::vector<BSONObj> firstBatch;
-    for (BSONElement elem : ret["cursor"].Obj()["firstBatch"].Array()) {
-        firstBatch.emplace_back(elem.Obj().getOwned());
-    }
+
+    const BSONObj cursorObj = ret["cursor"].Obj();
+    const long long cursorId = cursorObj["id"].Long();
+    auto firstBatch = [](auto&& in) {
+        std::vector<BSONObj> objs;
+        objs.reserve(in.size());
+        std::transform(in.begin(), in.end(), std::back_inserter(objs), [](auto&& e) {
+            return e.Obj().getOwned();
+        });
+        return objs;
+    }(cursorObj["firstBatch"].Array());
+
     boost::optional<BSONObj> postBatchResumeToken;
-    if (auto postBatchResumeTokenElem = ret["cursor"].Obj()["postBatchResumeToken"];
-        postBatchResumeTokenElem.type() == BSONType::Object) {
-        postBatchResumeToken = postBatchResumeTokenElem.Obj().getOwned();
-    } else if (ret["cursor"].Obj().hasField("postBatchResumeToken")) {
-        return Status(ErrorCodes::Error(5761702),
-                      "Expected field 'postbatchResumeToken' to be of object type");
+    if (auto elem = cursorObj["postBatchResumeToken"]) {
+        if (elem.type() != BSONType::Object)
+            return Status(ErrorCodes::Error(5761702),
+                          "Expected field 'postBatchResumeToken' to be of object type");
+        postBatchResumeToken = elem.Obj().getOwned();
     }
 
     boost::optional<Timestamp> operationTime = boost::none;
@@ -419,9 +428,9 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
                                              aggRequest.getNamespace(),
                                              cursorId,
                                              useExhaust,
-                                             firstBatch,
+                                             std::move(firstBatch),
                                              operationTime,
-                                             postBatchResumeToken)};
+                                             std::move(postBatchResumeToken))};
 }
 
 DBClientCursor::~DBClientCursor() {
