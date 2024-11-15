@@ -102,6 +102,10 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
 
 std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << kStageName << " must take a nested object but found: " << spec,
+            spec.type() == BSONType::Object);
+
     std::vector<LiteParsedPipeline> liteParsedPipelines;
 
     auto parsedSpec = ScoreFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());

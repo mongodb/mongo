@@ -58,6 +58,16 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputsField) {
                        ErrorCodes::IDLFailedToParse);
 }
 
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoNestedObject) {
+    auto spec = fromjson(R"({
+        $rankFusion: 'not_an_object'
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownField) {
     auto spec = fromjson(R"({
         $scoreFusion: {

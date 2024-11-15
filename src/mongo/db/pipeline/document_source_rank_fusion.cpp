@@ -259,6 +259,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
 
 std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << kStageName << " must take a nested object but found: " << spec,
+            spec.type() == BSONType::Object);
+
     std::vector<LiteParsedPipeline> liteParsedPipelines;
 
     auto parsedSpec = RankFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
