@@ -39,7 +39,8 @@ namespace {
 namespace value = sbe::value;
 
 using stats::CEHistogram;
-using stats::getMinMaxBoundForSBEType;
+using stats::getMaxBound;
+using stats::getMinBound;
 using stats::ScalarHistogram;
 using stats::TypeCounts;
 
@@ -741,19 +742,19 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     ASSERT_BSONOBJ_EQ(expected, hist.serialize());
 
     // Minimum ObjectId.
-    auto&& [minOid, inclOid] = getMinMaxBoundForSBEType(value::TypeTags::ObjectId, true /*isMin*/);
+    auto&& [minOid, inclOid] = getMinBound(value::TypeTags::ObjectId);
     auto minOidTag = minOid.getTag();
     auto minOidVal = minOid.getValue();
     ASSERT_EQ(1.0, estimateCardinality(hist, minOidTag, minOidVal, kEqual).card);
 
     // Minimum date.
-    const auto&& [minDate, inclDate] = getMinMaxBoundForSBEType(Date, true /*isMin*/);
+    const auto&& [minDate, inclDate] = getMinBound(Date);
     const auto minDateTag = minDate.getTag();
     const auto minDateVal = minDate.getValue();
     ASSERT_EQ(1.0, estimateCardinality(hist, minDateTag, minDateVal, kEqual).card);
 
     // Minimum timestamp.
-    auto&& [minTs, inclTs] = getMinMaxBoundForSBEType(value::TypeTags::Timestamp, true /*isMin*/);
+    auto&& [minTs, inclTs] = getMinBound(value::TypeTags::Timestamp);
     auto minTsTag = minTs.getTag();
     auto minTsVal = minTs.getValue();
     ASSERT_EQ(1.0, estimateCardinality(hist, minTsTag, minTsVal, kEqual).card);
@@ -823,8 +824,7 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     ASSERT_EQ(3.0, expectedCard.card);
 
     // [minTs, maxTs], estimated by the entire timestamp bucket.
-    auto&& [maxTs, inclMaxTs] =
-        getMinMaxBoundForSBEType(value::TypeTags::Timestamp, false /*isMin*/);
+    auto&& [maxTs, inclMaxTs] = getMaxBound(value::TypeTags::Timestamp);
     const auto maxTsTag = maxTs.getTag();
     const auto maxTsVal = maxTs.getValue();
     expectedCard =
@@ -849,20 +849,20 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
     ASSERT_EQ(500.0, getTotals(hist).card);
 
     // Minimum ObjectId.
-    auto&& [minOid, inclOid] = getMinMaxBoundForSBEType(value::TypeTags::ObjectId, true /*isMin*/);
+    auto&& [minOid, inclOid] = getMinBound(value::TypeTags::ObjectId);
     auto minOidTag = minOid.getTag();
     auto minOidVal = minOid.getValue();
     ASSERT_APPROX_EQUAL(
         1.9, estimateCardinality(hist, minOidTag, minOidVal, kEqual).card, kErrorBound);
 
     // Minimum date.
-    const auto&& [minDate, inclDate] = getMinMaxBoundForSBEType(Date, true /*isMin*/);
+    const auto&& [minDate, inclDate] = getMinBound(Date);
     const auto minDateTag = minDate.getTag();
     const auto minDateVal = minDate.getValue();
     ASSERT_EQ(4.0, estimateCardinality(hist, minDateTag, minDateVal, kEqual).card);
 
     // Minimum timestamp.
-    auto&& [minTs, inclTs] = getMinMaxBoundForSBEType(value::TypeTags::Timestamp, true /*isMin*/);
+    auto&& [minTs, inclTs] = getMinBound(value::TypeTags::Timestamp);
     auto minTsTag = minTs.getTag();
     auto minTsVal = minTs.getValue();
     ASSERT_APPROX_EQUAL(
