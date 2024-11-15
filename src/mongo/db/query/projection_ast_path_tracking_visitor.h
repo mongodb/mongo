@@ -103,7 +103,6 @@ private:
     boost::optional<FieldPath> _basePath;
 };
 
-namespace {
 /**
  * A path tracking pre-visitor used for maintaining field names while traversing the AST.
  *
@@ -190,7 +189,6 @@ public:
 private:
     PathTrackingVisitorContext<UserData>* _context;
 };
-}  // namespace
 
 /**
  * A general path tracking walker to be used with projection AST visitors which need to track

@@ -56,8 +56,10 @@
  */
 namespace mongo {
 namespace executor {
-namespace {
-BSONObj buildCursorResponse(StringData fieldName, size_t start, size_t end, size_t cursorId) {
+inline BSONObj buildCursorResponse(StringData fieldName,
+                                   size_t start,
+                                   size_t end,
+                                   size_t cursorId) {
     BSONObjBuilder bob;
     {
         BSONObjBuilder cursor(bob.subobjStart("cursor"));
@@ -76,10 +78,10 @@ BSONObj buildCursorResponse(StringData fieldName, size_t start, size_t end, size
     return bob.obj();
 }
 
-BSONObj buildMultiCursorResponse(StringData fieldName,
-                                 size_t start,
-                                 size_t end,
-                                 std::vector<size_t> cursorIds) {
+inline BSONObj buildMultiCursorResponse(StringData fieldName,
+                                        size_t start,
+                                        size_t end,
+                                        std::vector<size_t> cursorIds) {
     BSONObjBuilder bob;
     {
         BSONArrayBuilder cursors;
@@ -103,7 +105,6 @@ BSONObj buildMultiCursorResponse(StringData fieldName,
     bob.append("ok", 1);
     return bob.obj();
 }
-}  // namespace
 
 class NonPinningTaskExecutorCursorTestFixture : public ThreadPoolExecutorTest {
 public:

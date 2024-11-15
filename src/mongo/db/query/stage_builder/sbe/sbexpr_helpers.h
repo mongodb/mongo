@@ -38,7 +38,6 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 
 namespace mongo::stage_builder {
-namespace {
 inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result) {}
 
 template <typename... Ts>
@@ -79,7 +78,6 @@ inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result,
     result.emplace_back(std::move(p.first), p.second);
     makeSbExprOptSbSlotVecHelper(result, std::forward<Ts>(rest)...);
 }
-}  // namespace
 
 template <typename... Ts>
 auto makeSbExprOptSbSlotVec(Ts&&... pack) {

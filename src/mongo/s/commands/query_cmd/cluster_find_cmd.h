@@ -56,12 +56,11 @@
 #include "mongo/s/query/planner/cluster_find.h"
 
 namespace mongo {
-namespace {
 /**
  * Parses the command object to a FindCommandRequest and validates that no runtime
  * constants were supplied and that querySettings was not passed into the command.
  */
-std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(
+inline std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(
     OperationContext* opCtx, const OpMsgRequest& request) {
     const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
     auto findCommand = query_request_helper::makeFromFindCommand(
@@ -85,7 +84,6 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(
 
     return findCommand;
 }
-}  // namespace
 
 /**
  * Implements the find command for a router.

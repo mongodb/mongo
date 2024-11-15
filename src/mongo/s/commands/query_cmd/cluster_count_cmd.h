@@ -57,12 +57,7 @@
 
 namespace mongo {
 
-namespace {
-
-// The # of documents returned is always 1 for the count command.
-static constexpr long long kNReturned = 1;
-
-BSONObj prepareCountForPassthrough(const BSONObj& cmdObj, bool requestQueryStats) {
+inline BSONObj prepareCountForPassthrough(const BSONObj& cmdObj, bool requestQueryStats) {
     if (!requestQueryStats) {
         return CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
     }
@@ -71,8 +66,6 @@ BSONObj prepareCountForPassthrough(const BSONObj& cmdObj, bool requestQueryStats
     bob.append("includeQueryStatsMetrics", true);
     return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
 }
-
-}  // namespace
 
 /**
  * Implements the find command on mongos.
@@ -282,6 +275,9 @@ public:
         shardSubTotal.doneFast();
         total = applySkipLimit(total, cmdObj);
         result.appendNumber("n", total);
+
+        // The # of documents returned is always 1 for the count command.
+        static constexpr long long kNReturned = 1;
 
         auto* curOp = CurOp::get(opCtx);
         curOp->setEndOfOpMetrics(kNReturned);

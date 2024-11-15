@@ -380,11 +380,11 @@ private:
     stdx::mutex _m;
 };
 
-std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Request& o) {
+inline std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Request& o) {
     return s << o.toBSON();
 }
 
-std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Expectation& o) {
+inline std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Expectation& o) {
     return s << o.name;
 }
 

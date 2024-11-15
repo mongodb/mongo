@@ -36,12 +36,11 @@
 #include "mongo/s/transaction_router.h"
 
 namespace mongo {
-namespace {
 /**
  * Function which produces an vector of 'ScopedShardRole' objects for the namespaces in 'nssList'
  * using the routing information in 'criMap'.
  */
-std::vector<ScopedSetShardRole> createScopedShardRoles(
+inline std::vector<ScopedSetShardRole> createScopedShardRoles(
     OperationContext* opCtx,
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap,
     const std::vector<NamespaceString>& nssList) {
@@ -72,7 +71,6 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
     }
     return scopedShardRoles;
 }
-}  // namespace
 
 /**
  * Helper that constructs an 'AutoGetCollectionForReadCommandMaybeLockFree' using 'initAutoGetFn'.

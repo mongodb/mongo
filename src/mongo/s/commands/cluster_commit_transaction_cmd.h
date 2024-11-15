@@ -35,7 +35,6 @@
 #include "mongo/s/transaction_router.h"
 
 namespace mongo {
-namespace {
 
 /**
  * Implements the commitTransaction command for a router.
@@ -118,5 +117,4 @@ public:
     }
 };
 
-}  // namespace
 }  // namespace mongo

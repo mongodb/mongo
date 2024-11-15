@@ -43,7 +43,6 @@
 
 
 namespace mongo {
-namespace {
 
 class VectorClockMongoD : public VectorClockMutable,
                           public ReplicaSetAwareService<VectorClockMongoD> {
@@ -146,5 +145,4 @@ private:
     WaitableAtomic<bool> _taskIsRunning{false};
 };
 
-}  // namespace
 }  // namespace mongo

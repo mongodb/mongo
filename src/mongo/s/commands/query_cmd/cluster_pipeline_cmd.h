@@ -39,7 +39,6 @@
 #include "mongo/s/query/planner/cluster_aggregate.h"
 
 namespace mongo {
-namespace {
 
 template <typename Impl>
 class ClusterPipelineCommandBase final : public Command {
@@ -223,5 +222,4 @@ public:
     }
 };
 
-}  // namespace
 }  // namespace mongo

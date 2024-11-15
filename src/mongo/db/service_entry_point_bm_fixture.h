@@ -44,8 +44,6 @@
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
-namespace {
-
 class ServiceEntryPointBenchmarkFixture : public BenchmarkWithProfiler {
 public:
     void SetUp(benchmark::State& state) override {
@@ -130,10 +128,13 @@ const auto kSEPBMMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
 
 /**
  * Required initializers, but this is a benchmark so nothing needs to be done.
+ *
+ * These should not be in a header file, but it works because it is only included in 2 files and
+ * they are never included into the same binary. If that changes, these should find a home in a new
+ * cpp file.
  */
-MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
+MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))  // NOLINT
 (InitializerContext* context) {}
-MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {}
+MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {}  // NOLINT
 
-}  // namespace
 }  // namespace mongo

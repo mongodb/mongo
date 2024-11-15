@@ -32,7 +32,6 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-namespace {
 /**
  * Reads directly from memory for the ByteCode VM.
  */
@@ -56,7 +55,6 @@ size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
     return sizeof(T);
 }
 
-}  // namespace
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

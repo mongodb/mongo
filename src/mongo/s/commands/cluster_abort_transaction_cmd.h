@@ -36,7 +36,6 @@
 #include "mongo/s/transaction_router.h"
 
 namespace mongo {
-namespace {
 
 /**
  * Implements the abortTransaction command for a router.
@@ -136,5 +135,4 @@ public:
     }
 };
 
-}  // namespace
 }  // namespace mongo

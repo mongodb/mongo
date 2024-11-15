@@ -41,7 +41,6 @@
 #include "mongo/platform/compiler.h"
 
 namespace mongo::sbe::vm {
-namespace {
 class MakeObjImpl : ByteCode::MakeObjImplBase {
 public:
     using BaseT = ByteCode::MakeObjImplBase;
@@ -360,5 +359,4 @@ private:
         traverseAndProduceObj(spec, tag, val, fieldName, bob);
     }
 };
-}  // namespace
 }  // namespace mongo::sbe::vm

@@ -36,8 +36,6 @@
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {
-namespace {
-
 class DBCommandTestFixture : public ServiceContextMongoDTest {
 public:
     void setUp() override {
@@ -65,8 +63,7 @@ public:
     static const DatabaseName kDatabaseName;
 };
 
-const DatabaseName DBCommandTestFixture::kDatabaseName =
+inline const DatabaseName DBCommandTestFixture::kDatabaseName =
     DatabaseName::createDatabaseName_forTest(boost::none, "unittest_db");
 
-}  // namespace
 }  // namespace mongo

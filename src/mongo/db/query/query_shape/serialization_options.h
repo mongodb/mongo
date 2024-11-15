@@ -51,13 +51,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace {
-// Should never be called, throw to ensure we catch this in tests.
-std::string defaultHmacStrategy(StringData s) {
-    MONGO_UNREACHABLE_TASSERT(7332410);
-}
-}  // namespace
-
 /**
  * A policy enum for how to serialize literal values.
  */
@@ -209,6 +202,11 @@ struct SerializationOptions {
                            const boost::optional<Value>& representativeValue = boost::none) const;
     Value serializeLiteral(const ImplicitValue& v,
                            const boost::optional<Value>& representativeValue = boost::none) const;
+
+    // Should never be called, throw to ensure we catch this in tests.
+    static std::string defaultHmacStrategy(StringData s) {
+        MONGO_UNREACHABLE_TASSERT(7332410);
+    }
 
     // 'literalPolicy' is an independent option to serialize in a general format with the aim of
     // similar "shaped" queries serializing to the same object. For example, if set to

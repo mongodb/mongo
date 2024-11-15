@@ -68,9 +68,7 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-namespace {
 using QueryTargetingInfo = shard_key_pattern_query_util::QueryTargetingInfo;
-}
 
 /**
  * The utility class for calculating read or write distribution metrics for sampled queries against

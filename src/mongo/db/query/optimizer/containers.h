@@ -38,11 +38,10 @@
 
 namespace mongo::optimizer::opt {
 
-namespace {
 enum class ContainerImpl { STD, STDX };
 
 // For debugging, switch between STD and STDX containers.
-static constexpr ContainerImpl kContainerImpl = ContainerImpl::STDX;
+inline constexpr ContainerImpl kContainerImpl = ContainerImpl::STDX;
 
 template <ContainerImpl>
 struct OptContainers {};
@@ -70,7 +69,6 @@ struct OptContainers<ContainerImpl::STD> {
 };
 
 using ActiveContainers = OptContainers<kContainerImpl>;
-}  // namespace
 
 template <class T, class H = ActiveContainers::Hasher<T>, typename... Args>
 using unordered_set = ActiveContainers::unordered_set<T, H, Args...>;

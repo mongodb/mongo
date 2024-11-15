@@ -43,7 +43,7 @@ def main():
         if os.path.isfile(arg):
             source_relative_path = os.path.relpath(arg, os.path.dirname(os.path.dirname(__file__)))
             if (
-                arg.endswith(".cpp")
+                (arg.endswith(".cpp") or arg.endswith(".h"))
                 and source_relative_path.startswith("src/mongo")
                 # TODO: SERVER-79076 remove this condition when resolved
                 and not source_relative_path.startswith(

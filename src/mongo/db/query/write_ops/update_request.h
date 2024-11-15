@@ -40,11 +40,6 @@
 
 namespace mongo {
 
-namespace {
-const std::vector<BSONObj> emptyArrayFilters{};
-const BSONObj emptyCollation{};
-const BSONObj emptySort{};
-
 template <typename T>
 void appendArrayToString(const T& arr, StringBuilder* builder) {
     bool first = true;
@@ -58,7 +53,6 @@ void appendArrayToString(const T& arr, StringBuilder* builder) {
     }
     *builder << "]";
 }
-}  // namespace
 
 class FieldRef;
 
@@ -361,6 +355,10 @@ public:
     }
 
 private:
+    inline static const std::vector<BSONObj> emptyArrayFilters{};
+    inline static const BSONObj emptyCollation{};
+    inline static const BSONObj emptySort{};
+
     NamespaceString _nsString;
 
     write_ops::UpdateOpEntry _updateOp;

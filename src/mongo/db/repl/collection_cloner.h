@@ -65,10 +65,8 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-const int kProgressMeterSecondsBetween = 60;
-const int kProgressMeterCheckInterval = 128;
-}  // namespace
+inline const int kProgressMeterSecondsBetween = 60;
+inline const int kProgressMeterCheckInterval = 128;
 
 class CollectionCloner final : public InitialSyncBaseCloner {
 public:

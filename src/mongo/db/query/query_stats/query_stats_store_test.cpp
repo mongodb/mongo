@@ -104,7 +104,7 @@ public:
         SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
         if (!applyHmac) {
             opts.transformIdentifiers = false;
-            opts.transformIdentifiersCallback = defaultHmacStrategy;
+            opts.transformIdentifiersCallback = opts.defaultHmacStrategy;
         }
         return findKey.toBson(
             expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
@@ -128,7 +128,7 @@ public:
         opts.literalPolicy = literalPolicy;
         if (!applyHmac) {
             opts.transformIdentifiers = false;
-            opts.transformIdentifiersCallback = defaultHmacStrategy;
+            opts.transformIdentifiersCallback = opts.defaultHmacStrategy;
         }
         return aggKey->toBson(
             expCtx->getOperationContext(), opts, SerializationContext::stateDefault());

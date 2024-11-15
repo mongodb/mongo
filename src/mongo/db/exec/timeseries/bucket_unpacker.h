@@ -54,7 +54,6 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo::timeseries {
-namespace {
 // A table that is useful for interpolations between the number of measurements in a bucket and
 // the byte size of a bucket's data section timestamp column. Each table entry is a pair (b_i,
 // S_i), where b_i is the number of measurements in the bucket and S_i is the byte size of the
@@ -62,7 +61,7 @@ namespace {
 // pairs of b_i and S_i for the lower bounds of the row key digit intervals [0, 9], [10, 99],
 // [100, 999], [1000, 9999] and so on. The last entry in the table, S7, is the first entry to
 // exceed the server BSON object limit of 16 MB.
-static constexpr std::array<std::pair<int32_t, int32_t>, 8> kTimestampObjSizeTable{
+inline constexpr std::array<std::pair<int32_t, int32_t>, 8> kTimestampObjSizeTable{
     {{0, BSONObj::kMinBSONLength},
      {10, 115},
      {100, 1195},
@@ -79,7 +78,7 @@ static constexpr std::array<std::pair<int32_t, int32_t>, 8> kTimestampObjSizeTab
 // pair such that 'targetTimestampObjSize' < S_i. Once the interval is found, the upper bound of the
 // pair for the interval is computed and then linear interpolation is used to compute the
 // measurement count corresponding to the 'targetTimestampObjSize' provided.
-int computeElementCountFromTimestampObjSize(int targetTimestampObjSize) {
+inline int computeElementCountFromTimestampObjSize(int targetTimestampObjSize) {
     auto currentInterval =
         std::find_if(std::begin(kTimestampObjSizeTable),
                      std::end(kTimestampObjSizeTable),
@@ -100,7 +99,6 @@ int computeElementCountFromTimestampObjSize(int targetTimestampObjSize) {
     return currentInterval->first +
         ((targetTimestampObjSize - currentInterval->second) / (10 + nDigitsInRowKey));
 }
-}  // namespace
 
 /**
  * BucketUnpacker will unpack bucket fields for metadata and the provided fields.

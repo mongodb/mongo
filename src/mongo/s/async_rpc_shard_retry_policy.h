@@ -37,10 +37,8 @@
 namespace mongo {
 namespace async_rpc {
 
-namespace {
 // See ARS::kMaxNumFailedHostRetryAttempts and Shard::kOnErrorNumRetries
-const int kOnErrorNumRetries = 3;
-}  // namespace
+inline const int kOnErrorNumRetries = 3;
 
 class ShardRetryPolicy : public RetryPolicy {
 public:
