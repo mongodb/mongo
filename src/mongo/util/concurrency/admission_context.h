@@ -35,6 +35,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
 
+#include <cstdint>
+
 namespace mongo {
 
 class OperationContext;
@@ -85,7 +87,12 @@ public:
     /**
      * Returns the number of times this context has taken a ticket.
      */
-    int getAdmissions() const;
+    std::int32_t getAdmissions() const;
+
+    /**
+     * Returns the number of times this context has taken an exempt ticket.
+     */
+    std::int32_t getExemptedAdmissions() const;
 
     /**
      * Returns true if the operation is already holding a ticket.
@@ -106,6 +113,8 @@ protected:
 
     void recordAdmission();
 
+    void recordExemptedAdmission();
+
     void markTicketHeld() {
         tassert(
             9150200,
@@ -120,9 +129,10 @@ protected:
 
     constexpr static TickSource::Tick kNotQueueing = -1;
 
-    Atomic<int32_t> _admissions{0};
+    Atomic<std::int32_t> _exemptedAdmissions{0};
+    Atomic<std::int32_t> _admissions{0};
     Atomic<Priority> _priority{Priority::kNormal};
-    Atomic<int64_t> _totalTimeQueuedMicros;
+    Atomic<std::int64_t> _totalTimeQueuedMicros;
     WaitableAtomic<TickSource::Tick> _startQueueingTime{kNotQueueing};
     Atomic<bool> _holdingTicket;
 };

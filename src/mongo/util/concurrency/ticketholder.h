@@ -215,7 +215,8 @@ private:
 
     void _updateQueueStatsOnRelease(TicketHolder::QueueStats& queueStats, const Ticket& ticket);
     void _updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
-                                              TicketHolder::QueueStats& queueStats);
+                                              TicketHolder::QueueStats& queueStats,
+                                              AdmissionContext::Priority priority);
 
     /**
      * Appends the statistics stored in QueueStats to BSONObjBuilder b; We track statistics

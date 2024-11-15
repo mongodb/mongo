@@ -152,7 +152,8 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
 
     if (ticket) {
         cancelWait.dismiss();
-        _updateQueueStatsOnTicketAcquisition(admCtx, _normalPriorityQueueStats);
+        _updateQueueStatsOnTicketAcquisition(
+            admCtx, _normalPriorityQueueStats, admCtx->getPriority());
         _updatePeakUsed();
         return ticket;
     } else {
@@ -209,14 +210,15 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
 }
 
 boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
-    if (admCtx->getPriority() == AdmissionContext::Priority::kExempt) {
-        _updateQueueStatsOnTicketAcquisition(admCtx, _exemptQueueStats);
+    const auto currentPriority = admCtx->getPriority();
+    if (currentPriority == AdmissionContext::Priority::kExempt) {
+        _updateQueueStatsOnTicketAcquisition(admCtx, _exemptQueueStats, currentPriority);
         return Ticket{this, admCtx};
     }
 
     auto ticket = _tryAcquireNormalPriorityTicket(admCtx);
     if (ticket) {
-        _updateQueueStatsOnTicketAcquisition(admCtx, _normalPriorityQueueStats);
+        _updateQueueStatsOnTicketAcquisition(admCtx, _normalPriorityQueueStats, currentPriority);
         _updatePeakUsed();
     }
 
@@ -299,10 +301,16 @@ void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueSta
 }
 
 void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
-                                                        TicketHolder::QueueStats& queueStats) {
+                                                        TicketHolder::QueueStats& queueStats,
+                                                        AdmissionContext::Priority priority) {
     if (admCtx->getAdmissions() == 0) {
         queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
     }
+
+    if (priority == AdmissionContext::Priority::kExempt) {
+        admCtx->recordExemptedAdmission();
+    }
+
     admCtx->recordAdmission();
     queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
 }

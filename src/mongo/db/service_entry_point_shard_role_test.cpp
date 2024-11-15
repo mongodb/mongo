@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
@@ -72,6 +73,8 @@ MONGO_INITIALIZER(ServiceEntryPointTestLogSettings)(InitializerContext*) {
 }
 
 MONGO_REGISTER_COMMAND(TestCmdSucceeds).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdProcessInternalCommand).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdProcessInternalSucceedCommand).testOnly().forShard();
 MONGO_REGISTER_COMMAND(TestCmdFailsRunInvocationWithResponse).testOnly().forShard();
 MONGO_REGISTER_COMMAND(TestCmdFailsRunInvocationWithException).testOnly().forShard();
 MONGO_REGISTER_COMMAND(TestCmdFailsRunInvocationWithCloseConnectionError).testOnly().forShard();
@@ -108,6 +111,23 @@ TEST_F(ServiceEntryPointShardRoleTest, TestCommandSucceeds) {
     ASSERT_OK(swDbResponse);
     auto response = dbResponseToBSON(swDbResponse.getValue());
     assertErrorResponseIsExpected(response, Status::OK(), opCtx.get());
+}
+
+TEST_F(ServiceEntryPointShardRoleTest, TestCmdProcessInternalCommand) {
+    auto opCtx = makeOperationContext();
+    auto& admCtx = IngressAdmissionContext::get(opCtx.get());
+    // Here we send a command that will itself send another command using DBDirectClient
+    auto msg =
+        constructMessage(BSON(TestCmdProcessInternalCommand::kCommandName << 1), opCtx.get());
+    auto swDbResponse = handleRequest(msg, opCtx.get());
+    ASSERT_OK(swDbResponse);
+    const auto admissions = admCtx.getAdmissions();
+    const auto exemptedAdmissions = admCtx.getExemptedAdmissions();
+    // After sending one command, we expect two admissions since we admit the command itself and
+    // also the subcommand. However, we expect the second command to be exempted since the top level
+    // command was already admitted.
+    ASSERT_EQ(admissions, 2);
+    ASSERT_EQ(exemptedAdmissions, 1);
 }
 
 TEST_F(ServiceEntryPointShardRoleTest, TestCommandFailsRunInvocationWithResponse) {

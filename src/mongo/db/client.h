@@ -542,4 +542,16 @@ Client& cc();
 
 bool haveClient();
 
+/**
+ * Checks if the client is process internal.
+ *
+ * Process internal means that the client is created for the purpose of directly invoking a command
+ * from the inside of the process. A command that creates a DBDirectClient to call another command
+ * is an example of that.
+ *
+ * TODO: Remove this function when SERVER-74444 is merged, as this PR will add
+ *       'isProcessInternalClient' directly on the client
+ */
+bool isProcessInternalClient(const Client& client);
+
 }  // namespace mongo

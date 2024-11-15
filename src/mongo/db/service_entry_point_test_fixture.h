@@ -29,11 +29,14 @@
 
 
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/clock_source_mock.h"
@@ -133,6 +136,44 @@ public:
     TestCmdSucceeds() : TestCmdBase(kCommandName) {}
     TestCmdSucceeds(std::string cmdName) : TestCmdBase(cmdName) {}
     bool runWithBuilderOnly(BSONObjBuilder& result) override {
+        return true;
+    }
+};
+
+class TestCmdProcessInternalSucceedCommand : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testCmdProcessInternalSucceedCommand";
+    TestCmdProcessInternalSucceedCommand() : TestCmdBase(kCommandName) {}
+    bool runWithBuilderOnly(BSONObjBuilder& result) override {
+        return true;
+    }
+};
+
+class TestCmdProcessInternalCommand : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testProcessInternalCommand";
+    TestCmdProcessInternalCommand() : TestCmdBase(kCommandName) {}
+
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+
+    // We want to reuse all the members from the base class except this shortcut.
+    bool runWithBuilderOnly(BSONObjBuilder& result) override {
+        uassert(ErrorCodes::InternalError, "runWithBuilderOnly not implemented", false);
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        // Run the list command as subcommand.
+        auto cmdBSON = BSON(TestCmdProcessInternalSucceedCommand::kCommandName << 1);
+
+        constexpr auto dummyDatabaseName = StringData{"dummy_database_name"};
+        BSONObj info;
+        DBDirectClient{opCtx}.runCommand(
+            DatabaseName{dummyDatabaseName.data(), dummyDatabaseName.size()}, cmdBSON, info);
         return true;
     }
 };

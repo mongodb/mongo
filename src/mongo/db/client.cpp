@@ -174,6 +174,10 @@ bool haveClient() {
     return static_cast<bool>(currentClient);
 }
 
+bool isProcessInternalClient(const Client& client) {
+    return client.isInDirectClient() || !client.session();
+}
+
 /**
  * User connections are listed active so long as they are associated with an opCtx.
  * Non-user connections are listed active if they have an opCtx and not waiting on a condvar.
