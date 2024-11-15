@@ -2302,15 +2302,18 @@ struct __wt_connection {
      * is found on the root page\, attempt to locate a random in-memory page by examining all
      * entries on the root page., a boolean flag; default \c true.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-     * threads_max, maximum number of threads WiredTiger will start to help evict pages from cache.
-     * The number of threads started will vary depending on the current eviction load.  Each
-     * eviction worker thread uses a session from the configured session_max., an integer between \c
-     * 1 and \c 20; default \c 8.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of
-     * threads WiredTiger will start to help evict pages from cache.  The number of threads
-     * currently running will vary depending on the current eviction load., an integer between \c 1
-     * and \c 20; default \c 1.}
-     * @config{ ),,}
+     * legacy_page_visit_strategy, Use legacy page visit strategy for eviction.  Using this option
+     * is highly discouraged as it will re-introduce the bug described in WT-9121., a boolean flag;
+     * default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
+     * WiredTiger will start to help evict pages from cache.  The number of threads started will
+     * vary depending on the current eviction load.  Each eviction worker thread uses a session from
+     * the configured session_max., an integer between \c 1 and \c 20; default \c 8.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads WiredTiger will start
+     * to help evict pages from cache.  The number of threads currently running will vary depending
+     * on the current eviction load., an integer between \c 1 and \c 20; default \c 1.}
+     * @config{
+     * ),,}
      * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring
      * the dirty content in cache to this level.  It is a percentage of the cache size if the value
      * is within the range of 0 to 100 or an absolute size when greater than 100. The value is not
@@ -3077,14 +3080,18 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;evict_sample_inmem, If no in-memory ref is
  * found on the root page\, attempt to locate a random in-memory page by examining all entries on
  * the root page., a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max,
- * maximum number of threads WiredTiger will start to help evict pages from cache.  The number of
- * threads started will vary depending on the current eviction load.  Each eviction worker thread
- * uses a session from the configured session_max., an integer between \c 1 and \c 20; default \c
- * 8.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads WiredTiger will start
- * to help evict pages from cache.  The number of threads currently running will vary depending on
- * the current eviction load., an integer between \c 1 and \c 20; default \c 1.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * legacy_page_visit_strategy, Use legacy page visit strategy for eviction.  Using this option is
+ * highly discouraged as it will re-introduce the bug described in WT-9121., a boolean flag; default
+ * \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger will
+ * start to help evict pages from cache.  The number of threads started will vary depending on the
+ * current eviction load.  Each eviction worker thread uses a session from the configured
+ * session_max., an integer between \c 1 and \c 20; default \c 8.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * threads_min, minimum number of threads WiredTiger will start to help evict pages from cache.  The
+ * number of threads currently running will vary depending on the current eviction load., an integer
+ * between \c 1 and \c 20; default \c 1.}
  * @config{ ),,}
  * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring the
  * dirty content in cache to this level.  It is a percentage of the cache size if the value is

@@ -34,6 +34,26 @@ functions:
     command: git.get_project
     params:
       directory: wiredtiger
+  "generate github token": &gen_github_token
+    command: github.generate_token
+    params:
+      owner: wiredtiger
+      repo: automation-scripts
+      expansion_name: generated_token
+      permissions:
+          metadata: read
+          contents: read
+  "get automation-scripts": &get_automation_scripts
+    command: shell.exec
+    type: setup
+    params:
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        if ! [ -d "./automation-scripts" ]; then
+          git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git
+        fi
   "fetch artifacts": &fetch_artifacts
     command: s3.get
     params:
@@ -178,8 +198,7 @@ functions:
           # Fetch the gperftools library if needed. This will also get tcmalloc.
           if [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}" =~ (tcmalloc|TCMALLOC) ]] && ! [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}" =~ "ENABLE_TCMALLOC=0" ]] && [ ! -d "./automation-scripts" ]; then
             is_cmake_build=true
-            git clone git@github.com:wiredtiger/automation-scripts.git
-            . automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
+            . ../automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
           fi
           # Compiling with CMake.
           . test/evergreen/find_cmake.sh
@@ -235,6 +254,8 @@ functions:
           ${compile_env_vars|} ${make_command|ninja} ${smp_command|} 2>&1
         fi
   "compile wiredtiger":
+    - *gen_github_token
+    - *get_automation_scripts
     - *configure_wiredtiger
     - *make_wiredtiger
   "compile wiredtiger no linux ftruncate":
@@ -399,7 +420,7 @@ functions:
             exit 0
           fi
 
-          git clone git@github.com:wiredtiger/wiredtiger.github.com.git
+          git clone https://github.com/wiredtiger/wiredtiger.github.com.git
           cd wiredtiger.github.com
 
           # Branches to update are defined through an expansion variable.
@@ -925,6 +946,8 @@ functions:
         file: ./wiredtiger/cmake_build/${test_path}.json
 
   "upload-perf-test-stats":
+    - *gen_github_token
+    - *get_automation_scripts
     - command: shell.exec
       params:
         working_dir: "wiredtiger/cmake_build/bench/wtperf"
@@ -935,9 +958,6 @@ functions:
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
           ${pip3_binary} install pymongo[srv]==3.12.2 pygit2==1.10.1
-          if [[ ! -d "automation-scripts" ]]; then
-            git clone git@github.com:wiredtiger/automation-scripts.git
-          fi
           EVERGREEN_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'", "distro_id": "'${distro_id}'", "execution": "'${execution}'", "task_name": "'${task_name}'", "version_id": "'${version_id}'", "branch_name": "'${branch_name}'" } }'
           echo "EVERGREEN_TASK_INFO: $EVERGREEN_TASK_INFO"
           ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_perf_test_username} -p ${atlas_perf_test_password} -c ${collection|} -f test_stats/atlas_out_${perf-test-name}.json -t ${created_at} -i "$EVERGREEN_TASK_INFO" -g "../../../"
@@ -3003,6 +3023,8 @@ tasks:
   - name: configure-combinations
     commands:
       - func: "get project"
+      - func: "generate github token"
+      - func: "get automation-scripts"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
@@ -3347,6 +3369,8 @@ tasks:
   - name: long-test
     commands:
       - func: "get project"
+      - func: "generate github token"
+      - func: "get automation-scripts"
       - func: "configure wiredtiger"
       - func: "make wiredtiger"
 

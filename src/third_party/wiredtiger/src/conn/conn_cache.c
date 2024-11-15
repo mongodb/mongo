@@ -154,6 +154,9 @@ __cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
     WT_RET(__wt_config_gets(session, cfg, "eviction.evict_sample_inmem", &cval));
     conn->evict_sample_inmem = cval.val != 0;
 
+    WT_RET(__wt_config_gets(session, cfg, "eviction.legacy_page_visit_strategy", &cval));
+    conn->evict_legacy_page_visit_strategy = cval.val != 0;
+
     /* Retrieve the wait time and convert from milliseconds */
     WT_RET(__wt_config_gets(session, cfg, "cache_max_wait_ms", &cval));
     cache->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
