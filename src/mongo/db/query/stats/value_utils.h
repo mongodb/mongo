@@ -195,40 +195,10 @@ std::string serialize(sbe::value::TypeTags tag);
 sbe::value::TypeTags deserialize(const std::string& name);
 
 /**
- * Three ways TypeTags comparison (aka spaceship operator) according to the BSON type sort order.
+ * Returns the minimum or maximum bound of the type 'tag'. If 'isMin' is false, returns the maximum
+ * bound.
  */
-int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b);
-
-/**
- * Given a type, returns whether or not that type has a variable width. Returns true if the type has
- * variable width, indicating the maxmimum value cannot be represented by the same type
- * (e.g., objects, arrays). Returns false for types with fixed width (e.g., numbers, booleans).
- */
-bool isVariableWidthType(sbe::value::TypeTags tag);
-
-/**
- * Returns the minimum bound of the type 'tag'.
- * The result is a pair where the first element is the minimum bound value (stats::SBEValue), and
- * the second element is a boolean indicating if the bound is inclusive.
- *
- * Examples:
- * - getMinBound(NumberInt32): (nan, true)
- * - getMinBound(StringSmall): ("", true)
- * - getMinBound(Object): ({}, true)
- */
-std::pair<stats::SBEValue, bool> getMinBound(sbe::value::TypeTags tag);
-
-/**
- * Returns the maximum bound of the type 'tag'.
- * The result is a pair where the first element is the maximum bound value (stats::SBEValue), and
- * the second element is a boolean indicating if the bound is inclusive.
- *
- * Examples:
- * - getMaxBound(NumberInt32): (infinity, true)
- * - getMaxBound(StringSmall): ({}, false)
- * - getMaxBound(Object): ([], false)
- */
-std::pair<stats::SBEValue, bool> getMaxBound(sbe::value::TypeTags tag);
+std::pair<stats::SBEValue, bool> getMinMaxBoundForSBEType(sbe::value::TypeTags tag, bool isMin);
 
 /**
  * Returns true if the interval is of the same type. This takes type-bracketing into consideration.
@@ -249,10 +219,9 @@ bool sameTypeBracketInterval(sbe::value::TypeTags startTag,
 /**
  * Returns true if the interval covers a full type. This helps to determine if the interval is
  * estimable by a type count. The design of this method follows the definition of a full interval as
- * inclusive the minimum value of the current type and either:
- * a) inclusive the maximum value of the current type (if representable, e.g., [nan.0, inf.0])
- * or
- * b) exclusive the minimume value of the next type (e.g., for Object, [{}, [])).
+ * inclusive the minimum value of the current type and exclusive the minimume value of the next
+ * type e.g., for NumberDecimal [quite_NaN, ""). Thus, it assumes that the start type tag and end
+ * type tag differ.
  */
 bool isFullBracketInterval(sbe::value::TypeTags startTag,
                            sbe::value::Value startVal,

@@ -46,37 +46,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo::stats {
-
-/**
- * Generates and returns a sorted vector of all type tags.
- *
- * This function enumerates all possible type tags defined in the sbe::value::TypeTags enum. It then
- * sorts these type tags using the compareStrictOrder() function. The compareStrictOrder() function
- * sorts according to their sort order. If two type tags share the same sort order, it breaks the
- * tie using the TypeTags enum values.
- */
-std::vector<sbe::value::TypeTags> sortTypeTags();
-
-/**
- * Generates and returns a map of type tags to their respective subsequent type tags.
- *
- * This function creates a mapping from each type tag to its subsequent type tag, determined by the
- * order of type tags in the 'kTypeTagsSorted' vector. If two type tags share the same canonical
- * order, they will map to the same subsequent type tag.
- *
- * The function skips the last type tag in the vector, as there is no subsequent type tag for it.
- */
-absl::flat_hash_map<sbe::value::TypeTags, sbe::value::TypeTags> nextTypeTagsMap();
-
-namespace {
-
-const static std::vector<sbe::value::TypeTags> kTypeTagsSorted = sortTypeTags();
-
-const static absl::flat_hash_map<sbe::value::TypeTags, sbe::value::TypeTags> kNextTypeTagsMap =
-    nextTypeTagsMap();
-
-}  // namespace
-
 namespace value = sbe::value;
 
 SBEValue::SBEValue(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
@@ -170,7 +139,21 @@ std::pair<value::TypeTags, value::Value> makeNaNValue() {
 };
 
 bool sameTypeClass(value::TypeTags tag1, value::TypeTags tag2) {
-    return compareTypeTags(tag1, tag2) == 0;
+    if (tag1 == tag2) {
+        return true;
+    }
+
+    static constexpr const char* kTempFieldName = "temp";
+
+    BSONObjBuilder minb1;
+    minb1.appendMinForType(kTempFieldName, value::tagToType(tag1));
+    const BSONObj min1 = minb1.obj();
+
+    BSONObjBuilder minb2;
+    minb2.appendMinForType(kTempFieldName, value::tagToType(tag2));
+    const BSONObj min2 = minb2.obj();
+
+    return min1.woCompare(min2) == 0;
 }
 
 bool sameTypeBracket(value::TypeTags tag1, value::TypeTags tag2) {
@@ -470,104 +453,49 @@ value::TypeTags deserialize(const std::string& name) {
               str::stream() << "String " << name << " is not convertable to SBE type tag.");
 }
 
-int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b) {
-    auto orderOfA = canonicalizeBSONTypeUnsafeLookup(tagToType(a));
-    auto orderOfB = canonicalizeBSONTypeUnsafeLookup(tagToType(b));
-    if (orderOfA < orderOfB) {
-        return -1;
-    } else if (orderOfA > orderOfB) {
-        return 1;
-    }
-    return 0;
-}
-
-
-std::vector<sbe::value::TypeTags> sortTypeTags() {
-    // Sorts type tags according to the sort order. Breaks tie with the TypeTags enum values if
-    // two tags share the same sort order.
-    auto compareStrictOrder = [](sbe::value::TypeTags a, sbe::value::TypeTags b) -> bool {
-        auto result = compareTypeTags(a, b);
-        return result != 0 ? result < 0 : (a < b);
-    };
-
-    static constexpr size_t numTypeTags = size_t(sbe::value::TypeTags::TypeTagsMax);
-    std::vector<sbe::value::TypeTags> typeTagsOrder;
-
-    // Enumerates all the type tags.
-    for (uint8_t tagValue = 0; tagValue < numTypeTags; ++tagValue) {
-        auto tag = static_cast<sbe::value::TypeTags>(tagValue);
-
-        // Skips unsupported types.
-        if (sbe::value::tagToType(tag) == BSONType::EOO) {
-            continue;
-        }
-        typeTagsOrder.push_back(tag);
-    }
-
-    std::sort(typeTagsOrder.begin(), typeTagsOrder.end(), compareStrictOrder);
-
-    return typeTagsOrder;
-}
-
-absl::flat_hash_map<sbe::value::TypeTags, sbe::value::TypeTags> nextTypeTagsMap() {
-    absl::flat_hash_map<sbe::value::TypeTags, sbe::value::TypeTags> nextTypeTagsMap;
-
-    // Skips the last one as there is no next type.
-    sbe::value::TypeTags nextTag = kTypeTagsSorted[kTypeTagsSorted.size() - 1];
-    invariant(!kTypeTagsSorted.empty());
-    for (int32_t index = kTypeTagsSorted.size() - 2; index >= 0; --index) {
-        auto tag = kTypeTagsSorted[index];
-        nextTypeTagsMap[tag] = nextTag;
-
-        // If 'tag' and 'kTypeTagsSorted[index - 1]' are at the same canonical order, reuse
-        // 'nextTag'. For example, as compareTypeTags(NumberInt32, NumberDouble) == 0, their next
-        // type tags are both 'StringSmall'.
-        if (!(index > 0 && compareTypeTags(tag, kTypeTagsSorted[index - 1]) == 0)) {
-            nextTag = tag;
-        }
-    }
-
-    return nextTypeTagsMap;
-}
-
-sbe::value::TypeTags getNextType(sbe::value::TypeTags tag) {
-    auto it = kNextTypeTagsMap.find(tag);
-    tassert(9619600,
-            fmt::format("Type {} does not have a next type", tag),
-            it != kNextTypeTagsMap.end());
-    return it->second;
-}
-
-bool isVariableWidthType(sbe::value::TypeTags tag) {
-    return isVariableWidthType(tagToType(tag));
-}
-
-std::pair<stats::SBEValue, bool> getMinBound(sbe::value::TypeTags tag) {
+std::pair<stats::SBEValue, bool> getMinMaxBoundForSBEType(sbe::value::TypeTags tag, bool isMin) {
     switch (tag) {
         case sbe::value::TypeTags::MinKey:
-            return {{tag, 0}, true};
+            return {{tag, 0}, false};
         case sbe::value::TypeTags::MaxKey:
-            return {{tag, 0}, true};
+            return {{tag, 0}, false};
         case sbe::value::TypeTags::NumberInt32:
         case sbe::value::TypeTags::NumberInt64:
         case sbe::value::TypeTags::NumberDouble:
         case sbe::value::TypeTags::NumberDecimal:
-            return {{sbe::value::TypeTags::NumberDouble,
-                     sbe::value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
-                    true};
+            if (isMin) {
+                return {{tag,
+                         sbe::value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
+                        false};
+            } else {
+                return {sbe::value::makeNewString(""), false};
+            }
 
         case sbe::value::TypeTags::StringSmall:
         case sbe::value::TypeTags::StringBig:
         case sbe::value::TypeTags::bsonString:
         case sbe::value::TypeTags::bsonSymbol:
-            return {sbe::value::makeNewString(""), true};
+            if (isMin) {
+                return {sbe::value::makeNewString(""), true};
+            } else {
+                return {sbe::value::makeNewObject(), false};
+            }
 
         case sbe::value::TypeTags::Date:
-            return {{tag, sbe::value::bitcastFrom<int64_t>(Date_t::min().toMillisSinceEpoch())},
-                    true};
+            if (isMin) {
+                return {{tag, sbe::value::bitcastFrom<int64_t>(Date_t::min().toMillisSinceEpoch())},
+                        true};
+            } else {
+                return {{tag, sbe::value::bitcastFrom<int64_t>(Date_t::max().toMillisSinceEpoch())},
+                        true};
+            }
 
         case sbe::value::TypeTags::Timestamp:
-            return {{tag, sbe::value::bitcastFrom<uint64_t>(Timestamp::min().asULL())}, true};
+            if (isMin) {
+                return {{tag, sbe::value::bitcastFrom<uint64_t>(Timestamp::min().asULL())}, true};
+            } else {
+                return {{tag, sbe::value::bitcastFrom<uint64_t>(Timestamp::max().asULL())}, true};
+            }
 
         case sbe::value::TypeTags::Null:
             return {{tag, 0}, true};
@@ -578,86 +506,76 @@ std::pair<stats::SBEValue, bool> getMinBound(sbe::value::TypeTags tag) {
 
         case sbe::value::TypeTags::Object:
         case sbe::value::TypeTags::bsonObject:
-            return {sbe::value::makeNewObject(), true};
+            if (isMin) {
+                return {sbe::value::makeNewObject(), true};
+            } else {
+                return {sbe::value::makeNewArray(), false};
+            }
 
         case sbe::value::TypeTags::Array:
         case sbe::value::TypeTags::ArraySet:
         case sbe::value::TypeTags::ArrayMultiSet:
         case sbe::value::TypeTags::bsonArray:
-            return {sbe::value::makeNewArray(), true};
+            if (isMin) {
+                return {sbe::value::makeNewArray(), true};
+            } else {
+                return {sbe::value::makeValue(Value(BSONBinData())), false};
+            }
 
         case sbe::value::TypeTags::bsonBinData:
-            return {sbe::value::makeValue(Value(BSONBinData())), true};
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONBinData())), true};
+            } else {
+                return {sbe::value::makeValue(Value(OID())), false};
+            }
 
         case sbe::value::TypeTags::Boolean:
-            return {{tag, sbe::value::bitcastFrom<bool>(false)}, true};
+            if (isMin) {
+                return {{tag, sbe::value::bitcastFrom<bool>(false)}, true};
+            } else {
+                return {{tag, sbe::value::bitcastFrom<bool>(true)}, true};
+            }
 
         case sbe::value::TypeTags::ObjectId:
         case sbe::value::TypeTags::bsonObjectId:
-            return {sbe::value::makeValue(Value(OID())), true};
+            if (isMin) {
+                return {sbe::value::makeValue(Value(OID())), true};
+            } else {
+                return {sbe::value::makeValue(Value(OID::max())), true};
+            }
 
         case sbe::value::TypeTags::bsonRegex:
-            return {sbe::value::makeValue(Value(BSONRegEx("", ""))), true};
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONRegEx("", ""))), true};
+            } else {
+                return {sbe::value::makeValue(Value(BSONDBRef())), false};
+            }
 
         case sbe::value::TypeTags::bsonDBPointer:
-            return {sbe::value::makeValue(Value(BSONDBRef())), true};
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONDBRef())), true};
+            } else {
+                return {sbe::value::makeCopyBsonJavascript(StringData("")), false};
+            }
 
         case sbe::value::TypeTags::bsonJavascript:
-            return {sbe::value::makeCopyBsonJavascript(StringData("")), true};
+            if (isMin) {
+                return {sbe::value::makeCopyBsonJavascript(StringData("")), true};
+            } else {
+                return {sbe::value::makeValue(Value(BSONCodeWScope())), false};
+            }
 
         case sbe::value::TypeTags::bsonCodeWScope:
-            return {sbe::value::makeValue(Value(BSONCodeWScope())), true};
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONCodeWScope())), true};
+            } else {
+                return {{sbe::value::TypeTags::MaxKey, 0}, false};
+            }
+
         default:
-            tasserted(9619601, str::stream() << "Type not supported for getMinBound: " << tag);
+            return {{sbe::value::TypeTags::Nothing, 0}, false};
     }
-
-    MONGO_UNREACHABLE_TASSERT(9619602);
-}
-
-std::pair<stats::SBEValue, bool> getMaxBound(sbe::value::TypeTags tag) {
-    // If the type is a variable width type, the maximum value cannot be represented with the same
-    // type. Therefore, we use the minimum value of the next type to represent the maximum bound.
-    // The inclusive flag is set to false to indicate that the bound is excluded.
-    if (isVariableWidthType(tag)) {
-        auto bound = getMinBound(getNextType(tag));
-        bound.second = false;
-        return bound;
-    }
-
-    switch (tag) {
-        case sbe::value::TypeTags::MinKey:
-            return {{tag, 0}, true};
-        case sbe::value::TypeTags::MaxKey:
-            return {{tag, 0}, true};
-        case sbe::value::TypeTags::NumberInt32:
-        case sbe::value::TypeTags::NumberInt64:
-        case sbe::value::TypeTags::NumberDouble:
-        case sbe::value::TypeTags::NumberDecimal:
-            return {{sbe::value::TypeTags::NumberDouble,
-                     sbe::value::bitcastFrom<double>(std::numeric_limits<double>::infinity())},
-                    true};
-        case sbe::value::TypeTags::Date:
-            return {{tag, sbe::value::bitcastFrom<int64_t>(Date_t::max().toMillisSinceEpoch())},
-                    true};
-        case sbe::value::TypeTags::Timestamp:
-            return {{tag, sbe::value::bitcastFrom<uint64_t>(Timestamp::max().asULL())}, true};
-
-        case sbe::value::TypeTags::Null:
-            return {{tag, 0}, true};
-
-        case sbe::value::TypeTags::bsonUndefined:
-            return {sbe::value::makeValue(Value(BSONUndefined)), true};
-
-        case sbe::value::TypeTags::Boolean:
-            return {{tag, sbe::value::bitcastFrom<bool>(true)}, true};
-        case sbe::value::TypeTags::ObjectId:
-        case sbe::value::TypeTags::bsonObjectId:
-            return {sbe::value::makeValue(Value(OID::max())), true};
-        default:
-            tasserted(9619603, str::stream() << "Type not supported for getMaxBound: " << tag);
-    }
-
-    MONGO_UNREACHABLE_TASSERT(9619604);
+    MONGO_UNREACHABLE;
 }
 
 bool sameTypeBracketInterval(sbe::value::TypeTags startTag,
@@ -672,7 +590,7 @@ bool sameTypeBracketInterval(sbe::value::TypeTags startTag,
         return false;
     }
 
-    auto [max, maxInclusive] = getMinBound(getNextType(startTag));
+    auto [max, maxInclusive] = getMinMaxBoundForSBEType(startTag, false /*isMin*/);
     return stats::compareValues(endTag, endVal, max.getTag(), max.getValue()) == 0;
 }
 
@@ -682,42 +600,9 @@ bool isFullBracketInterval(sbe::value::TypeTags startTag,
                            sbe::value::TypeTags endTag,
                            sbe::value::Value endVal,
                            bool endInclusive) {
-    // 'startInclusive' must be true because a full bracket interval includes the minimum value of
-    // the type.
-    if (!startInclusive) {
-        return false;
-    }
 
-    // Short-circuits by first evaluating 'endInclusive'. This approach prevents unnecessary memory
-    // allocation by avoiding calls to getMinBound() and getMaxBound() if the conditions are not
-    // met.
-    //
-    // The logic checks if the start and end tags are of the same type. If they are, either
-    // isVariableWidthType(startTag) and (!endInclusive) must be false for the interval to be
-    // considered a full bracket interval.
-    //
-    // Example scenarios:
-    // - If 'startTag' is Object, the logic returns false Because isVariableWidthType() is true.
-    //   We expect the end bound of a full bracket interval of object to be an empty Array.
-    // - If 'startTag' is NumberInt32, the logic returns false if 'endInclusive' is false, as we
-    //   expect the end bound to be infinitiy and inclusive.
-    bool sameType = sameTypeClass(startTag, endTag);
-    if (sameType && (isVariableWidthType(startTag) || !endInclusive)) {
-        return false;
-    } else if (!sameType && (endInclusive || !sameTypeClass(endTag, getNextType(startTag)))) {
-        // If the start and end bounds are of different type classes, 'endInclusive' must be false
-        // and 'endTag' must be the next type of 'startTag' for the interval to be considered a full
-        // bracket interval.
-        //
-        // Example scenario:
-        // - If 'startTag' is Object, 'endTag' must be Array (or equivalent) and 'endInclusive'
-        //   must be false for the interval to be valid.
-        return false;
-    }
-
-    auto [expectedMin, minInclusive] = getMinBound(startTag);
-    auto [expectedMax, maxInclusive] =
-        sameType ? getMaxBound(startTag) : getMinBound(getNextType(startTag));
+    auto [expectedMin, minInclusive] = getMinMaxBoundForSBEType(startTag, true /*isMin*/);
+    auto [expectedMax, maxInclusive] = getMinMaxBoundForSBEType(startTag, false /*isMin*/);
 
     bool compareValuesMin =
         (stats::compareValues(startTag, startVal, expectedMin.getTag(), expectedMin.getValue()) ==
@@ -726,7 +611,7 @@ bool isFullBracketInterval(sbe::value::TypeTags startTag,
     bool compareValuesMax =
         (stats::compareValues(endTag, endVal, expectedMax.getTag(), expectedMax.getValue()) == 0);
 
-    return compareValuesMin && compareValuesMax;
+    return (compareValuesMin && (compareValuesMax && !endInclusive));
 }
 
 }  // namespace mongo::stats
