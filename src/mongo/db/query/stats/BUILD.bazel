@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -81,5 +81,101 @@ mongo_cc_library(
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/util:caching",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "stats_test_utils",
+    srcs = [
+        "collection_statistics_mock.cpp",
+        "maxdiff_test_utils.cpp",
+        "rand_utils.cpp",
+        "rand_utils_new.cpp",
+    ],
+    hdrs = [
+        "collection_statistics_mock.h",
+        "maxdiff_test_utils.h",
+        "rand_utils.h",
+        "rand_utils_new.h",
+    ],
+    deps = [
+        ":stats_gen",
+        ":stats_histograms",
+        "//src/mongo:base",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/ce:histogram_common",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stats_cache_test",
+    srcs = [
+        "stats_cache_loader_mock.cpp",
+        "stats_cache_loader_mock.h",
+        "stats_cache_test.cpp",
+    ],
+    deps = [
+        ":stats",
+        ":stats_test_utils",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stats_path_test",
+    srcs = [
+        "stats_path_test.cpp",
+    ],
+    deps = [
+        ":stats_test_utils",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "type_collision_test",
+    srcs = [
+        "type_collision_test.cpp",
+    ],
+    deps = [
+        ":stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "type_count_test",
+    srcs = [
+        "type_count_test.cpp",
+    ],
+    deps = [
+        ":stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ce_histogram_test",
+    srcs = [
+        "ce_histogram_test.cpp",
+    ],
+    deps = [
+        ":stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "value_utils_test",
+    srcs = [
+        "value_utils_test.cpp",
+    ],
+    deps = [
+        ":stats_test_utils",
+        "//src/mongo/db/query:index_bounds_builder_test_fixture",
     ],
 )

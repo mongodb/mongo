@@ -39,89 +39,38 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/pcre_wrapper",
     ],
 )
-
 env.CppUnitTest(
     target="stats_cache_test",
-    source=[
-        "stats_cache_test.cpp",
-        "stats_cache_loader_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "stats",
-        "stats_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="stats_path_test",
-    source=[
-        "stats_path_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "stats_test_utils",
-    ],
-)
-
-env.Library(
-    target="stats_test_utils",
-    source=[
-        "collection_statistics_mock.cpp",
-        "rand_utils.cpp",
-        "rand_utils_new.cpp",
-        "maxdiff_test_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "stats_gen",
-        "stats_histograms",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="type_collision_test",
-    source=[
-        "type_collision_test.cpp",
-    ],
-    LIBDEPS=[
-        "stats_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="type_count_test",
-    source=[
-        "type_count_test.cpp",
-    ],
-    LIBDEPS=[
-        "stats_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="ce_histogram_test",
-    source=[
-        "ce_histogram_test.cpp",
-    ],
-    LIBDEPS=[
-        "stats_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="value_utils_test",
-    source=[
-        "value_utils_test.cpp",
-    ],
-    LIBDEPS=[
-        "stats_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

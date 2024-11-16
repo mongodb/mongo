@@ -375,6 +375,17 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "index_bounds_builder_test_fixture",
+    srcs = [
+    ],
+    hdrs = [
+        "index_bounds_builder_test_fixture.h",
+    ],
+    deps = [
+    ],
+)
+
+mongo_cc_library(
     name = "query_planner",
     srcs = [
         "distinct_access.cpp",
@@ -613,6 +624,22 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_test_service_context",
+    srcs = [
+        "query_test_service_context.cpp",
+    ],
+    hdrs = [
+        "query_test_service_context.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/s:grid",
     ],
 )
 
