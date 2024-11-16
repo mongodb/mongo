@@ -137,6 +137,10 @@ patch_aliases:
     description: "Run tests and report code coverage"
     variant: ".*-coverage"
     task: ".*"
+  - alias: unittestcoverage
+    description: "Run unit tests and report code coverage"
+    variant: ".*-coverage"
+    task: "^(compile_and_run_unittests_.*|bazel_coverage)$"
   - alias: cluster_scalability
     variant_tags: ["cluster_scalability_only"]
     task_tags: ["cluster_scalability_only"]
