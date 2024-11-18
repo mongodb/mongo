@@ -1198,15 +1198,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "expression_context_for_test",
-    srcs = [],
-    hdrs = [
-        "expression_context_for_test.h",
-    ],
-    deps = [],
-)
-
 # TODO(SERVER-96860): Remove cycle created by moving //src/mongo/db/pipeline:field_path.h to //src/mongo/db/pipeline:field_path
 filegroup(
     name = "field_path_hdrs",

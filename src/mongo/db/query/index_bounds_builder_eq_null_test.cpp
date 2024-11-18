@@ -44,7 +44,7 @@
 #include "mongo/db/query/expression_geo_index_mapping.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/index_bounds_builder_test_fixture.h"
+#include "mongo/db/query/index_bounds_builder_test.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
