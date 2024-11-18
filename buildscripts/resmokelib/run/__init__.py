@@ -1984,14 +1984,6 @@ class RunPlugin(PluginInterface):
         )
 
         evergreen_options.add_argument(
-            "--buildloggerUrl",
-            action="store",
-            dest="buildlogger_url",
-            metavar="URL",
-            help="The root url of the buildlogger server.",
-        )
-
-        evergreen_options.add_argument(
             "--distroId",
             dest="distro_id",
             metavar="DISTRO_ID",

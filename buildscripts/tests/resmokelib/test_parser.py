@@ -279,7 +279,6 @@ class TestLocalCommandLine(unittest.TestCase):
                 "run",
                 "--suites=my_suite",
                 "--log=buildlogger",
-                "--buildloggerUrl=some_url",
                 "--storageEngine=my_storage_engine",
             ]
         )
