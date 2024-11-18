@@ -15,14 +15,6 @@ const dbCount = 2;
 const collPrefix = 'sharded_coll_';
 const collCount = 2;
 
-function getRandomDb(db) {
-    return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));
-}
-
-function getRandomCollection(db) {
-    return db[collPrefix + Random.randInt(collCount)];
-}
-
 function getRandomShard(connCache) {
     const shards = Object.keys(connCache.shards);
     return shards[Random.randInt(shards.length)];
@@ -30,6 +22,12 @@ function getRandomShard(connCache) {
 
 export const $config = (function() {
     let data = {
+        getRandomDb: function(db) {
+            return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));
+        },
+        getRandomCollection: function(db) {
+            return db[collPrefix + Random.randInt(collCount)];
+        },
         movePrimaryAllowedErrorCodes: [
             ErrorCodes.ConflictingOperationInProgress,
             // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
@@ -44,8 +42,8 @@ export const $config = (function() {
 
     let states = {
         create: function(db, collName, connCache) {
-            db = getRandomDb(db);
-            const coll = getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
             const fullNs = coll.getFullName();
 
             jsTestLog('Executing create state: ' + fullNs);
@@ -53,18 +51,18 @@ export const $config = (function() {
                 db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
         },
         drop: function(db, collName, connCache) {
-            db = getRandomDb(db);
-            const coll = getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
 
             jsTestLog('Executing drop state: ' + coll.getFullName());
 
             assert.eq(coll.drop(), true);
         },
         rename: function(db, collName, connCache) {
-            db = getRandomDb(db);
-            const srcColl = getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const srcColl = this.getRandomCollection(db);
             const srcCollName = srcColl.getFullName();
-            const destCollNS = getRandomCollection(db).getFullName();
+            const destCollNS = this.getRandomCollection(db).getFullName();
             const destCollName = destCollNS.split('.')[1];
 
             jsTestLog('Executing rename state:' + srcCollName + ' to ' + destCollNS);
@@ -76,7 +74,7 @@ export const $config = (function() {
                 ]);
         },
         movePrimary: function(db, collName, connCache) {
-            db = getRandomDb(db);
+            db = this.getRandomDb(db);
             const shardId = getRandomShard(connCache);
 
             jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
@@ -85,8 +83,8 @@ export const $config = (function() {
                 this.movePrimaryAllowedErrorCodes);
         },
         collMod: function(db, collName, connCache) {
-            db = getRandomDb(db);
-            const coll = getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
 
             jsTestLog('Executing collMod state: ' + coll.getFullName());
             assert.commandWorkedOrFailedWithCode(
@@ -94,14 +92,14 @@ export const $config = (function() {
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {
-            db = getRandomDb(db);
+            db = this.getRandomDb(db);
             jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         checkCollectionMetadataConsistency: function(db, collName, connCache) {
-            db = getRandomDb(db);
-            const coll = getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
             jsTestLog('Executing checkMetadataConsistency state for collection: ' +
                       coll.getFullName());
             const inconsistencies = coll.checkMetadataConsistency().toArray();

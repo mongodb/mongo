@@ -110,6 +110,12 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeDDLLock);
+MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterDDLLock);
+
+MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeEstablishCursors);
+MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterEstablishCursors);
+
 constexpr StringData kDDLLockReason = "checkMetadataConsistency"_sd;
 
 /*
@@ -222,8 +228,12 @@ public:
 
                 auto checkMetadataForDb = [&]() {
                     try {
+                        hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                         DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
                             opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
+                        tassert(9504001,
+                                "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
+                                !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
 
                         auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
                         cursors.insert(cursors.end(),
@@ -278,8 +288,12 @@ public:
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
             auto dbCursors = [&]() {
+                hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                 DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
                     opCtx, nss.dbName(), kDDLLockReason, MODE_S};
+                tassert(9504002,
+                        "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
+                        !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
                 return _establishCursorOnParticipants(opCtx, nss);
             }();
 
@@ -288,8 +302,12 @@ public:
 
         Response _runCollectionLevel(OperationContext* opCtx, const NamespaceString& nss) {
             auto collCursors = [&]() {
+                hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                 DDLLockManager::ScopedCollectionDDLLock dbDDLLock{
                     opCtx, nss, kDDLLockReason, MODE_S};
+                tassert(9504003,
+                        "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
+                        !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
                 return _establishCursorOnParticipants(opCtx, nss);
             }();
 
@@ -302,6 +320,8 @@ public:
          */
         std::vector<RemoteCursor> _establishCursorOnParticipants(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
+            hangShardCheckMetadataBeforeEstablishCursors.pauseWhileSet();
+
             // Shard requests
             const auto shardOpKey = UUID::gen();
             ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
@@ -330,14 +350,18 @@ public:
             appendOpKey(configOpKey, &configRequestBob);
             requests.emplace_back(ShardId::kConfigServerId, configRequestBob.obj());
 
-            return establishCursors(opCtx,
-                                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                    nss,
-                                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                    requests,
-                                    false /* allowPartialResults */,
-                                    Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
-                                    {shardOpKey, configOpKey});
+            auto cursors = establishCursors(opCtx,
+                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                            nss,
+                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                            requests,
+                                            false /* allowPartialResults */,
+                                            Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
+                                            {shardOpKey, configOpKey});
+            tassert(9504004,
+                    "Expected interrupt before tripwireShardCheckMetadataAfterEstablishCursors",
+                    !tripwireShardCheckMetadataAfterEstablishCursors.shouldFail());
+            return cursors;
         }
 
         CursorInitialReply _mergeCursors(OperationContext* opCtx,

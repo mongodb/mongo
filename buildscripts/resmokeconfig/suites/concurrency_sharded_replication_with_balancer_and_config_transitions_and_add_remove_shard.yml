@@ -53,6 +53,7 @@ selector:
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
     - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_check_metadata_consistency_killop.js
     - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_sharded_collection.js
     - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_chain.js
     - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_droptarget.js
