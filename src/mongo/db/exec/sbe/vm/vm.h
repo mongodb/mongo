@@ -1095,6 +1095,14 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableConcatArraysInit(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableConcatArraysAdd(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableConcatArraysRemove(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableConcatArraysFinalize(
+        ArityType arity);
     template <int quantity>
     void aggRemovableStdDevImpl(value::TypeTags stateTag,
                                 value::Value stateVal,

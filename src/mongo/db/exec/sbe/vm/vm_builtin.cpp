@@ -447,6 +447,14 @@ std::string builtinToString(Builtin b) {
             return "aggRemovablePushRemove";
         case Builtin::aggRemovablePushFinalize:
             return "aggRemovablePushFinalize";
+        case Builtin::aggRemovableConcatArraysInit:
+            return "aggRemovableConcatArraysInit";
+        case Builtin::aggRemovableConcatArraysAdd:
+            return "aggRemovableConcatArraysAdd";
+        case Builtin::aggRemovableConcatArraysRemove:
+            return "aggRemovableConcatArraysRemove";
+        case Builtin::aggRemovableConcatArraysFinalize:
+            return "aggRemovableConcatArraysFinalize";
         case Builtin::aggRemovableStdDevAdd:
             return "aggRemovableStdDevAdd";
         case Builtin::aggRemovableStdDevRemove:
@@ -1034,6 +1042,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovablePushRemove(arity);
         case Builtin::aggRemovablePushFinalize:
             return builtinAggRemovablePushFinalize(arity);
+        case Builtin::aggRemovableConcatArraysInit:
+            return builtinAggRemovableConcatArraysInit(arity);
+        case Builtin::aggRemovableConcatArraysAdd:
+            return builtinAggRemovableConcatArraysAdd(arity);
+        case Builtin::aggRemovableConcatArraysRemove:
+            return builtinAggRemovableConcatArraysRemove(arity);
+        case Builtin::aggRemovableConcatArraysFinalize:
+            return builtinAggRemovableConcatArraysFinalize(arity);
         case Builtin::aggRemovableStdDevAdd:
             return builtinAggRemovableStdDevAdd(arity);
         case Builtin::aggRemovableStdDevRemove:

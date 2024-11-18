@@ -433,17 +433,6 @@ public:
     }
 };
 
-/**
- * A parser for any SBE unsupported window function that satisfies ExpressionRemovable.
- */
-template <typename NonRemovableType, typename RemovableType>
-boost::intrusive_ptr<Expression> genericParseSBEUnsupportedExpressionRemovable(
-    BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
-    expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
-    return ExpressionRemovable<NonRemovableType, RemovableType>::parse(
-        std::move(obj), sortBy, expCtx);
-}
-
 template <typename RankType>
 class ExpressionFromRankAccumulator : public Expression {
 public:

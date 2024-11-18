@@ -2431,14 +2431,35 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePush
     return {true, stateTag, stateVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePushFinalize(
-    ArityType arity) {
-    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
-    uassert(7993102, "State should be of array type", stateTag == value::TypeTags::Array);
-    auto state = value::getArrayView(stateVal);
+namespace {
+std::tuple<value::Array*, value::Array*, int32_t> concatArraysState(value::TypeTags stateTag,
+                                                                    value::Value stateVal) {
+    tassert(9476001, "state should be of type Array", stateTag == value::TypeTags::Array);
+    auto stateArr = value::getArrayView(stateVal);
+    tassert(9476002,
+            str::stream() << "state array should have "
+                          << static_cast<size_t>(AggArrayWithSize::kLast) << " elements",
+            stateArr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+
+    // Read the accumulator from the state.
+    auto [accArrTag, accArrVal] = stateArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(9476003, "accumulator should be of type Array", accArrTag == value::TypeTags::Array);
+    auto accArr = value::getArrayView(accArrVal);
+
+    auto [accArrSizeTag, accArrSizeVal] =
+        stateArr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+    tassert(9476004,
+            "accumulator size should be of type NumberInt32",
+            accArrSizeTag == value::TypeTags::NumberInt32);
+
+    return {stateArr, accArr, value::bitcastTo<int32_t>(accArrSizeVal)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> pushConcatArraysCommonFinalize(value::Array* state) {
     auto [queueBuffer, startIdx, queueSize] = getArrayQueueState(state);
 
     auto [resultTag, resultVal] = value::makeNewArray();
+    value::ValueGuard resGuard{resultTag, resultVal};
     auto result = value::getArrayView(resultVal);
     result->reserve(queueSize);
 
@@ -2451,7 +2472,171 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePush
         std::tie(tag, val) = value::copyValue(tag, val);
         result->push_back(tag, val);
     }
+    resGuard.reset();
     return {true, resultTag, resultVal};
+}
+}  // namespace
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePushFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    uassert(7993102, "State should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+
+    return pushConcatArraysCommonFinalize(state);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableConcatArraysInit(
+    ArityType arity) {
+    auto [stateTag, stateVal] = value::makeNewArray();
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto arr = value::getArrayView(stateVal);
+
+    // This will be the structure where the accumulated values are stored.
+    auto [accArrTag, accArrVal] = arrayQueueInit();
+
+    // The order is important! The accumulated array should be at index
+    // AggArrayWithSize::kValues, and the size (bytes) should be at index
+    // AggArrayWithSize::kSizeOfValues.
+    arr->push_back(accArrTag, accArrVal);
+    arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableConcatArraysAdd(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [newElTag, newElVal] = moveOwnedFromStack(1);
+    value::ValueGuard newElGuard{newElTag, newElVal};
+
+    // If the field resolves to Nothing (e.g. if it is missing in the document), then we want to
+    // leave the current state as is.
+    if (newElTag == value::TypeTags::Nothing) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    auto [sizeCapOwned, sizeCapTag, sizeCapVal] = getFromStack(2);
+    tassert(9476000,
+            "The size cap must be of type NumberInt32",
+            sizeCapTag == value::TypeTags::NumberInt32);
+    auto capSize = value::bitcastTo<int32_t>(sizeCapVal);
+    auto [stateArr, accArr, accArrSize] = concatArraysState(stateTag, stateVal);
+
+    // Note the importance of templating 'arrayForEach' on 'true' here. The input to $concatArrays
+    // is an array. In order to avoid leaking the memory associated with each element of the array,
+    // we create copies of each element to store in the accumulator (via templating on 'true'). An
+    // example where we might otherwise leak memory is if we get the input off the stack as type
+    // 'bsonArray'. Iterating over a 'bsonArray' results in pointers into the underlying BSON. Thus,
+    // (without passing 'true') calling 'arrayQueuePush' below would insert elements that are
+    // pointers to memory that will be destroyed with 'newElGuard' above, which is the source of a
+    // memory leak.
+    value::arrayForEach<true>(
+        newElTag,
+        newElVal,
+        // We do an initialization capture because clang fails when trying to capture a structured
+        // binding in a lambda expression.
+        [&accArr = accArr, &accArrSize = accArrSize, capSize](value::TypeTags elemTag,
+                                                              value::Value elemVal) {
+            // Check that the size of the accumulator will not exceed the cap.
+            auto elemSize = value::getApproximateSize(elemTag, elemVal);
+            if (accArrSize + elemSize >= capSize) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream() << "Used too much memory for the $concatArrays operator in "
+                                           "$setWindowFields. Memory limit: "
+                                        << capSize << " bytes. The window contains "
+                                        << accArr->size() << " elements and is of size "
+                                        << accArrSize << " bytes. The element being added has size "
+                                        << elemSize << " bytes.");
+            }
+            // Update the state
+            arrayQueuePush(accArr, elemTag, elemVal);
+            accArrSize += elemSize;
+        });
+    // Update the window field with the new total size.
+    stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(accArrSize));
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableConcatArraysRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [elTag, elVal] = moveOwnedFromStack(1);
+    value::ValueGuard elGuard{elTag, elVal};
+    auto [stateArr, accArr, accArrSize] = concatArraysState(stateTag, stateVal);
+
+    // If the field resolves to Nothing (e.g. if it is missing in the document), then we want to
+    // leave the current state as is.
+    if (elTag == value::TypeTags::Nothing) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    // Note the importance of templating 'arrayForEach' on 'true' here. We followed the same pattern
+    // in 'builtinAggRemovableConcatArraysAdd' (see comment there for details), which means we made
+    // copies of each element to insert into the accumulator. This is important for some types
+    // because while the underlying data stays the same, making a copy can return a value of a
+    // different SBE type. For example, if the input to $concatArrays was the bsonArray ["Beauty"],
+    // the string "Beauty" would be of type 'bsonString'. When we make a copy to insert it into the
+    // accumulator, the new value is of type 'StringSmall'. These two representations of the same
+    // string take up different amounts of memory. This is important here because we are tracking
+    // accumulator memory usage and need to ensure that the value we subtract from the memory
+    // tracker for each element is the same as what we added to the memory tracker in
+    // 'builtinAggRemovableConcatArraysAdd'.
+    value::arrayForEach<true>(
+        elTag,
+        elVal,
+        // We do an initialization capture because clang fails when trying to
+        // capture a structured binding in a lambda expression.
+        [&accArr = accArr, &accArrSize = accArrSize](value::TypeTags elemBeingRemovedTag,
+                                                     value::Value elemBeingRemovedVal) {
+            value::ValueGuard removedGuard{elemBeingRemovedTag, elemBeingRemovedVal};
+            auto elemSize = value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
+            invariant(elemSize <= accArrSize);
+
+            // Ensure that there is a value to remove from the window.
+            tassert(9476005, "Trying to remove from an empty window", accArr->size() > 0);
+
+            if (kDebugBuild) {
+                // Ensure the value we will remove is in fact the value we have been told to remove.
+                // This check is expensive on workloads with a lot of removals, and becomes even
+                // more expensive with arbitrarily long arrays.
+                auto [frontElemTag, frontElemVal] = arrayQueueFront(accArr);
+                auto [cmpTag, cmpVal] = value::compareValue(
+                    frontElemTag, frontElemVal, elemBeingRemovedTag, elemBeingRemovedVal);
+                invariant(cmpTag == value::TypeTags::NumberInt32 &&
+                              value::bitcastTo<int32_t>(cmpVal) == 0,
+                          "Can't remove a value that is not at the front of the window");
+            }
+
+            // Remove the value.
+            auto [removedTag, removedVal] = arrayQueuePop(accArr);
+            value::releaseValue(removedTag, removedVal);
+
+            accArrSize -= elemSize;
+        });
+
+    // Update the window field with the new total size.
+    stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(accArrSize));
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableConcatArraysFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    uassert(9476007, "State should be of array type", stateTag == value::TypeTags::Array);
+    auto [stateArr, accArr, _] = concatArraysState(stateTag, stateVal);
+
+    return pushConcatArraysCommonFinalize(accArr);
 }
 
 namespace {
@@ -2938,7 +3123,7 @@ std::tuple<value::Array*, value::ArrayMultiSet*, int32_t> setOperatorCommonState
     auto [accMultiSetSizeTag, accMultiSetSizeVal] =
         stateArr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
     tassert(8124903,
-            "accumulator size be of type NumberInt32",
+            "accumulator size should be of type NumberInt32",
             accMultiSetSizeTag == value::TypeTags::NumberInt32);
 
     return {stateArr, accMultiSet, value::bitcastTo<int32_t>(accMultiSetSizeVal)};
@@ -3069,20 +3254,29 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetU
         return {true, stateTag, stateVal};
     }
 
+    // Note the importance of templating 'arrayForEach' on 'true' here. The input to $setUnion
+    // is an array. In order to avoid leaking the memory associated with each element of the array,
+    // we create copies of each element to store in the accumulator (via templating on 'true'). An
+    // example where we might otherwise leak memory is if we get the input off the stack as type
+    // 'bsonArray'. Iterating over a 'bsonArray' results in pointers into the underlying BSON. Thus,
+    // (without passing 'true') calling 'arrayQueuePush' below would insert elements that are
+    // pointers to memory that will be destroyed with 'newElGuard' above, which is the source of a
+    // memory leak.
     value::arrayForEach<true>(
         newElTag,
         newElVal,
         // We do an initialization capture because clang fails when trying to capture a structured
         // binding in a lambda expression.
-        [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize, &capSize = capSize](
+        [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize, capSize](
             value::TypeTags elemTag, value::Value elemVal) {
             // Check that the size of the accumulator will not exceed the cap.
             auto elemSize = value::getApproximateSize(elemTag, elemVal);
             if (accMultiSetSize + elemSize >= capSize) {
                 uasserted(ErrorCodes::ExceededMemoryLimit,
                           str::stream()
-                              << "Used too much memory for a single set. Memory limit: " << capSize
-                              << " bytes. The set contains " << accMultiSet->size()
+                              << "Used too much memory for the $setUnion operator in "
+                                 "$setWindowFields. Memory limit: "
+                              << capSize << " bytes. The set contains " << accMultiSet->size()
                               << " elements and is of size " << accMultiSetSize
                               << " bytes. The element being added has size " << elemSize
                               << " bytes.");
@@ -3117,20 +3311,32 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetU
         return {true, stateTag, stateVal};
     }
 
-    value::arrayForEach(elTag,
-                        elVal,
-                        // We do an initialization capture because clang fails when trying to
-                        // capture a structured binding in a lambda expression.
-                        [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize](
-                            value::TypeTags elemBeingRemovedTag, value::Value elemBeingRemovedVal) {
-                            auto elemSize =
-                                value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
-                            invariant(elemSize <= accMultiSetSize);
-                            tassert(9475902,
-                                    "Can't remove a value that is not contained in the window",
-                                    accMultiSet->remove(elemBeingRemovedTag, elemBeingRemovedVal));
-                            accMultiSetSize -= elemSize;
-                        });
+    // Note the importance of templating 'arrayForEach' on 'true' here. We followed the same pattern
+    // in 'builtinAggRemovableSetUnionAdd' (see comment there for details), which means we made
+    // copies of each element to insert into the accumulator. This is important for some types
+    // because while the underlying data stays the same, making a copy can return a value of a
+    // different SBE type. For example, if the input to $setUnion was the bsonArray ["Beauty"], the
+    // string "Beauty" would be of type 'bsonString'. When we make a copy to insert it into the
+    // accumulator, the new value is of type 'StringSmall'. These two representations of the same
+    // string take up different amounts of memory. This is important here because we are tracking
+    // accumulator memory usage and need to ensure that the value we subtract from the memory
+    // tracker for each element is the same as what we added to the memory tracker in
+    // 'builtinAggRemovableSetUnionAdd'.
+    value::arrayForEach<true>(
+        elTag,
+        elVal,
+        // We do an initialization capture because clang fails when trying to
+        // capture a structured binding in a lambda expression.
+        [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize](
+            value::TypeTags elemBeingRemovedTag, value::Value elemBeingRemovedVal) {
+            value::ValueGuard removedGuard{elemBeingRemovedTag, elemBeingRemovedVal};
+            auto elemSize = value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
+            invariant(elemSize <= accMultiSetSize);
+            tassert(9475902,
+                    "Can't remove a value that is not contained in the window",
+                    accMultiSet->remove(elemBeingRemovedTag, elemBeingRemovedVal));
+            accMultiSetSize -= elemSize;
+        });
 
     // Update the window field with the new total size.
     stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),

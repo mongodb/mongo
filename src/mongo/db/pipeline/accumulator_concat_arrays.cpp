@@ -39,9 +39,8 @@ REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(
 
 REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
     concatArrays,
-    (mongo::window_function::genericParseSBEUnsupportedExpressionRemovable<
-        AccumulatorConcatArrays,
-        WindowFunctionConcatArrays>),
+    (mongo::window_function::ExpressionRemovable<AccumulatorConcatArrays,
+                                                 WindowFunctionConcatArrays>::parse),
     feature_flags::gFeatureFlagArrayAccumulators,
     AllowedWithApiStrict::kNeverInVersion1);
 

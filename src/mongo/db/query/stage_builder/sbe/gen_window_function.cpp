@@ -249,6 +249,61 @@ SbExpr buildWindowFinalizePush(const WindowOp& op, StageBuilderState& state, SbS
     return b.makeFunction("aggRemovablePushFinalize", std::move(exprs));
 }
 
+SbExpr::Vector buildWindowAddConcatArrays(const WindowOp& op,
+                                          std::unique_ptr<AddSingleInput> inputs,
+                                          StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    auto frameId = state.frameId();
+    auto argValue = SbLocalVar{frameId, 0};
+    auto expr = b.makeIf(b.makeFunction("isArray", argValue),
+                         argValue,
+                         b.makeFail(ErrorCodes::TypeMismatch,
+                                    "Expected new value for $concatArrays to be an array"_sd));
+    auto argWithTypeCheck =
+        b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
+
+    const int cap = internalQueryMaxConcatArraysBytes.load();
+    return SbExpr::makeSeq(b.makeFunction(
+        "aggRemovableConcatArraysAdd", std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
+}
+
+SbExpr::Vector buildWindowRemoveConcatArrays(const WindowOp& op,
+                                             std::unique_ptr<AddSingleInput> inputs,
+                                             StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    auto frameId = state.frameId();
+    auto argValue = SbLocalVar{frameId, 0};
+    auto expr =
+        b.makeIf(b.makeFunction("isArray", argValue),
+                 argValue,
+                 b.makeFail(ErrorCodes::TypeMismatch,
+                            "Expected value to remove for $concatArrays to be an array"_sd));
+    auto argWithTypeCheck =
+        b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
+
+    return SbExpr::makeSeq(
+        b.makeFunction("aggRemovableConcatArraysRemove", std::move(argWithTypeCheck)));
+}
+
+SbExpr::Vector buildWindowInitializeConcatArrays(const WindowOp& op, StageBuilderState& state) {
+    SbExprBuilder b(state);
+    return SbExpr::makeSeq(b.makeFunction("aggRemovableConcatArraysInit"));
+}
+
+SbExpr buildWindowFinalizeConcatArrays(const WindowOp& op,
+                                       StageBuilderState& state,
+                                       SbSlotVector slots) {
+    SbExprBuilder b(state);
+
+    SbExpr::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(slot);
+    }
+    return b.makeFunction("aggRemovableConcatArraysFinalize", std::move(exprs));
+}
+
 SbExpr::Vector buildWindowInitializeIntegral(const WindowOp& op,
                                              std::unique_ptr<InitIntegralInputs> inputs,
                                              StageBuilderState& state) {
@@ -567,10 +622,10 @@ SbExpr::Vector buildWindowRemoveSetUnion(const WindowOp& op,
 
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
-    auto expr = b.makeIf(
-        b.makeFunction("isArray", argValue),
-        argValue,
-        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
+    auto expr = b.makeIf(b.makeFunction("isArray", argValue),
+                         argValue,
+                         b.makeFail(ErrorCodes::TypeMismatch,
+                                    "Expected value to remove for $setUnion to be an array"_sd));
     auto argWithTypeCheck =
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
@@ -796,6 +851,13 @@ static const StringDataMap<WindowOpInfo> windowOpInfoMap = {
                   .buildRemoveAggs = makeBuildFn(&buildWindowRemoveBottomN),
                   .buildInit = makeBuildFn(&buildWindowInitializeBottomN),
                   .buildFinalize = makeBuildFn(&buildWindowFinalizeBottomN)}},
+
+    // ConcatArrays
+    {"$concatArrays",
+     WindowOpInfo{.buildAddAggs = makeBuildFn(&buildWindowAddConcatArrays),
+                  .buildRemoveAggs = makeBuildFn(&buildWindowRemoveConcatArrays),
+                  .buildInit = makeBuildFn(&buildWindowInitializeConcatArrays),
+                  .buildFinalize = makeBuildFn(&buildWindowFinalizeConcatArrays)}},
 
     // CovariancePop
     {"$covariancePop",
