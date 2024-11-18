@@ -943,8 +943,8 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_util.h",
     ],
     tags = [
-        "compile_requires_large_memory_fsan",
         "compile_requires_large_memory_gcc",
+        "compile_requires_large_memory_sanitizer",
     ],
     deps = [
         ":analyze_shard_key_util",

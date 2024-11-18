@@ -1487,12 +1487,12 @@ def mongo_cc_library(
             "//conditions:default": {},
         })
 
-    if "compile_requires_large_memory_fsan" in tags:
+    if "compile_requires_large_memory_sanitizer" in tags:
         exec_properties |= select({
-            "//bazel/config:fsan_enabled_x86_64": {
+            "//bazel/config:any_sanitizer_x86_64": {
                 "Pool": "large_mem_x86_64",
             },
-            "//bazel/config:fsan_enabled_aarch64": {
+            "//bazel/config:any_sanitizer_aarch64": {
                 "Pool": "large_memory_arm64",
             },
             "//conditions:default": {},
