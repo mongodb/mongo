@@ -129,6 +129,17 @@ public:
     static const Status authenticationFailedStatus;
 
     /**
+     * Query to match the auth schema version document in the versionCollectionNamespace while
+     * upserting it on FCV downgrade.
+     */
+    static const BSONObj versionDocumentQuery;
+
+    /**
+     * Name of the field in the auth schema version document containing the current schema version.
+     */
+    static constexpr StringData schemaVersionFieldName = "currentVersion"_sd;
+
+    /**
      * Auth schema version for MongoDB 3.0 SCRAM only mode.
      * Users are stored in admin.system.users, roles in admin.system.roles.
      * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
