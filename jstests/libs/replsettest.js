@@ -148,7 +148,6 @@ export class ReplSetTest {
                     // Allow caller to perform tasks on reconnect.
                     reconnectNode(conn);
                 }
-
                 asCluster(this, conn, function() {
                     status = conn.getDB('admin').runCommand({replSetGetStatus: 1});
                 });
@@ -558,7 +557,11 @@ export class ReplSetTest {
         var status = null;
         assert.soonNoExcept(
             function() {
-                status = node.getDB("admin").runCommand({replSetGetStatus: 1});
+                status =
+                    asCluster(this,
+                              node,
+                              () => assert.commandWorked(node.adminCommand({replSetGetStatus: 1})));
+
                 for (var j = 0; j < status.members.length; j++) {
                     if (status.members[j].self) {
                         return status.members[j].syncSourceHost === upstreamNode.host;
@@ -753,8 +756,11 @@ export class ReplSetTest {
             var primary = expectedPrimaryNodeIdx;
 
             for (var i = 0; i < nodes.length; i++) {
-                var replSetGetStatus =
-                    assert.commandWorked(nodes[i].getDB("admin").runCommand({replSetGetStatus: 1}));
+                let node = nodes[i];
+                let replSetGetStatus =
+                    asCluster(this,
+                              node,
+                              () => assert.commandWorked(node.adminCommand({replSetGetStatus: 1})));
                 var nodesPrimary = -1;
                 for (var j = 0; j < replSetGetStatus.members.length; j++) {
                     if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
@@ -771,19 +777,19 @@ export class ReplSetTest {
                 }
                 // Node doesn't see a primary.
                 if (nodesPrimary < 0) {
-                    print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
+                    print("AwaitNodesAgreeOnPrimary: Retrying because " + node.name +
                           " does not see a primary.");
                     return false;
                 }
 
                 if (primary < 0) {
-                    print("AwaitNodesAgreeOnPrimary: " + nodes[i].name + " thinks the " +
+                    print("AwaitNodesAgreeOnPrimary: " + node.name + " thinks the " +
                           " primary is " + this.nodes[nodesPrimary].name +
                           ". Other nodes are expected to agree on the same primary.");
                     // If the nodes haven't seen a primary yet, set primary to nodes[i]'s primary.
                     primary = nodesPrimary;
                 } else if (primary !== nodesPrimary) {
-                    print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
+                    print("AwaitNodesAgreeOnPrimary: Retrying because " + node.name +
                           " thinks the primary is " + this.nodes[nodesPrimary].name +
                           " instead of " + this.nodes[primary].name);
                     return false;
@@ -868,8 +874,8 @@ export class ReplSetTest {
         if (!primary) {
             primary = this._liveNodes[0];
         }
-
-        return primary.getDB("admin").runCommand({replSetGetStatus: 1});
+        return asCluster(
+            this, primary, () => assert.commandWorked(primary.adminCommand({replSetGetStatus: 1})));
     }
 
     /**
@@ -992,6 +998,7 @@ export class ReplSetTest {
         print("waitForConfigReplication: Waiting for the config on " + primary.host +
               " to replicate to " + nodeHosts);
 
+        let rst = this;
         let configVersion = -2;
         let configTerm = -2;
         assert.soon(function() {
@@ -1331,9 +1338,11 @@ export class ReplSetTest {
             for (let i = 2; i <= originalMembers.length; i++) {
                 print("ReplSetTest adding in node " + i);
                 assert.soon(() => {
-                    primary = this.getPrimary().getDB("admin");
-                    const statusRes =
-                        assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+                    primary = this.getPrimary();
+                    const statusRes = asCluster(
+                        this,
+                        primary,
+                        () => assert.commandWorked(primary.adminCommand({replSetGetStatus: 1})));
                     const primaryMember = statusRes.members.find((m) => m.self);
                     config.version = primaryMember.configVersion + 1;
 
@@ -1779,7 +1788,6 @@ export class ReplSetTest {
             function() {
                 for (var i = 0; i < membersToCheck.length; i++) {
                     var node = membersToCheck[i];
-
                     // Continue if we're connected to an arbiter
                     const res = asCluster(
                         rst,
@@ -1868,7 +1876,10 @@ export class ReplSetTest {
             for (let node of rst.nodes) {
                 // The `lastStableRecoveryTimestamp` field contains a stable timestamp
                 // guaranteed to exist on storage engine recovery to stable timestamp.
-                let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+                let res =
+                    asCluster(rst,
+                              node,
+                              () => assert.commandWorked(node.adminCommand({replSetGetStatus: 1})));
 
                 // Continue if we're connected to an arbiter.
                 if (res.myState === ReplSetTest.State.ARBITER) {
@@ -1997,7 +2008,6 @@ export class ReplSetTest {
 
                 return Progress.ConfigMismatch;
             }
-
             // Skip this node if we're connected to an arbiter
             var res = asCluster(
                 rst,
