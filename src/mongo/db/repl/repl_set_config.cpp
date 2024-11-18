@@ -124,10 +124,6 @@ BSONObj ReplSetConfig::toBSON() const {
     BSONObjBuilder builder;
     serialize(&builder);
 
-    if (_recipientConfig) {
-        builder.append(kRecipientConfigFieldName, _recipientConfig->toBSON());
-    }
-
     return builder.obj();
 }
 
@@ -157,12 +153,6 @@ ReplSetConfig::ReplSetConfig(const BSONObj& cfg,
     setSettings(ReplSetConfigSettings());
     ReplSetConfigBase::parseProtected(IDLParserContext("ReplSetConfig"), cfg);
     uassertStatusOK(_initialize(forInitiate, forceTerm, defaultReplicaSetId));
-
-    if (cfg.hasField(kRecipientConfigFieldName)) {
-        auto splitConfig = cfg[kRecipientConfigFieldName].Obj();
-        _recipientConfig.reset(new ReplSetConfig(
-            splitConfig, false /* forInitiate */, forceTerm, defaultReplicaSetId));
-    }
 }
 
 Status ReplSetConfig::_initialize(bool forInitiate,
@@ -805,14 +795,6 @@ Status ReplSetConfig::validateWriteConcern(const WriteConcernOptions& writeConce
         return findCustomWriteMode(get<std::string>(writeConcern.w)).getStatus();
     }
     return Status::OK();
-}
-
-bool ReplSetConfig::isSplitConfig() const {
-    return !!_recipientConfig;
-}
-
-ReplSetConfigPtr ReplSetConfig::getRecipientConfig() const {
-    return _recipientConfig;
 }
 
 bool ReplSetConfig::areWriteConcernModesTheSame(ReplSetConfig* otherConfig) const {

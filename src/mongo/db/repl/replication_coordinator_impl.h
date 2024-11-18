@@ -1557,26 +1557,17 @@ private:
     void _scheduleHeartbeatReconfig(WithLock lk, const ReplSetConfig& newConfig);
 
     /**
-     * Accepts a ReplSetConfig and resolves it either to itself, or the embedded shard split
-     * recipient config if it's present and self is a shard split recipient. Returns a tuple of the
-     * resolved config and a boolean indicating whether a recipient config was found.
-     */
-    std::tuple<StatusWith<ReplSetConfig>, bool> _resolveConfigToApply(const ReplSetConfig& config);
-
-    /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
      */
     void _heartbeatReconfigStore(const executor::TaskExecutor::CallbackArgs& cbd,
-                                 const ReplSetConfig& newConfig,
-                                 bool isSplitRecipientConfig = false);
+                                 const ReplSetConfig& newConfig);
 
     /**
      * Conclusion actions of a heartbeat-triggered reconfiguration.
      */
     void _heartbeatReconfigFinish(const executor::TaskExecutor::CallbackArgs& cbData,
                                   const ReplSetConfig& newConfig,
-                                  StatusWith<int> myIndex,
-                                  bool isSplitRecipientConfig);
+                                  StatusWith<int> myIndex);
 
     /**
      * Calculates the time (in millis) left in quiesce mode and converts the value to int64.
@@ -2069,9 +2060,6 @@ private:
     // Construct used to synchronize default write concern changes with config write concern
     // changes.
     WriteConcernTagChangesImpl _writeConcernTagChanges;
-
-    // An optional promise created when entering drain mode for shard split.
-    boost::optional<Promise<void>> _finishedDrainingPromise;  // (M)
 
     // Pointer to the SplitPrepareSessionManager owned by this ReplicationCoordinator.
     SplitPrepareSessionManager _splitSessionManager;  // (S)

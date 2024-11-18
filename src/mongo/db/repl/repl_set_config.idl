@@ -193,9 +193,3 @@ structs:
                 description: "This field indicates the replicated data has been repaired, and
                               prevents use of the configuration until it is removed."
                 type: optionalBool
-            recipientConfig:
-                description: "An optional field representing a config for a recipient during a shard
-                              split operation. Due to compiler support issues, the type is set to
-                              any."
-                type: any
-                ignore: true

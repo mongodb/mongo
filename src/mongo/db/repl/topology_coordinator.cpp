@@ -1505,18 +1505,6 @@ StatusWith<bool> TopologyCoordinator::setLastOptimeForMember(
 
     auto* memberData = _findMemberDataByMemberId(memberId.getData());
 
-    // If we are applying a splitConfig for a shard split, we may still be receiving updates for
-    // nodes that have been removed from the donor set.
-    if (_rsConfig.isSplitConfig() && !memberData &&
-        memberId.getData() >= _rsConfig.getNumMembers()) {
-        LOGV2(6234605,
-              "Skipping update from node",
-              "data"_attr = memberId.getData(),
-              "conf"_attr = _rsConfig);
-        // Do not advance optime
-        return false;
-    }
-
     // While we can accept replSetUpdatePosition commands across config versions, we still do not
     // allow receiving them from a node that is not in our config.
     if (!memberData) {

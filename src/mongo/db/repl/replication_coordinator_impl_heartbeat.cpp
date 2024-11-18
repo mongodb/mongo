@@ -704,75 +704,14 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
               _selfIndex < 0);
     _replExecutor
         ->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
-            const auto [swConfig, isSplitRecipientConfig] = _resolveConfigToApply(newConfig);
-            if (!swConfig.isOK()) {
-                LOGV2_WARNING(
-                    6234600,
-                    "Ignoring new configuration in heartbeat response because it is invalid",
-                    "status"_attr = swConfig.getStatus());
-
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
-                invariant(_rsConfigState == kConfigHBReconfiguring);
-                _setConfigState(lg, !rsc.isInitialized() ? kConfigUninitialized : kConfigSteady);
-                return;
-            }
-
-            if (MONGO_likely(!isSplitRecipientConfig)) {
-                _heartbeatReconfigStore(cbData, newConfig);
-                return;
-            }
+            _heartbeatReconfigStore(cbData, newConfig);
+            return;
         })
         .status_with_transitional_ignore();
 }
 
-std::tuple<StatusWith<ReplSetConfig>, bool> ReplicationCoordinatorImpl::_resolveConfigToApply(
-    const ReplSetConfig& config) {
-    if (!_settings.isServerless() || !config.isSplitConfig()) {
-        return {config, false};
-    }
-
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    auto rsc = _rsConfig.unsafePeek();
-    if (!rsc.isInitialized()) {
-        // Unlock the lock because isSelf performs network I/O.
-        lk.unlock();
-
-        // If this node is listed in the members of incoming config, accept the config.
-        auto swSelfIndex = findSelfInConfig(_externalState.get(), config, cc().getServiceContext());
-        if (swSelfIndex.isOK()) {
-            return {config, false};
-        }
-
-        return {Status(ErrorCodes::NotYetInitialized,
-                       "Cannot apply a split config if the current config is uninitialized"),
-                false};
-    }
-
-    auto recipientConfig = config.getRecipientConfig();
-    const auto& selfMember = rsc.getMemberAt(_selfIndex);
-    if (recipientConfig->findMemberByHostAndPort(selfMember.getHostAndPort())) {
-        if (selfMember.getNumVotes() > 0) {
-            return {Status(ErrorCodes::BadValue, "Cannot apply recipient config to a voting node"),
-                    false};
-        }
-
-        if (rsc.getReplSetName() == recipientConfig->getReplSetName()) {
-            return {Status(ErrorCodes::InvalidReplicaSetConfig,
-                           "Cannot apply recipient config since current config and recipient "
-                           "config have the same set name."),
-                    false};
-        }
-
-        return {ReplSetConfig(*recipientConfig), true};
-    }
-
-    return {config, false};
-}
-
 void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
-    const executor::TaskExecutor::CallbackArgs& cbd,
-    const ReplSetConfig& newConfig,
-    bool isSplitRecipientConfig) {
+    const executor::TaskExecutor::CallbackArgs& cbd, const ReplSetConfig& newConfig) {
 
     if (cbd.status.code() == ErrorCodes::CallbackCanceled) {
         LOGV2(21480,
@@ -780,12 +719,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
               "configuration was not persisted but was used",
               "newConfig"_attr = newConfig.toBSON());
         return;
-    }
-
-    if (isSplitRecipientConfig) {
-        LOGV2(6309200,
-              "Applying a recipient config for a shard split operation.",
-              "config"_attr = newConfig);
     }
 
     auto rsc = _getReplSetConfig();
@@ -839,14 +772,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                              "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
 
         auto opCtx = cc().makeOperationContext();
-        auto status = [this,
-                       opCtx = opCtx.get(),
-                       newConfig,
-                       isSplitRecipientConfig = isSplitRecipientConfig]() {
-            if (isSplitRecipientConfig) {
-                return _externalState->replaceLocalConfigDocument(opCtx, newConfig.toBSON());
-            }
-
+        auto status = [this, opCtx = opCtx.get(), newConfig]() {
             // Don't write the no-op for config learned via heartbeats.
             return _externalState->storeLocalConfigDocument(
                 opCtx, newConfig.toBSON(), false /* writeOplog */);
@@ -901,7 +827,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
     }
 
-    _heartbeatReconfigFinish(cbd, newConfig, myIndex, isSplitRecipientConfig);
+    _heartbeatReconfigFinish(cbd, newConfig, myIndex);
 
     // Start data replication after the config has been installed.
     if (shouldStartDataReplication) {
@@ -931,8 +857,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& newConfig,
-    StatusWith<int> myIndex,
-    bool isSplitRecipientConfig) {
+    StatusWith<int> myIndex) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -945,8 +870,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         _replExecutor
             ->scheduleWorkAt(_replExecutor->now() + Milliseconds{10},
                              [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
-                                 _heartbeatReconfigFinish(
-                                     cbData, newConfig, myIndex, isSplitRecipientConfig);
+                                 _heartbeatReconfigFinish(cbData, newConfig, myIndex);
                              })
             .status_with_transitional_ignore();
         return;
@@ -968,8 +892,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             _replExecutor
                 ->onEvent(electionFinishedEvent,
                           [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
-                              _heartbeatReconfigFinish(
-                                  cbData, newConfig, myIndex, isSplitRecipientConfig);
+                              _heartbeatReconfigFinish(cbData, newConfig, myIndex);
                           })
                 .status_with_transitional_ignore();
             return;
@@ -1023,7 +946,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!rsc.isInitialized() ||
               rsc.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
-              _selfIndex < 0 || isSplitRecipientConfig);
+              _selfIndex < 0);
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {
@@ -1054,20 +977,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
-
-    if (isSplitRecipientConfig) {
-        LOGV2(8423364,
-              "Clearing the commit point and current committed snapshot after applying split "
-              "recipient config.");
-        // Clear lastCommittedOpTime by passing in a default constructed OpTimeAndWallTime, and
-        // indicating that this is `forInitiate`.
-        _topCoord->advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTime(), false, true);
-        _clearCommittedSnapshot(lk);
-
-        invariant(_oplogSyncState == OplogSyncState::Stopped);
-        _oplogSyncState = OplogSyncState::Running;
-        _externalState->startProducerIfStopped();
-    }
 
     lk.unlock();
     if (contentChanged) {

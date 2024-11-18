@@ -1288,20 +1288,6 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
     }
 
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (_finishedDrainingPromise) {
-            auto scopedTimer = createTimeElapsedBuilderScopedTimer(
-                opCtx->getServiceContext()->getFastClockSource(),
-                "Cancel wait for drain mode",
-                shutdownTimeElapsedBuilder);
-            _finishedDrainingPromise->setError(
-                {ErrorCodes::InterruptedAtShutdown,
-                 "Cancelling wait for drain mode to complete due to shutdown"});
-            _finishedDrainingPromise = boost::none;
-        }
-    }
-
-    {
         auto scopedTimer =
             createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
                                                 "Shut down external state",
@@ -4472,16 +4458,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         _clearCommittedSnapshot(lk);
     }
 
-    // If we have a split config, schedule heartbeats to each recipient member. It informs them of
-    // the new split config.
-    if (newConfig.isSplitConfig()) {
-        const auto now = _replExecutor->now();
-        const auto recipientConfig = newConfig.getRecipientConfig();
-        for (const auto& member : recipientConfig->members()) {
-            _scheduleHeartbeatToTarget(
-                lk, member.getHostAndPort(), now, newConfig.getReplSetName().toString());
-        }
-    }
     lk.unlock();
     ReplicaSetAwareServiceRegistry::get(_service).onSetCurrentConfig(opCtx);
     _performPostMemberStateUpdateAction(action);

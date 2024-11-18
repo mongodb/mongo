@@ -164,8 +164,6 @@ protected:
      * Returns a pointer to a mutable MemberConfig.
      */
     MemberConfig* _findMemberByID(MemberId id);
-
-    ReplSetConfigPtr _recipientConfig;
 };
 
 /**
@@ -567,17 +565,6 @@ public:
      * otherwise.
      */
     Status validateWriteConcern(const WriteConcernOptions& writeConcern) const;
-
-    /**
-     * Returns true if this config is a split config, which is determined by checking if it contains
-     * a recipient config for a shard split operation.
-     */
-    bool isSplitConfig() const;
-
-    /**
-     * Returns the config for the recipient during a tenant split operation, if it exists.
-     */
-    ReplSetConfigPtr getRecipientConfig() const;
 
     /**
      * Compares the write concern modes with another config and returns 'true' if they are
