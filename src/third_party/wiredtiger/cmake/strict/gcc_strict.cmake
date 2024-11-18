@@ -14,7 +14,7 @@ list(APPEND gcc_flags "-Wsign-conversion")
 
 # Specific C flags:
 list(APPEND gcc_flags "-Wbad-function-cast")
-list(APPEND gcc_flags "-Wdeclaration-after-statement")
+list(APPEND gcc_flags "-Wno-declaration-after-statement")
 list(APPEND gcc_flags "-Wjump-misses-init")
 list(APPEND gcc_flags "-Wmissing-prototypes")
 list(APPEND gcc_flags "-Wnested-externs")

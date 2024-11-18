@@ -109,11 +109,11 @@ existing example in the source code and copy it.
   WiredTiger structures (``WT_SESSION`` and ``WT_CONNECTION`` are
   "wt_session" and "wt_conn", ``WT_SESSION_IMPL`` and
   ``WT_CONNECTION_IMPL`` are "session" and "conn)
-* Variable declaration blocks should not contain initializers
-* Variable initialisation should be in a block at the beginning of a
-  function.
-* Variable initializations should follow either alphabetical order or
-  variable declaration order.
+* It is strongly preferred, but not required, that variables are declared
+  and initialized where they are first used, i.e. the scope of each variable
+  should be as limited as possible.
+* Initializing a variable at the time it is declared should be preferred
+  to declaring separately from initialisation.
 * For the cases where the initialization isn't required, but a
   compiler wants it, tag them with this comment
   ``/* -Werror=maybe-uninitialized */``

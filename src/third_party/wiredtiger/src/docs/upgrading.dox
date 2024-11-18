@@ -1,6 +1,6 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_1130 Upgrading to Version 11.3.0
+@section version_1131 Upgrading to Version 11.3.1
 <dl>
 
 <dt>Per-file configuration "huffman_value"</dt>

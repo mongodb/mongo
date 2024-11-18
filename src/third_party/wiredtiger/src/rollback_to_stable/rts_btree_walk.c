@@ -436,6 +436,8 @@ __wti_rts_btree_walk_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
 {
     WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
+    wt_timestamp_t stable_timestamp;
+    uint64_t oldest_id;
 
     btree = S2BT(session);
     conn = S2C(session);
@@ -458,5 +460,18 @@ __wti_rts_btree_walk_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
     if (btree->root.page == NULL)
         return (0);
 
-    return (__rts_btree_walk(session, rollback_timestamp));
+    WT_RET(__rts_btree_walk(session, rollback_timestamp));
+
+    /*
+     * Now the unstable data has been rolled back, we can set the reconciliation information to
+     * reflect that the tree only contains stable data. The fields are set in a way to ensure RTS
+     * does not mark the btree as dirty when checkpoint is happening.
+     */
+    oldest_id = __wt_atomic_loadv64(&conn->txn_global.oldest_id);
+    stable_timestamp = __wt_atomic_loadv64(&conn->txn_global.stable_timestamp);
+    WT_ASSERT(session, oldest_id > WT_TXN_NONE);
+    btree->rec_max_txn = oldest_id - 1;
+    btree->rec_max_timestamp = stable_timestamp;
+
+    return (0);
 }

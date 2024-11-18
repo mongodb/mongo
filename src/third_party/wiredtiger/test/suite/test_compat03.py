@@ -58,6 +58,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     compat_release = [
         ('future_rel', dict(rel=future_rel, log_rel=future_logv)),
         ('def_rel', dict(rel='none', log_rel=5)),
+        ('120_rel', dict(rel="12.0", log_rel=5)),
         ('113_rel', dict(rel="11.3", log_rel=5)),
         ('112_rel', dict(rel="11.2", log_rel=5)),
         ('111_rel', dict(rel="11.1", log_rel=5)),
@@ -80,7 +81,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     compat_max = [
         ('future_max', dict(max_req=future_rel, log_max=future_logv)),
         ('def_max', dict(max_req='none', log_max=5)),
-        ('113_max', dict(max_req="11.3", log_max=5)),
+        ('120_max', dict(max_req="12.0", log_max=5)),
         ('33_max', dict(max_req="3.3", log_max=4)),
         ('32_max', dict(max_req="3.2", log_max=3)),
         ('30_max', dict(max_req="3.0", log_max=2)),
