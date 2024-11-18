@@ -506,11 +506,6 @@ public:
     // Stores the duration of execution after removing time spent blocked.
     Milliseconds workingTimeMillis{0};
 
-    // Stores the total time an operation spends with an uncommitted oplog slot held open. Indicator
-    // that an operation is holding back replication by causing oplog holes to remain open for
-    // unusual amounts of time.
-    Microseconds totalOplogSlotDurationMicros{0};
-
     // Stores the amount of the data processed by the throttle cursors in MB/sec.
     boost::optional<float> dataThroughputLastSecond;
     boost::optional<float> dataThroughputAverage;

@@ -53,6 +53,7 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -1165,7 +1166,9 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("placementVersionRefreshDuration", placementVersionRefreshMillis);
     }
 
-    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+    if (const auto& totalOplogSlotDurationMicros =
+            LocalOplogInfo::get(opCtx)->getTotalOplogSlotDurationMicros();
+        totalOplogSlotDurationMicros > Microseconds::zero()) {
         pAttrs->add("totalOplogSlotDuration", totalOplogSlotDurationMicros);
     }
 
@@ -1550,7 +1553,9 @@ void OpDebug::append(OperationContext* opCtx,
 
     OPDEBUG_APPEND_OPTIONAL(b, "estimatedCardinality", estimatedCardinality);
 
-    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+    if (const auto& totalOplogSlotDurationMicros =
+            LocalOplogInfo::get(opCtx)->getTotalOplogSlotDurationMicros();
+        totalOplogSlotDurationMicros > Microseconds::zero()) {
         b.appendNumber("totalOplogSlotDurationMicros",
                        durationCount<Microseconds>(totalOplogSlotDurationMicros));
     }
@@ -1900,9 +1905,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("totalOplogSlotDurationMicros", [](auto field, auto args, auto& b) {
-        if (args.op.totalOplogSlotDurationMicros > Nanoseconds::zero()) {
-            b.appendNumber(field,
-                           durationCount<Microseconds>(args.op.totalOplogSlotDurationMicros));
+        if (const auto& totalOplogSlotDurationMicros =
+                LocalOplogInfo::get(args.opCtx)->getTotalOplogSlotDurationMicros();
+            totalOplogSlotDurationMicros > Nanoseconds::zero()) {
+            b.appendNumber(field, durationCount<Microseconds>(totalOplogSlotDurationMicros));
         }
     });
 
