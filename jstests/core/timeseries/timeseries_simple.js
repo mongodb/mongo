@@ -2,7 +2,7 @@
  * Tests inserting sample data into the time-series buckets collection.
  * This test is for the simple case of only one measurement per bucket.
  * @tags: [
- *   # This test depends on certain writes ending up in the same bucket. Stepdowns/tenant migration
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns
  *   # may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.

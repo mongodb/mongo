@@ -78,8 +78,9 @@ function runTest(retryableWrite) {
     coll.drop();
     coll1.drop();
 
+    // TODO SERVER-97170 check if the following is still necessary
     // Want to test ns is properly applied to a cursor that does not need a getMore. This test
-    // is in this file so it does not run in tenant migration suites since that would change the ns
+    // is in this file so it does not run in suites since that would change the ns
     // name.
     res = assert.commandWorked(db.adminCommand({
         bulkWrite: 1,

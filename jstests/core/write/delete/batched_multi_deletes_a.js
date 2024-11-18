@@ -1,7 +1,7 @@
 /**
  * Tests batch-deleting a large range of data using predicate on the 'a' field.
- * This test does not rely on getMores on purpose, as this is a requirement for running on
- * tenant migration passthroughs.
+ * TODO SERVER-97166 Re-evaluate if this test does not need to rely on getMores
+ * This test does not rely on getMores on purpose.
  *
  * @tags: [
  *   does_not_support_retryable_writes,

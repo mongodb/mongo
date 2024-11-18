@@ -442,7 +442,7 @@ certs:
         DNS: localhost
         IP: 127.0.0.1
 
-  # For tenant migration testing.
+  # TODO SERVER-97176 do we need this cert after removal of tenant migration code?
   - name: "rs0.pem"
     description: General purpose server certificate file.
     Subject:

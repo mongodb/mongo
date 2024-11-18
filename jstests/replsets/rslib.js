@@ -885,9 +885,8 @@ createRst = function(rstArgs, retryOnRetryableErrors) {
             return new ReplSetTest({rstArgs: rstArgs});
         } catch (e) {
             if (retryOnRetryableErrors && isNetworkError(e)) {
-                jsTest.log(`Failed to create ReplSetTest for ${
-                    rstArgs.name} inside tenant migration thread: ${tojson(e)}. Retrying in ${
-                    kCreateRstRetryIntervalMS}ms.`);
+                jsTest.log(`Failed to create ReplSetTest for ${rstArgs.name} with error: ${
+                    tojson(e)}. Retrying in ${kCreateRstRetryIntervalMS}ms.`);
                 sleep(kCreateRstRetryIntervalMS);
                 continue;
             }

@@ -1,7 +1,7 @@
 /**
  * Tests batch-deleting a large range of data using a given predicate.
- * This test does not rely on getMores on purpose, as this is a requirement for running on
- * tenant migration passthroughs.
+ * TODO SERVER-97166 Re-evaluate if this test does not need to rely on getMores
+ * This test does not rely on getMores on purpose.
  */
 
 export function runBatchedMultiDeletesTest(coll, queryPredicate) {

@@ -180,9 +180,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
                                        boost::optional<bool>* newUnique) {
     invariant(!idx->unique(), str::stream() << "Index is already unique: " << idx->infoObj());
 
-    // Checks for duplicates for the 'applyOps' command. In the tenant migration case, assumes
-    // similarly to initial sync that we don't need to perform this check in the destination
-    // cluster.
+    // Checks for duplicates for the 'applyOps' command.
     if (mode && *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
         auto duplicateRecords = scanIndexForDuplicates(opCtx, idx);
         if (!duplicateRecords.empty()) {

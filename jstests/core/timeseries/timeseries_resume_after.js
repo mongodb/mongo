@@ -7,7 +7,7 @@
  *   not_allowed_with_signed_security_token,
  *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
- *   # Resuming may not work properly with stepdowns/tenant migration.
+ *   # Resuming may not work properly with stepdowns.
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,

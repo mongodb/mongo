@@ -142,7 +142,7 @@ std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationConte
     }
 
     // We reserve oplog slots here, expecting the slot with the greatest timestmap (say TS) to be
-    // used as the oplog timestamp. Tenant migrations and resharding will forge no-op image oplog
+    // used as the oplog timestamp. Resharding will forge no-op image oplog
     // entries and set the timestamp for these synthetic entries to be TS - 1.
     auto oplogInfo = LocalOplogInfo::get(opCtx);
     auto slots = oplogInfo->getNextOpTimes(opCtx, 2);
@@ -695,13 +695,13 @@ void updateDocument(OperationContext* opCtx,
         // post-image in a side collection, then we must reserve oplog slots in advance. We
         // expect to use the reserved oplog slots as follows, where TS is the greatest
         // timestamp of 'oplogSlots':
-        // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
+        // TS - 1: Resharding will forge no-op image oplog entries and set
         //         the entry timestamps to TS - 1.
         // TS:     The timestamp given to the update oplog entry.
         args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
-        // function since tenant migrations and resharding rely on always being able to set
+        // function since resharding rely on always being able to set
         // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
         invariant(!(args->retryableWrite && setNeedsRetryImageOplogField));
     }
@@ -775,13 +775,13 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
         // post-image in a side collection, then we must reserve oplog slots in advance. We
         // expect to use the reserved oplog slots as follows, where TS is the greatest
         // timestamp of 'oplogSlots':
-        // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
+        // TS - 1: Resharding will forge no-op image oplog entries and set
         //         the entry timestamps to TS - 1.
         // TS:     The timestamp given to the update oplog entry.
         args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
-        // function since tenant migrations and resharding rely on always being able to set
+        // function since resharding rely on always being able to set
         // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
         invariant(!(args->retryableWrite && setNeedsRetryImageOplogField));
     }

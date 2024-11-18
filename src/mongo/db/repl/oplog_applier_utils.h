@@ -71,8 +71,7 @@ private:
 };
 
 /**
- * This class contains some static methods common to ordinary oplog application and oplog
- * application as part of tenant migration.
+ * This class contains some static methods common to ordinary oplog application.
  */
 class OplogApplierUtils {
 public:
