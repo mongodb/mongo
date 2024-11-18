@@ -688,6 +688,7 @@ tasks:
         vars:
           targets: install-all-meta-but-not-unittests
           compiling_for_test: true
+          task_compile_flags: ${compile_all_but_not_unittests_flags}
 
   - <<: *clang_tidy_task_template
     name: clang_tidy_1
@@ -2318,6 +2319,18 @@ task_groups:
       - determine_patch_tests
       - archive_dist_test
       - archive_dist_test_debug
+      - compile_all_but_not_unittests
+
+  - <<: *compile_task_group_template
+    name: compile_test_parallel_core_stream_no_compile_all_TG
+    tasks:
+      - compile_dist_test
+      - archive_dist_test
+      - archive_dist_test_debug
+
+  - <<: *compile_task_group_template
+    name: compile_all_but_not_unittests_TG
+    tasks:
       - compile_all_but_not_unittests
 
   - <<: *compile_task_group_template
