@@ -50,12 +50,6 @@ SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
                                                 CardinalityEstimate inputCard);
 
 /**
- * Estimate the selectivity of the given 'IndexBounds'. Uses exponential backoff to combine
- * disjunctions (Intervals in an OrderedIntervalList) and conjunctions (OILs in IndexBounds).
- */
-SelectivityEstimate estimateIndexBounds(const IndexBounds& bounds, CardinalityEstimate inputCard);
-
-/**
  * Estimate a single interval heuristically, depending on the available bounds.
  */
 SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstimate inputCard);

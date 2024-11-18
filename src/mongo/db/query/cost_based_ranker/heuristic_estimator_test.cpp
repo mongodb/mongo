@@ -57,75 +57,6 @@ std::unique_ptr<MatchExpression> parse(const BSONObj& bson) {
     return std::move(expr.getValue());
 }
 
-TEST(HeuristicEstimator, PointInterval) {
-    OrderedIntervalList oil;
-    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(5));
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-    ASSERT_EQ(estimateIndexBounds(bounds, makeCard(100)), makeSel(0.1));
-}
-
-TEST(HeuristicEstimator, ManyPointIntervals) {
-    OrderedIntervalList oil;
-    for (size_t i = 0; i < 100; ++i) {
-        oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(i));
-    }
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-    ASSERT_EQ(estimateIndexBounds(bounds, makeCard(100)), makeSel(0.179262));
-}
-
-TEST(HeuristicEstimator, CompoundIndex) {
-    IndexBounds bounds;
-    for (size_t i = 0; i < 10; ++i) {
-        OrderedIntervalList oil;
-        for (size_t j = 0; j < 10; ++j) {
-            oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(i * j));
-        }
-        bounds.fields.push_back(oil);
-    }
-    ASSERT_EQ(estimateIndexBounds(bounds, makeCard(100)), makeSel(0.0398372));
-}
-
-TEST(HeuristicEstimator, PointMoreSelectiveThanRange) {
-    OrderedIntervalList oil;
-    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(5));
-    IndexBounds pointBounds;
-    pointBounds.fields.push_back(oil);
-
-    OrderedIntervalList oilRange;
-    oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << 5 << " " << 6), BoundInclusion::kIncludeBothStartAndEndKeys));
-    IndexBounds rangeBounds;
-    rangeBounds.fields.push_back(oilRange);
-
-    ASSERT_LT(estimateIndexBounds(pointBounds, makeCard(100)),
-              estimateIndexBounds(rangeBounds, makeCard(100)));
-}
-
-TEST(HeuristicEstimator, CompoundBoundsMoreSelectiveThanSingleField) {
-    OrderedIntervalList oil;
-    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(5));
-    IndexBounds singleField;
-    singleField.fields.push_back(oil);
-
-    IndexBounds compoundBounds;
-    compoundBounds.fields.push_back(oil);
-    compoundBounds.fields.push_back(oil);
-
-    ASSERT_LT(estimateIndexBounds(compoundBounds, makeCard(100)),
-              estimateIndexBounds(singleField, makeCard(100)));
-}
-
-TEST(HeuristicEstimator, PointIntervalSelectivityDependsOnInputCard) {
-    OrderedIntervalList oil;
-    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(5));
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-    ASSERT_LT(estimateIndexBounds(bounds, makeCard(10000)),
-              estimateIndexBounds(bounds, makeCard(100)));
-}
-
 TEST(HeuristicEstimator, AlwaysFalse) {
     BSONObj query = fromjson("{$alwaysFalse: 1}");
     auto expr = parse(query);
@@ -136,58 +67,6 @@ TEST(HeuristicEstimator, AlwaysTrue) {
     BSONObj query = fromjson("{$alwaysTrue: 1}");
     auto expr = parse(query);
     ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), oneSel);
-}
-
-TEST(HeuristicEstimator, EqualityMatchesIndexPointInterval) {
-    // Bounds for [5,5]
-    OrderedIntervalList oil;
-    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(5));
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-
-    // Expression for a = 5
-    BSONObj query = fromjson("{a: 5}");
-    auto expr = parse(query);
-
-    auto collCard = makeCard(100);
-    ASSERT_EQ(estimateIndexBounds(bounds, collCard),
-              estimateLeafMatchExpression(expr.get(), collCard));
-}
-
-TEST(HeuristicEstimate, InequalityMatchesRangeOpenInterval) {
-    // Bounds for (5,inf]
-    OrderedIntervalList oil;
-    oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << 5 << " " << std::numeric_limits<double>::infinity()),
-        BoundInclusion::kIncludeEndKeyOnly));
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-
-    // Expression for a > 5
-    BSONObj query = fromjson("{a: {$gt: 5}}");
-    auto expr = parse(query);
-
-    auto collCard = makeCard(100);
-    ASSERT_EQ(estimateIndexBounds(bounds, collCard),
-              estimateLeafMatchExpression(expr.get(), collCard));
-}
-
-TEST(HeuristicEstimate, InequalityMatchesRangeClosedInterval) {
-    // Bounds for [5,inf]
-    OrderedIntervalList oil;
-    oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << 5 << " " << std::numeric_limits<double>::infinity()),
-        BoundInclusion::kIncludeBothStartAndEndKeys));
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-
-    // Expression for a >= 5
-    BSONObj query = fromjson("{a: {$gte: 5}}");
-    auto expr = parse(query);
-
-    auto collCard = makeCard(100);
-    ASSERT_EQ(estimateIndexBounds(bounds, collCard),
-              estimateLeafMatchExpression(expr.get(), collCard));
 }
 
 TEST(HeuristicEstimate, RegexMatchExpression) {
@@ -208,41 +87,6 @@ TEST(HeuristicEstimate, ExistsExpression) {
     BSONObj query = fromjson("{a: {$exists: true}}");
     auto expr = parse(query);
     ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), kExistsSel);
-}
-
-TEST(HeuristicEstimate, InExpressionMatchesIntervals) {
-    // Interval for [[1,1], [2,2], [3,3]]
-    OrderedIntervalList oil;
-    for (size_t i = 0; i < 3; ++i) {
-        oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(i));
-    }
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-
-    BSONObj query = fromjson("{a: {$in: [1,2,3]}}");
-    auto expr = parse(query);
-
-    auto collCard = makeCard(100);
-    ASSERT_EQ(estimateIndexBounds(bounds, collCard),
-              estimateLeafMatchExpression(expr.get(), collCard));
-}
-
-TEST(HeuristicEstimate, TypeExpressionMatchesIntervals) {
-    OrderedIntervalList oil;
-    oil.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << Date_t::min() << " " << Date_t::max()),
-                                              BoundInclusion::kIncludeBothStartAndEndKeys));
-    oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << false << " " << true), BoundInclusion::kIncludeBothStartAndEndKeys));
-    IndexBounds bounds;
-    bounds.fields.push_back(oil);
-
-    BSONObj query = fromjson("{a: {$type: ['date', 'bool']}}");
-    auto expr = parse(query);
-
-    auto collCard = makeCard(100);
-    ASSERT_EQ(estimateIndexBounds(bounds, collCard),
-              estimateLeafMatchExpression(expr.get(), collCard));
 }
 
 TEST(HeuristicEstimate, BitsExpression) {

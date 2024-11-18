@@ -84,65 +84,72 @@ SelectivityEstimate heuristicPointIntervalSel(CardinalityEstimate inputCard) {
 
 SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
                                                 CardinalityEstimate inputCard) {
-    return [&]() -> SelectivityEstimate {
-        switch (expr->matchType()) {
-            case MatchExpression::MatchType::ALWAYS_FALSE:
-                return zeroSelHeuristic;
-            case MatchExpression::MatchType::ALWAYS_TRUE:
-                return oneSelHeuristic;
-            case MatchExpression::MatchType::EQ:
-            case MatchExpression::MatchType::INTERNAL_EXPR_EQ: {
-                // Equality predicate is equalivent to a point interval
-                return heuristicPointIntervalSel(inputCard);
-            }
-            case MatchExpression::MatchType::LT:
-            case MatchExpression::MatchType::GT: {
-                return heuristicOpenRangeSel(inputCard);
-            }
-            case MatchExpression::MatchType::LTE:
-            case MatchExpression::MatchType::GTE: {
-                return heuristicClosedRangeSel(inputCard);
-            }
-            case MatchExpression::MatchType::REGEX:
-                return kRegexSel;
-            case MatchExpression::MatchType::MOD: {
-                // Assume that the results of mod are equally likely.
-                auto modExpr = static_cast<const ModMatchExpression*>(expr);
-                return {SelectivityType{1.0 / modExpr->getDivisor()}, EstimationSource::Heuristics};
-            }
-            case MatchExpression::MatchType::EXISTS: {
-                return kExistsSel;
-            }
-            case MatchExpression::MatchType::MATCH_IN: {
-                // Construct vector of selectivities for each element in the $in list and perform
-                // disjunction estimation.
-                auto inExpr = static_cast<const InMatchExpression*>(expr);
-                std::vector<SelectivityEstimate> sels(inExpr->getEqualities().size(),
-                                                      heuristicPointIntervalSel(inputCard));
-                sels.insert(sels.end(), inExpr->getRegexes().size(), kRegexSel);
-                return disjExponentialBackoff(sels);
-            }
-            case MatchExpression::MatchType::TYPE_OPERATOR: {
-                // Treat each operand in a $type operator as a closed interval. Estimate it by
-                // constructing a vector a selecitvies (one per type specified) and perform
-                // disjunction estimation, similar to $in.
-                auto typeExpr = static_cast<const TypeMatchExpression*>(expr);
-                std::vector<SelectivityEstimate> sels(typeExpr->typeSet().bsonTypes.size(),
-                                                      heuristicClosedRangeSel(inputCard));
-                return disjExponentialBackoff(sels);
-            }
-            case MatchExpression::MatchType::BITS_ALL_SET:
-            case MatchExpression::MatchType::BITS_ALL_CLEAR:
-            case MatchExpression::MatchType::BITS_ANY_SET:
-            case MatchExpression::MatchType::BITS_ANY_CLEAR: {
-                return kBitsSel;
-            }
-            default:
-                tasserted(9608701,
-                          fmt::format("invalid MatchExpression passed to heuristic estimate: {}",
-                                      expr->matchType()));
+    switch (expr->matchType()) {
+        case MatchExpression::MatchType::ALWAYS_FALSE:
+            return zeroSelHeuristic;
+        case MatchExpression::MatchType::ALWAYS_TRUE:
+            return oneSelHeuristic;
+        case MatchExpression::MatchType::EQ:
+        case MatchExpression::MatchType::INTERNAL_EXPR_EQ: {
+            // Equality predicate is equalivent to a point interval
+            return heuristicPointIntervalSel(inputCard);
         }
-    }();
+        case MatchExpression::MatchType::LT:
+        case MatchExpression::MatchType::GT: {
+            return heuristicOpenRangeSel(inputCard);
+        }
+        case MatchExpression::MatchType::LTE:
+        case MatchExpression::MatchType::GTE: {
+            return heuristicClosedRangeSel(inputCard);
+        }
+        case MatchExpression::MatchType::REGEX:
+            return kRegexSel;
+        case MatchExpression::MatchType::MOD: {
+            // Assume that the results of mod are equally likely.
+            auto modExpr = static_cast<const ModMatchExpression*>(expr);
+            return {SelectivityType{1.0 / modExpr->getDivisor()}, EstimationSource::Heuristics};
+        }
+        case MatchExpression::MatchType::EXISTS: {
+            return kExistsSel;
+        }
+        case MatchExpression::MatchType::MATCH_IN: {
+            // Construct vector of selectivities for each element in the $in list and perform
+            // disjunction estimation.
+            auto inExpr = static_cast<const InMatchExpression*>(expr);
+            // The elements of an IN list are unique, therefore the sets of documents matching
+            // each IN-list element are disjunct (similar to the elements of an OIL). Therefore
+            // the selectivities of all equalities should be summed instead of applying
+            // exponential backoff.
+            double eqSel = heuristicPointIntervalSel(inputCard).toDouble();
+            double totalSelDbl = std::min(inExpr->getEqualities().size() * eqSel, 1.0);
+            SelectivityEstimate totalEqSel{SelectivityType{totalSelDbl},
+                                           EstimationSource::Heuristics};
+            std::vector<SelectivityEstimate> sels;
+            sels.push_back(std::move(totalEqSel));
+            sels.insert(sels.end(), inExpr->getRegexes().size(), kRegexSel);
+            return disjExponentialBackoff(sels);
+        }
+        case MatchExpression::MatchType::TYPE_OPERATOR: {
+            // Treat each operand in a $type operator as a closed interval. Estimate it by
+            // summing the estimates similar to $in because documents of different types are
+            // disjunct.
+            auto typeExpr = static_cast<const TypeMatchExpression*>(expr);
+            double rangeSel = heuristicClosedRangeSel(inputCard).toDouble();
+            double totalSelDbl = std::min(typeExpr->typeSet().bsonTypes.size() * rangeSel, 1.0);
+            return SelectivityEstimate{SelectivityType{totalSelDbl}, EstimationSource::Heuristics};
+        }
+        case MatchExpression::MatchType::BITS_ALL_SET:
+        case MatchExpression::MatchType::BITS_ALL_CLEAR:
+        case MatchExpression::MatchType::BITS_ANY_SET:
+        case MatchExpression::MatchType::BITS_ANY_CLEAR: {
+            return kBitsSel;
+        }
+        default:
+            tasserted(9608701,
+                      fmt::format("invalid MatchExpression passed to heuristic estimate: {}",
+                                  expr->matchType()));
+    }
+    MONGO_UNREACHABLE_TASSERT(9695000);
 }
 
 SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstimate inputCard) {
@@ -166,28 +173,6 @@ SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstima
         return heuristicOpenRangeSel(inputCard);
     }
     return heuristicClosedRangeSel(inputCard);
-}
-
-SelectivityEstimate estimateOil(const OrderedIntervalList& oil, CardinalityEstimate inputCard) {
-    std::vector<SelectivityEstimate> sels;
-    for (size_t j = 0; j < oil.intervals.size(); ++j) {
-        sels.push_back(estimateInterval(oil.intervals[j], inputCard));
-    }
-    return disjExponentialBackoff(sels);
-}
-
-SelectivityEstimate estimateIndexBounds(const IndexBounds& bounds, CardinalityEstimate inputCard) {
-    if (bounds.isSimpleRange) {
-        MONGO_UNIMPLEMENTED;
-    }
-    if (bounds.isUnbounded()) {
-        return oneSel;
-    }
-    std::vector<SelectivityEstimate> sels;
-    for (size_t i = 0; i < bounds.fields.size(); ++i) {
-        sels.push_back(estimateOil(bounds.fields[i], inputCard));
-    }
-    return conjExponentialBackoff(sels);
 }
 
 }  // namespace mongo::cost_based_ranker

@@ -7,6 +7,7 @@ env.CppUnitTest(
     source=[
         "estimates_test.cpp",
         "heuristic_estimator_test.cpp",
+        "cardinality_estimator_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_planner",
