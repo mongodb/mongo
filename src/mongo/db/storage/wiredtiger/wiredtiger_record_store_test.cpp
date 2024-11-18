@@ -455,7 +455,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     // Initialize the truncate markers.
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-    wtrs->postConstructorInit(opCtx.get());
+    wtrs->setTruncateMarkers(
+        WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtrs));
 
     // Confirm that small oplogs are processed by scanning.
     auto oplogTruncateMarkers = wtrs->oplog()->getCollectionTruncateMarkers();
@@ -505,7 +506,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         wtrs->setNumRecords(1024 * 1024);
         wtrs->setDataSize(1024 * 1024 * 1024);
-        wtrs->postConstructorInit(opCtx.get());
+        wtrs->setTruncateMarkers(
+            WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtrs));
     }
 
     // Confirm that some truncate markers were generated.
@@ -648,7 +650,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
     auto& ru2 = *shard_role_details::getRecoveryUnit(op2.get());
-    // Should not see uncommited write from op1.
+    // Should not see uncommitted write from op1.
     ASSERT_EQ(tsOne, wtrs->getLatestTimestamp(ru2));
 
     Timestamp tsThree = [&] {

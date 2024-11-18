@@ -369,8 +369,6 @@ public:
 
     ~Oplog() override;
 
-    void postConstructorInit(OperationContext* opCtx);
-
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                     bool forward = true) const override;
 
@@ -395,7 +393,7 @@ public:
 
     int64_t getMaxSize() const;
 
-    WiredTigerOplogTruncateMarkers* truncateMarkers() const;
+    void setTruncateMarkers(std::shared_ptr<WiredTigerOplogTruncateMarkers> markers);
 
 private:
     Status _insertRecords(OperationContext*,

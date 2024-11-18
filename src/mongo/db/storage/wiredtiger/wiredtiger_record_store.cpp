@@ -1537,18 +1537,6 @@ WiredTigerRecordStore::Oplog::~Oplog() {
     _kvEngine->haltOplogManager(this, /*shuttingDown=*/false);
 }
 
-void WiredTigerRecordStore::Oplog::postConstructorInit(OperationContext* opCtx) {
-    // If the server was started in read-only mode or if we are restoring the node, skip
-    // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
-    // in this instance.
-    if (opCtx->getServiceContext()->userWritesAllowed() && !storageGlobalParams.repair &&
-        !storageGlobalParams.restore && !storageGlobalParams.magicRestore) {
-        _oplog->setTruncateMarkers(
-            WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx, this));
-    }
-    _kvEngine->startOplogManager(opCtx, this);
-}
-
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getCursor(
     OperationContext* opCtx, bool forward) const {
     return std::make_unique<WiredTigerOplogCursor>(opCtx, *this, forward);
@@ -1633,6 +1621,11 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(Recover
 int64_t WiredTigerRecordStore::Oplog::getMaxSize() const {
     // TODO make TruncateMarkers depend on OplogData (not RecrodStore), then move this method.
     return _oplog->getMaxSize();
+}
+
+void WiredTigerRecordStore::Oplog::setTruncateMarkers(
+    std::shared_ptr<WiredTigerOplogTruncateMarkers> markers) {
+    _oplog->setTruncateMarkers(markers);
 }
 
 Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
@@ -1754,10 +1747,6 @@ Status WiredTigerRecordStore::Oplog::_truncate(OperationContext* opCtx) {
 
     return Status::OK();
 }
-
-WiredTigerOplogTruncateMarkers* WiredTigerRecordStore::Oplog::truncateMarkers() const {
-    return _oplog->getTruncateMarkers().get();
-};
 
 WiredTigerRecordStoreCursor::WiredTigerRecordStoreCursor(OperationContext* opCtx,
                                                          const WiredTigerRecordStore& rs,

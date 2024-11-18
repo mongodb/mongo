@@ -96,6 +96,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -1592,7 +1593,16 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
                                                  .tracksSizeAdjustments = true,
                                                  .forceUpdateWithFullDocument =
                                                      options.timeseries.has_value()});
-        static_cast<WiredTigerRecordStore::Oplog*>(ret.get())->postConstructorInit(opCtx);
+
+        // If the server was started in read-only mode or if we are restoring the node, skip
+        // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
+        // in this instance.
+        if (opCtx->getServiceContext()->userWritesAllowed() && !storageGlobalParams.repair &&
+            !storageGlobalParams.restore && !storageGlobalParams.magicRestore) {
+            static_cast<WiredTigerRecordStore::Oplog*>(ret.get())->setTruncateMarkers(
+                WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx, ret.get()));
+        }
+        startOplogManager(opCtx, ret.get());
     } else {
         WiredTigerRecordStore::Params params{
             .uuid = options.uuid,
