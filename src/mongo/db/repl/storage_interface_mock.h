@@ -328,7 +328,7 @@ public:
     }
 
     Timestamp getEarliestOplogTimestamp(OperationContext* opCtx) override {
-        return Timestamp();
+        return earliestOplogTimestamp;
     }
 
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override {
@@ -481,6 +481,7 @@ public:
 
     Timestamp allDurableTimestamp = Timestamp::min();
     Timestamp oldestOpenReadTimestamp = Timestamp::min();
+    Timestamp earliestOplogTimestamp = Timestamp::min();
 
 private:
     mutable stdx::mutex _mutex;

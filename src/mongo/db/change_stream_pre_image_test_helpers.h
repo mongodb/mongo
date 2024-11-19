@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/change_stream_options_gen.h"
+#include "mongo/db/change_stream_options_manager.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 
@@ -44,7 +47,7 @@ struct ChangeStreamPreImageTestConstants {
      */
     const UUID kNsUUID = UUID::gen();
     const ChangeStreamPreImage kPreImageMin{
-        ChangeStreamPreImageId{kNsUUID, Timestamp::min(), 0}, Date_t::min(), BSON("x" << 0)};
+        ChangeStreamPreImageId{kNsUUID, Timestamp::min(), 0}, Date_t{}, BSON("x" << 0)};
     const ChangeStreamPreImage kPreImage1{ChangeStreamPreImageId{kNsUUID, Timestamp(1, 1), 0},
                                           dateFromISOString("2024-01-01T00:00:01.000Z").getValue(),
                                           BSON("x" << 1)};
@@ -64,7 +67,7 @@ struct ChangeStreamPreImageTestConstants {
      */
     const UUID kNsUUIDOther = UUID::gen();
     const ChangeStreamPreImage kPreImageOtherMin{
-        ChangeStreamPreImageId{kNsUUIDOther, Timestamp::min(), 0}, Date_t::min(), BSON("x" << 0)};
+        ChangeStreamPreImageId{kNsUUIDOther, Timestamp::min(), 0}, Date_t{}, BSON("x" << 0)};
     const ChangeStreamPreImage kPreImageOther{
         ChangeStreamPreImageId{kNsUUIDOther, Timestamp(1, 1), 0},
         dateFromISOString("2024-01-01T00:00:01.000Z").getValue(),
@@ -76,11 +79,65 @@ struct ChangeStreamPreImageTestConstants {
 };
 
 /**
+ * Returns 'ChangeStreamOptions' populated with 'expireAfterSeconds'.
+ */
+std::unique_ptr<ChangeStreamOptions> populateChangeStreamPreImageOptions(
+    std::variant<std::string, std::int64_t> expireAfterSeconds);
+
+/**
+ * Sets the 'changeStreamOptions' on the 'ChangeStreamOptionsManager' tied to the 'opCtx'.
+ */
+void setChangeStreamOptionsToManager(OperationContext* opCtx,
+                                     ChangeStreamOptions& changeStreamOptions);
+
+/**
  * Generates a pre-image specific BSON for the CollectionTruncateMarkers::Marker with the
  * 'lastRecord's timestamp extracted when non-null.
  */
 BSONObj toBSON(const CollectionTruncateMarkers::Marker& preImageMarker);
 
+/**
+ * Returns a BSON representation of the truncate markers for enhanced failure reporting.
+ */
+BSONObj toBSON(const PreImagesTruncateMarkersPerNsUUID& truncateMarkers);
+
+CollectionTruncateMarkers::Marker makeWholeMarker(const ChangeStreamPreImage& lastRecord,
+                                                  int64_t records,
+                                                  int64_t bytes);
+
+/**
+ * Creates a set of initial markers that accounts for both the 'wholeMarkers', as well as the
+ * partial marker. 'highestPreImage' is the pre-image with the highest seen RecordId and wall time.
+ */
+PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers makeInitialSetOfMarkers(
+    std::deque<CollectionTruncateMarkers::Marker> wholeMarkers,
+    const ChangeStreamPreImage& highestPreImage,
+    int64_t partialMarkerRecords,
+    int64_t partialMarkerBytes,
+    CollectionTruncateMarkers::MarkersCreationMethod creationMethod);
+
+PreImagesTruncateMarkersPerNsUUID makeEmptyTruncateMarkers(boost::optional<TenantId> tenantId,
+                                                           const UUID& nsUUID,
+                                                           int64_t minBytesPerMarker);
+
+/**
+ * For test convenience, issues PreImagesTruncateMarkersPerNsUUID::updateMarkers() with input
+ * extracted from 'preImage'.
+ */
+void updateMarkers(const ChangeStreamPreImage& preImage,
+                   PreImagesTruncateMarkersPerNsUUID& nsUUIDTruncateMarkers);
+
+/**
+ * Returns 'true' if the 'nsUUIDTruncateMarkers' actively track the 'preImage'. A pre-image is
+ * actively tracked if:
+ *      . The pre-image is less than or equal to the highest tracked record
+ *      (according to RecordId and wall time).
+ *      . The 'nsUUIDTruncateMarkers' track non-zero bytes and records across whole markers and/or
+ *      the partial markers. This ensures the 'preImage' is actively tracked, and not viewed as a
+ *      record which has already been truncated.
+ */
+bool activelyTrackingPreImage(const PreImagesTruncateMarkersPerNsUUID& nsUUIDTruncateMarkers,
+                              const ChangeStreamPreImage& preImage);
 
 /**
  * Performs a direct write to the pre-images collection for 'tenantId'.

@@ -127,22 +127,13 @@ const runTestCase = (expireAfterSeconds) => {
     jsTest.log(`Pre-images for all nodes ${tojson(getPreImagesForAllNodes(nodes))}`);
 
     if (expireAfterSeconds != "off") {
-        // All pre-images should eventually expire.
+        // All pre-images should eventually expire. However, due to SERVER-97243, we cannot enforce
+        // that in this test.
         //
-        // When 'expireAfterSeconds' is off, rely on the data consistency check to validate that
-        // the pre-images collection is consistent across nodes.
-        nodes.forEach((node) => {
-            assert.soon(
-                () => {
-                    return getPreImages(node).length == 0;
-                },
-                `Unexpected number of pre-images on node ${node.port}. Found pre-images ${
-                    tojson(getPreImagesForAllNodes(nodes))}`);
-        });
+        // TODO SERVER-97243 - Enforce all pre-images are removed.
     }
     rollbackTest.stop({}, false /* skipDataConsistencyCheck */);
 };
 
 runTestCase("off");
-// TODO SERVER-90705: Re-enable testing all pre-images are eventually truncated.
-// runTestCase(12);
+runTestCase(12);

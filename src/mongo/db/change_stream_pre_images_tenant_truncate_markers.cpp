@@ -212,7 +212,7 @@ void appendSample(
 }
 
 void updateMarkersMapAggregates(
-    const CollectionTruncateMarkers::InitialSetOfMarkers& initialSetOfMarkers,
+    const PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers& initialSetOfMarkers,
     int64_t& aggNumRecords,
     int64_t& aggDataSize) {
     for (const auto& marker : initialSetOfMarkers.markers) {
@@ -230,21 +230,22 @@ stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNs
 
     auto cursor = rs->getCursor(opCtx, false /** forward **/);
     boost::optional<Record> record = cursor->next();
+
     while (record) {
         // As a reverse cursor, the first record we see for a namespace is the highest.
         UUID currentNsUUID = change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson());
-        const auto rid = record->id;
-        const auto wallTime = PreImagesTruncateMarkersPerNsUUID::getWallTime(record->data.toBson());
-        lastRecords.insert({currentNsUUID, RecordIdAndWallTime{rid, wallTime}});
+        auto sample = PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(*record);
+        lastRecords.insert({currentNsUUID, std::move(sample)});
 
-        RecordId minRecordIdForNsUUID =
+        RecordId minRecordIdForCurrentNsUUID =
             change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(currentNsUUID)
                 .recordId();
 
         // A reverse exclusive 'seek' will return the previous entry in the collection. This
-        // should ensure that the record's id is less than the 'minRecordIdForNsUUID', which
+        // should ensure that the record's id is less than the 'minRecordIdForCurrentNsUUID', which
         // positions it exactly at the highest record of the previous collection UUID.
-        record = cursor->seek(minRecordIdForNsUUID, SeekableRecordCursor::BoundInclusion::kExclude);
+        record = cursor->seek(minRecordIdForCurrentNsUUID,
+                              SeekableRecordCursor::BoundInclusion::kExclude);
         invariant(!record ||
                   currentNsUUID !=
                       change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson()));
@@ -318,13 +319,8 @@ void populateByScanning(
         auto initialSetOfMarkers = PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
             opCtx, preImagesCollection, nsUUID, minBytesPerMarker);
 
-        markersMap.getOrEmplace(nsUUID,
-                                tenantId,
-                                std::move(initialSetOfMarkers.markers),
-                                initialSetOfMarkers.leftoverRecordsCount,
-                                initialSetOfMarkers.leftoverRecordsBytes,
-                                minBytesPerMarker,
-                                CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+        markersMap.getOrEmplace(
+            nsUUID, tenantId, nsUUID, std::move(initialSetOfMarkers), minBytesPerMarker);
     }
 }
 
@@ -371,6 +367,7 @@ void populateBySampling(
     //  PHASE 1: Gather ordered sample points across the 'nsUUIDs' captured in the pre-images
     //  collection.
     ////////////////////////////////////////////////////////////////////////////////////////////
+
     const auto samples = collectPreImageSamples(opCtx, preImagesCollection, numSamples);
     const auto totalSamples = countTotalSamples(samples);
     if (totalSamples != (int64_t)numSamples) {
@@ -407,17 +404,13 @@ void populateBySampling(
                 nsUUID,
                 nsUUIDSamples,
                 estimatedRecordsPerMarker,
-                estimatedBytesPerMarker);
+                estimatedBytesPerMarker,
+                randomSamplesPerMarker);
 
         updateMarkersMapAggregates(initialSetOfMarkers, recordsInMarkersMap, bytesInMarkersMap);
 
-        markersMap.getOrEmplace(nsUUID,
-                                tenantId,
-                                std::move(initialSetOfMarkers.markers),
-                                0,
-                                0,
-                                minBytesPerMarker,
-                                CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+        markersMap.getOrEmplace(
+            nsUUID, tenantId, nsUUID, std::move(initialSetOfMarkers), minBytesPerMarker);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
@@ -508,12 +501,19 @@ void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
             const auto preImagesCollection = acquirePreImagesCollectionForRead(
                 opCtx,
                 NamespaceStringOrUUID{_preImagesCollectionNss.dbName(), _preImagesCollectionUUID});
-            const auto nsUUIDLastRecords =
-                pre_image_marker_initialization_internal::sampleLastRecordPerNsUUID(
-                    opCtx, preImagesCollection);
-            for (const auto& [nsUUID, recordIdAndWallTime] : nsUUIDLastRecords) {
-                const auto& [highestRid, highestWallTime] = recordIdAndWallTime;
-                updateOnInsert(highestRid, nsUUID, highestWallTime, 0, 0);
+
+            const auto nsUUIDs =
+                change_stream_pre_image_util::getNsUUIDs(opCtx, preImagesCollection);
+            for (const auto& nsUUID : nsUUIDs) {
+                // Account for records inserted into an 'nsUUID' not tracked during the initial
+                // construction of the markers.
+                auto nsUUIDMarkers = _markersMap.getOrEmplace(
+                    nsUUID,
+                    _tenantId,
+                    nsUUID,
+                    PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers{},
+                    gPreImagesCollectionTruncateMarkersMinBytes);
+                nsUUIDMarkers->refreshHighestTrackedRecord(opCtx, preImagesCollection);
             }
         });
 }
@@ -637,14 +637,12 @@ void PreImagesTenantMarkers::updateOnInsert(const RecordId& recordId,
                                             int64_t numRecords) {
     auto nsUUIDMarkers = _markersMap.find(nsUUID);
     if (!nsUUIDMarkers) {
-        nsUUIDMarkers = _markersMap.getOrEmplace(
-            nsUUID,
-            _tenantId,
-            std::deque<CollectionTruncateMarkers::Marker>{},
-            0,
-            0,
-            gPreImagesCollectionTruncateMarkersMinBytes,
-            CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection);
+        nsUUIDMarkers =
+            _markersMap.getOrEmplace(nsUUID,
+                                     _tenantId,
+                                     nsUUID,
+                                     PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers{},
+                                     gPreImagesCollectionTruncateMarkersMinBytes);
     }
     nsUUIDMarkers->updateMarkers(bytesInserted, recordId, wallTime, numRecords);
 }

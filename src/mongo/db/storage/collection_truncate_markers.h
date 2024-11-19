@@ -386,18 +386,27 @@ public:
      *                'leftoverRecordsCount' or 'leftoveRecordsBytes'.
      *  . Strictly increasing over time.
      *
-     * Thus, to support partial marker expiration, the 'InitialSetOfMarkers' is
-     * extended to account for the highest RecordId and wall time.
+     * In order to maintain the contract upon construction, future implementations must use the
+     * following constructor which accounts for 'highestRecordId' and 'highestWallTime'.
+     *
+     * TODO SERVER-96162: Remove the deprecated constructor and the comment referencing it.
      */
-    struct InitialSetOfMarkers {
-        std::deque<Marker> markers;
-        int64_t leftoverRecordsCount;
-        int64_t leftoverRecordsBytes;
-        RecordId highestRecordId;
-        Date_t highestWallTime;
-        Microseconds timeTaken;
-        MarkersCreationMethod methodUsed;
-    };
+    CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
+                                                   RecordId highestRecordId,
+                                                   Date_t highestWallTime,
+                                                   int64_t leftoverRecordsCount,
+                                                   int64_t leftoverRecordsBytes,
+                                                   int64_t minBytesPerMarker,
+                                                   Microseconds totalTimeSpentBuilding,
+                                                   MarkersCreationMethod creationMethod)
+        : CollectionTruncateMarkers(std::move(markers),
+                                    leftoverRecordsCount,
+                                    leftoverRecordsBytes,
+                                    minBytesPerMarker,
+                                    totalTimeSpentBuilding,
+                                    creationMethod),
+          _highestRecordId(std::move(highestRecordId)),
+          _highestWallTime(highestWallTime) {}
 
     /**
      * Deprecated: Upon construction, records may be accounted for by the 'markers' or non-zero

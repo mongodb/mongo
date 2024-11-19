@@ -38,7 +38,7 @@ namespace {
 using namespace change_stream_pre_image_test_helper;
 
 /**
- * Tests components of pre-image truncate marker initialization.
+ * Tests components of pre-image truncate marker initialization across a pre-image collection.
  */
 class PreImageMarkerInitializationTest : public CatalogTestFixture,
                                          public ChangeStreamPreImageTestConstants {};
@@ -202,123 +202,120 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesRepeatSamples) {
     }
 }
 
-// TODO SERVER-95290: Re-enable the following tests to enforce correct partial marker creation.
-// TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
-//    auto opCtx = operationContext();
-//    createPreImagesCollection(opCtx, kTenantId);
-//    const auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
-//
-//    {
-//        // Populate by scanning an empty collection.
-//        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
-//        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
-//        pre_image_marker_initialization_internal::populateByScanning(
-//            opCtx, kTenantId, preImagesCollection, minBytesPerMarker, mapByScan);
-//        const auto mapSnapshot = mapByScan.getUnderlyingSnapshot();
-//        ASSERT_EQ(0, mapSnapshot->size());
-//    }
-//
-//    {
-//        // Populate by sampling an empty collection where the initial 'totalRecords' and
-//        // 'totalBytes' estimates are accurate.
-//        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>
-//        mapBySamples; auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx,
-//        kTenantId); pre_image_marker_initialization_internal::populateBySampling(
-//            opCtx,
-//            kTenantId,
-//            preImagesCollection,
-//            0 /* totalRecords */,
-//            0 /* totalBytes */,
-//            minBytesPerMarker,
-//            CollectionTruncateMarkers::kRandomSamplesPerMarker,
-//            mapBySamples);
-//        const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
-//        ASSERT_EQ(0, mapSnapshot->size());
-//    }
-//
-//    {
-//        // Populate by sampling an empty collection where the initial 'totalRecords' and
-//        // 'totalBytes' estimates aren't accurate. The size tracked in-memory can be inaccurate
-//        // after unclean shutdowns.
-//        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>
-//        mapBySamples; auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx,
-//        kTenantId); pre_image_marker_initialization_internal::populateBySampling(
-//            opCtx,
-//            kTenantId,
-//            preImagesCollection,
-//            100 /* totalRecords */,
-//            200 /* totalBytes */,
-//            minBytesPerMarker,
-//            CollectionTruncateMarkers::kRandomSamplesPerMarker,
-//            mapBySamples);
-//        const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
-//        ASSERT_EQ(0, mapSnapshot->size());
-//    }
-//}
-//
-// TEST_F(PreImageMarkerInitializationTest, PopulateMapWithSinglePreImage) {
-//    auto opCtx = operationContext();
-//    createPreImagesCollection(opCtx, kTenantId);
-//    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage1);
-//    auto assertLastTrackedPreImage =
-//        [](const UUID& expectedUUID,
-//           const ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>&
-//               csvMap,
-//           const ChangeStreamPreImage& expectedPreImage) {
-//            const auto mapSnapshot = csvMap.getUnderlyingSnapshot();
-//            ASSERT_GTE(1, mapSnapshot->size());
-//            auto it = mapSnapshot->find(expectedUUID);
-//            ASSERT(it != mapSnapshot->end());
-//            auto perNsUUIDMarkers = it->second;
-//            ASSERT_FALSE(perNsUUIDMarkers->isEmpty());
-//
-//            // The partial marker should always track up the the highest seen RecordId and wall
-//            // time.
-//            const auto [highestRecord, highestWallTime] =
-//                perNsUUIDMarkers->getHighestRecordMetrics_forTest();
-//            const auto [expectedHighestRecord, expectedHighestWall] =
-//                extractRecordIdAndWallTime(expectedPreImage);
-//            ASSERT_EQ(expectedHighestRecord, highestRecord);
-//            ASSERT_EQ(expectedHighestWall, highestWallTime);
-//        };
-//
-//    {
-//        // Populate by scanning, pre-image covered by full marker.
-//        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
-//        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
-//        pre_image_marker_initialization_internal::populateByScanning(
-//            opCtx, kTenantId, preImagesCollection, 1 /* minBytesPerMarker */, mapByScan);
-//        assertLastTrackedPreImage(kNsUUID, mapByScan, kPreImage1);
-//    }
-//
-//    {
-//        // Populate by scanning, pre-image not covered in marker.
-//        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
-//        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
-//        pre_image_marker_initialization_internal::populateByScanning(
-//            opCtx,
-//            kTenantId,
-//            preImagesCollection,
-//            bytes(kPreImage1) + 100 /* minBytesPerMarker */,
-//            mapByScan);
-//        assertLastTrackedPreImage(kNsUUID, mapByScan, kPreImage1);
-//    }
-//
-//    {
-//        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>
-//        mapBySamples; auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx,
-//        kTenantId); pre_image_marker_initialization_internal::populateBySampling(
-//            opCtx,
-//            kTenantId,
-//            preImagesCollection,
-//            1 /* totalRecords */,
-//            bytes(kPreImage1) /* totalBytes */,
-//            1 /* minBytesPerMarker */,
-//            1 /* randomSamplesPerMarker */,
-//            mapBySamples);
-//        assertLastTrackedPreImage(kNsUUID, mapBySamples, kPreImage1);
-//    }
-//}
-//
+TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
+    auto opCtx = operationContext();
+    createPreImagesCollection(opCtx, kTenantId);
+    const auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
+
+    {
+        // Populate by scanning an empty collection.
+        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        pre_image_marker_initialization_internal::populateByScanning(
+            opCtx, kTenantId, preImagesCollection, minBytesPerMarker, mapByScan);
+        const auto mapSnapshot = mapByScan.getUnderlyingSnapshot();
+        ASSERT_EQ(0, mapSnapshot->size());
+    }
+
+    {
+        // Populate by sampling an empty collection where the initial 'totalRecords' and
+        // 'totalBytes' estimates are accurate.
+        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapBySamples;
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        pre_image_marker_initialization_internal::populateBySampling(
+            opCtx,
+            kTenantId,
+            preImagesCollection,
+            0 /* totalRecords */,
+            0 /* totalBytes */,
+            minBytesPerMarker,
+            CollectionTruncateMarkers::kRandomSamplesPerMarker,
+            mapBySamples);
+        const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
+        ASSERT_EQ(0, mapSnapshot->size());
+    }
+
+    {
+        // Populate by sampling an empty collection where the initial 'totalRecords' and
+        // 'totalBytes' estimates aren't accurate. The size tracked in-memory can be inaccurate
+        // after unclean shutdowns.
+        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapBySamples;
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        pre_image_marker_initialization_internal::populateBySampling(
+            opCtx,
+            kTenantId,
+            preImagesCollection,
+            100 /* totalRecords */,
+            200 /* totalBytes */,
+            minBytesPerMarker,
+            CollectionTruncateMarkers::kRandomSamplesPerMarker,
+            mapBySamples);
+        const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
+        ASSERT_EQ(0, mapSnapshot->size());
+    }
+}
+
+TEST_F(PreImageMarkerInitializationTest, PopulateMapWithSinglePreImage) {
+    auto opCtx = operationContext();
+    createPreImagesCollection(opCtx, kTenantId);
+    insertDirectlyToPreImagesCollection(opCtx, kTenantId, kPreImage1);
+    auto assertPreImageIsTracked =
+        [](const UUID& expectedUUID,
+           const ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>&
+               csvMap,
+           const ChangeStreamPreImage& expectedPreImage) {
+            const auto mapSnapshot = csvMap.getUnderlyingSnapshot();
+            ASSERT_GTE(1, mapSnapshot->size());
+            auto it = mapSnapshot->find(expectedUUID);
+            ASSERT(it != mapSnapshot->end());
+            auto perNsUUIDMarkers = it->second;
+            ASSERT_FALSE(perNsUUIDMarkers->isEmpty());
+
+            bool trackingPreImage = activelyTrackingPreImage(*perNsUUIDMarkers, expectedPreImage);
+            ASSERT_TRUE(trackingPreImage) << fmt::format(
+                "Expected pre-image to be actively tracked in truncate markers. Pre-image: {}, "
+                "truncateMarkers: {}",
+                expectedPreImage.toBSON().toString(),
+                toBSON(*perNsUUIDMarkers).toString());
+        };
+
+    {
+        // Populate by scanning, pre-image covered by full marker.
+        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        pre_image_marker_initialization_internal::populateByScanning(
+            opCtx, kTenantId, preImagesCollection, 1 /* minBytesPerMarker */, mapByScan);
+        assertPreImageIsTracked(kNsUUID, mapByScan, kPreImage1);
+    }
+
+    {
+        // Populate by scanning, pre-image not covered in marker.
+        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        pre_image_marker_initialization_internal::populateByScanning(
+            opCtx,
+            kTenantId,
+            preImagesCollection,
+            bytes(kPreImage1) + 100 /* minBytesPerMarker */,
+            mapByScan);
+        assertPreImageIsTracked(kNsUUID, mapByScan, kPreImage1);
+    }
+
+    {
+        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapBySamples;
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        pre_image_marker_initialization_internal::populateBySampling(
+            opCtx,
+            kTenantId,
+            preImagesCollection,
+            1 /* totalRecords */,
+            bytes(kPreImage1) /* totalBytes */,
+            1 /* minBytesPerMarker */,
+            1 /* randomSamplesPerMarker */,
+            mapBySamples);
+        assertPreImageIsTracked(kNsUUID, mapBySamples, kPreImage1);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

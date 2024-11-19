@@ -100,22 +100,67 @@ bool isExpired(OperationContext* opCtx,
     return expiredByTimeBasedExpiration || highestRecordTimestamp < currentEarliestOplogEntryTs;
 }
 
+// Returns information (RecordId, wall time, size in bytes) about the last record for 'nsUUID' in
+// the pre-images collection, boost::none if no record is found.
+boost::optional<std::tuple<RecordId, Date_t, int>> getLastRecordInfo(
+    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection, const UUID& nsUUID) {
+    const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
+    auto cursor = rs->getCursor(opCtx, false /** forward **/);
+
+    // A reverse inclusive 'seek' will return the previous entry in the collection if the record
+    // searched does not exist. This should ensure that the record's id is less than or equal to the
+    // 'maxRecordIdForNsUUID'.
+    RecordId maxRecordIdForNsUUID =
+        change_stream_pre_image_util::getAbsoluteMaxPreImageRecordIdBoundForNs(nsUUID).recordId();
+    boost::optional<Record> lastRecord =
+        cursor->seek(maxRecordIdForNsUUID, SeekableRecordCursor::BoundInclusion::kInclude);
+    if (!lastRecord ||
+        nsUUID != change_stream_pre_image_util::getPreImageNsUUID(lastRecord->data.toBson())) {
+        return boost::none;
+    }
+    auto [rid, wallTime] = PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(*lastRecord);
+    return std::tuple<RecordId, Date_t, int>{rid, wallTime, lastRecord->data.size()};
+}
 }  // namespace
 
 PreImagesTruncateMarkersPerNsUUID::PreImagesTruncateMarkersPerNsUUID(
     boost::optional<TenantId> tenantId,
-    std::deque<Marker> markers,
-    int64_t leftoverRecordsCount,
-    int64_t leftoverRecordsBytes,
-    int64_t minBytesPerMarker,
-    CollectionTruncateMarkers::MarkersCreationMethod creationMethod)
-    : CollectionTruncateMarkersWithPartialExpiration(std::move(markers),
-                                                     leftoverRecordsCount,
-                                                     leftoverRecordsBytes,
+    const UUID& nsUUID,
+    InitialSetOfMarkers initialSetOfMarkers,
+    int64_t minBytesPerMarker)
+    : CollectionTruncateMarkersWithPartialExpiration(std::move(initialSetOfMarkers.markers),
+                                                     initialSetOfMarkers.highestRecordId,
+                                                     initialSetOfMarkers.highestWallTime,
+                                                     initialSetOfMarkers.leftoverRecordsCount,
+                                                     initialSetOfMarkers.leftoverRecordsBytes,
                                                      minBytesPerMarker,
-                                                     Microseconds(0),
-                                                     creationMethod),
-      _tenantId(std::move(tenantId)) {}
+                                                     initialSetOfMarkers.timeTaken,
+                                                     initialSetOfMarkers.creationMethod),
+      _tenantId(std::move(tenantId)),
+      _nsUUID(nsUUID) {}
+
+void PreImagesTruncateMarkersPerNsUUID::refreshHighestTrackedRecord(
+    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection) {
+    const auto lastRecordInfo = getLastRecordInfo(opCtx, preImagesCollection, _nsUUID);
+    if (!lastRecordInfo) {
+        // There are no records for this 'nsUUID'. It's possible an insert tracked during
+        // initialization was rolled back or a new insert created the markers, but has yet to
+        // update them.
+        return;
+    }
+    const auto [lastRecordId, lastRecordWallTime, lastRecordBytes] = *lastRecordInfo;
+
+    // The truncate markers are already tracking the 'lastRecord', no need to update.
+    bool isTrackingCurrentLastRecord = checkPartialMarkerWith(
+        [&lastRecordId = lastRecordId](const RecordId& highestTrackedRecordId, const Date_t&) {
+            return highestTrackedRecordId >= lastRecordId;
+        });
+
+    if (isTrackingCurrentLastRecord) {
+        return;
+    }
+    updateMarkers(lastRecordBytes, lastRecordId, lastRecordWallTime, 1 /** numRecords */);
+}
 
 CollectionTruncateMarkers::RecordIdAndWallTime
 PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(const Record& record) {
@@ -127,7 +172,7 @@ Date_t PreImagesTruncateMarkersPerNsUUID::getWallTime(const BSONObj& preImageObj
     return preImageObj[ChangeStreamPreImage::kOperationTimeFieldName].date();
 }
 
-CollectionTruncateMarkers::InitialSetOfMarkers
+PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers
 PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
     OperationContext* opCtx,
     const UUID& preImagesCollectionUUID,
@@ -136,9 +181,11 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
     int64_t estimatedRecordsPerMarker,
     int64_t estimatedBytesPerMarker,
     uint64_t randomSamplesPerMarker) {
-    std::deque<CollectionTruncateMarkers::Marker> markers;
-    auto numSamples = samples.size();
+    std::deque<CollectionTruncateMarkers::Marker> wholeMarkers;
+    const auto numSamples = samples.size();
     invariant(numSamples > 0);
+    invariant(randomSamplesPerMarker > 0);
+    invariant(randomSamplesPerMarker <= static_cast<uint64_t>(estimatedRecordsPerMarker));
     for (size_t i = randomSamplesPerMarker - 1; i < numSamples; i = i + randomSamplesPerMarker) {
         const auto& [id, wallTime] = samples[i];
         LOGV2_DEBUG(7658602,
@@ -148,79 +195,97 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
                     "nsUUID"_attr = nsUUID,
                     "wallTime"_attr = wallTime,
                     "ts"_attr = change_stream_pre_image_util::getPreImageTimestamp(id));
-        markers.emplace_back(estimatedRecordsPerMarker, estimatedBytesPerMarker, id, wallTime);
+        wholeMarkers.emplace_back(estimatedRecordsPerMarker, estimatedBytesPerMarker, id, wallTime);
     }
 
-    // Sampling is best effort estimations and at this step, only account for the whole markers
-    // generated and leave the 'currentRecords' and 'currentBytes' to be filled in at a later time.
-    // Additionally, the time taken is relatively arbitrary as the expensive part of the operation
-    // was retrieving the samples.
-    return CollectionTruncateMarkers::InitialSetOfMarkers{
-        std::move(markers),
-        0 /** currentRecords **/,
-        0 /** currentBytes **/,
-        Microseconds{0} /** timeTaken **/,
-        CollectionTruncateMarkers::MarkersCreationMethod::Sampling};
+    auto currentBytes = 0;
+    auto currentRecords = 0;
+    const auto [highestRecordId, highestWallTime] = samples.back();
+    if (wholeMarkers.size() == 0 || wholeMarkers.front().lastRecord < highestRecordId) {
+        // For partial marker expiry, the highest tracked record must be tracked with non-zero bytes
+        // and count. Otherwise, it will be interpreted as a record which was already truncated.
+        //
+        // Compute the average records and bytes per sample.
+        currentRecords = std::ceil(estimatedRecordsPerMarker / randomSamplesPerMarker);
+        currentBytes = std::ceil(estimatedBytesPerMarker / randomSamplesPerMarker);
+    }
+    return InitialSetOfMarkers{std::move(wholeMarkers),
+                               std::move(highestRecordId),
+                               highestWallTime,
+                               currentRecords,
+                               currentBytes,
+                               Microseconds{0} /** timeTaken **/,
+                               CollectionTruncateMarkers::MarkersCreationMethod::Sampling};
 }
 
-CollectionTruncateMarkers::InitialSetOfMarkers
+PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers
 PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
     OperationContext* opCtx,
-    const CollectionAcquisition& collAcq,
+    const CollectionAcquisition& preImagesCollection,
     const UUID& nsUUID,
     int64_t minBytesPerMarker) {
-    Timer scanningTimer;
 
+    // Snapshots the last Record to help properly account for rollbacks and other events that could
+    // affect iteration
+    const auto lastRecordInfo = getLastRecordInfo(opCtx, preImagesCollection, nsUUID);
+    if (!lastRecordInfo) {
+        return InitialSetOfMarkers{};
+    }
+
+    // Bound the scan with the snapshotted 'last' record for 'nsUUID'. This caps the amount of work
+    // scanning must do with concurrent inserts and guarantees the 'highestRecordId' and
+    // 'highestWallTime' are accurate with respect to the upper bound of records tracked.
+    const auto [highestRecordId, highestWallTime, _] = *lastRecordInfo;
     RecordIdBound minRecordIdBound =
         change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID);
-    RecordId minRecordId = minRecordIdBound.recordId();
-
-    RecordIdBound maxRecordIdBound =
-        change_stream_pre_image_util::getAbsoluteMaxPreImageRecordIdBoundForNs(nsUUID);
-    RecordId maxRecordId = maxRecordIdBound.recordId();
-
+    RecordIdBound maxRecordIdBound = RecordIdBound(highestRecordId);
     auto exec = InternalPlanner::collectionScan(opCtx,
-                                                collAcq,
+                                                preImagesCollection,
                                                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                 InternalPlanner::Direction::FORWARD,
                                                 boost::none,
                                                 std::move(minRecordIdBound),
                                                 std::move(maxRecordIdBound));
+
+    std::deque<CollectionTruncateMarkers::Marker> wholeMarkers;
     int64_t currentRecords = 0;
     int64_t currentBytes = 0;
-    std::deque<CollectionTruncateMarkers::Marker> markers;
-    BSONObj docOut;
-    RecordId rIdOut;
-    while (exec->getNext(&docOut, &rIdOut) == PlanExecutor::ADVANCED) {
+    BSONObj currentPreImageDoc;
+    RecordId currentRecordId;
+    Timer scanningTimer;
+    while (exec->getNext(&currentPreImageDoc, &currentRecordId) == PlanExecutor::ADVANCED) {
         currentRecords++;
-        currentBytes += docOut.objsize();
-
-        auto wallTime = getWallTime(docOut);
+        currentBytes += currentPreImageDoc.objsize();
+        auto currWallTime = getWallTime(currentPreImageDoc);
         if (currentBytes >= minBytesPerMarker) {
             LOGV2_DEBUG(7500500,
                         1,
                         "Marking potential future truncation point for pre-images collection",
-                        "preImagesCollectionUUID"_attr = collAcq.uuid(),
+                        "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
                         "nsUuid"_attr = nsUUID,
-                        "wallTime"_attr = wallTime,
-                        "ts"_attr = change_stream_pre_image_util::getPreImageTimestamp(rIdOut));
+                        "wallTime"_attr = currWallTime,
+                        "ts"_attr =
+                            change_stream_pre_image_util::getPreImageTimestamp(currentRecordId));
 
-            markers.emplace_back(
-                std::exchange(currentRecords, 0), std::exchange(currentBytes, 0), rIdOut, wallTime);
+            wholeMarkers.emplace_back(std::exchange(currentRecords, 0),
+                                      std::exchange(currentBytes, 0),
+                                      currentRecordId,
+                                      currWallTime);
         }
     }
 
-    if (currentRecords == 0 && markers.empty()) {
-        return CollectionTruncateMarkers::InitialSetOfMarkers{
-            {}, 0, 0, Microseconds{0}, MarkersCreationMethod::EmptyCollection};
+    if (currentRecords == 0 && wholeMarkers.empty()) {
+        // Unlikely, but it's possible the highest record inserted was rolled back.
+        return InitialSetOfMarkers{};
     }
 
-    return CollectionTruncateMarkers::InitialSetOfMarkers{
-        std::move(markers),
-        currentRecords,
-        currentBytes,
-        scanningTimer.elapsed(),
-        CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
+    return InitialSetOfMarkers{std::move(wholeMarkers),
+                               highestRecordId,
+                               highestWallTime,
+                               currentRecords,
+                               currentBytes,
+                               scanningTimer.elapsed(),
+                               CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
 }
 
 void PreImagesTruncateMarkersPerNsUUID::updateMarkers(int64_t numBytes,

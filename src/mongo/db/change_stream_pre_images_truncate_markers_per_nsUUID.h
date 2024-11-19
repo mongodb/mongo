@@ -62,13 +62,28 @@ namespace mongo {
 class PreImagesTruncateMarkersPerNsUUID final
     : public CollectionTruncateMarkersWithPartialExpiration {
 public:
-    PreImagesTruncateMarkersPerNsUUID(
-        boost::optional<TenantId> tenantId,
-        std::deque<Marker> markers,
-        int64_t leftoverRecordsCount,
-        int64_t leftoverRecordsBytes,
-        int64_t minBytesPerMarker,
-        CollectionTruncateMarkers::MarkersCreationMethod creationMethod);
+    struct InitialSetOfMarkers {
+        std::deque<Marker> markers{};
+        RecordId highestRecordId{};
+        Date_t highestWallTime{};
+        int64_t leftoverRecordsCount{0};
+        int64_t leftoverRecordsBytes{0};
+        Microseconds timeTaken{0};
+        MarkersCreationMethod creationMethod{MarkersCreationMethod::EmptyCollection};
+    };
+
+    PreImagesTruncateMarkersPerNsUUID(boost::optional<TenantId> tenantId,
+                                      const UUID& nsUUID,
+                                      InitialSetOfMarkers initialSetOfMarkers,
+                                      int64_t minBytesPerMarker);
+
+    /**
+     * Refreshes the highest seen record for the nsUUID. Does nothing if the highest record is
+     * already tracked. Useful to call with a newer snapshot than the one used to originally
+     * construct the truncate markers to ensure all new inserts are tracked.
+     */
+    void refreshHighestTrackedRecord(OperationContext* opCtx,
+                                     const CollectionAcquisition& preImagesCollection);
 
     /**
      * Creates an 'InitialSetOfMarkers' from samples of pre-images with 'nsUUID'. The generated
@@ -77,28 +92,28 @@ public:
      * because size metrics are only available for an entire pre-images collection, not individual
      * segments corresponding to the provided 'nsUUID'.
      *
-     * For mathamatical simplicity, the 'InitialSetOfMarkers' will only capture whole markers. Any
-     * samples not captured by whole markers will not be accounted for as a partial marker in the
-     * result.
+     * Caller is responsible for ensuring 'samples' are in ascending order.
+     *
+     * Guarantee: The last sample is tracked by the resulting initial set, even if the exact size
+     * and records count aren't correct.
      */
-    static CollectionTruncateMarkers::InitialSetOfMarkers createInitialMarkersFromSamples(
+    static InitialSetOfMarkers createInitialMarkersFromSamples(
         OperationContext* opCtx,
         const UUID& preImagesCollectionUUID,
         const UUID& nsUUID,
         const std::vector<CollectionTruncateMarkers::RecordIdAndWallTime>& samples,
         int64_t estimatedRecordsPerMarker,
         int64_t estimatedBytesPerMarker,
-        uint64_t randomSamplesPerMarker = CollectionTruncateMarkers::kRandomSamplesPerMarker);
+        uint64_t randomSamplesPerMarker);
 
     /**
      * Returns an accurate 'InitialSetOfMarkers' corresponding to the segment of the pre-images
      * collection generated from 'nsUUID'.
      */
-    static CollectionTruncateMarkers::InitialSetOfMarkers createInitialMarkersScanning(
-        OperationContext* opCtx,
-        const CollectionAcquisition& collPtr,
-        const UUID& nsUUID,
-        int64_t minBytesPerMarker);
+    static InitialSetOfMarkers createInitialMarkersScanning(OperationContext* opCtx,
+                                                            const CollectionAcquisition& collPtr,
+                                                            const UUID& nsUUID,
+                                                            int64_t minBytesPerMarker);
 
     static CollectionTruncateMarkers::RecordIdAndWallTime getRecordIdAndWallTime(
         const Record& record);
@@ -122,8 +137,6 @@ public:
     void updateMarkers(int64_t numBytes, RecordId recordId, Date_t wallTime, int64_t numRecords);
 
 private:
-    friend class PreImagesRemoverTest;
-
     bool _hasExcessMarkers(OperationContext* opCtx) const override;
 
     bool _hasPartialMarkerExpired(OperationContext* opCtx,
@@ -134,6 +147,8 @@ private:
      * When initialized, indicates this is a serverless environment.
      */
     boost::optional<TenantId> _tenantId;
+
+    UUID _nsUUID;
 };
 
 }  // namespace mongo

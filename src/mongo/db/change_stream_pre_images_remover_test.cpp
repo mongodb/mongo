@@ -60,6 +60,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/change_stream_options_manager.h"
+#include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
@@ -100,23 +101,7 @@
 namespace mongo {
 
 namespace {
-std::unique_ptr<ChangeStreamOptions> populateChangeStreamPreImageOptions(
-    std::variant<std::string, std::int64_t> expireAfterSeconds) {
-    PreAndPostImagesOptions preAndPostImagesOptions;
-    preAndPostImagesOptions.setExpireAfterSeconds(expireAfterSeconds);
-
-    auto changeStreamOptions = std::make_unique<ChangeStreamOptions>();
-    changeStreamOptions->setPreAndPostImages(std::move(preAndPostImagesOptions));
-
-    return changeStreamOptions;
-}
-
-void setChangeStreamOptionsToManager(OperationContext* opCtx,
-                                     ChangeStreamOptions& changeStreamOptions) {
-    auto& changeStreamOptionsManager = ChangeStreamOptionsManager::get(opCtx);
-    ASSERT_EQ(changeStreamOptionsManager.setOptions(opCtx, changeStreamOptions).getStatus(),
-              ErrorCodes::OK);
-}
+using namespace change_stream_pre_image_test_helper;
 
 class ChangeStreamPreImageExpirationPolicyTest : public ServiceContextTest {
 public:
@@ -183,12 +168,10 @@ protected:
         const UUID& nsUUID,
         Timestamp ts,
         boost::optional<Date_t> forcedOperationTime = boost::none) {
-        auto preImageId = ChangeStreamPreImageId(nsUUID, ts, 0);
-        const BSONObj doc = BSON("x" << 1);
         auto operationTime = forcedOperationTime
             ? *forcedOperationTime
             : Date_t::fromDurationSinceEpoch(Seconds{ts.getSecs()});
-        return ChangeStreamPreImage(preImageId, operationTime, doc);
+        return makePreImage(nsUUID, ts, operationTime);
     }
 
     // Populates the pre-images collection with 'numRecords'. Generates pre-images with Timestamps 1
@@ -279,23 +262,6 @@ protected:
         changeStreamsParam->setValue(oldSettings, tenantId).ignore();
     }
 
-    RecordId generatePreImageRecordId(Timestamp timestamp) {
-        const UUID uuid{UUID::gen()};
-        ChangeStreamPreImageId preImageId(uuid, timestamp, 0);
-        return change_stream_pre_image_util::toRecordId(preImageId);
-    }
-
-    RecordId generatePreImageRecordId(Date_t wallTime) {
-        const UUID uuid{UUID::gen()};
-        Timestamp timestamp{wallTime};
-        ChangeStreamPreImageId preImageId(uuid, timestamp, 0);
-        return change_stream_pre_image_util::toRecordId(preImageId);
-    }
-
-    bool hasExcessMarkers(OperationContext* opCtx, PreImagesTruncateMarkersPerNsUUID& markers) {
-        return markers._hasExcessMarkers(opCtx);
-    }
-
     void setUp() override {
         CatalogTestFixture::setUp();
         ChangeStreamOptionsManager::create(getServiceContext());
@@ -336,197 +302,6 @@ protected:
         return boost::none;
     }
 };
-
-// When 'expireAfterSeconds' is off, defaults to comparing the 'lastRecord's Timestamp of oldest
-// marker with the Timestamp of the ealiest oplog entry.
-//
-// When 'expireAfterSeconds' is on, defaults to comparing the 'lastRecord's wallTime with
-// the current time - 'expireAfterSeconds',  which is already tested as a part of the
-// ChangeStreamPreImageExpirationPolicyTest.
-TEST_F(PreImagesRemoverTest, hasExcessMarkersExpiredAfterSecondsOff) {
-    auto opCtx = operationContext();
-
-    // With no explicit 'expireAfterSeconds', excess markers are determined by whether the Timestamp
-    // of the 'lastRecord' in the oldest marker is greater than the Timestamp of the earliest oplog
-    // entry.
-    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
-    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
-
-    const auto currentEarliestOplogEntryTs =
-        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
-
-    // Ensure that the generated Timestamp associated with the lastRecord of the marker is less than
-    // the earliest oplog entry Timestamp.
-    auto ts = currentEarliestOplogEntryTs - 1;
-    ASSERT_GT(currentEarliestOplogEntryTs, ts);
-    auto wallTime = Date_t::fromMillisSinceEpoch(ts.asInt64());
-    auto lastRecordId = generatePreImageRecordId(wallTime);
-
-    auto numRecords = 1;
-    auto numBytes = 100;
-    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
-        {numRecords, numBytes, lastRecordId, wallTime}};
-
-    PreImagesTruncateMarkersPerNsUUID markers(nullTenantId() /* tenantId */,
-                                              std::move(initialMarkers),
-                                              0,
-                                              0,
-                                              100,
-                                              kArbitraryMarkerCreationMethod);
-    bool excessMarkers = hasExcessMarkers(opCtx, markers);
-    ASSERT_TRUE(excessMarkers);
-}
-
-TEST_F(PreImagesRemoverTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
-    auto opCtx = operationContext();
-
-    // With no explicit 'expireAfterSeconds', excess markers are determined by whether the Timestamp
-    // of the 'lastRecord' in the oldest marker is greater than the Timestamp of the earliest oplog
-    // entry.
-    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
-    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
-
-    const auto currentEarliestOplogEntryTs =
-        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
-
-    // Ensure that the generated Timestamp associated with the lastRecord of the marker is less than
-    // the earliest oplog entry Timestamp.
-    auto ts = currentEarliestOplogEntryTs + 1;
-    ASSERT_LT(currentEarliestOplogEntryTs, ts);
-    auto wallTime = Date_t::fromMillisSinceEpoch(ts.asInt64());
-    auto lastRecordId = generatePreImageRecordId(wallTime);
-
-    auto numRecords = 1;
-    auto numBytes = 100;
-    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
-        {numRecords, numBytes, lastRecordId, wallTime}};
-
-    PreImagesTruncateMarkersPerNsUUID markers(nullTenantId() /* tenantId */,
-                                              std::move(initialMarkers),
-                                              0,
-                                              0,
-                                              100,
-                                              kArbitraryMarkerCreationMethod);
-    bool excessMarkers = hasExcessMarkers(opCtx, markers);
-    ASSERT_FALSE(excessMarkers);
-}
-
-TEST_F(PreImagesRemoverTest, serverlessHasNoExcessMarkers) {
-    Seconds expireAfter{1000};
-    auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
-    setExpirationTime(tenantId, expireAfter);
-
-    auto opCtx = operationContext();
-    auto wallTime = opCtx->getServiceContext()->getFastClockSource()->now() + Minutes(120);
-    auto lastRecordId = generatePreImageRecordId(wallTime);
-    auto numRecords = 1;
-    auto numBytes = 100;
-    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
-        {numRecords, numBytes, lastRecordId, wallTime}};
-
-    PreImagesTruncateMarkersPerNsUUID markers(
-        tenantId, std::move(initialMarkers), 0, 0, 100, kArbitraryMarkerCreationMethod);
-    bool excessMarkers = hasExcessMarkers(opCtx, markers);
-    ASSERT_FALSE(excessMarkers);
-}
-
-TEST_F(PreImagesRemoverTest, serverlessHasExcessMarkers) {
-    Seconds expireAfter{1};
-    auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
-    setExpirationTime(tenantId, expireAfter);
-
-    auto opCtx = operationContext();
-    auto wallTime = opCtx->getServiceContext()->getFastClockSource()->now() - Minutes(120);
-    auto lastRecordId = generatePreImageRecordId(wallTime);
-    auto numRecords = 1;
-    auto numBytes = 100;
-    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
-        {numRecords, numBytes, lastRecordId, wallTime}};
-
-    PreImagesTruncateMarkersPerNsUUID markers(
-        tenantId, std::move(initialMarkers), 0, 0, 100, kArbitraryMarkerCreationMethod);
-    bool excessMarkers = hasExcessMarkers(opCtx, markers);
-    ASSERT_TRUE(excessMarkers);
-}
-
-// Tests an empty 'PreImagesTruncateMarkersPerNsUUID' doesn't generate partial markers for
-// truncation.
-TEST_F(PreImagesRemoverTest, createPartialMarkerIfNecessaryEmptySet) {
-    auto opCtx = operationContext();
-
-    // Expiry by oldest oplog entry timestamp.
-    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
-    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
-
-    PreImagesTruncateMarkersPerNsUUID nsUUIDMarkers(nullTenantId() /* tenantId */,
-                                                    std::deque<CollectionTruncateMarkers::Marker>{},
-                                                    0,
-                                                    0,
-                                                    100,
-                                                    kArbitraryMarkerCreationMethod);
-    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
-    ASSERT_EQ(numMarkersBefore, 0);
-    nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
-    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
-    ASSERT_EQ(numMarkersAfter, 0);
-}
-
-// Tests that without a highest recordId or wall time, 'PreImagesTruncateMarkersPerNsUUID' won't
-// generate partial markers for truncation.
-TEST_F(PreImagesRemoverTest, createPartialMarkerIfNecessaryNoHighestRecordIdOrWallTime) {
-    auto opCtx = operationContext();
-
-    // Expiry by oldest oplog entry timestamp.
-    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
-    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
-
-    PreImagesTruncateMarkersPerNsUUID nsUUIDMarkers(nullTenantId() /* tenantId */,
-                                                    std::deque<CollectionTruncateMarkers::Marker>{},
-                                                    1,
-                                                    1,
-                                                    100,
-                                                    kArbitraryMarkerCreationMethod);
-    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
-    ASSERT_EQ(numMarkersBefore, 0);
-    nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
-    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
-    ASSERT_EQ(numMarkersAfter, 0);
-}
-
-TEST_F(PreImagesRemoverTest, createPartialMarkerSucceedsExpiryByOldestOplogEntry) {
-    auto opCtx = operationContext();
-
-    // Expiry by oldest oplog entry timestamp.
-    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
-    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
-
-    const auto currentEarliestOplogEntryTs =
-        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
-
-    // Generate a timestamp older than oldest oplog entry.
-    auto ts = currentEarliestOplogEntryTs - 1;
-    ASSERT_GT(currentEarliestOplogEntryTs, ts);
-    auto wallTime = Date_t::fromMillisSinceEpoch(ts.asInt64());
-    auto recordIdToInsert = generatePreImageRecordId(wallTime);
-    auto numBytesToInsert = 3;
-    auto numRecordsToInsert = 1;
-
-    PreImagesTruncateMarkersPerNsUUID nsUUIDMarkers(nullTenantId() /* tenantId */,
-                                                    std::deque<CollectionTruncateMarkers::Marker>{},
-                                                    0,
-                                                    0,
-                                                    100,
-                                                    kArbitraryMarkerCreationMethod);
-    // Simulate an insert of an "expired" pre-image with few enough bytes that a new marker isn't
-    // auto-generated.
-    nsUUIDMarkers.updateMarkers(numBytesToInsert, recordIdToInsert, wallTime, numRecordsToInsert);
-
-    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
-    ASSERT_EQ(numMarkersBefore, 0);
-    nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
-    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
-    ASSERT_EQ(numMarkersAfter, 1);
-}
 
 TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimstampRetrieval) {
     // Basic case.
