@@ -127,16 +127,15 @@ buildvariants:
         distros:
           - amazon2-arm64-latest-xlarge
 
-  - &enterprise-amazon-linux2-arm64-template
-    <<: *amazon_linux2_arm64_static_compile_variant_dependency
-    name: &enterprise-amazon-linux2-arm64 enterprise-amazon-linux2-arm64
+  - <<: *amazon_linux2_arm64_static_compile_variant_dependency
+    name: enterprise-amazon-linux2-arm64
     display_name: "* Amazon Linux 2 arm64 Atlas Enterprise"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - amazon2-arm64-atlas-latest-small
     stepback: true
-    expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+    expansions:
       <<: *amazon_linux2_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all

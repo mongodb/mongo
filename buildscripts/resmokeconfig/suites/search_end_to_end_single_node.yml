@@ -29,7 +29,7 @@ executor:
   config:
     shell_options:
       global_vars:
-        TestData: &TestData
+        TestData:
           auth: true
           authMechanism: SCRAM-SHA-256
           keyFile: *keyFile

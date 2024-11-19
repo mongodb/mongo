@@ -52,7 +52,7 @@ executor:
         globalThis.testingReplication = true;
         await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
       global_vars:
-        TestData: &TestData
+        TestData:
           tenantId: "636d957b2646ddfaf9b5e13f"
           hashTestNamesForMultitenancy: true
           useSecurityToken: true

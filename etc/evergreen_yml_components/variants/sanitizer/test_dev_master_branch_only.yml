@@ -17,25 +17,6 @@ variables:
     has_packages: false
 
   # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
-  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &linux_x86_dynamic_compile_variant_dependency
-    depends_on:
-      - name: archive_dist_test
-        variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
-    # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: linux-x86-dynamic-compile
-
-  # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
@@ -52,6 +33,15 @@ variables:
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
     #   variant: linux-debug-aubsan-compile-required
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
@@ -106,12 +96,6 @@ variables:
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
       ASAN_OPTIONS="detect_odr_violation=0:detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
-  # If you add anything to san_options, make sure the appropriate changes are
-  # also made to SConstruct.
-  # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - ubsan_options: &ubsan_options UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
   # THIS HAS COPIES IN:
@@ -364,14 +348,13 @@ buildvariants:
   #         macos buildvariants             #
   ###########################################
 
-  - &macos-debug-template
-    name: &macos-debug-suggested macos-debug-suggested
+  - name: &macos-debug-suggested macos-debug-suggested
     display_name: "* macOS arm64 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - macos-14-arm64
-    expansions: &macos-debug-expansions
+    expansions:
       compile_variant: *macos-debug-suggested
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos
@@ -437,8 +420,7 @@ buildvariants:
   #     Experimental buildvariants          #
   ###########################################
 
-  - &rhel8-debug-ubsan-all-feature-flags-template
-    name: &rhel8-debug-ubsan-all-feature-flags rhel8-debug-ubsan-all-feature-flags
+  - name: &rhel8-debug-ubsan-all-feature-flags rhel8-debug-ubsan-all-feature-flags
     display_name: "* Shared Library UBSAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -481,7 +463,7 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel8-debug-aubsan-all-feature-flags rhel8-debug-aubsan-all-feature-flags
+    name: rhel8-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
@@ -514,7 +496,7 @@ buildvariants:
           - rhel8.8-large
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel8-debug-aubsan-experimental-all-feature-flags rhel8-debug-aubsan-experimental-all-feature-flags
+    name: rhel8-debug-aubsan-experimental-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental (all feature flags)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -568,7 +550,7 @@ buildvariants:
       - name: .benchmarks
 
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
-    name: &enterprise-rhel8-debug-tsan-all-feature-flags enterprise-rhel8-debug-tsan-all-feature-flags
+    name: enterprise-rhel8-debug-tsan-all-feature-flags
     display_name: "* TSAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day.

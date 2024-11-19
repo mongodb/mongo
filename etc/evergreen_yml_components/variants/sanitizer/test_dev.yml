@@ -38,17 +38,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &linux_x86_dynamic_compile_variant_dependency
-    depends_on:
-      - name: archive_dist_test
-        variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
-    # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: linux-x86-dynamic-compile
+  - &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
@@ -58,7 +48,8 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    multiversion_platform: rhel8
+    multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     large_distro_name: rhel8.8-medium
@@ -141,14 +132,6 @@ variables:
       UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-
-  # If you add anything to san_options, make sure the appropriate changes are
-  # also made to SConstruct.
-  # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - ubsan_options: &ubsan_options UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
@@ -294,9 +277,8 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - &linux-64-debug-required-template
-    <<: *linux_x86_dynamic_debug_compile_variant_dependency
-    name: &linux-64-debug-required linux-64-debug-required
+  - <<: *linux_x86_dynamic_debug_compile_variant_dependency
+    name: linux-64-debug-required
     display_name: "! Linux x86 Shared Library DEBUG"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -325,9 +307,8 @@ buildvariants:
         distros:
           - rhel8.8-medium
 
-  - &rhel8-debug-aubsan-lite-all-feature-flags-required-template
-    <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel8-debug-aubsan-lite-all-feature-flags-required rhel8-debug-aubsan-lite-all-feature-flags-required
+  - <<: *linux_debug_aubsan_compile_variant_dependency
+    name: rhel8-debug-aubsan-lite-all-feature-flags-required
     display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["required"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -346,7 +327,7 @@ buildvariants:
       - name: jsCore_wildcard_indexes
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel8-debug-aubsan rhel8-debug-aubsan
+    name: rhel8-debug-aubsan
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
@@ -375,7 +356,7 @@ buildvariants:
       - name: .search_e2e_tests
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel8-debug-aubsan-experimental rhel8-debug-aubsan-experimental
+    name: rhel8-debug-aubsan-experimental
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -429,8 +410,7 @@ buildvariants:
       - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_system_allocator
       - name: generate_buildid_to_debug_symbols_mapping
 
-  - &rhel8-debug-aubsan-lite_fuzzer-template
-    name: &rhel8-debug-aubsan-lite_fuzzer rhel8-debug-aubsan-lite_fuzzer
+  - name: &rhel8-debug-aubsan-lite_fuzzer rhel8-debug-aubsan-lite_fuzzer
     display_name: "{A,UB}SAN Enterprise RHEL 8 FUZZER"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -472,7 +452,7 @@ buildvariants:
     tasks:
       - name: compile_archive_and_run_libfuzzertests_TG
 
-  - name: &enterprise-rhel8-debug-tsan-compile enterprise-rhel8-debug-tsan-compile
+  - name: enterprise-rhel8-debug-tsan-compile
     display_name: "* TSAN Enterprise RHEL 8 DEBUG Compile"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -499,7 +479,7 @@ buildvariants:
           - rhel8.8-xlarge
 
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
-    name: &enterprise-rhel8-debug-tsan enterprise-rhel8-debug-tsan
+    name: enterprise-rhel8-debug-tsan
     display_name: "* TSAN Enterprise RHEL 8 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day.
@@ -542,7 +522,7 @@ buildvariants:
           - *enterprise-rhel8-debug-tsan-large-distro-name
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: &rhel8-debug-aubsan-classic-engine rhel8-debug-aubsan-classic-engine
+    name: rhel8-debug-aubsan-classic-engine
     display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Classic Engine)"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -593,7 +573,7 @@ buildvariants:
       - name: unittest_shell_hang_analyzer_gen
       - name: .watchdog
 
-  - name: &enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
+  - name: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
     display_name: "~ Shared Library Enterprise RHEL 8 SpiderMonkey Debug"
     tags: []
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter

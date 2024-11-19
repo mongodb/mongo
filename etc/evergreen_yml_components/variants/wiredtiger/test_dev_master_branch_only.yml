@@ -60,7 +60,7 @@ buildvariants:
       use_wt_develop: true
       compile_variant: *linux-x86-dynamic-debug-wtdevelop-compile
 
-  - name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
+  - name: linux-64-debug-wtdevelop
     display_name: "~ Linux DEBUG WiredTiger develop"
     tags: []
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter

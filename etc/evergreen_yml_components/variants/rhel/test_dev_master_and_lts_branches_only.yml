@@ -12,10 +12,17 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_dynamic_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
-        variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+        variant: *linux_x86_dynamic_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
@@ -117,7 +124,7 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
 
   - <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-8-64-bit-large-txns-format enterprise-rhel-8-64-bit-large-txns-format
+    name: enterprise-rhel-8-64-bit-large-txns-format
     display_name: "Enterprise RHEL 8 (large transactions format)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter

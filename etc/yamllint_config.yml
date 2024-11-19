@@ -1,11 +1,14 @@
 extends: default
 
 rules:
-  line-length: disable
-  indentation: disable
-  document-start: disable
+  anchors:
+    forbid-duplicated-anchors: true
+    forbid-unused-anchors: true
   comments: disable
   comments-indentation: disable
+  document-start: disable
+  indentation: disable
+  line-length: disable
   truthy: disable
 
 ignore:

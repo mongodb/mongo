@@ -35,7 +35,6 @@ parameters:
     description: "Overrides the default timeout_secs defined at the top of this file for the f_dsi_run_workload task"
 
 variables:
-  _src_dir: &src_dir src/mongo
   _modules: &modules
     - dsi
     - genny
@@ -48,13 +47,6 @@ variables:
     - py-tpcc
     - PrivateWorkloads
     - flamegraph
-
-  _shared_compile_expansions: &shared_compile_expansions
-    platform: linux
-    project_dir: dsi
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    has_packages: false
 
 ###
 # Same in every DSI project. Ensure that this block is synchronized with
@@ -159,8 +151,7 @@ functions:
               /opt/mongodbtoolchain/v4/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
   f_other_pre_ops:
-    - &f_other_pre_ops
-      command: shell.exec
+    - command: shell.exec
       params:
         silent: true
         script: |

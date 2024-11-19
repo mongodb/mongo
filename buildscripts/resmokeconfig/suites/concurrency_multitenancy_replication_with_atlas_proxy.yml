@@ -54,7 +54,7 @@ executor:
   config:
     shell_options:
       global_vars:
-        TestData: &TestData
+        TestData:
           hashTestNamesForMultitenancy: true
           useSecurityToken: true
           useResponsePrefixChecking: true

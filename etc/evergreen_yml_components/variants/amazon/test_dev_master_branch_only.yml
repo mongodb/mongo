@@ -170,14 +170,14 @@ buildvariants:
 
   - &enterprise-amazon-linux2-arm64-all-feature-flags-template
     <<: *amazon_linux2_arm64_static_compile_variant_dependency
-    name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
+    name: enterprise-amazon-linux2-arm64-all-feature-flags
     display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - amazon2-arm64-atlas-latest-small
     stepback: true
-    expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+    expansions:
       <<: *amazon_linux2_arm64_dynamic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
@@ -208,8 +208,7 @@ buildvariants:
           - amazon2-arm64-atlas-latest-large
       - name: .fuzzer_deterministic
 
-  - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
-    <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
     display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Fuzzers"
     tags: ["suggested"]
@@ -222,16 +221,14 @@ buildvariants:
       - name: .updatefuzzer
       - name: .jstestfuzz
 
-  - &enterprise-amazon-linux2-arm64-all-feature-flags-cluster-scalability-only
-    <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2-arm64-all-feature-flags-cluster-scalability-only
     display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Cluster Scalability Patch Only"
     tags: ["cluster_scalability_only", "suggested"]
     tasks:
       - name: .cluster_scalability_only
 
-  - &enterprise-amazon-linux2-arm64-all-feature-flags-embedded-router
-    <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2-arm64-all-feature-flags-embedded-router
     display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Embedded Router Tasks"
     tags: ["suggested"]
@@ -259,7 +256,7 @@ buildvariants:
   ### Query Patch-Specific Build Variants ###
 
   - <<: *amazon_linux2_arm64_static_compile_variant_dependency
-    name: &amazon_linux2_arm64_static-classic-engine-query-patch-only amazon_linux2_arm64_static-classic-engine-query-patch-only
+    name: amazon_linux2_arm64_static-classic-engine-query-patch-only
     display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (Classic Engine)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -312,7 +309,7 @@ buildvariants:
       - name: rollback_fuzzer_sanity_patch
 
   - <<: *amazon_linux2_arm64_static_compile_variant_dependency
-    name: &amazon_linux2_arm64_static-try-sbe-engine-query-patch-only amazon_linux2_arm64_static-try-sbe-engine-query-patch-only
+    name: amazon_linux2_arm64_static-try-sbe-engine-query-patch-only
     display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (Try SBE Engine)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -336,7 +333,7 @@ buildvariants:
     tasks: *query-alias-task-list
 
   - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: &enterprise-amazon-linux2-arm64-all-feature-flags-required-query-patch-only enterprise-amazon-linux2-arm64-all-feature-flags-required-query-patch-only
+    name: enterprise-amazon-linux2-arm64-all-feature-flags-required-query-patch-only
     display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (all feature flags)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.

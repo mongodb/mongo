@@ -90,7 +90,7 @@ buildvariants:
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
-    expansions: &enterprise-rhel-8-64-bit-expansions
+    expansions:
       additional_package_targets: >-
         archive-mongocryptd
         archive-mongocryptd-debug
@@ -289,7 +289,7 @@ buildvariants:
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel93-small
-    expansions: &enterprise-rhel-93-64-bit-expansions
+    expansions:
       additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com

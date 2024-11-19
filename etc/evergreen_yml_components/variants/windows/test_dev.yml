@@ -99,9 +99,8 @@ buildvariants:
         distros:
           - windows-2022-xxlarge
 
-  - &enterprise-windows-all-feature-flags-required-template
-    <<: *windows_compile_variant_dependency
-    name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
+  - <<: *windows_compile_variant_dependency
+    name: enterprise-windows-all-feature-flags-required
     display_name: "! Enterprise Windows Server 2022 (all feature flags) essential tasks"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -139,7 +138,7 @@ buildvariants:
   # This Windows build variant exists to run all tasks that have been excluded from running on the required Windows build variant.
   # See SERVER-79037 for how the essential set of tasks was computed.
   - <<: *windows_compile_variant_dependency
-    name: &enterprise-windows-all-feature-flags-non-essential enterprise-windows-all-feature-flags-non-essential
+    name: enterprise-windows-all-feature-flags-non-essential
     display_name: "* Enterprise Windows Server 2022 (all feature flags) non-essential tasks"
     tags: ["suggested"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter

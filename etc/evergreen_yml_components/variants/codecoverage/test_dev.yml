@@ -35,7 +35,7 @@ buildvariants:
       gcov_environment: GCOV_PREFIX=$(pwd)/.. GCOV_PREFIX_STRIP=3
       num_scons_link_jobs_available: 0.99
       compile_variant: *AL2023-arm64-coverage
-    tasks: &AL2023-arm64-coverage-tasks
+    tasks:
       # These are carefully and explicitly curated. Do not add more tests/tasks without consulting with DevProd.
       # unittests
       - name: compile_and_package_serial_no_unittests_TG
@@ -92,7 +92,7 @@ buildvariants:
       gcov_environment: GCOV_PREFIX=$(pwd)/.. GCOV_PREFIX_STRIP=3
       num_scons_link_jobs_available: 0.99
       compile_variant: *rhel-93-64-bit-coverage
-    tasks: &rhel-93-64-bit-coverage-tasks
+    tasks:
       # These are carefully and explicitly curated. Do not add more tests/tasks without consulting with DevProd.
       # unittests
       - name: compile_and_package_serial_no_unittests_TG

@@ -40,7 +40,7 @@ buildvariants:
     tasks:
       - name: burn_in_tags_gen
 
-  - name: &copybara-sync-between-repos copybara-sync-between-repos
+  - name: copybara-sync-between-repos
     display_name: "* Copybara Sync Between Repos"
     tags: ["suggested"]
     activate: true

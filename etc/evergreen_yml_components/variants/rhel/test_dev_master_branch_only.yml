@@ -63,10 +63,17 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_dynamic_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
-        variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+        variant: *linux_x86_dynamic_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
@@ -286,7 +293,7 @@ buildvariants:
 
   - &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags enterprise-rhel-8-64-bit-dynamic-all-feature-flags
+    name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags
     display_name: "* Shared Library Enterprise RHEL 8 (all feature flags)"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -334,8 +341,7 @@ buildvariants:
 
   # This build variant is used to test suites that use sharded cluster fixture with embedded router mode.
   # Also supports ProgramRunner/ShardingTest driven suites that look for an embedded router flag in TestData.
-  - &enterprise-rhel-8-64-bit-dynamic-embedded-router-all-feature-flags
-    <<: *linux_x86_dynamic_compile_variant_dependency
+  - <<: *linux_x86_dynamic_compile_variant_dependency
     name: enterprise-rhel-8-64-bit-dynamic-embedded-router
     display_name: "* Shared Library Enterprise RHEL 8 (Embedded Router all feature flags)"
     tags: ["suggested"]
@@ -343,7 +349,7 @@ buildvariants:
     run_on:
       - rhel8.8-small
     stepback: false
-    expansions: &enterprise-rhel-8-64-bit-dynamic-embedded-router-expansions
+    expansions:
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       test_flags: >-
         --embeddedRouter=true
@@ -354,8 +360,7 @@ buildvariants:
 
   # This build variant is used to test feature parity between replica set and sharded cluster
   # connected via replica set endpoint.
-  - &enterprise-rhel-8-64-bit-dynamic-replica-set-endpoint-all-feature-flags
-    <<: *linux_x86_dynamic_compile_variant_dependency
+  - <<: *linux_x86_dynamic_compile_variant_dependency
     name: enterprise-rhel-8-64-bit-dynamic-replica-set-endpoint
     display_name: "* Shared Library Enterprise RHEL 8 (Replica Set Endpoint all feature flags)"
     tags: ["suggested"]
@@ -364,7 +369,6 @@ buildvariants:
       - rhel8.8-small
     stepback: false
     expansions:
-      &enterprise-rhel-8-64-bit-dynamic-replica-set-endpoint-expansions
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       test_flags: >-
         --runAllFeatureFlagTests
@@ -396,7 +400,7 @@ buildvariants:
   # currently only run on our daily builders.
   - &linux-x86-multiversion-template
     <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-8-64-bit-multiversion enterprise-rhel-8-64-bit-multiversion
+    name: enterprise-rhel-8-64-bit-multiversion
     display_name: "Enterprise RHEL 8 (implicit multiversion)"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -411,7 +415,7 @@ buildvariants:
       - name: .random_multiversion_ds
 
   - <<: *linux-x86-multiversion-template
-    name: &enterprise-rhel-8-64-bit-multiversion-all-feature-flags enterprise-rhel-8-64-bit-multiversion-all-feature-flags
+    name: enterprise-rhel-8-64-bit-multiversion-all-feature-flags
     display_name: "Enterprise RHEL 8 (implicit multiversion & all feature flags)"
     tags: []
     expansions:
@@ -423,9 +427,8 @@ buildvariants:
   # This variant exists because this is the only way to test future multiversion tags
   # version_expansions_gen will pretend we are upgrading to "bv_future_git_tag"
   # which is like simulating a branching task
-  - &enterprise-rhel-8-64-bit-future-git-tag-multiversion-template
-    <<: *linux-x86-multiversion-template
-    name: &enterprise-rhel-8-64-bit-future-git-tag-multiversion enterprise-rhel-8-64-bit-future-git-tag-multiversion
+  - <<: *linux-x86-multiversion-template
+    name: enterprise-rhel-8-64-bit-future-git-tag-multiversion
     display_name: "Enterprise RHEL 8 (future git tag multiversion)"
     tags: []
     expansions:
@@ -535,7 +538,7 @@ buildvariants:
   # This build variant injects old-format (pre-4.2) unique index keys for all new keys inserted into
   # a index. This should not change correctness or user-observable server behavior.
   - <<: *linux_x86_dynamic_compile_variant_dependency
-    name: &enterprise-rhel-8-64-bit-old-unique-index-format enterprise-rhel-8-64-bit-old-unique-index-format
+    name: enterprise-rhel-8-64-bit-old-unique-index-format
     display_name: "Enterprise RHEL 8 (old unique index format)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -627,7 +630,7 @@ buildvariants:
 
   ### Query Patch-Specific Build Variants ###
 
-  - name: &enterprise-rhel-8-64-bit-dynamic-query-quick-patch-only enterprise-rhel-8-64-bit-dynamic-query-quick-patch-only
+  - name: enterprise-rhel-8-64-bit-dynamic-query-quick-patch-only
     display_name: "~ Shared Library Enterprise RHEL 8 Query Quick Patch Only"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -680,7 +683,7 @@ buildvariants:
       - name: check_for_todos
 
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
-    name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-quick-patch-only enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-quick-patch-only
+    name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-quick-patch-only
     display_name: "~ Shared Library Enterprise RHEL 8 Query Quick Patch Only (all feature flags)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -713,7 +716,7 @@ buildvariants:
 
   ### Security Patch-Specific Build Variants ###
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
-    name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only
+    name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only
     display_name: "~ Shared Library Enterprise RHEL 8 Security Patch Only (all feature flags)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -737,7 +740,7 @@ buildvariants:
       - name: external_auth_oidc
       - name: lint_fuzzer_sanity_patch
 
-  - name: &tla-plus tla-plus
+  - name: tla-plus
     display_name: "TLA+"
     tags: []
     run_on:

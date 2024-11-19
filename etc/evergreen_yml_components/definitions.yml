@@ -120,7 +120,7 @@ functions:
     - *restore_git_history_and_tags
     - *add_git_tag
 
-  "gen feature flags": &gen_feature_flags
+  "gen feature flags":
     command: subprocess.exec
     display_name: "gen feature flags"
     type: test
@@ -223,7 +223,7 @@ functions:
       args:
         - "src/evergreen/functions/venv_adjust.sh"
 
-  "fetch packages": &fetch_packages
+  "fetch packages":
     command: s3.get
     display_name: "fetch packages"
     params:
@@ -360,7 +360,7 @@ functions:
       bucket: mciuploads
       local_file: src/mongo_benchmarks.tgz
 
-  "fetch corpus": &fetch_corpus
+  "fetch corpus":
     command: s3.get
     display_name: "fetch corpus"
     params:
@@ -417,7 +417,7 @@ functions:
       key: "${build_variant}_${project}"
       destination: "builder_num"
 
-  "get mongot version": &get_mongot_version
+  "get mongot version":
     - *f_expansions_write
     - command: subprocess.exec
       display_name: "get mongot version"
@@ -510,7 +510,7 @@ functions:
     - *f_expansions_write
     - *set_up_remote_credentials
 
-  "upload debugsymbols": &upload_debugsymbols
+  "upload debugsymbols":
     command: s3.put
     display_name: "upload debugsymbols"
     params:
@@ -530,7 +530,7 @@ functions:
       args:
         - "./src/evergreen/functions/wiredtiger_develop_use.sh"
 
-  "umount shared scons directory": &umount_shared_scons_directory
+  "umount shared scons directory":
     command: subprocess.exec
     display_name: "shared scons directory umount"
     params:
@@ -638,7 +638,7 @@ functions:
   # This needs to be run after "set up venv"
   # This depends on having a venv already setup
   # This just installs the extra deps needed for libdeps
-  "set up libdeps venv": &set_up_libdeps_venv
+  "set up libdeps venv":
     command: subprocess.exec
     display_name: "set up libdeps venv"
     params:
@@ -659,7 +659,7 @@ functions:
       content_type: text/plain
       display_name: Pip Requirements
 
-  "run clang tidy": &run_clang_tidy
+  "run clang tidy":
     - *f_expansions_write
     - command: subprocess.exec
       type: test
@@ -672,7 +672,7 @@ functions:
           - "--split-jobs=4"
           - "--split=${split}"
 
-  "upload clang tidy results": &upload_clang_tidy_results
+  "upload clang tidy results":
     - command: s3.put
       display_name: "upload clang_tidy_fixes.tgz"
       params:
@@ -1085,7 +1085,7 @@ functions:
     - *upload_burn_in_generate_tasks_config
     - *generate_resmoke_tasks_config
 
-  "initialize multiversion tasks": &initialize_multiversion_tasks
+  "initialize multiversion tasks":
     - *f_expansions_write
     - command: subprocess.exec
       params:
@@ -1510,7 +1510,7 @@ functions:
     - *archive_resmoke_constants
     - *upload_remoske_constants
 
-  "fetch resmoke constants": &fetch_resmoke_constants
+  "fetch resmoke constants":
     command: s3.get
     display_name: "fetch resmoke constants"
     params:
@@ -1946,7 +1946,7 @@ functions:
           - "release"
           - "--evg-project=${project}"
 
-  "set up EC2 instance": &set_up_ec2_instance
+  "set up EC2 instance":
     - command: host.create
       params:
         provider: ec2
@@ -2469,7 +2469,7 @@ functions:
     - *tar_system_resource_information
     - *archive_system_resource_information
 
-  "save bazel headers": &save_bazel_headers
+  "save bazel headers":
     command: s3.put
     display_name: "attach generated bazel header list"
     params:

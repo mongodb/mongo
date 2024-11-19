@@ -159,7 +159,7 @@ buildvariants:
 
   ### Security Patch-Specific Build Variants ###
   - <<: *windows_compile_variant_dependency
-    name: &windows-compile-security-patch-only windows-compile-security-patch-only
+    name: windows-compile-security-patch-only
     display_name: "~ Windows Server 2022 Security Patch Only"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
