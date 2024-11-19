@@ -83,3 +83,16 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "test_utils",
+    srcs = [
+        "test_utils.cpp",
+    ],
+    hdrs = [
+        "test_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db:sbe_values",
+    ],
+)
