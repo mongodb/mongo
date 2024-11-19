@@ -133,12 +133,11 @@ void lookupPipeValidator(const Pipeline& pipeline) {
 // Parses $lookup 'from' field. The 'from' field must be a string or one of the following
 // exceptions:
 // {from: {db: "config", coll: "cache.chunks.*"}, ...} or
-// {from: {db: "local", coll: "oplog.rs"}, ...} or
-// {from: {db: "local", coll: "tenantMigration.oplogView"}, ...} .
+// {from: {db: "local", coll: "oplog.rs"}, ...}
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb) {
-    // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs', and
-    // 'local.tenantMigration.oplogViewwhich' which are not user namespaces so object type is
+    // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs'
+    //  which are not user namespaces so object type is
     // omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$lookup 'from' field must be a string, but found "
@@ -170,7 +169,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
                       << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
         nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
-            nss == NamespaceString::kTenantMigrationOplogView || isConfigSvrSupportedCollection);
+            isConfigSvrSupportedCollection);
     return nss;
 }
 

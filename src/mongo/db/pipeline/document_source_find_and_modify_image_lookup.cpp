@@ -294,9 +294,7 @@ Document DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage(D
     }
 
     if (inputOplogEntry.isCrudOpType() && inputOplogEntry.getNeedsRetryImage()) {
-        // Strip the needsRetryImage field if set, even if we don't forge a noop image oplog entry
-        // to ensure we don't erroneously generate config.image_collection entries on the recipient
-        // for tenant migrations.
+        // Strip the needsRetryImage field if set.
         MutableDocument downConvertedDoc{inputDoc};
         downConvertedDoc.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
 
@@ -341,9 +339,7 @@ Document DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage(D
                 forgeNoopImageOplogEntry(pExpCtx, inputOplogEntry, op);
 
             // Downcovert the document for this applyOps oplog entry by downcoverting this
-            // operation. We strip the needsRetryImage field, even if we don't forge a noop image
-            // oplog entry to ensure we don't erroneously generate config.image_collection entries
-            // on the recipient for tenant migrations.
+            // operation.
             op.setNeedsRetryImage(boost::none);
             if (forgedNoopOplogEntry) {
                 if (imageType == repl::RetryImageEnum::kPreImage) {

@@ -82,49 +82,19 @@ namespace mongo {
 
 namespace {
 
-// Parses $graphLookup 'from' field. The 'from' field must be a string with the exception of
-// 'local.system.tenantMigration.oplogView'.
-//
-// {from: {db: "local", coll: "system.tenantMigration.oplogView"}, ...}.
+// Parses $graphLookup 'from' field. The 'from' field must be a string.
 NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
                                                         const DatabaseName& defaultDb) {
-    // The object syntax only works for 'local.system.tenantMigration.oplogView' which is not a user
-    // namespace so object type is omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$graphLookup 'from' field must be a string, but found "
                           << typeName(elem.type()),
-            elem.type() == String || elem.type() == Object);
+            elem.type() == String);
 
-    if (elem.type() == BSONType::String) {
-        NamespaceString fromNss(
-            NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData()));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "invalid $graphLookup namespace: "
-                              << fromNss.toStringForErrorMsg(),
-                fromNss.isValid());
-        return fromNss;
-    }
-
-    // Valdate the db and coll names.
-    const auto tenantId = defaultDb.tenantId();
-    const auto vts = tenantId
-        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
-              *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
-        : boost::none;
-    auto spec = NamespaceSpec::parse(
-        IDLParserContext{
-            elem.fieldNameStringData(), vts, tenantId, SerializationContext::stateDefault()},
-        elem.embeddedObject());
-
-    auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
-                                                spec.getColl().value_or(""));
-
-    uassert(ErrorCodes::FailedToParse,
-            str::stream()
-                << "$graphLookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
-                << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
-            nss == NamespaceString::kTenantMigrationOplogView);
-    return nss;
+    NamespaceString fromNss(NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData()));
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "invalid $graphLookup namespace: " << fromNss.toStringForErrorMsg(),
+            fromNss.isValid());
+    return fromNss;
 }
 
 }  // namespace
@@ -855,14 +825,11 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
 
         if (argName == "from" || argName == "as" || argName == "connectFromField" ||
             argName == "depthField" || argName == "connectToField") {
-            // All remaining arguments to $graphLookup are expected to be strings or
-            // {db: "local", coll: "system.tenantMigration.oplogView"}.
-            // 'local.system.tenantMigration.oplogView' is not a user namespace so object
-            // type is omitted from the error message below.
+            // All remaining arguments to $graphLookup are expected to be strings.
             uassert(40103,
                     str::stream() << "expected string as argument for " << argName
                                   << ", found: " << typeName(argument.type()),
-                    argument.type() == String || argument.type() == Object);
+                    argument.type() == String);
         }
 
         if (argName == "from") {
