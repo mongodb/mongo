@@ -2,12 +2,12 @@
 BUILD files in the "src/" subtree.
 """
 
+load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
+load("@com_github_grpc_grpc//bazel:protobuf.bzl", "well_known_proto_libs")
 load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
-load("@com_github_grpc_grpc//bazel:protobuf.bzl", "well_known_proto_libs")
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load(
     "//bazel:header_deps.bzl",
     "HEADER_DEP_SUFFIX",
@@ -614,6 +614,9 @@ GCC_OR_CLANG_GENERAL_COPTS = select({
 
         # Disable TBAA optimization
         "-fno-strict-aliasing",
+
+        # Show colors even though bazel captures stdout/stderr
+        "-fdiagnostics-color",
     ],
     "//conditions:default": [],
 })
