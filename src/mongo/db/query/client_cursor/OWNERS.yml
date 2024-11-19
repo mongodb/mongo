@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-client-cursor
   - "exhaust_cursor_currentop_integration_test.cpp":
     approvers:
       - 10gen/query-integration-staff-leads

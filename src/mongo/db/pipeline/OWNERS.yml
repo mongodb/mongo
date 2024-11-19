@@ -17,13 +17,13 @@ filters:
       - 10gen/query-optimization
   - "accumulator*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "aggregation_request*":
     approvers:
       - 10gen/query-optimization
   - "*change_stream*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-change-streams
   - "dependencies*":
     approvers:
       - 10gen/query-optimization
@@ -44,7 +44,7 @@ filters:
       - 10gen/query-integration-search
   - "document_source_index_stats*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-index-access-stats
   - "document_source_internal_unpack_bucket*":
     approvers:
       - 10gen/query-integration-timeseries
@@ -71,7 +71,7 @@ filters:
       - 10gen/query-integration-analytic-extensions
   - "granularity_rounder*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "javascript_execution*":
     approvers:
       - 10gen/query-integration-javascript
@@ -80,13 +80,13 @@ filters:
       - 10gen/query-integration-javascript
   - "group_processor*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "lite_parsed*":
     approvers:
       - 10gen/query-optimization
   - "merge_processor*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   # Percentile calculations fall under the umbrella of "analytical extensions" which are owned by
   # QI.
   - "percentile_algo*":
@@ -94,28 +94,28 @@ filters:
       - 10gen/query-integration-analytic-extensions
   - "plan_executor_pipeline*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "resume_token*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-change-streams
   - "semantic_analysis*":
     approvers:
       - 10gen/query-optimization
   - "sequential_document_cache*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "single_document_transformation_processor*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "tee_buffer*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "unwind_processor*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "value.idl":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-aggregation
   - "document_source_coll_stats*":
     approvers:
       - 10gen/server-catalog-and-routing

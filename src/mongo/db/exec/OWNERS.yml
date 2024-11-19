@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-classic-engine
   - "*timeseries*":
     approvers:
       - 10gen/query-integration-timeseries

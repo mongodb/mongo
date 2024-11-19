@@ -10,13 +10,13 @@ filters:
       - 10gen/query-optimization
   - "change_stream_state_command.cpp":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-change-streams
   - "current_op*":
     approvers:
       - 10gen/query-integration-observability
   - "index_filter_commands.*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-execution-query-settings
   - "explain.idl":
     approvers:
       - 10gen/query-optimization
@@ -28,7 +28,7 @@ filters:
       - 10gen/query-optimization
   - "query_settings_cmds.*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-query-settings
   - "search_index_commands.*":
     approvers:
       - 10gen/query-integration-search

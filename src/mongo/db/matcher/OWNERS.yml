@@ -7,7 +7,7 @@ filters:
       - 10gen/query
   - "doc_validation*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-doc-validation
   - "expression_parser*":
     approvers:
       - 10gen/query-optimization

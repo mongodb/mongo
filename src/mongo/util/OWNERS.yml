@@ -23,19 +23,21 @@ filters:
       - 10gen/server-security
   - "field_set*":
     approvers:
-      - 10gen/query-execution
+      # Note that this is currently owned by the SBE team because it is only used in the SBE stage
+      # builders.
+      - 10gen/query-execution-sbe
   - "generate_icu_init_cpp.py":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-collation
   - "icu*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-collation
   - "pcre*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-regex
   - "regex_util*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-regex
   - "log_with_sampling*":
     approvers:
       - 10gen/query-integration-observability

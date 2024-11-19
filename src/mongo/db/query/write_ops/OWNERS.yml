@@ -7,7 +7,7 @@ filters:
       - 10gen/query-optimization
   - "write_ops_exec*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-write-exec
 
   # These files contain high-level APIs for running write operations which are not currently owned
   # by a particular query subteam.

@@ -8,28 +8,31 @@ filters:
       - 10gen/query
   - "collection_index_usage_tracker*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-index-access-stats
   - "collection_query_info*":
     approvers:
-      - 10gen/query-execution
+      # TODO SERVER-96045: This is currently owned by query because the plan cache part is a query
+      # optimization component, while the update and stats tracking components are owned by query
+      # execution. As such, this can be split between the two teams once these files are split up.
+      - 10gen/query
   - "*query_settings*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-query-settings
   - "mock_yield_policies.h":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-yielding
   - "*yield_policy*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-yielding
   - "*plan_executor*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-classic-engine
   - "plan_insert_listener*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-classic-engine
   - "sbe*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-sbe
   - "*geo*":
     approvers:
       - 10gen/query-integration-geo
