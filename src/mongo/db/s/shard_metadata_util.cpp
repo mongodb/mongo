@@ -486,7 +486,7 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
         return ex.toStatus();
     }
 
-    LOGV2(5966302, "Dropped persisted chunk metadata and collection entry", logAttrs(nss));
+    LOGV2_DEBUG(5966302, 1, "Dropped persisted chunk metadata and collection entry", logAttrs(nss));
 
     return Status::OK();
 }

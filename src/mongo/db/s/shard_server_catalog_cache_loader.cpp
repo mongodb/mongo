@@ -185,7 +185,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         return status;
     }
 
-    LOGV2(3463204, "Persisted collection entry and chunk metadata", logAttrs(nss));
+    LOGV2_DEBUG(3463204, 1, "Persisted collection entry and chunk metadata", logAttrs(nss));
 
     return Status::OK();
 }
