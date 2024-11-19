@@ -115,21 +115,23 @@ class test_import08(test_import_base):
         # allocated earlier.
         session2.rollback_transaction()
 
-        # Close the connection.
-        self.close_conn()
-
-        # Create a new database and connect to it.
+        # Create a new database.
         newdir = 'IMPORT_DB'
         shutil.rmtree(newdir, ignore_errors=True)
         os.mkdir(newdir)
+
+        # Copy over the datafiles for the object we want to import.
+        self.copy_file(self.original_db_file, '.', newdir)
+
+        # Close the connection.
+        self.close_conn()
+
+        # Connect to the new database.
         self.conn = self.setUpConnectionOpen(newdir)
         self.session = self.setUpSessionOpen(self.conn)
 
         # Bring forward the oldest to be past or equal to the timestamps we'll be importing.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.ts[-1]))
-
-        # Copy over the datafiles for the object we want to import.
-        self.copy_file(self.original_db_file, '.', newdir)
 
         # Construct the config string.
         if self.repair:

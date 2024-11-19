@@ -291,7 +291,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             dirty = __wt_page_is_modified(page);
             WT_ACQUIRE_BARRIER();
 
-            /* Skip clean pages, but always update the maximum transaction ID. */
+            /* Skip clean pages, but always update the maximum transaction ID and timestamp. */
             if (!dirty) {
                 mod = page->modify;
                 if (mod != NULL && mod->rec_max_txn > btree->rec_max_txn)

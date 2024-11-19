@@ -1808,7 +1808,15 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             }
             break;
         case WT_TXN_OP_REF_DELETE:
+            /*
+             * For non-standalone builds, skip truncate commit timestamp validation, as MongoDB
+             * doesn't use timestamps with truncate operations.
+             */
+#ifdef WT_STANDALONE_BUILD
             WT_ERR(__wt_txn_op_set_timestamp(session, op, true));
+#else
+            WT_ERR(__wt_txn_op_set_timestamp(session, op, false));
+#endif
             break;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:

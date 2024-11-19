@@ -48,6 +48,9 @@ class test_truncate28(wttest.WiredTigerTestCase):
         if wiredtiger.diagnostic_build():
             self.skipTest('requires a non-diagnostic build')
 
+        if not wiredtiger.standalone_build():
+            self.skipTest('requires a standalone build')
+
         nrows = 10000
         uri = 'table:test_truncate27'
         self.session.create(uri, 'key_format=i,value_format=S')

@@ -1393,6 +1393,7 @@ static const char *const __stats_connection_desc[] = {
   "backup: backup cursor open",
   "backup: backup duplicate cursor open",
   "backup: backup granularity size",
+  "backup: backup total bits cleared",
   "backup: incremental backup enabled",
   "backup: opening the backup cursor in progress",
   "backup: total modified incremental blocks",
@@ -2174,6 +2175,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing backup_cursor_open */
     /* not clearing backup_dup_open */
     stats->backup_granularity = 0;
+    stats->backup_bits_clr = 0;
     /* not clearing backup_incremental */
     /* not clearing backup_start */
     stats->backup_blocks = 0;
@@ -2906,6 +2908,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->backup_cursor_open += WT_STAT_CONN_READ(from, backup_cursor_open);
     to->backup_dup_open += WT_STAT_CONN_READ(from, backup_dup_open);
     to->backup_granularity += WT_STAT_CONN_READ(from, backup_granularity);
+    to->backup_bits_clr += WT_STAT_CONN_READ(from, backup_bits_clr);
     to->backup_incremental += WT_STAT_CONN_READ(from, backup_incremental);
     to->backup_start += WT_STAT_CONN_READ(from, backup_start);
     to->backup_blocks += WT_STAT_CONN_READ(from, backup_blocks);

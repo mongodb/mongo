@@ -158,8 +158,11 @@ class test_backup29(backup_base):
         c1.close()
         c2.close()
 
-        self.compare_bitmap(self.orig1_bitmap, new1_bitmap)
-        self.compare_bitmap(self.orig2_bitmap, new2_bitmap)
+        # We now clear parts of the bitmaps from discarded blocks in checkpoint. So
+        # comparing the bitmaps is no longer valid. Retain the function for now. Once
+        # this is hardened these lines and the function can be removed.
+        #self.compare_bitmap(self.orig1_bitmap, new1_bitmap)
+        #self.compare_bitmap(self.orig2_bitmap, new2_bitmap)
 
     def test_backup29_reopen(self):
         self.setup_test()

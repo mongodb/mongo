@@ -43,21 +43,6 @@ class test_compact11(backup_base, compact_util):
     num_tables = 5
     table_numkv = 100 * 1000
 
-    def compare_bitmap(self, orig, new):
-        # Compare the bitmaps from the metadata. Once a bit is set, it should never
-        # be cleared. But new bits could be set. So the check is only: if the original
-        # bitmap has a bit set then the current bitmap must be set for that bit also.
-        #
-        # First convert both bitmaps to a binary string, accounting for any possible leading
-        # zeroes (that would be truncated off). Then compare bit by bit.
-        orig_bits = bin(int('1'+orig, 16))[3:]
-        new_bits = bin(int('1'+new, 16))[3:]
-        self.pr("Original bitmap in binary: " + orig_bits)
-        self.pr("Reopened bitmap in binary: " + new_bits)
-        for o_bit, n_bit in zip(orig_bits, new_bits):
-            if o_bit != '0':
-               self.assertTrue(n_bit != '0')
-
     def parse_blkmods(self, uri):
         meta_cursor = self.session.open_cursor('metadata:')
         config = meta_cursor[uri]
@@ -131,11 +116,6 @@ class test_compact11(backup_base, compact_util):
                 self.bkup_id += 1
                 shutil.copytree(self.home_tmp, self.backup_incr + str(self.bkup_id))
                 self.take_incr_backup(self.backup_incr + str(self.bkup_id), 0, self.bkup_id)
-
-                self.pr('Comparing the original bitmaps with the new ones...')
-                for index, uri in enumerate(files):
-                    new_bitmap = self.parse_blkmods(uri)
-                    self.compare_bitmap(bitmaps[index], new_bitmap)
 
                 bytes_recovered = new_bytes_recovered
 

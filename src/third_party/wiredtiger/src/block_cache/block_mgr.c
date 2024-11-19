@@ -890,6 +890,16 @@ __bm_write_size_readonly(WT_BM *bm, WT_SESSION_IMPL *session, size_t *sizep)
 }
 
 /*
+ * __bm_can_truncate --
+ *     Check if a file has available space at the end of the file.
+ */
+static bool
+__bm_can_truncate(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+    return (__wt_block_extlist_can_truncate(session, bm->block, &bm->block->live.avail));
+}
+
+/*
  * __wti_bm_method_set --
  *     Set up the legal methods.
  */
@@ -899,6 +909,7 @@ __wti_bm_method_set(WT_BM *bm, bool readonly)
     bm->addr_invalid = __bm_addr_invalid;
     bm->addr_string = __bm_addr_string;
     bm->block_header = __bm_block_header;
+    bm->can_truncate = __bm_can_truncate;
     bm->checkpoint = __bm_checkpoint;
     bm->checkpoint_last = __bm_checkpoint_last;
     bm->checkpoint_load = __bm_checkpoint_load;

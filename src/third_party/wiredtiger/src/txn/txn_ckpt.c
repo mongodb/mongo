@@ -1944,6 +1944,7 @@ static int
 __checkpoint_lock_dirty_tree(
   WT_SESSION_IMPL *session, bool is_checkpoint, bool force, bool need_tracking, const char *cfg[])
 {
+    WT_BM *bm;
     WT_BTREE *btree;
     WT_CKPT *ckpt, *ckptbase;
     WT_CONFIG dropconf;
@@ -1959,6 +1960,7 @@ __checkpoint_lock_dirty_tree(
     bool is_drop, is_wt_ckpt, seen_ckpt_add, skip_ckpt;
 
     btree = S2BT(session);
+    bm = btree->bm;
     ckpt = ckptbase = NULL;
     ckpt_bytes_allocated = 0;
     dhandle = session->dhandle;
@@ -2012,7 +2014,8 @@ __checkpoint_lock_dirty_tree(
      * we want to periodically check if we need to delete old checkpoints that may have been in use
      * by an open cursor.
      */
-    if (!btree->modified && !force && is_checkpoint && is_wt_ckpt && !is_drop) {
+    if (!btree->modified && !force && is_checkpoint && is_wt_ckpt && !is_drop &&
+      !bm->can_truncate(btree->bm, session)) {
         /* In the common case of the timer set forever, don't even check the time. */
         skip_ckpt = true;
         if (btree->clean_ckpt_timer != WT_BTREE_CLEAN_CKPT_FOREVER) {
@@ -2175,6 +2178,7 @@ static int
 __checkpoint_mark_skip(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, bool force)
 {
     WT_BTREE *btree = S2BT(session);
+    WT_BM *bm = btree->bm;
 
     /*
      * Check for clean objects not requiring a checkpoint.
@@ -2186,18 +2190,18 @@ __checkpoint_mark_skip(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, bool force)
      *
      * If the application repeatedly checkpoints an object (imagine hourly checkpoints using the
      * same explicit or internal name), there's no reason to repeat the checkpoint for clean
-     * objects. The test is if the only checkpoint we're deleting is the last one in the list and it
-     * has the same name as the checkpoint we're about to take, skip the work. (We can't skip
-     * checkpoints that delete more than the last checkpoint because deleting those checkpoints
-     * might free up space in the file.) This means an application toggling between two (or more)
-     * checkpoint names will repeatedly take empty checkpoints, but that's not likely enough to make
-     * detection worthwhile.
+     * objects, unless there is available space to be recovered at the end of the file. The test is
+     * if the only checkpoint we're deleting is the last one in the list and it has the same name as
+     * the checkpoint we're about to take, skip the work. (We can't skip checkpoints that delete
+     * more than the last checkpoint because deleting those checkpoints might free up space in the
+     * file.) This means an application toggling between two (or more) checkpoint names will
+     * repeatedly take empty checkpoints, but that's not likely enough to make detection worthwhile.
      *
      * Checkpoint read-only objects otherwise: the application must be able to open the checkpoint
      * in a cursor after taking any checkpoint, which means it must exist.
      */
     F_CLR(btree, WT_BTREE_SKIP_CKPT);
-    if (!btree->modified && !force) {
+    if (!btree->modified && !force && !bm->can_truncate(bm, session)) {
         WT_CKPT *ckpt = NULL;
         int deleted = 0;
 
@@ -2270,6 +2274,15 @@ __wt_checkpoint_tree_reconcile_update(WT_SESSION_IMPL *session, WT_TIME_AGGREGAT
             ckpt->run_write_gen = btree->run_write_gen;
             WT_TIME_AGGREGATE_COPY(&ckpt->ta, ta);
         }
+
+    /*
+     * During RTS, recovery, or shutdown reset the maximum timestamp used for reconciliation to a
+     * value that is the same as the maximum between the start and stop durable timestamps. In those
+     * specific scenarios, we should always reflect the state of the stable content.
+     */
+    if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE) ||
+      F_ISSET(S2C(session), WT_CONN_CLOSING_CHECKPOINT | WT_CONN_RECOVERING))
+        btree->rec_max_timestamp = WT_MAX(ta->newest_start_durable_ts, ta->newest_stop_durable_ts);
 }
 
 /*

@@ -61,10 +61,11 @@ maintains two checkpoints, the location of the most recent checkpoint is written
 
 # Skipping checkpoints #
 
-It is possible that a checkpoint will be skipped. If no modifications to the database have been
-made since the last checkpoint, and the last checkpoint timestamp is equal to the current stable
-timestamp then a checkpoint will not be taken. This logic can be overridden by forcing a checkpoint
-via configuration.
+It is possible that a checkpoint will be skipped. A checkpoint will be skipped when:
+ - No modifications to the database have been made since the last checkpoint.
+ - The last checkpoint timestamp is equal to the current stable timestamp.
+ - There is no available space at the end of the file.
+This logic can be overridden by forcing a checkpoint via configuration.
 
 # Checkpoint generations #
 
