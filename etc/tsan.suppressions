@@ -48,10 +48,6 @@ deadlock:mongo::executor::EgressConnectionCloserManager::add
 deadlock:mongo::executor::EgressConnectionCloserManager::setKeepOpen
 deadlock:mongo::ShardRegistry::_initConfigShard
 
-# TODO SERVER-71207
-deadlock:mongo::repl::TenantOplogBatcher::_doStartup_inlock
-deadlock:mongo::repl::TenantMigrationRecipientService::Instance::_interrupt
-
 # TODO SERVER-91827
 deadlock:mongo::executor::EgressConnectionCloserManager::remove
 deadlock:mongo::repl::ReplicationCoordinatorExternalStateImpl::tooStale

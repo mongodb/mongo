@@ -329,7 +329,6 @@ DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "replication": {"rollback": 2},
     "sharding": {"migration": 2, "rangeDeleter": 2},
     "transaction": 4,
-    "tenantMigration": 4,
 }
 
 # The default verbosity setting for any mongod processes running in Evergreen i.e. started with an
@@ -339,7 +338,6 @@ DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "sharding": {"migration": 2, "rangeDeleter": 2},
     "storage": {"recovery": 2},
     "transaction": 4,
-    "tenantMigration": 4,
 }
 
 

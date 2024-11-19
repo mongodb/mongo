@@ -37,9 +37,3 @@
   value:
     exclude_with_any_tags:
       - does_not_support_encrypted_storage_engine
-
-# Shard merge protocol won't work with encrypted storage engines.
-- name: serverless_excluded_files
-  value:
-    exclude_with_any_tags:
-      - serverless

@@ -28,7 +28,6 @@ selector:
   exclude_files: []
   exclude_with_any_tags:
     - does_not_support_encrypted_storage_engine
-    - serverless
     - requires_capped
   roots:
     - jstests/replsets/*.js

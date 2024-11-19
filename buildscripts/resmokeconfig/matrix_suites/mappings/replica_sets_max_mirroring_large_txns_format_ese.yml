@@ -10,6 +10,5 @@ overrides:
   - "archive.tests"
 excludes:
   - "encryption.excluded_files"
-  - "encryption.serverless_excluded_files"
   - "large_txns_format.excluded_files"
   - "large_txns_format.replica_sets_excluded_files"
