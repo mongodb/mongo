@@ -1006,14 +1006,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
             serverGlobalParams.validateFeaturesAsPrimary.store(false);
         }
 
-        if (replSettings.isReplSet()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Create an oplog view for tenant migrations",
-                                                      &startupTimeElapsedBuilder);
-            Lock::GlobalWrite lk(startupOpCtx.get());
-            OldClientContext ctx(startupOpCtx.get(), NamespaceString::kRsOplogNamespace);
-        }
-
         storageEngine->startTimestampMonitor();
 
         startFLECrud(serviceContext);

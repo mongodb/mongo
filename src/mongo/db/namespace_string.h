@@ -725,18 +725,6 @@ public:
     }
 
     /**
-     * Checks if a given tenant prefixes or matches the tenantId from this NamespaceString.
-     * TODO SERVER-63517 Since we are removing tenant migration code we might be able to remove this
-     * method from the codebase.
-     */
-    bool isNamespaceForTenant(StringData tenant) const {
-        if (auto tid = tenantId()) {
-            return tid->toString() == tenant;
-        }
-        return db_deprecated().startsWith(tenant + "_");
-    }
-
-    /**
      * Use to compare the TenantId and `db` part of a NamespaceString.
      */
     bool isEqualDb(const NamespaceString& other) const {

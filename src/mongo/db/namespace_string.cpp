@@ -156,16 +156,12 @@ bool NamespaceString::isLegalClientSystemNS() const {
  * Oplog entries on 'config.shards' should be processed one at a time, otherwise the in-memory state
  * that its kept on the TopologyTimeTicker might be wrong.
  *
- * Serialize updates to 'config.tenantMigrationDonors' to avoid races
- * with creating tenant access blockers on secondaries.
  */
 bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
     auto ns = this->ns();
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
         ns == kDonorReshardingOperationsNamespace.ns() ||
-        ns == kForceOplogBatchBoundaryNamespace.ns() ||
-        ns == kTenantMigrationDonorsNamespace.ns() ||
-        ns == kTenantMigrationRecipientsNamespace.ns() || ns == kConfigsvrShardsNamespace.ns();
+        ns == kForceOplogBatchBoundaryNamespace.ns() || ns == kConfigsvrShardsNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeBulkWriteNSS(const boost::optional<TenantId>& tenantId) {

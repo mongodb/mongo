@@ -84,17 +84,6 @@ NSS_CONSTANT(kMigrationCoordinatorsNamespace, DatabaseName::kConfig, "migrationC
 // Namespace for storing the persisted state of migration recipients.
 NSS_CONSTANT(kMigrationRecipientsNamespace, DatabaseName::kConfig, "migrationRecipients"_sd)
 
-// Namespace for storing the persisted state of tenant migration donors.
-NSS_CONSTANT(kTenantMigrationDonorsNamespace, DatabaseName::kConfig, "tenantMigrationDonors"_sd)
-
-// Namespace for storing the persisted state of tenant migration recipient service instances.
-NSS_CONSTANT(kTenantMigrationRecipientsNamespace,
-             DatabaseName::kConfig,
-             "tenantMigrationRecipients"_sd)
-
-// Namespace for view on local.oplog.rs for tenant migrations.
-NSS_CONSTANT(kTenantMigrationOplogView, DatabaseName::kLocal, "system.tenantMigration.oplogView"_sd)
-
 // Namespace for replica set configuration settings.
 NSS_CONSTANT(kSystemReplSetNamespace, DatabaseName::kLocal, "system.replset"_sd)
 

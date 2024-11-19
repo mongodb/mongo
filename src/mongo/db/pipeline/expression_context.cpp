@@ -292,8 +292,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::viewNS(
 
 ExpressionContextBuilder& ExpressionContextBuilder::withReplicationResolvedNamespaces() {
     StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kTenantMigrationOplogView.coll()] = {
-        NamespaceString::kTenantMigrationOplogView, std::vector<BSONObj>()};
 
     resolvedNamespaces[NamespaceString::kSessionTransactionsTableNamespace.coll()] = {
         NamespaceString::kSessionTransactionsTableNamespace, std::vector<BSONObj>()};

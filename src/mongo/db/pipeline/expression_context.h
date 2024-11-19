@@ -1129,7 +1129,7 @@ public:
     ExpressionContextBuilder& viewNS(boost::optional<NamespaceString>);
 
     /**
-     * Add kTenantMigrationOplogView, kSessionTransactionsTableNamespace, and kRsOplogNamespace
+     * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace
      * to resolvedNamespaces since they are all used during different pipeline stages
      */
     ExpressionContextBuilder& withReplicationResolvedNamespaces();
