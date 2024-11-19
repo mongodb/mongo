@@ -41,10 +41,12 @@ namespace service_context_test {
  * "Literal" and "structural" type to stand-in for a `ClusterRole` value.
  * Necessary until `ClusterRole` can be used as a NTTP.
  */
-enum class ServerRoleIndex { shard, router };
+enum class ServerRoleIndex { replicaSet, shard, router };
 
 inline ClusterRole getClusterRole(ServerRoleIndex i) {
     switch (i) {
+        case ServerRoleIndex::replicaSet:
+            return ClusterRole::None;
         case ServerRoleIndex::shard:
             return {ClusterRole::ShardServer, ClusterRole::RouterServer};
         case ServerRoleIndex::router:
@@ -69,6 +71,7 @@ private:
     ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, getClusterRole(roleIndex))};
 };
 
+using ReplicaSetRoleOverride = RoleOverride<ServerRoleIndex::replicaSet>;
 using ShardRoleOverride = RoleOverride<ServerRoleIndex::shard>;
 using RouterRoleOverride = RoleOverride<ServerRoleIndex::router>;
 

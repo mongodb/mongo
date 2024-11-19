@@ -153,3 +153,19 @@ env.Benchmark(
         "message_compressor",
     ],
 )
+
+env.Library(
+    target="service_entry_point_test_fixture",
+    source=[
+        "service_entry_point_test_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/read_write_concern_defaults_mock",
+        "$BUILD_DIR/mongo/db/repl/hello_command",
+        "$BUILD_DIR/mongo/db/repl/replmocks",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+        "$BUILD_DIR/mongo/transport/transport_layer_mock",
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+    ],
+)

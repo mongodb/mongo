@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#pragma once
 
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
@@ -39,6 +40,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -53,6 +55,7 @@ public:
                                                       std::make_unique<TickSourceMock<>>()),
                                  shouldSetupTL),
                              std::make_shared<transport::MockSession>(nullptr)) {}
+
     void setUp() override;
 
     ServiceContext::UniqueOperationContext makeOperationContext() {
@@ -61,9 +64,9 @@ public:
 
     BSONObj dbResponseToBSON(DbResponse& dbResponse);
 
-    void assertErrorResponseIsExpected(BSONObj response,
-                                       Status expectedStatus,
-                                       OperationContext* opCtx);
+    virtual void assertResponseStatus(BSONObj response,
+                                      Status expectedStatus,
+                                      OperationContext* opCtx);
 
     Message constructMessage(BSONObj cmdBSON,
                              OperationContext* opCtx,
@@ -76,19 +79,53 @@ public:
                                           OperationContext* opCtx = nullptr,
                                           Status expectedStatus = Status::OK());
 
-    void assertResponseForClusterAndOperationTime(BSONObj response);
-
-    void assertCapturedTextLogsContainSubstr(std::string substr);
-
-    // Check `attr` from the log that matches with `msg`.
-    void assertAttrFromCapturedBSON(std::string msg, BSONObj check);
+    virtual void assertResponseForClusterAndOperationTime(BSONObj response);
 
     ServiceEntryPoint* getServiceEntryPoint() {
         return getClient()->getService()->getServiceEntryPoint();
     }
 
+    void testCommandSucceeds();
+    void testCommandFailsRunInvocationWithResponse();
+    void testCommandFailsRunInvocationWithException(std::string log);
+    void testHandleRequestException(int errorId);
+    void testParseCommandFailsDbQueryUnsupportedCommand(std::string log);
+    void testCommandNotFound(bool logsCommandNotFound);
+    void testHelloCmdSetsClientMetadata();
+    void testCommentField();
+    void testHelpField();
+    void testCommandGlobalCounters();
+    void testCommandMaxTimeMS();
+    void testOpCtxInterrupt(bool deferHandling);
+    void testReadConcernClientUnspecifiedNoDefault();
+    void testReadConcernClientUnspecifiedWithDefault(bool expectClusterDefault);
+    void testReadConcernClientSuppliedLevelNotAllowed(bool exceptionLogged);
+    void testReadConcernClientSuppliedAllowed();
+    void testReadConcernExtractedOnException();
+    void testCommandInvocationHooks();
+    void testExhaustCommandNextInvocationSet();
+    void testWriteConcernClientSpecified();
+    void testWriteConcernClientUnspecifiedNoDefault();
+    void testWriteConcernClientUnspecifiedWithDefault(bool expectClusterDefault);
+
+protected:
+    void runWriteConcernTestExpectImplicitDefault(OperationContext* opCtx);
+    void runWriteConcernTestExpectClusterDefault(OperationContext* opCtx);
+    WriteConcernOptions makeWriteConcernOptions(BSONObj wc);
+    void setDefaultReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rc);
+    void setDefaultWriteConcern(OperationContext* opCtx, WriteConcernOptions wc);
+    void setDefaultWriteConcern(OperationContext* opCtx, BSONObj obj);
+
 private:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{logv2::LogComponent::kNetwork,
+                                                                 logv2::LogSeverity::Error()};
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardReplication{
+        logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(2)};
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardSharding{logv2::LogComponent::kSharding,
+                                                                  logv2::LogSeverity::Debug(2)};
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardCommand{logv2::LogComponent::kCommand,
+                                                                 logv2::LogSeverity::Debug(2)};
 };
 
 class TestCmdBase : public BasicCommand {
@@ -276,8 +313,29 @@ public:
 class TestCmdSupportsWriteConcern : public TestCmdSucceeds {
 public:
     static constexpr auto kCommandName = "testSuccessWriteConcern";
+    static WriteConcernOptions expectedWriteConcern;
+    static void setExpectedWriteConcern(WriteConcernOptions wc) {
+        TestCmdSupportsWriteConcern::expectedWriteConcern = wc;
+    }
+    static WriteConcernOptions getExpectedWriteConcern() {
+        return TestCmdSupportsWriteConcern::expectedWriteConcern;
+    }
     TestCmdSupportsWriteConcern() : TestCmdSucceeds(kCommandName) {}
     bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+    bool runWithReplyBuilder(OperationContext* opCtx,
+                             const DatabaseName&,
+                             const BSONObj&,
+                             rpc::ReplyBuilderInterface*) override {
+        if (getExpectedWriteConcern() != opCtx->getWriteConcern()) {
+            uassertStatusOK(Status(
+                ErrorCodes::InternalError,
+                fmt::format(
+                    "Expected write concern {}, got {}",
+                    TestCmdSupportsWriteConcern::getExpectedWriteConcern().toBSON().toString(),
+                    opCtx->getWriteConcern().toBSON().toString())));
+        }
         return true;
     }
 };
