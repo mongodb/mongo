@@ -74,10 +74,6 @@ struct TestSpec {
     size_t startTest;
     size_t endTest;
 };
-int exitWithError(const int statusCode, const std::string& msg) {
-    std::cout << "Tester exiting after error: " << msg << "\n";
-    exit(statusCode);
-}
 
 std::unique_ptr<mongo::DBClientConnection> buildConn(const std::string& uriString,
                                                      MockVersionInfo* const versionInfo,
@@ -86,56 +82,60 @@ std::unique_ptr<mongo::DBClientConnection> buildConn(const std::string& uriStrin
         // Return a default (empty) unique ptr.
         return {};
     } else {
+        // Enable required components.
+        mongo::TestingProctor::instance().setEnabled(false);
+
+        mongo::WireSpec::getWireSpec(mongo::getGlobalServiceContext())
+            .initialize(mongo::WireSpec::Specification{});
+
         // For now use a port not reserved for an MDB process.
         auto params = mongo::ServerGlobalParams{.port = 27016};
         mongo::VersionInfoInterface::enable(versionInfo);
         auto tl = mongo::transport::TransportLayerManagerImpl::createWithConfig(
             &params, mongo::getGlobalServiceContext());
         auto res = tl->setup();
-        uassert(9670415, mongo::str::stream() << "Error setting up listener " << res, res.isOK());
+        uassert(9670415, mongo::str::stream{} << "Error setting up listener " << res, res.isOK());
         mongo::getGlobalServiceContext()->setTransportLayerManager(std::move(tl));
         auto mongoURI = mongo::MongoURI::parse(uriString);
         uassert(9670455,
-                mongo::str::stream()
-                    << "URI Parsing failed with message " << mongoURI.getStatus().reason(),
+                mongo::str::stream{} << "URI Parsing failed with message "
+                                     << mongoURI.getStatus().reason(),
                 mongoURI.isOK());
         auto conn = std::make_unique<mongo::DBClientConnection>(false, 0, mongoURI.getValue());
         auto hostAndPortVec = mongoURI.getValue().getServers();
         uassert(
             9670412, "Expected exactly one host/port in the given URI", hostAndPortVec.size() == 1);
         conn->connect(hostAndPortVec[0], "MongoTester", boost::none);
+        uassert(9699400, "Failed to connect to mongod in a connection-using mode.", conn);
         return conn;
     }
 }
 
+void exitWithError(const int statusCode, const std::string& msg) {
+    std::cerr << "Tester exiting after error: " << msg << std::endl;
+    std::exit(statusCode);
+}
+
 int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const std::string& uriString,
-                   const QueryFile::CollectionInitOptions loadData,
+                   const bool dropData,
+                   const bool loadData,
                    const WriteOutOptions outOpt,
                    const ModeOption mode,
                    const bool populateAndExit) {
-    // Enable required components.
-    // TODO(DEVPROD-12295): Move to different function.
-    auto versionInfo = MockVersionInfo();
-    mongo::TestingProctor::instance().setEnabled(false);
-
-    mongo::WireSpec::getWireSpec(mongo::getGlobalServiceContext())
-        .initialize(mongo::WireSpec::Specification{});
     // Run the tests.
+    auto versionInfo = MockVersionInfo{};
     auto conn = queryTester::buildConn(uriString, &versionInfo, mode);
-    uassert(9670442,
-            "Failed to connect to mongod in a connection-using mode.",
-            conn || mode == ModeOption::Normalize);
     // Track collections loaded in the previous test file.
     auto prevFileCollections = std::set<std::string>{};
     // TODO(SERVER-96984): Robustify
     auto failedTestFiles = std::vector<std::filesystem::path>{};
     auto failedQueryCount = size_t{0};
     auto totalTestsRun = size_t{0};
-    for (auto [testPath, startRange, endRange] : testsToRun) {
+    for (const auto& [testPath, startRange, endRange] : testsToRun) {
         auto currFile = queryTester::QueryFile(testPath, {startRange, endRange});
         currFile.readInEntireFile(mode);
-        currFile.loadCollections(conn.get(), loadData, prevFileCollections);
+        currFile.loadCollections(conn.get(), dropData, loadData, prevFileCollections);
         if (populateAndExit) {
             continue;
         }
@@ -189,7 +189,7 @@ void printHelpString() {
         {"-t",
          "Test. This should be followed by a test name. This can appear "
          "multiple times to run multiple tests."},
-        {"-n",  // TODO(DEVPROD-12147): Remove this option.
+        {"-n",
          "Run a specific test in the test file that immediately preceded "
          "this argument. This "
          "should be followed by an integer"},
@@ -212,7 +212,7 @@ void printHelpString() {
          "[run, compare, normalize]. Specify whether to just run and record "
          "results; expect all test files to specify results (default); or ensure that "
          "output results are correctly normalized."},
-        {"-r",  // TODO(DEVPROD-12147): Remove this option.
+        {"-r",
          "Run a specific range of tests in the test file immediately "
          "before this argument. "
          "Should "
@@ -227,93 +227,95 @@ int main(const int argc, const char** const argv) {
     auto parsedArgs = std::vector<std::string>(argv, argv + argc);
     // Vector of file, startTest, endTest where the numbers are optional.
     auto testsToRun = std::vector<queryTester::TestSpec>{};
-    auto expectingNumAt = size_t{0} - 1;  // TODO(DEVPROD-12147): Remove this value.
+    auto expectingNumAt = size_t{0} - 1;
     auto runningPartialFile = false;
-    auto loadOpt = queryTester::QueryFile::CollectionInitOptions::kNone;
+    auto dropOpt = false;
+    auto loadOpt = false;
     auto outOpt = queryTester::WriteOutOptions::kNone;
     auto mongoURIString = boost::optional<std::string>{};
     auto mode = queryTester::ModeOption::Compare;  // Default.
     auto populateAndExit = false;
     for (auto argNum = size_t{1}; argNum < parsedArgs.size(); ++argNum) {
-        if (parsedArgs[argNum].compare("-t") == 0) {
-            assertNextArgExists(parsedArgs, argNum, "-t");
-            // The next -n we hit will modify the default test range of {0, max size_t} to be the
-            // actual test number.
-            testsToRun.push_back({parsedArgs[argNum + 1]});
-            ++argNum;  // Skip the testName
-            expectingNumAt = argNum + 1;
-        } else if (parsedArgs[argNum].compare("-h") == 0) {
+        // Same order as in the help menu.
+        if (parsedArgs[argNum] == "--drop") {
+            dropOpt = true;
+        } else if (parsedArgs[argNum] == "--load") {
+            loadOpt = true;
+        } else if (parsedArgs[argNum] == "--mode") {
+            assertNextArgExists(parsedArgs, argNum, "--mode");
+            mode = queryTester::stringToModeOption(parsedArgs[argNum + 1]);
+            ++argNum;
+        } else if (parsedArgs[argNum] == "--out") {
+            assertNextArgExists(parsedArgs, argNum, "--out");
+            outOpt = queryTester::stringToWriteOutOpt(parsedArgs[argNum + 1]);
+            ++argNum;
+        } else if (parsedArgs[argNum] == "--populateAndExit") {
+            std::tie(dropOpt, loadOpt, populateAndExit) = std::tuple{true, true, true};
+        } else if (parsedArgs[argNum] == "--uri") {
+            assertNextArgExists(parsedArgs, argNum, "--uri");
+            mongoURIString = parsedArgs[argNum + 1];
+            ++argNum;
+        } else if (parsedArgs[argNum] == "-h") {
             printHelpString();
-            return 0;
-        } else if (parsedArgs[argNum].compare("-n") ==
-                   0) {  // TODO(DEVPROD-12147): Remove this option.
+            std::exit(0);
+        } else if (parsedArgs[argNum] == "-n") {
             if (expectingNumAt != argNum) {
                 queryTester::exitWithError(1, "-n must follow the -t test it modifies");
             }
             runningPartialFile = true;
             assertNextArgExists(parsedArgs, argNum, "-n");
-            testsToRun.back().startTest = std::stoi(parsedArgs[argNum + 1]);
-            testsToRun.back().endTest = std::stoi(parsedArgs[argNum + 1]);
+            testsToRun.back().startTest = std::stoull(parsedArgs[argNum + 1]);
+            testsToRun.back().endTest = std::stoull(parsedArgs[argNum + 1]);
             ++argNum;
-        } else if (parsedArgs[argNum].compare("--out") == 0) {
-            assertNextArgExists(parsedArgs, argNum, "--out");
-            outOpt = queryTester::stringToWriteOutOpt(parsedArgs[argNum + 1]);
-            ++argNum;
-        } else if (parsedArgs[argNum].compare("-r") ==
-                   0) {  // TODO(DEVPROD-12147): Remove this option.
+        } else if (parsedArgs[argNum] == "-r") {
             if (expectingNumAt != argNum) {
                 queryTester::exitWithError(1, "-r must follow the -t test it modifies");
             }
             runningPartialFile = true;
             assertNextArgExists(parsedArgs, argNum, "-r");
             assertNextArgExists(parsedArgs, argNum + 1, "-r");
-            testsToRun.back().startTest = std::stoi(parsedArgs[argNum + 1]);
-            testsToRun.back().endTest = std::stoi(parsedArgs[argNum + 2]);
+            testsToRun.back().startTest = std::stoull(parsedArgs[argNum + 1]);
+            testsToRun.back().endTest = std::stoull(parsedArgs[argNum + 2]);
             if (testsToRun.back().startTest > testsToRun.back().endTest) {
                 queryTester::exitWithError(
                     1,
-                    mongo::str::stream()
+                    mongo::str::stream{}
                         << "Start test number must be lower than end test number for test "
                         << testsToRun.back().testPath.string());
             }
             argNum += 2;
-        } else if (parsedArgs[argNum].compare("--uri") == 0) {
-            assertNextArgExists(parsedArgs, argNum, "--uri");
-            mongoURIString = parsedArgs[argNum + 1];
-            ++argNum;
-        } else if (parsedArgs[argNum].compare("--load") == 0) {
-            if (loadOpt == queryTester::QueryFile::CollectionInitOptions::kNone) {
-                loadOpt = queryTester::QueryFile::CollectionInitOptions::kLoad;
-            } else {
-                loadOpt = queryTester::QueryFile::CollectionInitOptions::kDropAndLoad;
-            }
-        } else if (parsedArgs[argNum].compare("--mode") == 0) {
-            assertNextArgExists(parsedArgs, argNum, "--mode");
-            mode = queryTester::stringToModeOption(parsedArgs[argNum + 1]);
-            ++argNum;
-        } else if (parsedArgs[argNum].compare("--drop") == 0) {
-            if (loadOpt == queryTester::QueryFile::CollectionInitOptions::kNone) {
-                loadOpt = queryTester::QueryFile::CollectionInitOptions::kDrop;
-            } else {
-                loadOpt = queryTester::QueryFile::CollectionInitOptions::kDropAndLoad;
-            }
-        } else if (parsedArgs[argNum].compare("--populateAndExit") == 0) {
-            populateAndExit = true;
-            loadOpt = queryTester::QueryFile::CollectionInitOptions::kDropAndLoad;
+        } else if (parsedArgs[argNum] == "-t") {
+            assertNextArgExists(parsedArgs, argNum, "-t");
+            // The next -n we hit will modify the default test range of {0, max size_t} to be the
+            // actual test number.
+            testsToRun.push_back({parsedArgs[argNum + 1]});
+            ++argNum;  // Skip the testName
+            expectingNumAt = argNum + 1;
         } else {
-            queryTester::exitWithError(1, std::string("Unexpected argument ") + parsedArgs[argNum]);
+            queryTester::exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
         }
     }
 
     if (!mongoURIString) {
         mongoURIString = "mongodb://localhost:27017";
-        std::cout << "Using default URI of " << mongoURIString.get() << "\n";
+        std::cout << "Using default URI of " << mongoURIString.get() << std::endl;
     }
 
-    if (runningPartialFile) {
-        // Cannot write out if only running part of a file.
-        if (outOpt != queryTester::WriteOutOptions::kNone) {
-            queryTester::exitWithError(1, "--out not supported with either -n or -r");
+    // Validate some flag conditions.
+    for (const auto& [condition, message] : std::map<bool, std::string>{
+             {mode == queryTester::ModeOption::Compare &&
+                  outOpt != queryTester::WriteOutOptions::kNone,
+              "--mode compare and --out are incompatible."},
+             // Cannot write out if only running part of a file.
+             {runningPartialFile && outOpt != queryTester::WriteOutOptions::kNone,
+              "--out not supported with either -n or -r"},
+             {mode == queryTester::ModeOption::Normalize && (dropOpt || loadOpt),
+              "--drop and --load are incompatible with --mode normalize."},
+             {populateAndExit && testsToRun.size() != 1,
+              "--populateAndExit must be specified with a single test file."},
+             {testsToRun.empty(), "Make sure to provide QueryTester with a .test file."}}) {
+        if (condition) {
+            queryTester::exitWithError(1, message);
         }
     }
 
@@ -322,23 +324,16 @@ int main(const int argc, const char** const argv) {
         testSpec.validate(mode);
     }
 
-    uassert(9670441,
-            "--mode compare and --out are incompatible.",
-            outOpt == queryTester::WriteOutOptions::kNone ||
-                mode != queryTester::ModeOption::Compare);
-
-    if (const auto numTestFiles = testsToRun.size(); populateAndExit && numTestFiles != 1) {
-        queryTester::exitWithError(1,
-                                   "--populateAndExit must be specified with a single test file.");
-    } else if (numTestFiles == 0) {
-        queryTester::exitWithError(1, "Make sure to provide QueryTester with a .test file.");
-    }
-
     try {
         auto serviceContextHolder = mongo::ServiceContext::make();
         setGlobalServiceContext(std::move(serviceContextHolder));
-        return queryTester::runTestProgram(
-            std::move(testsToRun), mongoURIString.get(), loadOpt, outOpt, mode, populateAndExit);
+        return queryTester::runTestProgram(std::move(testsToRun),
+                                           mongoURIString.get(),
+                                           dropOpt,
+                                           loadOpt,
+                                           outOpt,
+                                           mode,
+                                           populateAndExit);
     } catch (mongo::AssertionException& ex) {
         queryTester::exitWithError(1, ex.reason());
     }

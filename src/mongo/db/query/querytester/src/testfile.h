@@ -50,7 +50,7 @@ namespace queryTester {
 
 class QueryFile {
 public:
-    QueryFile(std::filesystem::path filePath, std::pair<size_t, size_t> testsToRun)
+    QueryFile(std::filesystem::path filePath, std::pair<size_t, size_t> testsToRun = {-1, -1})
         : _filePath(filePath),
           _testsToRun(testsToRun),
           _expectedPath(std::filesystem::path{filePath}.replace_extension(".results")),
@@ -60,63 +60,46 @@ public:
     // Delete certain constructors to avoid accidental I/O races.
     QueryFile(const QueryFile&) = delete;
 
-    /* Options on what action to take in loadCollections.*/
-    enum class CollectionInitOptions {
-        kNone,
-        kLoad,
-        kDrop,
-        kDropAndLoad,
-    };
-
     /**
      * Drops collections in a test file that haven't been dropped as of the previous file.
      */
-    void dropStaleCollections(mongo::DBClientConnection* conn,
-                              std::set<std::string>& prevFileCollections);
+    void dropStaleCollections(mongo::DBClientConnection*,
+                              const std::set<std::string>& prevFileCollections) const;
+
+    std::string generateFailureReport() const;
+    std::vector<std::string>& getCollectionsNeeded();
+    size_t getFailedQueryCount() const;
+    size_t getTestsRun() const;
 
     /**
      * Loads or drops then loads the collections needed for the test files depending on the passed
      * in options. Updates the already dropped/loaded collections from the previous file vector.
      */
-    void loadCollections(mongo::DBClientConnection* conn,
-                         CollectionInitOptions opts,
-                         std::set<std::string>& prevFileCollections);
+    void loadCollections(mongo::DBClientConnection*,
+                         bool dropData,
+                         bool loadData,
+                         const std::set<std::string>& prevFileCollections) const;
+
+    void printFailedQueries(const std::vector<size_t>& failedTestNums) const;
     bool readInEntireFile(ModeOption);
     void runTestFile(mongo::DBClientConnection*, ModeOption);
-    /**
-     * If 'compare' is set, tests must have results to compare to.
-     */
-    bool textBasedCompare(const std::filesystem::path&, const std::filesystem::path&);
-    bool writeAndValidate(ModeOption, WriteOutOptions);
-    bool writeOutAndNumber(std::fstream&, WriteOutOptions);
-    void printFailedQueries(const std::vector<size_t>& failedTestNums) const;
 
     /**
      * Write out all the non-test information to a string for debug purposes.
      */
-    std::string serializeStateForDebug() {
-        std::string out = std::string("_filePath: ") + _filePath.string() + " | " +
-            " db: " + _databaseNeeded + " | ";
-        for (const auto& coll : _collectionsNeeded) {
-            out += coll + " , ";
-        }
-        out += mongo::str::stream() << " NumTests: " << _tests.size() << " | ";
-        out += mongo::str::stream()
-            << " Tests to run: " << _testsToRun.first << _testsToRun.second << " | ";
-        return out;
-    }
+    std::string serializeStateForDebug() const;
 
-    std::vector<std::string>& getCollectionsNeeded() {
-        return _collectionsNeeded;
-    }
+    /**
+     * If 'compare' is set, tests must have results to compare to.
+     */
+    bool textBasedCompare(const std::filesystem::path&, const std::filesystem::path&);
 
-    size_t getFailedQueryCount() const {
-        return _failedQueryCount;
-    }
+    /**
+     * If 'compare' is set, tests must have results to compare to.
+     */
+    bool writeAndValidate(ModeOption, WriteOutOptions);
 
-    size_t getTestsRun() const {
-        return _testsRun;
-    }
+    bool writeOutAndNumber(std::fstream&, WriteOutOptions);
 
 protected:
     void parseHeader(std::fstream& fs);
@@ -137,5 +120,4 @@ protected:
     mongo::stdx::unordered_map<size_t, std::string> _testNumToQuery;
     size_t _failedQueryCount;
 };
-
 }  // namespace queryTester

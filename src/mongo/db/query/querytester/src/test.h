@@ -62,6 +62,24 @@ public:
     }
 
     /**
+     * Returns all actual results, including those that are not contained in the first batch.
+     */
+    std::vector<mongo::BSONObj> getAllResults(mongo::DBClientConnection* conn,
+                                              const mongo::BSONObj& result);
+
+    std::string getTestLine() const;
+
+    size_t getTestNum() const;
+
+    /**
+     * Compute the normalized version of the input set.
+     */
+    static std::vector<std::string> normalize(const std::vector<mongo::BSONObj>&,
+                                              NormalizationOptsSet);
+
+    static NormalizationOptsSet parseResultType(const std::string& type);
+
+    /**
      * Parses a single test definition. This includes the number and name line, the comment line(s)
      * and the actual test command.
      * Expects the file stream to be open and allow reading.
@@ -75,67 +93,13 @@ public:
     static Test parseTest(std::fstream&, ModeOption, size_t testNum);
 
     /**
-     * Compute the normalized version of the input set.
-     */
-    static std::vector<std::string> normalize(const std::vector<mongo::BSONObj>&,
-                                              NormalizationOptsSet);
-
-    /**
-     * Returns all actual results, including those that are not contained in the first batch.
-     */
-    std::vector<mongo::BSONObj> getAllResults(mongo::DBClientConnection* conn,
-                                              const mongo::BSONObj& result);
-
-    /**
      * Runs the test and records the result returned by the server.
      */
     void runTestAndRecord(mongo::DBClientConnection*, ModeOption);
 
-    std::string testName;
+    void setDB(const std::string& db);
 
-    static NormalizationOptsSet parseResultType(const std::string& type) {
-        static const std::map<std::string, NormalizationOptsSet> typeMap = {
-            {":normalizeFull",
-             NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
-                 NormalizationOpts::kSortArrays | NormalizationOpts::kNormalizeNumerics |
-                 NormalizationOpts::kConflateNullAndMissing},
-            {":normalizeNonNull",
-             NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
-                 NormalizationOpts::kSortArrays | NormalizationOpts::kNormalizeNumerics},
-            {":sortFull",
-             NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
-                 NormalizationOpts::kSortArrays},
-            {":sortBSONNormalizeNumerics",
-             NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
-                 NormalizationOpts::kNormalizeNumerics},
-            {":sortBSON", NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON},
-            {":sortResultsNormalizeNumerics",
-             NormalizationOpts::kSortResults | NormalizationOpts::kNormalizeNumerics},
-            {":normalizeNumerics", NormalizationOpts::kNormalizeNumerics},
-            {":normalizeNulls", NormalizationOpts::kConflateNullAndMissing},
-            {":sortResults", NormalizationOpts::kSortResults},
-            {":results", NormalizationOpts::kResults}};
-
-        if (auto it = typeMap.find(type); it != typeMap.end()) {
-            return it->second;
-        } else {
-            uasserted(9670456, mongo::str::stream() << "Unexpected test type " << type);
-        }
-    }
-
-    auto getTestLine() const {
-        return _testLine;
-    }
-
-    size_t getTestNum() const {
-        return _testNum;
-    }
-
-    void setDB(const std::string& db) {
-        _db = db;
-    }
-
-    void writeToStream(std::fstream& fs, WriteOutOptions resultOpt = WriteOutOptions::kNone) const;
+    void writeToStream(std::fstream&, WriteOutOptions = WriteOutOptions::kNone) const;
 
 private:
     void parseTestQueryLine();

@@ -42,30 +42,55 @@
 
 namespace queryTester {
 namespace {
-static const auto stringToModeOptionMap = std::map<std::string, ModeOption>{
-    {"run", ModeOption::Run},
-    {"compare", ModeOption::Compare},
-    {"normalize", ModeOption::Normalize},
-};
-
 // If a line begins with a mode string, it is a test.
 bool isTestLine(const std::string& line) {
     return line.starts_with(":");
 }
 
 mongo::BSONObj toBSONObj(const std::vector<mongo::BSONObj>& objs) {
-    mongo::BSONObjBuilder bob;
+    auto bob = mongo::BSONObjBuilder{};
     bob.append("res", objs.begin(), objs.end());
     return bob.obj();
 }
 }  // namespace
 
-ModeOption stringToModeOption(const std::string& modeString) {
-    if (auto itr = stringToModeOptionMap.find(modeString); itr != stringToModeOptionMap.end()) {
-        return itr->second;
-    } else {
-        uasserted(9670422, "Only valid options for --mode are 'run', 'compare', and 'normalize'");
+std::vector<mongo::BSONObj> Test::getAllResults(mongo::DBClientConnection* const conn,
+                                                const mongo::BSONObj& result) {
+    const auto actualResult = commandHelpers::getResultsFromCommandResponse(result);
+    const auto id = result.getField("cursor").embeddedObject()["id"].Long();
+
+    auto actualObjs = std::vector<mongo::BSONObj>{};
+    if (auto actualArr = actualResult.firstElement().Array(); !actualArr.empty()) {
+        std::for_each(actualArr.begin(), actualArr.end(), [&actualObjs](const auto& elem) {
+            actualObjs.push_back(elem.Obj().getOwned());
+        });
     }
+
+    // If cursor ID is 0, all results are in the first batch, and we don't need to call getMore.
+    // Otherwise, call getMore() to retrieve the entire result set.
+    if (id != 0) {
+        auto cursor = mongo::DBClientCursor(
+            conn,
+            mongo::NamespaceStringUtil::deserialize(
+                boost::none,
+                result.getField("cursor").embeddedObject().getStringField("ns"),
+                mongo::SerializationContext::stateDefault()),
+            id,
+            false /*isExhaust*/);
+        while (cursor.more()) {
+            actualObjs.push_back(cursor.nextSafe().getOwned());
+        }
+    }
+
+    return actualObjs;
+}
+
+std::string Test::getTestLine() const {
+    return _testLine;
+}
+
+size_t Test::getTestNum() const {
+    return _testNum;
 }
 
 std::vector<std::string> Test::normalize(const std::vector<mongo::BSONObj>& objs,
@@ -75,7 +100,7 @@ std::vector<std::string> Test::normalize(const std::vector<mongo::BSONObj>& objs
 
     const auto numThreads =
         std::min(static_cast<size_t>(std::thread::hardware_concurrency()), numResults);
-    std::vector<mongo::stdx::thread> threads;
+    auto threads = std::vector<mongo::stdx::thread>{};
     threads.reserve(numThreads);
 
     // Generate partitions and boundaries ahead of time.
@@ -84,7 +109,7 @@ std::vector<std::string> Test::normalize(const std::vector<mongo::BSONObj>& objs
     auto buckets = numThreads;
 
     for (; remainingResults > 0 && buckets > 0; --buckets) {
-        auto step = remainingResults / buckets;
+        const auto step = remainingResults / buckets;
         partitions.push_back(partitions.back() + step);
         remainingResults -= step;
     }
@@ -99,16 +124,16 @@ std::vector<std::string> Test::normalize(const std::vector<mongo::BSONObj>& objs
     for (auto sitr = partitions.begin(), eitr = partitions.begin() + 1; eitr != partitions.end();
          ++sitr, ++eitr) {
         threads.emplace_back([&, sitr, eitr]() {
-            for (auto i = *sitr; i < *eitr; ++i) {
+            for (auto index = *sitr; index < *eitr; ++index) {
                 // Either perform a direct results comparison or normalize each result in the result
                 // set, which may involve sorting the fields and/or arrays within a result object,
                 // as well as normalizing numerics to the same type.
-                if (opts == NormalizationOpts::kResults) {
-                    normalized[i] = objs[i].jsonString(mongo::ExtendedRelaxedV2_0_0, false, false);
-                } else {
-                    normalized[i] = mongo::shell_utils::normalizeBSONObj(objs[i], opts)
-                                        .jsonString(mongo::ExtendedRelaxedV2_0_0, false, false);
-                }
+                const auto& normalizedObj =
+                    (opts == NormalizationOpts::kResults
+                         ? objs[index]
+                         : mongo::shell_utils::normalizeBSONObj(objs[index], opts));
+                normalized[index] =
+                    normalizedObj.jsonString(mongo::ExtendedRelaxedV2_0_0, false, false);
             }
         });
     }
@@ -125,45 +150,34 @@ std::vector<std::string> Test::normalize(const std::vector<mongo::BSONObj>& objs
     return normalized;
 }
 
-std::vector<mongo::BSONObj> Test::getAllResults(mongo::DBClientConnection* conn,
-                                                const mongo::BSONObj& result) {
-    const auto actualResult = commandHelpers::getResultsFromCommandResponse(result);
-    const auto id = result.getField("cursor").embeddedObject()["id"].Long();
+NormalizationOptsSet Test::parseResultType(const std::string& type) {
+    static const auto kTypeMap = std::map<std::string, NormalizationOptsSet>{
+        {":normalizeFull",
+         NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
+             NormalizationOpts::kSortArrays | NormalizationOpts::kNormalizeNumerics |
+             NormalizationOpts::kConflateNullAndMissing},
+        {":normalizeNonNull",
+         NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
+             NormalizationOpts::kSortArrays | NormalizationOpts::kNormalizeNumerics},
+        {":sortFull",
+         NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
+             NormalizationOpts::kSortArrays},
+        {":sortBSONNormalizeNumerics",
+         NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
+             NormalizationOpts::kNormalizeNumerics},
+        {":sortBSON", NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON},
+        {":sortResultsNormalizeNumerics",
+         NormalizationOpts::kSortResults | NormalizationOpts::kNormalizeNumerics},
+        {":normalizeNumerics", NormalizationOpts::kNormalizeNumerics},
+        {":normalizeNulls", NormalizationOpts::kConflateNullAndMissing},
+        {":sortResults", NormalizationOpts::kSortResults},
+        {":results", NormalizationOpts::kResults}};
 
-    auto actualObjs = std::vector<mongo::BSONObj>{};
-    if (auto actualArr = actualResult.firstElement().Array(); !actualArr.empty()) {
-        std::for_each(actualArr.begin(), actualArr.end(), [&actualObjs](const auto& elem) {
-            actualObjs.push_back(elem.Obj().getOwned());
-        });
+    if (auto it = kTypeMap.find(type); it != kTypeMap.end()) {
+        return it->second;
+    } else {
+        uasserted(9670456, mongo::str::stream{} << "Unexpected test type " << type);
     }
-
-    // If cursor ID is 0, all results are in the first batch, and we don't need to call getMore.
-    // Otherwise, call getMore() to retrieve the entire result set.
-    if (id != 0) {
-        mongo::DBClientCursor cursor(
-            conn,
-            mongo::NamespaceStringUtil::deserialize(
-                boost::none,
-                result.getField("cursor").embeddedObject().getStringField("ns"),
-                mongo::SerializationContext::stateDefault()),
-            id,
-            false /*isExhaust*/);
-        while (cursor.more()) {
-            actualObjs.push_back(cursor.nextSafe().getOwned());
-        }
-    }
-
-    return actualObjs;
-}
-
-void Test::runTestAndRecord(mongo::DBClientConnection* conn, const ModeOption mode) {
-    // Populate _normalizedResult so that git diff operates on normalized result sets.
-    _normalizedResult =
-        normalize(mode == ModeOption::Normalize
-                      ? _expectedResult
-                      // Run test
-                      : getAllResults(conn, commandHelpers::runCommand(conn, _db, _query)),
-                  _testType);
 }
 
 Test Test::parseTest(std::fstream& fs, const ModeOption mode, const size_t testNum) {
@@ -282,6 +296,34 @@ Test Test::parseTest(std::fstream& fs, const ModeOption mode, const size_t testN
     }
 }
 
+void Test::runTestAndRecord(mongo::DBClientConnection* const conn, const ModeOption mode) {
+    // Populate _normalizedResult so that git diff operates on normalized result sets.
+    _normalizedResult =
+        normalize(mode == ModeOption::Normalize
+                      ? _expectedResult
+                      // Run test
+                      : getAllResults(conn, commandHelpers::runCommand(conn, _db, _query)),
+                  _testType);
+}
+
+void Test::setDB(const std::string& db) {
+    _db = db;
+}
+
+ModeOption stringToModeOption(const std::string& modeString) {
+    static const auto kStringToModeOptionMap = std::map<std::string, ModeOption>{
+        {"run", ModeOption::Run},
+        {"compare", ModeOption::Compare},
+        {"normalize", ModeOption::Normalize},
+    };
+
+    if (auto itr = kStringToModeOptionMap.find(modeString); itr != kStringToModeOptionMap.end()) {
+        return itr->second;
+    } else {
+        uasserted(9670422, "Only valid options for --mode are 'run', 'compare', and 'normalize'");
+    }
+}
+
 void Test::writeToStream(std::fstream& fs, const WriteOutOptions resultOpt) const {
     tassert(9670452,
             "Expected file to be open and ready for writing, but it wasn't",
@@ -326,7 +368,7 @@ void Test::writeToStream(std::fstream& fs, const WriteOutOptions resultOpt) cons
 
 void Test::parseTestQueryLine() {
     // First word is test type.
-    auto endTestType = _testLine.find(' ');
+    const auto endTestType = _testLine.find(' ');
     _testType = parseResultType(_testLine.substr(0, endTestType));
 
     // The rest of the string is the query.

@@ -34,24 +34,10 @@
 #include "mongo/rpc/op_msg.h"
 
 namespace queryTester::commandHelpers {
-
-mongo::BSONObj runCommand(mongo::DBClientConnection* conn,
-                          std::string db,
-                          mongo::BSONObj commandToRun) {
-    uassert(9670414, "Conn is not still connected", conn->isStillConnected());
-    mongo::OpMsgRequestBuilder opMsgQueryBuilder;
-    auto opMsgQuery =
-        opMsgQueryBuilder.create(boost::none,
-                                 mongo::DatabaseName().createDatabaseName_forTest(boost::none, db),
-                                 commandToRun);
-    auto [reply, clientBase] = conn->runCommandWithTarget(opMsgQuery);
-    return reply->getCommandReply().getOwned();
-}
-
 // Returns the array element containing result documents.
 mongo::BSONObj getResultsFromCommandResponse(const mongo::BSONObj& cmdResponse) {
     uassert(9670416,
-            mongo::str::stream() << "Expected OK command result but got " << cmdResponse,
+            mongo::str::stream{} << "Expected OK command result but got " << cmdResponse,
             cmdResponse.getField("ok").trueValue());
     // Assume format is correct and cursor is an object containing 'firstBatch' or 'nextBatch'.
     auto&& cursorObj = cmdResponse.getField("cursor").Obj();
@@ -60,4 +46,16 @@ mongo::BSONObj getResultsFromCommandResponse(const mongo::BSONObj& cmdResponse) 
         .getOwned();
 }
 
+mongo::BSONObj runCommand(mongo::DBClientConnection* const conn,
+                          const std::string& db,
+                          const mongo::BSONObj& commandToRun) {
+    uassert(9670414, "Conn is not still connected", conn->isStillConnected());
+    auto opMsgQueryBuilder = mongo::OpMsgRequestBuilder{};
+    auto opMsgQuery =
+        opMsgQueryBuilder.create(boost::none,
+                                 mongo::DatabaseName{}.createDatabaseName_forTest(boost::none, db),
+                                 commandToRun);
+    auto [reply, clientBase] = conn->runCommandWithTarget(opMsgQuery);
+    return reply->getCommandReply().getOwned();
+}
 }  // namespace queryTester::commandHelpers
