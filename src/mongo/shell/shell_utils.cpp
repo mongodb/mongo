@@ -1084,6 +1084,12 @@ BSONObj _compareStringsWithCollation(const BSONObj& input, void*) {
     CollatorFactoryICU collationFactory;
     auto collator = uassertStatusOK(collationFactory.makeFromBSON(collatorSpec.Obj()));
 
+    if (collator == nullptr) {
+        // 'makeFromBSON' will return a nullptr if the collator spec contains '{locale:
+        // "simple"}'. In this case we can go with a simple binary comparison.
+        return BSON("" << left.valueStringData().compare(right.valueStringData()));
+    }
+
     int cmp = collator->compare(left.valueStringData(), right.valueStringData());
     return BSON("" << cmp);
 }

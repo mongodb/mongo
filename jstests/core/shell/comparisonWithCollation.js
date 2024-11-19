@@ -6,6 +6,11 @@ assert.eq(_compareStringsWithCollation("abc", "abc", {locale: "en_US"}), 0);
 assert.gt(_compareStringsWithCollation("bcd", "abc", {locale: "en_US"}), 0);
 assert.lt(_compareStringsWithCollation("abc", "ABC", {locale: "en_US"}), 0);
 
+// "simple" locale.
+assert.eq(_compareStringsWithCollation("abc", "abc", {locale: "simple"}), 0);
+assert.lt(_compareStringsWithCollation("ABC", "abc", {locale: "simple"}), 0);
+assert.gt(_compareStringsWithCollation("abc", "ABC", {locale: "simple"}), 0);
+
 // zero length strings and null bytes
 assert.eq(_compareStringsWithCollation("", "", {locale: "en_US"}), 0);
 assert.gt(_compareStringsWithCollation("abc", "", {locale: "en_US"}), 0);
