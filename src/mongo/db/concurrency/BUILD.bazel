@@ -222,3 +222,27 @@ mongo_cc_unit_test(
         "//src/mongo/transport:transport_layer_mock",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "lock_manager_test",
+    srcs = [
+        "fast_map_noalloc_test.cpp",
+        "fill_locker_info_test.cpp",
+        "lock_manager_test.cpp",
+        "lock_manager_test_help.h",
+        "lock_stats_test.cpp",
+        "locker_test.cpp",
+        "resource_catalog_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":exception_util",
+        ":lock_manager",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)

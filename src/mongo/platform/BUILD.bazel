@@ -83,6 +83,7 @@ mongo_cc_unit_test(
         "visibility_test2.cpp",
         "//src/mongo/util:exit_code.h",
     ],
+    has_custom_mainline = True,
     tags = [
         "mongo_unittest_first_group",
         "server-programmability",

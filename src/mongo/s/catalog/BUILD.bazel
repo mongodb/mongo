@@ -142,3 +142,17 @@ mongo_cc_library(
         "//src/mongo/util:pcre_wrapper",
     ],
 )
+
+mongo_cc_library(
+    name = "sharding_catalog_client_mock",
+    srcs = [
+        "sharding_catalog_client_mock.cpp",
+    ],
+    hdrs = [
+        "sharding_catalog_client_mock.h",
+    ],
+    deps = [
+        ":sharding_catalog_client",
+        "//src/mongo/s/client:shard_interface",
+    ],
+)

@@ -55,17 +55,8 @@ env.Library(
 
 env.CppUnitTest(
     target="shard_server_op_observer_test",
-    source=[
-        "shard_server_op_observer_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "sharding_runtime_d",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

@@ -6,6 +6,6 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_catalog_util_test",
-    source=["partitioned_test.cpp"],
+    source=[],
     LIBDEPS=[],
 )

@@ -6,24 +6,8 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="lock_manager_test",
-    source=[
-        "fast_map_noalloc_test.cpp",
-        "fill_locker_info_test.cpp",
-        "lock_manager_test.cpp",
-        "lock_stats_test.cpp",
-        "locker_test.cpp",
-        "resource_catalog_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/transport/transport_layer_mock",
-        "exception_util",
-        "lock_manager",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
