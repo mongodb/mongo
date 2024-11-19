@@ -111,7 +111,7 @@ private:
     unsigned long long _started;
 };
 auto& globalLockServerStatusSection =
-    *ServerStatusSectionBuilder<GlobalLockServerStatusSection>("globalLock");
+    *ServerStatusSectionBuilder<GlobalLockServerStatusSection>("globalLock").forShard();
 
 
 class LockStatsServerStatusSection : public ServerStatusSection {
@@ -135,7 +135,7 @@ public:
     }
 };
 auto& lockStatsServerStatusSection =
-    *ServerStatusSectionBuilder<LockStatsServerStatusSection>("locks");
+    *ServerStatusSectionBuilder<LockStatsServerStatusSection>("locks").forShard();
 
 }  // namespace
 }  // namespace mongo
