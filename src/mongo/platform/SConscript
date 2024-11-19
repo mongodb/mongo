@@ -10,21 +10,7 @@ Import(
 env = env.Clone()
 env.CppUnitTest(
     target="platform_test",
-    source=[
-        "atomic_proxy_test.cpp",
-        "atomic_test.cpp",
-        "bits_test.cpp",
-        "endian_test.cpp",
-        "int128_test.cpp",
-        "process_id_test.cpp",
-        "random_test.cpp",
-        "source_location_test.cpp",
-        "stack_locator_test.cpp",
-        "decimal128_test.cpp",
-        "decimal128_bson_test.cpp",
-        "overflow_arithmetic_test.cpp",
-        "waitable_atomic_test.cpp",
-    ],
+    source=[],
     PROVE_ALIASES=["server-programmability"],
 )
 
@@ -46,23 +32,15 @@ if get_option("link-model") == "dynamic":
 
     env.CppUnitTest(
         target="visibility2_test",
-        source=[
-            "visibility_test2.cpp",
-        ],
-        LIBDEPS=[
-            "visibility_test_lib2",
-        ],
+        source=[],
+        LIBDEPS=[],
         PROVE_ALIASES=["server-programmability"],
     )
 
 env.CppUnitTest(
     target="rwmutex_test",
-    source=[
-        "rwmutex_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
+    source=[],
+    LIBDEPS=[],
     PROVE_ALIASES=["server-programmability"],
 )
 

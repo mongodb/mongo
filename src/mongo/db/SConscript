@@ -66,13 +66,8 @@ env.SConscript(
 
 env.CppUnitTest(
     target="server_base_test",
-    source=[
-        "$BUILD_DIR/mongo/util/database_name_util_test.cpp",
-        "$BUILD_DIR/mongo/util/namespace_string_util_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
@@ -187,14 +182,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="client_out_of_line_executor_test",
-    source=[
-        "client_out_of_line_executor_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "client_out_of_line_executor",
-        "concurrency/lock_manager",
-    ],
+    source=[],
+    LIBDEPS=[],
     PROVE_ALIASES=["server-programmability"],
 )
 
@@ -781,10 +770,6 @@ env.Benchmark(
 
 env.CppUnitTest(
     target="server_lifecycle_monitor_test",
-    source=[
-        "server_lifecycle_monitor_test.cpp",
-    ],
-    LIBDEPS=[
-        "server_lifecycle_monitor",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

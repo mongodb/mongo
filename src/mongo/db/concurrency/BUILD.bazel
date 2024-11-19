@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -204,5 +204,21 @@ mongo_cc_library(
         "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "exception_util_test",
+    srcs = [
+        "exception_util_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":exception_util",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
     ],
 )

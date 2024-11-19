@@ -704,3 +704,10 @@ filegroup(
         "//src/mongo/util/net/ssl:apple.hpp",
     ],
 )
+
+# Necessary if used in cc_test since it doesn't have a hdrs field
+# and will try to compile idl gen files in the core_headers filegroup.
+mongo_cc_library(
+    name = "core_headers_library",
+    hdrs = ["core_headers"],
+)
