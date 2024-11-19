@@ -906,7 +906,7 @@ _SELECTOR_REGISTRY = {
     "tla_plus_test": (_FileBasedSelectorConfig, _Selector),
     "bulk_write_cluster_js_test": (_JSTestSelectorConfig, _JSTestSelector),
     "magic_restore_js_test": (_JSTestSelectorConfig, _JSTestSelector),
-    "querytester_self_test": (_FileBasedSelectorConfig, _Selector),
+    "query_tester_self_test": (_FileBasedSelectorConfig, _Selector),
 }
 
 

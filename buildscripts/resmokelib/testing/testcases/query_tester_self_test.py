@@ -10,7 +10,7 @@ from buildscripts.resmokelib.testing.testcases import interface
 class QueryTesterSelfTestCase(interface.ProcessTestCase):
     """A QueryTester self-test to execute."""
 
-    REGISTERED_NAME = "querytester_self_test"
+    REGISTERED_NAME = "query_tester_self_test"
 
     def __init__(self, logger: logging.Logger, test_filenames: list[str]):
         """Initialize QueryTesterSelfTestCase.
