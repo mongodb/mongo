@@ -47,7 +47,6 @@ selector:
     - jstests/sharding/query/limit_push.js
     - jstests/sharding/merge_with_drop_shard.js
     - jstests/sharding/merge_with_move_primary.js
-    - jstests/sharding/move_chunk_basic.js
     - jstests/sharding/movePrimary1.js
     - jstests/sharding/names.js
     - jstests/sharding/prefix_shard_key.js

@@ -14,6 +14,7 @@ selector:
 
     # Chunk migration smoke tests
     - jstests/core_sharding/chunk_migration/chunk_operations_preserve_uuid.js
+    - jstests/core_sharding/chunk_migration/merge_split_chunks.js
     - jstests/core_sharding/chunk_migration/move_chunk.js
 
     # Resharding smoke tests

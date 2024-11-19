@@ -9,7 +9,6 @@
 
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-const dbName = db.getName();
 const configDB = db.getSiblingDB('config');
 const shardNames = db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
 
@@ -43,27 +42,27 @@ function getInitialChunkAndShardNames(configDB, ns, shardNames) {
     return [chunk, shardNames[chunkIndex], shardNames[otherIndex]];
 }
 
-function testErrorOnInvalidNamespace() {
+function testErrorOnInvalidNamespace(db) {
     jsTestLog("Test moveChunk fails for invalid namespace.");
     assert.commandFailed(db.adminCommand({moveChunk: '', find: {_id: 1}, to: shardNames[1]}));
 }
 
-function testErrorOnDatabaseDNE() {
+function testErrorOnDatabaseDNE(db) {
     jsTestLog("Test moveChunk fails for namespace that does not exist.");
     assert.commandFailed(
         db.adminCommand({moveChunk: 'nonexistent.namespace', find: {_id: 1}, to: shardNames[1]}));
 }
 
-function testErrorOnUnshardedCollection() {
+function testErrorOnUnshardedCollection(db) {
     jsTestLog("Test moveChunk fails for an unsharded collection.");
-    assert.commandFailed(
-        db.adminCommand({moveChunk: dbName + '.unsharded', find: {_id: 1}, to: shardNames[1]}));
+    assert.commandFailed(db.adminCommand(
+        {moveChunk: db.getName() + '.unsharded', find: {_id: 1}, to: shardNames[1]}));
 }
 
-function testHashed() {
+function testHashed(db) {
     jsTestLog("Test moveChunk on sharded collection with hashed key using find and bounds.");
     const collName = jsTestName() + "_hashed";
-    const ns = dbName + '.' + collName;
+    const ns = db.getName() + '.' + collName;
     const coll = db.getCollection(collName);
 
     assert.commandWorked(
@@ -94,15 +93,21 @@ function testHashed() {
     coll.drop();
 }
 
-function testNotHashed(keyDoc) {
+function testNotHashed(db, keyDoc) {
     jsTestLog("Test moveChunk on sharded collection with key " + tojson(keyDoc) +
               " using find and bounds.");
     const collName = jsTestName();
-    const ns = dbName + '.' + collName;
+    const ns = db.getName() + '.' + collName;
     const coll = db.getCollection(collName);
 
     // Fail if find is not a valid shard key.
-    assert.commandWorked(db.adminCommand({shardCollection: ns, key: keyDoc}));
+    const res = db.adminCommand({shardCollection: ns, key: keyDoc});
+    // Some suites install an index that conflicts with the shard key, so skip this test case.
+    if (!res.ok && res.code == ErrorCodes.AlreadyInitialized) {
+        jsTest.log("Skipping testNotHashed with " + tojson(keyDoc) + " because " + res.errmsg);
+        coll.drop();
+        return;
+    }
 
     var chunk;
     var shard0;
@@ -127,11 +132,17 @@ function testNotHashed(keyDoc) {
 
 print(jsTestName() + " is running on " + shardNames.length + " shards.");
 
-assert.commandWorked(db.adminCommand({enableSharding: dbName}));
+const mongos = db.getMongo();
+const dbName = jsTestName() + "db";
+const db2 = mongos.getDB(dbName);
 
-testErrorOnInvalidNamespace();
-testErrorOnDatabaseDNE();
-testErrorOnUnshardedCollection();
-testHashed();
-testNotHashed({a: 1});
-testNotHashed({a: 1, b: 1});
+assert.commandWorked(db2.adminCommand({enableSharding: dbName, primaryShard: shardNames[0]}));
+
+testErrorOnInvalidNamespace(db2);
+testErrorOnDatabaseDNE(db2);
+testErrorOnUnshardedCollection(db2);
+testHashed(db2);
+testNotHashed(db2, {a: 1});
+testNotHashed(db2, {a: 1, b: 1});
+
+db2.dropDatabase();
