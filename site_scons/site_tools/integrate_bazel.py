@@ -441,7 +441,10 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
             os.remove(file)
         extra_args += ["--build_tag_filters=scons_link_lists"]
 
-    bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
+    if SCons.Script.BUILD_TARGETS == ["compiledb"]:
+        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//:compiledb"]
+    else:
+        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
 
     if ninja_generate:
         print("Generating bazel link deps...")
@@ -599,7 +602,7 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
         "CXX": env.get("CXX", ""),
         "USE_NATIVE_TOOLCHAIN": os.environ.get("USE_NATIVE_TOOLCHAIN"),
     }
-    with open(".bazel_info_for_ninja.txt", "w") as f:
+    with open(f".{env.subst('$NINJA_PREFIX')}.bazel_info_for_ninja.txt", "w") as f:
         json.dump(ninja_bazel_build_json, f)
 
     # we also store the outputs in the env (the passed env is intended to be
@@ -615,6 +618,9 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     for scons_t, bazel_t in Globals.scons2bazel_targets.items():
         ninja_bazel_outs += [bazel_t["bazel_output"]]
         ninja_bazel_ins += env.NinjaGetInputs(env.File(scons_t))
+
+    if platform.system() == "Linux" and not os.environ.get("USE_NATIVE_TOOLCHAIN"):
+        ninja_bazel_outs += [env.get("CC"), env.get("CXX")]
 
     # This is to be used directly by ninja later during generation of the ninja file
     env["NINJA_BAZEL_OUTPUTS"] = ninja_bazel_outs
@@ -1259,6 +1265,9 @@ def generate(env: SCons.Environment.Environment) -> None:
     env["BAZEL_OUT_DIR"] = env.Dir(f"#/bazel-out/{out_dir_platform}-dbg/bin/").path.replace(
         "\\", "/"
     )
+
+    if env.get("__NINJA_NO") == "1":
+        return
 
     # ThinTarget builder is a special bazel target and should not be prefixed with Bazel in the builder
     # name to exclude it from the other BazelBuilder's. This builder excludes any normal builder

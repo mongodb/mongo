@@ -47,7 +47,8 @@ except OSError as exc:
 # the specific ninja file
 ninja_build_info = dict()
 try:
-    bazel_info_file = ".bazel_info_for_ninja.txt"
+    ninja_prefix = args.ninja_file.split(".")[0]
+    bazel_info_file = f".{ninja_prefix}.bazel_info_for_ninja.txt"
     with open(bazel_info_file) as f:
         ninja_build_info = json.load(f)
 except OSError as exc:
