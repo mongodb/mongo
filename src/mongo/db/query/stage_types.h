@@ -169,11 +169,8 @@ inline bool isSortStageType(StageType stageType) {
     }
 }
 
-StringData stageTypeToString(StageType stageType);
+struct QuerySolutionNode;
 
-/**
- * Returns the explain() stage type string for a STAGE_COLLSCAN stage that is performing a clustered
- * collection scan in SBE, to match Classic's explain() output.
- */
-StringData clusteredCollectionScanSbeToString();
+StringData nodeStageTypeToString(const QuerySolutionNode* node);
+
 }  // namespace mongo

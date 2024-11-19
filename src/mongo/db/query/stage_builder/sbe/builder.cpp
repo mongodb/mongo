@@ -5231,7 +5231,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
 
     if (reqResultInfo) {
         tassert(8146611,
-                str::stream() << "Expected build() for " << stageTypeToString(stageType)
+                str::stream() << "Expected build() for " << nodeStageTypeToString(root)
                               << " to produce a result object or ResultInfo",
                 outputs.hasResult());
     }
@@ -5254,7 +5254,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
             for (const auto& f : missingFields) {
                 tassert(6023424,
                         str::stream()
-                            << "Expected build() for " << stageTypeToString(stageType)
+                            << "Expected build() for " << nodeStageTypeToString(root)
                             << " to either satisfy all kField reqs, provide a materialized "
                             << "result object, or provide a compatible result base object",
                         reqs.hasResultInfo() && reqs.getResultInfoTrackedFieldSet().count(f) &&

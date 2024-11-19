@@ -2,9 +2,10 @@
  * Validate bounded collection scans on a clustered collection.
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 import {getExecutionStats, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
+export const testClusteredCollectionBoundedScan = function(coll, clusterKey, checkProfile) {
     const batchSize = 100;
     const clusterKeyFieldName = Object.keys(clusterKey)[0];
 
@@ -33,6 +34,34 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         // And strings should sort after.
         extra.insert({[clusterKeyFieldName]: "foo", a: "foo"});
         assert.commandWorked(extra.execute());
+
+        if (checkProfile) {
+            assert.commandWorked(coll.getDB().setProfilingLevel(2, {slowms: 0}));
+        }
+    }
+
+    function assertLogAndProfileHaveCorrectStage(db, comment, expectedStage) {
+        if (!checkProfile) {
+            return;
+        }
+
+        const slowQueryLogs = assert.commandWorked(db.adminCommand({getLog: 'global'}))
+                                  .log.map(JSON.parse)
+                                  .filter((entry) => {
+                                      return entry.msg == "Slow query" &&
+                                          !entry?.attr?.command?.explain &&
+                                          entry?.attr?.command?.comment === comment;
+                                  });
+        assert.gte(slowQueryLogs.length, 1);
+        for (let slowQueryLog of slowQueryLogs) {
+            assert.eq(slowQueryLog.attr.planSummary, expectedStage, tojson(slowQueryLog));
+        }
+
+        profilerHasAtLeastOneMatchingEntryOrThrow({
+            profileDB: db,
+            filter: {"command.comment": comment, "planSummary": expectedStage},
+            errorMsgFilter: {"command.comment": comment}
+        });
     }
 
     // Checks that the number of docs examined matches the expected number. There are separate
@@ -72,9 +101,13 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
     function testEq(op = "$eq") {
         initAndPopulate(coll, clusterKey);
 
+        const filter = {[clusterKeyFieldName]: 5};
+        const comment = "testEq-" + op;
+        // Use 'batchSize' to avoid selecting "EXPRESS" instead of "CLUSTERED_IXSCAN".
+        assert.eq(coll.find(filter).batchSize(20).comment(comment).itcount(), 1);
+        assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
         const expl = assert.commandWorked(coll.getDB().runCommand({
-            // use batchSize to avoid selecting EXPRESS instead of CLUSTERED_IXSCAN
-            explain: {find: coll.getName(), filter: {[clusterKeyFieldName]: 5}, batchSize: 20},
+            explain: {find: coll.getName(), filter: filter, batchSize: 20},
             verbosity: "executionStats"
         }));
 
@@ -100,10 +133,12 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
                     expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1) {
         initAndPopulate(coll, clusterKey);
 
-        const expl = assert.commandWorked(coll.getDB().runCommand({
-            explain: {find: coll.getName(), filter: {[clusterKeyFieldName]: {[op]: val}}},
-            verbosity: "executionStats"
-        }));
+        const filter = {[clusterKeyFieldName]: {[op]: val}};
+        const comment = "testLT-" + op + "-" + val;
+        assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
+        assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
+        const expl = assert.commandWorked(coll.getDB().runCommand(
+            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
         assert(clusteredIxScan);
@@ -132,10 +167,12 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
                     expectedDocsExaminedSbe = expectedDocsExaminedClassic) {
         initAndPopulate(coll, clusterKey);
 
-        const expl = assert.commandWorked(coll.getDB().runCommand({
-            explain: {find: coll.getName(), filter: {[clusterKeyFieldName]: {[op]: val}}},
-            verbosity: "executionStats"
-        }));
+        const filter = {[clusterKeyFieldName]: {[op]: val}};
+        const comment = "testGT-" + op + "-" + val;
+        assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
+        assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
+        const expl = assert.commandWorked(coll.getDB().runCommand(
+            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
 
@@ -166,13 +203,12 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
                        expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1) {
         initAndPopulate(coll, clusterKey);
 
-        const expl = assert.commandWorked(coll.getDB().runCommand({
-            explain: {
-                find: coll.getName(),
-                filter: {[clusterKeyFieldName]: {[min]: minVal, [max]: maxVal}}
-            },
-            verbosity: "executionStats"
-        }));
+        const filter = {[clusterKeyFieldName]: {[min]: minVal, [max]: maxVal}};
+        const comment = "testRange-" + min + "-" + minVal + "-" + max + "-" + maxVal;
+        assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
+        assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
+        const expl = assert.commandWorked(coll.getDB().runCommand(
+            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
 
@@ -193,10 +229,12 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
     function testIn() {
         initAndPopulate(coll, clusterKey);
 
-        const expl = assert.commandWorked(coll.getDB().runCommand({
-            explain: {find: coll.getName(), filter: {[clusterKeyFieldName]: {$in: [10, 20, 30]}}},
-            verbosity: "executionStats"
-        }));
+        const filter = {[clusterKeyFieldName]: {$in: [10, 20, 30]}};
+        const comment = "testIn";
+        assert.eq(coll.find(filter).comment(comment).itcount(), 3);
+        assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
+        const expl = assert.commandWorked(coll.getDB().runCommand(
+            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
 
@@ -214,10 +252,13 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
     function testNonClusterKeyScan() {
         initAndPopulate(coll, clusterKey);
 
-        const expl = assert.commandWorked(coll.getDB().runCommand({
-            explain: {find: coll.getName(), filter: {a: {$gt: -10}}},
-            verbosity: "executionStats"
-        }));
+        const filter = {a: {$gt: -10}};
+        const comment = "testNonClusteredKeyScan";
+        assert.eq(coll.find(filter).comment(comment).itcount(), 10);
+        assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "COLLSCAN");
+
+        const expl = assert.commandWorked(coll.getDB().runCommand(
+            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
 
         assert(getPlanStage(expl, "COLLSCAN"));
         assert(!getPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));

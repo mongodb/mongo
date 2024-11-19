@@ -6,6 +6,8 @@
  *   # Does not support sharding
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
+ *   does_not_support_stepdowns,
+ *   requires_profiling,
  * ]
  */
 import {
@@ -18,6 +20,6 @@ const nonReplicatedDB = conn.getDB("local");
 const collName = "coll";
 const nonReplicatedColl = nonReplicatedDB[collName];
 
-testClusteredCollectionBoundedScan(nonReplicatedColl, {ts: 1});
+testClusteredCollectionBoundedScan(nonReplicatedColl, {ts: 1}, true /*checkProfile*/);
 
 MongoRunner.stopMongod(conn);

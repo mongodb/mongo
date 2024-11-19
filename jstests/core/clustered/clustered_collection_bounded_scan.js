@@ -17,4 +17,4 @@ const replicatedDB = db.getSiblingDB(jsTestName());
 const collName = "coll";
 const replicatedColl = replicatedDB[collName];
 
-testClusteredCollectionBoundedScan(replicatedColl, {_id: 1});
+testClusteredCollectionBoundedScan(replicatedColl, {_id: 1}, false /*checkProfile*/);
