@@ -767,7 +767,9 @@ last-continuous:
     ticket: SERVER-95724
   - test_file: jstests/sharding/timeseries_query_extended_range.js
     ticket: SERVER-73641
-  - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
+  - test_file: jstests/core/timeseries/timeseries_index_partial.js
+    ticket: SERVER-73641
+  - test_file: jstests/core/timeseries/timeseries_update_delete_extended_range.js
     ticket: SERVER-95075
   - test_file: jstests/core/query/find_all_values_at_path_expression.js
     ticket: SERVER-95670
@@ -1602,7 +1604,9 @@ last-lts:
     ticket: SERVER-95724
   - test_file: jstests/sharding/timeseries_query_extended_range.js
     ticket: SERVER-73641
-  - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
+  - test_file: jstests/core/timeseries/timeseries_index_partial.js
+    ticket: SERVER-73641
+  - test_file: jstests/core/timeseries/timeseries_update_delete_extended_range.js
     ticket: SERVER-95075
   - test_file: jstests/core/query/find_all_values_at_path_expression.js
     ticket: SERVER-95670
