@@ -191,11 +191,6 @@ bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
     }
 }
 
-bool QueryPlannerIXSelect::canUseIndexForNin(const InMatchExpression* ime) {
-    return !ime->hasRegex() && ime->getEqualities().size() == 2 && ime->hasNull() &&
-        ime->hasEmptyArray();
-}
-
 /**
  * 2d indices don't handle wrapping so we can't use them for queries that wrap.
  */
@@ -502,7 +497,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             if (MatchExpression::MATCH_IN == child->matchType()) {
                 InMatchExpression* ime = static_cast<InMatchExpression*>(node->getChild(0));
 
-                if (canUseIndexForNin(ime)) {
+                if (Indexability::canUseIndexForNin(ime)) {
                     // This is a case that we know is supported.
                     return true;
                 }
@@ -624,7 +619,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             return false;
         }
 
-        return nodeIsSupportedByHashedIndex(node);
+        return Indexability::nodeIsSupportedByHashedIndex(node);
     } else if (IndexNames::GEO_2DSPHERE == indexedFieldType) {
         if (exprtype == MatchExpression::GEO) {
             // within or intersect.
@@ -761,27 +756,6 @@ bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression*
     }
 
     return true;
-}
-
-bool QueryPlannerIXSelect::nodeIsSupportedByHashedIndex(const MatchExpression* queryExpr) {
-    // Hashed fields can answer simple equality predicates.
-    if (ComparisonMatchExpressionBase::isEquality(queryExpr->matchType())) {
-        return true;
-    }
-    if (queryExpr->matchType() == MatchExpression::INTERNAL_EQ_HASHED_KEY) {
-        return true;
-    }
-    // An $in can be answered so long as its operand contains only simple equalities.
-    if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
-        const InMatchExpression* expr = static_cast<const InMatchExpression*>(queryExpr);
-        return expr->getRegexes().empty();
-    }
-    // {$exists:false} produces a single point-interval index bound on [null,null].
-    if (queryExpr->matchType() == MatchExpression::NOT) {
-        return queryExpr->getChild(0)->matchType() == MatchExpression::EXISTS;
-    }
-    // {$exists:true} can be answered using [MinKey, MaxKey] bounds.
-    return (queryExpr->matchType() == MatchExpression::EXISTS);
 }
 
 // static

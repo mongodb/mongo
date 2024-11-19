@@ -375,12 +375,43 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "query_planner",
+    name = "index_multikey_helpers",
+    hdrs = [
+        "index_multikey_helpers.h",
+    ],
+    deps = [
+        "//src/mongo/db/index:index_access_method",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_bounds_builder",
     srcs = [
-        "distinct_access.cpp",
         "expression_geo_index_mapping.cpp",
         "index_bounds_builder.cpp",
         "interval_evaluation_tree.cpp",
+        ":expression_geo_index_knobs_gen",
+    ],
+    hdrs = [
+        "expression_geo_index_mapping.h",
+        "index_bounds_builder.h",
+        "interval_evaluation_tree.h",
+    ],
+    deps = [
+        ":canonical_query",
+        ":index_multikey_helpers",
+        ":query_index_bounds",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/geo:geometry",
+        "//src/mongo/db/index:expression_params",
+        "//src/third_party/s2",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_planner",
+    srcs = [
+        "distinct_access.cpp",
         "planner_access.cpp",
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
@@ -391,7 +422,6 @@ mongo_cc_library(
         "query_solution.cpp",
         "record_id_range.cpp",
         "stage_types.cpp",
-        ":expression_geo_index_knobs_gen",
         "//src/mongo/db/query/plan_cache:plan_cache_indexability.cpp",
         "//src/mongo/db/query/plan_enumerator:enumerator_memo.cpp",
         "//src/mongo/db/query/plan_enumerator:memo_prune.cpp",
@@ -401,9 +431,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "distinct_access.h",
-        "expression_geo_index_mapping.h",
-        "index_bounds_builder.h",
-        "interval_evaluation_tree.h",
         "planner_access.h",
         "planner_analysis.h",
         "planner_ixselect.h",
@@ -421,6 +448,8 @@ mongo_cc_library(
     ],
     deps = [
         ":canonical_query",
+        ":index_bounds_builder",
+        ":index_multikey_helpers",
         ":query_index_bounds",
         ":query_knobs",
         "//src/mongo/db:query_expressions",

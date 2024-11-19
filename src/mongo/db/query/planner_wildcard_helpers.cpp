@@ -57,6 +57,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_multikey_helpers.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -144,24 +145,6 @@ bool fieldNameOrArrayIndexPathSetContains(const std::set<FieldRef>& multikeyPath
             return fieldNameOrArrayIndexPathMatches(
                 pathToLookup, multikeyPath, multikeyPathComponents);
         });
-}
-
-/**
- * Returns the positions of all path components in 'queryPath' that may be interpreted as array
- * indices by the query system. We obtain this list by finding all multikey path components that
- * have a numerical path component immediately after. Note that the 'queryPath' argument may be a
- * prefix of the full path used to generate 'multikeyPaths', and so we must avoid checking path
- * components beyond the end of 'queryPath'.
- */
-std::vector<size_t> findArrayIndexPathComponents(const MultikeyComponents& multikeyPaths,
-                                                 const FieldRef& queryPath) {
-    std::vector<size_t> arrayIndices;
-    for (auto i : multikeyPaths) {
-        if (i < queryPath.numParts() - 1 && queryPath.isNumericPathComponentStrict(i + 1)) {
-            arrayIndices.push_back(i + 1);
-        }
-    }
-    return arrayIndices;
 }
 
 /**
@@ -365,49 +348,6 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
 }
 
 /**
- * Queries whose bounds overlap the Object type bracket may require special handling, since the $**
- * index does not index complete objects but instead only contains the leaves along each of its
- * subpaths. Since we ban all object-value queries except those on the empty object {}, this will
- * typically only be relevant for bounds involving MinKey and MaxKey, such as {$exists: true}.
- */
-bool boundsOverlapObjectTypeBracket(const OrderedIntervalList& oil) {
-    // Create an Interval representing the subrange ({}, []) of the object type bracket. We exclude
-    // both ends of the bracket because $** indexes support queries on empty objects and arrays.
-    static const Interval objectTypeBracketBounds = []() {
-        BSONObjBuilder objBracketBounds;
-        objBracketBounds.appendMinForType("", BSONType::Object);
-        objBracketBounds.appendMaxForType("", BSONType::Object);
-        return IndexBoundsBuilder::makeRangeInterval(objBracketBounds.obj(),
-                                                     BoundInclusion::kExcludeBothStartAndEndKeys);
-    }();
-
-    // Determine whether any of the ordered intervals overlap with the object type bracket. Because
-    // Interval's various bounds-comparison methods all depend upon the bounds being in ascending
-    // order, we reverse the direction of the input OIL if necessary here.
-    const bool isDescending = (oil.computeDirection() == Interval::Direction::kDirectionDescending);
-    const auto& oilAscending = (isDescending ? oil.reverseClone() : oil);
-    // Iterate through each of the OIL's intervals. If the current interval precedes the bracket, we
-    // must check the next interval in sequence. If the interval succeeds the bracket then we can
-    // stop checking. If we neither precede nor succeed the object type bracket, then they overlap.
-    for (const auto& interval : oilAscending.intervals) {
-        switch (interval.compare(objectTypeBracketBounds)) {
-            case Interval::IntervalComparison::INTERVAL_PRECEDES_COULD_UNION:
-            case Interval::IntervalComparison::INTERVAL_PRECEDES:
-                // Break out of the switch and proceed to check the next interval.
-                break;
-
-            case Interval::IntervalComparison::INTERVAL_SUCCEEDS:
-                return false;
-
-            default:
-                return true;
-        }
-    }
-    // If we're here, then all the OIL's bounds precede the object type bracket.
-    return false;
-}
-
-/**
  * Returns expanded wildcard key pattern with a wildcard field replaced by the given expandField and
  * the position of the replaced wildcard field.
  */
@@ -599,57 +539,6 @@ bool canOnlyAnswerWildcardPrefixQuery(
     });
 }
 
-BoundsTightness translateWildcardIndexBoundsAndTightness(
-    const IndexEntry& index,
-    BoundsTightness tightnessIn,
-    OrderedIntervalList* oil,
-    interval_evaluation_tree::Builder* ietBuilder) {
-    // This method should only ever be called for a $** IndexEntry. We expect to be called during
-    // planning, *before* finishWildcardIndexScanNode has been invoked. The IndexEntry should thus
-    // only have a single keyPattern field and multikeyPath entry, but this is sufficient to
-    // determine whether it will be necessary to adjust the tightness.
-    invariant(index.type == IndexType::INDEX_WILDCARD);
-    invariant(oil);
-
-    // If 'oil' was not filled the filter type may not be supported, but we can still use this
-    // wildcard index for queries on prefix fields. The index bounds for the wildcard field will be
-    // filled later to include all values. Therefore, we should use INEXACT_FETCH to avoid false
-    // positives.
-    if (oil->name.empty()) {
-        return BoundsTightness::INEXACT_FETCH;
-    }
-
-    // If our bounds include any objects -- anything in the range ({}, []) -- then we will need to
-    // use subpath bounds; that is, we will add the interval ["path.","path/") at the point where we
-    // finalize the index scan. If the subpath interval is required but the bounds do not already
-    // run from MinKey to MaxKey, then we must expand them to [MinKey, MaxKey]. Consider the case
-    // where out bounds are [[MinKey, null), (null, MaxKey]] as generated by {$ne: null}. Our
-    // result set should include documents such as {a: {b: null}}; however, the wildcard index key
-    // for this object will be {"": "a.b", "": null}, which means that the original bounds would
-    // skip this document. We must also set the tightness to INEXACT_FETCH to avoid false positives.
-    if (boundsOverlapObjectTypeBracket(*oil) && !oil->intervals.front().isMinToMax()) {
-        oil->intervals = {IndexBoundsBuilder::allValues()};
-        if (ietBuilder) {
-            // We need to replace a previously added interval in the IET builder with a new
-            // all-values interval.
-            tassert(
-                6944102, "Cannot pop an element from an empty IET builder", !ietBuilder->isEmpty());
-            ietBuilder->pop();
-
-            ietBuilder->addConst(*oil);
-        }
-        return BoundsTightness::INEXACT_FETCH;
-    }
-
-    auto wildcardElt = getWildcardField(index);
-    // If the query passes through any array indices, we must always fetch and filter the documents.
-    const auto arrayIndicesTraversedByQuery = findArrayIndexPathComponents(
-        index.multikeyPaths[index.wildcardFieldPos], FieldRef{wildcardElt.fieldName()});
-
-    // If the list of array indices we traversed is non-empty, set the tightness to INEXACT_FETCH.
-    return (arrayIndicesTraversedByQuery.empty() ? tightnessIn : BoundsTightness::INEXACT_FETCH);
-}
-
 void finalizeWildcardIndexScanConfiguration(
     IndexScanNode* scan, std::vector<interval_evaluation_tree::Builder>* ietBuilders) {
     IndexEntry* index = &scan->index;
@@ -702,7 +591,7 @@ void finalizeWildcardIndexScanConfiguration(
     // bounds that encompass all its subpaths, specifically the interval ["path.","path/") on
     // "$_path".
     const bool requiresSubpathBounds = bounds->fields[index->wildcardFieldPos].name.empty() ||
-        boundsOverlapObjectTypeBracket(bounds->fields[index->wildcardFieldPos]);
+        bounds->fields[index->wildcardFieldPos].boundsOverlapObjectTypeBracket();
 
     // Account for fieldname-or-array-index semantics. $** indexes do not explicitly encode array
     // indices in their keys, so if this query traverses one or more multikey fields via an array
@@ -737,24 +626,11 @@ bool isWildcardObjectSubpathScan(const IndexEntry& index, const IndexBounds& bou
     }
 
     // Check the bounds on the query field for any intersections with the object type bracket.
-    return boundsOverlapObjectTypeBracket(bounds.fields[index.wildcardFieldPos]);
+    return bounds.fields[index.wildcardFieldPos].boundsOverlapObjectTypeBracket();
 }
 
 bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
     return node && isWildcardObjectSubpathScan(node->index, node->bounds);
-}
-
-BSONElement getWildcardField(const IndexEntry& index) {
-    uassert(7246601, "The index is not a wildcard index", index.type == IndexType::INDEX_WILDCARD);
-
-    BSONObjIterator it(index.keyPattern);
-    BSONElement wildcardElt = it.next();
-    for (size_t i = 0; i < index.wildcardFieldPos; ++i) {
-        invariant(it.more());
-        wildcardElt = it.next();
-    }
-
-    return wildcardElt;
 }
 
 std::vector<Interval> makeAllValuesForPath() {

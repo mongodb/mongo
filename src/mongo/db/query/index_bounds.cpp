@@ -268,6 +268,48 @@ bool OrderedIntervalList::containsOnlyPointIntervals() const {
     return true;
 }
 
+/**
+ * Queries whose bounds overlap the Object type bracket may require special handling, since the $**
+ * index does not index complete objects but instead only contains the leaves along each of its
+ * subpaths. Since we ban all object-value queries except those on the empty object {}, this will
+ * typically only be relevant for bounds involving MinKey and MaxKey, such as {$exists: true}.
+ */
+bool OrderedIntervalList::boundsOverlapObjectTypeBracket() const {
+    // Create an Interval representing the subrange ({}, []) of the object type bracket. We exclude
+    // both ends of the bracket because $** indexes support queries on empty objects and arrays.
+    static const Interval objectTypeBracketBounds = []() {
+        BSONObjBuilder objBracketBounds;
+        objBracketBounds.appendMinForType("", BSONType::Object);
+        objBracketBounds.appendMaxForType("", BSONType::Object);
+        return Interval(objBracketBounds.obj(), false /*startIncluded*/, false /*endIncluded*/);
+    }();
+
+    // Determine whether any of the ordered intervals overlap with the object type bracket. Because
+    // Interval's various bounds-comparison methods all depend upon the bounds being in ascending
+    // order, we reverse the direction of the input OIL if necessary here.
+    const bool isDescending = (computeDirection() == Interval::Direction::kDirectionDescending);
+    const auto& oilAscending = (isDescending ? reverseClone() : *this);
+    // Iterate through each of the OIL's intervals. If the current interval precedes the bracket, we
+    // must check the next interval in sequence. If the interval succeeds the bracket then we can
+    // stop checking. If we neither precede nor succeed the object type bracket, then they overlap.
+    for (const auto& interval : oilAscending.intervals) {
+        switch (interval.compare(objectTypeBracketBounds)) {
+            case Interval::IntervalComparison::INTERVAL_PRECEDES_COULD_UNION:
+            case Interval::IntervalComparison::INTERVAL_PRECEDES:
+                // Break out of the switch and proceed to check the next interval.
+                break;
+
+            case Interval::IntervalComparison::INTERVAL_SUCCEEDS:
+                return false;
+
+            default:
+                return true;
+        }
+    }
+    // If we're here, then all the OIL's bounds precede the object type bracket.
+    return false;
+}
+
 // static
 void OrderedIntervalList::complement() {
     BSONObjBuilder minBob;

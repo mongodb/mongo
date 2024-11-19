@@ -190,11 +190,6 @@ public:
      */
     static bool nodeIsSupportedByWildcardIndex(const MatchExpression* queryExpr);
 
-    /**
-     * Check if this match expression is a leaf and is supported by a hashed index.
-     */
-    static bool nodeIsSupportedByHashedIndex(const MatchExpression* queryExpr);
-
     /*
      * Return true if the given match expression can use a sparse index, false otherwise. This will
      * not traverse the children of the given match expression.
@@ -207,20 +202,6 @@ public:
      * returns true then 'queryExpr' may (or may not) be supported by some index.
      */
     static bool logicalNodeMayBeSupportedByAnIndex(const MatchExpression* queryExpr);
-
-    /**
-     * We can use an index for this special case: {$not:{$in:[null, []]}}. Return true if this is
-     * the expression (modulo in-list ordering) and it doesn't contain any regexes.
-     *
-     * Why is this case special? An equality expression for "null" will match both documents with a
-     * literal null for the specified key, and those where the key is not present. An equality
-     * expression for "[]" (which is stored as "undefined" in the index) will match documents with
-     * an empty array or an array with an empty array element. If we negate either of this bounds in
-     * isolation, we may produce incomplete results wrt the other expression. If we negate the
-     * composition of the two, we can properly return complete results excluding both null and empty
-     * array values.
-     */
-    static bool canUseIndexForNin(const InMatchExpression* ime);
 
 private:
     /**

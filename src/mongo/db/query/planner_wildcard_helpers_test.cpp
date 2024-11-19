@@ -204,13 +204,13 @@ TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
 TEST(PlannerWildcardHelpersTest, GetCorrectWildcardElement) {
     WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
     wildcardIndex.indexEntry->wildcardFieldPos = 0;
-    auto elem = getWildcardField(*wildcardIndex.indexEntry);
+    auto elem = wildcardIndex.indexEntry->getWildcardField();
     ASSERT_EQ(0, elem.woCompare(BSON("$**" << 1).firstElement()));
 
     WildcardIndexEntryMock wildcardIndex2{
         BSON("a" << 1 << "$**" << 1 << "b" << 1), BSON("c" << 1), {}};
     wildcardIndex2.indexEntry->wildcardFieldPos = 1;
-    elem = getWildcardField(*wildcardIndex2.indexEntry);
+    elem = wildcardIndex2.indexEntry->getWildcardField();
     ASSERT_EQ(0, elem.woCompare(BSON("$**" << 1).firstElement()));
 }
 

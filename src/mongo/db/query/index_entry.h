@@ -216,6 +216,13 @@ struct IndexEntry : CoreIndexInfo {
      */
     bool pathHasMultikeyComponent(StringData indexedField) const;
 
+    /**
+     * It's not obvious which element is the wildcard element in a compound wildcard index key
+     * pattern. This helper can give you the wildcard element based on the position tracked in
+     * 'IndexEntry'. Only valid to call on a WILDCARD index.
+     */
+    BSONElement getWildcardField() const;
+
     bool operator==(const IndexEntry& rhs) const {
         // Indexes are logically equal when names are equal.
         return this->identifier == rhs.identifier;

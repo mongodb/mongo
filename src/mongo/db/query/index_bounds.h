@@ -115,6 +115,11 @@ struct OrderedIntervalList {
      */
     bool containsOnlyPointIntervals() const;
 
+    /**
+     * Returns true is this OIL overlaps the type bracket containing objects.
+     */
+    bool boundsOverlapObjectTypeBracket() const;
+
     template <typename H>
     friend H AbslHashValue(H state, const OrderedIntervalList& c) {
         state = absl::HashState::combine_contiguous(

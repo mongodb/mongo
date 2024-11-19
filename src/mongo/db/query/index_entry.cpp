@@ -85,6 +85,19 @@ bool IndexEntry::pathHasMultikeyComponent(StringData indexedField) const {
     MONGO_UNREACHABLE;
 }
 
+BSONElement IndexEntry::getWildcardField() const {
+    uassert(7246601, "The index is not a wildcard index", type == IndexType::INDEX_WILDCARD);
+
+    BSONObjIterator it(keyPattern);
+    BSONElement wildcardElt = it.next();
+    for (size_t i = 0; i < wildcardFieldPos; ++i) {
+        invariant(it.more());
+        wildcardElt = it.next();
+    }
+
+    return wildcardElt;
+}
+
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident) {
     stream << ident.toString();
     return stream;
