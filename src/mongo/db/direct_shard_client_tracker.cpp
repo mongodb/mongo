@@ -99,7 +99,7 @@ public:
 };
 
 auto& directShardConnections =
-    *ServerStatusSectionBuilder<DirectShardConnections>("directShardConnections");
+    *ServerStatusSectionBuilder<DirectShardConnections>("directShardConnections").forShard();
 
 }  // namespace
 
