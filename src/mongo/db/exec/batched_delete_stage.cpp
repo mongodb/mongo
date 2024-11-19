@@ -132,7 +132,8 @@ struct BatchedDeletesSSS : ServerStatusSection {
     AtomicWord<long long> timeInBatchMillis{0};
     AtomicWord<long long> refetchesDueToYield{0};
 };
-auto& batchedDeletesSSS = *ServerStatusSectionBuilder<BatchedDeletesSSS>("batchedDeletes");
+auto& batchedDeletesSSS =
+    *ServerStatusSectionBuilder<BatchedDeletesSSS>("batchedDeletes").forShard();
 
 // Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
 // serverStatus metric. As with ensureStillMatches, if false is returned, the WoringSetMember
