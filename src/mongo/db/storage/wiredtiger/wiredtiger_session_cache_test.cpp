@@ -34,7 +34,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/unittest/assert.h"
@@ -163,12 +162,11 @@ TEST(WiredTigerSessionCacheTest, ReleaseSessionAfterShutdown) {
 TEST(WiredTigerSessionCacheTest, resetConfigurationBeforeReleasingSessionToCache) {
     WiredTigerSessionCacheHarnessHelper harnessHelper("");
     WiredTigerSessionCache* sessionCache = harnessHelper.getSessionCache();
-    WiredTigerOplogManager oplogManager;
 
     // Assert that we start off with no sessions in the session cache.
     ASSERT_EQ(sessionCache->getIdleSessionsCount(), 0U);
     {
-        WiredTigerRecoveryUnit recoveryUnit(sessionCache, &oplogManager);
+        WiredTigerRecoveryUnit recoveryUnit(sessionCache, nullptr);
         // Set cache max wait time to be a non-default value.
         recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
 
@@ -192,7 +190,7 @@ TEST(WiredTigerSessionCacheTest, resetConfigurationBeforeReleasingSessionToCache
     // session cache.
     ASSERT_EQ(sessionCache->getIdleSessionsCount(), 1U);
     {
-        WiredTigerRecoveryUnit recoveryUnit(sessionCache, &oplogManager);
+        WiredTigerRecoveryUnit recoveryUnit(sessionCache, nullptr);
         WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
         // Assert that before it was released back into the session cache, the set of undo config
         // strings was cleared, which should indicate that the changes to the default settings of
@@ -207,9 +205,8 @@ TEST(WiredTigerSessionCacheTest, resetConfigurationBeforeReleasingSessionToCache
 TEST(WiredTigerSessionCacheTest, resetConfigurationToDefault) {
     WiredTigerSessionCacheHarnessHelper harnessHelper("");
     WiredTigerSessionCache* sessionCache = harnessHelper.getSessionCache();
-    WiredTigerOplogManager oplogManager;
 
-    WiredTigerRecoveryUnit recoveryUnit(sessionCache, &oplogManager);
+    WiredTigerRecoveryUnit recoveryUnit(sessionCache, nullptr);
     // Set cache max wait time to be a non-default value.
     recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
 

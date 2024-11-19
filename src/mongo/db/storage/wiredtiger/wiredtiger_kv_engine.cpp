@@ -735,8 +735,6 @@ void WiredTigerKVEngine::cleanShutdown() {
         return;
     }
 
-    // these must be the last things we do before _conn->close();
-    haltOplogManager(/*oplogRecordStore=*/nullptr, /*shuttingDown=*/true);
     if (_sessionSweeper) {
         LOGV2(22318, "Shutting down session sweeper thread");
         _sessionSweeper->shutdown();
@@ -1602,7 +1600,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             static_cast<WiredTigerRecordStore::Oplog*>(ret.get())->setTruncateMarkers(
                 WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx, ret.get()));
         }
-        startOplogManager(opCtx, ret.get());
+        initializeOplogVisibility(opCtx, ret.get());
     } else {
         WiredTigerRecordStore::Params params{
             .uuid = options.uuid,
@@ -2626,27 +2624,9 @@ bool WiredTigerKVEngine::supportsOplogTruncateMarkers() const {
     return true;
 }
 
-void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,
-                                           WiredTigerRecordStore* oplogRecordStore) {
-    stdx::lock_guard<stdx::mutex> lock(_oplogManagerMutex);
-    // Halt visibility thread if running on previous record store
-    if (_oplogRecordStore) {
-        _oplogManager->haltVisibilityThread();
-    }
-
-    _oplogManager->startVisibilityThread(opCtx, oplogRecordStore);
-    _oplogRecordStore = oplogRecordStore;
-}
-
-void WiredTigerKVEngine::haltOplogManager(WiredTigerRecordStore* oplogRecordStore,
-                                          bool shuttingDown) {
-    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
-    // Halt the visibility thread if we're in shutdown or the request matches the current record
-    // store.
-    if (shuttingDown || _oplogRecordStore == oplogRecordStore) {
-        _oplogManager->haltVisibilityThread();
-        _oplogRecordStore = nullptr;
-    }
+void WiredTigerKVEngine::initializeOplogVisibility(OperationContext* opCtx,
+                                                   WiredTigerRecordStore* oplogRecordStore) {
+    _oplogManager->initialize(opCtx, oplogRecordStore);
 }
 
 Status WiredTigerKVEngine::oplogDiskLocRegister(RecoveryUnit& ru,
@@ -2675,9 +2655,7 @@ Status WiredTigerKVEngine::oplogDiskLocRegister(RecoveryUnit& ru,
 void WiredTigerKVEngine::waitForAllEarlierOplogWritesToBeVisible(
     OperationContext* opCtx, RecordStore* oplogRecordStore) const {
     auto oplogManager = getOplogManager();
-    if (oplogManager->isRunning()) {
-        oplogManager->waitForAllEarlierOplogWritesToBeVisible(oplogRecordStore, opCtx);
-    }
+    oplogManager->waitForAllEarlierOplogWritesToBeVisible(oplogRecordStore, opCtx);
 }
 
 bool WiredTigerKVEngine::waitUntilDurable(OperationContext* opCtx) {

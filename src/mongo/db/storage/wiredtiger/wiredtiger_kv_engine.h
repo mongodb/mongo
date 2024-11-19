@@ -405,25 +405,17 @@ public:
     void syncSizeInfo(bool sync) const;
 
     /*
-     * The oplog manager is always accessible, but this method will start the background thread to
-     * control oplog entry visibility for reads.
-     *
-     * On mongod, the background thread will be started when the oplog record store is created, and
-     * stopped when the oplog record store is destroyed. For unit tests, the background thread may
-     * be started and stopped multiple times as tests create and destroy the oplog record store.
+     * Registers the oplog and initializes the oplog manager
      */
-    void startOplogManager(OperationContext* opCtx, WiredTigerRecordStore* oplogRecordStore);
-    void haltOplogManager(WiredTigerRecordStore* oplogRecordStore, bool shuttingDown);
+    void initializeOplogVisibility(OperationContext* opCtx,
+                                   WiredTigerRecordStore* oplogRecordStore);
 
     /*
-     * Always returns a non-nil pointer. However, the WiredTigerOplogManager may not have been
-     * initialized and its background refreshing thread may not be running.
+     * Always returns a non-null pointer and is valid for the lifetime of this KVEngine. However,
+     * the WiredTigerOplogManager may not have been initialized, which happens after the oplog
+     * RecordStore is constructed.
      *
-     * A caller that wants to get the oplog read timestamp, or call
-     * `waitForAllEarlierOplogWritesToBeVisible`, is advised to first see if the oplog manager is
-     * running with a call to `isRunning`.
-     *
-     * A caller that simply wants to call `triggerOplogVisibilityUpdate` may do so without concern.
+     * See WiredTigerOplogManager for details on thread safety.
      */
     WiredTigerOplogManager* getOplogManager() const {
         return _oplogManager.get();
@@ -664,10 +656,7 @@ private:
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
     ClockSource* const _clockSource;
 
-    // Mutex to protect use of _oplogRecordStore by this instance of KV engine.
-    mutable stdx::mutex _oplogManagerMutex;
-    const WiredTigerRecordStore* _oplogRecordStore = nullptr;
-    std::unique_ptr<WiredTigerOplogManager> _oplogManager;
+    const std::unique_ptr<WiredTigerOplogManager> _oplogManager;
 
     std::string _canonicalName;
     std::string _path;

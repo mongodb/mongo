@@ -40,7 +40,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/unittest/assert.h"
@@ -75,7 +74,7 @@ private:
 class WiredTigerTestHelper : public ScopedGlobalServiceContextForTest {
 public:
     WiredTigerTestHelper() {
-        _ru = std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, &_oplogManager);
+        _ru = std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, nullptr);
         _session = _ru->getSession();
         auto wt_session = _session->getSession();
         invariant(
@@ -92,7 +91,6 @@ private:
     WiredTigerConnection _connection{_dbpath.path(), ""};
     ClockSourceMock _clockSource;
     WiredTigerSessionCache _sessionCache{_connection.getConnection(), &_clockSource};
-    WiredTigerOplogManager _oplogManager;
     std::unique_ptr<WiredTigerRecoveryUnit> _ru;
 
     WiredTigerSession* _session;

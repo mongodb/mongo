@@ -50,7 +50,6 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -171,7 +170,7 @@ public:
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache.get(), &_oplogManager);
+        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache.get(), nullptr);
     }
 
 private:
@@ -180,7 +179,6 @@ private:
     std::vector<IndexDescriptor> _descriptors;
     WT_CONNECTION* _conn;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
-    WiredTigerOplogManager _oplogManager;
 };
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {

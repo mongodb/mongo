@@ -33,23 +33,19 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
-
-class WiredTigerSessionCache;
 
 /**
  * Manages oplog visibility.
  *
  * On demand, queries WiredTiger's all_durable timestamp value and updates the oplog read timestamp.
- * This is done asynchronously on a thread that startVisibilityThread() will set up.
+ * This is done synchronously when calls to triggerOplogVisibilityUpdate() provide a timestamp
+ * greater than the current visibility timestamp.
  *
  * The WT all_durable timestamp is the in-memory timestamp behind which there are no oplog holes
  * in-memory. Note, all_durable is the timestamp that has no holes in-memory, which may NOT be
@@ -65,23 +61,24 @@ class WiredTigerOplogManager {
     WiredTigerOplogManager& operator=(const WiredTigerOplogManager&) = delete;
 
 public:
-    WiredTigerOplogManager() {}
-    ~WiredTigerOplogManager() {}
+    WiredTigerOplogManager() = default;
+    ~WiredTigerOplogManager() = default;
 
     /*
-     * Initializes the oplog read timestamp and start the update visibility thread.
+     * Initializes the oplog read timestamp with the highest oplog timestamp and saves the oplog
+     * pointer for notifying capped waiters.
      */
-    void startVisibilityThread(OperationContext* opCtx, RecordStore* oplogRecordStore);
-    void haltVisibilityThread();
-
-    bool isRunning() {
-        return _isRunning.load();
-    }
+    void initialize(OperationContext* opCtx, RecordStore* oplogRecordStore);
 
     /**
-     * Signals the oplog visibility thread to update the oplog read timestamp.
+     * Updates the oplog read timestamp if the visibility timestamp is behind the provided
+     * `commitTimestamp`, and notifies any capped waiters on the oplog if the visibility point is
+     * advanced.
+     *
+     * Callers must ensure this call is not concurrenct with a call to `initialize`, as this is not
+     * thread-safe.
      */
-    void triggerOplogVisibilityUpdate();
+    void triggerOplogVisibilityUpdate(KVEngine* engine, Timestamp commitTimestamp);
 
     /**
      * Waits for all committed writes at this time to become visible (that is, until no holes exist
@@ -98,43 +95,23 @@ public:
      *
      * Holes in the oplog occur due to out-of-order primary writes, where a write with a later
      * assigned timestamp can commit before a write assigned an earlier timestamp.
+     *
+     * This is a thread-safe call at any point.
      */
     std::uint64_t getOplogReadTimestamp() const;
     void setOplogReadTimestamp(Timestamp ts);
 
 private:
-    /**
-     * Runs the oplog visibility updates when signaled by triggerOplogVisibilityUpdate() until
-     * _shuttingDown is set to true.
-     */
-    void _updateOplogVisibilityLoop(WiredTigerSessionCache* sessionCache,
-                                    RecordStore* oplogRecordStore);
-
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
 
     AtomicWord<unsigned long long> _oplogReadTimestamp{0};
 
-    stdx::thread _oplogVisibilityThread;
-
-    // Signaled to trigger the oplog visibility thread to run.
-    mutable stdx::condition_variable _oplogVisibilityThreadCV;
+    RecordStore* _oplogRecordStore = nullptr;
 
     // Signaled when oplog visibility has been updated.
     mutable stdx::condition_variable _oplogEntriesBecameVisibleCV;
 
     // Protects the state below.
     mutable stdx::mutex _oplogVisibilityStateMutex;
-
-    AtomicWord<bool> _isRunning{false};
-
-    bool _shuttingDown = false;
-
-    // Triggers an oplog visibility update -- can be delayed if no callers are waiting for an
-    // update, per the _opsWaitingForOplogVisibility counter.
-    bool _triggerOplogVisibilityUpdate = false;
-
-    // Incremented when a caller is waiting for more of the oplog to become visible, to avoid update
-    // delays for batching.
-    int64_t _opsWaitingForOplogVisibilityUpdate = 0;
 };
 }  // namespace mongo

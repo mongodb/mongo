@@ -352,14 +352,15 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     }
 
     if (_isTimestamped) {
-        if (!_orderedCommit) {
+        if (!_orderedCommit && _oplogManager) {
             // We only need to update oplog visibility where commits can be out-of-order with
             // respect to their assigned optime. This will ensure the oplog read timestamp gets
             // updated when oplog 'holes' are filled: the last commit filling the last hole will
             // prompt the oplog read timestamp to be forwarded.
             //
             // This should happen only on primary nodes.
-            _oplogManager->triggerOplogVisibilityUpdate();
+            auto commitTs = _lastTimestampSet ? _lastTimestampSet.value() : _commitTimestamp;
+            _oplogManager->triggerOplogVisibilityUpdate(_sessionCache->getKVEngine(), commitTs);
         }
         _isTimestamped = false;
     }
@@ -475,7 +476,9 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 
     switch (_timestampReadSource) {
         case ReadSource::kNoTimestamp: {
-            _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
+            if (_oplogManager) {
+                _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
+            }
             WiredTigerBeginTxnBlock(_session,
                                     _prepareConflictBehavior,
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,

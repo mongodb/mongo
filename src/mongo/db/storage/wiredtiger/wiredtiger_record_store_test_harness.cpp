@@ -136,7 +136,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto oplog = dynamic_cast<WiredTigerRecordStore::Oplog*>(ret.get());
     oplog->setTruncateMarkers(
         WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), oplog));
-    _engine.startOplogManager(opCtx.get(), oplog);
+    _engine.initializeOplogVisibility(opCtx.get(), oplog);
     return ret;
 }
 

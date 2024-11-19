@@ -41,7 +41,6 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -103,22 +102,16 @@ public:
         return &_sessionCache;
     }
 
-    WiredTigerOplogManager* getOplogManager() {
-        return &_oplogManager;
-    }
-
 private:
     unittest::TempDir _dbpath{"wt_test"};
     WiredTigerConnection _connection;
     WiredTigerSessionCache _sessionCache;
-    WiredTigerOplogManager _oplogManager;
 };
 
 class WiredTigerUtilMetadataTest : public ServiceContextTest {
 protected:
     WiredTigerUtilMetadataTest() : _harnessHelper("") {
-        _ru = std::make_unique<WiredTigerRecoveryUnit>(_harnessHelper.getSessionCache(),
-                                                       _harnessHelper.getOplogManager());
+        _ru = std::make_unique<WiredTigerRecoveryUnit>(_harnessHelper.getSessionCache(), nullptr);
     }
 
     const char* getURI() const {
@@ -295,8 +288,7 @@ class WiredTigerUtilTest : public ServiceContextTest {};
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
-                                                       harnessHelper.getOplogManager());
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
     WiredTigerSession* session = ru->getSession();
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:no_such_table",
@@ -308,8 +300,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
-                                                       harnessHelper.getOplogManager());
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
     WiredTigerSession* session = ru->getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
@@ -323,8 +314,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
-                                                       harnessHelper.getOplogManager());
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
     WiredTigerSession* session = ru->getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
@@ -339,8 +329,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
-                                                       harnessHelper.getOplogManager());
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
     WiredTigerSession* session = ru->getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
@@ -366,8 +355,7 @@ TEST_F(WiredTigerUtilTest, ParseAPIMessages) {
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
 
     // Create a session.
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
-                                                       harnessHelper.getOplogManager());
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
     WiredTigerSession* session = ru->getSession();
     WT_SESSION* wtSession = session->getSession();
 

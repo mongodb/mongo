@@ -67,9 +67,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -246,9 +243,6 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
  * long as the commit for each insert comes before the next insert starts.
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
-    ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
-    WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
-
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = harnessHelper->getEngine();
@@ -266,7 +260,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
         RecordId id = oplogOrderInsertOplog(opCtx.get(), engine, rs, 1);
         ASSERT(isOpHidden(id));
         txn.commit();
-        ASSERT(isOpHidden(id));
+        ASSERT_FALSE(isOpHidden(id));
     }
 
     {
@@ -276,7 +270,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
         RecordId id = oplogOrderInsertOplog(opCtx.get(), engine, rs, 2);
         ASSERT(isOpHidden(id));
         txn.commit();
-        ASSERT(isOpHidden(id));
+        ASSERT_FALSE(isOpHidden(id));
     }
 }
 
@@ -285,9 +279,6 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
  * op and all earlier ops are durable.
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
-    ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
-    WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
-
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = harnessHelper->getEngine();
@@ -322,20 +313,13 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
 
     txn.commit();
 
-    ASSERT(isOpHidden(id1));
-    ASSERT(isOpHidden(id2));
-
-    // Wait a bit and check again to make sure they don't become visible automatically.
-    sleepsecs(1);
-    ASSERT(isOpHidden(id1));
-    ASSERT(isOpHidden(id2));
-
-    WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off);
+    ASSERT_FALSE(isOpHidden(id1));
+    ASSERT_FALSE(isOpHidden(id2));
 
     engine->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get(), rs.get());
 
-    ASSERT(!isOpHidden(id1));
-    ASSERT(!isOpHidden(id2));
+    ASSERT_FALSE(isOpHidden(id1));
+    ASSERT_FALSE(isOpHidden(id2));
 }
 
 TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {

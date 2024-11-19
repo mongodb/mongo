@@ -45,8 +45,6 @@ namespace mongo {
 class WiredTigerSession;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 
-class WiredTigerOplogManager;
-
 class WiredTigerSnapshotManager final : public SnapshotManager {
     WiredTigerSnapshotManager(const WiredTigerSnapshotManager&) = delete;
     WiredTigerSnapshotManager& operator=(const WiredTigerSnapshotManager&) = delete;

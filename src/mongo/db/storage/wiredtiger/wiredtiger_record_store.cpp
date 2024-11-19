@@ -1533,8 +1533,6 @@ WiredTigerRecordStore::Oplog::~Oplog() {
     if (_oplog->getTruncateMarkers()) {
         _oplog->getTruncateMarkers()->kill();
     }
-    // Delete oplog visibility manager on KV engine.
-    _kvEngine->haltOplogManager(this, /*shuttingDown=*/false);
 }
 
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getCursor(
