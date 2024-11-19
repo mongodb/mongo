@@ -10,7 +10,7 @@ export function getShardNames(db) {
  * Finds the _id of the primary shard for database 'dbname', e.g., 'test-rs0'
  */
 export function getPrimaryShardIdForDatabase(conn, dbname) {
-    var x = conn.getDB("config").databases.findOne({_id: "" + dbname});
+    var x = conn.getDB("config").databases.findOne({_id: dbname});
     if (x) {
         return x.primary;
     }

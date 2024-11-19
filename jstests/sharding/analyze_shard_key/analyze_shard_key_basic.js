@@ -7,19 +7,13 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
+    setParameterOpts,
     testExistingShardedCollection,
     testExistingUnshardedCollection,
     testNonExistingCollection
 } from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_common_tests.js";
 
-const setParameterOpts = {
-    analyzeShardKeyNumRanges: 100
-};
 const dbNameBase = "testDb";
-// The sampling-based initial split policy needs 10 samples per split point so
-// 10 * analyzeShardKeyNumRanges is the minimum number of distinct shard key values that the
-// collection must have for the command to not fail to generate split points.
-const numDocs = 10 * setParameterOpts.analyzeShardKeyNumRanges;
 
 function testNotSupportReadWriteConcern(writeConn, testCases) {
     const dbName = dbNameBase;
@@ -77,8 +71,8 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
     });
 
     testNonExistingCollection(dbNameBase, testCases);
-    testExistingUnshardedCollection(dbNameBase, st.s, testCases, numDocs);
-    testExistingShardedCollection(dbNameBase, st.s, testCases, numDocs);
+    testExistingUnshardedCollection(dbNameBase, st.s, testCases);
+    testExistingShardedCollection(dbNameBase, st.s, testCases);
     testNotSupportReadWriteConcern(st.s, testCases);
 
     st.stop();
@@ -104,7 +98,7 @@ if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove t
         testCases.push({conn: node, isSupported: true, isReplSetMongod: true});
     });
 
-    testExistingUnshardedCollection(dbNameBase, primary, testCases, numDocs);
+    testExistingUnshardedCollection(dbNameBase, primary, testCases);
     testNonExistingCollection(dbNameBase, testCases);
     testNotSupportReadWriteConcern(primary, testCases);
 
@@ -142,7 +136,7 @@ if (!TestData.auth) {
 
     // The analyzeShardKey command is not supported on standalone mongod.
     const testCases = [{conn: mongod, isSupported: false}];
-    testExistingUnshardedCollection(dbNameBase, mongod, testCases, numDocs);
+    testExistingUnshardedCollection(dbNameBase, mongod, testCases);
 
     MongoRunner.stopMongod(mongod);
 }

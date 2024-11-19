@@ -1,31 +1,31 @@
 /**
  * Utilities for testing the analyzeShardKey command.
  */
-export var AnalyzeShardKeyUtil = (function() {
+export var AnalyzeShardKeyUtil = {
     /**
      * Returns true if the given key pattern contains a hashed key.
      */
-    function isHashedKeyPattern(keyPattern) {
+    isHashedKeyPattern(keyPattern) {
         for (let fieldName in keyPattern) {
             if (keyPattern[fieldName] == "hashed") {
                 return true;
             }
         }
         return false;
-    }
+    },
 
     /**
      * Returns true if the given key pattern is {_id: 1}.
      */
-    function isIdKeyPattern(keyPattern) {
+    isIdKeyPattern(keyPattern) {
         return bsonWoCompare(keyPattern, {_id: 1}) == 0;
-    }
+    },
 
     /**
      * Returns a set of current shard key field names, candidate shard key field names and
      * index key field names combined.
      */
-    function getCombinedFieldNames(currentShardKey, candidateShardKey, indexKey) {
+    getCombinedFieldNames(currentShardKey, candidateShardKey, indexKey) {
         const fieldNames = new Set([]);
         for (let fieldName in currentShardKey) {
             fieldNames.add(fieldName);
@@ -37,24 +37,24 @@ export var AnalyzeShardKeyUtil = (function() {
             fieldNames.add(fieldName);
         }
         return fieldNames;
-    }
+    },
 
     /**
      * Returns the value for the given field.
      */
-    function getDottedField(doc, fieldName) {
+    getDottedField(doc, fieldName) {
         let val = doc;
         const fieldNames = fieldName.split(".");
         for (let i = 0; i < fieldNames.length; i++) {
             val = val[fieldNames[i]];
         }
         return val;
-    }
+    },
 
     /**
      * Sets the given field to the given value. The field name can be dotted.
      */
-    function setDottedField(doc, fieldName, val) {
+    setDottedField(doc, fieldName, val) {
         let obj = doc;
         const fieldNames = fieldName.split(".");
         for (let i = 0; i < fieldNames.length; i++) {
@@ -68,38 +68,38 @@ export var AnalyzeShardKeyUtil = (function() {
             }
             obj = obj[fieldName];
         }
-    }
+    },
 
     /**
      * Extracts the shard key value from the given document.
      */
-    function extractShardKeyValueFromDocument(doc, shardKey) {
+    extractShardKeyValueFromDocument(doc, shardKey) {
         const shardKeyValue = {};
         for (let fieldName in shardKey) {
             shardKeyValue[fieldName] = AnalyzeShardKeyUtil.getDottedField(doc, fieldName);
         }
         return shardKeyValue;
-    }
+    },
 
     /**
      * Returns a random integer between the given range (inclusive).
      */
-    function getRandInteger(min, max) {
+    getRandInteger(min, max) {
         return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
+    },
 
     /**
      * Returns a random element in the given array.
      */
-    function getRandomElement(arr) {
-        return arr[getRandInteger(0, arr.length - 1)];
-    }
+    getRandomElement(arr) {
+        return arr[this.getRandInteger(0, arr.length - 1)];
+    },
 
     /**
      * Returns the field name "<prefix>", "<prefix>.x" or "<prefix>.x.y" with roughly equal
      * probability.
      */
-    function getRandomFieldName(prefix) {
+    getRandomFieldName(prefix) {
         const prob = Math.random();
         if (prob < 0.3) {
             return prefix;
@@ -107,73 +107,73 @@ export var AnalyzeShardKeyUtil = (function() {
             return prefix + ".x";
         }
         return prefix + ".x.y";
-    }
+    },
 
     /**
      * Returns true if the collection is a clustered collection. Assumes that the collection
      * exists.
      */
-    function isClusterCollection(conn, dbName, collName) {
+    isClusterCollection(conn, dbName, collName) {
         const listCollectionRes = assert.commandWorked(
             conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}));
         return listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
-    }
+    },
 
     /**
      * Enables profiling of the given database on all the given mongods.
      */
-    function enableProfiler(mongodConns, dbName) {
+    enableProfiler(mongodConns, dbName) {
         mongodConns.forEach(conn => {
             assert.commandWorked(conn.getDB(dbName).setProfilingLevel(2));
         });
-    }
+    },
 
     /**
      * Disables profiling of the given database on all the given mongods.
      */
-    function disableProfiler(mongodConns, dbName) {
+    disableProfiler(mongodConns, dbName) {
         mongodConns.forEach(conn => {
             assert.commandWorked(conn.getDB(dbName).setProfilingLevel(0));
         });
-    }
+    },
 
-    function calculatePercentage(part, whole) {
+    calculatePercentage(part, whole) {
         assert.gte(part, 0);
         assert.gt(whole, 0);
         assert.lte(part, whole);
         return (part * 100.0 / whole);
-    }
+    },
 
     /**
      * Returns true if 'objs' contains 'obj'.
      */
-    function containsBSONObj(objs, obj) {
+    containsBSONObj(objs, obj) {
         for (let tmpObj of objs) {
             if (bsonWoCompare(obj, tmpObj) == 0) {
                 return true;
             }
         }
         return false;
-    }
+    },
 
     // The analyzeShardKey command rounds the percentages 10 decimal places. The epsilon is chosen
     // to account for that.
-    function assertApprox(actual, expected, msg, epsilon = 1e-9) {
+    assertApprox(actual, expected, msg, epsilon = 1e-9) {
         return assert.lte(Math.abs(actual - expected), epsilon, {actual, expected, msg});
-    }
+    },
 
     /**
      * Asserts that the difference between 'actual' and 'expected' is less than 'maxPercentage' of
      * 'expected'.
      */
-    function assertDiffPercentage(actual, expected, maxPercentage) {
+    assertDiffPercentage(actual, expected, maxPercentage) {
         const actualPercentage = Math.abs(actual - expected) * 100 / expected;
         assert.lt(actualPercentage,
                   maxPercentage,
                   tojson({actual, expected, maxPercentage, actualPercentage}));
-    }
+    },
 
-    function validateKeyCharacteristicsMetrics(metrics) {
+    validateKeyCharacteristicsMetrics(metrics) {
         assert.gt(metrics.numDocsTotal, 0, metrics);
         assert.gt(metrics.numDocsSampled, 0, metrics);
         assert.gt(metrics.numDistinctValues, 0, metrics);
@@ -211,13 +211,13 @@ export var AnalyzeShardKeyUtil = (function() {
             assert.gte(Math.abs(coefficient), 0, metrics);
             assert.lte(Math.abs(coefficient), 1, metrics);
         }
-    }
+    },
 
-    function assertNotContainKeyCharacteristicsMetrics(res) {
+    assertNotContainKeyCharacteristicsMetrics(res) {
         assert(!res.hasOwnProperty("keyCharacteristics"), res);
-    }
+    },
 
-    function assertContainKeyCharacteristicsMetrics(res) {
+    assertContainKeyCharacteristicsMetrics(res) {
         assert(res.hasOwnProperty("keyCharacteristics"), res);
         const metrics = res.keyCharacteristics;
         assert(metrics.hasOwnProperty("numDocsTotal"), metrics);
@@ -226,10 +226,10 @@ export var AnalyzeShardKeyUtil = (function() {
         assert(metrics.hasOwnProperty("mostCommonValues"), metrics);
         assert(metrics.hasOwnProperty("monotonicity"), metrics);
         assert(metrics.hasOwnProperty("avgDocSizeBytes"), metrics);
-        validateKeyCharacteristicsMetrics(metrics);
-    }
+        this.validateKeyCharacteristicsMetrics(metrics);
+    },
 
-    function assertKeyCharacteristicsMetrics(actual, expected) {
+    assertKeyCharacteristicsMetrics(actual, expected) {
         assert.eq(actual.numDocsTotal, expected.numDocs, {actual, expected});
         assert.eq(actual.numDocsSampled, expected.numDocs, {actual, expected});
         assert.eq(actual.isUnique, expected.isUnique, {actual, expected});
@@ -250,7 +250,7 @@ export var AnalyzeShardKeyUtil = (function() {
             });
 
             // Verify that this shard key value is among the expected ones.
-            assert(containsBSONObj(expected.mostCommonValues, mostCommonValue), {
+            assert(this.containsBSONObj(expected.mostCommonValues, mostCommonValue), {
                 mostCommonValue,
                 actual: actual.mostCommonValues,
                 expected: expected.mostCommonValues
@@ -260,9 +260,9 @@ export var AnalyzeShardKeyUtil = (function() {
 
         assert(actual.hasOwnProperty("monotonicity"), {actual, expected});
         assert(actual.hasOwnProperty("avgDocSizeBytes"), {actual, expected});
-    }
+    },
 
-    function validateReadDistributionMetrics(metrics) {
+    validateReadDistributionMetrics(metrics) {
         if (metrics.sampleSize.total == 0) {
             assert.eq(bsonWoCompare(
                           metrics,
@@ -286,16 +286,16 @@ export var AnalyzeShardKeyUtil = (function() {
                     assert.lte(metrics[fieldName], 100);
                 }
             }
-            assertApprox(metrics.percentageOfSingleShardReads +
-                             metrics.percentageOfMultiShardReads +
-                             metrics.percentageOfScatterGatherReads,
-                         100,
-                         metrics);
+            this.assertApprox(metrics.percentageOfSingleShardReads +
+                                  metrics.percentageOfMultiShardReads +
+                                  metrics.percentageOfScatterGatherReads,
+                              100,
+                              metrics);
             assert.gt(metrics.numReadsByRange.length, 0);
         }
-    }
+    },
 
-    function validateWriteDistributionMetrics(metrics) {
+    validateWriteDistributionMetrics(metrics) {
         if (metrics.sampleSize.total == 0) {
             assert.eq(
                 bsonWoCompare(metrics,
@@ -322,28 +322,28 @@ export var AnalyzeShardKeyUtil = (function() {
                     assert.lte(metrics[fieldName], 100);
                 }
             }
-            assertApprox(metrics.percentageOfSingleShardWrites +
-                             metrics.percentageOfMultiShardWrites +
-                             metrics.percentageOfScatterGatherWrites,
-                         100,
-                         metrics);
+            this.assertApprox(metrics.percentageOfSingleShardWrites +
+                                  metrics.percentageOfMultiShardWrites +
+                                  metrics.percentageOfScatterGatherWrites,
+                              100,
+                              metrics);
             assert.gt(metrics.numWritesByRange.length, 0);
         }
-    }
+    },
 
-    function assertNotContainReadWriteDistributionMetrics(res) {
+    assertNotContainReadWriteDistributionMetrics(res) {
         assert(!res.hasOwnProperty("readDistribution"));
         assert(!res.hasOwnProperty("writeDistribution"));
-    }
+    },
 
-    function assertContainReadWriteDistributionMetrics(res) {
+    assertContainReadWriteDistributionMetrics(res) {
         assert(res.hasOwnProperty("readDistribution"));
         assert(res.hasOwnProperty("writeDistribution"));
-        validateReadDistributionMetrics(res.readDistribution);
-        validateWriteDistributionMetrics(res.writeDistribution);
-    }
+        this.validateReadDistributionMetrics(res.readDistribution);
+        this.validateWriteDistributionMetrics(res.writeDistribution);
+    },
 
-    function validateSampledQueryDocument(doc) {
+    validateSampledQueryDocument(doc) {
         const readCmdNames = new Set(["find", "aggregate", "count", "distinct"]);
         assert(doc.hasOwnProperty("ns"), doc);
         assert(doc.hasOwnProperty("collectionUuid"), doc);
@@ -354,30 +354,5 @@ export var AnalyzeShardKeyUtil = (function() {
             assert(doc.cmd.hasOwnProperty("filter"));
             assert(doc.cmd.hasOwnProperty("collation"));
         }
-    }
-
-    return {
-        isHashedKeyPattern,
-        isIdKeyPattern,
-        getCombinedFieldNames,
-        getDottedField,
-        setDottedField,
-        extractShardKeyValueFromDocument,
-        getRandInteger,
-        getRandomElement,
-        getRandomFieldName,
-        isClusterCollection,
-        enableProfiler,
-        disableProfiler,
-        calculatePercentage,
-        assertApprox,
-        assertDiffPercentage,
-        assertNotContainKeyCharacteristicsMetrics,
-        assertContainKeyCharacteristicsMetrics,
-        assertKeyCharacteristicsMetrics,
-        validateKeyCharacteristicsMetrics,
-        assertNotContainReadWriteDistributionMetrics,
-        assertContainReadWriteDistributionMetrics,
-        validateSampledQueryDocument
-    };
-})();
+    },
+};

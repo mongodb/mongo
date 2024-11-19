@@ -8,6 +8,7 @@ selector:
   roots:
     # Analyze shard key smoke tests
     - jstests/core_sharding/analyze_shard_key/analyze_shard_key.js
+    - jstests/core_sharding/analyze_shard_key/cardinality_and_frequency.js
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_basic.js
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_persistence.js

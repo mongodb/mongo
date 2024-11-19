@@ -4,7 +4,19 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {getNonPrimaryShardName} from "jstests/sharding/libs/sharding_util.js";
+
+export const setParameterOpts = {
+    analyzeShardKeyNumRanges: 100
+};
+
+// The sampling-based initial split policy needs 10 samples per split point so
+// 10 * analyzeShardKeyNumRanges is the minimum number of distinct shard key values that the
+// collection must have for the command to not fail to generate split points.
+const numDocs = 10 * setParameterOpts.analyzeShardKeyNumRanges;
 
 export function testNonExistingCollection(dbName, testCases) {
     const collName = "testCollNonExisting";
@@ -25,7 +37,7 @@ export function testNonExistingCollection(dbName, testCases) {
     });
 }
 
-export function testExistingUnshardedCollection(dbName, writeConn, testCases, numDocs) {
+export function testExistingUnshardedCollection(dbName, writeConn, testCases) {
     const collName = "testCollUnsharded";
     const ns = dbName + "." + collName;
     const db = writeConn.getDB(dbName);
@@ -97,7 +109,7 @@ export function testExistingUnshardedCollection(dbName, writeConn, testCases, nu
     });
 }
 
-export function testExistingShardedCollection(dbName, mongos, testCases, numDocs) {
+export function testExistingShardedCollection(dbName, mongos, testCases) {
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
     const db = mongos.getDB(dbName);
