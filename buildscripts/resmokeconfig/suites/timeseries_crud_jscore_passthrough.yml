@@ -33,7 +33,6 @@ selector:
     - jstests/core/query/collection_uuid_find.js
     - jstests/core/write/collection_uuid_write_commands.js
     # Time-series is not allowed with an explicit validator.
-    - jstests/core/query/doc_validation/doc_validation_with_now_variable.js
     - jstests/core/list_namespaces_invalidation.js
     - jstests/core/write/bulk/bulk_write.js
     - jstests/core/write/bulk/bulk_write_non_transaction.js
