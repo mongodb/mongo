@@ -91,10 +91,7 @@ buildvariants:
   - &ubuntu2404-template
     name: &ubuntu2404 ubuntu2404
     display_name: Ubuntu 24.04
-    tags:
-      [
-        "forbid_tasks_tagged_with_experimental_experimental_experimental_experimental",
-      ]
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2404-small
@@ -150,7 +147,7 @@ buildvariants:
 
   - name: ubuntu2004
     display_name: Ubuntu 20.04
-    tags: ["forbid_tasks_tagged_with_experimental_experimental_experimental"]
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2004-small
@@ -197,7 +194,7 @@ buildvariants:
   - &enterprise-ubuntu2004-64-template
     name: &enterprise-ubuntu2004-64 enterprise-ubuntu2004-64
     display_name: Enterprise Ubuntu 20.04
-    tags: ["forbid_tasks_tagged_with_experimental_experimental"]
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2004-small
@@ -260,7 +257,7 @@ buildvariants:
 
   - name: enterprise-ubuntu2204-64
     display_name: Enterprise Ubuntu 22.04
-    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental_experimental"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-small
@@ -337,7 +334,7 @@ buildvariants:
 
   - name: enterprise-ubuntu2004-arm64
     display_name: Enterprise Ubuntu 20.04 arm64
-    tags: ["forbid_tasks_tagged_with_experimental_experimental"]
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2004-arm64
@@ -435,7 +432,7 @@ buildvariants:
 
   - name: enterprise-ubuntu2204-arm64
     display_name: Enterprise Ubuntu 22.04 arm64
-    tags: ["forbid_tasks_tagged_with_experimental_experimental"]
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-arm64-small
@@ -481,7 +478,7 @@ buildvariants:
 
   - name: ubuntu2204-arm64
     display_name: Ubuntu 22.04 arm64
-    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental_experimental"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-arm64-small
@@ -581,11 +578,7 @@ buildvariants:
 
   - name: ubuntu2404-arm64
     display_name: Ubuntu 24.04 arm64
-    tags:
-      [
-        "bazel_check",
-        "forbid_tasks_tagged_with_experimental_experimental_experimental_experimental_experimental",
-      ]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2404-arm64-small
@@ -632,7 +625,7 @@ buildvariants:
 
   - name: enterprise-ubuntu2404-arm64
     display_name: Enterprise Ubuntu 24.04 arm64
-    tags: ["forbid_tasks_tagged_with_experimental_experimental_experimental"]
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2404-arm64-small

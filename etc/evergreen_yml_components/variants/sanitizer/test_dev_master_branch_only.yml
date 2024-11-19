@@ -465,7 +465,7 @@ buildvariants:
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
-    tags: ["suggested", "forbid_tasks_tagged_with_experimental_experimental"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     run_on:
       - rhel8.8-large

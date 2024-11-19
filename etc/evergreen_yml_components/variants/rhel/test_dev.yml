@@ -118,7 +118,7 @@ buildvariants:
   - <<: *linux_x86_dynamic_compile_variant_dependency
     name: enterprise-rhel-8-64-bit-dynamic
     display_name: "* Shared Library Enterprise RHEL 8"
-    tags: ["suggested", "forbid_tasks_tagged_with_experimental_experimental"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-small
