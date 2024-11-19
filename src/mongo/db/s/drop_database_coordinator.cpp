@@ -116,6 +116,14 @@
 namespace mongo {
 namespace {
 
+BSONObj makeDatabaseQuery(const DatabaseName& dbName, const DatabaseVersion& dbVersion) {
+    // Making the dbVersion timestamp part of the query ensures idempotency.
+    return BSON(DatabaseType::kDbNameFieldName
+                << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())
+                << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kTimestampFieldName
+                << dbVersion.getTimestamp());
+}
+
 void removeDatabaseFromConfigAndUpdatePlacementHistory(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -138,13 +146,7 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
     const auto transactionChain = [opCtx, dbName, dbVersion](
                                       const txn_api::TransactionClient& txnClient,
                                       ExecutorPtr txnExec) {
-        // Making the dbVersion timestamp part of the query ensures idempotency.
-        write_ops::DeleteOpEntry deleteDatabaseEntryOp{
-            BSON(DatabaseType::kDbNameFieldName
-                 << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())
-                 << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kTimestampFieldName
-                 << dbVersion.getTimestamp()),
-            false};
+        write_ops::DeleteOpEntry deleteDatabaseEntryOp{makeDatabaseQuery(dbName, dbVersion), false};
 
         write_ops::DeleteCommandRequest deleteDatabaseEntry(
             NamespaceString::kConfigDatabasesNamespace, {deleteDatabaseEntryOp});
@@ -166,8 +168,26 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
                 return txnClient.runCRUDOp(insertPlacementEntry, {1});
             })
             .thenRunOn(txnExec)
-            .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
+            .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
                 uassertStatusOK(insertPlacementEntryResponse.toStatus());
+
+                // Inserts a document {_id: <dbName>, version: {timestamp: <timestamp>}} to
+                // 'config.dropPendingDBs' collection on the config server. This blocks
+                // createDatabase coordinator from committing the creation of database with the
+                // same name to the sharding catalog.
+                write_ops::InsertCommandRequest insertConfigDropPendingDBsEntry(
+                    NamespaceString::kConfigDropPendingDBsNamespace,
+                    {BSON(DatabaseType::kDbNameFieldName
+                          << DatabaseNameUtil::serialize(
+                                 dbName, SerializationContext::stateCommandRequest())
+                          << DatabaseType::kVersionFieldName
+                          << BSON(DatabaseVersion::kTimestampFieldName
+                                  << dbVersion.getTimestamp()))});
+                return txnClient.runCRUDOp(insertConfigDropPendingDBsEntry, {2});
+            })
+            .thenRunOn(txnExec)
+            .then([](const BatchedCommandResponse& insertConfigDropPendingDBsEntryResponse) {
+                uassertStatusOK(insertConfigDropPendingDBsEntryResponse.toStatus());
             })
             .semi();
     };
@@ -525,6 +545,30 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
             ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase", dbNss);
             LOGV2(5494506, "Database dropped", "db"_attr = _dbName);
+        })
+        .then([this, anchor = shared_from_this()] {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            BatchedCommandRequest request([&] {
+                write_ops::DeleteOpEntry deleteDatabaseEntryOp{
+                    makeDatabaseQuery(_dbName, *metadata().getDatabaseVersion()), false};
+
+                write_ops::DeleteCommandRequest deleteDatabaseEntry(
+                    NamespaceString::kConfigDropPendingDBsNamespace, {deleteDatabaseEntryOp});
+
+                return deleteDatabaseEntry;
+            }());
+
+            auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            uassertStatusOK(configServer
+                                ->runBatchWriteCommand(opCtx,
+                                                       Milliseconds::max(),
+                                                       request,
+                                                       ShardingCatalogClient::kMajorityWriteConcern,
+                                                       Shard::RetryPolicy::kIdempotent)
+                                .toStatus());
         });
 }
 
