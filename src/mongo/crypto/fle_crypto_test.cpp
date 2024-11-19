@@ -276,10 +276,6 @@ TEST(FLETokens, TestVectors) {
     ASSERT_EQUALS(
         ESCToken(decodePrf("279C575B52B73677EEF07D9C1126EBDF08C35369570A9B75E44A9AFDCCA96B6D"_sd)),
         escToken);
-    auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
-    ASSERT_EQUALS(
-        ECCToken(decodePrf("C58F671F04A8CFDD8FB1F718F563139F1286D7950E97C0C4A94EDDF0EDB127FE"_sd)),
-        eccToken);
     ASSERT_EQUALS(
         ECOCToken(decodePrf("9E837ED3926CB8ED680E0E7DCB2A481A3E398BE7851FA1CE4D738FA5E67FFCC9"_sd)),
         FLECollectionTokenGenerator::generateECOCToken(collectionToken));
@@ -302,12 +298,6 @@ TEST(FLETokens, TestVectors) {
     ASSERT_EQUALS(ESCDerivedFromDataToken(decodePrf(
                       "DE6A1AC292BC62094C33E94647B044B9B10514317B75F4128DDA2E0FB686704F"_sd)),
                   escDataToken);
-
-    auto eccDataToken =
-        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, sampleValue);
-    ASSERT_EQUALS(ECCDerivedFromDataToken(decodePrf(
-                      "9A95D4F44734447E3F0266D1629513A0B7698CCE8C1524F329CE7970627FFD06"_sd)),
-                  eccDataToken);
 
     ASSERT_EQUALS(ServerCountAndContentionFactorEncryptionToken(decodePrf(
                       "2F30DBCC06B722B60BC1FF018FC28D5FAEE2F222496BE34A264EF3267E811DA0"_sd)),
@@ -333,14 +323,6 @@ TEST(FLETokens, TestVectors) {
                       "8AAF04CBA6DC16BFB37CADBA43DCA66C183634CB3DA278DE174556AE6E17CEBB"_sd)),
                   escDataCounterToken);
 
-
-    auto eccDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateECCDerivedFromDataTokenAndContentionFactorToken(eccDataToken, counter);
-    ASSERT_EQUALS(ECCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
-                      "E9580F805E0D07AF384EBA185384F28A49C3DB93AFA4A187A1F4DA129271D82C"_sd)),
-                  eccDataCounterToken);
-
-
     // Level 5
     auto edcTwiceToken =
         FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterToken);
@@ -358,19 +340,6 @@ TEST(FLETokens, TestVectors) {
     ASSERT_EQUALS(ESCTwiceDerivedValueToken(decodePrf(
                       "53F0A51A43447B9881D5E79BA4C5F78E80BC2BC6AA42B00C81079EBF4C9D5A7C"_sd)),
                   escTwiceValueToken);
-
-
-    auto eccTwiceTagToken =
-        FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(eccDataCounterToken);
-    ASSERT_EQUALS(ECCTwiceDerivedTagToken(decodePrf(
-                      "5DD9F09757BE35BB33FFAF6FC5CDFC649248E59AEA9FF7D9E2A9F36B6F5A6152"_sd)),
-                  eccTwiceTagToken);
-    auto eccTwiceValueToken =
-        FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(eccDataCounterToken);
-    ASSERT_EQUALS(ECCTwiceDerivedValueToken(decodePrf(
-                      "EFA5746DB796DAC6FAACB7E5F28DB53B333588A43131F0C026B19D2B1215EAE2"_sd)),
-                  eccTwiceValueToken);
-
 
     // Anchor Padding
     auto anchorPaddingTokenRoot =
@@ -441,35 +410,6 @@ TEST(FLETokens, TestVectorESCCollectionDecryptDocument) {
     ASSERT_OK(swDoc.getStatus());
     ASSERT_EQ(swDoc.getValue().position, 0);
     ASSERT_EQ(swDoc.getValue().count, 123456789);
-}
-
-TEST(FLETokens, TestVectorECCCollectionDecryptDocument) {
-    ECCTwiceDerivedTagToken twiceTag(
-        decodePrf("8879748219186CAC6B5E77D664A05C4BA2C7690F09ACC16B8E9910B80FF4B5AB"_sd));
-    ECCTwiceDerivedValueToken twiceValue(
-        decodePrf("F868EB46AA38963658E453DE05B2955225CB00C96B72975DACF9D837C8189FA2"_sd));
-
-    BSONObj doc = fromjson(R"({
-            "_id": {
-                "$binary": {
-                    "base64": "TTB8rMJipFwpSMbWMf3Rpx8RuRP4Fnc6bJl1tdMc84A=",
-                    "subType": "0"
-                }
-            },
-            "value": {
-                "$binary": {
-                    "base64": "anHlFVy/XbIDENbKPUVf5OgPv2fkt3JBxYAUGTStAj4=",
-                    "subType": "0"
-                }
-            }
-        })");
-
-    auto swDoc = ECCCollection::decryptDocument(twiceValue, doc);
-
-    ASSERT_OK(swDoc.getStatus());
-    ASSERT(swDoc.getValue().valueType == ECCValueType::kNormal);
-    ASSERT_EQ(swDoc.getValue().start, 123456789);
-    ASSERT_EQ(swDoc.getValue().end, 123456789);
 }
 
 TEST(FLE_ESC, RoundTrip) {
@@ -547,61 +487,6 @@ TEST(FLE_ESC, RoundTrip) {
         ASSERT_OK(swDoc.getStatus());
         ASSERT_EQ(swDoc.getValue().position, 123);
         ASSERT_EQ(swDoc.getValue().count, 456789);
-    }
-}
-
-TEST(FLE_ECC, RoundTrip) {
-    TestKeyVault keyVault;
-
-    ConstDataRange value(testValue);
-
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto token = FLECollectionTokenGenerator::generateECCToken(c1);
-
-    ECCDerivedFromDataToken datakey =
-        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(token, value);
-
-    ECCDerivedFromDataTokenAndContentionFactorToken dataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateECCDerivedFromDataTokenAndContentionFactorToken(datakey, 0);
-
-    auto twiceTag = FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(dataCounterkey);
-    auto twiceValue =
-        FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(dataCounterkey);
-
-
-    {
-        BSONObj doc = ECCCollection::generateNullDocument(twiceTag, twiceValue, 123456789);
-        auto swDoc = ECCCollection::decryptNullDocument(twiceValue, doc);
-        ASSERT_OK(swDoc.getStatus());
-        ASSERT_EQ(swDoc.getValue().position, 123456789);
-    }
-
-
-    {
-        BSONObj doc = ECCCollection::generateDocument(twiceTag, twiceValue, 123, 123456789);
-        auto swDoc = ECCCollection::decryptDocument(twiceValue, doc);
-        ASSERT_OK(swDoc.getStatus());
-        ASSERT(swDoc.getValue().valueType == ECCValueType::kNormal);
-        ASSERT_EQ(swDoc.getValue().start, 123456789);
-        ASSERT_EQ(swDoc.getValue().end, 123456789);
-    }
-
-    {
-        BSONObj doc =
-            ECCCollection::generateDocument(twiceTag, twiceValue, 123, 123456789, 983456789);
-        auto swDoc = ECCCollection::decryptDocument(twiceValue, doc);
-        ASSERT_OK(swDoc.getStatus());
-        ASSERT(swDoc.getValue().valueType == ECCValueType::kNormal);
-        ASSERT_EQ(swDoc.getValue().start, 123456789);
-        ASSERT_EQ(swDoc.getValue().end, 983456789);
-    }
-
-    {
-        BSONObj doc = ECCCollection::generateCompactionDocument(twiceTag, twiceValue, 123456789);
-        auto swDoc = ECCCollection::decryptDocument(twiceValue, doc);
-        ASSERT_OK(swDoc.getStatus());
-        ASSERT(swDoc.getValue().valueType == ECCValueType::kCompactionPlaceholder);
     }
 }
 
@@ -2324,7 +2209,6 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
 
     constexpr auto schema = R"({
         "escCollection": "enxcol_.coll.esc",
-        "eccCollection": "enxcol_.coll.ecc",
         "ecocCollection": "enxcol_.coll.ecoc",
         "fields": [
             {
@@ -2400,13 +2284,6 @@ TEST(EncryptionInformation, MissingStateCollection) {
                                ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
                            DBException,
                            6371207);
-    }
-    {
-        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-        efc.setEccCollection(boost::none);
-        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
-        ASSERT_DOES_NOT_THROW(EncryptionInformationHelpers::getAndValidateSchema(
-            ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)));
     }
     {
         EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
@@ -2984,16 +2861,6 @@ TEST(CompactionHelpersTest, validateCompactionTokensTest) {
     builder.append("abc.xyz", "foo");
     CompactionHelpers::validateCompactionTokens(efc, builder.obj());
 }
-
-std::vector<ECCDocument> pairsToECCDocuments(
-    const std::vector<std::pair<uint64_t, uint64_t>>& pairs) {
-    std::vector<ECCDocument> output;
-    std::transform(pairs.begin(), pairs.end(), std::back_inserter(output), [](auto& pair) {
-        return ECCDocument{ECCValueType::kNormal, pair.first, pair.second};
-    });
-    return output;
-}
-
 
 TEST(EDCServerCollectionTest, GenerateEDCTokens) {
 

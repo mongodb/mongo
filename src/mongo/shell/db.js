@@ -1671,8 +1671,6 @@ DB.prototype.createEncryptedCollection = function(name, opts) {
     assert.commandWorked(
         this.createCollection(ef.escCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
     assert.commandWorked(
-        this.createCollection(ef.eccCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
-    assert.commandWorked(
         this.createCollection(ef.ecocCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
 
     return res;
@@ -1690,7 +1688,6 @@ DB.prototype.dropEncryptedCollection = function(name) {
     }
 
     this.getCollection(ef.escCollection).drop();
-    this.getCollection(ef.eccCollection).drop();
     this.getCollection(ef.ecocCollection).drop();
     return this.getCollection(name).drop();
 };

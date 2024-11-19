@@ -118,9 +118,6 @@ structs:
             escNss:
                 description: "Collection containing insertions metadata"
                 type: namespacestring
-            eccNss:
-                description: "Collection containing deletions metadata"
-                type: namespacestring
             ecocNss:
                 description: "Collection containing compaction metadata to perform compact with"
                 type: namespacestring

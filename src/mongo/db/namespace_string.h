@@ -568,7 +568,7 @@ public:
     bool isConfigTransactionsCollection() const;
 
     /**
-     * Returns whether the specified namespace is <database>.enxcol_.<.+>.(esc|ecc|ecoc).
+     * Returns whether the specified namespace is <database>.enxcol_.<.+>.(esc|ecoc).
      */
     bool isFLE2StateCollection() const;
 

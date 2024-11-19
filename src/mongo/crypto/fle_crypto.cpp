@@ -143,15 +143,12 @@ constexpr uint64_t kLevelServerDataEncryption = 3;
 
 constexpr uint64_t kEDC = 1;
 constexpr uint64_t kESC = 2;
-constexpr uint64_t kECC = 3;
 constexpr uint64_t kECOC = 4;
 
 
 constexpr uint64_t kTwiceDerivedTokenFromEDC = 1;
 constexpr uint64_t kTwiceDerivedTokenFromESCTag = 1;
 constexpr uint64_t kTwiceDerivedTokenFromESCValue = 2;
-constexpr uint64_t kTwiceDerivedTokenFromECCTag = 1;
-constexpr uint64_t kTwiceDerivedTokenFromECCValue = 2;
 
 constexpr uint64_t kServerCountAndContentionFactorEncryption = 1;
 constexpr uint64_t kServerZerosEncryption = 2;
@@ -164,10 +161,6 @@ constexpr uint64_t kAnchorPaddingKeyToken = 1;
 constexpr uint64_t kAnchorPaddingValueToken = 2;
 
 constexpr int32_t kEncryptionInformationSchemaVersion = 1;
-
-constexpr auto kECCNullId = 0;
-constexpr auto kECCNonNullId = 1;
-constexpr uint64_t kECCompactionRecordValue = std::numeric_limits<uint64_t>::max();
 
 constexpr uint64_t kESCNullId = 0;
 constexpr uint64_t kESCNonNullId = 1;
@@ -1958,10 +1951,6 @@ ESCToken FLECollectionTokenGenerator::generateESCToken(CollectionsLevel1Token to
     return FLEUtil::prf(token.data, kESC);
 }
 
-ECCToken FLECollectionTokenGenerator::generateECCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kECC);
-}
-
 ECOCToken FLECollectionTokenGenerator::generateECOCToken(CollectionsLevel1Token token) {
     return FLEUtil::prf(token.data, kECOC);
 }
@@ -1974,11 +1963,6 @@ EDCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateEDCDerivedFrom
 
 ESCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(
     ESCToken token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
-}
-
-ECCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(
-    ECCToken token, ConstDataRange value) {
     return FLEUtil::prf(token.data, value);
 }
 
@@ -2001,14 +1985,6 @@ FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     return FLEUtil::prf(token.data, counter);
 }
 
-ECCDerivedFromDataTokenAndContentionFactorToken
-FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-    generateECCDerivedFromDataTokenAndContentionFactorToken(ECCDerivedFromDataToken token,
-                                                            FLECounter counter) {
-    return FLEUtil::prf(token.data, counter);
-}
-
-
 EDCTwiceDerivedToken FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
     EDCDerivedFromDataTokenAndContentionFactorToken token) {
     return FLEUtil::prf(token.data, kTwiceDerivedTokenFromEDC);
@@ -2022,16 +1998,6 @@ ESCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTa
 ESCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(
     ESCDerivedFromDataTokenAndContentionFactorToken token) {
     return FLEUtil::prf(token.data, kTwiceDerivedTokenFromESCValue);
-}
-
-ECCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(
-    ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCTag);
-}
-
-ECCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(
-    ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCValue);
 }
 
 ServerCountAndContentionFactorEncryptionToken
@@ -2071,12 +2037,12 @@ StatusWith<EncryptedStateCollectionTokens> EncryptedStateCollectionTokens::decry
     auto value = swUnpack.getValue();
 
     return EncryptedStateCollectionTokens{
-        ESCDerivedFromDataTokenAndContentionFactorToken(std::get<0>(value)),
-        ECCDerivedFromDataTokenAndContentionFactorToken(std::get<1>(value))};
+        ESCDerivedFromDataTokenAndContentionFactorToken(std::get<0>(value))};
 }
 
 StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokens::serialize(ECOCToken token) {
-    return packAndEncrypt(std::tie(esc.data, ecc.data), token);
+    constexpr uint64_t dummy{0};
+    return packAndEncrypt(std::tie(esc.data, dummy), token);
 }
 
 StateCollectionTokensV2 StateCollectionTokensV2::Encrypted::decrypt(const ECOCToken& token) const
@@ -2724,104 +2690,6 @@ std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
     return countInfoSets;
 }
 
-PrfBlock ECCCollection::generateId(ECCTwiceDerivedTagToken tagToken,
-                                   boost::optional<uint64_t> index) {
-    if (index.has_value()) {
-        return prf(tagToken.data, kECCNonNullId, index.value());
-    } else {
-        return prf(tagToken.data, kECCNullId, 0);
-    }
-}
-
-BSONObj ECCCollection::generateNullDocument(ECCTwiceDerivedTagToken tagToken,
-                                            ECCTwiceDerivedValueToken valueToken,
-                                            uint64_t count) {
-    auto block = ECCCollection::generateId(tagToken, boost::none);
-
-    auto swCipherText = packAndEncrypt(std::tie(count, count), valueToken);
-    uassertStatusOK(swCipherText);
-
-    BSONObjBuilder builder;
-    toBinData(kId, block, &builder);
-    toBinData(kValue, swCipherText.getValue(), &builder);
-#ifdef FLE2_DEBUG_STATE_COLLECTIONS
-    builder.append(kDebugId, "NULL DOC");
-    builder.append(kDebugValueCount, static_cast<int64_t>(count));
-#endif
-
-    return builder.obj();
-}
-
-BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
-                                        ECCTwiceDerivedValueToken valueToken,
-                                        uint64_t index,
-                                        uint64_t start,
-                                        uint64_t end) {
-    auto block = ECCCollection::generateId(tagToken, index);
-
-    auto swCipherText = packAndEncrypt(std::tie(start, end), valueToken);
-    uassertStatusOK(swCipherText);
-
-    BSONObjBuilder builder;
-    toBinData(kId, block, &builder);
-    toBinData(kValue, swCipherText.getValue(), &builder);
-#ifdef FLE2_DEBUG_STATE_COLLECTIONS
-    builder.append(kDebugId, static_cast<int64_t>(index));
-    builder.append(kDebugValueStart, static_cast<int64_t>(start));
-    builder.append(kDebugValueEnd, static_cast<int64_t>(end));
-#endif
-
-    return builder.obj();
-}
-
-BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
-                                        ECCTwiceDerivedValueToken valueToken,
-                                        uint64_t index,
-                                        uint64_t count) {
-    return generateDocument(tagToken, valueToken, index, count, count);
-}
-
-BSONObj ECCCollection::generateCompactionDocument(ECCTwiceDerivedTagToken tagToken,
-                                                  ECCTwiceDerivedValueToken valueToken,
-                                                  uint64_t index) {
-    auto block = ECCCollection::generateId(tagToken, index);
-
-    auto swCipherText =
-        packAndEncrypt(std::tie(kECCompactionRecordValue, kECCompactionRecordValue), valueToken);
-    uassertStatusOK(swCipherText);
-
-    BSONObjBuilder builder;
-    toBinData(kId, block, &builder);
-    toBinData(kValue, swCipherText.getValue(), &builder);
-#ifdef FLE2_DEBUG_STATE_COLLECTIONS
-    builder.append(kDebugId, static_cast<int64_t>(index));
-    builder.append(kDebugValueStart, static_cast<int64_t>(kECCompactionRecordValue));
-    builder.append(kDebugValueEnd, static_cast<int64_t>(kECCompactionRecordValue));
-#endif
-
-    return builder.obj();
-}
-
-
-StatusWith<ECCNullDocument> ECCCollection::decryptNullDocument(ECCTwiceDerivedValueToken valueToken,
-                                                               const BSONObj& doc) {
-    BSONElement encryptedValue;
-    auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    auto swUnpack = decryptAndUnpack<uint64_t, uint64_t>(binDataToCDR(encryptedValue), valueToken);
-
-    if (!swUnpack.isOK()) {
-        return swUnpack.getStatus();
-    }
-
-    auto& value = swUnpack.getValue();
-
-    return ECCNullDocument{std::get<0>(value)};
-}
-
 
 FLE2FindEqualityPayloadV2 FLEClientCrypto::serializeFindPayloadV2(FLEIndexKeyAndId indexKey,
                                                                   FLEUserKeyAndId userKey,
@@ -2916,36 +2784,6 @@ FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangeStubV2(const FLE2Range
     payload.setPayloadId(spec.getPayloadId());
 
     return payload;
-}
-
-StatusWith<ECCDocument> ECCCollection::decryptDocument(ECCTwiceDerivedValueToken valueToken,
-                                                       const BSONObj& doc) {
-    BSONElement encryptedValue;
-    auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    auto swUnpack = decryptAndUnpack<uint64_t, uint64_t>(binDataToCDR(encryptedValue), valueToken);
-
-    if (!swUnpack.isOK()) {
-        return swUnpack.getStatus();
-    }
-
-    auto& value = swUnpack.getValue();
-
-    return ECCDocument{std::get<0>(value) != kECCompactionRecordValue
-                           ? ECCValueType::kNormal
-                           : ECCValueType::kCompactionPlaceholder,
-                       std::get<0>(value),
-                       std::get<1>(value)};
-}
-
-boost::optional<uint64_t> ECCCollection::emuBinary(const FLEStateCollectionReader& reader,
-                                                   ECCTwiceDerivedTagToken tagToken,
-                                                   ECCTwiceDerivedValueToken valueToken) {
-    return emuBinaryCommon<ECCCollection, ECCTwiceDerivedTagToken, ECCTwiceDerivedValueToken>(
-        reader, tagToken, valueToken);
 }
 
 ECOCCompactionDocumentV2 ECOCCompactionDocumentV2::parseAndDecrypt(const BSONObj& doc,
@@ -4531,14 +4369,6 @@ PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
     DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
 
     return prf(key, bufValue);
-}
-
-void FLEUtil::checkEFCForECC(const EncryptedFieldConfig& efc) {
-    uassert(7568300,
-            str::stream()
-                << "Queryable Encryption version 2 collections must not contain the eccCollection"
-                << " in EncryptedFieldConfig",
-            !efc.getEccCollection());
 }
 
 StatusWith<std::vector<uint8_t>> FLEUtil::decryptData(ConstDataRange key,

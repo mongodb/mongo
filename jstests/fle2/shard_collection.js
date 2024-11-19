@@ -37,6 +37,4 @@ assert.eq(ef.ecocCollection, "enxcol_.basic.ecoc");
 assert.commandFailedWithCode(
     db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.esc', key: {_id: 1}}), 6464401);
 assert.commandFailedWithCode(
-    db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.ecc', key: {_id: 1}}), 6464401);
-assert.commandFailedWithCode(
     db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.ecoc', key: {_id: 1}}), 6464401);

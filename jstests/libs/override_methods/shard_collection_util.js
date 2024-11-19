@@ -18,7 +18,6 @@ export const denylistedNamespaces = [
     // TODO SERVER-84406 create a new list for the case unsplittable collection. The
     // below nss should now be allowed in case of unsplittable.
     /enxcol_\..*\.esc/,
-    /enxcol_\..*\.ecc/,
     /enxcol_\..*\.ecoc/,
 ];
 

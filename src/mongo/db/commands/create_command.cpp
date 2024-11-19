@@ -358,9 +358,6 @@ public:
                         "type rangePreview, as it is deprecated",
                         !hasQueryType(cmd.getEncryptedFields().get(),
                                       QueryTypeEnum::RangePreviewDeprecated));
-
-
-                FLEUtil::checkEFCForECC(cmd.getEncryptedFields().get());
             }
 
             if (auto timeseries = cmd.getTimeseries()) {

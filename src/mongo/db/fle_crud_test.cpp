@@ -785,7 +785,6 @@ protected:
         auto s = getTestESCDataToken(obj);
         auto d = getTestEDCDataToken(obj);
         auto nssEsc = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
-        auto nssEcc = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecc");
 
         return mongo::fle::readTags(_queryImpl.get(), nssEsc, s, d, cm);
     }
@@ -1569,7 +1568,6 @@ TEST_F(FleTagsTest, InsertAndUpdate) {
 TEST_F(FleTagsTest, ContentionFactor) {
     auto efc = EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(R"({
         "escCollection": "enxcol_.coll.esc",
-        "eccCollection": "enxcol_.coll.ecc",
         "ecocCollection": "enxcol_.coll.ecoc",
         "fields": [{
             "keyId": { "$uuid": "12345678-1234-9876-1234-123456789012"},

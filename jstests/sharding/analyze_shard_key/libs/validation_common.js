@@ -72,7 +72,6 @@ export function ValidationTest(conn, _dbName) {
         {dbName: dbName, collName: "system.profile"},
         // Cannot analyze a shard key or queries for an FLE state collection.
         {dbName: dbName, collName: "enxcol_.basic.esc"},
-        {dbName: dbName, collName: "enxcol_.basic.ecc"},
         {dbName: dbName, collName: "enxcol_.basic.ecoc"},
         // Cannot analyze a shard key or queries for a collection with FLE enabled.
         {dbName: dbName, collName: "testFLEColl"},

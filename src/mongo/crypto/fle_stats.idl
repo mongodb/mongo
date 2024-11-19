@@ -44,7 +44,7 @@ structs:
                 default: 0
 
     ECStats:
-        description: "Stats about records in ECC & ESC compact touched"
+        description: "Stats about records in ESC compact touched"
         fields:
             read:
                 type: exactInt64

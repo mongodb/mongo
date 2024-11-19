@@ -52,7 +52,6 @@ constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
 constexpr auto fle2Prefix = "enxcol_."_sd;
 constexpr auto fle2EscSuffix = ".esc"_sd;
-constexpr auto fle2EccSuffix = ".ecc"_sd;
 constexpr auto fle2EcocSuffix = ".ecoc"_sd;
 constexpr auto fle2EcocCompactSuffix = ".ecoc.compact"_sd;
 
@@ -353,14 +352,13 @@ bool NamespaceString::isConfigTransactionsCollection() const {
 
 bool NamespaceString::isFLE2StateCollection() const {
     return coll().startsWith(fle2Prefix) &&
-        (coll().endsWith(fle2EscSuffix) || coll().endsWith(fle2EccSuffix) ||
-         coll().endsWith(fle2EcocSuffix) || coll().endsWith(fle2EcocCompactSuffix));
+        (coll().endsWith(fle2EscSuffix) || coll().endsWith(fle2EcocSuffix) ||
+         coll().endsWith(fle2EcocCompactSuffix));
 }
 
 bool NamespaceString::isFLE2StateCollection(StringData coll) {
     return coll.startsWith(fle2Prefix) &&
-        (coll.endsWith(fle2EscSuffix) || coll.endsWith(fle2EccSuffix) ||
-         coll.endsWith(fle2EcocSuffix));
+        (coll.endsWith(fle2EscSuffix) || coll.endsWith(fle2EcocSuffix));
 }
 
 bool NamespaceString::isOplogOrChangeCollection() const {

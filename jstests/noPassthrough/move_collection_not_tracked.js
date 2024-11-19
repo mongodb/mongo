@@ -108,10 +108,8 @@ const testCases = [
                     ]
                 }
             }));
-            // Explicitly create dummy instances of the ecc and ecoc.compact collections
+            // Explicitly create dummy instances of the ecoc.compact collection
             encryptedClient.runEncryptionOperation(() => {
-                assert.commandWorked(
-                    encryptedClient.getDB().createCollection("enxcol_.testColl.ecc"));
                 assert.commandWorked(
                     encryptedClient.getDB().createCollection("enxcol_.testColl.ecoc.compact"));
             });
@@ -120,7 +118,6 @@ const testCases = [
             {nsToMove: "testDbWithFLE.enxcol_.testColl.esc"},
             {nsToMove: "testDbWithFLE.enxcol_.testColl.ecoc"},
             {nsToMove: "testDbWithFLE.enxcol_.testColl.ecoc.compact"},
-            {nsToMove: "testDbWithFLE.enxcol_.testColl.ecc"}
         ]
     },
     {

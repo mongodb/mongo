@@ -207,7 +207,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     }
 
     // Step 2: for each encrypted field in compactionTokens, get distinct set of entries 'C'
-    // from ECOC, and for each entry in 'C', compact ESC and ECC.
+    // from ECOC, and for each entry in 'C', compact ESC.
     {
         // acquire IS lock on the ecocRenameNss to prevent it from being dropped during compact
         AutoGetCollection tempEcocColl(opCtx, namespaces.ecocRenameNss, MODE_IS);
