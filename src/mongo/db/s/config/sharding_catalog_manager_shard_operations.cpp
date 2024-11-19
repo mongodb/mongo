@@ -1912,8 +1912,8 @@ Status ShardingCatalogManager::_pullClusterTimeKeys(
         repl::ReadConcernLevel::kLocalReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
-                keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(
-                    doc.getOwned(), boost::none /* migrationId */, expireAt));
+                keyDocs.push_back(
+                    keys_collection_util::makeExternalClusterTimeKeyDoc(doc.getOwned(), expireAt));
             }
             return true;
         },

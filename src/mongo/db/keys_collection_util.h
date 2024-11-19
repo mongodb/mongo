@@ -48,7 +48,6 @@ namespace keys_collection_util {
  * document created based on the given the admin.system.keys document BSONObj.
  */
 ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(BSONObj keyDoc,
-                                                             boost::optional<UUID> migrationId,
                                                              boost::optional<Date_t> expireAt);
 
 /*

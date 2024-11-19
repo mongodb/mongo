@@ -73,9 +73,6 @@ namespace {
 
 class CacheTest : public ConfigServerTestFixture {
 protected:
-    const UUID kMigrationId1 = UUID::gen();
-    const UUID kMigrationId2 = UUID::gen();
-
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
@@ -229,7 +226,6 @@ void CacheTest::testGetKeyShouldReturnCorrectKeysAfterRefresh(KeysCollectionClie
     // Use external keys with the same keyId and expiresAt as the internal key to test that the
     // cache correctly tackles key collisions.
     ExternalKeysCollectionDocument origKey1(OID::gen(), 1);
-    origKey1.setMigrationId(kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     origKey1.setTTLExpiresAt(getServiceContext()->getFastClockSource()->now() + Seconds(30));
@@ -237,7 +233,6 @@ void CacheTest::testGetKeyShouldReturnCorrectKeysAfterRefresh(KeysCollectionClie
         operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
 
     ExternalKeysCollectionDocument origKey2(OID::gen(), 1);
-    origKey2.setMigrationId(kMigrationId2);
     origKey2.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0))});
     insertDocument(
@@ -481,7 +476,6 @@ void CacheTest::testRefreshShouldNotGetExternalKeysForOtherPurpose(KeysCollectio
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
 
     ExternalKeysCollectionDocument origKey1(OID::gen(), 1);
-    origKey1.setMigrationId(kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     insertDocument(
@@ -496,7 +490,6 @@ void CacheTest::testRefreshShouldNotGetExternalKeysForOtherPurpose(KeysCollectio
     }
 
     ExternalKeysCollectionDocument origKey2(OID::gen(), 2);
-    origKey2.setMigrationId(kMigrationId2);
     origKey2.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
     insertDocument(
@@ -603,7 +596,6 @@ void CacheTest::testCacheExternalKeyBasic(KeysCollectionClient* client) {
     ASSERT_EQ(ErrorCodes::KeyNotFound, swExternalKeys.getStatus());
 
     ExternalKeysCollectionDocument externalKey(OID::gen(), 5);
-    externalKey.setMigrationId(kMigrationId1);
     externalKey.setTTLExpiresAt(getServiceContext()->getFastClockSource()->now() + Seconds(30));
     externalKey.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
@@ -639,7 +631,6 @@ void CacheTest::testRefreshClearsRemovedExternalKeys(KeysCollectionClient* clien
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
 
     ExternalKeysCollectionDocument origKey1(OID::gen(), 1);
-    origKey1.setMigrationId(kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     origKey1.setTTLExpiresAt(getServiceContext()->getFastClockSource()->now() + Seconds(30));
@@ -647,7 +638,6 @@ void CacheTest::testRefreshClearsRemovedExternalKeys(KeysCollectionClient* clien
         operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
 
     ExternalKeysCollectionDocument origKey2(OID::gen(), 1);
-    origKey2.setMigrationId(kMigrationId2);
     origKey2.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0))});
     insertDocument(
@@ -722,7 +712,6 @@ void CacheTest::testRefreshHandlesKeysReceivingTTLValue(KeysCollectionClient* cl
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
 
     ExternalKeysCollectionDocument origKey1(OID::gen(), 1);
-    origKey1.setMigrationId(kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     insertDocument(

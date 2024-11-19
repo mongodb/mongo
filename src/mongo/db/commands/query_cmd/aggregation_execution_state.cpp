@@ -326,35 +326,23 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
         };
 
         // If the involved namespace is not in the same database as the aggregation, it must be
-        // from a $lookup/$graphLookup into a tenant migration donor's oplog view or from an
-        // $out/$merge to a collection in a different database.
+        // from an $out/$merge to a collection in a different database.
         if (!involvedNs.isEqualDb(request.getNamespace())) {
-            if (involvedNs == NamespaceString::kTenantMigrationOplogView) {
-                // For tenant migrations, we perform an aggregation on 'config.transactions' but
-                // require a lookup stage involving a view on the 'local' database.
-                // If the involved namespace is 'local.system.tenantMigration.oplogView', resolve
-                // its view definition.
-                auto status = resolveViewDefinition(involvedNs);
+            // SERVER-51886: It is not correct to assume that we are reading from a collection
+            // because the collection targeted by $out/$merge on a given database can have the
+            // same name as a view on the source database. As such, we determine whether the
+            // collection name references a view on the aggregation request's database. Note
+            // that the inverse scenario (mistaking a view for a collection) is not an issue
+            // because $merge/$out cannot target a view.
+            auto nssToCheck = NamespaceStringUtil::deserialize(request.getNamespace().dbName(),
+                                                               involvedNs.coll());
+            if (catalog->lookupView(_opCtx, nssToCheck)) {
+                auto status = resolveViewDefinition(nssToCheck);
                 if (!status.isOK()) {
                     return status;
                 }
             } else {
-                // SERVER-51886: It is not correct to assume that we are reading from a collection
-                // because the collection targeted by $out/$merge on a given database can have the
-                // same name as a view on the source database. As such, we determine whether the
-                // collection name references a view on the aggregation request's database. Note
-                // that the inverse scenario (mistaking a view for a collection) is not an issue
-                // because $merge/$out cannot target a view.
-                auto nssToCheck = NamespaceStringUtil::deserialize(request.getNamespace().dbName(),
-                                                                   involvedNs.coll());
-                if (catalog->lookupView(_opCtx, nssToCheck)) {
-                    auto status = resolveViewDefinition(nssToCheck);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                } else {
-                    resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
-                }
+                resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
             }
         } else if (catalog->lookupCollectionByNamespace(_opCtx, involvedNs)) {
             // Attempt to acquire UUID of the collection using lock free method.

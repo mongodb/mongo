@@ -58,12 +58,10 @@ namespace mongo {
 namespace keys_collection_util {
 
 ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(BSONObj keyDoc,
-                                                             boost::optional<UUID> migrationId,
                                                              boost::optional<Date_t> expireAt) {
     auto originalKeyDoc = KeysCollectionDocument::parse(IDLParserContext("keyDoc"), keyDoc);
 
     ExternalKeysCollectionDocument externalKeyDoc(OID::gen(), originalKeyDoc.getKeyId());
-    externalKeyDoc.setMigrationId(migrationId);
     externalKeyDoc.setKeysCollectionDocumentBase(originalKeyDoc.getKeysCollectionDocumentBase());
     externalKeyDoc.setTTLExpiresAt(expireAt);
 

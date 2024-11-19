@@ -588,9 +588,6 @@ class KeysManagerDirectTest : public ConfigServerTestFixture {
 protected:
     KeysManagerDirectTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}
 
-    const UUID kMigrationId1 = UUID::gen();
-    const UUID kMigrationId2 = UUID::gen();
-
     KeysCollectionManager* keyManager() {
         return _keyManager.get();
     }
@@ -621,7 +618,6 @@ TEST_F(KeysManagerDirectTest, CacheExternalKeyBasic) {
     keyManager()->refreshNow(operationContext());
 
     ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
-    externalKey1.setMigrationId(kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -659,7 +655,6 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
         operationContext(), NamespaceString::kKeysCollectionNamespace, internalKey.toBSON()));
 
     ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
-    externalKey1.setMigrationId(kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -678,7 +673,6 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
     keyManager()->stopMonitoring();
 
     ExternalKeysCollectionDocument externalKey2(OID::gen(), 1);
-    externalKey2.setMigrationId(kMigrationId2);
     externalKey2.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
 
