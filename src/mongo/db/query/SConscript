@@ -392,6 +392,12 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="command_diagnostic_printer_test",
+    source=[],
+    LIBDEPS=[],
+)
+
 env.Library(
     target='sort_pattern',
     source=[
