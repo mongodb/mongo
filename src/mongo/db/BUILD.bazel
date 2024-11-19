@@ -913,7 +913,6 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:user_acquisition_stats",
         "//src/mongo/db/catalog:collection_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/catalog:local_oplog_info",
         "//src/mongo/db/commands:create_command",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
