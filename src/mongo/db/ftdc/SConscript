@@ -1,32 +1,10 @@
 # -*- mode: python -*-
 
-
 Import("env")
 
 env = env.Clone()
-
-ftdcEnv = env.Clone()
-ftdcEnv.InjectThirdParty(libraries=["zlib"])
-
 env.CppUnitTest(
     target="db_ftdc_test",
-    source=[
-        "compressor_test.cpp",
-        "controller_test.cpp",
-        "collector_test.cpp",
-        "file_manager_test.cpp",
-        "file_writer_test.cpp",
-        "ftdc_prctl_test.cpp",
-        "ftdc_test.cpp",
-        "ftdc_util_test.cpp",
-        "metadata_compressor_test.cpp",
-        "varint_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "ftdc",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

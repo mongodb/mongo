@@ -521,6 +521,17 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "replica_set_monitor_protocol_test_util",
+    srcs = [
+        "replica_set_monitor_protocol_test_util.cpp",
+        "replica_set_monitor_protocol_test_util.h",
+    ],
+    deps = [
+        ":clientdriver_network",
+    ],
+)
+
 # TODO(SERVER-96852): Remove cycle created by moving //src/mongo/client:connection_string.h to //src/mongo/client:connection_string
 filegroup(
     name = "connection_string_hdrs",

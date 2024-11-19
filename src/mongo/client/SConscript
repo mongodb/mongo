@@ -111,16 +111,6 @@ env.CppIntegrationTest(
     ],
 )
 
-env.Library(
-    target="replica_set_monitor_protocol_test_util",
-    source=[
-        "replica_set_monitor_protocol_test_util.cpp",
-    ],
-    LIBDEPS=[
-        "clientdriver_network",
-    ],
-)
-
 env.CppUnitTest(
     target="client_rs_test",
     source=[

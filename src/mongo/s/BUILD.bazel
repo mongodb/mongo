@@ -912,7 +912,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }) + select({
         "//bazel/config:enterprise_feature_audit_or_encryptdb_enabled": [
-            "//src/mongo/db/modules/enterprise:kmip_configuration",
+            "//src/mongo/db/modules/enterprise/src/kmip:kmip_configuration",
         ],
         "//conditions:default": [],
     }),

@@ -48,37 +48,8 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="sdam_test_util",
-    source=[
-        "mock_topology_manager.cpp",
-        "server_description_builder.cpp",
-        "topology_description_builder.cpp",
-        "topology_listener_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "sdam",
-    ],
-)
-
 env.CppUnitTest(
     target="sdam_test",
-    source=[
-        "election_id_set_version_pair_test.cpp",
-        "server_description_test.cpp",
-        "server_selector_test.cpp",
-        "topology_description_test.cpp",
-        "topology_listener_test.cpp",
-        "topology_manager_test.cpp",
-        "topology_state_machine_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/client/replica_set_monitor_protocol_test_util",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "sdam",
-        "sdam_test_util",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
