@@ -894,16 +894,6 @@ void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx
     abortOngoingMigrationIfNeeded(opCtx, nss);
 }
 
-void ShardServerOpObserver::onAbortIndexBuildSinglePhase(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
-    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
-        return;
-    }
-
-    abortOngoingMigrationIfNeeded(opCtx, nss);
-}
-
 void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const UUID& uuid,

@@ -177,7 +177,7 @@ public:
     // commit phase while write blocking is active was started and hit the onStartIndexBuild hook
     // with write blocking active, and thus must be allowed under user write blocking.
 
-    // At the moment we are leaving the onAbortIndexBuildSinglePhase() and onAbortIndexBuild() as
+    // At the moment we are leaving the onAbortIndexBuild() as
     // unchecked. This is because they can be called from both user and internal codepaths, and
     // we don't want to risk throwing an assert for the internal paths.
 

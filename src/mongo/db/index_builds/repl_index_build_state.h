@@ -100,10 +100,6 @@ enum class IndexBuildAction {
      */
     kInitialSyncAbort,
     /**
-     * Abort signal set on donor when tenant migration starts.
-     */
-    kTenantMigrationAbort,
-    /**
      * Abort signal set by createIndexes cmd or by drop databases/collections/indexes cmds
      */
     kPrimaryAbort,

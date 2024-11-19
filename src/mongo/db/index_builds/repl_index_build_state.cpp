@@ -90,8 +90,6 @@ std::string indexBuildActionToString(IndexBuildAction action) {
             return "Initial sync abort";
         case IndexBuildAction::kRollbackAbort:
             return "Rollback abort";
-        case IndexBuildAction::kTenantMigrationAbort:
-            return "Tenant migration abort";
         case IndexBuildAction::kPrimaryAbort:
             return "Primary abort";
         case IndexBuildAction::kSinglePhaseCommit:
@@ -519,8 +517,7 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
         // When the node steps down, the caller of this function, dropIndexes/createIndexes
         // command (user operation) will also get interrupted. So, we no longer need to
         // abort the index build on step down.
-        if (signalAction == IndexBuildAction::kPrimaryAbort ||
-            signalAction == IndexBuildAction::kTenantMigrationAbort) {
+        if (signalAction == IndexBuildAction::kPrimaryAbort) {
             // Indicate if the index build is already being committed or aborted.
             if (nextAction == IndexBuildAction::kPrimaryAbort) {
                 return TryAbortResult::kAlreadyAborted;
@@ -547,10 +544,6 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
     _indexBuildState.setState(
         IndexBuildState::kExternalAbort, skipCheck, abortTimestamp, abortStatus);
 
-    // Aside from setting the tenantMigrationAbortStatus, tenant migration aborts are identical to
-    // primary aborts.
-    if (signalAction == IndexBuildAction::kTenantMigrationAbort)
-        signalAction = IndexBuildAction::kPrimaryAbort;
     // Interrupt the builder thread so that it can no longer acquire locks or make progress.
     // It is possible that the index build thread may have completed its operation and removed
     // itself from the ServiceContext. This may happen in the case of an explicit db.killOp()

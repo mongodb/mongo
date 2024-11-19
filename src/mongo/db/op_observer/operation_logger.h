@@ -89,7 +89,6 @@ public:
      * @param oplogCollection collection to be written to.
      * @param finalOpTime the OpTime of the last oplog record.
      * @param wallTime the wall clock time of the last oplog record.
-     * @param isAbortIndexBuild for tenant migration use only.
      */
     virtual void logOplogRecords(OperationContext* opCtx,
                                  const NamespaceString& nss,
@@ -97,8 +96,7 @@ public:
                                  const std::vector<Timestamp>& timestamps,
                                  const CollectionPtr& oplogCollection,
                                  repl::OpTime finalOpTime,
-                                 Date_t wallTime,
-                                 bool isAbortIndexBuild) = 0;
+                                 Date_t wallTime) = 0;
 
     /**
      * Allocates optimes for new entries in the oplog.  Returns a vector of OplogSlots, which

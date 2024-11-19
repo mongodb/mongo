@@ -221,13 +221,6 @@ public:
     virtual void onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                               const NamespaceString& nss) = 0;
 
-    /**
-     * Generates a timestamp by writing a no-op oplog entry. This is only necessary for tenant
-     * migrations that are aborting single-phase index builds.
-     */
-    virtual void onAbortIndexBuildSinglePhase(OperationContext* opCtx,
-                                              const NamespaceString& nss) = 0;
-
     virtual void onCommitIndexBuild(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const UUID& collUUID,

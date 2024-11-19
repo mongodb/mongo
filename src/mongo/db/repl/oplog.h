@@ -162,7 +162,6 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry);
  * @param oplogCollection collection to be written to.
  * @param finalOpTime the OpTime of the last oplog record.
  * @param wallTime the wall clock time of the last oplog record.
- * @param isAbortIndexBuild for tenant migration use only.
  */
 void logOplogRecords(OperationContext* opCtx,
                      const NamespaceString& nss,
@@ -170,8 +169,7 @@ void logOplogRecords(OperationContext* opCtx,
                      const std::vector<Timestamp>& timestamps,
                      const CollectionPtr& oplogCollection,
                      OpTime finalOpTime,
-                     Date_t wallTime,
-                     bool isAbortIndexBuild);
+                     Date_t wallTime);
 
 // Flush out the cached pointer to the oplog.
 void clearLocalOplogPtr(ServiceContext* service);

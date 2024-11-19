@@ -169,14 +169,6 @@ public:
         }
     }
 
-    void onAbortIndexBuildSinglePhase(OperationContext* opCtx,
-                                      const NamespaceString& nss) override {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers) {
-            o->onAbortIndexBuildSinglePhase(opCtx, nss);
-        }
-    }
-
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const UUID& collUUID,

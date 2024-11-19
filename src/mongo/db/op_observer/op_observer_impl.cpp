@@ -406,26 +406,6 @@ void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
         boost::none);
 }
 
-void OpObserverImpl::onAbortIndexBuildSinglePhase(OperationContext* opCtx,
-                                                  const NamespaceString& nss) {
-    if (!shouldTimestampIndexBuildSinglePhase(opCtx, nss)) {
-        return;
-    }
-
-    onInternalOpMessage(
-        opCtx,
-        {},
-        boost::none,
-        BSON("msg" << std::string(str::stream() << "Aborting indexes. Coll: "
-                                                << NamespaceStringUtil::serialize(
-                                                       nss, SerializationContext::stateDefault()))),
-        boost::none,
-        boost::none,
-        boost::none,
-        boost::none,
-        boost::none);
-}
-
 void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const UUID& collUUID,
@@ -590,14 +570,8 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     auto lastOpTime = opTimes.back();
     invariant(!lastOpTime.isNull());
     auto wallClockTime = oplogEntryTemplate->getWallClockTime();
-    operationLogger->logOplogRecords(opCtx,
-                                     nss,
-                                     &records,
-                                     timestamps,
-                                     oplogWrite.getCollection(),
-                                     lastOpTime,
-                                     wallClockTime,
-                                     /*isAbortIndexBuild=*/false);
+    operationLogger->logOplogRecords(
+        opCtx, nss, &records, timestamps, oplogWrite.getCollection(), lastOpTime, wallClockTime);
     wuow.commit();
     return opTimes;
 }

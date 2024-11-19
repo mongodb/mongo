@@ -300,14 +300,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             << indexCollection->uuid() << "; original index spec: " << indexSpec);
     const auto constraints = IndexBuildsManager::IndexConstraints::kRelax;
 
-    // Run single-phase builds synchronously with oplog batch application. For tenant migrations,
-    // the recipient needs to build the index on empty collections to completion within the same
-    // storage transaction. This is in order to eliminate a window of time where we can reload the
-    // catalog through startup or rollback and detect the index in an incomplete state. Before
-    // SERVER-72618 this was possible and would require us to remove the index from the catalog to
-    // allow replication recovery to rebuild it. The result of this was an untimestamped write to
-    // the catalog. This only applies to empty collection index builds during tenant migration and
-    // is resolved by calling `createIndexesOnEmptyCollection` on empty collections.
+    // Run single-phase builds synchronously with oplog batch application.
     //
     // Single phase builds are only used for empty collections, and to rebuild indexes admin.system
     // collections. See SERVER-47439.
@@ -388,7 +381,7 @@ void writeToImageCollection(OperationContext* opCtx,
         write_ops::UpdateModification::parseFromClassicUpdate(imageEntry.toBSON()));
     request.setFromOplogApplication(true);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-    // This code path can also be hit by things such as `applyOps` and tenant migrations.
+    // This code path can also be hit by things such as `applyOps.`
     ::mongo::update(opCtx, collection, request);
 }
 
@@ -411,8 +404,7 @@ void logOplogRecords(OperationContext* opCtx,
                      const std::vector<Timestamp>& timestamps,
                      const CollectionPtr& oplogCollection,
                      OpTime finalOpTime,
-                     Date_t wallTime,
-                     bool isAbortIndexBuild) {
+                     Date_t wallTime) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().isReplSet() && !replCoord->canAcceptWritesFor(opCtx, nss)) {
         str::stream ss;
@@ -519,16 +511,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     std::vector<Record> records{
         {RecordId(), RecordData(bsonOplogEntry.objdata(), bsonOplogEntry.objsize())}};
     std::vector<Timestamp> timestamps{slot.getTimestamp()};
-    const auto isAbortIndexBuild = oplogEntry->getOpType() == OpTypeEnum::kCommand &&
-        parseCommandType(oplogEntry->getObject()) == OplogEntry::CommandType::kAbortIndexBuild;
-    logOplogRecords(opCtx,
-                    oplogEntry->getNss(),
-                    &records,
-                    timestamps,
-                    oplog,
-                    slot,
-                    wallClockTime,
-                    isAbortIndexBuild);
+    logOplogRecords(opCtx, oplogEntry->getNss(), &records, timestamps, oplog, slot, wallClockTime);
     wuow.commit();
     return slot;
 }
@@ -1177,11 +1160,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
-// operation to collection 'collection'. If we are writing the pre-image during oplog application
-// on a secondary for a serverless tenant migration, we will use the timestamp and applyOpsIndex
-// from the donor timeline. If we are applying this entry on a primary during tenant oplog
-// application, we skip writing of the pre-image. The op observer will handle inserting the
-// correct pre-image on the primary in this case.
+// operation to collection 'collection'.
 void writeChangeStreamPreImage(OperationContext* opCtx,
                                const CollectionPtr& collection,
                                const mongo::repl::OplogEntry& oplogEntry,
@@ -1481,8 +1460,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (opOrGroupedInserts.isGroupedInserts()) {
                 // Grouped inserts.
 
-                // Cannot apply an array insert with applyOps command.  But can apply grouped
-                // inserts on primary as part of a tenant migration.
+                // Cannot apply an array insert with applyOps command.
                 uassert(ErrorCodes::OperationFailed,
                         "Cannot apply an array insert with applyOps",
                         !opCtx->writesAreReplicated());
@@ -1490,23 +1468,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 std::vector<InsertStatement> insertObjs;
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();
                 WriteUnitOfWork wuow(opCtx);
-                if (!opCtx->writesAreReplicated()) {
-                    for (const auto& iOp : insertOps) {
-                        invariant(iOp->getTerm());
-                        insertObjs.emplace_back(
-                            iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().value());
-                    }
-                } else {
-                    // Applying grouped inserts on the primary as part of a tenant migration.
-                    // We assign new optimes as the optimes on the donor are not relevant to
-                    // the recipient.
-                    std::vector<OplogSlot> slots = getNextOpTimes(opCtx, insertOps.size());
-                    auto slotIter = slots.begin();
-                    for (const auto& iOp : insertOps) {
-                        insertObjs.emplace_back(
-                            iOp->getObject(), slotIter->getTimestamp(), slotIter->getTerm());
-                        slotIter++;
-                    }
+                for (const auto& iOp : insertOps) {
+                    invariant(iOp->getTerm());
+                    insertObjs.emplace_back(
+                        iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().value());
                 }
 
                 // If an oplog entry has a recordId, this means that the collection is a

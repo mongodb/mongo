@@ -951,62 +951,6 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
     }
 }
 
-void IndexBuildsCoordinator::_abortTenantIndexBuilds(
-    OperationContext* opCtx,
-    const std::vector<std::shared_ptr<ReplIndexBuildState>>& builds,
-    MigrationProtocolEnum protocol,
-    const std::string& reason) {
-
-    std::vector<std::shared_ptr<ReplIndexBuildState>> buildsWaitingToFinish;
-    buildsWaitingToFinish.reserve(builds.size());
-    const auto indexBuildActionStr =
-        indexBuildActionToString(IndexBuildAction::kTenantMigrationAbort);
-    for (const auto& replState : builds) {
-        if (!abortIndexBuildByBuildUUID(
-                opCtx, replState->buildUUID, IndexBuildAction::kTenantMigrationAbort, reason)) {
-            // The index build may already be in the midst of tearing down.
-            LOGV2(4886204,
-                  "Index build: failed to abort index build for tenant migration",
-                  "buildUUID"_attr = replState->buildUUID,
-                  logAttrs(replState->dbName),
-                  "collectionUUID"_attr = replState->collectionUUID,
-                  "buildAction"_attr = indexBuildActionStr);
-            buildsWaitingToFinish.push_back(replState);
-        }
-    }
-    for (const auto& replState : buildsWaitingToFinish) {
-        LOGV2(6221600,
-              "Waiting on the index build to unregister before continuing the tenant migration.",
-              "buildUUID"_attr = replState->buildUUID,
-              logAttrs(replState->dbName),
-              "collectionUUID"_attr = replState->collectionUUID,
-              "buildAction"_attr = indexBuildActionStr);
-        awaitNoIndexBuildInProgressForCollection(
-            opCtx, replState->collectionUUID, replState->protocol);
-    }
-}
-
-void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
-                                                    MigrationProtocolEnum protocol,
-                                                    const boost::optional<TenantId>& tenantId,
-                                                    const std::string& reason) {
-    const auto tenantIdStr = tenantId ? tenantId->toString() : "";
-    LOGV2(4886205,
-          "About to abort all index builders running for collections belonging to the given tenant",
-          "tenantId"_attr = tenantIdStr,
-          "reason"_attr = reason);
-
-    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
-        auto indexBuildFilter = [=](const auto& replState) {
-            // Abort *all* index builds at the start of shard merge.
-            return repl::ClonerUtils::isDatabaseForTenant(replState.dbName, tenantId, protocol);
-        };
-        return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
-    }();
-
-    _abortTenantIndexBuilds(opCtx, builds, protocol, reason);
-}
-
 void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext* opCtx,
                                                                const std::string& reason) {
     _abortAllIndexBuildsWithReason(opCtx, IndexBuildAction::kInitialSyncAbort, reason);
@@ -1532,8 +1476,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                 signalAction = IndexBuildAction::kInitialSyncAbort;
             }
 
-            if ((IndexBuildAction::kPrimaryAbort == signalAction ||
-                 IndexBuildAction::kTenantMigrationAbort == signalAction) &&
+            if ((IndexBuildAction::kPrimaryAbort == signalAction) &&
                 !replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
                 uassertStatusOK({ErrorCodes::NotWritablePrimary,
                                  str::stream()
@@ -1599,7 +1542,6 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     switch (signalAction) {
         // Replicates an abortIndexBuild oplog entry and deletes the index from the durable catalog.
-        case IndexBuildAction::kTenantMigrationAbort:
         case IndexBuildAction::kPrimaryAbort: {
             // Single-phase builds are aborted on step-down, so it's possible to no longer be
             // primary after we process an abort. We must continue with the abort, but since
@@ -2177,10 +2119,8 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     }
 
     ScopeGuard abortOnExit([&] {
-        // A timestamped transaction is needed to perform a catalog write that removes the index
-        // entry when aborting the single-phase index build for tenant migrations only.
-        auto onCleanUpFn = MultiIndexBlock::makeTimestampedOnCleanUpFn(opCtx, collection.get());
-        _indexBuildsManager.abortIndexBuild(opCtx, collection, buildUUID, onCleanUpFn);
+        _indexBuildsManager.abortIndexBuild(
+            opCtx, collection, buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
     });
     uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection.get(), buildUUID));
 

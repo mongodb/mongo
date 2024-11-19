@@ -200,14 +200,6 @@ MultiIndexBlock::~MultiIndexBlock() {
 MultiIndexBlock::OnCleanUpFn MultiIndexBlock::kNoopOnCleanUpFn = []() {
 };
 
-MultiIndexBlock::OnCleanUpFn MultiIndexBlock::makeTimestampedOnCleanUpFn(
-    OperationContext* opCtx, const CollectionPtr& coll) {
-    return [opCtx, ns = coll->ns()]() -> Status {
-        opCtx->getServiceContext()->getOpObserver()->onAbortIndexBuildSinglePhase(opCtx, ns);
-        return Status::OK();
-    };
-}
-
 void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
                                       CollectionWriter& collection,
                                       OnCleanUpFn onCleanUp) noexcept {

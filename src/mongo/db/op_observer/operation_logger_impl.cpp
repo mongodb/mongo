@@ -51,10 +51,8 @@ void OperationLoggerImpl::logOplogRecords(OperationContext* opCtx,
                                           const std::vector<Timestamp>& timestamps,
                                           const CollectionPtr& oplogCollection,
                                           repl::OpTime finalOpTime,
-                                          Date_t wallTime,
-                                          bool isAbortIndexBuild) {
-    repl::logOplogRecords(
-        opCtx, nss, records, timestamps, oplogCollection, finalOpTime, wallTime, isAbortIndexBuild);
+                                          Date_t wallTime) {
+    repl::logOplogRecords(opCtx, nss, records, timestamps, oplogCollection, finalOpTime, wallTime);
 }
 
 std::vector<OplogSlot> OperationLoggerImpl::getNextOpTimes(OperationContext* opCtx,

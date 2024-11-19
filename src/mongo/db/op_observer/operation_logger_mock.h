@@ -56,8 +56,7 @@ public:
                          const std::vector<Timestamp>& timestamps,
                          const CollectionPtr& oplogCollection,
                          repl::OpTime finalOpTime,
-                         Date_t wallTime,
-                         bool isAbortIndexBuild) override {}
+                         Date_t wallTime) override {}
 
     /**
      * Returns a vector of 'count' non-null OpTimes.

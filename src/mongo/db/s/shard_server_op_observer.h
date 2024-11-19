@@ -86,8 +86,6 @@ public:
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) override;
 
-    void onAbortIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) override;
-
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,

@@ -165,22 +165,3 @@ mongo_cc_library(
         "//src/mongo/util/options_parser",
     ],
 )
-
-mongo_cc_library(
-    name = "storage_wiredtiger_import",
-    srcs = [
-        "wiredtiger_import.cpp",
-    ],
-    hdrs = [
-        "wiredtiger_import.h",
-    ],
-    target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,
-    deps = [
-        "storage_wiredtiger_core",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:catalog_helpers",
-        "//src/mongo/db/repl:oplog",
-        "//src/mongo/db/storage:bson_collection_catalog_entry",
-        "//src/mongo/db/storage:feature_document_util",
-    ],
-)

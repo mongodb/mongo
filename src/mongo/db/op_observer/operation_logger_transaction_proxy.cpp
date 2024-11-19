@@ -56,10 +56,9 @@ void OperationLoggerTransactionProxy::logOplogRecords(OperationContext* opCtx,
                                                       const std::vector<Timestamp>& timestamps,
                                                       const CollectionPtr& oplogCollection,
                                                       repl::OpTime finalOpTime,
-                                                      Date_t wallTime,
-                                                      bool isAbortIndexBuild) {
+                                                      Date_t wallTime) {
     _targetOperationLogger->logOplogRecords(
-        opCtx, nss, records, timestamps, oplogCollection, finalOpTime, wallTime, isAbortIndexBuild);
+        opCtx, nss, records, timestamps, oplogCollection, finalOpTime, wallTime);
 }
 
 std::vector<OplogSlot> OperationLoggerTransactionProxy::getNextOpTimes(OperationContext* opCtx,

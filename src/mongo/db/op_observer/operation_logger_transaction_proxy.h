@@ -73,8 +73,7 @@ public:
                          const std::vector<Timestamp>& timestamps,
                          const CollectionPtr& oplogCollection,
                          repl::OpTime finalOpTime,
-                         Date_t wallTime,
-                         bool isAbortIndexBuild) override;
+                         Date_t wallTime) override;
 
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override;
 

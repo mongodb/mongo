@@ -428,7 +428,6 @@ public:
     using MutableOplogEntry::k_idFieldName;
     using MutableOplogEntry::kCheckExistenceForDiffInsertFieldName;
     using MutableOplogEntry::kDestinedRecipientFieldName;
-    using MutableOplogEntry::kDonorApplyOpsIndexFieldName;
     using MutableOplogEntry::kDurableReplOperationFieldName;
     using MutableOplogEntry::kFromMigrateFieldName;
     using MutableOplogEntry::kMultiOpTypeFieldName;
@@ -704,8 +703,6 @@ public:
     static constexpr auto kCheckExistenceForDiffInsertFieldName =
         DurableOplogEntry::kCheckExistenceForDiffInsertFieldName;
     static constexpr auto kMultiOpTypeFieldName = DurableOplogEntry::kMultiOpTypeFieldName;
-    static constexpr auto kDonorApplyOpsIndexFieldName =
-        DurableOplogEntry::kDonorApplyOpsIndexFieldName;
     static constexpr auto kTidFieldName = DurableOplogEntry::kTidFieldName;
     static constexpr auto kNssFieldName = DurableOplogEntry::kNssFieldName;
     static constexpr auto kObject2FieldName = DurableOplogEntry::kObject2FieldName;

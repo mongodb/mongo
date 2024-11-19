@@ -212,13 +212,6 @@ structs:
                 cpp_name: wallClockTime
                 type: date
                 description: "A wallclock time with MS resolution"
-            donorApplyOpsIndex:
-                type: safeInt64
-                optional: true
-                description: "Used for Serverless shard merge during the oplog catchup phase. If the
-                              write was part of a transaction or applyOps entry, this will be the
-                              index of the original applyOps entry. Will be set to 0 for any
-                              non-applyOps writes."
             _id:
                 cpp_name: _id
                 type: Value

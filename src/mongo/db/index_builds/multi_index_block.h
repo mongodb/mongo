@@ -292,14 +292,6 @@ public:
     static OnCleanUpFn kNoopOnCleanUpFn;
 
     /**
-     * Returns an onCleanUp function for clean up when this index build should be timestamped. When
-     * called on primaries, this generates a new optime, writes a no-op oplog entry, and timestamps
-     * the catalog write to remove the index entry. Does nothing on secondaries.
-     */
-    static OnCleanUpFn makeTimestampedOnCleanUpFn(OperationContext* opCtx,
-                                                  const CollectionPtr& coll);
-
-    /**
      * May be called at any time after construction but before a successful commit(). Suppresses
      * the default behavior on destruction of removing all traces of uncommitted index builds. May
      * delete internal tables, but this is not transactional. Writes the resumable index build
