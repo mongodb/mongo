@@ -440,9 +440,12 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
         for file in glob.glob("bazel-out/**/*.gen_source_list", recursive=True):
             os.remove(file)
         extra_args += ["--build_tag_filters=scons_link_lists"]
+        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
 
-    if SCons.Script.BUILD_TARGETS == ["compiledb"]:
-        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//:compiledb"]
+    elif SCons.Script.BUILD_TARGETS == ["compiledb"]:
+        extra_args += ["--build_tag_filters=scons_link_lists,compiledb,gen_source"]
+        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//:compiledb", "//src/..."]
+
     else:
         bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
 

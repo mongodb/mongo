@@ -43,6 +43,7 @@ refresh_compile_commands(
     name = "compiledb",
     exclude_external_sources = True,
     exclude_headers = "all",  # not using "all" adds headers as sources to compile_commands.json which is never what we want
+    tags = ["compiledb"],
     targets = {
         "//src/...": "",
     },
