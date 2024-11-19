@@ -47,19 +47,42 @@ namespace mongo::command_diagnostics {
 
 struct Printer {
     auto format(auto& fc) const {
-        // It's assumed that 'opCtx' is a valid pointer and has been decorated with a CurOp. This
-        // class should not be used in scopes where that assumption doesn't hold.
+        // All operations have an OperationContext, and all OpContexts are decorated with a
+        // CurOpStack. This access should always be valid while 'opCtx' is a valid pointer.
         auto& curOp = *CurOp::get(opCtx);
         auto out = fc.out();
+
+        // Do not log any information if asked to omit it.
+        if (curOp.getShouldOmitDiagnosticInformation()) {
+            out = format_to(out, FMT_STRING("omitted"));
+            return out;
+        }
+
+        // Remove sensitive fields from the command object before logging.
+        // TODO SERVER-74604: When the implementations of OpDebug::append() and OpDebug::report()
+        // are merged, we should be able to remove the duplicated logic here that handles
+        // 'snipForLogging()' and 'redact()'.
+        BSONObj cmd;
+        if (const Command* curCommand = curOp.getCommand()) {
+            mutablebson::Document cmdToLog(curOp.opDescription(),
+                                           mutablebson::Document::kInPlaceDisabled);
+            curCommand->snipForLogging(&cmdToLog);
+            cmd = cmdToLog.getObject();
+        }
+
+        auto opDesc = redact(cmd).toString();
+        auto opDebug = redact(serializeOpDebug(curOp)).toString();
+        auto origCommand = redact(curOp.originatingCommand()).toString();
         out = format_to(
             out,
-            FMT_STRING("{{'currentOp': {}, 'opDescription': {}, 'originatingCommand': {}}}"),
-            redact(serializeOpDebug(curOp)).toString(),
-            redact(curOp.opDescription()).toString(),
-            redact(curOp.originatingCommand()).toString());
+            FMT_STRING("{{'currentOp': {}, 'opDescription': {}{}}}"),
+            opDebug,
+            opDesc,
+            curOp.originatingCommand().isEmpty() ? "" : ", 'originatingCommand': " + origCommand);
         return out;
     }
 
+    // This pointer must outlive this class.
     OperationContext* opCtx;
 
 private:

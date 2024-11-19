@@ -86,6 +86,12 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target="command_diagnostic_printer_test",
+    source=[],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
     target="db_query_test",
     source=[
         "canonical_distinct_test.cpp",

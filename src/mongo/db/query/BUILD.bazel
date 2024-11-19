@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -642,6 +642,18 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "command_diagnostic_printer_test",
+    srcs = [
+        "command_diagnostic_printer_test.cpp",
+        "//src/mongo/db/query:command_diagnostic_printer.h",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:service_context_test_fixture",
     ],
 )
 
