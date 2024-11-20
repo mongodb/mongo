@@ -1,5 +1,6 @@
 """Module for syncing a repo with Copybara and setting up configurations."""
 import argparse
+import fileinput
 import subprocess
 import os
 import sys
@@ -112,25 +113,56 @@ def main():
     # Read configurations
     expansions = read_config_file(args.expansion_file)
 
-    access_token_copybara_syncer = get_installation_access_token(
-        expansions["app_id_copybara_syncer"], expansions["private_key_copybara_syncer"],
-        expansions["installation_id_copybara_syncer"])
+    token_mongodb_mongo = get_installation_access_token(
+        expansions["app_id_copybara_syncer"],
+        expansions["private_key_copybara_syncer"],
+        expansions["installation_id_copybara_syncer"],
+    )
+    token_10gen_mongo = get_installation_access_token(
+        expansions["app_id_copybara_syncer_10gen"],
+        expansions["private_key_copybara_syncer_10gen"],
+        expansions["installation_id_copybara_syncer_10gen"],
+    )
+
+    tokens_map = {
+        "https://github.com/mongodb/mongo.git": token_mongodb_mongo,
+        "https://github.com/10gen/mongo.git": token_10gen_mongo,
+    }
 
     # Create the mongodb-bot.gitconfig file as necessary.
     create_mongodb_bot_gitconfig()
 
     current_dir = os.getcwd()
-    git_destination_url_with_token = f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
+    config_file = f"{current_dir}/copy.bara.sky"
+
+    # Overwrite repo urls in copybara config in-place
+    with fileinput.FileInput(config_file, inplace=True) as file:
+        for line in file:
+            token = None
+            for repo, value in tokens_map.items():
+                if repo in line:
+                    token = value
+
+            if token:
+                print(
+                    line.replace(
+                        "https://github.com",
+                        f"https://x-access-token:{token}@github.com",
+                    ),
+                    end="",
+                )
+            else:
+                print(line, end="")
 
     # Set up the Docker command and execute it
     docker_cmd = [
         "docker run",
         "-v ~/.ssh:/root/.ssh",
         "-v ~/mongodb-bot.gitconfig:/root/.gitconfig",
-        f'-v "{current_dir}/copy.bara.sky":/usr/src/app/copy.bara.sky',
+        f'-v "{config_file}":/usr/src/app/copy.bara.sky',
         "-e COPYBARA_CONFIG='copy.bara.sky'",
         "-e COPYBARA_SUBCOMMAND='migrate'",
-        f"-e COPYBARA_OPTIONS='-v --git-destination-url={git_destination_url_with_token}'",
+        "-e COPYBARA_OPTIONS='-v'",
         "copybara copybara",
     ]
 
