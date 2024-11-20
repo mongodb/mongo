@@ -984,6 +984,16 @@ public:
 
     virtual const GenericArguments& getGenericArguments() const = 0;
 
+    /**
+     * Returns true when this command is safe to retry on a StaleConfig or
+     * ShardCannotRefreshDueToLocksHeld error. Commands can override this method with their own
+     * retry logic.
+     */
+    virtual bool canRetryOnStaleConfigOrShardCannotRefreshDueToLocksHeld(
+        const OpMsgRequest& request) const {
+        return true;
+    }
+
 protected:
     ResourcePattern resourcePattern() const;
 

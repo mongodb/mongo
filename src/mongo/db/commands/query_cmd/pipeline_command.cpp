@@ -70,6 +70,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -319,6 +320,27 @@ public:
                                          _privileges,
                                          result,
                                          _usedExternalDataSources));
+        }
+
+        bool canRetryOnStaleConfigOrShardCannotRefreshDueToLocksHeld(
+            const OpMsgRequest& opMsgRequest) const override {
+            // Can not rerun the command when executing an aggregation that runs $mergeCursors as it
+            // may have consumed the cursors within.
+            SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
+
+            const AggregateCommandRequest aggregationRequest =
+                aggregation_request_helper::parseFromBSON(opMsgRequest.body,
+                                                          opMsgRequest.validatedTenancyScope,
+                                                          boost::none,
+                                                          serializationCtx);
+
+            const auto& pipeline = aggregationRequest.getPipeline();
+            const auto hasMergeCursor =
+                std::any_of(pipeline.begin(), pipeline.end(), [](const BSONObj& stage) {
+                    return stage.firstElementFieldNameStringData() ==
+                        DocumentSourceMergeCursors::kStageName;
+                });
+            return !hasMergeCursor;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

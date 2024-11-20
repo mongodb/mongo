@@ -1876,11 +1876,6 @@ void ExecCommandDatabase::_initiateCommand() {
     command->incrementCommandsExecuted();
 }
 
-namespace {
-const CommandNameAtom aggregateAtom("aggregate");
-const CommandNameAtom getMoreAtom("getMore");
-}  // namespace
-
 void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
 
@@ -2066,42 +2061,17 @@ bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
         return !inCriticalSection;
     }
 
-    // Can not rerun the command when executing a GetMore command as the cursor may already be lost.
-    const auto isRunningGetMoreCmd = _execContext.getCommand()->getNameAtom() == getMoreAtom;
-
-    // Can not rerun the command when executing an aggregation that runs $mergeCursors as it may
-    // have consumed the cursors within.
-    const auto isAggregateWithMergeCursors = [&]() {
-        if (_execContext.getCommand()->getNameAtom() != aggregateAtom) {
-            return false;
-        }
-
-        const auto& opMsgRequest = _execContext.getRequest();
-        SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
-
-        const AggregateCommandRequest aggregationRequest =
-            aggregation_request_helper::parseFromBSON(opMsgRequest.body,
-                                                      opMsgRequest.validatedTenancyScope,
-                                                      boost::none,
-                                                      serializationCtx);
-
-        const auto& pipeline = aggregationRequest.getPipeline();
-        const auto hasMergeCursor =
-            std::any_of(pipeline.begin(), pipeline.end(), [](const BSONObj& stage) {
-                return stage.firstElementFieldNameStringData() ==
-                    DocumentSourceMergeCursors::kStageName;
-            });
-        return hasMergeCursor;
-    }();
+    const auto canRetryCmd = _invocation->canRetryOnStaleConfigOrShardCannotRefreshDueToLocksHeld(
+        _execContext.getRequest());
 
     if (execError == ErrorCodes::StaleConfig) {
         const auto staleInfo = execError.extraInfo<StaleConfigInfo>();
         tassert(8462307, "StaleConfig must have extraInfo", staleInfo);
         const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
 
-        return !inCriticalSection && !isRunningGetMoreCmd && !isAggregateWithMergeCursors;
+        return !inCriticalSection && canRetryCmd;
     } else if (execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
-        return !isRunningGetMoreCmd && !isAggregateWithMergeCursors;
+        return canRetryCmd;
     }
 
     return false;
