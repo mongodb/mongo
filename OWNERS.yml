@@ -53,7 +53,8 @@ filters:
   - "copy.bara.sky":
     approvers:
       - IamXander
-  - "copybara.staging.sky":
+      - smcclure15
+  - "copy.bara.staging.sky":
     approvers:
       - devprod-correctness
   - "jsconfig.json":
