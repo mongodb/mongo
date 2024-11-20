@@ -31,11 +31,9 @@
 
 #include "mongo/client/dbclient_connection.h"
 
-namespace queryTester::commandHelpers {
+namespace mongo::query_tester {
 // Returns the array element containing result documents.
-mongo::BSONObj getResultsFromCommandResponse(const mongo::BSONObj& cmdResponse);
+BSONObj getResultsFromCommandResponse(const BSONObj& cmdResponse);
 
-mongo::BSONObj runCommand(mongo::DBClientConnection* conn,
-                          const std::string& db,
-                          const mongo::BSONObj& commandToRun);
-}  // namespace queryTester::commandHelpers
+BSONObj runCommand(DBClientConnection* conn, const std::string& db, const BSONObj& commandToRun);
+}  // namespace mongo::query_tester

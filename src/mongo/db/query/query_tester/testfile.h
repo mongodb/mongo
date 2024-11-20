@@ -34,7 +34,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "test.h"
 
-namespace queryTester {
+namespace mongo::query_tester {
 
 /**
  * A class representing a test file. A test file can have a number of formats (subclassed below).
@@ -63,7 +63,7 @@ public:
     /**
      * Drops collections in a test file that haven't been dropped as of the previous file.
      */
-    void dropStaleCollections(mongo::DBClientConnection*,
+    void dropStaleCollections(DBClientConnection*,
                               const std::set<std::string>& prevFileCollections) const;
 
     std::string generateFailureReport() const;
@@ -75,14 +75,14 @@ public:
      * Loads or drops then loads the collections needed for the test files depending on the passed
      * in options. Updates the already dropped/loaded collections from the previous file vector.
      */
-    void loadCollections(mongo::DBClientConnection*,
+    void loadCollections(DBClientConnection*,
                          bool dropData,
                          bool loadData,
                          const std::set<std::string>& prevFileCollections) const;
 
     void printFailedQueries(const std::vector<size_t>& failedTestNums) const;
     bool readInEntireFile(ModeOption);
-    void runTestFile(mongo::DBClientConnection*, ModeOption);
+    void runTestFile(DBClientConnection*, ModeOption);
 
     /**
      * Write out all the non-test information to a string for debug purposes.
@@ -117,7 +117,7 @@ protected:
         std::vector<std::vector<std::string>> preCollFiles;
     } _comments;
     // Stores a mapping between each test number and its associated query string.
-    mongo::stdx::unordered_map<size_t, std::string> _testNumToQuery;
+    stdx::unordered_map<size_t, std::string> _testNumToQuery;
     size_t _failedQueryCount;
 };
-}  // namespace queryTester
+}  // namespace mongo::query_tester

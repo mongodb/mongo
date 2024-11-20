@@ -29,7 +29,8 @@
 
 #include "mongo/util/version.h"
 
-class MockVersionInfo : public mongo::VersionInfoInterface {
+namespace mongo::query_tester {
+class MockVersionInfo : public VersionInfoInterface {
 public:
     int majorVersion() const noexcept final {
         return -1;
@@ -47,27 +48,27 @@ public:
         return 0;
     }
 
-    mongo::StringData version() const noexcept final {
+    StringData version() const noexcept final {
         return "UNKNOWN";
     }
 
-    mongo::StringData gitVersion() const noexcept final {
+    StringData gitVersion() const noexcept final {
         return "UNKNOWN";
     }
 
-    std::vector<mongo::StringData> modules() const final {
+    std::vector<StringData> modules() const final {
         return {"mongoTester"};
     }
 
-    mongo::StringData allocator() const noexcept final {
+    StringData allocator() const noexcept final {
         return "UNKNOWN";
     }
 
-    mongo::StringData jsEngine() const noexcept final {
+    StringData jsEngine() const noexcept final {
         return "UNKNOWN";
     }
 
-    mongo::StringData targetMinOS() const noexcept final {
+    StringData targetMinOS() const noexcept final {
         return "UNKNOWN";
     }
 
@@ -75,3 +76,4 @@ public:
         return {};
     }
 };
+}  // namespace mongo::query_tester

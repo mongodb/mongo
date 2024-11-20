@@ -44,8 +44,8 @@
 #include "mock_version_info.h"
 #include "testfile.h"
 
-namespace queryTester {
-
+namespace mongo::query_tester {
+namespace {
 struct TestSpec {
     TestSpec(std::filesystem::path path,
              size_t low = 0,
@@ -55,16 +55,15 @@ struct TestSpec {
     // Validate that this test conforms to our expectations about filesystem things.
     void validate(ModeOption mode) const {
         uassert(9670437,
-                mongo::str::stream{} << "Test file name must end in .test, not "
-                                     << testPath.extension().string(),
+                str::stream{} << "Test file name must end in .test, not "
+                              << testPath.extension().string(),
                 testPath.extension() == ".test" || mode == ModeOption::Normalize);
         uassert(9670438,
-                mongo::str::stream{} << "Test file does not exist: " << testPath.string(),
+                str::stream{} << "Test file does not exist: " << testPath.string(),
                 std::filesystem::exists(testPath));
         uassert(9670439,
-                mongo::str::stream{}
-                    << "A corresponding .results file must exist in compare mode for "
-                    << testPath.string(),
+                str::stream{} << "A corresponding .results file must exist in compare mode for "
+                              << testPath.string(),
                 mode != ModeOption::Compare ||
                     std::filesystem::exists(
                         std::filesystem::path{testPath}.replace_extension(".results")));
@@ -75,33 +74,32 @@ struct TestSpec {
     size_t endTest;
 };
 
-std::unique_ptr<mongo::DBClientConnection> buildConn(const std::string& uriString,
-                                                     MockVersionInfo* const versionInfo,
-                                                     const ModeOption mode) {
+std::unique_ptr<DBClientConnection> buildConn(const std::string& uriString,
+                                              MockVersionInfo* const versionInfo,
+                                              const ModeOption mode) {
     if (mode == ModeOption::Normalize) {
         // Return a default (empty) unique ptr.
         return {};
     } else {
         // Enable required components.
-        mongo::TestingProctor::instance().setEnabled(false);
+        TestingProctor::instance().setEnabled(false);
 
-        mongo::WireSpec::getWireSpec(mongo::getGlobalServiceContext())
-            .initialize(mongo::WireSpec::Specification{});
+        WireSpec::getWireSpec(getGlobalServiceContext()).initialize(WireSpec::Specification{});
 
         // For now use a port not reserved for an MDB process.
-        auto params = mongo::ServerGlobalParams{.port = 27016};
-        mongo::VersionInfoInterface::enable(versionInfo);
-        auto tl = mongo::transport::TransportLayerManagerImpl::createWithConfig(
-            &params, mongo::getGlobalServiceContext());
+        auto params = ServerGlobalParams{.port = 27016};
+        VersionInfoInterface::enable(versionInfo);
+        auto tl = transport::TransportLayerManagerImpl::createWithConfig(&params,
+                                                                         getGlobalServiceContext());
         auto res = tl->setup();
-        uassert(9670415, mongo::str::stream{} << "Error setting up listener " << res, res.isOK());
-        mongo::getGlobalServiceContext()->setTransportLayerManager(std::move(tl));
-        auto mongoURI = mongo::MongoURI::parse(uriString);
+        uassert(9670415, str::stream{} << "Error setting up listener " << res, res.isOK());
+        getGlobalServiceContext()->setTransportLayerManager(std::move(tl));
+        auto mongoURI = MongoURI::parse(uriString);
         uassert(9670455,
-                mongo::str::stream{} << "URI Parsing failed with message "
-                                     << mongoURI.getStatus().reason(),
+                str::stream{} << "URI Parsing failed with message "
+                              << mongoURI.getStatus().reason(),
                 mongoURI.isOK());
-        auto conn = std::make_unique<mongo::DBClientConnection>(false, 0, mongoURI.getValue());
+        auto conn = std::make_unique<DBClientConnection>(false, 0, mongoURI.getValue());
         auto hostAndPortVec = mongoURI.getValue().getServers();
         uassert(
             9670412, "Expected exactly one host/port in the given URI", hostAndPortVec.size() == 1);
@@ -125,7 +123,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const bool populateAndExit) {
     // Run the tests.
     auto versionInfo = MockVersionInfo{};
-    auto conn = queryTester::buildConn(uriString, &versionInfo, mode);
+    auto conn = buildConn(uriString, &versionInfo, mode);
     // Track collections loaded in the previous test file.
     auto prevFileCollections = std::set<std::string>{};
     // TODO(SERVER-96984): Robustify
@@ -133,7 +131,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     auto failedQueryCount = size_t{0};
     auto totalTestsRun = size_t{0};
     for (const auto& [testPath, startRange, endRange] : testsToRun) {
-        auto currFile = queryTester::QueryFile(testPath, {startRange, endRange});
+        auto currFile = QueryFile(testPath, {startRange, endRange});
         currFile.readInEntireFile(mode);
         currFile.loadCollections(conn.get(), dropData, loadData, prevFileCollections);
         if (populateAndExit) {
@@ -164,21 +162,18 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         std::cout << std::endl << "All tests passed!" << std::endl;
         return 0;
     } else {
-        fileHelpers::printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
+        printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
         return 1;
     }
 }
-}  // namespace queryTester
 
-namespace {
 void assertNextArgExists(const std::vector<std::string>& args,
                          const size_t& curArg,
                          const std::string& argName) {
     if (args.size() <= curArg + 1) {
-        queryTester::exitWithError(1, std::string{"Expected more arguments after "} + argName);
+        exitWithError(1, std::string{"Expected more arguments after "} + argName);
     }
 }
-}  // namespace
 
 void printHelpString() {
     std::map<std::string, std::string> helpMap = {
@@ -222,18 +217,19 @@ void printHelpString() {
         std::cout << key << ": " << val << std::endl;
     }
 }
+}  // namespace
 
-int main(const int argc, const char** const argv) {
+int queryTesterMain(const int argc, const char** const argv) {
     auto parsedArgs = std::vector<std::string>(argv, argv + argc);
     // Vector of file, startTest, endTest where the numbers are optional.
-    auto testsToRun = std::vector<queryTester::TestSpec>{};
+    auto testsToRun = std::vector<TestSpec>{};
     auto expectingNumAt = size_t{0} - 1;
     auto runningPartialFile = false;
     auto dropOpt = false;
     auto loadOpt = false;
-    auto outOpt = queryTester::WriteOutOptions::kNone;
+    auto outOpt = WriteOutOptions::kNone;
     auto mongoURIString = boost::optional<std::string>{};
-    auto mode = queryTester::ModeOption::Compare;  // Default.
+    auto mode = ModeOption::Compare;  // Default.
     auto populateAndExit = false;
     for (auto argNum = size_t{1}; argNum < parsedArgs.size(); ++argNum) {
         // Same order as in the help menu.
@@ -243,11 +239,11 @@ int main(const int argc, const char** const argv) {
             loadOpt = true;
         } else if (parsedArgs[argNum] == "--mode") {
             assertNextArgExists(parsedArgs, argNum, "--mode");
-            mode = queryTester::stringToModeOption(parsedArgs[argNum + 1]);
+            mode = stringToModeOption(parsedArgs[argNum + 1]);
             ++argNum;
         } else if (parsedArgs[argNum] == "--out") {
             assertNextArgExists(parsedArgs, argNum, "--out");
-            outOpt = queryTester::stringToWriteOutOpt(parsedArgs[argNum + 1]);
+            outOpt = stringToWriteOutOpt(parsedArgs[argNum + 1]);
             ++argNum;
         } else if (parsedArgs[argNum] == "--populateAndExit") {
             std::tie(dropOpt, loadOpt, populateAndExit) = std::tuple{true, true, true};
@@ -260,7 +256,7 @@ int main(const int argc, const char** const argv) {
             std::exit(0);
         } else if (parsedArgs[argNum] == "-n") {
             if (expectingNumAt != argNum) {
-                queryTester::exitWithError(1, "-n must follow the -t test it modifies");
+                exitWithError(1, "-n must follow the -t test it modifies");
             }
             runningPartialFile = true;
             assertNextArgExists(parsedArgs, argNum, "-n");
@@ -269,7 +265,7 @@ int main(const int argc, const char** const argv) {
             ++argNum;
         } else if (parsedArgs[argNum] == "-r") {
             if (expectingNumAt != argNum) {
-                queryTester::exitWithError(1, "-r must follow the -t test it modifies");
+                exitWithError(1, "-r must follow the -t test it modifies");
             }
             runningPartialFile = true;
             assertNextArgExists(parsedArgs, argNum, "-r");
@@ -277,9 +273,9 @@ int main(const int argc, const char** const argv) {
             testsToRun.back().startTest = std::stoull(parsedArgs[argNum + 1]);
             testsToRun.back().endTest = std::stoull(parsedArgs[argNum + 2]);
             if (testsToRun.back().startTest > testsToRun.back().endTest) {
-                queryTester::exitWithError(
+                exitWithError(
                     1,
-                    mongo::str::stream{}
+                    str::stream{}
                         << "Start test number must be lower than end test number for test "
                         << testsToRun.back().testPath.string());
             }
@@ -292,7 +288,7 @@ int main(const int argc, const char** const argv) {
             ++argNum;  // Skip the testName
             expectingNumAt = argNum + 1;
         } else {
-            queryTester::exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
+            exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
         }
     }
 
@@ -303,19 +299,18 @@ int main(const int argc, const char** const argv) {
 
     // Validate some flag conditions.
     for (const auto& [condition, message] : std::map<bool, std::string>{
-             {mode == queryTester::ModeOption::Compare &&
-                  outOpt != queryTester::WriteOutOptions::kNone,
+             {mode == ModeOption::Compare && outOpt != WriteOutOptions::kNone,
               "--mode compare and --out are incompatible."},
              // Cannot write out if only running part of a file.
-             {runningPartialFile && outOpt != queryTester::WriteOutOptions::kNone,
+             {runningPartialFile && outOpt != WriteOutOptions::kNone,
               "--out not supported with either -n or -r"},
-             {mode == queryTester::ModeOption::Normalize && (dropOpt || loadOpt),
+             {mode == ModeOption::Normalize && (dropOpt || loadOpt),
               "--drop and --load are incompatible with --mode normalize."},
              {populateAndExit && testsToRun.size() != 1,
               "--populateAndExit must be specified with a single test file."},
              {testsToRun.empty(), "Make sure to provide QueryTester with a .test file."}}) {
         if (condition) {
-            queryTester::exitWithError(1, message);
+            exitWithError(1, message);
         }
     }
 
@@ -325,16 +320,22 @@ int main(const int argc, const char** const argv) {
     }
 
     try {
-        auto serviceContextHolder = mongo::ServiceContext::make();
+        auto serviceContextHolder = ServiceContext::make();
         setGlobalServiceContext(std::move(serviceContextHolder));
-        return queryTester::runTestProgram(std::move(testsToRun),
-                                           mongoURIString.get(),
-                                           dropOpt,
-                                           loadOpt,
-                                           outOpt,
-                                           mode,
-                                           populateAndExit);
-    } catch (mongo::AssertionException& ex) {
-        queryTester::exitWithError(1, ex.reason());
+        return runTestProgram(std::move(testsToRun),
+                              mongoURIString.get(),
+                              dropOpt,
+                              loadOpt,
+                              outOpt,
+                              mode,
+                              populateAndExit);
+    } catch (AssertionException& ex) {
+        exitWithError(1, ex.reason());
     }
+    MONGO_UNREACHABLE;
+}
+}  // namespace mongo::query_tester
+
+int main(const int argc, const char** const argv) {
+    return mongo::query_tester::queryTesterMain(argc, argv);
 }

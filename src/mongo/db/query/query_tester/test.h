@@ -36,9 +36,9 @@
 #include "mongo/db/query/util/jparse_util.h"
 #include "mongo/shell/shell_utils.h"
 
-namespace queryTester {
-using mongo::shell_utils::NormalizationOpts;
-using mongo::shell_utils::NormalizationOptsSet;
+namespace mongo::query_tester {
+using shell_utils::NormalizationOpts;
+using shell_utils::NormalizationOptsSet;
 
 enum class ModeOption { Run, Compare, Normalize };
 ModeOption stringToModeOption(const std::string&);
@@ -52,7 +52,7 @@ public:
          std::vector<std::string>&& preQueryComments,
          std::vector<std::string>&& postQueryComments,
          std::vector<std::string>&& postTestComments,
-         std::vector<mongo::BSONObj>&& expectedResult = {})
+         std::vector<BSONObj>&& expectedResult = {})
         : _testLine(testLine),
           _testNum(testNum),
           _testName(testName),
@@ -64,8 +64,7 @@ public:
     /**
      * Returns all actual results, including those that are not contained in the first batch.
      */
-    std::vector<mongo::BSONObj> getAllResults(mongo::DBClientConnection* conn,
-                                              const mongo::BSONObj& result);
+    std::vector<BSONObj> getAllResults(DBClientConnection* conn, const BSONObj& result);
 
     std::string getTestLine() const;
 
@@ -74,8 +73,7 @@ public:
     /**
      * Compute the normalized version of the input set.
      */
-    static std::vector<std::string> normalize(const std::vector<mongo::BSONObj>&,
-                                              NormalizationOptsSet);
+    static std::vector<std::string> normalize(const std::vector<BSONObj>&, NormalizationOptsSet);
 
     static NormalizationOptsSet parseResultType(const std::string& type);
 
@@ -95,7 +93,7 @@ public:
     /**
      * Runs the test and records the result returned by the server.
      */
-    void runTestAndRecord(mongo::DBClientConnection*, ModeOption);
+    void runTestAndRecord(DBClientConnection*, ModeOption);
 
     void setDB(const std::string& db);
 
@@ -112,11 +110,11 @@ private:
         std::vector<std::string> postQuery;
         std::vector<std::string> postTest;
     } _comments;
-    std::vector<mongo::BSONObj> _expectedResult;
+    std::vector<BSONObj> _expectedResult;
     std::vector<std::string> _normalizedResult;
     NormalizationOptsSet _testType;
-    mongo::BSONObj _query;
+    BSONObj _query;
     std::string _db;
 };
 
-}  // namespace queryTester
+}  // namespace mongo::query_tester

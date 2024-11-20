@@ -12,10 +12,10 @@ env.AppendUnique(
 env.Library(
     target="mongotest_core",
     source=[
-        "src/command_helpers.cpp",
-        "src/file_helpers.cpp",
-        "src/test.cpp",
-        "src/testfile.cpp",
+        "command_helpers.cpp",
+        "file_helpers.cpp",
+        "test.cpp",
+        "testfile.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -30,7 +30,7 @@ env.Library(
 
 mongoTest = env.Program(
     target="mongotest",
-    source=["src/main.cpp"],
+    source=["main.cpp"],
     LIBDEPS=[
         "mongotest_core",
     ],

@@ -44,23 +44,8 @@
 
 #include "mongo/bson/bsonelement.h"
 
-namespace queryTester {
+namespace mongo::query_tester {
 enum class WriteOutOptions { kNone, kResult, kOnelineResult };
-WriteOutOptions stringToWriteOutOpt(const std::string& opt);
-
-inline bool isTerminal() {
-    static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
-    return isTerminal;
-}
-
-namespace ColorCodes {
-constexpr std::string_view kRed = "\033[1;31m";
-constexpr std::string_view kYellow = "\033[1;33m";
-constexpr std::string_view kCyan = "\033[1;36m";
-constexpr std::string_view kBrown = "\033[33m";
-constexpr std::string_view kBold = "\033[1m";
-constexpr std::string_view kReset = "\033[m";
-}  // namespace ColorCodes
 
 class ConditionalColor {
 public:
@@ -74,48 +59,13 @@ public:
     }
 
 private:
+    static inline bool isTerminal() {
+        static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
+        return isTerminal;
+    }
+
     std::string_view _colorCode;
 };
-
-inline ConditionalColor applyRed() {
-    return ConditionalColor(ColorCodes::kRed);
-}
-inline ConditionalColor applyYellow() {
-    return ConditionalColor(ColorCodes::kYellow);
-}
-inline ConditionalColor applyCyan() {
-    return ConditionalColor(ColorCodes::kCyan);
-}
-inline ConditionalColor applyBrown() {
-    return ConditionalColor(ColorCodes::kBrown);
-}
-inline ConditionalColor applyBold() {
-    return ConditionalColor(ColorCodes::kBold);
-}
-inline ConditionalColor applyReset() {
-    return ConditionalColor(ColorCodes::kReset);
-}
-
-namespace fileHelpers {
-// Returns a {collName, fileName} tuple.
-std::tuple<std::string, std::filesystem::path> getCollAndFileName(const std::string&);
-/**
- * Extracts the test numbers associated with failing queries from hunk headers in the git diff
- * output and stores them in a vector.
- */
-std::vector<size_t> getFailedTestNums(const std::string& diffOutput);
-std::string getTestNameFromFilePath(const std::filesystem::path&);
-/**
- * Performs a text-based diff between the expected and actual result test files and returns the diff
- * output.
- */
-std::string gitDiff(const std::filesystem::path&, const std::filesystem::path&);
-void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
-                         size_t failedQueryCount,
-                         size_t totalTestsRun);
-std::vector<std::string> readAndAssertNewline(std::fstream&, const std::string& context);
-std::vector<std::string> readLine(std::fstream&, std::string& lineFromFile);
-void verifyFileStreamGood(std::fstream&, const std::filesystem::path&, const std::string& op);
 
 template <typename T, bool Multiline>
 class TestResult {
@@ -142,8 +92,8 @@ inline std::ostream& operator<<(std::ostream& stream, const TestResult<T, Multil
         } else {
             stream << " ";
         }
-        if constexpr (std::is_same_v<T, mongo::BSONObj> || std::is_same_v<T, mongo::BSONElement>) {
-            stream << it->jsonString(mongo::ExtendedRelaxedV2_0_0, false, false);
+        if constexpr (std::is_same_v<T, BSONObj> || std::is_same_v<T, BSONElement>) {
+            stream << it->jsonString(ExtendedRelaxedV2_0_0, false, false);
         } else {
             stream << *it;
         }
@@ -159,5 +109,38 @@ template <typename T>
 using ArrayResult = TestResult<T, true>;
 template <typename T>
 using LineResult = TestResult<T, false>;
-}  // namespace fileHelpers
-}  // namespace queryTester
+
+ConditionalColor applyBold();
+ConditionalColor applyBrown();
+ConditionalColor applyCyan();
+ConditionalColor applyRed();
+ConditionalColor applyReset();
+ConditionalColor applyYellow();
+
+// Returns a {collName, fileName} tuple.
+std::tuple<std::string, std::filesystem::path> getCollAndFileName(const std::string&);
+/**
+ * Extracts the test numbers associated with failing queries from hunk headers in the git diff
+ * output and stores them in a vector.
+ */
+std::vector<size_t> getFailedTestNums(const std::string& diffOutput);
+std::string getTestNameFromFilePath(const std::filesystem::path&);
+/**
+ * Performs a text-based diff between the expected and actual result test files and returns the diff
+ * output.
+ */
+std::string gitDiff(const std::filesystem::path&, const std::filesystem::path&);
+
+inline bool isTerminal() {
+    static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
+    return isTerminal;
+}
+
+void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
+                         size_t failedQueryCount,
+                         size_t totalTestsRun);
+std::vector<std::string> readAndAssertNewline(std::fstream&, const std::string& context);
+std::vector<std::string> readLine(std::fstream&, std::string& lineFromFile);
+WriteOutOptions stringToWriteOutOpt(const std::string& opt);
+void verifyFileStreamGood(std::fstream&, const std::filesystem::path&, const std::string& op);
+}  // namespace mongo::query_tester

@@ -24,7 +24,7 @@ env.SConscript(
         "query_settings",
         "query_stats",
         "query_shape",
-        "querytester",
+        "query_tester",
         "search",
         "stage_builder/sbe",
         "stats",

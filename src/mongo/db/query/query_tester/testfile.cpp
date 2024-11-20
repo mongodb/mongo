@@ -37,37 +37,36 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/util/jparse_util.h"
 
-namespace queryTester {
-
+namespace mongo::query_tester {
 namespace {
-void runCommandAssertOK(mongo::DBClientConnection*,
-                        const mongo::BSONObj& command,
+void runCommandAssertOK(DBClientConnection*,
+                        const BSONObj& command,
                         const std::string& db,
-                        std::vector<mongo::ErrorCodes::Error> acceptableErrorCodes = {});
+                        std::vector<ErrorCodes::Error> acceptableErrorCodes = {});
 
-void dropCollections(mongo::DBClientConnection* const conn,
+void dropCollections(DBClientConnection* const conn,
                      const std::string& dbName,
                      const std::vector<std::string>& collections) {
     auto cmd = BSON("drop"
                     << "");
     for (const auto& coll : collections) {
-        auto bob = mongo::BSONObjBuilder{};
-        bob.append("drop", std::get<0>(fileHelpers::getCollAndFileName(coll)));
+        auto bob = BSONObjBuilder{};
+        bob.append("drop", std::get<0>(getCollAndFileName(coll)));
         // Allow NamespaceNotFound.
-        runCommandAssertOK(conn, bob.done(), dbName, {mongo::ErrorCodes::NamespaceNotFound});
+        runCommandAssertOK(conn, bob.done(), dbName, {ErrorCodes::NamespaceNotFound});
     }
 }
 
 // Format result set so that each result is on a separate line.
-std::string formatResultSet(const mongo::BSONObj& obj) {
+std::string formatResultSet(const BSONObj& obj) {
     auto oss = std::ostringstream{};
     const auto arrayElt = obj.hasField("res") ? obj.getField("res") : obj.firstElement();
-    if (arrayElt.type() == mongo::Array) {
-        oss << fileHelpers::ArrayResult<mongo::BSONElement>{arrayElt.Array()};
+    if (arrayElt.type() == Array) {
+        oss << ArrayResult<BSONElement>{arrayElt.Array()};
     } else {
         uasserted(9670433,
-                  mongo::str::stream{} << "Expected result set to be of type array, but got "
-                                       << arrayElt.type());
+                  str::stream{} << "Expected result set to be of type array, but got "
+                                << arrayElt.type());
     }
     return oss.str();
 }
@@ -90,23 +89,22 @@ void moveResultsFile(const std::filesystem::path& actualPath,
     }
 }
 
-void readAndBuildIndexes(mongo::DBClientConnection* const conn,
+void readAndBuildIndexes(DBClientConnection* const conn,
                          const std::string& dbName,
                          const std::string& collName,
                          std::fstream& fs) {
-    fileHelpers::verifyFileStreamGood(
+    verifyFileStreamGood(
         fs, std::filesystem::path{collName}, std::string{"Stream not ready to read indexes"});
     auto lineFromFile = std::string{};
-    auto bob = mongo::BSONObjBuilder{};
+    auto bob = BSONObjBuilder{};
     bob.append("createIndexes", collName);
-    auto indexBuilder = mongo::BSONArrayBuilder{};
+    auto indexBuilder = BSONArrayBuilder{};
 
-    fileHelpers::readLine(fs, lineFromFile);
-    for (auto indexNum = 0; !lineFromFile.empty();
-         fileHelpers::readLine(fs, lineFromFile), ++indexNum) {
-        mongo::BSONObjBuilder indexBob;
-        indexBob.append("key", mongo::fromFuzzerJson(lineFromFile));
-        indexBob.append("name", mongo::str::stream{} << "index_" << indexNum);
+    readLine(fs, lineFromFile);
+    for (auto indexNum = 0; !lineFromFile.empty(); readLine(fs, lineFromFile), ++indexNum) {
+        BSONObjBuilder indexBob;
+        indexBob.append("key", fromFuzzerJson(lineFromFile));
+        indexBob.append("name", str::stream{} << "index_" << indexNum);
         indexBuilder.append(indexBob.done());
     }
 
@@ -116,19 +114,19 @@ void readAndBuildIndexes(mongo::DBClientConnection* const conn,
 }
 
 // Returns true if another batch is required.
-bool readAndInsertNextBatch(mongo::DBClientConnection* const conn,
+bool readAndInsertNextBatch(DBClientConnection* const conn,
                             const std::string& dbName,
                             const std::string& collName,
                             std::fstream& fileToRead) {
-    auto bob = mongo::BSONObjBuilder{};
+    auto bob = BSONObjBuilder{};
     bob.append("insert", collName);
-    auto docBuilder = mongo::BSONArrayBuilder{};
+    auto docBuilder = BSONArrayBuilder{};
     auto currentObjSize = 0;
     auto lineFromFile = std::string{};
-    for (fileHelpers::readLine(fileToRead, lineFromFile); !fileToRead.eof();
-         fileHelpers::readLine(fileToRead, lineFromFile)) {
+    for (readLine(fileToRead, lineFromFile); !fileToRead.eof();
+         readLine(fileToRead, lineFromFile)) {
         currentObjSize += lineFromFile.size();
-        docBuilder.append(mongo::fromFuzzerJson(lineFromFile));
+        docBuilder.append(fromFuzzerJson(lineFromFile));
         if (currentObjSize > 100000) {
             bob.append("documents", docBuilder.arr());
             auto cmd = bob.done();
@@ -142,26 +140,26 @@ bool readAndInsertNextBatch(mongo::DBClientConnection* const conn,
     return false;
 }
 
-bool readAndLoadCollFile(mongo::DBClientConnection* const conn,
+bool readAndLoadCollFile(DBClientConnection* const conn,
                          const std::string& dbName,
                          const std::string& collName,
                          const std::filesystem::path& filePath) {
     auto collFile = std::fstream{filePath};
-    fileHelpers::verifyFileStreamGood(collFile, filePath, "Failed to open file");
+    verifyFileStreamGood(collFile, filePath, "Failed to open file");
     // Read in indexes.
     readAndBuildIndexes(conn, dbName, collName, collFile);
     for (auto needMore = readAndInsertNextBatch(conn, dbName, collName, collFile); needMore;
          needMore = readAndInsertNextBatch(conn, dbName, collName, collFile)) {
-        fileHelpers::verifyFileStreamGood(collFile, filePath, "Failed to read batch");
+        verifyFileStreamGood(collFile, filePath, "Failed to read batch");
     }
     return true;
 }
 
-void runCommandAssertOK(mongo::DBClientConnection* const conn,
-                        const mongo::BSONObj& command,
+void runCommandAssertOK(DBClientConnection* const conn,
+                        const BSONObj& command,
                         const std::string& db,
-                        const std::vector<mongo::ErrorCodes::Error> acceptableErrorCodes) {
-    auto cmdResponse = commandHelpers::runCommand(conn, db, command);
+                        const std::vector<ErrorCodes::Error> acceptableErrorCodes) {
+    auto cmdResponse = runCommand(conn, db, command);
     if (cmdResponse.getField("ok").trueValue()) {
         return;
     }
@@ -171,12 +169,12 @@ void runCommandAssertOK(mongo::DBClientConnection* const conn,
         }
     }
     uasserted(9670420,
-              mongo::str::stream{} << "Expected OK command result from " << command << " but got "
-                                   << cmdResponse);
+              str::stream{} << "Expected OK command result from " << command << " but got "
+                            << cmdResponse);
 }
 }  // namespace
 
-void QueryFile::dropStaleCollections(mongo::DBClientConnection* const conn,
+void QueryFile::dropStaleCollections(DBClientConnection* const conn,
                                      const std::set<std::string>& prevFileCollections) const {
     std::vector<std::string> collectionsToDrop;
     for (const auto& collFileName : _collectionsNeeded) {
@@ -201,7 +199,7 @@ size_t QueryFile::getTestsRun() const {
     return _testsRun;
 }
 
-void QueryFile::loadCollections(mongo::DBClientConnection* const conn,
+void QueryFile::loadCollections(DBClientConnection* const conn,
                                 const bool dropData,
                                 const bool loadData,
                                 const std::set<std::string>& prevFileCollections) const {
@@ -218,7 +216,7 @@ void QueryFile::loadCollections(mongo::DBClientConnection* const conn,
         const auto pathPrefix = std::filesystem::path{_filePath}.remove_filename();
         // Deduce collection file.
         for (const auto& collSpec : _collectionsNeeded) {
-            const auto [collName, fileName] = fileHelpers::getCollAndFileName(collSpec);
+            const auto [collName, fileName] = getCollAndFileName(collSpec);
             const auto fullPath = pathPrefix / fileName;
             if (prevFileCollections.find(collName) == prevFileCollections.end()) {
                 // Only load a collection if it wasn't marked as loaded by the previous file.
@@ -231,44 +229,43 @@ void QueryFile::loadCollections(mongo::DBClientConnection* const conn,
 // Expects 'fs' to be open.
 void QueryFile::parseHeader(std::fstream& fs) {
     auto lineFromFile = std::string{};
-    _comments.preName = fileHelpers::readLine(fs, lineFromFile);
-    fileHelpers::verifyFileStreamGood(fs, _filePath, "Failed to read header line");
+    _comments.preName = readLine(fs, lineFromFile);
+    verifyFileStreamGood(fs, _filePath, "Failed to read header line");
     // The first line of a file is required to be the filename.
-    const auto nameNoExtension = fileHelpers::getTestNameFromFilePath(_filePath);
+    const auto nameNoExtension = getTestNameFromFilePath(_filePath);
     uassert(9670402,
-            mongo::str::stream{} << "Expected first test line of " << _filePath.string()
-                                 << " to match the test name, but got " << nameNoExtension,
+            str::stream{} << "Expected first test line of " << _filePath.string()
+                          << " to match the test name, but got " << nameNoExtension,
             nameNoExtension == lineFromFile);
-    _comments.preCollName = fileHelpers::readLine(fs, lineFromFile);
+    _comments.preCollName = readLine(fs, lineFromFile);
     uassert(9670411,
-            mongo::str::stream{} << "Expected single database, got multiple in "
-                                 << _filePath.string() << ". Databases are " << lineFromFile,
+            str::stream{} << "Expected single database, got multiple in " << _filePath.string()
+                          << ". Databases are " << lineFromFile,
             lineFromFile.find(' ') == std::string::npos);
     // Next line is a single database.
     _databaseNeeded = lineFromFile;
 
     // Next lines are a set of collection specifications.
-    for (_comments.preCollFiles.push_back(fileHelpers::readLine(fs, lineFromFile));
+    for (_comments.preCollFiles.push_back(readLine(fs, lineFromFile));
          !lineFromFile.empty() && !fs.eof();
-         _comments.preCollFiles.push_back(fileHelpers::readLine(fs, lineFromFile))) {
+         _comments.preCollFiles.push_back(readLine(fs, lineFromFile))) {
         _collectionsNeeded.push_back(lineFromFile);
     }
 
     // Final header line should be a newline.
     uassert(9670432,
-            mongo::str::stream{} << "Expected newline at end of header for file "
-                                 << _filePath.string(),
+            str::stream{} << "Expected newline at end of header for file " << _filePath.string(),
             lineFromFile.empty());
 }
 
 void QueryFile::printFailedQueries(const std::vector<size_t>& failedTestNums) const {
     std::cout << applyRed() << "------------------------------------------------------------"
               << applyReset() << std::endl
-              << applyCyan() << "FAIL: " << fileHelpers::getTestNameFromFilePath(_filePath)
-              << applyReset() << std::endl;
+              << applyCyan() << "FAIL: " << getTestNameFromFilePath(_filePath) << applyReset()
+              << std::endl;
     for (const auto& testNum : failedTestNums) {
         uassert(9699600,
-                mongo::str::stream() << "Test " << testNum << " does not exist.",
+                str::stream() << "Test " << testNum << " does not exist.",
                 _testNumToQuery.find(testNum) != _testNumToQuery.end());
         std::cout << applyBold() << "TestNum: " << applyReset() << testNum << std::endl
                   << applyBold() << "Query: " << applyReset() << _testNumToQuery.at(testNum)
@@ -280,7 +277,7 @@ void QueryFile::printFailedQueries(const std::vector<size_t>& failedTestNums) co
 bool QueryFile::readInEntireFile(const ModeOption mode) {
     // Open read only.
     auto fs = std::fstream{_filePath, std::fstream::in};
-    fileHelpers::verifyFileStreamGood(fs, _filePath, "Failed to open file");
+    verifyFileStreamGood(fs, _filePath, "Failed to open file");
 
     // Read the header.
     parseHeader(fs);
@@ -291,9 +288,9 @@ bool QueryFile::readInEntireFile(const ModeOption mode) {
             _tests.push_back(Test::parseTest(fs, mode, testNum));
             _tests.back().setDB(_databaseNeeded);
 
-        } catch (mongo::AssertionException& ex) {
+        } catch (AssertionException& ex) {
             fs.close();
-            ex.addContext(mongo::str::stream{} << "Failed to read test number " << _tests.size());
+            ex.addContext(str::stream{} << "Failed to read test number " << _tests.size());
             throw;
         }
     }
@@ -302,7 +299,7 @@ bool QueryFile::readInEntireFile(const ModeOption mode) {
     return true;
 }
 
-void QueryFile::runTestFile(mongo::DBClientConnection* conn, const ModeOption mode) {
+void QueryFile::runTestFile(DBClientConnection* conn, const ModeOption mode) {
     _testsRun = 0;
     for (auto& test : _tests) {
         test.runTestAndRecord(conn, mode);
@@ -326,12 +323,11 @@ std::string QueryFile::serializeStateForDebug() const {
 
 bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
                                  const std::filesystem::path& actualPath) {
-    if (const auto& diffOutput = fileHelpers::gitDiff(expectedPath, actualPath);
-        !diffOutput.empty()) {
+    if (const auto& diffOutput = gitDiff(expectedPath, actualPath); !diffOutput.empty()) {
         // Write out the diff output.
         std::cout << diffOutput << std::endl;
 
-        const auto& failedTestNums = fileHelpers::getFailedTestNums(diffOutput);
+        const auto& failedTestNums = getFailedTestNums(diffOutput);
         if (!failedTestNums.empty()) {
             printFailedQueries(failedTestNums);
             _failedQueryCount += failedTestNums.size();
@@ -374,7 +370,7 @@ bool QueryFile::writeAndValidate(const ModeOption mode, const WriteOutOptions wr
 
 bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
     // Write out the header.
-    auto nameNoExtension = fileHelpers::getTestNameFromFilePath(_filePath);
+    auto nameNoExtension = getTestNameFromFilePath(_filePath);
     for (const auto& comment : _comments.preName) {
         fs << comment << std::endl;
     }
@@ -416,4 +412,4 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
 
     return true;
 }
-}  // namespace queryTester
+}  // namespace mongo::query_tester

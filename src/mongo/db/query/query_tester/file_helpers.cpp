@@ -39,45 +39,63 @@
 #include "mongo/util/shell_exec.h"
 #include "mongo/util/str.h"
 
-namespace queryTester {
+namespace mongo::query_tester {
 namespace {
+static constexpr std::string_view kColorBold = "\033[1m";
+static constexpr std::string_view kColorBrown = "\033[33m";
+static constexpr std::string_view kColorCyan = "\033[1;36m";
+static constexpr std::string_view kColorRed = "\033[1;31m";
+static constexpr std::string_view kColorReset = "\033[m";
+static constexpr std::string_view kColorYellow = "\033[1;33m";
+
 /**
  * Regex to match the hunk header of the git diff output, which looks like @@ -lineNum, +lineNum @@
  * <Test Number>. We check that the line contains "@@", followed by optional ANSII escape sequences
  * for terminal color formatting, whitespace, and a number representing the test number at the end.
  * The test number will be captured as part of the summary of failing queries.
  */
-static const auto TEST_NUM_REGEX =
+static const auto kTestNumRegex =
     std::regex{R"(@@(?:\x1B\[[0-9;]*m)*[[:space:]]+(?:\x1B\[[0-9;]*m)*([0-9]+))"};
 }  // namespace
 
-WriteOutOptions stringToWriteOutOpt(const std::string& opt) {
-    static const auto kStringToWriteOutOptMap = std::map<std::string, WriteOutOptions>{
-        {"result", WriteOutOptions::kResult}, {"oneline", WriteOutOptions::kOnelineResult}};
+ConditionalColor applyBold() {
+    return ConditionalColor(kColorBold);
+}
 
-    if (auto it = kStringToWriteOutOptMap.find(opt); it != kStringToWriteOutOptMap.end()) {
-        return it->second;
-    } else {
-        uasserted(9670453, mongo::str::stream{} << "Unexpected write opt " << opt);
-    }
+ConditionalColor applyBrown() {
+    return ConditionalColor(kColorBrown);
+}
+
+ConditionalColor applyCyan() {
+    return ConditionalColor(kColorCyan);
+}
+
+ConditionalColor applyRed() {
+    return ConditionalColor(kColorRed);
+}
+
+ConditionalColor applyReset() {
+    return ConditionalColor(kColorReset);
+}
+
+ConditionalColor applyYellow() {
+    return ConditionalColor(kColorYellow);
 }
 
 // Returns a {collName, fileName} tuple.
-std::tuple<std::string, std::filesystem::path> fileHelpers::getCollAndFileName(
-    const std::string& collSpec) {
+std::tuple<std::string, std::filesystem::path> getCollAndFileName(const std::string& collSpec) {
     if (auto ss = std::stringstream{collSpec}; !ss.eof()) {
         auto filePath = std::string{};
         ss >> filePath;
         uassert(9670429,
-                mongo::str::stream{} << "Expected collection file name to end in .coll, but it is "
-                                     << filePath,
+                str::stream{} << "Expected collection file name to end in .coll, but it is "
+                              << filePath,
                 filePath.ends_with(".coll"));
         if (!ss.eof()) {
             auto token = std::string{};
             ss >> token;
             uassert(9670430,
-                    mongo::str::stream{} << "Expected token 'as' after collection name, but got "
-                                         << token,
+                    str::stream{} << "Expected token 'as' after collection name, but got " << token,
                     token == "as");
             auto collName = std::string{};
             ss >> collName;
@@ -89,32 +107,31 @@ std::tuple<std::string, std::filesystem::path> fileHelpers::getCollAndFileName(
             };
         }
     } else {
-        uassert(9670431, mongo::str::stream{} << "Unexpected empty line.", !ss.eof());
+        uassert(9670431, str::stream{} << "Unexpected empty line.", !ss.eof());
         MONGO_UNREACHABLE;
     }
 }
 
-std::vector<size_t> fileHelpers::getFailedTestNums(const std::string& diffOutput) {
+std::vector<size_t> getFailedTestNums(const std::string& diffOutput) {
     auto failedTestNums = std::vector<size_t>{};
     auto line = std::string{};
     auto diffStream = std::istringstream{diffOutput};
 
     while (std::getline(diffStream, line)) {
-        if (auto match = std::smatch{}; std::regex_search(line, match, TEST_NUM_REGEX)) {
+        if (auto match = std::smatch{}; std::regex_search(line, match, kTestNumRegex)) {
             failedTestNums.push_back(std::stoull(match[1]));
         }
     }
     return failedTestNums;
 }
 
-std::string fileHelpers::getTestNameFromFilePath(const std::filesystem::path& filePath) {
+std::string getTestNameFromFilePath(const std::filesystem::path& filePath) {
     auto fileName = filePath.filename().string();
     auto extension = fileName.find('.');
     return fileName.substr(0, extension);
 }
 
-std::string fileHelpers::gitDiff(const std::filesystem::path& expected,
-                                 const std::filesystem::path& actual) {
+std::string gitDiff(const std::filesystem::path& expected, const std::filesystem::path& actual) {
     const auto gitDiffCmd =
         (std::stringstream{}
          << "git"
@@ -129,20 +146,20 @@ std::string fileHelpers::gitDiff(const std::filesystem::path& expected,
          // preceding the diff will be captured.
          << " --no-index --word-diff=color -U0 -- " << expected << " " << actual << " 2>&1")
             .str();
-    static constexpr auto kTimeout = mongo::Milliseconds{60 * 60 * 1000};  // 1 hour.
+    static constexpr auto kTimeout = Milliseconds{60 * 60 * 1000};  // 1 hour.
 
     // Need to ignore exit status because the implied --exit-code will return an error sttatus when
     // there is a diff.
-    if (auto result = mongo::shellExec(gitDiffCmd, kTimeout, 1ULL << 32, true); result.isOK()) {
+    if (auto result = shellExec(gitDiffCmd, kTimeout, 1ULL << 32, true); result.isOK()) {
         return result.getValue();
     } else {
         return std::string{};
     }
 }
 
-void fileHelpers::printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
-                                      const size_t failedQueryCount,
-                                      const size_t totalTestsRun) {
+void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
+                         const size_t failedQueryCount,
+                         const size_t totalTestsRun) {
     std::cout << applyRed()
               << "============================================================" << applyReset()
               << std::endl
@@ -166,18 +183,17 @@ void fileHelpers::printFailureSummary(const std::vector<std::filesystem::path>& 
               << std::endl;
 }
 
-std::vector<std::string> fileHelpers::readAndAssertNewline(std::fstream& fs,
-                                                           const std::string& context) {
+std::vector<std::string> readAndAssertNewline(std::fstream& fs, const std::string& context) {
     auto lineFromFile = std::string{};
     auto comments = readLine(fs, lineFromFile);
     uassert(9670410,
-            mongo::str::stream{} << "Expected newline in context '" << context << "' but got "
-                                 << lineFromFile,
+            str::stream{} << "Expected newline in context '" << context << "' but got "
+                          << lineFromFile,
             lineFromFile.empty());
     return comments;
 }
 
-std::vector<std::string> fileHelpers::readLine(std::fstream& fs, std::string& lineFromFile) {
+std::vector<std::string> readLine(std::fstream& fs, std::string& lineFromFile) {
     auto comments = std::vector<std::string>{};
     std::getline(fs, lineFromFile);
     while (lineFromFile.starts_with("//")) {
@@ -187,12 +203,23 @@ std::vector<std::string> fileHelpers::readLine(std::fstream& fs, std::string& li
     return comments;
 }
 
-void fileHelpers::verifyFileStreamGood(std::fstream& fs,
-                                       const std::filesystem::path& nameString,
-                                       const std::string& op) {
+WriteOutOptions stringToWriteOutOpt(const std::string& opt) {
+    static const auto kStringToWriteOutOptMap = std::map<std::string, WriteOutOptions>{
+        {"result", WriteOutOptions::kResult}, {"oneline", WriteOutOptions::kOnelineResult}};
+
+    if (auto it = kStringToWriteOutOptMap.find(opt); it != kStringToWriteOutOptMap.end()) {
+        return it->second;
+    } else {
+        uasserted(9670453, str::stream{} << "Unexpected write opt " << opt);
+    }
+}
+
+void verifyFileStreamGood(std::fstream& fs,
+                          const std::filesystem::path& nameString,
+                          const std::string& op) {
     uassert(9670454,
-            mongo::str::stream{} << "Error while operating on " << nameString.string()
-                                 << " with error \" " << strerror(errno) << "\": " << op,
+            str::stream{} << "Error while operating on " << nameString.string() << " with error \" "
+                          << strerror(errno) << "\": " << op,
             fs.good() || fs.eof());
 }
-}  // namespace queryTester
+}  // namespace mongo::query_tester
