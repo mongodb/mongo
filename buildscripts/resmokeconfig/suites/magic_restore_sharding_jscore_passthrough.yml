@@ -67,6 +67,14 @@ selector:
     - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
     - jstests/core/catalog/list_collections_no_views.js
 
+    # Expects to successfully drop invalid views. As drops are no-oped, the leftover
+    # invalid views fail the data consistency checker.
+    - jstests/core/timeseries/drop_timeseries.js
+
+    # Fails upsert operations with duplicate key errors due to drops being no-oped.
+    # The test performs these upserts in retryable writes that cause the test to timeout.
+    - jstests/core/write/update/upsert_fields.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

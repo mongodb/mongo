@@ -203,7 +203,14 @@ tasks:
 
   - <<: *gen_task_template
     name: magic_restore_replica_sets_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_repl", "default", "large"]
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "magic_restore",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -211,7 +218,14 @@ tasks:
 
   - <<: *gen_task_template
     name: magic_restore_sharding_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_repl", "default", "large"]
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "magic_restore",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -219,7 +233,14 @@ tasks:
 
   - <<: *gen_task_template
     name: magic_restore_sharded_collections_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_repl", "default", "large"]
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "magic_restore",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:

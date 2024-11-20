@@ -235,6 +235,13 @@ buildvariants:
     tasks:
       - name: .embedded_router
 
+  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2-arm64-all-feature-flags-magic-restore
+    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Magic Restore Tasks"
+    tags: ["suggested"]
+    tasks:
+      - name: .magic_restore
+
   - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
     display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
     tags: ["required"]
