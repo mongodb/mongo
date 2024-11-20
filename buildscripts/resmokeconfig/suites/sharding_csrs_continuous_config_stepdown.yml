@@ -269,6 +269,45 @@ selector:
     # We'll consider re-enabling this test under SPM-3835.
     - jstests/sharding/causal_consistency_shell_support.js
 
+    # The following tests are excluded because they use changestreams, but do not handle
+    # resumable changestream errors right now.
+    # TODO (SERVER-97414): we could make these tests use the ChangeStreamTest fixture and
+    # then remove them from the exclusion list.
+    - jstests/sharding/api_version_stage_allowance_checks.js
+    - jstests/sharding/log_remote_op_wait.js
+    - jstests/sharding/query/change_streams/change_stream_against_shard_mongod.js
+    - jstests/sharding/query/change_streams/change_stream_chunk_migration.js
+    - jstests/sharding/query/change_streams/change_stream_empty_apply_ops.js
+    - jstests/sharding/query/change_streams/change_stream_enforce_max_time_ms_on_mongos.js
+    - jstests/sharding/query/change_streams/change_stream_error_label.js
+    - jstests/sharding/query/change_streams/change_stream_lookup_post_image_chunk_migration.js
+    - jstests/sharding/query/change_streams/change_stream_lookup_preimage_with_resharding.js
+    - jstests/sharding/query/change_streams/change_stream_metadata_notifications.js
+    - jstests/sharding/query/change_streams/change_stream_no_drop.js
+    - jstests/sharding/query/change_streams/change_stream_no_orphans.js
+    - jstests/sharding/query/change_streams/change_stream_no_shards.js
+    - jstests/sharding/query/change_streams/change_stream_on_system_collection.js
+    - jstests/sharding/query/change_streams/change_stream_read_preference.js
+    - jstests/sharding/query/change_streams/change_stream_resume_shard_key_change.js
+    - jstests/sharding/query/change_streams/change_stream_show_migration_events.js
+    - jstests/sharding/query/change_streams/change_stream_transaction_sharded.js
+    - jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
+    - jstests/sharding/query/change_streams/change_stream_update_lookup_read_concern.js
+    - jstests/sharding/query/change_streams/change_streams.js
+    - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
+    - jstests/sharding/query/change_streams/change_streams_new_shard_new_database.js
+    - jstests/sharding/query/change_streams/change_streams_unsharded_update_resume.js
+    - jstests/sharding/query/change_streams/change_streams_update_lookup_shard_metadata_missing.js
+    - jstests/sharding/query/change_streams/lookup_change_stream_post_image_compound_shard_key.js
+    - jstests/sharding/query/change_streams/lookup_change_stream_post_image_id_shard_key.js
+    - jstests/sharding/query/change_streams/resume_change_stream_from_stale_mongos.js
+    - jstests/sharding/query/change_streams/resume_change_stream_on_subset_of_shards.js
+    - jstests/sharding/query/agg/agg_write_stages_cannot_run_on_mongos.js
+    - jstests/sharding/query/explain/explain_cmd.js
+    - jstests/sharding/resharding_change_stream_namespace_filtering.js
+    - jstests/sharding/resharding_oplog_sync_agg_resume_token.js
+    - jstests/sharding/timeseries_change_stream_no_orphans.js
+
   exclude_with_any_tags:
     - does_not_support_stepdowns
 
@@ -280,5 +319,7 @@ executor:
           # TODO: SERVER-45994 remove
           skipCheckingCatalogCacheConsistencyWithShardingCatalog: true
           skipCheckOrphans: true
-      eval: await import("jstests/libs/override_methods/sharding_csrs_continuous_config_stepdown.js");
+      eval: >-
+        await import("jstests/libs/override_methods/sharding_csrs_continuous_config_stepdown.js");
+        await import("jstests/libs/override_methods/require_change_stream_test_fixture.js");
       nodb: ""
