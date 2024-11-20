@@ -4611,6 +4611,7 @@ tasks:
 
 - name: sync_repo_with_copybara
   tags: []
+  patchable: false
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
