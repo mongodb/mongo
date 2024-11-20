@@ -36,3 +36,78 @@ filters:
   - "*geo*":
     approvers:
       - 10gen/query-integration-geo
+  - "plan_explainer*":
+    approvers:
+      - 10gen/query-optimization-explain
+  - "explain_common*":
+    approvers:
+      - 10gen/query-optimization-explain
+  - "bind_input_params*":
+    approvers:
+      - 10gen/query-optimization-plan-cache
+  - "interval_evaluation_tree*":
+    approvers:
+      - 10gen/query-optimization-plan-cache
+  - "partitioned_cache.h":
+    approvers:
+      - 10gen/query-optimization-plan-cache
+  - "canonical_query_encoder*":
+    approvers:
+      - 10gen/query-optimization-plan-cache
+  - "plan_rank*":
+    approvers:
+      - 10gen/query-optimization-runtime-planners
+  - "*.idl":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "projection_parser*":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "hint_parser*":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "parsed*":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "canonical_query*":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "canonical_distinct*":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "projection_ast*":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "projection_policies.h":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "projection_test.cpp":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "projection.*":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "sort_pattern*":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "query_planner*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "query_solution*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "planner*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "interval.*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "interval_test.*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "index_tag*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "index_bounds_builder*":
+    approvers:
+      - 10gen/query-optimization-planner

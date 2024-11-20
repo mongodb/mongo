@@ -5,4 +5,7 @@ filters:
   # team and as of this writing is primarily used for query-related unit tests.
   - "*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-golden-test
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-optimization-staff-leads

@@ -10,23 +10,23 @@ filters:
   # owned by QO by default.
   - "*.idl":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   # This file deals primarily with parsing for accumulators, and is therefore owned by QO.
   - "accumulation_statement*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "accumulator*":
     approvers:
       - 10gen/query-execution-aggregation
   - "aggregation_request*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "*change_stream*":
     approvers:
       - 10gen/query-execution-change-streams
   - "dependencies*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-heuristic-rewrite
   - "document_source_current_op*":
     approvers:
       - 10gen/query-integration-observability
@@ -53,7 +53,7 @@ filters:
       - 10gen/query-integration-timeseries
   - "document_source_parsing_validators*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "document_source_query_stats*":
     approvers:
       - 10gen/query-integration-observability
@@ -83,7 +83,13 @@ filters:
       - 10gen/query-execution-aggregation
   - "lite_parsed*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
+  - "split_pipeline*":
+    approvers:
+      - 10gen/query-optimization-cluster-planning
+  - "sharded_agg_helpers*":
+    approvers:
+      - 10gen/query-optimization-cluster-planning
   - "merge_processor*":
     approvers:
       - 10gen/query-execution-aggregation
@@ -100,7 +106,7 @@ filters:
       - 10gen/query-execution-change-streams
   - "semantic_analysis*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-heuristic-rewrite
   - "sequential_document_cache*":
     approvers:
       - 10gen/query-execution-aggregation

@@ -10,10 +10,10 @@ filters:
       - 10gen/query-execution-doc-validation
   - "expression_parser*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "rewrite_expr*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "expression_geo*":
     approvers:
       - 10gen/query-integration-geo
@@ -28,10 +28,10 @@ filters:
   # These files are related to boolean simplification and thus owned by QO.
   - "expression_bitset_tree_converter*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-heuristic-rewrite
   - "expression_restorer*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-heuristic-rewrite
   - "expression_simplifier*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-heuristic-rewrite

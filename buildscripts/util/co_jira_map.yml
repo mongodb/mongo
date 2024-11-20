@@ -38,6 +38,34 @@
   - Query Integration
 10gen/query-optimization:
   - Query Optimization
+10gen/query-optimization-golden-test:
+  - Query Optimization
+10gen/query-optimization-cost-model:
+  - Query Optimization
+10gen/query-optimization-statistics:
+  - Query Optimization
+10gen/query-optimization-explain:
+  - Query Optimization
+10gen/query-optimization-plan-cache:
+  - Query Optimization
+10gen/query-optimization-runtime-planners:
+  - Query Optimization
+10gen/query-optimization-parsers:
+  - Query Optimization
+10gen/query-optimization-logical-models:
+  - Query Optimization
+10gen/query-optimization-heuristic-rewrite:
+  - Query Optimization
+10gen/query-optimization-cardinality-estimation:
+  - Query Optimization
+10gen/query-optimization-planner:
+  - Query Optimization
+10gen/query-optimization-views:
+  - Query Optimization
+10gen/query-optimization-cluster-planning:
+  - Query Optimization
+10gen/query-optimization-cost-based-ranker:
+  - Query Optimization
 10gen/server-catalog-and-routing:
   - Catalog And Routing
 10gen/server-cluster-scalability:

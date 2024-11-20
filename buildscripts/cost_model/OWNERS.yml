@@ -2,4 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-cost-model
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-optimization-staff-leads

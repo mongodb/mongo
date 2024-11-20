@@ -4,7 +4,7 @@ options:
 filters:
   - "query_golden*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-golden-test
   - "queryable_wt*":
     approvers:
       - 10gen/server-rss-sydney

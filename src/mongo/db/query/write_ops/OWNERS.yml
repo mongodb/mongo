@@ -4,7 +4,7 @@ filters:
   # by QO by default.
   - "*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "write_ops_exec*":
     approvers:
       - 10gen/query-execution-write-exec

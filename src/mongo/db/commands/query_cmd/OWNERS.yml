@@ -7,7 +7,7 @@ filters:
       - 10gen/query
   - "analyze_cmd*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-statistics
   - "change_stream_state_command.cpp":
     approvers:
       - 10gen/query-execution-change-streams
@@ -19,13 +19,13 @@ filters:
       - 10gen/query-execution-query-settings
   - "explain.idl":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "explain_test.cpp":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-parsers
   - "plan_cache*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-plan-cache
   - "query_settings_cmds.*":
     approvers:
       - 10gen/query-execution-query-settings

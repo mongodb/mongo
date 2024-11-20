@@ -11,4 +11,4 @@ filters:
       - 10gen/devprod-correctness
   - "golden_test.py":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-golden-test

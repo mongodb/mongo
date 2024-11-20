@@ -8,4 +8,4 @@ filters:
   # unit tests.
   - "golden_test*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-golden-test
