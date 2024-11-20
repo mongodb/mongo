@@ -875,6 +875,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_run_tracker.h @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_stage* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/exec/sbe/OWNERS.yml
+/src/mongo/db/exec/sbe/**/* @10gen/query-execution-sbe @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
 /src/mongo/db/ftdc/**/* @10gen/server-networking-and-observability @markbenvenuto @svc-auto-approve-bot
 
