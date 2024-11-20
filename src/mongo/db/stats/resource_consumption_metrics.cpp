@@ -110,7 +110,7 @@ public:
 };
 
 auto& resourceConsumptionSSM =
-    *ServerStatusSectionBuilder<ResourceConsumptionSSS>("resourceConsumption");
+    *ServerStatusSectionBuilder<ResourceConsumptionSSS>("resourceConsumption").forShard();
 
 }  // namespace
 
