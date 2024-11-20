@@ -75,6 +75,14 @@ protected:
         }
     }
 
+    // Adds a shard to the fixture, simulating a config.shards with no topologyTime in any of the
+    // entries. Old versions did not have the topologyTime, when upgrading the shard registry must
+    // still populate the cache.
+    void addShardWithoutTopologyTime(ShardId id) {
+        auto shardType = shardIdToShardType(id);
+        shards.push_back(shardType);
+    }
+
     // Removes a shard from the fixture. Drops the entry, and updates another entry's topologyTime.
     // If advanceTopologyTime is true, advances the VectorClock.
     void removeShard(ShardId id, bool advanceTopologyTime) {
@@ -337,6 +345,15 @@ DEATH_TEST_F(ShardRegistryTest, TopologyTimeMonotonicityViolation, "Tripwire ass
         ->advanceTopologyTime_forTest(LogicalTime(Timestamp(topologyTime.getSecs() + 100, 0)));
 
     auto future = launchAsync([this] { getData(); });
+    expectCSRSLookup();
+    future.default_timed_get();
+}
+
+TEST_F(ShardRegistryTest, ConfigShardsWithNoTopologyTimeDueToUpgrade) {
+    // Add a shard without a topologyTime. This can be the case when coming from older versions.
+    addShardWithoutTopologyTime({"0"});
+
+    auto future = launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
     expectCSRSLookup();
     future.default_timed_get();
 }
