@@ -32,7 +32,7 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
         const hostConn = new Mongo(host);
         assert.commandWorkedOrFailedWithCode(
             hostConn.getDB("admin").adminCommand(
-                {setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 10000}),
+                {setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 30000}),
             ErrorCodes.InvalidOptions);
         hostConn.close();
     });
