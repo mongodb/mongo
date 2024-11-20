@@ -5,7 +5,7 @@ set -vxeuo pipefail
 
 IMMER_GIT_URL="https://github.com/mongodb-forks/immer.git"
 
-IMMER_GIT_REV=23907316b69af7571c9bb3753c7fc5ee400a8333
+IMMER_GIT_REV=mongo/legacy_20241119
 
 LIB_GIT_DIR=$(mktemp -d /tmp/import-immer.XXXXXX)
 trap "rm -rf $LIB_GIT_DIR" EXIT
