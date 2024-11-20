@@ -348,8 +348,8 @@ Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
             // For the maximum check, if we had measurements that were pre-1970 (the lower end of
             // the extended range check), it is possible that the control.max value gets rounded up
             // to the epoch and is greater than the observed maximum timestamp. In the case where
-            // the control.max is earlier than the epoch, we should relax the check.
-            auto maxTimestampsMatch = (max.getField(fieldName).Date() < Date_t())
+            // the control.min is earlier than the epoch, we should relax the check.
+            auto maxTimestampsMatch = (min.getField(fieldName).Date() < Date_t())
                 ? controlMax.Date() >= max.getField(fieldName).Date()
                 : controlMax.Date() == max.getField(fieldName).Date();
 
