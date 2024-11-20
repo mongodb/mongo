@@ -44,19 +44,6 @@ function getCollectionUuid(coll) {
     return collInfo.info.uuid;
 }
 
-function assertChangeStreamEventEqMultiversionCompatible(actualEvent, expectedEvent) {
-    // SERVER-83104: Remove 'numInitialChunks' check once 8.0 becomes last LTS.
-    if ('numInitialChunks' in actualEvent.operationDescription) {
-        delete actualEvent.operationDescription.numInitialChunks;
-    }
-
-    // SERVER-83104: Remove 'capped' check once 8.0 becomes last LTS.
-    if (!('capped' in actualEvent.operationDescription)) {
-        delete expectedEvent.operationDescription.capped;
-    }
-    return assertChangeStreamEventEq(actualEvent, expectedEvent);
-}
-
 function assertNextChangeEvent(cursor, expectedEvent) {
     let events = test.getNextChanges(cursor, 1);
     while (events.length > 0) {
@@ -75,7 +62,7 @@ function assertNextChangeEvent(cursor, expectedEvent) {
     assert(event.wallTime instanceof Date);
     delete event.wallTime;
     expectedEvent.collectionUUID = getCollectionUuid(collName);
-    assertChangeStreamEventEqMultiversionCompatible(event, expectedEvent);
+    assertChangeStreamEventEq(event, expectedEvent);
 }
 
 function runTest(startChangeStream) {
@@ -107,7 +94,7 @@ function runTest(startChangeStream) {
         }
 
         const shardEvent = events[0];
-        assertChangeStreamEventEqMultiversionCompatible(shardEvent, expectedOutput);
+        assertChangeStreamEventEq(shardEvent, expectedOutput);
 
         // Insert a document before starting the next change stream so that we can validate the
         // resuming behavior.

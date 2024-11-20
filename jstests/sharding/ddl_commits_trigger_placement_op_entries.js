@@ -46,16 +46,6 @@ function verifyOpEntriesOnNodes(expectedOpEntryTemplates, nodes) {
 
         assert.eq(expectedOpEntryTemplates.length, foundOpEntries.length);
         for (let i = 0; i < foundOpEntries.length; ++i) {
-            // SERVER-83104: Remove 'numInitialChunks' check once 8.0 becomes last LTS.
-            if ('numInitialChunks' in foundOpEntries[i].o2) {
-                delete foundOpEntries[i].o2.numInitialChunks;
-            }
-
-            // SERVER-83104: Remove 'capped' check once 8.0 becomes last LTS.
-            if (!('capped' in foundOpEntries[i].o2)) {
-                delete expectedOpEntryTemplates[i].o2.capped;
-            }
-
             assert.eq(expectedOpEntryTemplates[i].op, foundOpEntries[i].op);
             assert.eq(expectedOpEntryTemplates[i].ns, foundOpEntries[i].ns);
             assert.docEq(expectedOpEntryTemplates[i].o, foundOpEntries[i].o);
