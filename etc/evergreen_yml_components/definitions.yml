@@ -1327,36 +1327,66 @@ functions:
       file: src/compile_expansions.yml
 
   "do jepsen setup":
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/do_jepsen_setup/build_libfaketime.sh"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/do_jepsen_setup/install_jepsen.sh"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/do_jepsen_setup/nodes.sh"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/do_jepsen_setup/move_binaries.sh"
+    - *f_expansions_write
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: libfaketime
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/build_libfaketime.sh"
+        include_expansions_in_env:
+          - github_token
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: jepsen
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/install_jepsen.sh"
+        include_expansions_in_env:
+          - github_token
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/nodes.sh"
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/move_binaries.sh"
 
   "do jepsen docker setup":
-  - *f_expansions_write
-  - command: subprocess.exec
-    type: system
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/jepsen_docker/setup.sh"
+    - *f_expansions_write
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: jepsen-io-mongodb
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
+    - command: subprocess.exec
+      type: system
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_docker/setup.sh"
+        include_expansions_in_env:
+          - github_token
   "setup jepsen config fuzzer":
   - *f_expansions_write
   - command: subprocess.exec
@@ -1438,13 +1468,23 @@ functions:
       - "./src/evergreen/jepsen_test_fail.sh"
 
   "setup jstestfuzz":
-  - *f_expansions_write
-  - command: subprocess.exec
-    display_name: "jstestfuzz setup sh"
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/jstestfuzz_setup.sh"
+    - *f_expansions_write
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: jstestfuzz
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
+    - command: subprocess.exec
+      display_name: "jstestfuzz setup sh"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jstestfuzz_setup.sh"
+        include_expansions_in_env:
+          - github_token
 
   "lint fuzzer sanity patch":
   - *f_expansions_write
@@ -1488,39 +1528,49 @@ functions:
 
   # Used by generator
   "run jstestfuzz":
-  - *f_expansions_write
-  - command: subprocess.exec
-    display_name: "clone repos sh"
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/run_jstestfuzz/clone_repos.sh"
-  - *f_expansions_write
-  - command: subprocess.exec
-    display_name: "jstestfuzz run sh"
-    type: test
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/jstestfuzz_run.sh"
-  - command: archive.targz_pack
-    display_name: "archive jstests.tgz"
-    params:
-      target: "jstests.tgz"
-      source_dir: "src/jstestfuzz"
-      include:
-      - "out/*.js"
-  - command: s3.put
-    display_name: "upload jstests.tgz"
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: jstests.tgz
-      remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      display_name: Generated Tests - Execution ${execution}
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: QA
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "clone repos sh"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/run_jstestfuzz/clone_repos.sh"
+        include_expansions_in_env:
+          - github_token
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "jstestfuzz run sh"
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jstestfuzz_run.sh"
+    - command: archive.targz_pack
+      display_name: "archive jstests.tgz"
+      params:
+        target: "jstests.tgz"
+        source_dir: "src/jstestfuzz"
+        include:
+          - "out/*.js"
+    - command: s3.put
+      display_name: "upload jstests.tgz"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: jstests.tgz
+        remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/gzip
+        display_name: Generated Tests - Execution ${execution}
 
   "upload npm logs":
   - *f_expansions_write
