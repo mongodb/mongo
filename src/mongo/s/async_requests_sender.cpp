@@ -50,6 +50,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/transaction_participant_failed_unyield_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
@@ -135,7 +136,25 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
             // If the interrupt was caused by an unyield error, every subsequent response must
             // also have that unyield error.
             auto failedResponse = response;
-            failedResponse.swResponse = _interruptStatus;
+
+            // TODO (SERVER-97256): Remove this workaround once a proper solution is implemented.
+            //
+            // This temporary workaround ensures that the routing information entry is invalidated
+            // when a stale exception is raised during a remote request within a transaction. We
+            // achieve this by decorating the TransactionParticipantFailedUnyieldInfo with the
+            // remote error. This is necessary because the unyield error can override the stale
+            // exception, preventing the router from invalidating the stale routing entry and
+            // causing it to not converge.
+            if (auto si = _interruptStatus.extraInfo<TransactionParticipantFailedUnyieldInfo>();
+                si && response.swResponse.isOK()) {
+                auto status = getStatusFromCommandResult(response.swResponse.getValue().data);
+                failedResponse.swResponse =
+                    Status{TransactionParticipantFailedUnyieldInfo(si->getOriginalError(), status),
+                           _interruptStatus.reason()};
+            } else {
+                failedResponse.swResponse = _interruptStatus;
+            }
+
             return failedResponse;
         }
         return response;

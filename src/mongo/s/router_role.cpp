@@ -46,6 +46,7 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction_participant_failed_unyield_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
 
@@ -200,6 +201,27 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
 
             catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
         }
+    } else if (s == ErrorCodes::TransactionParticipantFailedUnyield) {
+        auto extraInfo = s.extraInfo<TransactionParticipantFailedUnyieldInfo>();
+        tassert(9690300, "TransactionParticipantFailedUnyield must have extraInfo", extraInfo);
+
+        auto originalStatus = extraInfo->getOriginalResponseStatus();
+
+        if (!originalStatus || originalStatus->isOK()) {
+            uassertStatusOK(s);
+        }
+
+        if (*originalStatus == ErrorCodes::StaleConfig) {
+            auto si = originalStatus->extraInfo<StaleConfigInfo>();
+            tassert(9690301, "StaleConfig must have extraInfo", si);
+            catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
+        } else if (*originalStatus == ErrorCodes::StaleDbVersion) {
+            auto si = originalStatus->extraInfo<StaleDbRoutingVersion>();
+            tassert(9690302, "StaleDbVersion must have extraInfo", si);
+            catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
+        }
+
+        uassertStatusOK(s);
     } else {
         uassertStatusOK(s);
     }

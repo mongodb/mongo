@@ -50,20 +50,40 @@ class TransactionParticipantFailedUnyieldInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TransactionParticipantFailedUnyield;
     static constexpr StringData kOriginalErrorFieldName = "originalError"_sd;
+    static constexpr StringData kOriginalResponseStatusFieldName = "originalResponseStatus"_sd;
 
-    TransactionParticipantFailedUnyieldInfo(const Status& originalError)
-        : _originalError(originalError) {}
+    TransactionParticipantFailedUnyieldInfo(
+        const Status& originalError, boost::optional<Status> originalResponseStatus = boost::none)
+        : _originalError(originalError), _originalResponseStatus(originalResponseStatus) {}
 
+    /**
+     * Returns the original error that was thrown when a transaction participant shard failed to
+     * unyield its resources after processing remote responses.
+     */
     const auto& getOriginalError() const {
         return _originalError;
     }
 
+    /**
+     * Returns the status received from the last executed remote response when a transaction
+     * participant shard failed to unyield its resources.
+     *
+     * TODO (SERVER-97256): Currently, the AsyncRequestsSender may replace the last remote response
+     * with an unyield error, giving precedence to the unyield error over the original remote
+     * response. This can result in the loss of some exceptions that needed to mark the routing
+     * information as stale. Using this parameter serves as a temporary workaround to address this
+     * issue. Once a permanent solution is implemented, this parameter should be removed.
+     */
+    const auto& getOriginalResponseStatus() const {
+        return _originalResponseStatus;
+    }
+
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
-    static TransactionParticipantFailedUnyieldInfo parseFromCommandError(const BSONObj& obj);
 
 private:
     Status _originalError;
+    boost::optional<Status> _originalResponseStatus;
 };
 
 }  // namespace mongo

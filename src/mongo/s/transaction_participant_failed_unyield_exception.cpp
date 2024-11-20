@@ -44,17 +44,23 @@ void TransactionParticipantFailedUnyieldInfo::serialize(BSONObjBuilder* bob) con
     BSONObjBuilder b;
     _originalError.serializeErrorToBSON(&b);
     bob->append(kOriginalErrorFieldName, b.obj());
+
+    if (_originalResponseStatus) {
+        BSONObjBuilder b2;
+        _originalResponseStatus->serialize(&b2);
+        bob->append(kOriginalResponseStatusFieldName, b2.obj());
+    }
 }
 
 std::shared_ptr<const ErrorExtraInfo> TransactionParticipantFailedUnyieldInfo::parse(
     const BSONObj& obj) {
-    return std::make_shared<TransactionParticipantFailedUnyieldInfo>(parseFromCommandError(obj));
-}
-
-TransactionParticipantFailedUnyieldInfo
-TransactionParticipantFailedUnyieldInfo::parseFromCommandError(const BSONObj& obj) {
-    return TransactionParticipantFailedUnyieldInfo(
-        getErrorStatusFromCommandResult(obj[kOriginalErrorFieldName].Obj()));
+    auto originalError = getErrorStatusFromCommandResult(obj[kOriginalErrorFieldName].Obj());
+    auto originalResponse = obj[kOriginalResponseStatusFieldName]
+        ? boost::make_optional(
+              getStatusFromCommandResult(obj[kOriginalResponseStatusFieldName].Obj()))
+        : boost::optional<Status>();
+    return std::make_shared<TransactionParticipantFailedUnyieldInfo>(originalError,
+                                                                     originalResponse);
 }
 
 }  // namespace mongo
