@@ -70,6 +70,12 @@ public:
                               flipDistinctScanDirection));
 
         auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
+        if (statusWithMultiPlanSolns.getStatus().code() ==
+            ErrorCodes::NoDistinctScansForDistinctEligibleQuery) {
+            cq->resetDistinct();
+            statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
+        }
+
         ASSERT_OK(statusWithMultiPlanSolns.getStatus());
         solns = std::move(statusWithMultiPlanSolns.getValue());
     }

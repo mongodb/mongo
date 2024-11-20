@@ -8,16 +8,9 @@
 //   does_not_support_stepdowns,
 //   requires_profiling,
 //   not_allowed_with_signed_security_token,
-//   # TODO SERVER-93694: The test requires SBE to be enabled, but currently
-//   # featureFlagShardFilteringDistinctScan prevents any query that could potentially use a
-//   # DistinctScan from running in SBE. Since this flag is FCV gated, upgrade downgrade tests will
-//   # toggle the enablement of this flag, meaning that we can't guarantee whether or not the flag
-//   # is enabled when we execute queries that need to run in SBE. Once we allow queries that can't
-//   # use DistinctScans to run in SBE, we can remove this tag.
 //   cannot_run_during_upgrade_downgrade,
 // ]
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -74,14 +67,6 @@ function testPushedDownSBEPlanReplanning(match1, match2, pushedDownStage) {
 })();
 
 (function testPushedDownGroupReplanning() {
-    // TODO SERVER-93694: The posssiblity of choosing DistinctScans currently make queries SBE
-    // ineligble since DistinctScan isn't supported in SBE. After this ticket, we should be able to
-    // create SBE plans if we're unable to produce DistinctScans, making this flag check
-    // unecessary.
-    const featureShardFilteringDistinctScan =
-        FeatureFlagUtil.isEnabled(testDB, "ShardFilteringDistinctScan");
-    if (!featureShardFilteringDistinctScan) {
-        testPushedDownSBEPlanReplanning(
-            {$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {$group: {_id: "$a"}});
-    }
+    testPushedDownSBEPlanReplanning(
+        {$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {$group: {_id: "$a"}});
 })();

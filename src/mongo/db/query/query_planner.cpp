@@ -1614,6 +1614,18 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                       "No indexed plans available, and running with 'notablescan' 2");
     }
 
+    // If CanonicalQuery is distinct-like and we haven't generated a plan that features
+    // a DISTINCT_SCAN, we should use SBE instead.
+    if (query.isSbeCompatible() && query.getDistinct()) {
+        const bool noDistinctScans = std::none_of(out.begin(), out.end(), [](const auto& soln) {
+            return soln->hasNode(STAGE_DISTINCT_SCAN);
+        });
+        if (noDistinctScans) {
+            return Status(ErrorCodes::NoDistinctScansForDistinctEligibleQuery,
+                          "No DISTINCT_SCAN plans available");
+        }
+    }
+
     return {std::move(out)};
 }  // QueryPlanner::plan
 

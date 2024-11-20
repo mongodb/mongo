@@ -14,12 +14,10 @@ import {
     assertPlanUsesCollScan,
     assertPlanUsesDistinctScan,
     assertPlanUsesIndexScan,
-    coll,
     removeIndex,
 } from "jstests/libs/query/group_to_distinct_scan_utils.js";
-import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
-export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = false) {
+export function runGroupWithTopBottomToDistinctScanTests(database) {
     /**
      * The tests below should only pass once distinct scan for $top and $bottom accumulators is
      * achieved.
@@ -75,30 +73,22 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
     });
 
+    //
     // Verifies that we _do not_ attempt to use a DISTINCT_SCAN on a multikey dotted-path field.
     //
-    // This fails with an error of "cannot sort with keys that are parallel arrays". So, do not run
-    // this test case on the classic engine.
-    //
-    // $top requires sort key metadata for merging the results, so this query is SBE-ineligible when
-    // the collection is sharded.
-    if (!isSharded && !checkSbeCompletelyDisabled(database)) {
-        assertPipelineResultsAndExplain({
-            pipeline: [{
-                $group: {
-                    _id: "$mkFoo.a",
-                    accum: {$top: {sortBy: {"mkFoo.a": 1, "mkFoo.b": 1}, output: "$mkFoo.b"}}
-                }
-            }],
-            expectedOutput: [
-                {_id: null, accum: null},
-                {_id: 1, accum: 1},
-                {_id: 2, accum: 2},
-                {_id: [3, 4], accum: [4, 3]}
-            ],
-            validateExplain: assertPlanDoesNotUseDistinctScan,
-        });
-    }
+    assertPipelineResultsAndExplain({
+        pipeline: [
+            {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
+            {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}}
+        ],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 1},
+            {_id: 2, accum: 2},
+            {_id: [3, 4], accum: [4, 3]}
+        ],
+        validateExplain: assertPlanDoesNotUseDistinctScan,
+    });
 
     //
     // Verifies that we use a DISTINCT_SCAN to satisfy a sort on a multikey field if the bounds

@@ -257,13 +257,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 },
                 command: "distinct",
                 planSummary: "COLLSCAN",
-                /* Distinct multiplanning does not generate SBE plans, even if the resulting query
-                   solution doesn't contain a DISTINCT_SCAN. */
-                queryFramework:
-                    (!FeatureFlagUtil.isPresentAndEnabled(conn, "ShardFilteringDistinctScan") &&
-                     sbeEnabled)
-                    ? "sbe"
-                    : "classic",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: {"command.collation.locale": "fr"}
             },
             {

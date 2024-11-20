@@ -1191,9 +1191,6 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         // In the context of distinct multiplanning, if there are no indexes suitable for distinct
         // scans, we can omit the distinct part of the canonical query. For example, this will
         // remove the SBE ineligibilty criteria for queries that have a distinct component.
-        //
-        // TODO SERVER-93694: This initial pruning is just a temporary fix, since we still can end
-        // up with non-distinct scan solutions which otherwise could have been executed with SBE.
         auto plannerParams =
             std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForDistinct{
                 cq->getExpCtx()->getOperationContext(),

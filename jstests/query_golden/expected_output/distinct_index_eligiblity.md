@@ -24,6 +24,7 @@
 {  "_id" : [ 1, 2, 3 ],  "accum" : 5 }
 ```
 ### Summarized explain
+Execution Engine: sbe
 ```json
 {
 	"rejectedPlans" : [ ],
@@ -90,6 +91,7 @@
 {  "_id" : 1,  "accum" : 5 }
 ```
 ### Summarized explain
+Execution Engine: classic
 ```json
 {
 	"stages" : [
@@ -172,6 +174,7 @@
 {  "_id" : [ 1, 2, 3 ],  "accum" : 5 }
 ```
 ### Summarized explain
+Execution Engine: sbe
 ```json
 {
 	"rejectedPlans" : [ ],
@@ -215,6 +218,7 @@
 {  "_id" : 1,  "accum" : [ 1, 2, 3 ] }
 ```
 ### Summarized explain
+Execution Engine: classic
 ```json
 {
 	"stages" : [
@@ -418,7 +422,7 @@
 			"indexName" : "$**_1",
 			"isMultiKey" : false,
 			"isPartial" : false,
-			"isSparse" : false,
+			"isSparse" : true,
 			"isUnique" : false,
 			"keyPattern" : {
 				"$_path" : 1,

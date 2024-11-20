@@ -25,6 +25,6 @@ TestData.skipCheckOrphans = true;
 const st = new ShardingTest({shards: 2});
 const db = prepareShardedCollectionWithOrphans(st);
 
-runGroupWithTopBottomToDistinctScanTests(db, true);
+runGroupWithTopBottomToDistinctScanTests(db);
 
 st.stop();

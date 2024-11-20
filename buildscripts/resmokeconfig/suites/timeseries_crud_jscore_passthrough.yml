@@ -80,6 +80,7 @@ selector:
     - jstests/core/query/distinct/distinct_compound_index.js
     - jstests/core/query/distinct/distinct_index1.js
     - jstests/core/query/distinct/distinct_multikey_dotted_path.js
+    - jstests/core/query/distinct/distinct_sbe_compatibility.js
     - jstests/core/query/exists/existsa.js
     - jstests/core/query/explain/**/*.js
     - jstests/core/query/expr/expr_index_use.js

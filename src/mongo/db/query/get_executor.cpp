@@ -720,7 +720,16 @@ private:
         }
 
         auto cachedSolutionPair = retrievePlanFromCache(planCacheKey);
-        if (!cachedSolutionPair.has_value()) {
+
+        const bool noCachedPlan = !cachedSolutionPair.has_value();
+        const bool cachedPlanIsNotForClassic = !noCachedPlan &&
+            cachedSolutionPair->first->decisionReadsOrWorks &&
+            !std::holds_alternative<NumWorks>(
+                cachedSolutionPair->first->decisionReadsOrWorks->data);
+
+        // If cachedSolutionPair is empty or the stored entry uses NumReads instead of NumWorks, we
+        // cannot use it.
+        if (noCachedPlan || cachedPlanIsNotForClassic) {
             planCacheCounters.incrementClassicMissesCounter();
             return nullptr;
         }
@@ -1264,23 +1273,24 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
     }();
 
-    if (useSbeEngine) {
+    canonicalQuery->setSbeCompatible(useSbeEngine);
+    if (!useSbeEngine) {
+        // There's a special case of the projection optimization being skipped when a query has
+        // any user-defined "let" variable and the query may be run with SBE. Here we make sure
+        // the projection is optimized for the classic engine.
+        canonicalQuery->optimizeProjection();
+    } else if (!canonicalQuery->getDistinct()) {
         // Commit to using SBE by removing the pushed-down aggregation stages from the original
         // pipeline and by mutating the canonical query with search specific metadata.
         finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
-        canonicalQuery->setSbeCompatible(true);
-
-    } else {
-        // There's a special case of the projection optimization being skipped when a query has any
-        // user-defined "let" variable and the query may be run with SBE. Here we make sure the
-        // projection is optimized for the classic engine.
-        canonicalQuery->optimizeProjection();
-        canonicalQuery->setSbeCompatible(false);
     }
+
 
     auto makePlanner = [&](std::unique_ptr<QueryPlannerParams> plannerParams)
         -> std::unique_ptr<PlannerInterface> {
-        if (useSbeEngine) {
+        // If we have a distinct, we might get a better plan using classic and DISTINCT_SCAN than
+        // SBE without one.
+        if (useSbeEngine && !canonicalQuery->getDistinct()) {
             auto sbeYieldPolicy =
                 PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
 
@@ -1323,27 +1333,40 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
     auto planner = [&] {
         try {
-            // First try the single collection query parameters, as these would have been generated
-            // with query settings if present.
-            return makePlanner(std::move(paramsForSingleCollectionQuery));
-        } catch (const ExceptionFor<ErrorCodes::NoQueryExecutionPlans>& exception) {
-            // The planner failed to generate a viable plan. Remove the query settings and retry if
-            // any are present. Otherwise just propagate the exception.
-            const auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
-            const bool hasQuerySettings = querySettings.getIndexHints().has_value();
-            if (!hasQuerySettings) {
-                throw;
+            try {
+                // First try the single collection query parameters, as these would have been
+                // generated with query settings if present.
+                return makePlanner(std::move(paramsForSingleCollectionQuery));
+            } catch (const ExceptionFor<ErrorCodes::NoQueryExecutionPlans>& exception) {
+                // The planner failed to generate a viable plan. Remove the query settings and retry
+                // if any are present. Otherwise just propagate the exception.
+                const auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
+                const bool hasQuerySettings = querySettings.getIndexHints().has_value();
+                if (!hasQuerySettings) {
+                    throw;
+                }
+                LOGV2_DEBUG(
+                    8524200,
+                    2,
+                    "Encountered planning error while running with query settings. Retrying "
+                    "without query settings.",
+                    "query"_attr = canonicalQuery->toStringForErrorMsg(),
+                    "querySettings"_attr = querySettings,
+                    "reason"_attr = exception.reason(),
+                    "code"_attr = exception.codeString());
+
+                plannerOptions |= QueryPlannerParams::IGNORE_QUERY_SETTINGS;
+                return makePlanner(makeQueryPlannerParams(plannerOptions));
             }
-            LOGV2_DEBUG(8524200,
-                        2,
-                        "Encountered planning error while running with query settings. Retrying "
-                        "without query settings.",
-                        "query"_attr = canonicalQuery->toStringForErrorMsg(),
-                        "querySettings"_attr = querySettings,
-                        "reason"_attr = exception.reason(),
-                        "code"_attr = exception.codeString());
-            return makePlanner(
-                makeQueryPlannerParams(plannerOptions | QueryPlannerParams::IGNORE_QUERY_SETTINGS));
+        } catch (const ExceptionFor<ErrorCodes::NoDistinctScansForDistinctEligibleQuery>&) {
+            // The planner failed to generate a DISTINCT_SCAN for a distinct-like query. Replan
+            // using SBE.
+            tassert(
+                936940, "Expected query to be SBE-compatible", canonicalQuery->isSbeCompatible());
+            canonicalQuery->resetDistinct();
+            // Stages still need to be finalized for SBE since classic was used previously.
+            finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+            return makePlanner(makeQueryPlannerParams(plannerOptions));
         }
     }();
     auto exec = planner->makeExecutor(std::move(canonicalQuery));

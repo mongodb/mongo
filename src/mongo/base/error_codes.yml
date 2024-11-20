@@ -811,6 +811,7 @@ error_codes:
   - {code: 431, name: ChunkMetadataInconsistency}
   - {code: 432, name: OfflineValidationFailedToComplete}
   - {code: 433, name: AdmissionQueueOverflow}
+  - {code: 434, name: NoDistinctScansForDistinctEligibleQuery}
 
   # Error codes 4000-8999 are reserved.
 

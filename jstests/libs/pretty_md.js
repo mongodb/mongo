@@ -7,6 +7,7 @@
 import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
 import {
     formatExplainRoot,
+    getEngine,
 } from "jstests/libs/query/analyze_plan.js";
 
 let sectionCount = 1;
@@ -60,6 +61,9 @@ export function outputAggregationPlanAndResults(
     code(normalizeArray(results, shouldSortResults));
 
     subSection("Summarized explain");
+    if (!explain.hasOwnProperty("shards")) {
+        line("Execution Engine: " + getEngine(explain));
+    }
     code(tojsonMultiLineSortKeys(flatPlan));
 
     linebreak();

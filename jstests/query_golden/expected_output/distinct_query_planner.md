@@ -25,6 +25,7 @@
 {  "_id" : 2,  "accum" : 3 }
 ```
 ### Summarized explain
+Execution Engine: classic
 ```json
 {
 	"stages" : [
@@ -108,6 +109,7 @@
 {  "_id" : 2,  "accum" : 3 }
 ```
 ### Summarized explain
+Execution Engine: classic
 ```json
 {
 	"stages" : [
@@ -191,41 +193,20 @@
 {  "_id" : 2,  "accum" : 3 }
 ```
 ### Summarized explain
+Execution Engine: sbe
 ```json
 {
-	"stages" : [
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
 		{
-			"$cursor" : {
-				"rejectedPlans" : [ ],
-				"winningPlan" : [
-					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1,
-							"b" : 1
-						}
-					},
-					{
-						"direction" : "forward",
-						"stage" : "COLLSCAN"
-					}
-				]
-			}
+			"stage" : "GROUP"
 		},
 		{
-			"$group" : {
-				"_id" : "$a",
-				"accum" : {
-					"$top" : {
-						"output" : "$b",
-						"sortBy" : {
-							"a" : 1,
-							"b" : 1
-						}
-					}
-				}
-			}
+			"direction" : "forward",
+			"filter" : {
+				
+			},
+			"stage" : "COLLSCAN"
 		}
 	]
 }
@@ -265,60 +246,36 @@
 {  "_id" : 7,  "accum" : 3 }
 ```
 ### Summarized explain
+Execution Engine: sbe
 ```json
 {
-	"stages" : [
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
 		{
-			"$cursor" : {
-				"rejectedPlans" : [ ],
-				"winningPlan" : [
-					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1,
-							"b" : 1
-						}
-					},
-					{
-						"stage" : "FETCH"
-					},
-					{
-						"direction" : "forward",
-						"indexBounds" : {
-							"a" : [
-								"(3.0, inf.0]"
-							]
-						},
-						"indexName" : "a_1",
-						"isMultiKey" : false,
-						"isPartial" : false,
-						"isSparse" : false,
-						"isUnique" : false,
-						"keyPattern" : {
-							"a" : 1
-						},
-						"multiKeyPaths" : {
-							"a" : [ ]
-						},
-						"stage" : "IXSCAN"
-					}
-				]
-			}
+			"stage" : "GROUP"
 		},
 		{
-			"$group" : {
-				"_id" : "$a",
-				"accum" : {
-					"$top" : {
-						"output" : "$b",
-						"sortBy" : {
-							"a" : 1,
-							"b" : 1
-						}
-					}
-				}
-			}
+			"stage" : "FETCH"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"(3.0, inf.0]"
+				]
+			},
+			"indexName" : "a_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ]
+			},
+			"stage" : "IXSCAN"
 		}
 	]
 }
@@ -336,6 +293,7 @@
 {  "_id" : 2 }
 ```
 ### Summarized explain
+Execution Engine: classic
 ```json
 {
 	"stages" : [
@@ -397,31 +355,20 @@
 {  "_id" : 2 }
 ```
 ### Summarized explain
+Execution Engine: sbe
 ```json
 {
-	"stages" : [
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
 		{
-			"$cursor" : {
-				"rejectedPlans" : [ ],
-				"winningPlan" : [
-					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1
-						}
-					},
-					{
-						"direction" : "forward",
-						"stage" : "COLLSCAN"
-					}
-				]
-			}
+			"stage" : "GROUP"
 		},
 		{
-			"$group" : {
-				"_id" : "$a"
-			}
+			"direction" : "forward",
+			"filter" : {
+				
+			},
+			"stage" : "COLLSCAN"
 		}
 	]
 }
