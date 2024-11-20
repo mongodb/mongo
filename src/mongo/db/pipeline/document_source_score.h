@@ -50,8 +50,8 @@
 namespace mongo {
 
 /**
- * A projection-like stage, $score will output documents which are the same as the input
- * documents, now with extra metadata.
+ * $score computes the "score" metadata field based on some input Expression, without making any
+ * modifications to the non-metadata fields of the original document.
  *
  * This stage's goal is twofold:
  * - Help satisfy the constraint of $scoreFusion to participate in hybrid search. A valid input
@@ -60,96 +60,16 @@ namespace mongo {
  *   being considered a modification.
  * - Provide a way to normalize input scores to the same domain (usually between 0 and 1).
  */
-class DocumentSourceScore final : public DocumentSource {
+class DocumentSourceScore final {
 public:
     static constexpr StringData kStageName = "$score"_sd;
 
-    /**
-     * Create a new $score stage.
-     */
-    static boost::intrusive_ptr<DocumentSourceScore> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        ScoreSpec spec,
-        boost::intrusive_ptr<Expression> parsedScore,
-        boost::intrusive_ptr<Expression> parsedNormalizeFunction,
-        double parsedWeight);
-
-    /**
-     * Allows computation of score metadata for non-search pipelines, and also allows weighting or
-     * normalizing scores.
-     */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    /**
-     * Specify stage constraints. $score does not modify any documents.
-     */
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints{StreamType::kStreaming,
-                                     PositionRequirement::kNone,
-                                     HostTypeRequirement::kNone,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed};
-        constraints.noFieldModifications = true;
-        return constraints;
-    }
-
-    const char* getSourceName() const final {
-        return kStageName.rawData();
-    }
-
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kScore;
-    }
-
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-
-    /**
-     * This stage can be run in parallel.
-     */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return boost::none;
-    }
-
-    void addVariableRefs(std::set<Variables::Id>* refs) const final;
-
-    ScoreSpec getSpec() const {
-        return _spec;
-    }
-
-    boost::intrusive_ptr<Expression> getScore() const {
-        return _parsedScore;
-    }
-
-    boost::intrusive_ptr<Expression> getNormalizeFunction() const {
-        return _parsedNormalizeFunction;
-    }
-
-    double getWeight() const {
-        return _parsedWeight;
-    }
-
 private:
-    // It is illegal to construct a DocumentSourceScore directly, use createFromBson
-    // instead. Added a constructor only for use in DocumentSourceScore implementation.
-    DocumentSourceScore(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                        ScoreSpec spec,
-                        boost::intrusive_ptr<Expression> parsedScore,
-                        boost::intrusive_ptr<Expression> parsedNormalizeFunction,
-                        double parsedWeight);
-    GetNextResult doGetNext() final;
-
-    ScoreSpec _spec;
-    boost::intrusive_ptr<Expression> _parsedScore;
-    boost::intrusive_ptr<Expression> _parsedNormalizeFunction;
-    double _parsedWeight;
-
-    void setNormalizeFunction(boost::intrusive_ptr<Expression> newNormalizeFunction) {
-        _parsedNormalizeFunction = std::move(newNormalizeFunction);
-    }
+    // It is illegal to construct a DocumentSourceScore directly, use createFromBson() instead.
+    DocumentSourceScore() = default;
 };
 
 }  // namespace mongo

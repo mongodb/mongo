@@ -45,18 +45,18 @@ structs:
     description: Specification for a $score stage.
     strict: true
     fields:
-      score: 
+      score:
         description: Computes new value and reports it in score details metadata
         type: IDLAnyType
         optional: false
-      normalizeFunction: 
+      normalizeFunction:
         description: Type of score normalization function (none, sigmoid, minMaxScaler)
         type: NormalizeFunction
-        optional: true
-      weight: 
+        default: "kSigmoid"
+      weight:
         description: Number to multiply the 'score' expression by, after normalization
         type: safeDouble
-        optional: true
+        default: 1.0
         validator:
           lte: 1.0
           gte: 0.0

@@ -53,6 +53,7 @@ public:
         kComputedProjection,
         kReplaceRoot,
         kGroupFromFirstDocument,
+        kSetMetadata,
     };
     virtual ~TransformerInterface() = default;
     virtual Document applyTransformation(const Document& input) const = 0;
@@ -68,6 +69,14 @@ public:
      * Method used by optimize() to check if stage is a no-op.
      */
     virtual bool isNoop() const {
+        return false;
+    }
+
+    /**
+     * Method used to toggle the 'noFieldModifications' stage constraint. True only if guaranteed
+     * this transformation will not modify any document fields (although it may modify metadata).
+     */
+    virtual bool noFieldModifications() const {
         return false;
     }
 

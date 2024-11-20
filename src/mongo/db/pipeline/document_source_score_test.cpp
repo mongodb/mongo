@@ -233,7 +233,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
     docSourceScore->setSource(mock.get());
 
     // Assert cannot evaluate expression into double
-    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, 9484101);
+    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
@@ -251,7 +251,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
     docSourceScore->setSource(mock.get());
 
     // Assert cannot evaluate expression into double
-    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, 9484101);
+    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfScoreInvalidExpression) {

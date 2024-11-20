@@ -62,6 +62,27 @@ const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();
 }
 
+StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
+    Pipeline::SplitState pipeState) const {
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kNone,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kAllowed,
+                                 TransactionRequirement::kAllowed,
+                                 LookupRequirement::kAllowed,
+                                 UnionRequirement::kAllowed,
+                                 ChangeStreamRequirement::kAllowlist);
+    constraints.canSwapWithMatch = true;
+    constraints.canSwapWithSkippingOrLimitingStage = true;
+    constraints.isAllowedWithinUpdatePipeline = true;
+    // This transformation could be part of a 'collectionless' change stream on an entire
+    // database or cluster, mark as independent of any collection if so.
+    constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
+    constraints.noFieldModifications = getTransformer().noFieldModifications();
+    return constraints;
+}
+
 DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetNext() {
     if (!_transformationProcessor) {
         return DocumentSource::GetNextResult::makeEOF();

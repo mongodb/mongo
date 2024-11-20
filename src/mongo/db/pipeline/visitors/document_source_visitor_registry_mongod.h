@@ -178,7 +178,6 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceRedact,
                        DocumentSourceSample,
                        DocumentSourceSampleFromRandomCursor,
-                       DocumentSourceScore,
                        DocumentSourceSearchMeta,
                        DocumentSourceSearch,
                        DocumentSourceSequentialDocumentCache,

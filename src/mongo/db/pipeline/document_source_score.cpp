@@ -35,10 +35,12 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_gen.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/set_metadata_transformation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -46,17 +48,6 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-
-DocumentSourceScore::DocumentSourceScore(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                         ScoreSpec spec,
-                                         boost::intrusive_ptr<Expression> parsedScore,
-                                         boost::intrusive_ptr<Expression> parsedNormalizeFunction,
-                                         double parsedWeight)
-    : DocumentSource(kStageName, pExpCtx),
-      _spec(spec),
-      _parsedScore(parsedScore),
-      _parsedNormalizeFunction(parsedNormalizeFunction),
-      _parsedWeight(parsedWeight) {}
 
 /** Register $score as a DocumentSource without feature flag and check that the hybrid scoring
  * feature flag is enabled in createFromBson() instead of via
@@ -69,65 +60,35 @@ REGISTER_DOCUMENT_SOURCE(score,
                          DocumentSourceScore::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 
-constexpr StringData DocumentSourceScore::kStageName;
+namespace {
+intrusive_ptr<Expression> buildMetadataExpression(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                                  const ScoreSpec& spec) {
 
-DocumentSource::GetNextResult DocumentSourceScore::doGetNext() {
-    // Get the next input document.
-    auto input = pSource->getNext();
+    intrusive_ptr<Expression> scoreAndNormalizeExpr = [&]() {
+        switch (spec.getNormalizeFunction()) {
+            // $sigomid will recursively parse and nest the score Expression.
+            case NormalizeFunctionEnum::kSigmoid:
+                return ExpressionSigmoid::parseExpressionSigmoid(
+                    pExpCtx.get(), spec.getScore().getElement(), pExpCtx->variablesParseState);
+            // TODO SERVER-94600: Handle minMaxScaler expression behavior.
+            // The default case is no normalization, so parse just the score operator itself.
+            default:
+                return Expression::parseOperand(
+                    pExpCtx.get(), spec.getScore().getElement(), pExpCtx->variablesParseState);
+        }
+    }();
 
-    // If input is not advanced, return the input.
-    if (!input.isAdvanced()) {
-        return input;
+    if (spec.getWeight() == 1) {
+        return scoreAndNormalizeExpr;
     }
 
-    Document currentDoc = input.getDocument();
-    // Evaluate and validate the scored expression.
-    Value scoreValue = _parsedScore->evaluate(currentDoc, &(pExpCtx->variables));
-    uassert(9484101,
-            "Invalid expression or evaluated expression is not a valid double",
-            isNumericBSONType(scoreValue.getType()));
-    double scoreDouble = scoreValue.getDouble();
-
-    // Validate and execute the specified normalize function.
-    if (_parsedNormalizeFunction) {
-        Value evaluatedSigmoid =
-            _parsedNormalizeFunction->evaluate(currentDoc, &(pExpCtx->variables));
-        scoreDouble = evaluatedSigmoid.getDouble();
-    }
-
-    // TODO SERVER-94600: Handle minMaxScaler expression behavior
-
-    // If we don't enter above cases then normalize function is "none." Should have validated
-    // before this point that _parsedNormalizeFunction is one of the normalize function types.
-
-    // Calculate score with the specified weight (bounds: [0, 1]). Default is 1.0.
-    scoreDouble = scoreDouble * _parsedWeight;
-
-    // Store it in score's metadata (document must be mutable in order for score to be set).
-    MutableDocument output(std::move(currentDoc));
-    output.metadata().setScore(scoreDouble);
-
-    return output.freeze();
+    std::vector<intrusive_ptr<Expression>> children = {
+        std::move(scoreAndNormalizeExpr),
+        make_intrusive<ExpressionConstant>(pExpCtx.get(), Value(spec.getWeight()))};
+    return make_intrusive<ExpressionMultiply>(pExpCtx.get(), std::move(children));
 }
+}  // namespace
 
-Value DocumentSourceScore::serialize(const SerializationOptions& opts) const {
-    return Value(Document{{kStageName, _spec.toBSON()}});
-}
-
-void DocumentSourceScore::addVariableRefs(std::set<Variables::Id>* refs) const {
-    expression::addVariableRefs(_parsedScore.get(), refs);
-}
-
-intrusive_ptr<DocumentSourceScore> DocumentSourceScore::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx,
-    ScoreSpec spec,
-    boost::intrusive_ptr<Expression> parsedScore,
-    boost::intrusive_ptr<Expression> parsedNormalizeFunction,
-    double parsedWeight) {
-    intrusive_ptr<DocumentSourceScore> source(
-        new DocumentSourceScore(pExpCtx, spec, parsedScore, parsedNormalizeFunction, parsedWeight));
-    return source;
-}
 
 intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -143,39 +104,15 @@ intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
             elem.type() == BSONType::Object);
     auto spec = ScoreSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
-    // Parse "score" (required field).
-    auto score = [&]() -> intrusive_ptr<Expression> {
-        auto score = spec.getScore();
-        return Expression::parseOperand(
-            pExpCtx.get(), score.getElement(), pExpCtx->variablesParseState);
-    }();
+    boost::intrusive_ptr<Expression> expr = buildMetadataExpression(pExpCtx, spec);
 
-    // Parse "weight" (optional field). If not specified, default is 1.0.
-    double weight = spec.getWeight().value_or(1.0);
-
-    // Parse normalizeFunction once an instance of DocumentSourceScore created. Assume "none" for
-    // now.
-    boost::intrusive_ptr<Expression> normalizeFunction = nullptr;
-    boost::optional<mongo::NormalizeFunctionEnum> normalizeFunctionField =
-        spec.getNormalizeFunction();
-    bool normFuncExists = normalizeFunctionField.is_initialized();
-
-    // Need a DocumentSourceScore object to access fields within static method (cannot directly
-    // access member functions otw). Intrusive pointer manages object destruction.
-    intrusive_ptr<DocumentSourceScore> doc =
-        create(pExpCtx, spec, std::move(score), std::move(normalizeFunction), weight);
-
-    // Parse "normalizeFunction" (optional field). If not specified, default is "sigmoid."
-
-    // Parsing logic done after creating an instance of DocumentSourceScore so spec member
-    // variable can be accessed in parseExpressionSigmoid().
-    if ((!normFuncExists) ||
-        (normFuncExists && *normalizeFunctionField == NormalizeFunctionEnum::kSigmoid)) {
-        normalizeFunction = ExpressionSigmoid::parseExpressionSigmoid(
-            pExpCtx.get(), doc->getSpec().getScore().getElement(), pExpCtx->variablesParseState);
-        doc->setNormalizeFunction(normalizeFunction);
-    }
-    return doc;
+    const bool isIndependentOfAnyCollection = false;
+    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+        pExpCtx,
+        std::make_unique<SetMetadataTransformation>(
+            pExpCtx, std::move(expr), DocumentMetadataFields::MetaType::kScore),
+        kStageName,
+        isIndependentOfAnyCollection);
 }
 
 }  // namespace mongo

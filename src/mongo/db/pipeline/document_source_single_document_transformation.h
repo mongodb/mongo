@@ -86,24 +86,7 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
     GetModPathsReturn getModifiedPaths() const final;
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kNone,
-                                     HostTypeRequirement::kNone,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed,
-                                     ChangeStreamRequirement::kAllowlist);
-        constraints.canSwapWithMatch = true;
-        constraints.canSwapWithSkippingOrLimitingStage = true;
-        constraints.isAllowedWithinUpdatePipeline = true;
-        // This transformation could be part of a 'collectionless' change stream on an entire
-        // database or cluster, mark as independent of any collection if so.
-        constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
-        return constraints;
-    }
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
