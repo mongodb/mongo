@@ -973,7 +973,7 @@ public:
         uassertStatusOK(indexBuildBlock->init(opCtx, writableColl, /*forRecover=*/false));
         uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
-                            ->initializeAsEmpty(opCtx));
+                            ->initializeAsEmpty());
         wuow.commit();
 
         return indexBuildBlock;

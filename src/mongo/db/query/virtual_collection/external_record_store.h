@@ -160,9 +160,7 @@ public:
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
-    void printRecordMetadata(OperationContext*,
-                             const RecordId&,
-                             std::set<Timestamp>* recordTimestamps) const final {
+    void printRecordMetadata(const RecordId&, std::set<Timestamp>* recordTimestamps) const final {
         unimplementedTasserted();
     }
 

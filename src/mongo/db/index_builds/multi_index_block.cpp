@@ -423,7 +423,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             auto indexCatalogEntry =
                 index.block->getWritableEntry(opCtx, collection.getWritableCollection(opCtx));
             index.real = indexCatalogEntry->accessMethod();
-            status = index.real->initializeAsEmpty(opCtx);
+            status = index.real->initializeAsEmpty();
             if (!status.isOK())
                 return status;
 

@@ -174,7 +174,7 @@ public:
 
     long long getFreeStorageBytes(OperationContext* opCtx) const override;
 
-    Status initAsEmpty(OperationContext* opCtx) override;
+    Status initAsEmpty() override;
 
     void printIndexEntryMetadata(OperationContext* opCtx,
                                  const key_string::Value& keyString) const override;

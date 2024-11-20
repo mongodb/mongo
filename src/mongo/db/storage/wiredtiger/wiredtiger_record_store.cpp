@@ -568,7 +568,7 @@ int64_t WiredTigerRecordStore::freeStorageSize(RecoveryUnit& ru) const {
 void WiredTigerRecordStore::_updateLargestRecordId(OperationContext* opCtx, long long largestSeen) {
     invariant(_keyFormat == KeyFormat::Long);
 
-    // Make sure to inialize first; otherwise the compareAndSwap can succeed trivially.
+    // Make sure to initialize first; otherwise the compareAndSwap can succeed trivially.
     _initNextIdIfNeeded(opCtx);
 
     // Since the 'largestSeen' is the largest we've seen, we need to set the _nextIdNum to one
@@ -902,8 +902,7 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContex
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 
-void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
-                                                const RecordId& recordId,
+void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
                                                 std::set<Timestamp>* recordTimestamps) const {
     // Printing the record metadata requires a new session. We cannot open other cursors when there
     // are open history store cursors in the session.

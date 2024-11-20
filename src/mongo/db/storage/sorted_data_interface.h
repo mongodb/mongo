@@ -420,7 +420,7 @@ public:
     // Index creation
     //
 
-    virtual Status initAsEmpty(OperationContext* opCtx) = 0;
+    virtual Status initAsEmpty() = 0;
 
 protected:
     std::shared_ptr<Ident> _ident;

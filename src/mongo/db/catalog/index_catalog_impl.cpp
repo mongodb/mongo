@@ -699,7 +699,7 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     IndexDescriptor* descriptor = entry->descriptor();
     invariant(descriptor);
 
-    status = entry->accessMethod()->initializeAsEmpty(opCtx);
+    status = entry->accessMethod()->initializeAsEmpty();
     if (!status.isOK())
         return status;
     indexBuildBlock.success(opCtx, collection);

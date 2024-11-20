@@ -155,7 +155,7 @@ public:
      * only called once for the lifetime of the index
      * if called multiple times, is an error
      */
-    virtual Status initializeAsEmpty(OperationContext* opCtx) = 0;
+    virtual Status initializeAsEmpty() = 0;
 
     /**
      * Validates the index. If 'full' is false, only performs checks which do not traverse the
@@ -567,7 +567,7 @@ public:
                   int64_t* numInserted,
                   int64_t* numDeleted) final;
 
-    Status initializeAsEmpty(OperationContext* opCtx) final;
+    Status initializeAsEmpty() final;
 
     IndexValidateResults validate(OperationContext* opCtx, bool full) const final;
 

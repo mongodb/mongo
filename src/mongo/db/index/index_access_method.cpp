@@ -520,8 +520,8 @@ Status SortedDataIndexAccessMethod::removeKeys(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status SortedDataIndexAccessMethod::initializeAsEmpty(OperationContext* opCtx) {
-    return _newInterface->initAsEmpty(opCtx);
+Status SortedDataIndexAccessMethod::initializeAsEmpty() {
+    return _newInterface->initAsEmpty();
 }
 
 RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,

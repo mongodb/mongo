@@ -126,8 +126,7 @@ public:
         return false;
     }
 
-    void printRecordMetadata(OperationContext* opCtx,
-                             const RecordId& recordId,
+    void printRecordMetadata(const RecordId& recordId,
                              std::set<Timestamp>* recordTimestamps) const override {
         MONGO_UNREACHABLE;
     }
@@ -374,7 +373,7 @@ public:
         return {};
     }
 
-    Status initAsEmpty(OperationContext* opCtx) override {
+    Status initAsEmpty() override {
         return Status::OK();
     }
 };

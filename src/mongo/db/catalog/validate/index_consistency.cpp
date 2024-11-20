@@ -941,7 +941,7 @@ void KeyStringIndexConsistency::_foundInconsistency(OperationContext* opCtx,
 
     // Print the metadata associated with the inconsistency.
     _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-        opCtx, recordId, results.getRecordTimestampsPtr());
+        recordId, results.getRecordTimestampsPtr());
     info.accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(opCtx, ks);
 
     const BSONObj& indexKey =

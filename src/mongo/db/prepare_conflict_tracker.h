@@ -56,8 +56,8 @@ public:
     bool isWaitingOnPrepareConflict() const;
 
     /**
-     * Marks the start of a prepare conflict. Call updatePrepareConfict() to advance waiting metrics
-     * during a conflict, and endPrepareConflict() to mark a prepare conflict as resolved.
+     * Marks the start of a prepare conflict. Call updatePrepareConflict() to advance waiting
+     * metrics during a conflict, and endPrepareConflict() to mark a prepare conflict as resolved.
      */
     void beginPrepareConflict(TickSource& tickSource);
 

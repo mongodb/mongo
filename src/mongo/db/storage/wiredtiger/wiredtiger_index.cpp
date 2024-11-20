@@ -510,7 +510,7 @@ long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx) const {
     return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
 }
 
-Status WiredTigerIndex::initAsEmpty(OperationContext* opCtx) {
+Status WiredTigerIndex::initAsEmpty() {
     // No-op
     return Status::OK();
 }

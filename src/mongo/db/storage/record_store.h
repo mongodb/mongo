@@ -453,9 +453,7 @@ public:
      * If provided, saves any valid timestamps (startTs, startDurableTs, stopTs, stopDurableTs)
      * related to this record in 'recordTimestamps'.
      */
-    virtual void printRecordMetadata(OperationContext*,
-                                     const RecordId&,
-                                     std::set<Timestamp>*) const = 0;
+    virtual void printRecordMetadata(const RecordId&, std::set<Timestamp>*) const = 0;
 
     /**
      * Returns a new cursor over this record store.

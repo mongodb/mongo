@@ -156,8 +156,7 @@ public:
 
     bool updateWithDamagesSupported() const override;
 
-    void printRecordMetadata(OperationContext* opCtx,
-                             const RecordId& recordId,
+    void printRecordMetadata(const RecordId& recordId,
                              std::set<Timestamp>* recordTimestamps) const override;
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
