@@ -230,6 +230,9 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
         aggExState.getPrivileges());
     cursorParams.setTailableMode(expCtx->getTailableMode());
 
+    // The global cursor manager does not deliver invalidations or kill notifications; the
+    // underlying PlanExecutor(s) used by the pipeline will be receiving invalidations and kill
+    // notifications themselves, not the cursor we create here.
     auto pin = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
 
     pin->incNBatches();
@@ -442,7 +445,8 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
     if (doRegisterCursor) {
         auto curOp = CurOp::get(opCtx);
         // Only register a cursor for the pipeline if we have found that we need one for future
-        // calls to 'getMore()'.
+        // calls to 'getMore()'. This cursor owns no collection state, and thus we register it with
+        // the global cursor manager.
         maybePinnedCursor = registerCursor(aggExState, expCtx, std::move(execs[0]));
         auto cursor = maybePinnedCursor->getCursor();
         cursorId = cursor->cursorid();
@@ -559,7 +563,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
     return pipelines;
 }
 
-std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor(
+std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutors(
     const AggExState& aggExState,
     AggCatalogState& aggCatalogState,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
@@ -570,9 +574,9 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
     auto hasGeoNearStage = !pipeline->getSources().empty() &&
         dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
 
-    // Prepare a PlanExecutor to provide input into the pipeline, if needed; and additional
-    // executors if needed to serve the aggregation, this currently only includes search commands
-    // that generate metadata.
+    // Prepare a PlanExecutor to provide input into the pipeline, if needed. Add additional
+    // executors if needed to serve the aggregation (currently only includes search commands
+    // that generate metadata).
     auto [executor, attachCallback, additionalExecutors] =
         PipelineD::buildInnerQueryExecutor(aggCatalogState.getCollections(),
                                            aggExState.getExecutionNss(),
@@ -644,6 +648,23 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
     for (auto& exec : additionalExecutors) {
         execs.emplace_back(std::move(exec));
     }
+
+    tassert(6624353, "No executors", !execs.empty());
+
+    {
+        auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
+        stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
+        CurOp::get(aggExState.getOpCtx())->setPlanSummary(lk, std::move(planSummary));
+        CurOp::get(aggExState.getOpCtx())->debug().queryFramework = execs[0]->getQueryFramework();
+    }
+
+    hangAfterCreatingAggregationPlan.executeIf(
+        [](const auto&) { hangAfterCreatingAggregationPlan.pauseWhileSet(); },
+        [&](const BSONObj& data) {
+            boost::optional<UUID> uuid{aggCatalogState.getUUID()};
+            return uuid && UUID::parse(data["uuid"]) == *uuid;
+        });
+
     return execs;
 }
 
@@ -815,6 +836,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     }
 
     expCtx->initializeReferencedSystemVariables();
+
+    // Report usage statistics for each stage in the pipeline.
+    aggExState.tickGlobalStageCounters();
 
     return pipeline;
 }
@@ -996,33 +1020,10 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
             return swPipeline.getStatus();
         }
 
-        execs = createExecutor(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
-
-        tassert(6624353, "No executors", !execs.empty());
-
-        {
-            auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
-            stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-            curOp->setPlanSummary(lk, std::move(planSummary));
-            curOp->debug().queryFramework = execs[0]->getQueryFramework();
-        }
+        execs = prepareExecutors(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
     }
 
-    // Having released the collection lock, we can now begin to fetch results from the pipeline. If
-    // the documents in the result exceed the batch size, a cursor will be created. This cursor owns
-    // no collection state, and thus we register it with the global cursor manager. The global
-    // cursor manager does not deliver invalidations or kill notifications; the underlying
-    // PlanExecutor(s) used by the pipeline will be receiving invalidations and kill notifications
-    // themselves, not the cursor we create here.
-    hangAfterCreatingAggregationPlan.executeIf(
-        [](const auto&) { hangAfterCreatingAggregationPlan.pauseWhileSet(); },
-        [&](const BSONObj& data) {
-            boost::optional<UUID> uuid{aggCatalogState->getUUID()};
-            return uuid && UUID::parse(data["uuid"]) == *uuid;
-        });
-    // Report usage statistics for each stage in the pipeline.
-    aggExState.tickGlobalStageCounters();
-
+    // Having released the collection lock, we can now begin to fetch results from the pipeline.
     // If both explain and cursor are specified, explain wins.
     if (expCtx->getExplain()) {
         auto explainExecutor = execs[0].get();
