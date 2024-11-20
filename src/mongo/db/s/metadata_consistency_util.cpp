@@ -86,6 +86,7 @@ namespace metadata_consistency_util {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(insertFakeInconsistencies);
+MONGO_FAIL_POINT_DEFINE(simulateCatalogTopLevelMetadataInconsistency);
 
 /*
  * Emit a warning log containing information about the given inconsistency
@@ -759,18 +760,28 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossS
             pipeline.emplace_back(fromjson(R"(
                 { $replaceWith: '$docs' })"));
         }
+        simulateCatalogTopLevelMetadataInconsistency.execute([&](const auto&) {
+            // Generates a CollectionAuxiliaryMetadataMismatch inconsistency by simulating that
+            // $listCatalog returns a top-level field which is inconsistent across shards.
+            pipeline.emplace_back(fromjson(R"(
+                {$addFields: {
+                    'md.testOnlyInconsistentField': '$shard'
+                }})"));
+        });
         pipeline.emplace_back(fromjson(R"(
             {$project: {
                 md: '$md',
                 shard: '$shard'
             }})"));
-        // TODO (SERVER-91231): Remove this code once this metadata field is removed.
-        // If the TSBucketingParametersUnchanged feature flag is enabled, this field is updated in
-        // a non cluster-wide atomic way during FCV downgrades, which can transiently be detected
-        // as an inconsistency. Since we plan to delete this field, exclude it from the checks.
+        // Ignore inconsistencies in the legacy timeseries flags. Due to SERVER-91195, those flags
+        // have been deprecated and will be removed. At the same time, they can become inconsistent
+        // in various scenarios, such as movePrimary or FCV downgrades.
+        // TODO (SERVER-91231): Remove tsBucketingParametersHaveChanged field once it's removed.
+        // TODO (SERVER-96831): Remove tsBucketsMayHaveMixedSchemaData field once it's removed.
         pipeline.emplace_back(fromjson(R"(
             {$project: {
-                'md.timeseriesBucketingParametersHaveChanged': 0
+                'md.timeseriesBucketingParametersHaveChanged': 0,
+                'md.timeseriesBucketsMayHaveMixedSchemaData': 0
             }})"));
         pipeline.emplace_back(fromjson(R"(
             {$facet: {
