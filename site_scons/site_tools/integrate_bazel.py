@@ -223,13 +223,32 @@ def bazel_builder_action(
             shutil.copy(dwarf_sym_with_debug.replace(s, t), dwarf_sym.replace(s, t))
         else:
             s = Globals.bazel_output(t)
-            shutil.copy(s, str(t))
-            os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
+            try:
+                # Check if the current directory and .cache files are on the same mount
+                # because hardlinking doesn't work between drives and when it fails
+                # it leaves behind a symlink that is hard to clean up
+                if os.stat(".").st_dev == os.stat(s, follow_symlinks=True).st_dev:
+                    if os.path.exists(str(t)):
+                        os.remove(str(t))
+                    os.link(s, str(t))
+                else:
+                    print(
+                        f"Copying {s} to {t} instead of hardlinking because files are on different mounts."
+                    )
+                    shutil.copy(s, str(t))
+                    os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
+            # Fall back on the original behavior of copying, likely if we hit here this
+            # will still fail due to hardlinking leaving some symlinks around
+            except Exception as e:
+                print(e)
+                print(f"Failed to hardlink {s} to {t}, trying to copying file instead.")
+                shutil.copy(s, str(t))
+                os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
 
 
 BazelCopyOutputsAction = SCons.Action.FunctionAction(
     bazel_builder_action,
-    {"cmdstr": "Copying $TARGETS from bazel build directory.", "varlist": ["BAZEL_FLAGS_STR"]},
+    {"cmdstr": "Hardlinking $TARGETS from bazel build directory.", "varlist": ["BAZEL_FLAGS_STR"]},
 )
 
 total_query_time = 0
