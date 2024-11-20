@@ -2187,6 +2187,9 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
         CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
         throw;
+    } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
+        CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
+        throw;
     }
     shard_role_details::setWriteUnitOfWork(opCtx, nullptr);
 

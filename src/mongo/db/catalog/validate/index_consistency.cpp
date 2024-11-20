@@ -621,7 +621,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
     try {
         indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString);
     } catch (const DBException& ex) {
-        if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict) {
+        if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict &&
+            ex.code() != ErrorCodes::TemporarilyUnavailable &&
+            ex.code() != ErrorCodes::TransactionTooLargeForCache) {
             const key_string::Value firstKeyString = firstKeyStringBuilder.getValueCopy();
             LOGV2_FATAL(5318400,
                         "Error seeking to first key",
@@ -685,7 +687,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         try {
             indexEntry = indexCursor->nextKeyString(opCtx);
         } catch (const DBException& ex) {
-            if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict) {
+            if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict &&
+                ex.code() != ErrorCodes::TemporarilyUnavailable &&
+                ex.code() != ErrorCodes::TransactionTooLargeForCache) {
                 LOGV2_FATAL(5318401,
                             "Error advancing index cursor",
                             "error"_attr = ex.toString(),
