@@ -1183,16 +1183,36 @@ functions:
 
   "do jepsen setup":
     - *f_expansions_write
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: libfaketime
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/do_jepsen_setup/build_libfaketime.sh"
+        include_expansions_in_env:
+          - github_token
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: jepsen
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/do_jepsen_setup/install_jepsen.sh"
+        include_expansions_in_env:
+          - github_token
     - command: subprocess.exec
       params:
         binary: bash
@@ -1230,11 +1250,21 @@ functions:
 
   "setup jstestfuzz":
     - *f_expansions_write
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: jstestfuzz
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/jstestfuzz_setup.sh"
+        include_expansions_in_env:
+          - github_token
 
   "lint fuzzer sanity patch":
     - *f_expansions_write
@@ -1257,11 +1287,21 @@ functions:
   # Used by generator
   "run jstestfuzz":
     - *f_expansions_write
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: QA
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/run_jstestfuzz/clone_repos.sh"
+        include_expansions_in_env:
+          - github_token
     - *f_expansions_write
     - command: subprocess.exec
       type: test
