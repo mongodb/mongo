@@ -2065,11 +2065,7 @@ Status ReplicationCoordinatorImpl::waitUntilMajorityOpTime(mongo::OperationConte
                 1,
                 "waitUntilOpTime: waiting for target OpTime to be in a snapshot",
                 "targetOpTime"_attr = targetOpTime,
-                "currentCommittedSnapshotOpTime"_attr = _getCurrentCommittedSnapshotOpTime(lock));
-
-    LOGV2_DEBUG(21335,
-                3,
-                "waitUntilOpTime: waiting for a new snapshot",
+                "currentCommittedSnapshotOpTime"_attr = _getCurrentCommittedSnapshotOpTime(lock),
                 "deadline"_attr = deadline.value_or(opCtx->getDeadline()));
 
     try {

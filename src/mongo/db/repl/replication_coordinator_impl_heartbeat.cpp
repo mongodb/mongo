@@ -181,7 +181,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget(WithLock lk,
                                                             Date_t when,
                                                             std::string replSetName) {
     LOGV2_FOR_HEARTBEATS(
-        4615618, 2, "Scheduling heartbeat", "target"_attr = target, "when"_attr = when);
+        4615618, 4, "Scheduling heartbeat", "target"_attr = target, "when"_attr = when);
     _trackHeartbeatHandle(
         lk,
         _replExecutor->scheduleWorkAt(when,

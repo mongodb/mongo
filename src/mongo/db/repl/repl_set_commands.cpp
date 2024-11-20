@@ -805,11 +805,6 @@ public:
         ReplSetHeartbeatArgsV1 args;
         uassertStatusOK(args.initialize(cmdObj));
 
-        LOGV2_FOR_HEARTBEATS(24096,
-                             2,
-                             "Processing heartbeat request",
-                             "from"_attr = cmdObj.getStringField("from"),
-                             "cmdObj"_attr = cmdObj);
         ReplSetHeartbeatResponse response;
         status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(args, &response);
         if (status.isOK())
