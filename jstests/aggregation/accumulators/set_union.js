@@ -167,3 +167,32 @@ result =
 assert.eq(
     result,
     [{_id: "Pub1", setUnionArr: ["Book 1"]}, {_id: "Pub3", setUnionArr: ["Book 2", "Book 3"]}]);
+
+// Basic correctness tests for $setUnion used in $bucket and $bucketAuto. Though $bucket and
+// $bucketAuto use accumulators in the same way that $group does, the tests below verifies that
+// everything works properly with serialization and reporting results.
+assert(coll.drop());
+const docs = [];
+for (let i = 0; i < 10; i++) {
+    docs.push({_id: i, arr: [42]});
+}
+coll.insertMany(docs);
+
+// $bucket
+result =
+    coll.aggregate([{
+            $bucket: {groupBy: '$_id', boundaries: [0, 5, 10], output: {nums: {$setUnion: "$arr"}}}
+        }])
+        .toArray();
+assert.eq(result, [{"_id": 0, "nums": [42]}, {"_id": 5, "nums": [42]}]);
+
+// $bucketAuto
+result =
+    coll.aggregate(
+            [{$bucketAuto: {groupBy: '$_id', buckets: 2, output: {nums: {$setUnion: "$arr"}}}}])
+        .toArray();
+assert.eq(
+    result,
+    [{"_id": {"min": 0, "max": 5}, "nums": [42]}, {"_id": {"min": 5, "max": 9}, "nums": [42]}]);
+
+assert(coll.drop());

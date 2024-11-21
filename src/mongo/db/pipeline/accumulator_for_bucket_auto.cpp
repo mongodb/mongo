@@ -187,14 +187,52 @@ private:
 };
 
 /**
- * The custom positional accumulator $push for $bucketAuto stage. Similar to
- * AccumulatorFirstLastNForBucketAuto, this custom accumulator consumes the wrapped documents and
- * determines the accumulated results based on their original positions.
+ * The common class for the custom positional accumulators $push and $concatArrays for the
+ * $bucketAuto stage. Similar to AccumulatorFirstLastNForBucketAuto, these custom accumulators
+ * consume the wrapped documents and determine the accumulated results based on their original
+ * positions. $concatArrays is similar to $push except that it takes an array input and it
+ * flattens the array in the final result.
  */
-class AccumulatorPushForBucketAuto : public AccumulatorState {
+class AccumulatorPushConcatArraysCommonForBucketAuto : public AccumulatorState {
 public:
     using KeyOutPair = std::pair<long long, Value>;
 
+    AccumulatorPushConcatArraysCommonForBucketAuto(ExpressionContext* expCtx,
+                                                   int maxMemoryUsageBytes)
+        : AccumulatorState(expCtx, maxMemoryUsageBytes) {}
+
+    // Called by 'processInternal', it adds the incoming 'input' as is to
+    // '_inputPositionToValueMap'. The difference between $push's version and $concatArrays's
+    // version of this function is that $concatArrays additionally ensures that the 'input' is of
+    // type array. Note that the $concatArrays override does NOT insert each individual element as a
+    // separate entry; instead, we do the array flattening in 'getValue'. This is so that we can
+    // keep track of which document each array entry came from.
+    virtual void addToMap(long long inputPosition, Value input);
+
+    void processInternal(const Value& input, bool merging) final;
+
+    void reset() final {
+        std::map<long long, SimpleMemoryUsageTokenWith<Value>>().swap(_inputPositionToValueMap);
+        _memUsageTracker.set(sizeof(*this));
+    }
+
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       const SerializationOptions& options) const final {
+        // Similar to 'AccumulatorFirstLastNForBucketAuto::serialize()', this accumulator
+        // serializes itself as a user-facing '$push' or $concatArrays instead of the internal
+        // accumulator created in 'replaceAccumulationStatementForBucketAuto()'.
+        auto nullInitializer =
+            ExpressionConstant::create(initializer->getExpressionContext(), Value(BSONNULL));
+        return AccumulatorState::serialize(std::move(nullInitializer), argument, options);
+    }
+
+protected:
+    std::map<long long, SimpleMemoryUsageTokenWith<Value>> _inputPositionToValueMap;
+};
+
+class AccumulatorPushForBucketAuto : public AccumulatorPushConcatArraysCommonForBucketAuto {
+public:
     static constexpr auto kName = "$push"_sd;
 
     const char* getOpName() const final {
@@ -203,11 +241,10 @@ public:
 
     AccumulatorPushForBucketAuto(ExpressionContext* expCtx,
                                  boost::optional<int> maxMemoryUsageBytes)
-        : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
+        : AccumulatorPushConcatArraysCommonForBucketAuto(
+              expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
         _memUsageTracker.set(sizeof(*this));
     }
-
-    void processInternal(const Value& input, bool merging) final;
 
     Value getValue(bool toBeMerged) final {
         std::vector<Value> array;
@@ -217,30 +254,51 @@ public:
         return Value(array);
     }
 
-    void reset() final {
-        std::map<long long, SimpleMemoryUsageTokenWith<Value>>().swap(_inputPositionToValueMap);
-        _memUsageTracker.set(sizeof(*this));
-    }
-
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx) {
         return new AccumulatorPushForBucketAuto(expCtx, boost::none);
     }
-
-    Document serialize(boost::intrusive_ptr<Expression> initializer,
-                       boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options) const final {
-        // Similar to 'AccumulatorFirstLastNForBucketAuto::serialize()', this accumulator
-        // serializes itself as a user-facing '$push' instead of the internal accumulator
-        // created in 'replaceAccumulationStatementForBucketAuto()'.
-        auto nullInitializer =
-            ExpressionConstant::create(initializer->getExpressionContext(), Value(BSONNULL));
-        return AccumulatorState::serialize(std::move(nullInitializer), argument, options);
-    }
-
-private:
-    std::map<long long, SimpleMemoryUsageTokenWith<Value>> _inputPositionToValueMap;
 };
 
+class AccumulatorConcatArraysForBucketAuto : public AccumulatorPushConcatArraysCommonForBucketAuto {
+public:
+    static constexpr auto kName = "$concatArrays"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    AccumulatorConcatArraysForBucketAuto(ExpressionContext* expCtx,
+                                         boost::optional<int> maxMemoryUsageBytes)
+        : AccumulatorPushConcatArraysCommonForBucketAuto(
+              expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxConcatArraysBytes.load())) {
+        _memUsageTracker.set(sizeof(*this));
+    }
+
+    void addToMap(long long inputPosition, Value input) final;
+
+    Value getValue(bool toBeMerged) final {
+        std::vector<Value> array;
+        for (const auto& [_, entry] : _inputPositionToValueMap) {
+            auto entryVal = entry.value();
+            tassert(9736200,
+                    str::stream()
+                        << "Expected to find an array as the entries in the position map, instead "
+                           "found type: "
+                        << typeName(entryVal.getType()),
+                    entryVal.isArray());
+
+            // Flatten the array for the final result.
+            for (auto&& elem : entryVal.getArray()) {
+                array.push_back(std::move(elem));
+            }
+        }
+        return Value(array);
+    }
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx) {
+        return new AccumulatorConcatArraysForBucketAuto(expCtx, boost::none);
+    }
+};
 
 namespace {
 
@@ -288,6 +346,12 @@ static FactoryFnMap factoryFnMap{
      [](ExpressionContext* const expCtx) {
          return [expCtx] {
              return AccumulatorPushForBucketAuto::create(expCtx);
+         };
+     }},
+    {"$concatArrays",
+     [](ExpressionContext* const expCtx) {
+         return [expCtx] {
+             return AccumulatorConcatArraysForBucketAuto::create(expCtx);
          };
      }},
 };
@@ -451,32 +515,11 @@ void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compound
     }
 }
 
-void AccumulatorPushForBucketAuto::processInternal(const Value& compoundInput, bool merging) {
-    auto addToMap = [&_inputPositionToValueMap = _inputPositionToValueMap,
-                     &_memUsageTracker = _memUsageTracker](long long inputPosition,
-                                                           Value input) -> void {
-        const auto memUsage = sizeof(long long) + input.getApproximateSize() + sizeof(KeyOutPair);
-
-        tassert(9059700,
-                str::stream() << "Recieved a duplicate input position: " << inputPosition,
-                !_inputPositionToValueMap.contains(inputPosition));
-
-        _memUsageTracker.add(input.getApproximateSize());
-        uassert(
-            ErrorCodes::ExceededMemoryLimit,
-            str::stream() << "$push used too much memory and cannot spill to disk. Memory limit: "
-                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-            _memUsageTracker.withinMemoryLimit());
-
-        _inputPositionToValueMap.insert(
-            std::pair{inputPosition,
-                      SimpleMemoryUsageTokenWith<Value>{
-                          SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, std::move(input)}});
-    };
-
+void AccumulatorPushConcatArraysCommonForBucketAuto::processInternal(const Value& compoundInput,
+                                                                     bool merging) {
     if (!merging) {
         // 'compoundInput' is made of two parts:
-        // - 'input' is the value that the user specified in their {$push: _}
+        // - 'input' is the value that the user specified in their {$push: _} or {$concatArrays: _}
         //   accumulator-expression.
         // - 'inputPosition' is the position in the input where this value occurred.
         std::pair<long long, Value> inputPositionAndValue = genKeyOutPair(compoundInput);
@@ -494,8 +537,8 @@ void AccumulatorPushForBucketAuto::processInternal(const Value& compoundInput, b
         const std::vector<Value>& vec = compoundInput.getArray();
         for (auto&& val : vec) {
             // 'compoundInput' is an array where each element is made of two parts:
-            // - 'input' is the value that the user specified in their {$push: _}
-            //   accumulator-expression.
+            // - 'input' is the value that the user specified in their {$push: _} or
+            //   {$concatArrays: _} accumulator-expression.
             // - 'inputPosition' is the position in the input where this value occurred.
             std::pair<long long, Value> inputPositionAndValue = genKeyOutPair(val);
             auto inputPosition = inputPositionAndValue.first;
@@ -504,6 +547,39 @@ void AccumulatorPushForBucketAuto::processInternal(const Value& compoundInput, b
         }
     }
 }
+
+void AccumulatorPushConcatArraysCommonForBucketAuto::addToMap(long long inputPosition,
+                                                              Value input) {
+    const auto inputSize = input.getApproximateSize();
+    const auto memUsage = sizeof(long long) + inputSize + sizeof(KeyOutPair);
+
+    tassert(9059700,
+            str::stream() << "Received a duplicate input position: " << inputPosition,
+            !_inputPositionToValueMap.contains(inputPosition));
+
+    _memUsageTracker.add(inputSize);
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << getOpName()
+                          << "used too much memory and cannot spill to disk. Memory limit: "
+                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+            _memUsageTracker.withinMemoryLimit());
+
+    _inputPositionToValueMap.insert(
+        std::pair{inputPosition,
+                  SimpleMemoryUsageTokenWith<Value>{
+                      SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, std::move(input)}});
+}
+
+void AccumulatorConcatArraysForBucketAuto::addToMap(long long inputPosition, Value input) {
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "$concatArrays requires array inputs, but input "
+                          << redact(input.toString()) << " is of type "
+                          << typeName(input.getType()),
+            input.isArray());
+
+    AccumulatorPushConcatArraysCommonForBucketAuto::addToMap(inputPosition, input);
+}
+
 
 bool isPositionalAccumulator(const char* opName) {
     return factoryFnMap.find(opName) != factoryFnMap.cend();

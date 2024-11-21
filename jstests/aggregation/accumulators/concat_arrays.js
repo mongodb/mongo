@@ -145,3 +145,28 @@ result = coll.aggregate([
              .toArray();
 assert.eq(result, [{_id: null, nums: [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [7, 8, 9]]}]);
 assert(coll.drop());
+
+// Basic correctness test for $concatArrays used in $bucket (see bucketAuto_concatArrays.js for
+// $bucketAuto tests). Though $bucket and $bucketAuto use accumulators in the same way that $group
+// does, the test below verifies that everything works properly with serialization and reporting
+// results.
+assert(coll.drop());
+const docs = [];
+for (let i = 0; i < 10; i++) {
+    docs.push({_id: i, arr: [i]});
+}
+coll.insertMany(docs);
+
+result = coll.aggregate([
+                 {$sort: {_id: 1}},
+                 {
+                     $bucket: {
+                         groupBy: '$_id',
+                         boundaries: [0, 5, 10],
+                         output: {nums: {$concatArrays: "$arr"}}
+                     }
+                 }
+             ])
+             .toArray();
+assert.eq(result, [{"_id": 0, "nums": [0, 1, 2, 3, 4]}, {"_id": 5, "nums": [5, 6, 7, 8, 9]}]);
+assert(coll.drop());
