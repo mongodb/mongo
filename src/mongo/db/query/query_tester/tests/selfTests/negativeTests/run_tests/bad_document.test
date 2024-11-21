@@ -1,0 +1,5 @@
+bad_document
+bad_document
+bad_document.coll as test
+
+:sortResults {aggregate: "test", pipeline: [{$match: {}}], cursor: {}}

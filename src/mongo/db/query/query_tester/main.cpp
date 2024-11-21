@@ -126,20 +126,46 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     auto conn = buildConn(uriString, &versionInfo, mode);
     // Track collections loaded in the previous test file.
     auto prevFileCollections = std::set<std::string>{};
-    // TODO(SERVER-96984): Robustify
     auto failedTestFiles = std::vector<std::filesystem::path>{};
     auto failedQueryCount = size_t{0};
     auto totalTestsRun = size_t{0};
     for (const auto& [testPath, startRange, endRange] : testsToRun) {
         auto currFile = query_tester::QueryFile(testPath);
-        currFile.readInEntireFile(mode, startRange, endRange);
-        currFile.loadCollections(conn.get(), dropData, loadData, prevFileCollections);
+
+        // Treat data load errors as failures, too.
+        try {
+            currFile.readInEntireFile(mode);
+            currFile.readInEntireFile(mode, startRange, endRange);
+            currFile.loadCollections(conn.get(), dropData, loadData, prevFileCollections);
+        } catch (const std::exception& exception) {
+            std::cerr << std::endl
+                      << testPath.string() << std::endl
+                      << exception.what() << std::endl;
+            failedTestFiles.push_back(testPath);
+            prevFileCollections.clear();  // Assume data corruption on data load failure.
+            continue;
+        }
+
         if (populateAndExit) {
             continue;
         }
-        currFile.runTestFile(conn.get(), mode);
+
+        // Treat run errors as failures, but since data load is fine, we can still make use of the
+        // drop-load optimization.
+        const bool hasFailures = [&](const auto& testPath) {
+            try {
+                currFile.runTestFile(conn.get(), mode);
+                return !currFile.writeAndValidate(mode, outOpt, verbose);
+            } catch (const std::exception& exception) {
+                std::cerr << std::endl
+                          << testPath.string() << std::endl
+                          << exception.what() << std::endl;
+                return true;
+            }
+        }(testPath);
+
         totalTestsRun += currFile.getTestsRun();
-        if (!currFile.writeAndValidate(mode, outOpt, verbose)) {
+        if (hasFailures) {
             failedQueryCount += currFile.getFailedQueryCount();
             failedTestFiles.push_back(testPath);
         }
