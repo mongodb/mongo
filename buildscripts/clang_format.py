@@ -378,6 +378,11 @@ def format_func(clang_format):
     _format_files(clang_format, files)
 
 
+def format_one(clang_format, filename):
+    """Format file command entry point."""
+    _format_files(clang_format, [filename])
+
+
 def format_my_func(clang_format, origin_branch):
     """My Format files command entry point."""
     files = git.get_my_files_to_check(is_interesting_file, origin_branch)
@@ -581,6 +586,8 @@ def main():
             lint_git_diff(options.clang_format)
         elif command == "format":
             format_func(options.clang_format)
+        elif command == "format-one":
+            format_one(options.clang_format, args[2])
         elif command == "format-my":
             format_my_func(options.clang_format, args[2] if len(args) > 2 else "origin/master")
         elif command == "reformat-branch":
