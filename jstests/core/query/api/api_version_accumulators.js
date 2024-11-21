@@ -1,7 +1,7 @@
 /**
  * Tests accumulators (e.g. $concatArrays and $setUnion) that are not supported in API Version 1.
  *
- * @tags: [featureFlagArrayAccumulators, uses_api_parameters, requires_fcv_81]
+ * @tags: [uses_api_parameters, requires_fcv_81]
  */
 
 import {APIVersionHelpers} from "jstests/libs/api_version_helpers.js";

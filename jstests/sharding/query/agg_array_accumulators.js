@@ -1,6 +1,6 @@
 /**
  * Tests that $concatArrays is computed correctly for sharded collections.
- * @tags: [featureFlagArrayAccumulators, requires_fcv_81]
+ * @tags: [requires_fcv_81]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

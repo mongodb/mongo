@@ -329,59 +329,7 @@ TEST_F(SBESetWindowFieldsTest, LastTestConstantValueNegativeWindow) {
                    << BSON("a" << 4 << "b" << 7 << "last" << 1000)));
 }
 
-/**
- * This helper allows the manual registration of the $setUnion and $concatArrays window functions to
- * add them to the parserMap without guarding them behind a feature flag (note the boost::none
- * argument below). This is required for some unit tests. Normally, window functions are added at
- * server startup time via macros and the manual registration is not necessary. However,
- * $setUnion/$concatArrays are gated beind a feature flag and do not get put into the map as the
- * flag is off by default. Changing the value of the feature flag with
- * RAIIServerParameterControllerForTest() does not solve the issue because the registration logic is
- * not re-hit.
- *
- * TODO SERVER-94575: delete this manual registration of the $setUnion/$concatArrays window
- * functions and any callers once the feature flag is enabled. Should also be able to delete the
- * ArrayAccumSBESetWindowFieldsTest fixture and just use the SBESetWindowFieldsTest fixture.
- *
- * TODO SERVER-93426: delete this manual registration of the $setUnion/$concatArrays window
- * functions and any callers. Should be able to use RAIIServerParameterControllerForTest as a
- * private member of ArrayAccumSBESetWindowFieldsTest to enable the feature flag. Even if we
- * unconditionally register the window functions, we currently cannot use
- * RAIIServerParameterControllerForTest here because that enables a different instance of the
- * feature flag than the one that is found inside the parse map (and the parse map instance is
- * checked during parsing to see if the feature is allowed).
- */
-void registerArrayAccumulatorsWindowFunction() {
-    // 'registerParser' will hit an invariant if duplicate registration is attempted. So we only try
-    // to register the parser if we haven't already done so.
-    if (!mongo::window_function::Expression::isFunction("$setUnion")) {
-        mongo::window_function::Expression::registerParser(
-            "$setUnion",
-            mongo::window_function::ExpressionRemovable<AccumulatorSetUnion,
-                                                        WindowFunctionSetUnion>::parse,
-            boost::none,
-            AllowedWithApiStrict::kAlways);
-    }
-
-    if (!mongo::window_function::Expression::isFunction("$concatArrays")) {
-        mongo::window_function::Expression::registerParser(
-            "$concatArrays",
-            mongo::window_function::ExpressionRemovable<AccumulatorConcatArrays,
-                                                        WindowFunctionConcatArrays>::parse,
-            boost::none,
-            AllowedWithApiStrict::kAlways);
-    }
-}
-
-class ArrayAccumSBESetWindowFieldsTest : public SBESetWindowFieldsTest {
-public:
-    void setUp() override {
-        SBESetWindowFieldsTest::setUp();
-        registerArrayAccumulatorsWindowFunction();
-    }
-};
-
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowNoRemoval) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowNoRemoval) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [5, 6]}"))};
@@ -395,7 +343,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowNoRemoval) {
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 3, 4, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowDoesNotAllowDuplicates) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowDoesNotAllowDuplicates) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [2, 3]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [2, 3]}"))};
@@ -408,7 +356,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowDoesNotAllowDuplicates) {
                                        << fromjson("{a: 3, b: [5, 6], result: [1, 2, 3]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowWithRemovalsAndDuplicates) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowWithRemovalsAndDuplicates) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [2, 3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [4, 5, 6]}"))};
@@ -422,7 +370,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowWithRemovalsAndDuplicates
                    << fromjson("{a: 3, b: [4, 5, 6], result: [2, 3, 4, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowIgnoresMissingFieldOnAddition) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowIgnoresMissingFieldOnAddition) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [5, 6]}"))};
@@ -435,7 +383,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowIgnoresMissingFieldOnAddi
                                        << fromjson("{a: 3, b: [5, 6], result: [1, 2, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowIgnoresMissingFieldWithRemoval) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowIgnoresMissingFieldWithRemoval) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [5, 6]}"))};
@@ -448,7 +396,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowIgnoresMissingFieldWithRe
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowSubfiedMissingFieldWithRemoval) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowSubfiedMissingFieldWithRemoval) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: {c: [1, 2, 3]}}")),
                                        BSON_ARRAY(fromjson("{a: 2}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: 1}")),
@@ -465,7 +413,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowSubfiedMissingFieldWithRe
                    << fromjson("{a: 5, b: {c: [7, 8, 9]}, result: [4, 5, 6, 7, 8, 9]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowSubfiedArrayMissingFieldWithRemoval) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowSubfiedArrayMissingFieldWithRemoval) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(fromjson("{a: 1, b: [{c: [1, 2, 3]}, {c: [4, 5, 6]}]}")),
         BSON_ARRAY(fromjson("{a: 2}")),
@@ -487,7 +435,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowSubfiedArrayMissingFieldW
 }
 
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowRespectsCollation) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowRespectsCollation) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [\"a\", \"b\"]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [\"a\", \"c\"]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [\"c\"]}"))};
@@ -502,7 +450,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowRespectsCollation) {
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowArrayOfArrays) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowArrayOfArrays) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [[1, 2, 3], [4, 5, 6]]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [[1, 2, 3]]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [[7, 8, 9], [4, 5, 6]]}"))};
@@ -515,7 +463,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowArrayOfArrays) {
                    << fromjson("{a: 2, b: [3, 4], result: [[1, 2, 3], [4, 5, 6]]}")
                    << fromjson("{a: 3, b: [5, 6], result: [[1, 2, 3], [7, 8, 9], [4, 5, 6]]}")));
 }
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowNegOneToOne) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowNegOneToOne) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -533,7 +481,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowNegOneToOne) {
                    << fromjson("{a: 3, b: [5, 6], result: [5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowZeroToZero) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowZeroToZero) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -552,7 +500,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowZeroToZero) {
 }
 
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowZeroToOne) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowZeroToOne) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -571,7 +519,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowZeroToOne) {
 }
 
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowCurrentToCurrent) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowCurrentToCurrent) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -589,7 +537,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowCurrentToCurrent) {
                    << fromjson("{a: 3, b: [5, 6], result: [5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowCurrentToUnbounded) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowCurrentToUnbounded) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -607,7 +555,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowCurrentToUnbounded) {
                    << fromjson("{a: 3, b: [5, 6], result: [5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowUnboundedToCurrent) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowUnboundedToCurrent) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -625,7 +573,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowUnboundedToCurrent) {
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 3, 4, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowUnboundedToUnbounded) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowUnboundedToUnbounded) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -643,7 +591,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowUnboundedToUnbounded) {
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 3, 4, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowDifferentTypes) {
+TEST_F(SBESetWindowFieldsTest, SetUnionWindowDifferentTypes) {
     // We want to test the memory accounting for different types, so we need a second document so we
     // remove values from the window.
     auto docs = std::vector<BSONArray>{
@@ -665,7 +613,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, SetUnionWindowDifferentTypes) {
             << fromjson("{a: 2, result: []}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowNoRemoval) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowNoRemoval) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [5, 6]}"))};
@@ -679,7 +627,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowNoRemoval) {
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 3, 4, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowAllowsDuplicates) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowAllowsDuplicates) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [2, 3]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [2, 3]}"))};
@@ -693,7 +641,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowAllowsDuplicates) {
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 2, 3, 2, 3]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowWithRemovalsAndDuplicates) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowWithRemovalsAndDuplicates) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 1, b: [2, 3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 1, b: [4, 5, 6]}"))};
@@ -707,7 +655,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowWithRemovalsAndDuplic
                    << fromjson("{a: 3, b: [5, 6], result: [2, 3, 4, 4, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowIgnoresMissingFieldOnAddition) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowIgnoresMissingFieldOnAddition) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2}")),
                                        BSON_ARRAY(fromjson("{a: 1, b: [5, 6]}"))};
@@ -720,7 +668,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowIgnoresMissingFieldOn
                                        << fromjson("{a: 3, b: [5, 6], result: [1, 2, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowIgnoresMissingFieldWithRemoval) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowIgnoresMissingFieldWithRemoval) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [5, 6]}"))};
@@ -734,7 +682,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowIgnoresMissingFieldWi
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowSubfiedMissingFieldWithRemoval) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowSubfiedMissingFieldWithRemoval) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: {c: [1, 2, 3]}}")),
                                        BSON_ARRAY(fromjson("{a: 2}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: 1}")),
@@ -751,7 +699,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowSubfiedMissingFieldWi
                    << fromjson("{a: 5, b: {c: [7, 8, 9]}, result: [4, 5, 6, 7, 8, 9]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowSubfiedArrayMissingFieldWithRemoval) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowSubfiedArrayMissingFieldWithRemoval) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(fromjson("{a: 1, b: [{c: [1, 2, 3]}, {c: [4, 5, 6]}]}")),
         BSON_ARRAY(fromjson("{a: 2}")),
@@ -772,7 +720,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowSubfiedArrayMissingFi
                         "6], [13, 14, 15], [7,8, 9], [10, 11, 12]]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowNotAffectedByCollation) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowNotAffectedByCollation) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [\"a\", \"b\"]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [\"a\", \"c\"]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [\"c\"]}"))};
@@ -788,7 +736,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowNotAffectedByCollatio
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowArrayOfArrays) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowArrayOfArrays) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [[1, 2, 3], [4, 5, 6]]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [[1, 2, 3]]}")),
                                        BSON_ARRAY(fromjson("{a: 3, b: [[7, 8, 9], [4, 5, 6]]}"))};
@@ -802,7 +750,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowArrayOfArrays) {
                    << fromjson("{a: 3, b: [5, 6], result: [[1, 2, 3], [7, 8, 9], [4, 5, 6]]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowNegOneToOne) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowNegOneToOne) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -820,7 +768,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowNegOneToOne) {
                    << fromjson("{a: 3, b: [5, 6], result: [5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowZeroToZero) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowZeroToZero) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -839,7 +787,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowZeroToZero) {
 }
 
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowZeroToOne) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowZeroToOne) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -858,7 +806,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowZeroToOne) {
 }
 
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowCurrentToCurrent) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowCurrentToCurrent) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -876,7 +824,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowCurrentToCurrent) {
                    << fromjson("{a: 3, b: [5, 6], result: [5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowCurrentToUnbounded) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowCurrentToUnbounded) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -894,7 +842,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowCurrentToUnbounded) {
                    << fromjson("{a: 3, b: [5, 6], result: [5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowUnboundedToCurrent) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowUnboundedToCurrent) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -912,7 +860,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowUnboundedToCurrent) {
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 3, 4, 5, 6, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowUnboundedToUnbounded) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowUnboundedToUnbounded) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: 1, b: [1, 2]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [3, 4]}")),
                                        BSON_ARRAY(fromjson("{a: 2, b: [5, 6]}")),
@@ -930,7 +878,7 @@ TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowUnboundedToUnbounded)
                    << fromjson("{a: 3, b: [5, 6], result: [1, 2, 3, 4, 5, 6, 5, 6]}")));
 }
 
-TEST_F(ArrayAccumSBESetWindowFieldsTest, ConcatArraysWindowDifferentTypes) {
+TEST_F(SBESetWindowFieldsTest, ConcatArraysWindowDifferentTypes) {
     // We want to test the memory accounting for different types, so we need a second document so we
     // remove values from the window.
     auto docs = std::vector<BSONArray>{

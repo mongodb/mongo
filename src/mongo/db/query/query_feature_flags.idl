@@ -169,7 +169,8 @@ feature_flags:
     featureFlagArrayAccumulators:
       description: "Feature flag to enable the $concatArrays and $setUnion accumulators."
       cpp_varname: gFeatureFlagArrayAccumulators
-      default: false
+      default: true
+      version: 8.1
       shouldBeFCVGated: true
 
     featureFlagQueryStatsCountDistinct:

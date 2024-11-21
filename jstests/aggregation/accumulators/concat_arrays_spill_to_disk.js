@@ -1,6 +1,6 @@
 /**
  * Tests that the $concatArrays accumulator does not allow spilling to disk.
- * @tags: [featureFlagArrayAccumulators, requires_fcv_81, requires_collstats]
+ * @tags: [requires_fcv_81, requires_collstats]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 const coll = db["concat_arrays_spill_to_disk"];

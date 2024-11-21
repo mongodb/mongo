@@ -1,6 +1,6 @@
 /**
  * Tests that $concatArrays under $bucketAuto preserves incoming document order.
- * @tags: [featureFlagArrayAccumulators, requires_fcv_81]
+ * @tags: [requires_fcv_81]
  */
 
 const coll = db[jsTestName()];

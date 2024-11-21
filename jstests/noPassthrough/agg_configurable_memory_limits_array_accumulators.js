@@ -1,6 +1,6 @@
 /**
  * Tests that $concatArrays and $setUnion accumulators respect configurable memory limits.
- * @tags: [featureFlagArrayAccumulators, requires_fcv_81]
+ * @tags: [requires_fcv_81]
  */
 
 const conn = MongoRunner.runMongod();

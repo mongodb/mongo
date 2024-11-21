@@ -1,6 +1,6 @@
 /**
  * Basic tests for the $setUnion accumulator.
- * @tags: [featureFlagArrayAccumulators, requires_fcv_81]
+ * @tags: [requires_fcv_81]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
