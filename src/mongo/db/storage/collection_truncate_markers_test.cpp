@@ -133,28 +133,17 @@ public:
         wuow.commit();
     }
 };
+
 class TestCollectionMarkersWithPartialExpiration final
     : public CollectionTruncateMarkersWithPartialExpiration {
 public:
-    TestCollectionMarkersWithPartialExpiration(int64_t leftoverRecordsCount,
-                                               int64_t leftoverRecordsBytes,
-                                               int64_t minBytesPerMarker)
+    TestCollectionMarkersWithPartialExpiration(int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
               {},
-              leftoverRecordsCount,
-              leftoverRecordsBytes,
-              minBytesPerMarker,
-              Microseconds(0),
-              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
-
-    TestCollectionMarkersWithPartialExpiration(std::deque<Marker> markers,
-                                               int64_t leftoverRecordsCount,
-                                               int64_t leftoverRecordsBytes,
-                                               int64_t minBytesPerMarker)
-        : CollectionTruncateMarkersWithPartialExpiration(
-              std::move(markers),
-              leftoverRecordsCount,
-              leftoverRecordsBytes,
+              RecordId{},
+              Date_t{},
+              0 /* leftoverRecordsCount */,
+              0 /* leftoverRecordsBytes */,
               minBytesPerMarker,
               Microseconds(0),
               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
@@ -179,25 +168,11 @@ private:
 
 class TestCollectionMarkers final : public CollectionTruncateMarkers {
 public:
-    TestCollectionMarkers(int64_t leftoverRecordsCount,
-                          int64_t leftoverRecordsBytes,
-                          int64_t minBytesPerMarker)
+    TestCollectionMarkers(int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
               {},
-              leftoverRecordsCount,
-              leftoverRecordsBytes,
-              minBytesPerMarker,
-              Microseconds(0),
-              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
-
-    TestCollectionMarkers(std::deque<Marker> markers,
-                          int64_t leftoverRecordsCount,
-                          int64_t leftoverRecordsBytes,
-                          int64_t minBytesPerMarker)
-        : CollectionTruncateMarkers(
-              std::move(markers),
-              leftoverRecordsCount,
-              leftoverRecordsBytes,
+              0 /* leftoverRecordsCount */,
+              0 /* leftoverRecordsBytes */,
               minBytesPerMarker,
               Microseconds(0),
               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
@@ -210,7 +185,7 @@ private:
 
 template <typename T>
 void normalTest(CollectionMarkersTest* fixture, std::string collectionName) {
-    auto testMarkers = std::make_shared<T>(0, 0, 0);
+    auto testMarkers = std::make_shared<T>(1);
 
     auto opCtx = fixture->getClient()->makeOperationContext();
 
@@ -239,7 +214,7 @@ TEST_F(CollectionMarkersTest, NormalUsage) {
 }
 
 TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
-    auto testMarkers = std::make_shared<TestCollectionMarkersWithPartialExpiration>(0, 0, 100);
+    auto testMarkers = std::make_shared<TestCollectionMarkersWithPartialExpiration>(100);
 
     auto opCtx = getClient()->makeOperationContext();
 
@@ -270,7 +245,7 @@ TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
 // Insert records into a collection and verify the number of markers that are created.
 template <typename T>
 void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionName) {
-    auto testMarkers = std::make_shared<T>(0, 0, 100);
+    auto testMarkers = std::make_shared<T>(100);
 
     auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
     {
@@ -340,7 +315,7 @@ TEST_F(CollectionMarkersTest, CreateNewMarker) {
 // records to not be in increasing order.
 template <typename T>
 void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionName) {
-    auto testMarkers = std::make_shared<T>(0, 0, 100);
+    auto testMarkers = std::make_shared<T>(100);
 
     auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
     {
@@ -388,6 +363,7 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
         ASSERT_EQ(0, testMarkers->currentBytes_forTest());
     }
 }
+
 TEST_F(CollectionMarkersTest, AscendingOrder) {
     ascendingOrderTest<TestCollectionMarkers>(this, "coll");
     ascendingOrderTest<TestCollectionMarkersWithPartialExpiration>(this, "partial_coll");
@@ -483,119 +459,6 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
 
         ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
         ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
-    }
-}
-
-// Tests that auto yielding with query plan iterators works
-TEST_F(CollectionMarkersTest, ScanningAutoYieldingWorks) {
-    // Manually set the yielding parameters to make the yield count computation simpler.
-    RAIIServerParameterControllerForTest queryYieldMs("internalQueryExecYieldPeriodMS",
-                                                      1'000 * 3'600);
-    RAIIServerParameterControllerForTest queryYieldDocsRead("internalQueryExecYieldIterations",
-                                                            1'000);
-
-    static constexpr auto kNumElements = 5001;
-    static constexpr auto kElementSize = 15;
-    static constexpr auto kMinBytes = (kElementSize * 2) - 1;
-
-    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
-    {
-        auto opCtx = getClient()->makeOperationContext();
-        ASSERT_OK(createCollection(opCtx.get(), collNs));
-        insertElements(opCtx.get(), collNs, kElementSize, kNumElements, Timestamp(1, 0));
-    }
-
-    {
-        auto opCtx = getClient()->makeOperationContext();
-
-        AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-
-        YieldableCollectionIterator iterator(opCtx.get(), &coll.getCollection());
-
-        auto result = CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx.get(), iterator, kMinBytes, [](const Record& record) {
-                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
-            });
-        ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-        ASSERT_GTE(result.timeTaken, Microseconds(0));
-        ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
-        ASSERT_EQ(result.leftoverRecordsCount, 1);
-        ASSERT_EQ(result.markers.size(), kNumElements / 2);
-        for (const auto& marker : result.markers) {
-            ASSERT_EQ(marker.bytes, kElementSize * 2);
-            ASSERT_EQ(marker.records, 2);
-        }
-
-        ASSERT_EQ(CurOp::get(opCtx.get())->numYields(),
-                  kNumElements / internalQueryExecYieldIterations.load());
-    }
-}
-
-// Tests that auto yielding with query plan iterators works
-TEST_F(CollectionMarkersTest, SamplingAutoYieldingWorks) {
-    // Manually set the yielding parameters to make the yield count computation simpler.
-    RAIIServerParameterControllerForTest queryYieldMs("internalQueryExecYieldPeriodMS",
-                                                      1'000 * 3'600);
-    RAIIServerParameterControllerForTest queryYieldDocsRead("internalQueryExecYieldIterations",
-                                                            1'000);
-
-    static constexpr auto kNumRounds = 5000;
-    static constexpr auto kElementSize = 15;
-    static constexpr auto kNumElements = kElementSize * kNumRounds;
-    static constexpr auto kNumElementsToSample =
-        kNumElements / 20;  // We only sample 5% of the collection.
-
-    int totalBytes = 0;
-    int totalRecords = 0;
-    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
-    {
-        auto opCtx = getClient()->makeOperationContext();
-        ASSERT_OK(createCollection(opCtx.get(), collNs));
-        // Add documents of various sizes
-        for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
-            insertElements(opCtx.get(), collNs, numBytes, kNumRounds, Timestamp(1, 0));
-            totalRecords += kNumRounds;
-            totalBytes += numBytes * kNumRounds;
-        }
-    }
-
-    ASSERT_EQ(totalRecords, kNumElements);
-
-    {
-        auto opCtx = getClient()->makeOperationContext();
-
-        AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-
-        static constexpr auto kNumMarkers = 300;
-        auto kMinBytesPerMarker = totalBytes / kNumMarkers;
-        auto kRecordsPerMarker = totalRecords / kNumMarkers;
-
-        YieldableCollectionIterator iterator(opCtx.get(), &coll.getCollection());
-
-        auto result = CollectionTruncateMarkers::createFromCollectionIterator(
-            opCtx.get(), iterator, kMinBytesPerMarker, [](const Record& record) {
-                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
-            });
-
-        ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
-        const auto& firstMarker = result.markers.front();
-        auto recordCount = firstMarker.records;
-        auto recordBytes = firstMarker.bytes;
-        ASSERT_EQ(result.leftoverRecordsBytes, totalBytes % kMinBytesPerMarker);
-        ASSERT_EQ(result.leftoverRecordsCount, totalRecords % kRecordsPerMarker);
-        ASSERT_GT(recordCount, 0);
-        ASSERT_GT(recordBytes, 0);
-        ASSERT_EQ(result.markers.size(), kNumMarkers);
-        for (const auto& marker : result.markers) {
-            ASSERT_EQ(marker.bytes, recordBytes);
-            ASSERT_EQ(marker.records, recordCount);
-        }
-
-        ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
-        ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
-
-        ASSERT_EQ(CurOp::get(opCtx.get())->numYields(),
-                  kNumElementsToSample / internalQueryExecYieldIterations.load());
     }
 }
 

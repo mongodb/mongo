@@ -44,18 +44,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -377,19 +372,16 @@ public:
      * Partial marker expiration depends on tracking the highest seen RecordId and wall time
      * across the lifetime of the 'CollectionTruncateMarkersWithPartialExpiration' class.
      *
-     * 'CollectionTruncateMarkersWithPartialExpiration' should always maintain the highest tracked
-     * RecordId and wall time are:
-     *  . Greater than or equal to the 'lastRecord' and 'wall' of the most recent marker
-     *  generated, if any.
-     *  .Initialized provided records have been tracked at any point in time.
+     * 'CollectionTruncateMarkersWithPartialExpiration' should always maintain a state where the
+     * 'highestRecordId' and 'highestWallTime' are:
+     *      . Greater than or equal to the 'lastRecord' and 'wall' of the most recent marker
+     *      generated, if any.
+     *      .Initialized provided records have been tracked at any point in time.
      *              * Records are tracked either by full markers, or a non-zero
      *                'leftoverRecordsCount' or 'leftoveRecordsBytes'.
-     *  . Strictly increasing over time.
+     *      . Strictly increasing over time.
      *
-     * In order to maintain the contract upon construction, future implementations must use the
-     * following constructor which accounts for 'highestRecordId' and 'highestWallTime'.
-     *
-     * TODO SERVER-96162: Remove the deprecated constructor and the comment referencing it.
+     * Callers are responsible for ensuring the state requirements are met upon construction.
      */
     CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
                                                    RecordId highestRecordId,
@@ -407,25 +399,6 @@ public:
                                     creationMethod),
           _highestRecordId(std::move(highestRecordId)),
           _highestWallTime(highestWallTime) {}
-
-    /**
-     * Deprecated: Upon construction, records may be accounted for by the 'markers' or non-zero
-     * 'leftoverRecordsCounts'/'leftoverRecordsBytes' despite uninitialized '_highestRecordId' and
-     * '_highestWallTime'. Until the highest record metrics are updated, partial marker expiration
-     * isn't possible.
-     */
-    CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
-                                                   int64_t leftoverRecordsCount,
-                                                   int64_t leftoverRecordsBytes,
-                                                   int64_t minBytesPerMarker,
-                                                   Microseconds totalTimeSpentBuilding,
-                                                   MarkersCreationMethod creationMethod)
-        : CollectionTruncateMarkers(std::move(markers),
-                                    leftoverRecordsCount,
-                                    leftoverRecordsBytes,
-                                    minBytesPerMarker,
-                                    totalTimeSpentBuilding,
-                                    creationMethod) {}
 
     // Creates a partially filled marker if necessary. The criteria used is whether there is data in
     // the partial marker and whether the implementation's '_hasPartialMarkerExpired' returns true.
@@ -515,54 +488,6 @@ private:
     RecordStore* _rs;
     std::unique_ptr<RecordCursor> _directionalCursor;
     std::unique_ptr<RecordCursor> _randomCursor;
-};
-
-/**
- * A collection iterator that can yield between calls to getNext()/getNextRandom()
- */
-class YieldableCollectionIterator : public CollectionTruncateMarkers::CollectionIterator {
-public:
-    YieldableCollectionIterator(OperationContext* opCtx, VariantCollectionPtrOrAcquisition coll)
-        : _collection(coll) {
-        reset(opCtx);
-    }
-
-    boost::optional<std::pair<RecordId, BSONObj>> getNext() final {
-        RecordId rId;
-        BSONObj doc;
-        if (_collScanExecutor->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
-            return boost::none;
-        }
-        return std::make_pair(std::move(rId), std::move(doc));
-    }
-
-    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final {
-        RecordId rId;
-        BSONObj doc;
-        if (_sampleExecutor->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
-            return boost::none;
-        }
-        return std::make_pair(std::move(rId), std::move(doc));
-    }
-
-    RecordStore* getRecordStore() const final {
-        return _collection.getCollectionPtr()->getRecordStore();
-    }
-
-    void reset(OperationContext* opCtx) final {
-        _collScanExecutor =
-            InternalPlanner::collectionScan(opCtx,
-                                            _collection,
-                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                            InternalPlanner::Direction::FORWARD);
-        _sampleExecutor = InternalPlanner::sampleCollection(
-            opCtx, _collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
-    }
-
-private:
-    VariantCollectionPtrOrAcquisition _collection;
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _collScanExecutor;
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _sampleExecutor;
 };
 
 }  // namespace mongo

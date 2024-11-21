@@ -37,6 +37,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
