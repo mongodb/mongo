@@ -36,6 +36,9 @@
 
 namespace mongo::query_tester {
 
+static constexpr auto kMinTestNum = size_t{0};
+static constexpr auto kMaxTestNum = std::numeric_limits<size_t>::max();
+
 /**
  * A class representing a test file. A test file can have a number of formats (subclassed below).
  * However, all are expected to maintain the same approach to denoting the beginning of an
@@ -50,9 +53,8 @@ namespace mongo::query_tester {
 
 class QueryFile {
 public:
-    QueryFile(std::filesystem::path filePath, std::pair<size_t, size_t> testsToRun = {-1, -1})
+    QueryFile(std::filesystem::path filePath)
         : _filePath(filePath),
-          _testsToRun(testsToRun),
           _expectedPath(std::filesystem::path{filePath}.replace_extension(".results")),
           _actualPath(std::filesystem::path{filePath}.replace_extension(".actual")),
           _failedQueryCount(0) {}
@@ -81,7 +83,7 @@ public:
                          const std::set<std::string>& prevFileCollections) const;
 
     void printFailedQueries(const std::vector<size_t>& failedTestNums) const;
-    bool readInEntireFile(ModeOption);
+    bool readInEntireFile(ModeOption, size_t = kMinTestNum, size_t = kMaxTestNum);
     void runTestFile(DBClientConnection*, ModeOption);
 
     /**
@@ -107,7 +109,6 @@ protected:
     std::vector<std::string> _collectionsNeeded;
     std::string _databaseNeeded;
     std::vector<Test> _tests;
-    std::pair<size_t, size_t> _testsToRun;
     size_t _testsRun;
     std::filesystem::path _expectedPath;
     std::filesystem::path _actualPath;

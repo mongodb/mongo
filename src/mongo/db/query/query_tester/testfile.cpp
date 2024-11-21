@@ -274,7 +274,9 @@ void QueryFile::printFailedQueries(const std::vector<size_t>& failedTestNums) co
     }
 }
 
-bool QueryFile::readInEntireFile(const ModeOption mode) {
+bool QueryFile::readInEntireFile(const ModeOption mode,
+                                 const size_t startRange,
+                                 const size_t endRange) {
     // Open read only.
     auto fs = std::fstream{_filePath, std::fstream::in};
     verifyFileStreamGood(fs, _filePath, "Failed to open file");
@@ -283,11 +285,16 @@ bool QueryFile::readInEntireFile(const ModeOption mode) {
     parseHeader(fs);
 
     // The rest of the file is tests.
-    for (auto testNum = 0; !fs.eof(); ++testNum) {
+    bool partialTestRun = false;
+    for (size_t testNum = 0; !fs.eof(); ++testNum) {
         try {
-            _tests.push_back(Test::parseTest(fs, mode, testNum));
-            _tests.back().setDB(_databaseNeeded);
-
+            auto test = Test::parseTest(fs, mode, testNum);
+            test.setDB(_databaseNeeded);
+            if (testNum >= startRange && testNum <= endRange) {
+                _tests.push_back(test);
+            } else {
+                partialTestRun = true;
+            }
         } catch (AssertionException& ex) {
             fs.close();
             ex.addContext(str::stream{} << "Failed to read test number " << _tests.size());
@@ -296,6 +303,20 @@ bool QueryFile::readInEntireFile(const ModeOption mode) {
     }
     // Close the file.
     fs.close();
+
+    // If we're not running all tests, print the expected results of the narrowed set of tests to a
+    // temporary results file.
+    if (mode == ModeOption::Compare && partialTestRun) {
+        const auto narrowedPath = std::filesystem::path{_expectedPath}.concat(".narrowed");
+        auto narrowedStream = std::fstream{narrowedPath, std::ios::out | std::ios::trunc};
+
+        auto testsWithResults = QueryFile{_expectedPath};
+        testsWithResults.readInEntireFile(ModeOption::Normalize, startRange, endRange);
+        testsWithResults.writeOutAndNumber(narrowedStream, WriteOutOptions::kResult);
+        narrowedStream.close();
+        _expectedPath = narrowedPath;
+    }
+
     return true;
 }
 
@@ -316,8 +337,7 @@ std::string QueryFile::serializeStateForDebug() const {
     for (const auto& coll : _collectionsNeeded) {
         ss << coll << " , ";
     }
-    ss << " NumTests: " << _tests.size() << " | "
-       << " Tests to run: " << _testsToRun.first << _testsToRun.second << " | ";
+    ss << " NumTests: " << _tests.size() << " | ";
     return ss.str();
 }
 

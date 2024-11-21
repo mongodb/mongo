@@ -338,16 +338,32 @@ void Test::writeToStream(std::fstream& fs, const WriteOutOptions resultOpt) cons
         fs << comment << std::endl;
     }
 
+    // If we don't have a normalized result, generate it from the
+    // expected result. This is used when writing narrowed results
+    // file.
+    auto writeOutResult = std::vector<std::string>{};
+    const auto& resultRef = [&]() {
+        if (_normalizedResult.empty()) {
+            for (auto&& bson : _expectedResult) {
+                writeOutResult.push_back(
+                    bson.jsonString(mongo::ExtendedRelaxedV2_0_0, false, false));
+            }
+            return writeOutResult;
+        } else {
+            return _normalizedResult;
+        }
+    }();
+
     // This helps guard against WriteOutOptions that might get added but not handled.
     switch (resultOpt) {
         case WriteOutOptions::kOnelineResult: {
             // Print out just the array.
-            fs << LineResult<std::string>{_normalizedResult};
+            fs << LineResult<std::string>{resultRef};
             break;
         }
         case WriteOutOptions::kResult: {
             // Print out each result in the result set on its own line.
-            fs << ArrayResult<std::string>{_normalizedResult};
+            fs << ArrayResult<std::string>{resultRef};
             break;
         }
         default: {

@@ -47,9 +47,7 @@
 namespace mongo::query_tester {
 namespace {
 struct TestSpec {
-    TestSpec(std::filesystem::path path,
-             size_t low = 0,
-             size_t high = std::numeric_limits<size_t>::max())
+    TestSpec(std::filesystem::path path, size_t low = kMinTestNum, size_t high = kMaxTestNum)
         : testPath(path), startTest(low), endTest(high){};
 
     // Validate that this test conforms to our expectations about filesystem things.
@@ -131,8 +129,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     auto failedQueryCount = size_t{0};
     auto totalTestsRun = size_t{0};
     for (const auto& [testPath, startRange, endRange] : testsToRun) {
-        auto currFile = QueryFile(testPath, {startRange, endRange});
-        currFile.readInEntireFile(mode);
+        auto currFile = query_tester::QueryFile(testPath);
+        currFile.readInEntireFile(mode, startRange, endRange);
         currFile.loadCollections(conn.get(), dropData, loadData, prevFileCollections);
         if (populateAndExit) {
             continue;
