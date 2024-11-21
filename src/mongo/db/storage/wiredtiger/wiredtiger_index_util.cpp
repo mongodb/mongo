@@ -163,9 +163,11 @@ bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
     return false;
 }
 
-void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
-                                            const std::string& uri,
-                                            IndexValidateResults& results) {
+void WiredTigerIndexUtil::validateStructure(
+    WiredTigerRecoveryUnit& ru,
+    const std::string& uri,
+    const boost::optional<std::string>& configurationOverride,
+    IndexValidateResults& results) {
     if (ru.getSessionCache()->isEphemeral()) {
         return;
     }
@@ -179,7 +181,8 @@ void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
         return;
     }
 
-    auto err = WiredTigerUtil::verifyTable(ru, uri, results.getErrorsUnsafe());
+    auto err =
+        WiredTigerUtil::verifyTable(ru, uri, configurationOverride, results.getErrorsUnsafe());
     if (err == EBUSY) {
         std::string msg = str::stream()
             << "Could not complete validation of " << uri << ". "

@@ -164,6 +164,28 @@ void logCollStats(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 
+boost::optional<std::string> getConfigOverrideOrThrow(const BSONElement& raw) {
+    if (!raw) {
+        return boost::none;
+    }
+    StringData chosenConfig = raw.valueStringDataSafe();
+    // Only a specific subset of valid configurations are allowlisted here. This is mostly to avoid
+    // having complex logic to parse/sanitize the user-chosen configuration string.
+    static const char* allowed[] = {
+        "",
+        "dump_address",
+        "dump_blocks",
+        "dump_layout",
+        "dump_pages",
+        "dump_tree_shape",
+    };
+    static const char** allowedEnd = allowed + std::size(allowed);
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Unrecognized configuration string " << chosenConfig,
+            std::find(allowed, allowedEnd, chosenConfig) != allowedEnd);
+    return {raw.str()};
+}
+
 }  // namespace
 
 /**
@@ -323,6 +345,13 @@ public:
                                     << " supported with any other options");
         }
 
+        const auto rawConfigOverride = cmdObj["wiredtigerVerifyConfigurationOverride"];
+        if (rawConfigOverride && !(fullValidate || enforceFastCount)) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Overriding the verify configuration is only supported with "
+                                       "full validation set.");
+        }
+
         // Background validation uses point-in-time catalog lookups. This requires an instance of
         // the collection at the checkpoint timestamp. Because timestamps aren't used in standalone
         // mode, this prevents the CollectionCatalog from being able to establish the correct
@@ -395,7 +424,8 @@ public:
             repairMode,
             logDiagnostics,
             getTestCommandsEnabled() ? (ValidationVersion)bsonTestValidationVersion
-                                     : currentValidationVersion);
+                                     : currentValidationVersion,
+            getConfigOverrideOrThrow(rawConfigOverride));
 
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
@@ -406,7 +436,9 @@ public:
                   "enforceFastCount"_attr = options.enforceFastCountRequested(),
                   "checkBSONConformance"_attr = options.isBSONConformanceValidation(),
                   "fixMultiKey"_attr = options.adjustMultikey(),
-                  "repair"_attr = options.fixErrors());
+                  "repair"_attr = options.fixErrors(),
+                  "wiredtigerVerifyConfigurationOverride"_attr =
+                      options.verifyConfigurationOverride());
         }
 
         // Only one validation per collection can be in progress, the rest wait.

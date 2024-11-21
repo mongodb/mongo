@@ -83,7 +83,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -110,7 +109,6 @@ AtomicWord<bool> _validationIsPausedForTest{false};
  * May close or invalidate open cursors.
  */
 void _validateIndexesInternalStructure(OperationContext* opCtx,
-                                       bool full,
                                        ValidateState* validateState,
                                        ValidateResults* results) {
     // Need to use the IndexCatalog here because the 'validateState->indexes' object hasn't been
@@ -133,7 +131,7 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
                       "index"_attr = descriptor->indexName(),
                       logAttrs(validateState->nss()));
 
-        auto indexResults = iam->validate(opCtx, full);
+        auto indexResults = iam->validate(opCtx, *validateState);
 
         results->getIndexValidateResult(descriptor->indexName()) = std::move(indexResults);
     }
@@ -474,15 +472,6 @@ void _validateCatalogEntry(OperationContext* opCtx,
 
 }  // namespace
 
-ValidationOptions::ValidationOptions(ValidateMode validateMode,
-                                     RepairMode repairMode,
-                                     bool logDiagnostics,
-                                     ValidationVersion validationVersion)
-    : _validateMode(validateMode),
-      _repairMode(repairMode),
-      _logDiagnostics(logDiagnostics),
-      _validationVersion(validationVersion) {}
-
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidationOptions options,
@@ -559,12 +548,11 @@ Status validate(OperationContext* opCtx,
         // Record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
         validateState.getCollection()->getRecordStore()->validate(
-            *shard_role_details::getRecoveryUnit(opCtx), validateState.isFullValidation(), results);
+            *shard_role_details::getRecoveryUnit(opCtx), validateState, results);
 
         // For full index validation, we validate the internal structure of each index and save
         // the number of keys in the index to compare against _validateIndexes()'s count results.
-        _validateIndexesInternalStructure(
-            opCtx, validateState.isFullIndexValidation(), &validateState, results);
+        _validateIndexesInternalStructure(opCtx, &validateState, results);
 
         if (!results->isValid()) {
             _reportInvalidResults(opCtx, &validateState, results);

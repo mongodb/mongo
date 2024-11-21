@@ -237,6 +237,7 @@ public:
      */
     static int verifyTable(WiredTigerRecoveryUnit&,
                            const std::string& uri,
+                           const boost::optional<std::string>& configurationOverride,
                            StringSet* errors = nullptr);
 
     /**

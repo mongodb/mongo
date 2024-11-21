@@ -20,16 +20,30 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "validate_options",
+    srcs = [
+        "validate_options.cpp",
+    ],
+    hdrs = [
+        "validate_options.h",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
     name = "validate_state",
     srcs = [
         "validate_state.cpp",
     ],
     hdrs = [
-        "collection_validation.h",
         "validate_state.h",
     ],
     deps = [
         ":validate_idl",
+        ":validate_options",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
@@ -63,9 +77,10 @@ mongo_cc_library(
     hdrs = [
         "collection_validation.h",
         "validate_results.h",
+        ":validate_options",
     ],
     deps = [
-        "validate_state",
+        ":validate_state",
         "//src/mongo/bson/column",
         "//src/mongo/db:multi_key_path_tracker",
         "//src/mongo/db:record_id_helpers",
@@ -82,7 +97,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:record_store_base",
-        "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries/bucket_catalog",

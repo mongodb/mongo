@@ -168,7 +168,9 @@ public:
         return !_isEphemeral;
     }
 
-    void validate(RecoveryUnit&, bool full, ValidateResults* results) override;
+    void validate(RecoveryUnit& ru,
+                  const CollectionValidation::ValidationOptions& options,
+                  ValidateResults* results) override;
 
     void appendNumericCustomStats(RecoveryUnit& ru,
                                   BSONObjBuilder* result,
@@ -371,7 +373,9 @@ public:
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                     bool forward = true) const override;
 
-    void validate(RecoveryUnit&, bool full, ValidateResults*) override;
+    void validate(RecoveryUnit&,
+                  const CollectionValidation::ValidationOptions&,
+                  ValidateResults*) override;
 
     RecordStore::Capped* capped() override;
 

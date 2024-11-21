@@ -45,7 +45,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/catalog/validate/collection_validation.h"
+#include "mongo/db/catalog/validate/validate_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"

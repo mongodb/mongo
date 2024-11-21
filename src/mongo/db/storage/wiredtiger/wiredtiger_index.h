@@ -87,6 +87,10 @@ class IndexCatalogEntry;
 class IndexDescriptor;
 struct WiredTigerItem;
 
+namespace CollectionValidation {
+class ValidationOptions;
+}
+
 class WiredTigerIndex : public SortedDataInterface {
 public:
     /**
@@ -158,7 +162,9 @@ public:
 
     boost::optional<RecordId> findLoc(OperationContext* opCtx, StringData keyString) const override;
 
-    IndexValidateResults validate(OperationContext* opCtx, bool full) const override;
+    IndexValidateResults validate(
+        OperationContext* opCtx,
+        const CollectionValidation::ValidationOptions& options) const override;
 
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* output,

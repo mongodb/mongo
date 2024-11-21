@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_gen.h"
+#include "mongo/db/catalog/validate/validate_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -353,7 +354,8 @@ boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx, Stri
     return cursor->seekExact(key);
 }
 
-IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool full) const {
+IndexValidateResults WiredTigerIndex::validate(
+    OperationContext* opCtx, const CollectionValidation::ValidationOptions& options) const {
     IndexValidateResults results;
     WiredTigerUtil::validateTableLogging(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
@@ -362,12 +364,16 @@ IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool ful
         StringData{_indexName},
         results);
 
-    if (!full) {
+    if (!options.isFullIndexValidation()) {
+        invariant(!options.verifyConfigurationOverride().has_value());
         return results;
     }
 
     WiredTigerIndexUtil::validateStructure(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), _uri, results);
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        options.verifyConfigurationOverride(),
+        results);
 
     return results;
 }

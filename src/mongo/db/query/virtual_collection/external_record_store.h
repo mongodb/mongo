@@ -195,7 +195,9 @@ public:
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
-    void validate(RecoveryUnit&, bool full, ValidateResults*) final {
+    void validate(RecoveryUnit&,
+                  const CollectionValidation::ValidationOptions&,
+                  ValidateResults*) final {
         unimplementedTasserted();
     }
 

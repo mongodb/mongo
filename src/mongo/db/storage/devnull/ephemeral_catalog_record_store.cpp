@@ -564,7 +564,9 @@ StatusWith<int64_t> EphemeralForTestRecordStore::compact(OperationContext*, cons
     return Status::OK();
 }
 
-void EphemeralForTestRecordStore::validate(RecoveryUnit&, bool full, ValidateResults*) {}
+void EphemeralForTestRecordStore::validate(RecoveryUnit&,
+                                           const CollectionValidation::ValidationOptions&,
+                                           ValidateResults*) {}
 
 int64_t EphemeralForTestRecordStore::storageSize(RecoveryUnit&,
                                                  BSONObjBuilder* extraInfo,

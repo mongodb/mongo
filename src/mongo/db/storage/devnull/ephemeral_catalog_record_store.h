@@ -132,7 +132,9 @@ public:
 
     StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) override;
 
-    void validate(RecoveryUnit&, bool full, ValidateResults*) override;
+    void validate(RecoveryUnit&,
+                  const CollectionValidation::ValidationOptions&,
+                  ValidateResults*) override;
 
     void appendNumericCustomStats(RecoveryUnit& ru,
                                   BSONObjBuilder* result,

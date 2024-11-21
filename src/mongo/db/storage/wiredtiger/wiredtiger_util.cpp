@@ -744,6 +744,7 @@ int WiredTigerUtil::ErrorAccumulator::onError(WT_EVENT_HANDLER* handler,
 
 int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
                                 const std::string& uri,
+                                const boost::optional<std::string>& configurationOverride,
                                 StringSet* errors) {
     ErrorAccumulator eventHandler(errors);
 
@@ -767,8 +768,10 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
 
     ON_BLOCK_EXIT([&] { session->close(session, ""); });
 
+    const char* config =
+        configurationOverride.has_value() ? configurationOverride->c_str() : nullptr;
     // Do the verify. Weird parens prevent treating "verify" as a macro.
-    return (session->verify)(session, uri.c_str(), nullptr);
+    return (session->verify)(session, uri.c_str(), config);
 }
 
 void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,

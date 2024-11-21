@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,42 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/base/status.h"
 #include "mongo/db/catalog/validate/validate_options.h"
 
-namespace mongo {
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/testing_proctor.h"
 
-class NamespaceString;
-class OperationContext;
-class Collection;
-class CollectionPtr;
-class BSONObjBuilder;
-class Status;
-class ValidateResults;
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace CollectionValidation {
+namespace mongo::CollectionValidation {
 
-/**
- * Expects the caller to hold no locks.
- *
- * @return OK if the validate run successfully
- *         OK will be returned even if corruption is found
- *         details will be in 'results'.
- */
-Status validate(OperationContext* opCtx,
-                const NamespaceString& nss,
-                ValidationOptions options,
-                ValidateResults* results);
+namespace {
 
-/**
- * Checks whether a failpoint has been hit in the above validate() code..
- */
-bool getIsValidationPausedForTest();
+bool canEnforceTimeseriesAlwaysCompressed() {
+    // Test-only check to ensure time-series buckets are always compressed.
+    if (TestingProctor::instance().isEnabled() &&
+        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return true;
+    } else {
+        LOGV2_WARNING(7735102, "Not enforcing that time-series buckets are always compressed");
+        return false;
+    }
+}
 
-}  // namespace CollectionValidation
-}  // namespace mongo
+}  // namespace
+
+ValidationOptions::ValidationOptions(ValidateMode validateMode,
+                                     RepairMode repairMode,
+                                     bool logDiagnostics,
+                                     ValidationVersion validationVersion,
+                                     boost::optional<std::string> verifyConfigurationOverride)
+    : _validateMode(validateMode),
+      _repairMode(repairMode),
+      _logDiagnostics(logDiagnostics),
+      _validationVersion(validationVersion),
+      _verifyConfigurationOverride(std::move(verifyConfigurationOverride)) {}
+
+}  // namespace mongo::CollectionValidation

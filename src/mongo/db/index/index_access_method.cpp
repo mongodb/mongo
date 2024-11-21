@@ -577,9 +577,9 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
     return RecordId();
 }
 
-IndexValidateResults SortedDataIndexAccessMethod::validate(OperationContext* opCtx,
-                                                           bool full) const {
-    return _newInterface->validate(opCtx, full);
+IndexValidateResults SortedDataIndexAccessMethod::validate(
+    OperationContext* opCtx, const CollectionValidation::ValidationOptions& options) const {
+    return _newInterface->validate(opCtx, options);
 }
 
 int64_t SortedDataIndexAccessMethod::numKeys(OperationContext* opCtx) const {

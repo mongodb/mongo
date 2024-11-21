@@ -62,6 +62,7 @@ public:
 
     static void validateStructure(WiredTigerRecoveryUnit&,
                                   const std::string& uri,
+                                  const boost::optional<std::string>& configurationOverride,
                                   IndexValidateResults& results);
 };
 
