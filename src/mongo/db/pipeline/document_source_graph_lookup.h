@@ -324,7 +324,7 @@ private:
     // The aggregation pipeline to perform against the '_from' namespace.
     std::vector<BSONObj> _fromPipeline;
 
-    size_t _maxMemoryUsageBytes = 100 * 1024 * 1024;
+    size_t _maxMemoryUsageBytes;
 
     // Track memory usage to ensure we don't exceed '_maxMemoryUsageBytes'.
     size_t _visitedUsageBytes = 0;

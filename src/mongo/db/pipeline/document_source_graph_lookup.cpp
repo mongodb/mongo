@@ -62,6 +62,7 @@
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
@@ -143,11 +144,26 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::doGetNext() {
 
     performSearch();
 
+    const size_t maxOutputSize =
+        static_cast<size_t>(internalGraphLookupStageIntermediateDocumentMaxSizeBytes.load());
+    size_t totalSize = sizeof(Value) * _visited.size();
+
+    const auto& uassertTotalSize = [&]() {
+        uassert(8442700,
+                str::stream() << "Total size of the output document exceeds " << maxOutputSize
+                              << " bytes. Consider using $unwind to split the output.",
+                totalSize <= maxOutputSize);
+    };
+
+    uassertTotalSize();
     std::vector<Value> results;
+    results.reserve(_visited.size());
     while (!_visited.empty()) {
         // Remove elements one at a time to avoid consuming more memory.
         auto it = _visited.begin();
-        results.push_back(Value(it->second));
+        totalSize += it->second.getApproximateSize();
+        uassertTotalSize();
+        results.emplace_back(std::move(it->second));
         _visited.erase(it);
     }
 
@@ -700,6 +716,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _additionalFilter(additionalFilter),
       _depthField(depthField),
       _maxDepth(maxDepth),
+      _maxMemoryUsageBytes(internalDocumentSourceGraphLookupMaxMemoryBytes.load()),
       _frontier(pExpCtx->getValueComparator().makeFlatUnorderedValueSet()),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<Document>()),
       _cache(pExpCtx->getValueComparator()),
@@ -737,6 +754,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
           original._fromExpCtx->copyWith(original.pExpCtx->getResolvedNamespace(_from).ns,
                                          original.pExpCtx->getResolvedNamespace(_from).uuid)),
       _fromPipeline(original._fromPipeline),
+      _maxMemoryUsageBytes(internalDocumentSourceGraphLookupMaxMemoryBytes.load()),
       _frontier(pExpCtx->getValueComparator().makeFlatUnorderedValueSet()),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<Document>()),
       _cache(pExpCtx->getValueComparator()),

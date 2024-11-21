@@ -533,7 +533,31 @@ server_parameters:
     default:
       expr: 100 * 1024 * 1024
     validator:
-      gte: { expr: BSONObjMaxInternalSize}
+      gte: { expr: BSONObjMaxInternalSize }
+    redact: false
+
+  internalGraphLookupStageIntermediateDocumentMaxSizeBytes:
+    description: "Maximum size of the result set that we cache from the foreign collection during a
+    $graphLookup."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalGraphLookupStageIntermediateDocumentMaxSizeBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+      gte: { expr: BSONObjMaxInternalSize }
+    redact: false
+
+  internalDocumentSourceGraphLookupMaxMemoryBytes:
+    description: "Maximum size of the data that the $graphLookup aggregation stage will cache
+    in-memory before failing."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalDocumentSourceGraphLookupMaxMemoryBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+      gt: 0
     redact: false
 
   internalDocumentSourceGroupMaxMemoryBytes:
@@ -678,7 +702,7 @@ server_parameters:
         gt: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
-  
+
   internalQueryMaxSetUnionBytes:
     description: "Limits the vector of values pushed into a single array while grouping with the
     $setUnion accumulator."
@@ -691,7 +715,7 @@ server_parameters:
         gt: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
-  
+
   internalQueryMaxPercentileAccumulatorBytes:
     description: "The maximum amount of memory that can be used by an individual $percentile accumulator."
     set_at: [ startup, runtime ]
@@ -1383,13 +1407,13 @@ server_parameters:
     validator:
       gte: 0
     redact: false
-  
+
   internalQuerySpillingMinAvailableDiskSpaceBytes:
     description: "Minimum disk space that should be available before spilling"
     set_at: [startup, runtime]
     cpp_vartype: AtomicWord<long long>
     cpp_varname: internalQuerySpillingMinAvailableDiskSpaceBytes
-    default: 
+    default:
       expr: 500 * 1024 * 1024 # 500 MB
     validator:
       gte: 0
