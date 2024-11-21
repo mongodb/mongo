@@ -668,7 +668,26 @@ std::pair<TypeTags, Value> TsBlock::tryMin() const {
     } else if (canUseControlValue(_controlMin.first)) {
         return _controlMin;
     }
+    return std::pair{TypeTags::Nothing, Value{0u}};
+}
 
+std::pair<TypeTags, Value> TsBlock::tryMax() const {
+    auto isControlFieldExact = [&]() {
+        // For dates before 1970, the control.max time field is rounded rather than being a value
+        // in the bucket. We can't use it as a reliable max if it's before or equal to the Unix
+        // epoch.
+        // TODO SERVER-94614 use BSONColumn helpers from SERVER-90956 to lazily calculate min/max.
+        if (_isTimeField) {
+            tassert(9387400,
+                    "Expected time field in a time-series collection to always contain a date",
+                    _controlMax.first == TypeTags::Date);
+            return value::bitcastTo<int64_t>(_controlMax.second) > 0;
+        }
+        return true;
+    };
+    if (canUseControlValue(_controlMax.first) && isControlFieldExact()) {
+        return _controlMax;
+    }
     return std::pair{TypeTags::Nothing, Value{0u}};
 }
 

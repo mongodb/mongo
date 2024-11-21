@@ -41,6 +41,7 @@ selector:
     - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
     - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
     - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js # Some TS rewrites cannot be done on mongos.
     # The following tests fail because they count indexes. These counts do not take into account the
     # additional hashed shard key indexes that are automatically added by this passthrough.
     - jstests/core/**/apitest_dbcollection.js

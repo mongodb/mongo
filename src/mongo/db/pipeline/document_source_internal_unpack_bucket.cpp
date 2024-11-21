@@ -566,6 +566,14 @@ std::unique_ptr<AccumulationExpression> rewriteMinMaxGroupAccm(
             }
             os << timeseries::kControlMinFieldNamePrefix;
         } else if (op == "$max") {
+            // The control.max.time field is not a true max if there's extended range data. So we
+            // can only perform this rewrite conditionally.
+            // If we are on mongos, the extended range flag may not be accurate. If we are on
+            // mongod, the flag is accurate and we can perform the rewrite if there's no extended
+            // range data.
+            if (pExpCtx->getInRouter() || bucketSpec.usesExtendedRange()) {
+                return {};
+            }
             os << timeseries::kControlMaxFieldNamePrefix;
         } else {
             MONGO_UNREACHABLE;
