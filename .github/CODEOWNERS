@@ -183,8 +183,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/server_status/OWNERS.yml
 /jstests/concurrency/fsm_workloads/server_status/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/sharded_partitioned/OWNERS.yml
+/jstests/concurrency/fsm_workloads/sharded_partitioned/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/timeseries/OWNERS.yml
 /jstests/concurrency/fsm_workloads/timeseries/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/txns/OWNERS.yml
+/jstests/concurrency/fsm_workloads/txns/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/txns/internal_transactions/OWNERS.yml
 /jstests/concurrency/fsm_workloads/txns/internal_transactions/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -318,6 +324,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/write/insert/OWNERS.yml
 /jstests/core/write/insert/**/* @10gen/server-storage-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core_sharding/OWNERS.yml
+/jstests/core_sharding/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core_standalone/OWNERS.yml
 /jstests/core_standalone/**/* @10gen/server-replication @svc-auto-approve-bot
 
@@ -357,6 +366,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/query/**/query_settings*.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/query/**/sbe*.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/query/**/wildcard_index_helpers.js @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/libs/txns/OWNERS.yml
+/jstests/libs/txns/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libunwind/OWNERS.yml
 /jstests/libunwind/**/* @10gen/server-programmability @svc-auto-approve-bot
@@ -524,6 +536,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/ttl/**/* @10gen/server-storage-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/txns_retryable_writes_sessions/OWNERS.yml
+/jstests/noPassthrough/txns_retryable_writes_sessions/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/noPassthrough/txns_retryable_writes_sessions/**/skip_write_conflict_retries_failpoint.js @10gen/server-storage-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/txns_too_large_for_cache/OWNERS.yml
