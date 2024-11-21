@@ -145,12 +145,7 @@ feature_flags:
     default: true
     version: 8.0
     shouldBeFCVGated: true
-  featureFlagReplicaSetEndpoint:
-    description: When enabled, allows users to connect to a single-shard cluster with no dedicated config
-                 server using a replica set connection string.
-    cpp_varname: feature_flags::gFeatureFlagReplicaSetEndpoint
-    default: false
-    shouldBeFCVGated: true
+  # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
   featureFlag80CollectionCreationPath:
     description: "Feature flag protecting all codepaths that rely on the 8.0 way of collection creation in a
                   sharded cluster. Namely, no implicit creations by the shards and no usage of the
@@ -158,6 +153,12 @@ feature_flags:
     cpp_varname: feature_flags::g80CollectionCreationPath
     default: true
     version: 8.0
+    shouldBeFCVGated: true
+  featureFlagReplicaSetEndpoint:
+    description: When enabled, allows users to connect to a single-shard cluster with no dedicated config
+                 server using a replica set connection string.
+    cpp_varname: feature_flags::gFeatureFlagReplicaSetEndpoint
+    default: false
     shouldBeFCVGated: true
   featureFlagFailOnDirectShardOperations:
     description: "Feature flag for erroring when a direct shard operation is detected."

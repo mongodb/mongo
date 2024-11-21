@@ -431,7 +431,7 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
                                                           boost::optional<ShardId> dataShard) {
     cluster::createDatabase(opCtx, dbName);
 
-    // TODO (SERVER-85437): Remove the FCV check and keep only the 'else' branch
+    // TODO (SERVER-77915): Remove the FCV check and keep only the 'else' branch
     if (!feature_flags::g80CollectionCreationPath.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
