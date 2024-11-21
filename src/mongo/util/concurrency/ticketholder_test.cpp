@@ -573,9 +573,9 @@ TEST_F(TicketHolderTest, ReleaseToPoolWakesWaiters) {
         Future<Ticket> ticketFuture =
             spawn([holder = holder.get(), opCtx = admission->opCtx.get(), admCtx = admCtx]() {
                 Timer t;
-                // TODO(SERVER-89297): TicketHolder currently does timed waits in the 500ms
+                // TODO(SERVER-96332): TicketHolder currently does timed waits in the 500ms
                 // range, which prevents deadlock with the bug this test is meant to test. Remove
-                // this assertion when we switch to the NotifyableParkingLot. Choose a value of 400
+                // this assertion when we remove the timed waits. Choose a value of 400
                 // because the timed waiters introduce jitter for each wait using a base value of
                 // 500ms.
                 auto ticket = holder->waitForTicket(opCtx, admCtx);
