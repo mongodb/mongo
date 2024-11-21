@@ -469,6 +469,38 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "async_timer_mock",
+    srcs = [
+        "async_timer_mock.cpp",
+    ],
+    hdrs = [
+        "async_timer_interface.h",
+        "async_timer_mock.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/base:system_error",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_test_env",
+    srcs = [
+        "network_test_env.cpp",
+    ],
+    hdrs = [
+        "network_test_env.h",
+    ],
+    deps = [
+        ":network_interface_mock",
+        ":task_executor_interface",
+        "//src/mongo/db:commands",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
     name = "task_executor_test_fixture",
     srcs = [
         "task_executor_test_common.cpp",

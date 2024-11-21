@@ -60,3 +60,15 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "watchdog_mock",
+    srcs = [
+        "watchdog_mock.cpp",
+    ],
+    hdrs = ["watchdog_mock.h"],
+    deps = [
+        ":watchdog",
+        "//src/mongo/db:service_context",
+    ],
+)

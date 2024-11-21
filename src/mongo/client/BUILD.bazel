@@ -522,14 +522,57 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "remote_command_targeter_mock",
+    srcs = [
+        "remote_command_targeter_factory_mock.cpp",
+        "remote_command_targeter_mock.cpp",
+    ],
+    hdrs = [
+        "remote_command_targeter.h",
+        "remote_command_targeter_factory.h",
+        "remote_command_targeter_factory_mock.h",
+        "remote_command_targeter_mock.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "replica_set_monitor_test_helper",
+    srcs = [
+        "streamable_replica_set_monitor_for_testing.cpp",
+    ],
+    hdrs = [
+        "streamable_replica_set_monitor_for_testing.h",
+    ],
+    deps = [
+        ":replica_set_monitor_protocol_test_util",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client/sdam:sdam_test_util",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
     name = "replica_set_monitor_protocol_test_util",
     srcs = [
         "replica_set_monitor_protocol_test_util.cpp",
+    ],
+    hdrs = [
         "replica_set_monitor_protocol_test_util.h",
     ],
     deps = [
-        ":clientdriver_network",
+        "clientdriver_network",
     ],
+)
+
+mongo_cc_library(
+    name = "dbclient_mockcursor",
+    srcs = ["dbclient_mockcursor.cpp"],
+    hdrs = ["dbclient_mockcursor.h"],
+    deps = ["clientdriver_minimal"],
 )
 
 # TODO(SERVER-96852): Remove cycle created by moving //src/mongo/client:connection_string.h to //src/mongo/client:connection_string

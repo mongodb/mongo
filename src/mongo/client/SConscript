@@ -22,30 +22,6 @@ clientDriverEnv.InjectThirdParty("asio")
 if shouldBuildGRPC(env):
     clientDriverEnv.InjectThirdParty(libraries=["grpc"])
 
-env.Library(
-    target="remote_command_targeter_mock",
-    source=[
-        "remote_command_targeter_mock.cpp",
-        "remote_command_targeter_factory_mock.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
-env.Library(
-    target="replica_set_monitor_test_helper",
-    source=[
-        "streamable_replica_set_monitor_for_testing.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/client/sdam/sdam_test_util",
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
 if wiredtiger:
     env.CppUnitTest(
         target="client_test",
@@ -184,10 +160,4 @@ env.CppIntegrationTest(
         "$BUILD_DIR/mongo/util/version_impl",
         "clientdriver_network",
     ],
-)
-
-env.Library(
-    target="dbclient_mockcursor",
-    source=["dbclient_mockcursor.cpp"],
-    LIBDEPS_PRIVATE=["clientdriver_minimal"],
 )

@@ -279,6 +279,18 @@ mongo_cc_library(
     ],
 )
 
+# This library will initialize an egress transport layer in a mongo initializer
+# for C++ tests that require networking.
+mongo_cc_library(
+    name = "transport_layer_egress_init",
+    srcs = [
+        "transport_layer_egress_init.cpp",
+    ],
+    deps = [
+        ":transport_layer_manager",
+    ],
+)
+
 # TODO(SERVER-96852): Remove cycle created by moving //src/mongo/transport:session.h to //src/mongo/transport:transport_layer_common
 filegroup(
     name = "session_hdrs",

@@ -26,18 +26,6 @@ tlEnv.InjectThirdParty(libraries=["asio"])
 if shouldBuildGRPC(tlEnv):
     tlEnv.InjectThirdParty(libraries=["grpc"])
 
-# This library will initialize an egress transport layer in a mongo initializer
-# for C++ tests that require networking.
-env.Library(
-    target="transport_layer_egress_init",
-    source=[
-        "transport_layer_egress_init.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "transport_layer_manager",
-    ],
-)
-
 tlEnv.CppUnitTest(
     target="transport_test",
     source=[

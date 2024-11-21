@@ -60,18 +60,36 @@ mongo_cc_library(
     name = "sdam_test_util",
     srcs = [
         "mock_topology_manager.cpp",
+        "server_description_builder.cpp",
+        "topology_description_builder.cpp",
+        "topology_listener_mock.cpp",
+    ],
+    hdrs = [
         "mock_topology_manager.h",
         "sdam_test_base.h",
-        "server_description_builder.cpp",
         "server_description_builder.h",
-        "topology_description_builder.cpp",
         "topology_description_builder.h",
-        "topology_listener_mock.cpp",
         "topology_listener_mock.h",
     ],
     deps = [
         ":sdam",
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "json_test",
+    srcs = [
+        "json_test_arg_parser.cpp",
+        ":json_test_runner_cli_options_gen",
+    ],
+    hdrs = [
+        "json_test_arg_parser.h",
+    ],
+    deps = [
+        ":sdam",
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
     ],
 )
 

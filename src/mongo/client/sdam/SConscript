@@ -35,19 +35,6 @@ server_selection_json_test = env.Program(
     ],
 )[0]
 
-env.Library(
-    target="json_test",
-    source=[
-        "json_test_arg_parser.cpp",
-        "json_test_runner_cli_options_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "sdam",
-    ],
-)
-
 env.CppUnitTest(
     target="sdam_test",
     source=[],

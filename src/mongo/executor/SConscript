@@ -5,30 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="async_timer_mock",
-    source=[
-        "async_timer_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/base/system_error",
-    ],
-)
-
-env.Library(
-    target="network_test_env",
-    source=[
-        "network_test_env.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "network_interface_mock",
-        "task_executor_interface",
-    ],
-)
-
-env.Library(
     target="network_interface_fixture",
     source=[
         "network_interface_integration_fixture.cpp",
