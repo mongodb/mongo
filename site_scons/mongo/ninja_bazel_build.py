@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
 parser = argparse.ArgumentParser(description="Ninja Bazel builder.")
 
@@ -129,16 +130,26 @@ if ninja_build_info.get("USE_NATIVE_TOOLCHAIN"):
     bazel_env["CC"] = ninja_build_info.get("CC")
     bazel_env["CXX"] = ninja_build_info.get("CXX")
     bazel_env["USE_NATIVE_TOOLCHAIN"] = "1"
-sys.stderr.write(
-    f"Running bazel command:\n{' '.join(ninja_build_info['bazel_cmd'] + extra_args)} [{len(targets_to_build)} targets...]\n"
-)
-bazel_proc = subprocess.run(
-    ninja_build_info["bazel_cmd"] + extra_args + targets_to_build, env=bazel_env
-)
+
+with tempfile.NamedTemporaryFile(mode="w+", delete=False) as tf:
+    tf_name = tf.name
+    tpf = f"--target_pattern_file={tf_name}"
+    extra_args += [tpf]
+    bazel_cmd = " ".join(ninja_build_info["bazel_cmd"] + extra_args)
+    sys.stderr.write(f"Running bazel command:\n{bazel_cmd} [{len(targets_to_build)} targets...]\n")
+    tf.write("\n".join(targets_to_build))
+    tf.close()
+    bazel_proc = subprocess.run(
+        ninja_build_info["bazel_cmd"] + extra_args,
+        env=bazel_env,
+    )
+
 if bazel_proc.returncode != 0:
     print("Command that failed:")
-    print(" ".join(ninja_build_info["bazel_cmd"] + extra_args + targets_to_build))
+    print(bazel_cmd)
     sys.exit(1)
+else:
+    os.remove(tf_name)
 if (
     "compiledb" in ninja_command_line_targets
     or "compile_commands.json" in ninja_command_line_targets
