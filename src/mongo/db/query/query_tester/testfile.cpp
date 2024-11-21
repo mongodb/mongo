@@ -36,6 +36,7 @@
 #include "command_helpers.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/util/jparse_util.h"
+#include "mongo/util/shell_exec.h"
 
 namespace mongo::query_tester {
 namespace {
@@ -258,7 +259,36 @@ void QueryFile::parseHeader(std::fstream& fs) {
             lineFromFile.empty());
 }
 
-void QueryFile::printFailedQueries(const std::vector<size_t>& failedTestNums) const {
+void QueryFile::printAndExtractFailedQueries(const std::vector<size_t>& failedQueryIds) const {
+    const auto failPath = std::filesystem::path{_filePath}.replace_extension(".fail");
+    auto fs = std::fstream{failPath, std::ios::out | std::ios::trunc};
+    writeOutHeader(fs);
+
+    // Print and write the failed queries to a temp file for feature processing.
+    printFailedQueriesHelper(failedQueryIds, &fs);
+    fs.close();
+
+    // Extract failed test file to a pickle of dataframes.
+    const auto pyCmd = std::stringstream{}
+        << "python3 src/mongo/db/query/query_tester/scripts/extract_failed_test_to_pickle.py "
+        << getMongoRepoRoot() << " " << kFeatureExtractorDir << " " << kTmpFailureFile << " "
+        << std::filesystem::path{failPath}.replace_extension().string();
+    const auto swRes = shellExec(pyCmd.str(), kShellTimeout, kShellMaxLen, true);
+    uassert(9699501,
+            str::stream() << "Failed to extract " << failPath.string() << " to pickle.",
+            swRes.isOK());
+
+    // Clean up temp .fail file containing failed queries.
+    std::filesystem::remove(failPath);
+}
+
+void QueryFile::printFailedQueries(const std::vector<size_t>& failedQueryIds) const {
+    // Print the failed queries without any metadata extraction for feature processing.
+    printFailedQueriesHelper(failedQueryIds);
+}
+
+void QueryFile::printFailedQueriesHelper(const std::vector<size_t>& failedTestNums,
+                                         std::fstream* fs) const {
     std::cout << applyRed() << "------------------------------------------------------------"
               << applyReset() << std::endl
               << applyCyan() << "FAIL: " << getTestNameFromFilePath(_filePath) << applyReset()
@@ -267,10 +297,17 @@ void QueryFile::printFailedQueries(const std::vector<size_t>& failedTestNums) co
         uassert(9699600,
                 str::stream() << "Test " << testNum << " does not exist.",
                 _testNumToQuery.find(testNum) != _testNumToQuery.end());
+
+        // Print out the failed testId and its corresponding query.
+        const auto& query = _testNumToQuery.at(testNum);
         std::cout << applyBold() << "TestNum: " << applyReset() << testNum << std::endl
-                  << applyBold() << "Query: " << applyReset() << _testNumToQuery.at(testNum)
-                  << std::endl
+                  << applyBold() << "Query: " << applyReset() << query << std::endl
                   << std::endl;
+
+        // If a file stream is provided, write the failing query to it.
+        if (fs) {
+            *fs << std::endl << query << std::endl;
+        }
     }
 }
 
@@ -342,14 +379,19 @@ std::string QueryFile::serializeStateForDebug() const {
 }
 
 bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
-                                 const std::filesystem::path& actualPath) {
+                                 const std::filesystem::path& actualPath,
+                                 const bool verbose) {
     if (const auto& diffOutput = gitDiff(expectedPath, actualPath); !diffOutput.empty()) {
         // Write out the diff output.
         std::cout << diffOutput << std::endl;
 
         const auto& failedTestNums = getFailedTestNums(diffOutput);
         if (!failedTestNums.empty()) {
-            printFailedQueries(failedTestNums);
+            if (verbose) {
+                printAndExtractFailedQueries(failedTestNums);
+            } else {
+                printFailedQueries(failedTestNums);
+            }
             _failedQueryCount += failedTestNums.size();
         }
 
@@ -363,7 +405,9 @@ bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
     }
 }
 
-bool QueryFile::writeAndValidate(const ModeOption mode, const WriteOutOptions writeOutOpts) {
+bool QueryFile::writeAndValidate(const ModeOption mode,
+                                 const WriteOutOptions writeOutOpts,
+                                 const bool verbose) {
     // Set up the text-based diff environment.
     std::filesystem::create_directories(_actualPath.parent_path());
     auto actualStream = std::fstream{_actualPath, std::ios::out | std::ios::trunc};
@@ -376,7 +420,7 @@ bool QueryFile::writeAndValidate(const ModeOption mode, const WriteOutOptions wr
     // One big comparison, all at once.
     if (mode == ModeOption::Compare ||
         (mode == ModeOption::Normalize && writeOutOpts == WriteOutOptions::kNone)) {
-        return textBasedCompare(_expectedPath, _actualPath);
+        return textBasedCompare(_expectedPath, _actualPath, verbose);
     } else {
         const bool includeResults = writeOutOpts == WriteOutOptions::kResult ||
             writeOutOpts == WriteOutOptions::kOnelineResult;
@@ -389,6 +433,21 @@ bool QueryFile::writeAndValidate(const ModeOption mode, const WriteOutOptions wr
 }
 
 bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
+    writeOutHeader(fs);
+    // Newline after the header is included in the write-out before each test.
+
+    // Write out each test.
+    for (const auto& test : _tests) {
+        // Newline before each test write-out.
+        fs << std::endl;
+        _testNumToQuery[test.getTestNum()] = test.getTestLine();
+        test.writeToStream(fs, opt);
+    }
+
+    return true;
+}
+
+void QueryFile::writeOutHeader(std::fstream& fs) const {
     // Write out the header.
     auto nameNoExtension = getTestNameFromFilePath(_filePath);
     for (const auto& comment : _comments.preName) {
@@ -419,17 +478,5 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
             fs << comment << std::endl;
         }
     }
-
-    // Newline after the header is included in the write-out before each test.
-
-    // Write out each test.
-    for (const auto& test : _tests) {
-        // Newline before each test write-out.
-        fs << std::endl;
-        _testNumToQuery[test.getTestNum()] = test.getTestLine();
-        test.writeToStream(fs, opt);
-    }
-
-    return true;
 }
 }  // namespace mongo::query_tester

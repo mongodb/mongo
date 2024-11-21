@@ -28,6 +28,7 @@
  */
 
 #include <filesystem>
+#include <limits>
 #include <optional>
 #include <ostream>
 #include <string>
@@ -45,6 +46,10 @@
 #include "mongo/bson/bsonelement.h"
 
 namespace mongo::query_tester {
+static constexpr auto kFeatureExtractorDir = std::string_view{"/home/ubuntu/feature-extractor"};
+static constexpr auto kShellMaxLen = std::numeric_limits<size_t>::max();
+static constexpr auto kShellTimeout = Milliseconds{60 * 60 * 1000};  // 1 hour
+
 enum class WriteOutOptions { kNone, kResult, kOnelineResult };
 
 class ConditionalColor {
@@ -117,6 +122,7 @@ ConditionalColor applyRed();
 ConditionalColor applyReset();
 ConditionalColor applyYellow();
 
+void displayFailingQueryFeatures(const std::filesystem::path&);
 // Returns a {collName, fileName} tuple.
 std::tuple<std::string, std::filesystem::path> getCollAndFileName(const std::string&);
 /**
@@ -124,6 +130,7 @@ std::tuple<std::string, std::filesystem::path> getCollAndFileName(const std::str
  * output and stores them in a vector.
  */
 std::vector<size_t> getFailedTestNums(const std::string& diffOutput);
+std::string getMongoRepoRoot();
 std::string getTestNameFromFilePath(const std::filesystem::path&);
 /**
  * Performs a text-based diff between the expected and actual result test files and returns the diff

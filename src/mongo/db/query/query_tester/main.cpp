@@ -38,6 +38,7 @@
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/shell_exec.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/version.h"
 
@@ -118,7 +119,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const bool loadData,
                    const WriteOutOptions outOpt,
                    const ModeOption mode,
-                   const bool populateAndExit) {
+                   const bool populateAndExit,
+                   const bool verbose) {
     // Run the tests.
     auto versionInfo = MockVersionInfo{};
     auto conn = buildConn(uriString, &versionInfo, mode);
@@ -137,7 +139,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         }
         currFile.runTestFile(conn.get(), mode);
         totalTestsRun += currFile.getTestsRun();
-        if (!currFile.writeAndValidate(mode, outOpt)) {
+        if (!currFile.writeAndValidate(mode, outOpt, verbose)) {
             failedQueryCount += currFile.getFailedQueryCount();
             failedTestFiles.push_back(testPath);
         }
@@ -161,6 +163,22 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         return 0;
     } else {
         printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
+        if (verbose) {
+            const auto pyCmd = std::stringstream{}
+                << "python3 src/mongo/db/query/query_tester/scripts/extract_pickle_to_json.py "
+                << getMongoRepoRoot() << " " << kFeatureExtractorDir << " " << kTmpFailureFile;
+            const auto queryFeaturesFile =
+                std::filesystem::path{(std::stringstream{} << "src/mongo/db/query/query_tester/"
+                                                           << kTmpFailureFile << ".json")
+                                          .str()};
+            if (shellExec(pyCmd.str(), kShellTimeout, kShellMaxLen, true).isOK()) {
+                displayFailingQueryFeatures(queryFeaturesFile);
+            } else {
+                exitWithError(1, "failed to extract pickle file to json for feature processing.");
+            }
+
+            std::filesystem::remove(queryFeaturesFile);
+        }
         return 1;
     }
 }
@@ -229,6 +247,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto mongoURIString = boost::optional<std::string>{};
     auto mode = ModeOption::Compare;  // Default.
     auto populateAndExit = false;
+    auto verbose = false;
     for (auto argNum = size_t{1}; argNum < parsedArgs.size(); ++argNum) {
         // Same order as in the help menu.
         if (parsedArgs[argNum] == "--drop") {
@@ -285,6 +304,8 @@ int queryTesterMain(const int argc, const char** const argv) {
             testsToRun.push_back({parsedArgs[argNum + 1]});
             ++argNum;  // Skip the testName
             expectingNumAt = argNum + 1;
+        } else if (parsedArgs[argNum] == "-v") {
+            verbose = true;
         } else {
             exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
         }
@@ -306,7 +327,9 @@ int queryTesterMain(const int argc, const char** const argv) {
               "--drop and --load are incompatible with --mode normalize."},
              {populateAndExit && testsToRun.size() != 1,
               "--populateAndExit must be specified with a single test file."},
-             {testsToRun.empty(), "Make sure to provide QueryTester with a .test file."}}) {
+             {testsToRun.empty(), "Make sure to provide QueryTester with a .test file."},
+             {verbose && mode != ModeOption::Compare,
+              "option -v must be specified with --mode compare."}}) {
         if (condition) {
             exitWithError(1, message);
         }
@@ -326,7 +349,8 @@ int queryTesterMain(const int argc, const char** const argv) {
                               loadOpt,
                               outOpt,
                               mode,
-                              populateAndExit);
+                              populateAndExit,
+                              verbose);
     } catch (AssertionException& ex) {
         exitWithError(1, ex.reason());
     }

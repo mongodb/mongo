@@ -38,6 +38,7 @@ namespace mongo::query_tester {
 
 static constexpr auto kMinTestNum = size_t{0};
 static constexpr auto kMaxTestNum = std::numeric_limits<size_t>::max();
+inline constexpr auto kTmpFailureFile = "tmp_failed_queries";
 
 /**
  * A class representing a test file. A test file can have a number of formats (subclassed below).
@@ -82,7 +83,15 @@ public:
                          bool loadData,
                          const std::set<std::string>& prevFileCollections) const;
 
+    /**
+     * Print out failed test numbers and their corresponding queries. Optionally, with the -v
+     * (verbose) flag set, also extract and print out metadata about common features across failed
+     * queries for an enriched debugging experience.
+     */
+    void printAndExtractFailedQueries(const std::vector<size_t>& failedTestNums) const;
     void printFailedQueries(const std::vector<size_t>& failedTestNums) const;
+    void printFailedQueriesHelper(const std::vector<size_t>& failedTestNums,
+                                  std::fstream* fs = nullptr) const;
     bool readInEntireFile(ModeOption, size_t = kMinTestNum, size_t = kMaxTestNum);
     void runTestFile(DBClientConnection*, ModeOption);
 
@@ -94,14 +103,16 @@ public:
     /**
      * If 'compare' is set, tests must have results to compare to.
      */
-    bool textBasedCompare(const std::filesystem::path&, const std::filesystem::path&);
+    bool textBasedCompare(const std::filesystem::path&, const std::filesystem::path&, bool verbose);
 
     /**
      * If 'compare' is set, tests must have results to compare to.
      */
-    bool writeAndValidate(ModeOption, WriteOutOptions);
+    bool writeAndValidate(ModeOption, WriteOutOptions, bool verbose);
 
     bool writeOutAndNumber(std::fstream&, WriteOutOptions);
+
+    void writeOutHeader(std::fstream& fs) const;
 
 protected:
     void parseHeader(std::fstream& fs);

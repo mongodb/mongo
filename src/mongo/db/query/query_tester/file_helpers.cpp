@@ -29,6 +29,7 @@
 
 #include "file_helpers.h"
 
+#include <boost/algorithm/string.hpp>
 #include <fstream>
 #include <ostream>
 #include <regex>
@@ -36,6 +37,9 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/shell_exec.h"
 #include "mongo/util/str.h"
 
@@ -56,6 +60,50 @@ static constexpr std::string_view kColorYellow = "\033[1;33m";
  */
 static const auto kTestNumRegex =
     std::regex{R"(@@(?:\x1B\[[0-9;]*m)*[[:space:]]+(?:\x1B\[[0-9;]*m)*([0-9]+))"};
+
+/**
+ * Vector of relevant feature types to extract and display from a set of pipelines. These feature
+ * types represent the prefix of an entire feature, which is of the form
+ * <feature_type>:<feature_parameter>. There are more feature types listed in
+ * https://github.com/10gen/feature-extractor, but the ones that we care about are either Operator,
+ * Pipeline, Plan, or Index features.
+ */
+static const auto kFeatureTypes = std::vector<std::string>{// Operator Features
+                                                           "ConstantOperator",
+                                                           "Operator",
+                                                           // Pipeline Features
+                                                           "MatchTopOperator",
+                                                           "PipelineFirstStage",
+                                                           "PipelineStage",
+                                                           "PipelineStageConstantArgument",
+                                                           "PipelineStageRelationship",
+                                                           "PipelineVariableReference",
+                                                           // Plan Features
+                                                           "PlanStage",
+                                                           "PlanStageRelationship",
+                                                           "SBEStage",
+                                                           "SlotBasedPlan"
+                                                           // Index Features
+                                                           "IndexProperty"};
+
+bool matchesPrefix(const std::string& key) {
+    return std::any_of(kFeatureTypes.begin(),
+                       kFeatureTypes.end(),
+                       [&key](const std::string& prefix) { return key.starts_with(prefix); });
+}
+
+// Discover the MongoDB repository root with git command.
+std::string discoverMongoRepoRoot() {
+    const auto gitCmd = std::string{"git rev-parse --show-toplevel"};
+    const auto res = shellExec(gitCmd, kShellTimeout, kShellMaxLen, true);
+    if (!res.isOK()) {
+        uasserted(9699502, "Error: Unable to execute git command. Ensure this is in a Git repo.");
+    }
+    auto repoRoot = res.getValue();
+    // Trim trailing whitespace.
+    boost::algorithm::trim_right(repoRoot);
+    return repoRoot;
+}
 }  // namespace
 
 ConditionalColor applyBold() {
@@ -80,6 +128,45 @@ ConditionalColor applyReset() {
 
 ConditionalColor applyYellow() {
     return ConditionalColor(kColorYellow);
+}
+
+void displayFailingQueryFeatures(const std::filesystem::path& queryFeaturesFile) {
+    auto fs = std::ifstream{queryFeaturesFile};
+    tassert(9699500,
+            "Expected file to be open and ready for reading, but it wasn't",
+            fs.is_open() && fs.good());
+
+    const auto jsonStr =
+        std::string{std::istreambuf_iterator<char>(fs), std::istreambuf_iterator<char>()};
+    const auto& obj = fromjson(jsonStr);
+
+    auto featureCounts = stdx::unordered_map<std::string, size_t>{};
+
+    // Iterate through the BSON array of documents.
+    for (auto&& featureSet : obj) {
+        for (const auto& feature : featureSet.Obj()) {
+            // Only count features that are not null and begin with an allowed prefix.
+            if (const auto fieldName = feature.fieldName();
+                matchesPrefix(fieldName) && !feature.isNull()) {
+                featureCounts[fieldName]++;
+            }
+        }
+    }
+
+    // Convert unordered_map to vector of pairs to sort by descending count.
+    auto sortedCounts =
+        std::vector<std::pair<std::string, size_t>>(featureCounts.begin(), featureCounts.end());
+    std::sort(sortedCounts.begin(), sortedCounts.end(), [](const auto& a, const auto& b) {
+        return a.second > b.second;
+    });
+
+    // Display sorted feature counts.
+    std::cout << applyCyan() << "Feature Count:" << applyReset() << std::endl;
+    static constexpr auto kDefaultFeatureCountMax = size_t{10};
+    sortedCounts.resize(std::min(sortedCounts.size(), kDefaultFeatureCountMax));
+    for (const auto& [feature, count] : sortedCounts) {
+        std::cout << feature << ": " << count << std::endl;
+    }
 }
 
 // Returns a {collName, fileName} tuple.
@@ -125,6 +212,12 @@ std::vector<size_t> getFailedTestNums(const std::string& diffOutput) {
     return failedTestNums;
 }
 
+std::string getMongoRepoRoot() {
+    // Cache the discovered repo root value statically.
+    static const auto repoRoot = discoverMongoRepoRoot();
+    return repoRoot;
+}
+
 std::string getTestNameFromFilePath(const std::filesystem::path& filePath) {
     auto fileName = filePath.filename().string();
     auto extension = fileName.find('.');
@@ -146,11 +239,10 @@ std::string gitDiff(const std::filesystem::path& expected, const std::filesystem
          // preceding the diff will be captured.
          << " --no-index --word-diff=color -U0 -- " << expected << " " << actual << " 2>&1")
             .str();
-    static constexpr auto kTimeout = Milliseconds{60 * 60 * 1000};  // 1 hour.
 
     // Need to ignore exit status because the implied --exit-code will return an error sttatus when
     // there is a diff.
-    if (auto result = shellExec(gitDiffCmd, kTimeout, 1ULL << 32, true); result.isOK()) {
+    if (auto result = shellExec(gitDiffCmd, kShellTimeout, kShellMaxLen, true); result.isOK()) {
         return result.getValue();
     } else {
         return std::string{};
