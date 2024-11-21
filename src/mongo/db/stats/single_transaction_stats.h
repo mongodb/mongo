@@ -41,9 +41,11 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/util/concurrency/ticketholder_queue_stats.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/tick_source.h"
@@ -210,6 +212,21 @@ public:
         _lastClientInfo.update(client);
     }
 
+
+    /**
+     * Returns the TicketHolderQueueStats object stored in this SingleTransactionStats.
+     */
+    const TicketHolderQueueStats& getQueueStats() const {
+        return _queueStats;
+    }
+    /**
+     * Updates the TicketHolderQueueStats to include the latest operation's queueing stats.
+     */
+    void updateQueueStats(OperationContext* opCtx) {
+        TicketHolderQueueStats newOpQueueStat(opCtx);
+        _queueStats.add(newOpQueueStat);
+    }
+
     /**
      * Set the autoCommit field.  If this field is unset, this is not a transaction but a
      * retryable write and other values will not be meaningful.
@@ -286,6 +303,10 @@ private:
     // not be set in a transaction that is in state kPrepared if an exception is thrown after the
     // transaction transitions to the prepared state but before setPreparedStartTime is called.
     boost::optional<TickSource::Tick> _preparedStartTime{boost::none};
+
+    // Tracks and aggregates statistics for admission and execution control queueing across all
+    // operations within a transaction.
+    TicketHolderQueueStats _queueStats;
 };
 
 }  // namespace mongo

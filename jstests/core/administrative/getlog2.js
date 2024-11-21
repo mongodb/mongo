@@ -62,7 +62,7 @@ assert(contains(query.log, function(v) {
     print(v);
     return stringContains(v, " find ") && stringContains(v, "filter:") &&
         stringContains(v, "keysExamined:") && stringContains(v, "docsExamined:") &&
-        v.indexOf("SENTINEL") != -1;
+        stringContains(v, "queues") && v.indexOf("SENTINEL") != -1;
 }));
 
 // 2. Run a slow update

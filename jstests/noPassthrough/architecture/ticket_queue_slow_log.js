@@ -1,6 +1,7 @@
 /**
  * Test that verifies that time waiting for a ticket is logged as part of slow query logging.
- * Induces queueing for ticket by exhausting read tickets.
+ * Induces queueing for ticket by exhausting read tickets. Also verifies that ingress
+ * admission queueing stats are included in slow query logging.
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -83,8 +84,10 @@ for (let i = 0; i < queuedReaders.length; i++) {
     queuedReaders[i]();
 }
 
-const predicate = new RegExp(
-    `Slow query.*"${coll}.*"queues".*"execution":{"admissions":\\d+,"totalTimeQueuedMicros":\\d+}`);
+const predicate =
+    new RegExp(`Slow query.*"${coll}.*"queues".*` +
+               `"(execution|ingress)":{"admissions":\\d+(?:,"totalTimeQueuedMicros":\\d+)?}` +
+               `.*"(execution|ingress)":{"admissions":\\d+(?:,"totalTimeQueuedMicros":\\d+)?}`);
 assert(checkLog.checkContainsOnce(primary, predicate),
        "Could not find log containing " + predicate);
 

@@ -133,6 +133,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/util/concurrency:ticketholder_queue_stats",
     ],
 )
 

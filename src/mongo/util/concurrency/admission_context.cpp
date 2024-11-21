@@ -83,6 +83,14 @@ void AdmissionContext::recordAdmission() {
     _admissions.fetchAndAdd(1);
 }
 
+void AdmissionContext::setAdmission_forTest(int32_t admissions) {
+    _admissions.store(admissions);
+}
+
+void AdmissionContext::setTotalTimeQueuedMicros_forTest(int64_t micros) {
+    _totalTimeQueuedMicros.store(micros);
+}
+
 void AdmissionContext::recordExemptedAdmission() {
     _exemptedAdmissions.fetchAndAdd(1);
 }

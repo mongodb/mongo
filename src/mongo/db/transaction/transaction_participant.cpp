@@ -2883,6 +2883,8 @@ std::string TransactionParticipant::Participant::_transactionInfoForLog(
         s << " prepareOpTime:" << o().prepareOpTime.toString();
     }
 
+    s << " queues:" << singleTransactionStats.getQueueStats().toBson().toString();
+
     // Total duration of the transaction.
     s << ", "
       << duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick));
@@ -2954,6 +2956,8 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
         pAttrs->add("totalPreparedDuration", Microseconds(totalPreparedDuration));
         pAttrs->add("prepareOpTime", o().prepareOpTime);
     }
+
+    pAttrs->add("queues", singleTransactionStats.getQueueStats().toBson());
 
     // Total duration of the transaction.
     pAttrs->add(
@@ -3030,6 +3034,8 @@ BSONObj TransactionParticipant::Participant::_transactionInfoBSONForLog(
             attrs.append("totalPreparedDurationMicros", totalPreparedDuration);
             attrs.append("prepareOpTime", o().prepareOpTime.toBSON());
         }
+
+        attrs.append("queues", singleTransactionStats.getQueueStats().toBson());
 
         // Total duration of the transaction.
         attrs.append(

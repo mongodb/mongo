@@ -103,6 +103,13 @@ public:
 
     Priority getPriority() const;
 
+    /**
+     * Setters for queue statistics to be used in unit tests only
+     */
+    void setAdmission_forTest(int32_t admissions);
+
+    void setTotalTimeQueuedMicros_forTest(int64_t micros);
+
 protected:
     friend class ScopedAdmissionPriorityBase;
     friend class Ticket;

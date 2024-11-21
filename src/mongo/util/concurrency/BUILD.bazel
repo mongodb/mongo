@@ -69,6 +69,22 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "ticketholder_queue_stats",
+    srcs = [
+        "ticketholder_queue_stats.cpp",
+    ],
+    hdrs = [
+        "ticketholder_queue_stats.h",
+    ],
+    deps = [
+        ":admission_context",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/admission:ingress_admission_control",
+    ],
+)
+
+mongo_cc_library(
     name = "thread_pool",
     srcs = [
         "thread_pool.cpp",

@@ -212,6 +212,9 @@ void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
     // TransactionMetricsObserver with this Client's information. This is the last client that ran a
     // transaction operation on the txnParticipant.
     _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
+
+    // Update TicketHolderQueueStats with the latest operation's queueing data.
+    _singleTransactionStats.updateQueueStats(opCtx);
 }
 
 void TransactionMetricsObserver::_onAbort(OperationContext* opCtx,

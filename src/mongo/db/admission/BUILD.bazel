@@ -26,7 +26,6 @@ mongo_cc_library(
     deps = [
         ":ingress_admission_context",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.

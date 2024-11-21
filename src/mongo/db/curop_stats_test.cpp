@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/tick_source_mock.h"
 namespace mongo {
@@ -80,7 +83,7 @@ int64_t addWaitForLock(OperationContext* opCtx,
     return stats.get(resId, MODE_S).combinedWaitTimeMicros;
 }
 
-void addTicketQueueTime(ExecutionAdmissionContext* admCtx,
+void addTicketQueueTime(AdmissionContext* admCtx,
                         TickSourceMock<Microseconds>* tickSource,
                         Milliseconds& executionTime,
                         Milliseconds waitForTickets) {
@@ -436,6 +439,59 @@ TEST_F(CurOpStatsTest, SubOperationStats) {
     curop2.completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(curop2.debug().workingTimeMillis,
               executionTime2 - waitForTickets2 - waitForFlowControlTicket2 - waitForLocks2);
+}
+
+TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
+    auto opCtx = makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    Milliseconds waitForIngressAdmission = Milliseconds(2);
+    auto* ingressAdmCtx = &IngressAdmissionContext::get(opCtx.get());
+    ingressAdmCtx->setAdmission_forTest(5);
+
+    Milliseconds waitForExecutionTicket = Milliseconds(5);
+    auto* executionAdmCtx = &ExecutionAdmissionContext::get(opCtx.get());
+    executionAdmCtx->setAdmission_forTest(7);
+
+    // initialize timer to non-zero value
+    advanceTime(Milliseconds{100});
+    curop->setTickSource_forTest(tickSource());
+
+    Milliseconds executionTime = Milliseconds(512);
+    advanceTime(executionTime);
+    curop->done();
+
+    // Add queueing time for ingress admission control
+    addTicketQueueTime(ingressAdmCtx, tickSource(), executionTime, waitForIngressAdmission);
+
+    BSONObjBuilder builder;
+    SerializationContext sc = SerializationContext::stateCommandReply();
+    sc.setPrefixState(false);
+    {
+        // Simulate operation currently waiting in execution control queue
+        WaitingForAdmissionGuard waitForAdmission(executionAdmCtx, tickSource());
+        tickSource()->advance(waitForExecutionTicket);
+        executionTime += waitForExecutionTicket;
+
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportState(&builder, sc);
+    }
+    auto bsonObj = builder.done();
+    BSONObj currentQueue = bsonObj.getObjectField("currentQueue");
+    BSONObj queueStats = bsonObj.getObjectField("queues");
+
+    auto expectedCurrentQueue = BSON("name"
+                                     << "execution"
+                                     << "timeQueuedMicros" << 5000);
+    auto expectedQueueStats =
+        BSON("execution" << BSON("admissions" << 7 << "totalTimeQueuedMicros" << 5000
+                                              << "isHoldingTicket" << false)
+                         << "ingress"
+                         << BSON("admissions" << 5 << "totalTimeQueuedMicros" << 2000
+                                              << "isHoldingTicket" << false));
+
+    ASSERT_BSONOBJ_EQ(currentQueue, expectedCurrentQueue);
+    ASSERT_BSONOBJ_EQ_UNORDERED(queueStats, expectedQueueStats);
 }
 
 }  // namespace

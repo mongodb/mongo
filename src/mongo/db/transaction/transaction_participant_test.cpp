@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -2708,6 +2711,26 @@ protected:
     TickSourceMock<Microseconds>* mockTickSource() {
         return dynamic_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
     }
+
+    /**
+     * Returns a mock IngressAdmissionContext
+     */
+    IngressAdmissionContext mockIngressAdmissionContext(int32_t numAdmissions, int64_t micros) {
+        IngressAdmissionContext ingressAdmission;
+        ingressAdmission.setAdmission_forTest(numAdmissions);
+        ingressAdmission.setTotalTimeQueuedMicros_forTest(micros);
+        return ingressAdmission;
+    }
+
+    /**
+     * Returns a mock ExecutionAdmissionContext
+     */
+    ExecutionAdmissionContext mockExecutionAdmissionContext(int32_t numAdmissions, int64_t micros) {
+        ExecutionAdmissionContext executionAdmission;
+        executionAdmission.setAdmission_forTest(numAdmissions);
+        executionAdmission.setTotalTimeQueuedMicros_forTest(micros);
+        return executionAdmission;
+    }
 };
 
 TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
@@ -4250,6 +4273,10 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
                                                   : txnParticipant.getPrepareOpTime().toString());
     }
 
+    expectedTransactionInfo
+        << " queues:"
+        << txnParticipant.getSingleTransactionStatsForTest().getQueueStats().toBson().toString();
+
     expectedTransactionInfo << ", "
                             << duration_cast<Milliseconds>(
                                    txnParticipant.getSingleTransactionStatsForTest().getDuration(
@@ -4389,6 +4416,9 @@ BSONObj buildTransactionInfoBSON(OperationContext* opCtx,
                          (prepareOpTime ? prepareOpTime->toBSON()
                                         : txnParticipant.getPrepareOpTime().toBSON()));
         }
+
+        attrs.append("queues",
+                     txnParticipant.getSingleTransactionStatsForTest().getQueueStats().toBson());
 
         attrs.append("durationMillis",
                      duration_cast<Milliseconds>(
@@ -4612,6 +4642,57 @@ DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoS
 
     txnParticipant.getTransactionInfoForLogForTest(
         opCtx(), nullptr, true, apiParameters, readConcernArgs);
+}
+
+TEST_F(TransactionsMetricsTest, TransactionLogAggregatesQueueStats) {
+    const int baseValue = 100;
+    const int numIterations = 5;
+    auto sessionCheckout = checkOutSession();
+
+    for (int i = 0; i < numIterations; ++i) {
+        // Setup mock values on admission contexts
+        IngressAdmissionContext::get(opCtx()) = mockIngressAdmissionContext(baseValue, baseValue);
+        ExecutionAdmissionContext::get(opCtx()) =
+            mockExecutionAdmissionContext(baseValue, baseValue);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+        // Downstream, TransactionMetricsObserver::onTransactionOperation will accumulate queue
+        // stats on SingleTransactionStats
+        txnParticipant.stashTransactionResources(opCtx());
+    }
+
+    // Required objects for generating transaction log
+    APIParameters apiParameters = APIParameters();
+    apiParameters.setAPIVersion("2");
+    apiParameters.setAPIStrict(true);
+    apiParameters.setAPIDeprecationErrors(true);
+    APIParameters::get(opCtx()) = apiParameters;
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("find"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+    const auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
+
+    auto participant = TransactionParticipant::get(opCtx());
+    BSONObj transactionLog = participant.getTransactionInfoBSONForLogForTest(
+        opCtx(), &lockerInfo.stats, true, apiParameters, readConcernArgs);
+
+    BSONObj logAttr = transactionLog.getObjectField("attr");
+    ASSERT_TRUE(logAttr.getField("queues").isABSONObj());
+    BSONObj queueBsonStats = logAttr.getObjectField("queues");
+
+    int expectedVal = baseValue * numIterations;
+    auto expectedBson = BSON(
+        "execution" << BSON("admissions" << expectedVal << "totalTimeQueuedMicros" << expectedVal)
+                    << "ingress"
+                    << BSON("admissions" << expectedVal << "totalTimeQueuedMicros" << expectedVal));
+    ASSERT_BSONOBJ_EQ_UNORDERED(queueBsonStats, expectedBson);
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
