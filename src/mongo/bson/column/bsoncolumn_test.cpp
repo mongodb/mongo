@@ -167,9 +167,9 @@ public:
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createRegex(StringData options = "") {
+    BSONElement createRegex(StringData pattern = "", StringData options = "") {
         BSONObjBuilder ob;
-        ob.appendRegex("0"_sd, options);
+        ob.appendRegex("0"_sd, pattern, options);
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
@@ -3013,6 +3013,25 @@ TEST_F(BSONColumnTest, RegexBasic) {
     verifyDecompression(binData, {first, second, second});
 }
 
+TEST_F(BSONColumnTest, RegexBasicWithOptions) {
+    auto first = createRegex("regex", "ims");
+    auto second = createRegex("regex");
+    cb.append(first);
+    cb.append(first);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendLiteral(expected, second);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, first, second});
+}
+
 TEST_F(BSONColumnTest, RegexAfterChangeBack) {
     auto regex = createRegex();
     auto elemInt32 = createElementInt32(0);
@@ -3032,6 +3051,27 @@ TEST_F(BSONColumnTest, RegexAfterChangeBack) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, {elemInt32, regex, regex});
+}
+
+TEST_F(BSONColumnTest, RegexAfterChangeBackWithOption) {
+    auto regexWithOptions = createRegex("regex", "xu");
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(regexWithOptions);
+    cb.append(regexWithOptions);
+    cb.append(elemInt32);
+
+    BufBuilder expected;
+    appendLiteral(expected, regexWithOptions);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendLiteral(expected, elemInt32);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {regexWithOptions, regexWithOptions, elemInt32});
 }
 
 TEST_F(BSONColumnTest, DBRefBasic) {
