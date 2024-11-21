@@ -6,6 +6,9 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {
     testPerformUpgradeDowngradeReplSet
 } from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
+import {
+    testPerformUpgradeDowngradeSharded
+} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 const collectionName = "coll";
 
@@ -20,8 +23,13 @@ const toDoublePipeline = [{$project: {doubleFromBindata: {$toDouble: "$asBinData
 
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
 
-function setupCollection(primaryConnection) {
+function setupCollection(primaryConnection, shardingTest = null) {
     const coll = assertDropAndRecreateCollection(getDB(primaryConnection), collectionName);
+
+    if (shardingTest) {
+        shardingTest.shardColl(coll, {asBinData: 1}, false);
+    }
+
     assert.commandWorked(coll.insertMany([
         {
             _id: 0,
@@ -253,4 +261,14 @@ testPerformUpgradeDowngradeReplSet({
     whenSecondariesAreLatestBinary: assertViewCanBeCreatedButNotExecuted,
     whenFullyUpgraded: assertViewCanBeCreatedAndExecuted,
     whenBinariesAreLatestAndFCVIsLastLTS: assertQueriesOnViewsFail,
+});
+
+testPerformUpgradeDowngradeSharded({
+    setupFn: setupCollection,
+    whenFullyDowngraded: assertViewCanBeCreatedButNotExecuted,
+    whenOnlyConfigIsLatestBinary: assertViewCanBeCreatedButNotExecuted,
+    whenSecondariesAndConfigAreLatestBinary: assertViewCanBeCreatedButNotExecuted,
+    whenFullyUpgraded: assertViewCanBeCreatedAndExecuted,
+    whenBinariesAreLatestAndFCVIsLastLTS: assertQueriesOnViewsFail,
+    whenMongosBinaryIsLastLTS: assertQueriesOnViewsFail,
 });
