@@ -121,24 +121,6 @@ const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
 MONGO_FAIL_POINT_DEFINE(hangAfterProcessingDeferredXferMods);
 
-/**
- * Returns true if the given BSON object in the shard key value pair format is within the given
- * range.
- */
-bool isShardKeyValueInRange(const BSONObj& shardKeyValue, const BSONObj& min, const BSONObj& max) {
-    return shardKeyValue.woCompare(min) >= 0 && shardKeyValue.woCompare(max) < 0;
-}
-
-/**
- * Returns true if the given BSON document is within the given chunk range.
- */
-bool isDocInRange(const BSONObj& obj,
-                  const BSONObj& min,
-                  const BSONObj& max,
-                  const ShardKeyPattern& shardKeyPattern) {
-    return isShardKeyValueInRange(shardKeyPattern.extractShardKeyFromDoc(obj), min, max);
-}
-
 BSONObj createRequestWithSessionId(StringData commandName,
                                    const NamespaceString& nss,
                                    const MigrationSessionId& sessionId,
@@ -523,7 +505,7 @@ void MigrationChunkClonerSource::onInsertOp(OperationContext* opCtx,
         return;
     }
 
-    if (!isDocInRange(insertedDoc, getMin(), getMax(), _shardKeyPattern)) {
+    if (!isDocumentKeyInRange(insertedDoc, getMin(), getMax(), _shardKeyPattern)) {
         return;
     }
 
@@ -551,12 +533,13 @@ void MigrationChunkClonerSource::onUpdateOp(OperationContext* opCtx,
         return;
     }
 
-    if (!isDocInRange(postImageDoc, getMin(), getMax(), _shardKeyPattern)) {
+    if (!isDocumentKeyInRange(postImageDoc, getMin(), getMax(), _shardKeyPattern)) {
         // If the preImageDoc is not in range but the postImageDoc was, we know that the document
         // has changed shard keys and no longer belongs in the chunk being cloned. We will model
         // the deletion of the preImage document so that the destination chunk does not receive an
         // outdated version of this document.
-        if (preImageDoc && isDocInRange(*preImageDoc, getMin(), getMax(), _shardKeyPattern)) {
+        if (preImageDoc &&
+            isDocumentKeyInRange(*preImageDoc, getMin(), getMax(), _shardKeyPattern)) {
             onDeleteOp(opCtx, getDocumentKey(_shardKeyPattern, *preImageDoc), opTime);
         }
         return;
@@ -598,7 +581,7 @@ void MigrationChunkClonerSource::onDeleteOp(OperationContext* opCtx,
 
     const auto shardKeyValue =
         _shardKeyPattern.extractShardKeyFromDocumentKey(*documentKey.getShardKey());
-    if (!isShardKeyValueInRange(shardKeyValue, getMin(), getMax())) {
+    if (!isKeyInRange(shardKeyValue, getMin(), getMax())) {
         return;
     }
 
@@ -770,7 +753,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(OperationCont
         // index scan during cloning. This is needed because the destination is very
         // conservative in processing xferMod deletes and won't delete docs that are not in
         // the range of the chunk being migrated.
-        if (!isDocInRange(
+        if (!isDocumentKeyInRange(
                 doc->value(), _args.getMin().value(), _args.getMax().value(), _shardKeyPattern)) {
             {
                 stdx::lock_guard lk(_mutex);
@@ -838,7 +821,7 @@ bool MigrationChunkClonerSource::_processUpdateForXferMod(const BSONObj& preImag
     auto opType = repl::OpTypeEnum::kUpdate;
     auto idElement = preImageDocKey["_id"];
 
-    if (!isShardKeyValueInRange(postShardKeyValues, minKey, maxKey)) {
+    if (!isKeyInRange(postShardKeyValues, minKey, maxKey)) {
         // If the preImageDoc is not in range but the postImageDoc was, we know that the
         // document has changed shard keys and no longer belongs in the chunk being cloned.
         // We will model the deletion of the preImage document so that the destination chunk
@@ -848,7 +831,7 @@ bool MigrationChunkClonerSource::_processUpdateForXferMod(const BSONObj& preImag
             _shardKeyPattern.extractShardKeyFromDocumentKey(preImageDocKey);
         fassert(6836101, !preImageShardKeyValues.isEmpty());
 
-        if (!isShardKeyValueInRange(preImageShardKeyValues, minKey, maxKey)) {
+        if (!isKeyInRange(preImageShardKeyValues, minKey, maxKey)) {
             return false;
         }
 

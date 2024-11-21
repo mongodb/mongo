@@ -1009,4 +1009,10 @@ private:
     boost::optional<Timestamp> _clusterTime;
 };
 
+/**
+ * If `max` is the max bound of some chunk, returns that chunk. Otherwise, returns the chunk that
+ * contains the key `max`.
+ */
+Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max);
+
 }  // namespace mongo

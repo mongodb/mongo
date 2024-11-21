@@ -145,25 +145,6 @@ BSONObj computeOtherBound(OperationContext* opCtx,
     return needMaxBound ? max : min;
 }
 
-/**
- * If `max` is the max bound of some chunk, returns that chunk. Otherwise, returns the chunk that
- * contains the key `max`.
- */
-Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max) {
-    boost::optional<Chunk> chunkWithMaxBound;
-    cm.forEachChunk([&](const auto& chunk) {
-        if (chunk.getMax().woCompare(max) == 0) {
-            chunkWithMaxBound.emplace(chunk);
-            return false;
-        }
-        return true;
-    });
-    if (chunkWithMaxBound) {
-        return *chunkWithMaxBound;
-    }
-    return cm.findIntersectingChunkWithSimpleCollation(max);
-}
-
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep2);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep3);

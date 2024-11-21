@@ -127,8 +127,7 @@ Status ChunkRange::validateStrict(const ChunkRange& range) {
 }
 
 bool ChunkRange::containsKey(const BSONObj& key) const {
-    return (getMin().woCompare(key) <= 0 && key.woCompare(getMax()) < 0) ||
-        MONGO_unlikely(allElementsAreMaxKey(key) && key.binaryEqual(getMax()));
+    return isKeyInRange(key, getMin(), getMax());
 }
 
 std::string ChunkRange::toString() const {
@@ -181,6 +180,26 @@ ChunkRange ChunkRange::unionWith(ChunkRange const& other) const {
     };
     return ChunkRange(le(getMin(), other.getMin()) ? getMin() : other.getMin(),
                       le(getMax(), other.getMax()) ? other.getMax() : getMax());
+}
+
+bool isDocumentKeyInRange(const BSONObj& obj,
+                          const BSONObj& min,
+                          const BSONObj& max,
+                          const BSONObj& shardKeyPattern) {
+    ShardKeyPattern shardKey(shardKeyPattern);
+    return isDocumentKeyInRange(obj, min, max, shardKey);
+}
+
+bool isDocumentKeyInRange(const BSONObj& obj,
+                          const BSONObj& min,
+                          const BSONObj& max,
+                          const ShardKeyPattern& shardKeyPattern) {
+    return isKeyInRange(shardKeyPattern.extractShardKeyFromDoc(obj), min, max);
+}
+
+bool isKeyInRange(const BSONObj& key, const BSONObj& rangeMin, const BSONObj& rangeMax) {
+    return (rangeMin.woCompare(key) <= 0 && key.woCompare(rangeMax) < 0) ||
+        MONGO_unlikely(allElementsAreMaxKey(key) && key.binaryEqual(rangeMax));
 }
 
 }  // namespace mongo

@@ -235,15 +235,6 @@ std::string stateToString(MigrationDestinationManager::State state) {
     }
 }
 
-bool isInRange(const BSONObj& obj,
-               const BSONObj& min,
-               const BSONObj& max,
-               const BSONObj& shardKeyPattern) {
-    ShardKeyPattern shardKey(shardKeyPattern);
-    BSONObj k = shardKey.extractShardKeyFromDoc(obj);
-    return k.woCompare(min) >= 0 && k.woCompare(max) < 0;
-}
-
 /**
  * Checks if an upsert of a remote document will override a local document with the same _id but in
  * a different range on this shard. Must be in WriteContext to avoid races and DBHelper errors.
@@ -259,7 +250,7 @@ bool willOverrideLocalId(OperationContext* opCtx,
                          BSONObj* localDoc) {
     *localDoc = BSONObj();
     if (Helpers::findById(opCtx, nss, remoteDoc, *localDoc)) {
-        return !isInRange(*localDoc, min, max, shardKeyPattern);
+        return !isDocumentKeyInRange(*localDoc, min, max, shardKeyPattern);
     }
 
     return false;
@@ -1895,7 +1886,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
             // Do not apply delete if doc does not belong to the chunk being migrated
             BSONObj fullObj;
             if (Helpers::findById(opCtx, _nss, id, fullObj)) {
-                if (!isInRange(fullObj, _min, _max, _shardKeyPattern)) {
+                if (!isDocumentKeyInRange(fullObj, _min, _max, _shardKeyPattern)) {
                     if (MONGO_unlikely(failMigrationReceivedOutOfRangeOperation.shouldFail())) {
                         MONGO_UNREACHABLE;
                     }
@@ -1937,7 +1928,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
             BSONObj updatedDoc = i.next().Obj();
 
             // do not apply insert/update if doc does not belong to the chunk being migrated
-            if (!isInRange(updatedDoc, _min, _max, _shardKeyPattern)) {
+            if (!isDocumentKeyInRange(updatedDoc, _min, _max, _shardKeyPattern)) {
                 if (MONGO_unlikely(failMigrationReceivedOutOfRangeOperation.shouldFail())) {
                     MONGO_UNREACHABLE;
                 }

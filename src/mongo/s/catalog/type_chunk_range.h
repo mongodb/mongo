@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/catalog/type_chunk_range_base_gen.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -115,5 +116,28 @@ private:
         return {};
     }
 };
+
+/**
+ * Checks whether the specified key from the given BSON document is within the bounds of this given
+ * range.
+ */
+bool isDocumentKeyInRange(const BSONObj& obj,
+                          const BSONObj& min,
+                          const BSONObj& max,
+                          const ShardKeyPattern& shardKeyPattern);
+
+/**
+ * Checks whether the specified key from the given BSON document is within the bounds of this given
+ * range.
+ */
+bool isDocumentKeyInRange(const BSONObj& obj,
+                          const BSONObj& min,
+                          const BSONObj& max,
+                          const BSONObj& shardKeyPattern);
+
+/**
+ * Checks whether the specified key is within the bounds of this given range.
+ */
+bool isKeyInRange(const BSONObj& key, const BSONObj& rangeMin, const BSONObj& rangeMax);
 
 }  // namespace mongo
