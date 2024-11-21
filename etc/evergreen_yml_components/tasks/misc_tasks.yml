@@ -857,7 +857,8 @@ tasks:
         params:
           binary: bash
           args:
-            - "./src/evergreen/run_python_script.sh"
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "lint-large-files-check"
             - "buildscripts/large_file_check.py"
             - "--exclude"
             - "src/third_party/*"
@@ -883,7 +884,8 @@ tasks:
         params:
           binary: bash
           args:
-            - "src/evergreen/run_python_script.sh"
+            - "src/evergreen/run_python_script_with_report.sh"
+            - "lint-poetry-lock"
             - "evergreen/functions/poetry_lock_check.py"
 
   - name: lint_bazel
@@ -918,7 +920,8 @@ tasks:
           binary: bash
           add_expansions_to_env: true
           args:
-            - "src/evergreen/run_python_script.sh"
+            - "src/evergreen/run_python_script_with_report.sh"
+            - "lint-bazel"
             - "buildscripts/buildifier.py"
             - "--generate-report"
             - "--binary-dir=./"
@@ -948,7 +951,8 @@ tasks:
         params:
           binary: bash
           args:
-            - "src/evergreen/run_python_script.sh"
+            - "src/evergreen/run_python_script_with_report.sh"
+            - "lint-sbom"
             - "buildscripts/sbom_linter.py"
 
   - name: lint_pylinters
