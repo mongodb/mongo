@@ -108,7 +108,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
       _pipeline(std::move(pipeline)),
       _variablesParseState(_variables.useIdGenerator()) {
     if (!_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
-        globalOpCounters.gotNestedAggregate();
+        serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
     }
     _pipeline->getContext()->setInUnionWith(true);
 }

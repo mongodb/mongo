@@ -894,7 +894,7 @@ public:
             };
 
             // Counted as a getMore, not as a command.
-            globalOpCounters.gotGetMore();
+            serviceOpCounters(opCtx).gotGetMore();
             auto curOp = CurOp::get(opCtx);
             NamespaceString nss = ns();
             int64_t cursorId = _cmd.getCommandParameter();

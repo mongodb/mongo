@@ -643,7 +643,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                           batch.end(),
                                           source == OperationSource::kFromMigrate);
                 lastOpFixer->finishedOpSuccessfully();
-                globalOpCounters.gotInserts(batch.size());
+                serviceOpCounters(opCtx).gotInserts(batch.size());
                 SingleWriteResult result;
                 result.setN(1);
 
@@ -665,7 +665,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     // Try to insert the batch one-at-a-time. This path is executed for singular batches,
     // multi-statement transactions, capped collections, and if we failed all-at-once inserting.
     for (auto it = batch.begin(); it != batch.end(); ++it) {
-        globalOpCounters.gotInsert();
+        serviceOpCounters(opCtx).gotInsert();
         if (source != OperationSource::kTimeseriesInsert) {
             ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
                 opCtx->getWriteConcern());
@@ -1230,7 +1230,7 @@ WriteResult performInserts(OperationContext* opCtx,
         // Revisit any conditions that may have caused the batch to be flushed. In those cases,
         // append the appropriate result to the output.
         if (!fixedDoc.isOK()) {
-            globalOpCounters.gotInsert();
+            serviceOpCounters(opCtx).gotInsert();
             ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
                 opCtx->getWriteConcern());
             try {
@@ -1448,7 +1448,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     const boost::optional<UUID>& sampleId,
     OperationSource source,
     bool forgoOpCounterIncrements) {
-    globalOpCounters.gotUpdate();
+    serviceOpCounters(opCtx).gotUpdate();
     auto& curOp = *CurOp::get(opCtx);
     if (source != OperationSource::kTimeseriesInsert) {
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
@@ -1798,7 +1798,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
             "Cannot use (or request) retryable writes with limit=0",
             !opCtx->isRetryableWrite() || !op.getMulti() || stmtId == kUninitializedStmtId);
 
-    globalOpCounters.gotDelete();
+    serviceOpCounters(opCtx).gotDelete();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
     {

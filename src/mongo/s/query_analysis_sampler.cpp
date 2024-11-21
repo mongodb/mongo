@@ -226,13 +226,27 @@ double QueryAnalysisSampler::QueryStats::_calculateExponentialMovingAverage(
 
 void QueryAnalysisSampler::QueryStats::refreshTotalCount() {
     long long newTotalCount = [&] {
-        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
-            serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-            return globalOpCounters.getUpdate()->load() + globalOpCounters.getDelete()->load() +
-                _lastFindAndModifyQueriesCount + globalOpCounters.getQuery()->load() +
-                _lastAggregateQueriesCount + _lastCountQueriesCount + _lastDistinctQueriesCount;
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
+            auto& opCountersToUse = serviceOpCounters(ClusterRole::RouterServer);
+            return opCountersToUse.getUpdate()->load() +  //
+                opCountersToUse.getDelete()->load() +     //
+                opCountersToUse.getQuery()->load() +      //
+                _lastFindAndModifyQueriesCount +          //
+                _lastAggregateQueriesCount +              //
+                _lastCountQueriesCount +                  //
+                _lastDistinctQueriesCount;
+
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+            auto& opCountersToUse = serviceOpCounters(ClusterRole::ShardServer);
+            return opCountersToUse.getUpdate()->load() +  //
+                opCountersToUse.getDelete()->load() +     //
+                opCountersToUse.getQuery()->load() +      //
+                _lastFindAndModifyQueriesCount +          //
+                _lastAggregateQueriesCount +              //
+                _lastCountQueriesCount +                  //
+                _lastDistinctQueriesCount;
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            return globalOpCounters.getNestedAggregate()->load();
+            return serviceOpCounters(ClusterRole::ShardServer).getNestedAggregate()->load();
         }
         MONGO_UNREACHABLE;
     }();

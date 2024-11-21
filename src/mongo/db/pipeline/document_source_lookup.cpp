@@ -247,7 +247,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
       _variables(expCtx->variables),
       _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
     if (!_fromNs.isOnInternalDb()) {
-        globalOpCounters.gotNestedAggregate();
+        serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
     }
 
     const auto& resolvedNamespace = expCtx->getResolvedNamespace(_fromNs);

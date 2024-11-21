@@ -101,8 +101,8 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestHelpField) {
     testHelpField();
 }
 
-TEST_F(ServiceEntryPointRouterRoleTest, TestCommandGlobalCounters) {
-    testCommandGlobalCounters();
+TEST_F(ServiceEntryPointRouterRoleTest, TestCommandServiceCounters) {
+    testCommandServiceCounters(ClusterRole::RouterServer);
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, TestCommandMaxTimeMS) {

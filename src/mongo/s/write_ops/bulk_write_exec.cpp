@@ -299,7 +299,7 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
     switch (firstOpType) {
         // We support only 1 update or 1 delete or multiple inserts for FLE bulkWrites.
         case BulkWriteCRUDOp::kInsert:
-            globalOpCounters.gotInserts(response.getN());
+            serviceOpCounters(ClusterRole::RouterServer).gotInserts(response.getN());
             break;
         case BulkWriteCRUDOp::kUpdate: {
             const auto& updateRequest = request.getUpdateRequest();
@@ -311,7 +311,7 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
             break;
         }
         case BulkWriteCRUDOp::kDelete:
-            globalOpCounters.gotDelete();
+            serviceOpCounters(ClusterRole::RouterServer).gotDelete();
             break;
         default:
             MONGO_UNREACHABLE
@@ -1681,7 +1681,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
         if (writeOpState == WriteOpState_Completed || writeOpState == WriteOpState_Error) {
             switch (writeOp.getWriteItem().getOpType()) {
                 case BatchedCommandRequest::BatchType_Insert:
-                    globalOpCounters.gotInsert();
+                    serviceOpCounters(ClusterRole::RouterServer).gotInsert();
                     break;
                 case BatchedCommandRequest::BatchType_Update: {
                     // It is easier to handle the metric in handleWouldChangeOwningShardError for
@@ -1691,7 +1691,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                     if (writeOpState != WriteOpState_Error ||
                         writeOp.getOpError().getStatus() != ErrorCodes::WouldChangeOwningShard ||
                         _writeOps.size() > 1) {
-                        globalOpCounters.gotUpdate();
+                        serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
                     }
                     UpdateRef updateRef = writeOp.getWriteItem().getUpdateRef();
 
@@ -1706,7 +1706,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                     break;
                 }
                 case BatchedCommandRequest::BatchType_Delete:
-                    globalOpCounters.gotDelete();
+                    serviceOpCounters(ClusterRole::RouterServer).gotDelete();
                     break;
                 default:
                     MONGO_UNREACHABLE

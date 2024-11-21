@@ -206,8 +206,8 @@ TEST_F(ServiceEntryPointShardServerTest, TestCommandAdminOnlyLog) {
     ASSERT_EQ(countTextFormatLogLinesContaining("Admin only command"), 1);
 }
 
-TEST_F(ServiceEntryPointShardServerTest, TestCommandGlobalCounters) {
-    testCommandGlobalCounters();
+TEST_F(ServiceEntryPointShardServerTest, TestCommandServiceCounters) {
+    testCommandServiceCounters(ClusterRole::ShardServer);
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestCommandMaxTimeMS) {
@@ -315,8 +315,8 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestCommandAdminOnlyLog) {
     ASSERT_EQ(countTextFormatLogLinesContaining("Admin only command"), 1);
 }
 
-TEST_F(ServiceEntryPointReplicaSetTest, TestCommandGlobalCounters) {
-    testCommandGlobalCounters();
+TEST_F(ServiceEntryPointReplicaSetTest, TestCommandServiceCounters) {
+    testCommandServiceCounters(ClusterRole::ShardServer);
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestCommandMaxTimeMS) {

@@ -659,7 +659,7 @@ TEST_F(DocumentSourceGraphLookUpTest, IncrementNestedAggregateOpCounterOnCreateB
     auto testOpCounter = [&](const NamespaceString& nss, const int expectedIncrease) {
         auto resolvedNss =
             StringMap<ResolvedNamespace>{{nss.coll().toString(), {nss, std::vector<BSONObj>()}}};
-        auto countBeforeCreate = globalOpCounters.getNestedAggregate()->load();
+        auto countBeforeCreate = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
 
         // Create a DocumentSourceGraphLookUp and verify that the counter increases by the expected
         // amount.
@@ -677,14 +677,14 @@ TEST_F(DocumentSourceGraphLookUpTest, IncrementNestedAggregateOpCounterOnCreateB
                 .firstElement(),
             originalExpCtx);
         auto originalGraphLookup = static_cast<DocumentSourceGraphLookUp*>(docSource.get());
-        auto countAfterCreate = globalOpCounters.getNestedAggregate()->load();
+        auto countAfterCreate = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
         ASSERT_EQ(countAfterCreate - countBeforeCreate, expectedIncrease);
 
         // Copy the DocumentSourceGraphLookUp and verify that the counter doesn't increase.
         auto newExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
         newExpCtx->setResolvedNamespaces(resolvedNss);
         DocumentSourceGraphLookUp newGraphLookup{*originalGraphLookup, newExpCtx};
-        auto countAfterCopy = globalOpCounters.getNestedAggregate()->load();
+        auto countAfterCopy = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
         ASSERT_EQ(countAfterCopy - countAfterCreate, 0);
     };
 

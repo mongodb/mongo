@@ -253,7 +253,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
             opDebug->additiveMetrics.incrementNdeleted(1);
         }
-        globalOpCounters.gotDelete();
+        serviceOpCounters(opCtx).gotDelete();
     }
 
     if (cappedDeleteSideTxn) {

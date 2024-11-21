@@ -840,7 +840,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
         // Revisit any conditions that may have caused the batch to be flushed. In those cases,
         // append the appropriate result to the output.
         if (!fixedDoc.isOK()) {
-            globalOpCounters.gotInsert();
+            serviceOpCounters(opCtx).gotInsert();
             try {
                 uassertStatusOK(fixedDoc.getStatus());
                 MONGO_UNREACHABLE;
@@ -1121,7 +1121,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         lastOpFixer.startingOp(nsString);
         return writeConflictRetry(opCtx, "bulkWriteDelete", nsString, [&] {
             boost::optional<BSONObj> docFound;
-            globalOpCounters.gotDelete();
+            serviceOpCounters(opCtx).gotDelete();
             ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(
                 opCtx->getWriteConcern());
             auto nDeleted = write_ops_exec::performDelete(opCtx,
@@ -1718,7 +1718,7 @@ bool handleUpdateOp(OperationContext* opCtx,
             for (;;) {
                 try {
                     boost::optional<BSONObj> docFound;
-                    globalOpCounters.gotUpdate();
+                    serviceOpCounters(opCtx).gotUpdate();
                     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
                         opCtx->getWriteConcern());
                     auto result = write_ops_exec::performUpdate(opCtx,

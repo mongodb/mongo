@@ -38,6 +38,7 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/static_immortal.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -332,7 +333,18 @@ BSONObj OpCounterServerStatusSection::generateSection(OperationContext* opCtx,
     return _counters->getObj();
 }
 
-OpCounters globalOpCounters;
+OpCounters& serviceOpCounters(ClusterRole role) {
+    static StaticImmortal<OpCounters> routerOpCounters;
+    static StaticImmortal<OpCounters> shardOpCounters;
+    if (role.hasExclusively(ClusterRole::RouterServer)) {
+        return *routerOpCounters;
+    }
+    if (role.hasExclusively(ClusterRole::ShardServer)) {
+        return *shardOpCounters;
+    }
+    MONGO_UNREACHABLE;
+}
+
 OpCounters replOpCounters;
 NetworkCounter networkCounter;
 AuthCounter authCounter;

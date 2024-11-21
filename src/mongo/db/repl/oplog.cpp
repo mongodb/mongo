@@ -267,7 +267,9 @@ void createIndexForApplyOps(OperationContext* opCtx,
                           << indexNss.toStringForErrorMsg(),
             indexCollection);
 
-    OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
+    OpCounters* opCounters = opCtx->writesAreReplicated()
+        ? &serviceOpCounters(ClusterRole::ShardServer)
+        : &replOpCounters;
     opCounters->gotInsert();
     if (opCtx->writesAreReplicated()) {
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
@@ -1318,7 +1320,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
     // whether writes are replicated.
     const bool shouldUseGlobalOpCounters =
         mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated();
-    OpCounters* opCounters = shouldUseGlobalOpCounters ? &globalOpCounters : &replOpCounters;
+    OpCounters* opCounters =
+        shouldUseGlobalOpCounters ? &serviceOpCounters(ClusterRole::ShardServer) : &replOpCounters;
 
     auto opType = op.getOpType();
     if (opType == OpTypeEnum::kNoop) {
@@ -2101,7 +2104,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
     // Choose opCounters based on running on standalone/primary or secondary by checking
     // whether writes are replicated.
-    OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
+    OpCounters* opCounters = opCtx->writesAreReplicated()
+        ? &serviceOpCounters(ClusterRole::ShardServer)
+        : &replOpCounters;
     opCounters->gotCommand();
 
     BSONObj o = op->getObject();

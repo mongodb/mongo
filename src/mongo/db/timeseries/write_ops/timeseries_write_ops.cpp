@@ -1089,7 +1089,7 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
     }
 
     curOp->debug().additiveMetrics.ninserted = baseReply.getN();
-    globalOpCounters.gotInserts(baseReply.getN());
+    serviceOpCounters(opCtx).gotInserts(baseReply.getN());
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(opCtx->getWriteConcern(),
                                                                         baseReply.getN());
 

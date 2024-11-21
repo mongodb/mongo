@@ -599,7 +599,7 @@ TEST_F(DocumentSourceUnionWithTest, IncrementNestedAggregateOpCounterOnCreateBut
     auto testOpCounter = [&](const NamespaceString& nss, const int expectedIncrease) {
         auto resolvedNss =
             StringMap<ResolvedNamespace>{{nss.coll().toString(), {nss, std::vector<BSONObj>()}}};
-        auto countBeforeCreate = globalOpCounters.getNestedAggregate()->load();
+        auto countBeforeCreate = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
 
         // Create a DocumentSourceUnionWith and verify that the counter increases by the expected
         // amount.
@@ -611,14 +611,14 @@ TEST_F(DocumentSourceUnionWithTest, IncrementNestedAggregateOpCounterOnCreateBut
                 .firstElement(),
             originalExpCtx);
         auto originalUnionWith = static_cast<DocumentSourceUnionWith*>(docSource.get());
-        auto countAfterCreate = globalOpCounters.getNestedAggregate()->load();
+        auto countAfterCreate = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
         ASSERT_EQ(countAfterCreate - countBeforeCreate, expectedIncrease);
 
         // Copy the DocumentSourceUnionWith and verify that the counter doesn't increase.
         auto newExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
         newExpCtx->setResolvedNamespaces(resolvedNss);
         DocumentSourceUnionWith newUnionWith{*originalUnionWith, newExpCtx};
-        auto countAfterCopy = globalOpCounters.getNestedAggregate()->load();
+        auto countAfterCopy = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
         ASSERT_EQ(countAfterCopy - countAfterCreate, 0);
     };
 

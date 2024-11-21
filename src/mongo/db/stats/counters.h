@@ -184,7 +184,12 @@ private:
     CacheExclusive<AtomicWord<long long>> _queryDeprecated;
 };
 
-extern OpCounters globalOpCounters;
+OpCounters& serviceOpCounters(ClusterRole role);
+/** Convenience overload to fetch the serviceOpCounters for the role the opCtx is running under. */
+inline OpCounters& serviceOpCounters(OperationContext* opCtx) {
+    return serviceOpCounters(opCtx->getService()->role());
+}
+
 extern OpCounters replOpCounters;
 
 class NetworkCounter {

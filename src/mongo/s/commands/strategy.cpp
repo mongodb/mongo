@@ -916,14 +916,14 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     command->incrementCommandsExecuted();
 
     if (command->shouldAffectCommandCounter()) {
-        globalOpCounters.gotCommand();
+        serviceOpCounters(opCtx).gotCommand();
         if (analyze_shard_key::supportsSamplingQueries(opCtx)) {
             analyze_shard_key::QueryAnalysisSampler::get(opCtx).gotCommand(command->getName());
         }
     }
 
     if (command->shouldAffectQueryCounter()) {
-        globalOpCounters.gotQuery();
+        serviceOpCounters(opCtx).gotQuery();
     }
 
     if (opCtx->routedByReplicaSetEndpoint()) {

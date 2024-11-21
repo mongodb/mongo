@@ -440,7 +440,8 @@ public:
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
         // Reset the counters since each test assumes that the count starts at 0.
-        globalOpCounters.resetForTest();
+        serviceOpCounters(ClusterRole::ShardServer).resetForTest();
+        serviceOpCounters(ClusterRole::RouterServer).resetForTest();
     }
 
     void tearDown() override {
@@ -501,7 +502,7 @@ protected:
     void setUpConfigurations(
         QueryAnalysisSampler* sampler,
         const std::vector<CollectionQueryAnalyzerConfiguration>& configurations) {
-        globalOpCounters.gotQuery();
+        serviceOpCounters(ClusterRole::RouterServer).gotQuery();
         sampler->refreshQueryStatsForTest();
 
         auto queryStats = sampler->getQueryStatsForTest();
@@ -566,10 +567,10 @@ protected:
         ASSERT_EQ(*lastAvgCount, 0);
     }
 
-    void testInsertsTrackedByOpCounters(bool shouldCount) {
+    void testInsertsTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
         auto numInserts = 3;
-        globalOpCounters.gotInserts(numInserts);
+        serviceOpCounters(role).gotInserts(numInserts);
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -579,9 +580,9 @@ protected:
         ASSERT_EQ(*lastAvgCount, shouldCount ? numInserts : 0);
     }
 
-    void testUpdatesTrackedByOpCounters(bool shouldCount) {
+    void testUpdatesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters.gotUpdate();
+        serviceOpCounters(role).gotUpdate();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -591,9 +592,9 @@ protected:
         ASSERT_EQ(*lastAvgCount, shouldCount ? 1 : 0);
     }
 
-    void testDeletesTrackedByOpCounters(bool shouldCount) {
+    void testDeletesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters.gotDelete();
+        serviceOpCounters(role).gotDelete();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -615,9 +616,9 @@ protected:
         ASSERT_EQ(*lastAvgCount, shouldCount ? 1 : 0);
     }
 
-    void testQueriesTrackedByOpCounters(bool shouldCount) {
+    void testQueriesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters.gotQuery();
+        serviceOpCounters(role).gotQuery();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -627,9 +628,9 @@ protected:
         ASSERT_EQ(*lastAvgCount, shouldCount ? 1 : 0);
     }
 
-    void testCommandsTrackedByOpCounters(bool shouldCount) {
+    void testCommandsTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters.gotCommand();
+        serviceOpCounters(role).gotCommand();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -675,10 +676,9 @@ protected:
         ASSERT_EQ(*lastAvgCount, shouldCount ? 1 : 0);
     }
 
-    void testNestedAggregates(bool shouldCount) {
+    void testNestedAggregates(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters.gotNestedAggregate();
-        ;
+        serviceOpCounters(role).gotNestedAggregate();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -695,17 +695,17 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, InitialCount) {
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_NotCountInsertsTrackedByOpCounters) {
-    testInsertsTrackedByOpCounters(false /* shouldCount */);
+    testInsertsTrackedByOpCounters(false /* shouldCount */, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_CountUpdatesTrackedByOpCounters) {
-    testUpdatesTrackedByOpCounters(true /* shouldCount */);
+    testUpdatesTrackedByOpCounters(true /* shouldCount */, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_CountDeletesTrackedByOpCounters) {
-    testDeletesTrackedByOpCounters(true /* shouldCount */);
+    testDeletesTrackedByOpCounters(true /* shouldCount */, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountFindAndModify) {
@@ -714,12 +714,12 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountFindAndM
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_CountQueriesTrackedByOpCounters) {
-    testQueriesTrackedByOpCounters(true /* shouldCount */);
+    testQueriesTrackedByOpCounters(true /* shouldCount */, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_NotCountCommandsTrackedByOpCounters) {
-    testCommandsTrackedByOpCounters(false /* shouldCount */);
+    testCommandsTrackedByOpCounters(false /* shouldCount */, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountAggregates) {
@@ -736,19 +736,19 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountDistinct
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_NotCountNestedAggregatesTrackedByOpCounters) {
-    testNestedAggregates(false /* shouldCount */);
+    testNestedAggregates(false /* shouldCount */, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountInsertsTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testInsertsTrackedByOpCounters(false /* shouldCount */);
+    testInsertsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountUpdatesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testUpdatesTrackedByOpCounters(true /* shouldCount */);
+    testUpdatesTrackedByOpCounters(true /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountFindAndModify) {
@@ -759,19 +759,19 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountF
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountDeletesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testDeletesTrackedByOpCounters(true /* shouldCount */);
+    testDeletesTrackedByOpCounters(true /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountQueriesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testQueriesTrackedByOpCounters(true /* shouldCount */);
+    testQueriesTrackedByOpCounters(true /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountCommandsTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testCommandsTrackedByOpCounters(false /* shouldCount */);
+    testCommandsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountAggregates) {
@@ -792,25 +792,25 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountD
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountNestedAggregatesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testNestedAggregates(false /* shouldCount */);
+    testNestedAggregates(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountInsertsTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testInsertsTrackedByOpCounters(false /* shouldCount */);
+    testInsertsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountUpdatesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testUpdatesTrackedByOpCounters(false /* shouldCount */);
+    testUpdatesTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountDeletesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testDeletesTrackedByOpCounters(false /* shouldCount */);
+    testDeletesTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountFindAndModify) {
@@ -821,13 +821,13 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCo
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountQueriesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testQueriesTrackedByOpCounters(false /* shouldCount */);
+    testQueriesTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountCommandsTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testCommandsTrackedByOpCounters(false /* shouldCount */);
+    testCommandsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountAggregates) {
@@ -848,7 +848,7 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCo
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_CountNestedAggregatesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testNestedAggregates(true /* shouldCount */);
+    testNestedAggregates(true /* shouldCount */, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
@@ -904,8 +904,9 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     ASSERT_EQ(it1->second.getSamplesPerSecond(), refreshedConfigurations1[1].getSamplesPerSecond());
 
     // The per-second counts after: [0, 2].
-    globalOpCounters.gotUpdate();
-    globalOpCounters.gotDelete();
+    std::cout << "XXX role " << toString(operationContext()->getService()->role()) << std::endl;
+    serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
+    serviceOpCounters(ClusterRole::RouterServer).gotDelete();
     sampler.refreshQueryStatsForTest();
 
     auto queryStats2 = sampler.getQueryStatsForTest();
@@ -936,7 +937,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     ASSERT_EQ(it->second.getSamplesPerSecond(), refreshedConfigurations2[0].getSamplesPerSecond());
 
     // The per-second counts after: [0, 2, 5].
-    globalOpCounters.gotQuery();
+    serviceOpCounters(ClusterRole::RouterServer).gotQuery();
     sampler.gotCommand("findandmodify");
     sampler.gotCommand("aggregate");
     sampler.gotCommand("count");

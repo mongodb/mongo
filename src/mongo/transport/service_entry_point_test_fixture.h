@@ -94,7 +94,7 @@ public:
     void testHelloCmdSetsClientMetadata();
     void testCommentField();
     void testHelpField();
-    void testCommandGlobalCounters();
+    void testCommandServiceCounters(ClusterRole serviceRole);
     void testCommandMaxTimeMS();
     void testOpCtxInterrupt(bool deferHandling);
     void testReadConcernClientUnspecifiedNoDefault();

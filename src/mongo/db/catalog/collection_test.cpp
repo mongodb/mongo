@@ -752,7 +752,7 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     }
 
     ASSERT_EQUALS(1, coll->numRecords(operationContext()));
-    auto globalDeletesInitial = globalOpCounters.getDelete()->load();
+    auto globalDeletesInitial = serviceOpCounters(ClusterRole::ShardServer).getDelete()->load();
 
     // Inserting the second document will remove the first one.
     {
@@ -761,7 +761,7 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
             operationContext(), coll, InsertStatement(secondDoc), &opDebug));
         wuow.commit();
     }
-    auto globalDeletesAfterInsert = globalOpCounters.getDelete()->load();
+    auto globalDeletesAfterInsert = serviceOpCounters(ClusterRole::ShardServer).getDelete()->load();
     ASSERT_EQUALS(globalDeletesAfterInsert, globalDeletesInitial + 1);
 
     ASSERT_EQUALS(1, opDebug.additiveMetrics.keysDeleted.get_value_or(-1));
