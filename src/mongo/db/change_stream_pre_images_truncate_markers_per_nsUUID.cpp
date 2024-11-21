@@ -185,7 +185,6 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
     const auto numSamples = samples.size();
     invariant(numSamples > 0);
     invariant(randomSamplesPerMarker > 0);
-    invariant(randomSamplesPerMarker <= static_cast<uint64_t>(estimatedRecordsPerMarker));
     for (size_t i = randomSamplesPerMarker - 1; i < numSamples; i = i + randomSamplesPerMarker) {
         const auto& [id, wallTime] = samples[i];
         LOGV2_DEBUG(7658602,
@@ -198,16 +197,20 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
         wholeMarkers.emplace_back(estimatedRecordsPerMarker, estimatedBytesPerMarker, id, wallTime);
     }
 
-    auto currentBytes = 0;
-    auto currentRecords = 0;
+    int64_t currentBytes = 0;
+    int64_t currentRecords = 0;
     const auto [highestRecordId, highestWallTime] = samples.back();
     if (wholeMarkers.size() == 0 || wholeMarkers.front().lastRecord < highestRecordId) {
         // For partial marker expiry, the highest tracked record must be tracked with non-zero bytes
         // and count. Otherwise, it will be interpreted as a record which was already truncated.
         //
         // Compute the average records and bytes per sample.
-        currentRecords = std::ceil(estimatedRecordsPerMarker / randomSamplesPerMarker);
-        currentBytes = std::ceil(estimatedBytesPerMarker / randomSamplesPerMarker);
+        currentRecords =
+            std::max(static_cast<int64_t>(1),
+                     (estimatedRecordsPerMarker / static_cast<int64_t>(randomSamplesPerMarker)));
+        currentBytes =
+            std::max(static_cast<int64_t>(1),
+                     (estimatedBytesPerMarker / static_cast<int64_t>(randomSamplesPerMarker)));
     }
     return InitialSetOfMarkers{std::move(wholeMarkers),
                                std::move(highestRecordId),

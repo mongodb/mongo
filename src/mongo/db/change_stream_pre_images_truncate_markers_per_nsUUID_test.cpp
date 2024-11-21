@@ -406,6 +406,32 @@ TEST_F(PreImageInitialSetOfMarkersSamplingTest, InitialMarkersFullMarkerNoTracke
     assertTracksPreImage(actualInitialMarkers, kPreImage3);
 }
 
+// Exercises a scenario where the samples are for the same pre-image, and the
+// 'estimatedRecordsPerMarker' exceed the 'randomSamplesPerMarker'.
+TEST_F(PreImageInitialSetOfMarkersSamplingTest, InitialMarkers1RecordManySamples) {
+    auto opCtx = operationContext();
+    const auto kPreImageUUID = UUID::gen();
+
+    // Assume an incorrect 'avgRecordSize', which is possible if there is 1 large record.
+    const auto avgRecordSize = 16777328;
+    const auto estimatedRecordsPerMarker = 2;
+    const auto estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
+    const auto randomSamplesPerMarker = 10;
+    const auto actualInitialMarkers =
+        PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
+            opCtx,
+            kPreImageUUID,
+            kNsUUID,
+            {extractRecordIdAndWallTime(kPreImage1),
+             extractRecordIdAndWallTime(kPreImage1),
+             extractRecordIdAndWallTime(kPreImage1)},
+            estimatedRecordsPerMarker,
+            estimatedBytesPerMarker,
+            randomSamplesPerMarker);
+
+    assertTracksPreImage(actualInitialMarkers, kPreImage1);
+}
+
 class PreImagesPerNsUUIDRefreshHighestTrackedRecord : public CatalogTestFixture,
                                                       public ChangeStreamPreImageTestConstants {
 public:
