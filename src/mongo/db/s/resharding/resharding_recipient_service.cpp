@@ -1053,6 +1053,24 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                abortToken)
         .thenRunOn(**executor)
         .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
+            {
+                auto opCtx = factory.makeOperationContext(&cc());
+                auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
+                    opCtx.get(),
+                    _metadata.getSourceNss(),
+                    _metadata.getSourceUUID(),
+                    *_cloneTimestamp,
+                    "loading indexes to validate indexes on temporary resharding collection"_sd,
+                    /*expandSimpleCollation*/ false);
+
+                DBDirectClient client(opCtx.get());
+                auto tempCollIdxSpecs =
+                    client.getIndexSpecs(_metadata.getTempReshardingNss(), false, 0);
+                resharding::validateIndexSpecsMatch(sourceIdxSpecs.cbegin(),
+                                                    sourceIdxSpecs.cend(),
+                                                    tempCollIdxSpecs.cbegin(),
+                                                    tempCollIdxSpecs.cend());
+            }
             _transitionState(RecipientStateEnum::kApplying, factory);
         });
 }

@@ -88,7 +88,8 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         Timestamp afterClusterTime,
-        StringData reason) = 0;
+        StringData reason,
+        bool expandSimpleCollation = true) = 0;
 
     virtual boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss) = 0;
@@ -135,11 +136,13 @@ public:
         Timestamp afterClusterTime,
         StringData reason) override;
 
-    MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(OperationContext* opCtx,
-                                                                        const NamespaceString& nss,
-                                                                        const UUID& uuid,
-                                                                        Timestamp afterClusterTime,
-                                                                        StringData reason) override;
+    MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        Timestamp afterClusterTime,
+        StringData reason,
+        bool expandSimpleCollation = true) override;
 
 
     boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(

@@ -189,7 +189,8 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
                                                              const NamespaceString& nss,
                                                              const UUID& uuid,
                                                              Timestamp afterClusterTime,
-                                                             StringData reason) {
+                                                             StringData reason,
+                                                             bool expandSimpleCollation) {
     // Load the list of indexes from the shard which owns the global minimum chunk.
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
         auto cri = getTrackedCollectionRoutingInfo(opCtx, nss);
@@ -199,7 +200,7 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
             cri.cm.getMinKeyShardIdWithSimpleCollation(),
             cri,
             afterClusterTime,
-            /*normalizeMissingCollation=*/true);
+            expandSimpleCollation);
     });
 }
 

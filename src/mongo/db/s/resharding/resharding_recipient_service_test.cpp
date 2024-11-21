@@ -183,7 +183,8 @@ public:
         const NamespaceString& nss,
         const UUID& uuid,
         Timestamp afterClusterTime,
-        StringData reason) override {
+        StringData reason,
+        bool expandSimpleCollation) override {
         invariant(nss == _sourceNss);
         return {std::vector<BSONObj>{}, BSONObj()};
     }

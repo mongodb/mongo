@@ -49,6 +49,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -410,6 +411,38 @@ boost::optional<Status> coordinatorAbortedError();
  * hashed.
  */
 void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& shardKey);
+
+/**
+ * Validates that for each index spec in sourceIndexSpecs, there is an identical spec in
+ * localIndexSpecs. Field order does not matter.
+ */
+template <typename InputIterator1, typename InputIterator2>
+void validateIndexSpecsMatch(InputIterator1 sourceIndexSpecsBegin,
+                             InputIterator1 sourceIndexSpecsEnd,
+                             InputIterator2 localIndexSpecsBegin,
+                             InputIterator2 localIndexSpecsEnd) {
+    stdx::unordered_map<std::string, BSONObj> localIndexSpecMap;
+    std::transform(
+        localIndexSpecsBegin,
+        localIndexSpecsEnd,
+        std::inserter(localIndexSpecMap, localIndexSpecMap.end()),
+        [](const auto& spec) { return std::pair(spec.getStringField("name").toString(), spec); });
+
+    UnorderedFieldsBSONObjComparator bsonCmp;
+    for (auto it = sourceIndexSpecsBegin; it != sourceIndexSpecsEnd; ++it) {
+        auto spec = *it;
+        auto specName = spec.getStringField("name").toString();
+        uassert(9365601,
+                str::stream() << "Resharded collection missing source collection index: "
+                              << specName,
+                localIndexSpecMap.find(specName) != localIndexSpecMap.end());
+        uassert(9365602,
+                str::stream() << "Resharded collection created non-matching index. Source spec: "
+                              << spec << " Resharded collection spec: "
+                              << localIndexSpecMap.find(specName)->second,
+                bsonCmp.evaluate(spec == localIndexSpecMap.find(specName)->second));
+    }
+}
 
 }  // namespace resharding
 }  // namespace mongo
