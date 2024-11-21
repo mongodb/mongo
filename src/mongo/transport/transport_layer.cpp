@@ -57,5 +57,11 @@ const Status TransportLayer::TicketSessionClosedStatus = Status(
 
 ReactorTimer::ReactorTimer() : _id(reactorTimerIdCounter.addAndFetch(1)) {}
 
+thread_local Reactor* Reactor::_reactorForThread = nullptr;
+
+Date_t Reactor::ReactorClockSource::now() {
+    return _reactor->now();
+}
+
 }  // namespace transport
 }  // namespace mongo

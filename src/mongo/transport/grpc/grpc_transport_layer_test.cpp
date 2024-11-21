@@ -214,6 +214,20 @@ TEST_F(GRPCTransportLayerTest, RunLargeCommand) {
     runCommandThroughServiceEntryPoint(largeMessage);
 }
 
+TEST_F(GRPCTransportLayerTest, TransportLayerStartsEgressReactor) {
+    runWithTL(
+        makeNoopRPCHandler(),
+        [](GRPCTransportLayer& tl) {
+            auto reactor = tl.getReactor(TransportLayer::WhichReactor::kEgress);
+
+            // Schedule a single task on the reactor to make sure it is working.
+            auto pf = makePromiseFuture<void>();
+            reactor->schedule([&](Status status) { pf.promise.setFrom(status); });
+            ASSERT_OK(std::move(pf.future).getNoThrow());
+        },
+        CommandServiceTestFixtures::makeTLOptions());
+}
+
 /**
  * Modifies the `ServiceContext` with `PeriodicRunnerMock`, a custom `PeriodicRunner` that maintains
  * a list of all instances of `PeriodicJob` and allows monitoring their internal state. We use this

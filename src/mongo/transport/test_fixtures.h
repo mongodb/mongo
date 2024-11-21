@@ -129,10 +129,6 @@ public:
         t(Status::OK());
     }
 
-    bool onReactorThread() const override {
-        MONGO_UNREACHABLE;
-    }
-
     std::unique_ptr<ReactorTimer> makeTimer() override {
         MONGO_UNREACHABLE;
     }
@@ -156,10 +152,6 @@ public:
     }
 
     void schedule(Task) override {
-        MONGO_UNREACHABLE;
-    }
-
-    bool onReactorThread() const override {
         MONGO_UNREACHABLE;
     }
 

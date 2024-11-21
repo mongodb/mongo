@@ -60,7 +60,10 @@ GRPCTransportLayerImpl::Options::Options(const ServerGlobalParams& params) {
 GRPCTransportLayerImpl::GRPCTransportLayerImpl(ServiceContext* svcCtx,
                                                Options options,
                                                std::unique_ptr<SessionManager> sm)
-    : _svcCtx{svcCtx}, _options{std::move(options)}, _sessionManager(std::move(sm)) {}
+    : _svcCtx{svcCtx},
+      _egressReactor(std::make_shared<GRPCReactor>()),
+      _options{std::move(options)},
+      _sessionManager(std::move(sm)) {}
 
 std::unique_ptr<GRPCTransportLayerImpl> GRPCTransportLayerImpl::createWithConfig(
     ServiceContext* svcCtx,
@@ -201,6 +204,14 @@ Status GRPCTransportLayerImpl::start() {
             }
         }
         if (_client) {
+            _ioThread = stdx::thread([this] {
+                setThreadName("GRPCDefaultEgressReactor");
+                LOGV2_DEBUG(9715105, 2, "Starting the default egress gRPC reactor");
+                _egressReactor->run();
+                LOGV2_DEBUG(9715106, 2, "Draining the default egress gRPC reactor");
+                _egressReactor->drain();
+                LOGV2_DEBUG(9715107, 2, "Finished drain of the default egress gRPC reactor");
+            });
             _client->start(_svcCtx);
         }
         return Status::OK();
@@ -250,6 +261,10 @@ void GRPCTransportLayerImpl::shutdown() {
     }
     if (_client) {
         _client->shutdown();
+        LOGV2_DEBUG(9715108, 2, "Stopping default egress gRPC reactor");
+        _egressReactor->stop();
+        LOGV2_DEBUG(9715109, 2, "Joining the default egress gRPC reactor thread");
+        _ioThread.join();
     }
 
     if (_sessionManager) {

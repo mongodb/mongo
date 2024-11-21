@@ -230,10 +230,6 @@ public:
         }
     }
 
-    bool onReactorThread() const override {
-        return this == _reactorForThread;
-    }
-
     operator asio::io_context&() {
         return _ioContext;
     }
@@ -243,39 +239,6 @@ public:
     }
 
 private:
-    // Provides `ClockSource` API for the reactor's clock source.
-    class ReactorClockSource final : public ClockSource {
-    public:
-        explicit ReactorClockSource(AsioReactor* reactor) : _reactor(reactor) {}
-        ~ReactorClockSource() override = default;
-
-        Milliseconds getPrecision() override {
-            MONGO_UNREACHABLE;
-        }
-
-        Date_t now() override {
-            return _reactor->now();
-        }
-
-    private:
-        AsioReactor* const _reactor;
-    };
-
-    class ThreadIdGuard {
-    public:
-        ThreadIdGuard(AsioReactor* reactor) {
-            invariant(!_reactorForThread);
-            _reactorForThread = reactor;
-        }
-
-        ~ThreadIdGuard() {
-            invariant(_reactorForThread);
-            _reactorForThread = nullptr;
-        }
-    };
-
-    static thread_local AsioReactor* _reactorForThread;
-
     ReactorClockSource _clkSource;
 
     ExecutorStats _stats;
@@ -284,8 +247,6 @@ private:
 
     AtomicWord<bool> _closedForScheduling{false};
 };
-
-thread_local AsioReactor* AsioReactor::_reactorForThread = nullptr;
 
 AsioTransportLayer::Options::Options(const ServerGlobalParams* params)
     : port(params->port),

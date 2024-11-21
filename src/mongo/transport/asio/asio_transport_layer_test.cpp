@@ -745,6 +745,8 @@ TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
           "msg"_attr = "{}"_format(thrown ? thrown->message() : ""));
 }
 
+// TODO SERVER-97299: Remove this test in favor of
+// ReactorTestFixture::testScheduleOnReactorAfterShutdownFails.
 DEATH_TEST_REGEX(AsioTransportLayer, ScheduleOnReactorAfterShutdownFails, "Shutdown in progress") {
     TestFixture tf;
 

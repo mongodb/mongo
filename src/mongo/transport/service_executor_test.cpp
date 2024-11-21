@@ -128,10 +128,6 @@ public:
         asio::post(_ioContext, [task = std::move(task)] { task(Status::OK()); });
     }
 
-    bool onReactorThread() const final {
-        return false;
-    }
-
     operator asio::io_context&() {
         return _ioContext;
     }

@@ -34,6 +34,7 @@
 
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/grpc/reactor.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
 
@@ -88,6 +89,19 @@ public:
                               bool asyncOCSPStaple) override;
 #endif
 
+    ReactorHandle getReactor(WhichReactor which) override {
+        switch (which) {
+            case TransportLayer::kIngress:
+                MONGO_UNIMPLEMENTED;
+            case TransportLayer::kEgress:
+                return _egressReactor;
+            case TransportLayer::kNewReactor:
+                return std::make_shared<GRPCReactor>();
+        }
+
+        MONGO_UNREACHABLE;
+    }
+
     const std::vector<HostAndPort>& getListeningAddresses() const override;
 
     SessionManager* getSessionManager() const override {
@@ -105,6 +119,16 @@ private:
     std::shared_ptr<Client> _client;
     std::unique_ptr<Server> _server;
     ServiceContext* const _svcCtx;
+
+    /**
+     * The GRPCTransportLayer starts an egress reactor on an _ioThread that is provided to
+     * streams/sessions on calls to the synchronous connect() function. Providing this default
+     * reactor allows use of the synchronous transport layer APIs with gRPC's async completion queue
+     * API.
+     */
+    stdx::thread _ioThread;
+    std::shared_ptr<GRPCReactor> _egressReactor;
+
     // Invalidated after setup().
     std::vector<std::unique_ptr<Service>> _services;
     Options _options;

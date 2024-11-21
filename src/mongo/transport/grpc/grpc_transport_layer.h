@@ -105,13 +105,6 @@ public:
     }
 
     /**
-     * Not applicable to gRPC networking.
-     */
-    ReactorHandle getReactor(WhichReactor) override {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    /**
      * The addresses the gRPC server is listening to, if any.
      *
      * This must only be invoked after the transport layer has been started.

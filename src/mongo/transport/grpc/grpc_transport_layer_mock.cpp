@@ -42,6 +42,7 @@ GRPCTransportLayerMock::GRPCTransportLayerMock(ServiceContext* svcCtx,
                                                const HostAndPort& mockClientAddress)
     : _svcCtx{std::move(svcCtx)},
       _options{std::move(options)},
+      _reactor{std::make_shared<GRPCReactor>()},
       _resolver{std::move(resolver)},
       _mockClientAddress{std::move(mockClientAddress)} {}
 

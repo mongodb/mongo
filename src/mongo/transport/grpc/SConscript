@@ -16,6 +16,7 @@ env.CppUnitTest(
         "mock_client_test.cpp",
         "mock_server_stream_test.cpp",
         "mock_stub_test.cpp",
+        "reactor_test.cpp",
         "server_test.cpp",
         "service_test.cpp",
     ],

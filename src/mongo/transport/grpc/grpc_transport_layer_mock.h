@@ -35,6 +35,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/mock_client.h"
+#include "mongo/transport/grpc/reactor.h"
 
 namespace mongo::transport::grpc {
 
@@ -92,6 +93,10 @@ public:
         return {};
     }
 
+    ReactorHandle getReactor(WhichReactor which) override {
+        return _reactor;
+    }
+
 private:
     enum class StartupState { kNotStarted, kSetup, kStarted, kShutDown };
 
@@ -101,6 +106,9 @@ private:
     std::shared_ptr<Client> _client;
     ServiceContext* const _svcCtx;
     Options _options;
+    // This reactor is used to produce CompletionQueueEntry tags for the mocks that don't use the
+    // completion queue, but it does not need to be run.
+    std::shared_ptr<GRPCReactor> _reactor;
 
     // Invalidated after setup().
     MockClient::MockResolver _resolver;

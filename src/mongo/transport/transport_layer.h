@@ -189,7 +189,7 @@ public:
     ReactorTimer& operator=(const ReactorTimer&) = delete;
 
     /*
-     * The destructor calls cancel() to ensure outstanding Futures are filled.
+     * The destructor calls cancel() to ensure the outstanding Future is filled.
      */
     virtual ~ReactorTimer() = default;
 
@@ -208,7 +208,8 @@ public:
     /*
      * Returns a future that will be filled with Status::OK after the deadline has passed.
      *
-     * Calling this implicitly calls cancel().
+     * Calling this implicitly calls cancel(), as there can be at most one outstanding Future per
+     * ReactorTimer at a time.
      */
     virtual Future<void> waitUntil(Date_t deadline, const BatonHandle& baton = nullptr) = 0;
 
@@ -216,6 +217,15 @@ private:
     const size_t _id;
 };
 
+/**
+ * The Reactor is an OutOfLineExecutor that uses the event engine of the underlying transport layer
+ * to schedule and execute work. Work is scheduled on the reactor through calls to
+ * schedule and through performing async networking work on the relevant event engine primitive for
+ * each transport layer. The reactor is typically used by starting a separate thread that calls
+ * run() and drain().
+ *
+ * All Session objects associated with a reactor MUST be ended before the reactor is stopped.
+ */
 class Reactor : public OutOfLineExecutor {
 public:
     Reactor(const Reactor&) = delete;
@@ -227,24 +237,85 @@ public:
      * Run the event loop of the reactor until stop() is called.
      */
     virtual void run() noexcept = 0;
+
+    /**
+     * Stop the polling loop in run(). drain() must be called after stop() to ensure no outstanding
+     * tasks are leaked.
+     */
     virtual void stop() = 0;
+
+    /**
+     * This function will block until all outstanding work scheduled on the reactor has been
+     * completed or canceled.
+     */
     virtual void drain() = 0;
 
+    /**
+     * Schedule a task to run on the reactor thread. See OutOfLineExecutor::schedule for more
+     * detailed documentation.
+     */
     void schedule(Task task) override = 0;
 
-    virtual bool onReactorThread() const = 0;
+    bool onReactorThread() const {
+        return this == _reactorForThread;
+    }
 
     /*
      * Makes a timer tied to this reactor's event loop. Timeout callbacks will be
      * executed in a thread calling run().
      */
     virtual std::unique_ptr<ReactorTimer> makeTimer() = 0;
+
+    /**
+     * Get the time according to the clock driving the event engine of the reactor.
+     */
     virtual Date_t now() = 0;
 
+    /**
+     * Appends stats for the reactor, typically recorded with the ExecutorStats class.
+     */
     virtual void appendStats(BSONObjBuilder& bob) const = 0;
 
 protected:
     Reactor() = default;
+
+    /**
+     * Helper class for the onReactorThread function. Implementations of the Reactor should use the
+     * ThreadIdGuard in the run() and drain() functions.
+     */
+    class ThreadIdGuard {
+    public:
+        ThreadIdGuard(Reactor* reactor) {
+            invariant(!_reactorForThread);
+            _reactorForThread = reactor;
+        }
+
+        ~ThreadIdGuard() {
+            invariant(_reactorForThread);
+            _reactorForThread = nullptr;
+        }
+    };
+
+    /**
+     * Provides `ClockSource` API for the reactor's clock source, which can be used to record
+     * ExecutorStats.
+     */
+    class ReactorClockSource final : public ClockSource {
+    public:
+        explicit ReactorClockSource(Reactor* reactor) : _reactor(reactor) {}
+        ~ReactorClockSource() override = default;
+
+        Milliseconds getPrecision() override {
+            MONGO_UNREACHABLE;
+        }
+
+        Date_t now() override;
+
+    private:
+        Reactor* const _reactor;
+    };
+
+    static thread_local Reactor* _reactorForThread;
 };
 
 
