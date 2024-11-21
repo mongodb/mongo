@@ -1,6 +1,6 @@
-testB
-test
-basic.coll as fuzzer_coll
+indexOptions
+indexOptions
+indexOptions.coll as fuzzer_coll
 
 0
 :results {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}

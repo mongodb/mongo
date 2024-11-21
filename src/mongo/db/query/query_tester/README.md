@@ -77,7 +77,12 @@ These have the same format as .test files above, with the exception that each te
 
 See sampleTests/basic.coll
 These files are split into two sections divided by an empty line.
-Above the empty line are index definitions, one per line.
+Above the empty line are index definitions, one per line. They can be of the form:
+
+1. `{<index>}`, or
+2. `{key: <index>}`, or
+3. `{key: <index>, options: <indexOptions>}`
+
 Below the empty line are documents, one per line.
 
 These files are referenced by test files, and can/should be shared across tests.

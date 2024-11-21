@@ -103,9 +103,22 @@ void readAndBuildIndexes(DBClientConnection* const conn,
 
     readLine(fs, lineFromFile);
     for (auto indexNum = 0; !lineFromFile.empty(); readLine(fs, lineFromFile), ++indexNum) {
+        const auto& indexObj = fromFuzzerJson(lineFromFile);
         BSONObjBuilder indexBob;
-        indexBob.append("key", fromFuzzerJson(lineFromFile));
-        indexBob.append("name", str::stream{} << "index_" << indexNum);
+
+        // Append "key" field containing the index if present.
+        if (const auto keyObj = indexObj.getObjectField("key"); !keyObj.isEmpty()) {
+            indexBob.append("key", keyObj);
+            // Append "options" field containing the indexOptions if present.
+            if (const auto optionsObj = indexObj.getObjectField("options"); !optionsObj.isEmpty()) {
+                indexBob.appendElements(optionsObj);
+            }
+        } else {
+            // Otherwise, the entire object is just an index key.
+            indexBob.append("key", indexObj);
+        }
+
+        indexBob.append("name", mongo::str::stream{} << "index_" << indexNum);
         indexBuilder.append(indexBob.done());
     }
 

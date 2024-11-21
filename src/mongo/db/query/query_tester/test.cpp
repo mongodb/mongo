@@ -345,8 +345,7 @@ void Test::writeToStream(std::fstream& fs, const WriteOutOptions resultOpt) cons
     const auto& resultRef = [&]() {
         if (_normalizedResult.empty()) {
             for (auto&& bson : _expectedResult) {
-                writeOutResult.push_back(
-                    bson.jsonString(mongo::ExtendedRelaxedV2_0_0, false, false));
+                writeOutResult.push_back(bson.jsonString(ExtendedRelaxedV2_0_0, false, false));
             }
             return writeOutResult;
         } else {
