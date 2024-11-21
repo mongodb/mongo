@@ -1106,9 +1106,15 @@ TEST_F(InitialSyncerTest, InitialSyncerTransitionsToCompleteWhenFinishCallbackTh
     };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
+    auto hangBeforeFinish = globalFailPointRegistry().find("initialSyncHangBeforeFinish");
+    auto timesEnteredFailPoint = hangBeforeFinish->setMode(FailPoint::alwaysOn);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     ASSERT_OK(initialSyncer->shutdown());
+
+    hangBeforeFinish->waitForTimesEntered(timesEnteredFailPoint + 1);
+    hangBeforeFinish->setMode(FailPoint::off);
     initialSyncer->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
