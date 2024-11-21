@@ -99,7 +99,6 @@ namespace mongo::logv2 {
     X(kASIO,                   , "asio"                  , "ASIO"    , kNetwork) \
     X(kBridge,                 , "bridge"                , "BRIDGE"  , kNetwork) \
     X(kTransaction,            , "transaction"           , "TXN"     , kDefault) \
-    X(kTenantMigration,        , "tenantMigration"       , "TENANT_M", kDefault) \
     X(kConnectionPool,         , "connectionPool"        , "CONNPOOL", kNetwork) \
     X(kTest,                   , "test"                  , "TEST"    , kDefault) \
     X(kResourceConsumption,    , "resourceConsumption"   , "RES_CONS", kDefault) \

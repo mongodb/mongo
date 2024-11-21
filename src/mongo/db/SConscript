@@ -49,7 +49,6 @@ env.SConscript(
         "query",
         "repl",
         "s",
-        "serverless",
         "session",
         "sorter",
         "stats",

@@ -177,7 +177,6 @@ enums:
            revokeRolesFromUser :  "revokeRolesFromUser"       # ID only
            rotateCertificates :  "rotateCertificates"
            runAsLessPrivilegedUser :  "runAsLessPrivilegedUser"
-           runTenantMigration :  "runTenantMigration"
            serverStatus :  "serverStatus"
            setAuthenticationRestriction :  "setAuthenticationRestriction"
            setClusterParameter: "setClusterParameter"

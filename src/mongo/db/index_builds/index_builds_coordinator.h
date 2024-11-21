@@ -69,7 +69,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/tenant_id.h"

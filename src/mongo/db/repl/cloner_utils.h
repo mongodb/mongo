@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/tenant_id.h"
 
 namespace mongo {
@@ -51,26 +50,9 @@ class ClonerUtils {
 
 public:
     /**
-     * Builds a regex that matches database names prefixed with a specific tenantId.
-     */
-    static BSONObj makeTenantDatabaseRegex(StringData prefix);
-
-    /**
-     * Builds a filter that matches database names prefixed with a specific tenantId.
-     */
-    static BSONObj makeTenantDatabaseFilter(StringData prefix);
-
-    /**
      * Assembles a majority read using the operationTime specified as the afterClusterTime.
      */
     static BSONObj buildMajorityWaitRequest(Timestamp operationTime);
-
-    /**
-     * Checks if the database belongs to the given tenant.
-     */
-    static bool isDatabaseForTenant(const DatabaseName& db,
-                                    const boost::optional<TenantId>& tenant,
-                                    MigrationProtocolEnum protocol);
 };
 
 
