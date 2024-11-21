@@ -14,10 +14,6 @@ env.Benchmark(
 
 env.CppUnitTest(
     target="tracking_allocator_test",
-    source=[
-        "tracking_allocator_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

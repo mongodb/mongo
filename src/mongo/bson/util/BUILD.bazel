@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,6 +7,16 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_binary(
+    name = "bson_corpus_gen",
+    srcs = [
+        "bson_corpus_gen.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
 )
 
 mongo_cc_library(
@@ -19,5 +29,22 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "bson_util_test",
+    srcs = [
+        "bson_check.h",
+        "bson_check_test.cpp",
+        "bson_extract_test.cpp",
+        "builder_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":bson_extract",
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/util:safe_num",
     ],
 )

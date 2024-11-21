@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -24,5 +24,16 @@ mongo_cc_library(
         "string_map.h",
         "unordered_map.h",
         "vector.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "tracking_allocator_test",
+    srcs = [
+        "tracking_allocator_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
     ],
 )

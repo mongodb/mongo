@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "MONGO_GLOBAL_COPTS", "MONGO_GLOBAL_DEFINES", "MONGO_GLOBAL_LINKFLAGS", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "MONGO_GLOBAL_COPTS", "MONGO_GLOBAL_DEFINES", "MONGO_GLOBAL_LINKFLAGS", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 load("//bazel/config:render_template.bzl", "render_template")
 
@@ -14,6 +14,7 @@ filegroup(
     name = "headers",
     srcs = [
         "cancellation.h",
+        "concurrent_shared_values_map.h",
         "database_name_util.h",
         "fail_point.h",
         "inline_memory.h",
@@ -792,4 +793,228 @@ generate_config_header(
     logfile = "version_constants_gen.log",
     output = "version_constants.h",
     template = "version_constants.h.in",
+)
+
+mongo_cc_unit_test(
+    name = "concurrent_shared_values_map_test",
+    srcs = ["concurrent_shared_values_map_test.cpp"],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_unit_test(
+    name = "tracing_support_test",
+    srcs = [
+        "tracing_support_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":tick_source_mock",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:tracing_support",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "thread_safety_context_test",
+    srcs = [
+        "thread_safety_context_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "versioned_value_test",
+    srcs = [
+        "versioned_value_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "executor_stats_test",
+    srcs = [
+        "executor_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:executor_stats",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "tcmalloc_set_parameters_test",
+    srcs = [
+        "tcmalloc_set_parameter_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    target_compatible_with = select({
+        "//bazel/config:tcmalloc_gperf_enabled": [],
+        "//bazel/config:tcmalloc_google_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":processinfo",
+        ":tcmalloc_server_status",
+        ":tcmalloc_set_parameter",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "util_test",
+    srcs = [
+        "alarm_test.cpp",
+        "aligned_test.cpp",
+        "assert_util_test.cpp",
+        "background_job_test.cpp",
+        "background_thread_clock_source_test.cpp",
+        "base64_test.cpp",
+        "cancellation_test.cpp",
+        "clock_source_mock_test.cpp",
+        "concurrent_memory_aggregator_test.cpp",
+        "container_size_helper_test.cpp",
+        "ctype_test.cpp",
+        "decimal_counter_test.cpp",
+        "decorable_test.cpp",
+        "dns_name_test.cpp",
+        "dns_query_test.cpp",
+        "duration_test.cpp",
+        "dynamic_bitset_test.cpp",
+        "dynamic_catch_test.cpp",
+        "errno_util_test.cpp",
+        "executor_test_util.h",
+        "fail_point_test.cpp",
+        "fixed_string_test.cpp",
+        "functional_test.cpp",
+        "future_test_edge_cases.cpp",
+        "future_test_executor_future.cpp",
+        "future_test_future_int.cpp",
+        "future_test_future_move_only.cpp",
+        "future_test_future_void.cpp",
+        "future_test_promise_int.cpp",
+        "future_test_promise_void.cpp",
+        "future_test_shared_future.cpp",
+        "future_test_utils.h",
+        "future_test_valid.cpp",
+        "future_util_test.cpp",
+        "hierarchical_acquisition_test.cpp",
+        "histogram_test.cpp",
+        "icu_test.cpp",
+        "inline_memory_test.cpp",
+        "inlined_storage_test.cpp",
+        "interruptible_test.cpp",
+        "invalidating_lru_cache_test.cpp",
+        "itoa_test.cpp",
+        "latency_distribution.h",
+        "latency_distribution_test.cpp",
+        "lockable_adapter_test.cpp",
+        "log_with_sampling_test.cpp",
+        "lru_cache_test.cpp",
+        "md5_test.cpp",
+        "memory_usage_tracker_test.cpp",
+        "optional_util_test.cpp",
+        "out_of_line_executor_test.cpp",
+        "overloaded_visitor_test.cpp",
+        "packaged_task.h",
+        "packaged_task_test.cpp",
+        "parking_lot_test.cpp",
+        "pcre_test.cpp",
+        "pcre_util_test.cpp",
+        "periodic_runner_impl_test.cpp",
+        "processinfo_test.cpp",
+        "producer_consumer_queue_test.cpp",
+        "progress_meter_test.cpp",
+        "read_through_cache_test.cpp",
+        "registry_list_test.cpp",
+        "represent_as_test.cpp",
+        "roaring_bitmaps_test.cpp",
+        "safe_num_test.cpp",
+        "scoped_unlock_test.cpp",
+        "secure_zero_memory_test.cpp",
+        "shared_buffer_test.cpp",
+        "sort.h",
+        "static_immortal_test.cpp",
+        "str_test.cpp",
+        "string_map_test.cpp",
+        "strong_weak_finish_line_test.cpp",
+        "summation_test.cpp",
+        "text_test.cpp",
+        "tick_source_test.cpp",
+        "time_support_test.cpp",
+        "timer_test.cpp",
+        "util_sort_test.cpp",
+        "//src/mongo/unittest:join_thread.h",
+    ] + select({
+        "@platforms//os:linux": ["procparser_test.cpp"],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":alarm",
+        ":background_job",
+        ":caching",
+        ":clock_source_mock",
+        ":clock_sources",
+        ":dns_query",
+        ":fail_point",
+        ":future_util",
+        ":icu",
+        ":pcre_util",
+        ":pcre_wrapper",
+        ":periodic_runner_impl",
+        ":processinfo",
+        ":progress_meter",
+        ":safe_num",
+        ":secure_zero_memory",
+        ":summation",
+        ":version_impl",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/third_party/tomcrypt-1.18.2:tomcrypt_md5",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "signal_handlers_test",
+    srcs = [
+        "fixed_string.h",
+        "signal_handlers_asynchronous_test.cpp",
+        "signal_handlers_synchronous_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":signal_handlers",
+        ":version_impl",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+    ],
 )

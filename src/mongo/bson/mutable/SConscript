@@ -4,29 +4,8 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="mutable_bson_test_utils",
-    source=[
-        "mutable_bson_test_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "mutable_bson",
-    ],
-)
-
 env.CppUnitTest(
     target="bson_mutable_test",
-    source=[
-        "mutable_bson_test.cpp",
-        "mutable_bson_algo_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "mutable_bson",
-        "mutable_bson_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
