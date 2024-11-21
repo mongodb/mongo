@@ -35,4 +35,8 @@ mongoTest = env.Program(
         "mongotest_core",
     ],
     AIB_COMPONENT="mongotest",
+    AIB_COMPONENTS_EXTRA=[
+        "devcore",
+        "dist-test",
+    ],
 )

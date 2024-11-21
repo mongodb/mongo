@@ -1754,6 +1754,15 @@ tasks:
         vars:
           suite: query_golden_sharding
 
+  - <<: *task_template
+    name: query_tester_self_test
+    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_tester_self_test
+
   ################################################
   #           Query Integration tasks            #
   ################################################
