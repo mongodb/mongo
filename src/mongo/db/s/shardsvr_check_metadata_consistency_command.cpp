@@ -28,7 +28,6 @@
  */
 
 
-#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <string>
@@ -65,7 +64,6 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/member_state.h"
@@ -82,9 +80,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -94,12 +90,10 @@
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
@@ -229,8 +223,18 @@ public:
                 auto checkMetadataForDb = [&]() {
                     try {
                         hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
+                        auto backoffStrategy = std::invoke([]() {
+                            static const size_t retryCount{60};
+                            static const size_t baseWaitTimeMs{50};
+                            static const size_t maxWaitTimeMs{1000};
+
+                            return DDLLockManager::TruncatedExponentialBackoffStrategy<
+                                retryCount,
+                                baseWaitTimeMs,
+                                maxWaitTimeMs>();
+                        });
                         DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                            opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
+                            opCtx, dbNss.dbName(), kDDLLockReason, MODE_S, backoffStrategy};
                         tassert(9504001,
                                 "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                                 !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
