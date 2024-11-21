@@ -236,7 +236,7 @@ export var EncryptedClient = class {
      * @param {string} name Name of collection
      * @param {Object} options Create Collection options
      */
-    createEncryptionCollection(name, options) {
+    createEncryptionCollection(name, options, implicitShardingKey) {
         assert(options != undefined);
         assert(options.hasOwnProperty("encryptedFields"));
         assert(options.encryptedFields.hasOwnProperty("fields"));
@@ -275,9 +275,13 @@ export var EncryptedClient = class {
 
         // All our tests use "last" as the key to query on so shard on "last" instead of "_id"
         if (this.useImplicitSharding) {
+            let shardKey = {last: "hashed"};
+            if (implicitShardingKey) {
+                shardKey = implicitShardingKey;
+            }
             let shardCollCmd = {
                 shardCollection: this._db.getName() + "." + name,
-                key: {last: "hashed"},
+                key: shardKey,
                 collation: {locale: "simple"}
             };
 
