@@ -3,3 +3,6 @@ filters:
   - "prepare_recordid_initialization.js":
     approvers:
       - 10gen/server-storage-execution
+  - "replicate_record_ids_dbhash.js":
+    approvers:
+      - 10gen/server-replication
