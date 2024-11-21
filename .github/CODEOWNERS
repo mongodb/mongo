@@ -321,6 +321,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core_standalone/OWNERS.yml
 /jstests/core_standalone/**/* @10gen/server-replication @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/decimal/OWNERS.yml
+/jstests/decimal/**/* @10gen/server-programmability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/disk/OWNERS.yml
 /jstests/disk/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
 
@@ -354,6 +357,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/query/**/query_settings*.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/query/**/sbe*.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/query/**/wildcard_index_helpers.js @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/libunwind/OWNERS.yml
+/jstests/libunwind/**/* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/OWNERS.yml
 /jstests/multiVersion/**/migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -588,6 +594,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/ocsp/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/parallel/OWNERS.yml
+/jstests/parallel/**/* @10gen/server-programmability @svc-auto-approve-bot
 /jstests/parallel/**/insert.js @10gen/server-storage-execution @svc-auto-approve-bot
 /jstests/parallel/**/del.js @10gen/server-storage-execution @svc-auto-approve-bot
 
