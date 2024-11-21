@@ -36,7 +36,6 @@
 #include <mutex>
 #include <utility>
 
-#include "mongo/db/curop.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -88,6 +87,11 @@ void LocalOplogInfo::setRecordStore(RecordStore* rs) {
 void LocalOplogInfo::resetRecordStore() {
     _rs = nullptr;
 }
+
+Microseconds LocalOplogInfo::getTotalOplogSlotDurationMicros() const {
+    return Microseconds(_totalOplogSlotDurationMicros.loadRelaxed());
+}
+
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
     VectorClockMutable::get(service)->tickClusterTimeTo(LogicalTime(newTime));
@@ -154,7 +158,8 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
     // If we abort a transaction that has reserved an optime, we should make sure to update the
     // stable timestamp if necessary, since this oplog hole may have been holding back the stable
     // timestamp.
-    shard_role_details::getRecoveryUnit(opCtx)->onRollback([replCoord,
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback([this,
+                                                            replCoord,
                                                             oplogSlotDurationTimer,
                                                             isFirstOpTime,
                                                             prevAssertOnLockAttempt,
@@ -162,8 +167,8 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
                                                                OperationContext* opCtx) {
         replCoord->attemptToAdvanceStableTimestamp();
         // Sum the oplog slot durations. An operation may participate in multiple transactions.
-        CurOp::get(opCtx)->debug().totalOplogSlotDurationMicros +=
-            Microseconds(oplogSlotDurationTimer.elapsed());
+        _totalOplogSlotDurationMicros.fetchAndAdd(
+            durationCount<Microseconds>(oplogSlotDurationTimer.elapsed()));
 
         // Only reset these properties when the first slot is released.
         if (isFirstOpTime) {
@@ -172,21 +177,23 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
         }
     });
 
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [oplogSlotDurationTimer, isFirstOpTime, prevAssertOnLockAttempt, prevRuBlockingAllowed](
-            OperationContext* opCtx, boost::optional<Timestamp>) {
-            // Sum the oplog slot durations. An operation may participate in multiple transactions.
-            CurOp::get(opCtx)->debug().totalOplogSlotDurationMicros +=
-                Microseconds(oplogSlotDurationTimer.elapsed());
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit([this,
+                                                          oplogSlotDurationTimer,
+                                                          isFirstOpTime,
+                                                          prevAssertOnLockAttempt,
+                                                          prevRuBlockingAllowed](
+                                                             OperationContext* opCtx,
+                                                             boost::optional<Timestamp>) {
+        // Sum the oplog slot durations. An operation may participate in multiple transactions.
+        _totalOplogSlotDurationMicros.fetchAndAdd(
+            durationCount<Microseconds>(oplogSlotDurationTimer.elapsed()));
 
-            // Only reset these properties when the first slot is released.
-            if (isFirstOpTime) {
-                shard_role_details::getLocker(opCtx)->setAssertOnLockAttempt(
-                    prevAssertOnLockAttempt);
-                shard_role_details::getRecoveryUnit(opCtx)->setBlockingAllowed(
-                    prevRuBlockingAllowed);
-            }
-        });
+        // Only reset these properties when the first slot is released.
+        if (isFirstOpTime) {
+            shard_role_details::getLocker(opCtx)->setAssertOnLockAttempt(prevAssertOnLockAttempt);
+            shard_role_details::getRecoveryUnit(opCtx)->setBlockingAllowed(prevRuBlockingAllowed);
+        }
+    });
 
     return oplogSlots;
 }
