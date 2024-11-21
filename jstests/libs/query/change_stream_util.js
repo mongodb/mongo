@@ -149,13 +149,41 @@ export function assertEndOfTransaction(changes) {
     }
 }
 
+function isResumableChangeStreamError(error) {
+    return "errorLabels" in error && error.errorLabels.includes("ResumableChangeStreamError");
+}
+
 export function ChangeStreamTest(_db, options) {
     // Keeps track of cursors opened during the test so that we can be sure to
     // clean them up before the test completes.
     let _allCursors = [];
+    // Map to store cursor-specific data
+    let _cursorData = new Map();
     let self = this;
     options = options || {};
     const eventModifier = options.eventModifier || canonicalizeEventForTesting;
+
+    function updateResumeToken(cursor, changeEvents) {
+        const cursorId = String(cursor.id);
+        if (!_cursorData.has(cursorId)) {
+            _cursorData.set(cursorId, {});
+        }
+        const cursorInfo = _cursorData.get(cursorId);
+
+        if (changeEvents && changeEvents.length > 0) {
+            cursorInfo.resumeToken =
+                changeEvents[changeEvents.length - 1]._id || cursor.postBatchResumeToken;
+        } else if (cursor.postBatchResumeToken) {
+            cursorInfo.resumeToken = cursor.postBatchResumeToken;
+        }
+    }
+
+    function addResumeToken(pipeline, resumeToken) {
+        let csStage = pipeline[0]["$changeStream"];
+        csStage["resumeAfter"] = resumeToken;
+        pipeline[0] = {$changeStream: csStage};
+        return pipeline;
+    }
 
     /**
      * Starts a change stream cursor with the given pipeline on the given collection. It uses
@@ -178,11 +206,27 @@ export function ChangeStreamTest(_db, options) {
         const collName = (collection instanceof DBCollection ? collection.getName() : collection);
 
         return runInFixture(() => {
-            let res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
-                _db,
-                Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
-                doNotModifyInPassthroughs));
+            let maxRetries = 3;
+            let res;
+            for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
+                try {
+                    res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
+                        _db,
+                        Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
+                        doNotModifyInPassthroughs));
+                } catch (e) {
+                    if (attemptNumber === maxRetries || !isResumableChangeStreamError(e)) {
+                        throw e;
+                    }
+                }
+            }
             assert.neq(res.cursor.id, 0);
+            _cursorData.set(String(res.cursor.id), {
+                pipeline: pipeline,
+                collName: collName,
+                doNotModifyInPassthroughs: doNotModifyInPassthroughs
+            });
+            updateResumeToken(res.cursor, res.cursor.firstBatch);
             _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
             return res.cursor;
         });
@@ -202,14 +246,45 @@ export function ChangeStreamTest(_db, options) {
         });
     };
 
+    self.restartChangeStream = function(cursor) {
+        const cursorId = String(cursor.id);
+        const cursorInfo = _cursorData.get(cursorId);
+        if (!cursorInfo || !cursorInfo.resumeToken) {
+            throw new Error("Cannot resume change stream - no resume token available for cursor");
+        }
+        const pipeline = addResumeToken(cursorInfo.pipeline, cursorInfo.resumeToken);
+        cursor = self.startWatchingChanges({
+            pipeline: pipeline,
+            collection: cursorInfo.collName,
+            aggregateOptions: {cursor: {batchSize: 0}},
+            doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs
+        });
+        return cursor;
+    };
+
     /**
-     * Issues a 'getMore' on the provided cursor and returns the cursor returned.
+     * Issues a 'getMore' on the provided cursor and returns the cursor returned. The getMore can be
+     * interrupted with a ResumableChangeStreamError. We restart the changeStream pipeline and retry
+     * getMore 3 times.
      */
     self.getNextBatch = function(cursor) {
-        const collName = getCollectionNameFromFullNamespace(cursor.ns);
-        return assert
-            .commandWorked(_db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}))
-            .cursor;
+        const maxRetries = 3;
+        for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
+            try {
+                let collName = getCollectionNameFromFullNamespace(cursor.ns);
+                const res = assert.commandWorked(
+                    _db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}));
+                cursor = res.cursor;
+                updateResumeToken(cursor, getBatchFromCursorDocument(cursor));
+                return cursor;
+            } catch (e) {
+                if (attemptNumber === maxRetries || !isResumableChangeStreamError(e)) {
+                    throw e;
+                }
+                cursor = self.restartChangeStream(cursor);
+            }
+        }
+        throw new Error("Failed to get next batch after retries");
     };
 
     /**
@@ -264,7 +339,6 @@ export function ChangeStreamTest(_db, options) {
                         tojsonMaybeTruncate(changes) + ", expected changes: " + numChanges;
                 });
         }
-
         return changes;
     };
 
