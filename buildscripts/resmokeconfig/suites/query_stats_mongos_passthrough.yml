@@ -43,6 +43,23 @@ selector:
   # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
   # we expect a second drop to return status OK.
   - jstests/core/**/explain_upsert.js
+  # TODO SERVER-94818 Re-enable this test in query stats passthroughs.
+  # Query stats changes the error code expected by this test due to how it propagates parsing
+  # errors in test environments.
+  - jstests/core/json_schema/misc_validation.js
+  # SERVER-94231 These tests are excluded because query stats changes the error code that
+  # certain queries return. Specifically, queries that a) end in error and b) pass through
+  # mongos end up erroring in the query stats makeKey() callback. Query stats propagates the
+  # error with a different code, which makes the test fail. This behavior only exists pre-8.0,
+  # so we don't care to address this more robustly.
+  - jstests/core/administrative/list_all_sessions.js
+  - jstests/core/collation.js
+  - jstests/core/timeseries/timeseries_explicit_unpack_bucket.js
+  - jstests/core/sample_rate.js
+  - jstests/core/query/sort/sort_with_meta_operator.js
+  - jstests/core/index/geo/geonear_key.js
+  - jstests/core/query/index_key_expression.js
+  - jstests/core/timeseries/timeseries_streaming_group.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos

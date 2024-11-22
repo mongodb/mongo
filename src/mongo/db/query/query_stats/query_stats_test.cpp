@@ -174,4 +174,52 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
                                                            0 /*docsReturned*/));
     }
 }
+
+TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
+
+    auto opCtx = makeOperationContext();
+    auto& opDebug = CurOp::get(*opCtx)->debug();
+
+    QueryStatsStoreManager::getRateLimiter(getServiceContext()) =
+        std::make_unique<RateLimiting>(-1, Seconds{1});
+
+    // First case - don't treat errors as fatal.
+    internalQueryStatsErrorsAreCommandFatal.store(false);
+
+    // Skip these checks for debug builds because errors are always fatal in that environment.
+    if (!kDebugBuild) {
+        ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+            uasserted(ErrorCodes::BSONObjectTooLarge, "size error");
+            return nullptr;
+        }));
+
+        opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
+        ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+            uasserted(ErrorCodes::BadValue, "fake error");
+            return nullptr;
+        }));
+    }
+
+    // Now make sure that errors are propagated when the knob is set.
+    internalQueryStatsErrorsAreCommandFatal.store(true);
+
+    // We shouldn't propagate 'BSONObjectTooLarge' errors under any circumstances.
+    opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
+    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "size error");
+        return nullptr;
+    }));
+
+    // This should hit our assertion.
+    opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
+    ASSERT_THROWS(query_stats::registerRequest(opCtx.get(),
+                                               nss,
+                                               [&]() {
+                                                   uasserted(ErrorCodes::BadValue, "fake error");
+                                                   return nullptr;
+                                               }),
+                  DBException);
+}
+
 }  // namespace mongo::query_stats
