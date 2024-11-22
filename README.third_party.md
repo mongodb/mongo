@@ -37,7 +37,7 @@ a notice will be included in
 | [libstemmer]               | BSD-3-Clause      | Unknown           |          ✗           |                ✗                |
 | [librdkafka]               | BSD-2-Clause      | 2.0.2             |                      |                                 |
 | [linenoise]                | BSD-3-Clause      | 6cdc775 + changes |                      |                ✗                |
-| [mongo-c-driver]           | Apache-2.0        | 1.27.1            |          ✗           |                ✗                |
+| [mongo-c-driver]           | Apache-2.0        | 1.27.6            |          ✗           |                ✗                |
 | [MozJS]                    | MPL-2.0           | ESR 115.7         |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT               | 0.10.2            |                      |                                 |
