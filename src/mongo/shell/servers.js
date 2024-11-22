@@ -1379,9 +1379,7 @@ function appendSetParameterArgs(argArray) {
                 argArray.push(...["--setParameter", "backtraceLogFile=" + backtraceLogFilePath]);
             }
 
-            // TODO(SERVER-95610): update once this change is backported and in 8.0 versions
-            if ((programMajorMinorVersion < 800 && programMajorMinorVersion >= 600) ||
-                programMajorMinorVersion > 810) {
+            if (programMajorMinorVersion >= 600) {
                 const parameters = jsTest.options().setParameters;
                 const reshardingDefaults = {
                     'reshardingDelayBeforeRemainingOperationTimeQueryMillis': 0
