@@ -345,6 +345,17 @@ public:
         uasserted(51019, "Unexpected check of routing table");
     }
 
+    std::vector<DatabaseName> getAllDatabases(OperationContext* opCtx,
+                                              boost::optional<TenantId> tenantId) override {
+        MONGO_UNREACHABLE_TASSERT(9525801);
+    }
+
+    std::vector<BSONObj> runListCollections(OperationContext* opCtx,
+                                            const DatabaseName& db,
+                                            bool addPrimaryShard) override {
+        MONGO_UNREACHABLE_TASSERT(9525802);
+    }
+
     std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
     ensureFieldsUniqueOrResolveDocumentKey(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

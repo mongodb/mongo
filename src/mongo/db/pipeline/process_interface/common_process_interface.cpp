@@ -47,6 +47,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/generic_cursor_gen.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
@@ -59,7 +60,9 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -299,6 +302,95 @@ boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContex
 
 std::string CommonProcessInterface::getHostAndPort(OperationContext* opCtx) const {
     return prettyHostNameAndPort(opCtx->getClient()->getLocalPort());
+}
+
+std::vector<DatabaseName> CommonProcessInterface::_getAllDatabasesOnAShardedCluster(
+    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    tassert(9525808, "This method can only run on a sharded cluster", Grid::get(opCtx));
+
+    const std::vector<DatabaseType> databaseTypes = Grid::get(opCtx)->catalogClient()->getAllDBs(
+        opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    std::vector<DatabaseName> databases;
+    databases.reserve(databaseTypes.size());
+
+    std::transform(databaseTypes.begin(),
+                   databaseTypes.end(),
+                   std::back_inserter(databases),
+                   [](const DatabaseType& dbType) -> DatabaseName { return dbType.getDbName(); });
+
+    return databases;
+}
+
+std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnAShardedCluster(
+    OperationContext* opCtx, const NamespaceString& nss, bool addPrimaryShard) {
+    tassert(9525809, "This method can only run on a sharded cluster", Grid::get(opCtx));
+
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    const bool isCollectionless = nss.coll().empty();
+    return router.route(
+        opCtx,
+        "CommonMongodProcessInterface::_runListCollectionsCommandOnAShardedCluster",
+        [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            ListCollections listCollectionsCmd;
+            listCollectionsCmd.setDbName(nss.dbName());
+            if (!isCollectionless) {
+                listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+            }
+
+            const auto shard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
+            Shard::QueryResponse resultCollections;
+
+            try {
+                resultCollections = uassertStatusOK(shard->runExhaustiveCursorCommand(
+                    opCtx,
+                    ReadPreferenceSetting::get(opCtx),
+                    nss.dbName(),
+                    appendDbVersionIfPresent(listCollectionsCmd.toBSON({}), cdb->getVersion()),
+                    opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1)));
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                return std::vector<BSONObj>();
+            }
+
+            auto addPrimaryField = [&cdb](BSONObj obj) {
+                BSONObjBuilder bob(obj.getOwned());
+                bob.append("primary", cdb->getPrimary());
+                return bob.obj();
+            };
+
+            if (isCollectionless) {
+                if (addPrimaryShard) {
+                    std::vector<BSONObj> collections;
+                    collections.reserve(resultCollections.docs.size());
+                    for (BSONObj& bsonObj : resultCollections.docs) {
+                        collections.emplace_back(addPrimaryField(bsonObj.getOwned()));
+                    }
+                    return collections;
+                }
+                return resultCollections.docs;
+            }
+
+            for (BSONObj& bsonObj : resultCollections.docs) {
+                // Return the entire 'listCollections' response for the first element which matches
+                // on name.
+                const BSONElement nameElement = bsonObj["name"];
+                if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
+                    continue;
+                }
+
+                return (addPrimaryShard ? std::vector<BSONObj>{addPrimaryField(bsonObj.getOwned())}
+                                        : std::vector<BSONObj>{bsonObj.getOwned()});
+
+                tassert(5983900,
+                        str::stream()
+                            << "Expected at most one collection with the name "
+                            << nss.toStringForErrorMsg() << ": " << resultCollections.docs.size(),
+                        resultCollections.docs.size() <= 1);
+            }
+
+            return std::vector<BSONObj>();
+        });
 }
 
 }  // namespace mongo

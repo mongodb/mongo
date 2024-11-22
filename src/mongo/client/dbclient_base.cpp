@@ -531,7 +531,7 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
         bob.append("nameOnly", 1);
     }
     if (authorizedDatabases) {
-        bob.append("authorizedDatabases", 1);
+        bob.appendBool("authorizedDatabases", 1);
     }
 
     BSONObj cmd = bob.done();
