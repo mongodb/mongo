@@ -229,14 +229,6 @@ withRetryOnTransientTxnError(
     // All updates must succeed on all documents.
     assert.eq(kNumThreadsForConvoyTest,
               freshMongoS.getDB(kDatabaseName).TestConvoyColl.countDocuments({a: 1}));
-
-    // There must be two refreshes: one for convoy and another for the logical session.
-    const catalogCacheStatistics =
-        st.shard0.adminCommand({serverStatus: 1}).shardingStatistics.catalogCache;
-    assert.eq(2,
-              catalogCacheStatistics.countFullRefreshesStarted +
-                  catalogCacheStatistics.countIncrementalRefreshesStarted -
-                  catalogCacheStatistics.countFailedRefreshes);
 }
 
 st.stop();

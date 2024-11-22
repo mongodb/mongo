@@ -60,11 +60,12 @@ const sessionDB = session.getDatabase(dbName);
     st.refreshCatalogCacheForNs(st.s, foreignNs);
 
     // Run a $lookup which will add shard1 as an additional participant. This should throw
-    // because shard1 had an incoming migration.
+    // because shard1 had an incoming migration. This $lookup can also throw
+    // ShardCannotRefreshDueToLocksHeld if the shard acting as a router needs to refresh.
     let err = assert.throwsWithCode(() => {
         sessionDB.getCollection(localColl).aggregate(
             [{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}]);
-    }, ErrorCodes.MigrationConflict);
+    }, [ErrorCodes.MigrationConflict, ErrorCodes.ShardCannotRefreshDueToLocksHeld]);
     assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
     session.abortTransaction();
@@ -76,6 +77,10 @@ const sessionDB = session.getDatabase(dbName);
 
     // Insert a doc in the foreign collection that we will later update
     assert.commandWorked(st.s.getDB(dbName).foreign.insert({_id: 1, x: 1}));
+
+    // Refresh the routing information for the foreign collection in shard0 after the moveChunk
+    // operation from previous test case.
+    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
 
     // Start a transaction on shard0
     session.startTransaction({readConcern: {level: "snapshot"}});

@@ -116,6 +116,7 @@
 #include "mongo/s/router_uptime_reporter.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/stdx/unordered_map.h"
@@ -370,7 +371,7 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
 
     globalConnPool.addHook(new ShardingConnectionHook(makeShardingEgressHooksList(service)));
 
-    auto catalogCacheLoader = [&]() -> std::shared_ptr<CatalogCacheLoader> {
+    auto shardRoleCatalogCacheLoader = [&]() -> std::shared_ptr<CatalogCacheLoader> {
         if (storageGlobalParams.queryableBackupMode) {
             return std::make_shared<ReadOnlyCatalogCacheLoader>();
         } else {
@@ -378,7 +379,12 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
                 std::make_unique<ConfigServerCatalogCacheLoader>());
         }
     }();
-    auto catalogCache = std::make_unique<CatalogCache>(service, catalogCacheLoader);
+
+    // (Ignore FCV check): this feature flag is not FCV-gated.
+    auto catalogCache = feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()
+        ? std::make_unique<CatalogCache>(service,
+                                         std::make_shared<ConfigServerCatalogCacheLoader>())
+        : std::make_unique<CatalogCache>(service, shardRoleCatalogCacheLoader);
 
     bool isStandaloneOrPrimary = [&]() {
         // This is only called in startup when there shouldn't be replication state changes, but to
@@ -388,7 +394,8 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
         bool isReplSet = replCoord->getSettings().isReplSet();
         return !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
     }();
-    FilteringMetadataCache::init(service, catalogCacheLoader, isStandaloneOrPrimary);
+    FilteringMetadataCache::init(
+        service, std::move(shardRoleCatalogCacheLoader), isStandaloneOrPrimary);
 
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.

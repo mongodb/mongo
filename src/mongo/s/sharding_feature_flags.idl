@@ -197,3 +197,10 @@ feature_flags:
     cpp_varname: feature_flags::gAggregateClusterCatalogAggStage
     default: false
     shouldBeFCVGated: true
+  # TODO (SERVER-97261): remove once 9.0 becomes last LTS.
+  featureFlagDualCatalogCache:
+    description: "Feature flag to enable one catalog cache for the shard role and another one for
+                  the router role."
+    cpp_varname: feature_flags::gDualCatalogCache
+    default: false
+    shouldBeFCVGated: false

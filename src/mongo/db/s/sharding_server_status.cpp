@@ -46,6 +46,7 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -157,6 +158,8 @@ public:
             if (routingInfoCache) {
                 routingInfoCache->report(&result);
             }
+
+            FilteringMetadataCache::get(opCtx)->report(&result);
 
             auto nRangeDeletions = [&]() {
                 try {

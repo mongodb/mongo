@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
@@ -62,6 +63,11 @@ public:
     static FilteringMetadataCache* get(ServiceContext* serviceCtx);
 
     static FilteringMetadataCache* get(OperationContext* opCtx);
+
+    /**
+     * Shuts down and joins the executors used by the internal components.
+     */
+    void shutDown();
 
     /**
      * Updates internal state so that the loader can start behaving like a secondary.
@@ -101,6 +107,11 @@ public:
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss);
 
     void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName);
+
+    /**
+     * Reports statistics about the catalog cache to be used by serverStatus.
+     */
+    void report(BSONObjBuilder* builder) const;
 
     /**
      * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig error
@@ -188,7 +199,11 @@ private:
                                                const NamespaceString& nss,
                                                boost::optional<ChunkVersion> chunkVersionReceived);
 
-    std::shared_ptr<CatalogCacheLoader> _loader = nullptr;
+    // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
+    // If _cache is set, it will be used only for filtering; otherwise, the Grid's CatalogCache will
+    // be used.
+    std::unique_ptr<CatalogCache> _cache;
+    std::shared_ptr<CatalogCacheLoader> _loader;
 };
 
 extern FailPoint hangInRefreshFilteringMetadataUntilSuccessInterruptible;

@@ -79,6 +79,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -269,6 +270,12 @@ void FilteringMetadataCache::init(ServiceContext* serviceCtx,
     auto decoration = FilteringMetadataCache::get(serviceCtx);
     invariant(decoration->_loader == nullptr);
     decoration->_loader = loader;
+
+    // (Ignore FCV check): this feature flag is not FCV-gated.
+    if (feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+        decoration->_cache =
+            std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"_sd);
+    }
 }
 
 void FilteringMetadataCache::initForTesting(ServiceContext* serviceCtx,
@@ -286,6 +293,11 @@ FilteringMetadataCache* FilteringMetadataCache::get(ServiceContext* serviceCtx) 
 
 FilteringMetadataCache* FilteringMetadataCache::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
+}
+
+void FilteringMetadataCache::shutDown() {
+    if (_cache)
+        _cache->shutDownAndJoin();
 }
 
 void FilteringMetadataCache::onStepDown() {
@@ -383,6 +395,11 @@ void FilteringMetadataCache::waitForDatabaseFlush(OperationContext* opCtx,
     shardLoader->waitForDatabaseFlush(opCtx, dbName);
 }
 
+void FilteringMetadataCache::report(BSONObjBuilder* builder) const {
+    if (_cache)
+        _cache->report(builder);
+}
+
 Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -409,8 +426,10 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
     }
 
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
+    const auto catalogCache = _cache ? _cache.get() : Grid::get(opCtx)->catalogCache();
+    const auto cm =
+        uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
     if (!cm.hasRoutingTable()) {
         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
@@ -483,8 +502,10 @@ Status FilteringMetadataCache::onDbVersionMismatch(
 CollectionMetadata FilteringMetadataCache::_forceGetCurrentMetadata(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
     try {
-        const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+        // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
+        const auto catalogCache = _cache ? _cache.get() : Grid::get(opCtx)->catalogCache();
+        const auto cm =
+            uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
         if (!cm.hasRoutingTable()) {
             return CollectionMetadata();
@@ -648,7 +669,8 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
         scopedDss->resetDbMetadataRefreshFuture();
     });
 
-    const auto catalogCache = Grid::get(opCtx)->catalogCache();
+    // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
+    const auto catalogCache = _cache ? _cache.get() : Grid::get(opCtx)->catalogCache();
 
     // Force a refresh of the cached database metadata from the config server.
     catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);

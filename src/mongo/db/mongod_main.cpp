@@ -182,6 +182,7 @@
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -1917,6 +1918,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2_OPTIONS(6773201, {LogComponent::kSharding}, "Shutting down the CatalogCache");
         Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
     }
+
+    LOGV2_OPTIONS(9439300, {LogComponent::kSharding}, "Shutting down the filtering metadata cache");
+    FilteringMetadataCache::get(opCtx)->shutDown();
 
     if (auto configServerRoutingInfoCache = RoutingInformationCache::get(serviceContext)) {
         LOGV2_OPTIONS(
