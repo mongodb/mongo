@@ -342,32 +342,35 @@ bool canEstimateTypeViaHistogram(value::TypeTags tag) {
         case value::TypeTags::ObjectId:
             return true;
 
-        // Types that can only be estimated via the type-counters.
-        case value::TypeTags::Object:
-        case value::TypeTags::Array:
-        case value::TypeTags::Null:
-        case value::TypeTags::Nothing:
-        case value::TypeTags::Boolean:
-        case value::TypeTags::MinKey:
-        case value::TypeTags::MaxKey:
-            return false;
-
-        // Trying to estimate any other types should result in an error.
         default:
-            uasserted(7051100,
-                      str::stream()
-                          << "Type " << tag << " is not supported by histogram estimation.");
+            return false;
     }
 
     MONGO_UNREACHABLE;
 }
 
-bool canEstimateTypeViaTypeCounts(sbe::value::TypeTags startTag,
-                                  sbe::value::Value startVal,
-                                  bool startInclusive,
-                                  sbe::value::TypeTags endTag,
-                                  sbe::value::Value endVal,
-                                  bool endInclusive) {
+bool canEstimateTypeViaTypeCounts(sbe::value::TypeTags tag) {
+    switch (tag) {
+        case sbe::value::TypeTags::Boolean:
+            // There are dedicated counters for true and false, making it always estimable.
+        case sbe::value::TypeTags::Null:
+        case sbe::value::TypeTags::MinKey:
+        case sbe::value::TypeTags::MaxKey:
+        case sbe::value::TypeTags::bsonUndefined:
+            // These types have a single possible value, allowing cardinality estimation from type
+            // counts.
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool canEstimateIntervalViaTypeCounts(sbe::value::TypeTags startTag,
+                                      sbe::value::Value startVal,
+                                      bool startInclusive,
+                                      sbe::value::TypeTags endTag,
+                                      sbe::value::Value endVal,
+                                      bool endInclusive) {
 
     bool isFullBracketInterval = stats::isFullBracketInterval(
         startTag, startVal, startInclusive, endTag, endVal, endInclusive);
@@ -382,20 +385,12 @@ bool canEstimateTypeViaTypeCounts(sbe::value::TypeTags startTag,
     bool pointQuery = (sameTypeBracketInterval &&
                        (stats::compareValues(startTag, startVal, endTag, endVal) == 0));
 
+    // Types that can be estimated via the type-counters.
+    if (sameTypeBracketInterval && canEstimateTypeViaTypeCounts(startTag)) {
+        return true;
+    }
+
     switch (startTag) {
-        // Types that can only be estimated via the type-counters.
-        case value::TypeTags::Null:
-        case value::TypeTags::Nothing:
-        case value::TypeTags::Boolean: {
-            if (pointQuery) {
-                // i. For point queries with both sides need to be inclusive.
-                return (startInclusive && endInclusive);
-            } else {
-                // ii. For range query at least one side needs to be inclusive.
-                return (sameTypeBracketInterval && (startInclusive || endInclusive));
-            }
-            break;
-        }
         case value::TypeTags::Array: {
             if (sameTypeBracketInterval && stats::isEmptyArray(startTag, startVal) && pointQuery) {
                 return true;
@@ -409,17 +404,8 @@ bool canEstimateTypeViaTypeCounts(sbe::value::TypeTags startTag,
             }
             break;
         }
-        case value::TypeTags::Timestamp:
-        case value::TypeTags::Object:
-        case value::TypeTags::StringSmall:
-        case value::TypeTags::StringBig: {
-            break;
-        }
-        // Trying to estimate any other types should result in an error.
         default:
-            uasserted(9163900,
-                      str::stream() << "Type " << startTag
-                                    << " is not supported by histogram type counts estimation.");
+            return false;
     }
 
     return false;
@@ -660,6 +646,16 @@ std::pair<stats::SBEValue, bool> getMaxBound(sbe::value::TypeTags tag) {
     MONGO_UNREACHABLE_TASSERT(9619604);
 }
 
+std::string printInterval(bool startInclusive,
+                          sbe::value::TypeTags startTag,
+                          sbe::value::Value startVal,
+                          bool endInclusive,
+                          sbe::value::TypeTags endTag,
+                          sbe::value::Value endVal) {
+    return str::stream() << (startInclusive ? "[" : "(") << std::pair(startTag, startVal) << ", "
+                         << std::pair(endTag, endVal) << (endInclusive ? "]" : ")");
+}
+
 bool sameTypeBracketInterval(sbe::value::TypeTags startTag,
                              bool endInclusive,
                              sbe::value::TypeTags endTag,
@@ -727,6 +723,80 @@ bool isFullBracketInterval(sbe::value::TypeTags startTag,
         (stats::compareValues(endTag, endVal, expectedMax.getTag(), expectedMax.getValue()) == 0);
 
     return compareValuesMin && compareValuesMax;
+}
+
+bool isEmptyInterval(sbe::value::TypeTags startTag,
+                     sbe::value::Value startVal,
+                     bool startInclusive,
+                     sbe::value::TypeTags endTag,
+                     sbe::value::Value endVal,
+                     bool endInclusive) {
+    return compareValues(startTag, startVal, endTag, endVal) == 0 &&
+        !(startInclusive && endInclusive);
+}
+
+std::vector<std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>>> bracketizeInterval(
+    sbe::value::TypeTags startTag,
+    sbe::value::Value startVal,
+    bool startInclusive,
+    sbe::value::TypeTags endTag,
+    sbe::value::Value endVal,
+    bool endInclusive) {
+    std::vector<std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>>> intervals;
+
+    // Skips if the interval is empty.
+    if (isEmptyInterval(startTag, startVal, startInclusive, endTag, endVal, endInclusive)) {
+        return intervals;
+    }
+
+    // Short-circuits if the interval is of the same type.
+    if (sameTypeBracketInterval(startTag, endInclusive, endTag, endVal)) {
+        auto start = std::pair(SBEValue(copyValue(startTag, startVal)), startInclusive);
+        auto end = std::pair(SBEValue(copyValue(endTag, endVal)), endInclusive);
+        intervals.emplace_back(std::move(start), std::move(end));
+        return intervals;
+    }
+
+    // At this point, the interval is a mixed-type interval. We will start bracketizing it.
+    // Note: 'Nothing' is not included in 'kTypeTagsSorted', so it's safe as a dummy.
+    sbe::value::TypeTags prevTag = sbe::value::TypeTags::Nothing;
+    for (auto tag : kTypeTagsSorted) {
+        if (compareTypeTags(tag, startTag) < 0) {
+            continue;
+        }
+
+        // Ends searching when the rest of the tags are greater then 'endTag'.
+        if (compareTypeTags(tag, endTag) > 0) {
+            break;
+        }
+
+        // Dedup the type tags with the same order such as NumberInt32 and NumberDouble.
+        if (sameTypeClass(tag, prevTag)) {
+            continue;
+        }
+        prevTag = tag;
+
+        std::pair<SBEValue, bool> start = sameTypeClass(tag, startTag)
+            ? std::pair(SBEValue(copyValue(startTag, startVal)), startInclusive)
+            : getMinBound(tag);
+
+        std::pair<SBEValue, bool> end = sameTypeClass(tag, endTag)
+            ? std::pair(SBEValue(copyValue(endTag, endVal)), endInclusive)
+            : getMaxBound(tag);
+
+        // Skips if the interval is empty.
+        if (isEmptyInterval(start.first.getTag(),
+                            start.first.getValue(),
+                            start.second,
+                            end.first.getTag(),
+                            end.first.getValue(),
+                            end.second)) {
+            continue;
+        }
+
+        intervals.emplace_back(std::move(start), std::move(end));
+    }
+    return intervals;
 }
 
 }  // namespace mongo::stats

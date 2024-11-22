@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo::ce {
 
@@ -253,7 +254,11 @@ boost::optional<EstimationResult> estimateCardinalityEqViaTypeCounts(
     } else if (tag == sbe::value::TypeTags::Array && stats::isEmptyArray(tag, val)) {
         estimation.card = ceHist.getEmptyArrayCount();
         return estimation;
-    } else if ((tag == sbe::value::TypeTags::Null) || (tag == sbe::value::TypeTags::Nothing)) {
+    } else if ((tag == sbe::value::TypeTags::Null) || (tag == sbe::value::TypeTags::Nothing) ||
+               (tag == sbe::value::TypeTags::MinKey) || (tag == sbe::value::TypeTags::MaxKey) ||
+               (tag == sbe::value::TypeTags::bsonUndefined)) {
+        // These types have a single possible value. We can estimate the cardinality from the type
+        // counts.
         auto nTypeCounts = ceHist.getTypeCounts().find(tag);
         if (nTypeCounts != ceHist.getTypeCounts().end()) {
             estimation.card = nTypeCounts->second;
@@ -480,7 +485,75 @@ bool canEstimateBound(const stats::CEHistogram& ceHist,
     return true;
 }
 
-// TODO: SERVER-94855 Supports mixed type intervals with type counts.
+/**
+ * Estimates the cardinality of a given interval using either histograms or type counts.
+ *
+ * If the interval is a point interval, the function estimates the cardinality
+ * for that single value. Otherwise, it estimates the cardinality for the range between the
+ * start and end values.
+ *
+ * Assumptions:
+ * a) The interval must be in ascending direction, meaning the start value is less than or equal to
+ *    the end value.
+ * b) The interval must satisfy sameTypeInterval() and the type must be estimable.
+ */
+CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,
+                                                bool startInclusive,
+                                                sbe::value::TypeTags startTag,
+                                                sbe::value::Value startVal,
+                                                bool endInclusive,
+                                                sbe::value::TypeTags endTag,
+                                                sbe::value::Value endVal,
+                                                bool includeScalar) {
+    // The following conditions should have been satisfied before reaching this point. We only
+    // enable the following checks in a debug build.
+    if constexpr (kDebugBuild) {
+        tassert(
+            9485500,
+            str::stream() << "Interval cannot be empty: "
+                          << stats::printInterval(
+                                 startInclusive, startTag, startVal, endInclusive, endTag, endVal),
+            !stats::isEmptyInterval(
+                startTag, startVal, startInclusive, endTag, endVal, endInclusive));
+
+        // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they
+        // are estimable directly via either histograms or type counts.
+        tassert(
+            9485501,
+            str::stream() << "Interval must be bracketized: "
+                          << stats::printInterval(
+                                 startInclusive, startTag, startVal, endInclusive, endTag, endVal),
+            stats::sameTypeBracketInterval(startTag, endInclusive, endTag, endVal));
+
+        tassert(
+            9485502,
+            str::stream() << "Interval must be estimable using either histogram or type counts: "
+                          << stats::printInterval(
+                                 startInclusive, startTag, startVal, endInclusive, endTag, endVal),
+            stats::canEstimateTypeViaHistogram(startTag) ||
+                stats::canEstimateIntervalViaTypeCounts(
+                    startTag, startVal, startInclusive, endTag, endVal, endInclusive));
+    }
+
+    bool isPointInterval = stats::compareValues(startTag, startVal, endTag, endVal) == 0;
+    if (isPointInterval) {
+        return CardinalityEstimate{
+            CardinalityType{estimateCardinalityEq(ceHist, startTag, startVal, includeScalar).card},
+            EstimationSource::Histogram};
+    }
+
+    return CardinalityEstimate{CardinalityType{estimateCardinalityRange(ceHist,
+                                                                        startInclusive,
+                                                                        startTag,
+                                                                        startVal,
+                                                                        endInclusive,
+                                                                        endTag,
+                                                                        endVal,
+                                                                        includeScalar)
+                                                   .card},
+                               EstimationSource::Histogram};
+}
+
 CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,
                                                 const mongo::Interval& interval,
                                                 bool includeScalar) {
@@ -504,32 +577,27 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
         std::swap(startVal, endVal);
     }
 
-    // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they
-    // are estimable directly via either histograms or type counts.
-    if ((stats::sameTypeBracketInterval(startTag, endInclusive, endTag, endVal) &&
-         stats::canEstimateTypeViaHistogram(startTag)) ||
-        stats::canEstimateTypeViaTypeCounts(
-            startTag, startVal, startInclusive, endTag, endVal, endInclusive)) {
+    bool viaHistogram =
+        (stats::sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal) &&
+         stats::canEstimateTypeViaHistogram(startTag));
+    auto viaTypeCounts = stats::canEstimateIntervalViaTypeCounts(
+        startTag, startVal, interval.startInclusive, endTag, endVal, interval.endInclusive);
+    auto viaBracketization = stats::canEstimateType(startTag) && stats::canEstimateType(endTag);
 
-        // If start and end values are the same and both are inclusive in the interval then evaluate
-        // as a point query. The interval has to be inclusive from both sides.
-        if ((stats::compareValues(startTag, startVal, endTag, endVal) == 0)) {
-            return CardinalityEstimate{
-                CardinalityType{
-                    estimateCardinalityEq(ceHist, startTag, startVal, includeScalar).card},
-                EstimationSource::Histogram};
+    if (viaHistogram || viaTypeCounts || viaBracketization) {
+        CardinalityEstimate ce{cost_based_ranker::zeroCE};
+        for (const auto& interval : stats::bracketizeInterval(
+                 startTag, startVal, startInclusive, endTag, endVal, endInclusive)) {
+            ce += estimateIntervalCardinality(ceHist,
+                                              interval.first.second,
+                                              interval.first.first.getTag(),
+                                              interval.first.first.getValue(),
+                                              interval.second.second,
+                                              interval.second.first.getTag(),
+                                              interval.second.first.getValue(),
+                                              includeScalar);
         }
-
-        return CardinalityEstimate{CardinalityType{estimateCardinalityRange(ceHist,
-                                                                            startInclusive,
-                                                                            startTag,
-                                                                            startVal,
-                                                                            endInclusive,
-                                                                            endTag,
-                                                                            endVal,
-                                                                            includeScalar)
-                                                       .card},
-                                   EstimationSource::Histogram};
+        return ce;
     }
 
     // Cardinality estimation for an interval should only be called if interval bounds are

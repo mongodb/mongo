@@ -31,6 +31,7 @@
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo::ce {
@@ -110,10 +111,10 @@ TEST(HistogramPredicateEstimationTest, CanEstimateInestimableInterval) {
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
     }
 
-    {  // The interval is not constructible from IndexBoundBuilder. We cannot estimate intervals
-       // spanning multiple types.
+    {  // The interval is not constructible from IndexBoundBuilder. We can estimate intervals
+       // spanning multiple types if both bounds are estimable types.
         Interval interval(fromjson("{'': 10, '':  false}"), true, false);
-        ASSERT_FALSE(
+        ASSERT_TRUE(
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
     }
 }
@@ -385,31 +386,6 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
 
 TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusiveBounds2) {
 
-    size_t trueValues = 8, falseValues = 2;
-    size_t numberOfBuckets = 10;
-
-    std::vector<stats::SBEValue> data;
-    for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
-    }
-
-    for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
-    }
-
-    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
-
-    {  // [false, false)
-        Interval interval(fromjson("{'': false, '': false}"), true, false);
-        ASSERT_FALSE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
-    }
-}
-
-DEATH_TEST(HistogramPredicateEstimationTest,
-           EstimateViaTypeCountsBooleanMixNotInclusiveBounds3,
-           "Hit a MONGO_UNREACHABLE_TASSERT") {
-
     size_t trueValues = 8, falseValues = 2, size = trueValues + falseValues;
     size_t numberOfBuckets = 10;
     CardinalityEstimate collSize{CardinalityType{static_cast<double>(size)},
@@ -428,7 +404,10 @@ DEATH_TEST(HistogramPredicateEstimationTest,
 
     {  // [false, false)
         Interval interval(fromjson("{'': false, '': false}"), true, false);
-        HistogramEstimator::estimateCardinality(*ceHist, collSize, interval, true);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(cost_based_ranker::zeroCE,
+                  HistogramEstimator::estimateCardinality(*ceHist, collSize, interval, true));
     }
 }
 
@@ -1013,9 +992,7 @@ TEST(HistogramPredicateEstimationTest, IntArrayOnlyIntervalEstimate) {
     }
 }
 
-DEATH_TEST(HistogramPredicateEstimationTest,
-           NonHistogrammableTypesEstimation,
-           "Hit a MONGO_UNREACHABLE_TASSERT") {
+TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
     const int64_t startInstant = 1496777923LL;
     const int64_t endInstant = 1496864323LL;
     const Timestamp& startTs{Seconds(startInstant), 0};
@@ -1066,6 +1043,50 @@ DEATH_TEST(HistogramPredicateEstimationTest,
             estimateIntervalCardinality(*ceHist, interval));
     }
 
+    {  // check estimation for [Null, true]
+        Interval interval(
+            BSON("" << BSONNULL << "" << true), true /*startIncluded*/, true /*endIncluded*/);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            CardinalityEstimate(CardinalityType(75), EstimationSource::Code), /*estimatedCard ,*/
+            estimateIntervalCardinality(*ceHist, interval));
+    }
+
+    {  // check estimation for [false, timestamp]
+        Interval interval(
+            BSON("" << false << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            CardinalityEstimate(CardinalityType(50), EstimationSource::Code), /*estimatedCard ,*/
+            estimateIntervalCardinality(*ceHist, interval));
+    }
+}
+
+DEATH_TEST(HistogramPredicateEstimationTest,
+           NonEstimableTypesEstimation,
+           "Hit a MONGO_UNREACHABLE_TASSERT") {
+    const int64_t startInstant = 1496777923LL;
+    const int64_t endInstant = 1496864323LL;
+    const Timestamp& startTs{Seconds(startInstant), 0};
+    const Timestamp& endTs{Seconds(endInstant), 0};
+    std::vector<BucketData> data{{1, 10.0, 0.0, 0.0},
+                                 {10, 20.0, 0.0, 0.0},
+                                 {Value(startTs), 20.0, 0.0, 0.0},
+                                 {Value(endTs), 5.0, 0.0, 0.0}};
+    const CardinalityEstimate totalCnt{CardinalityType{100.0}, EstimationSource::Code};
+    const ScalarHistogram& hist = createHistogram(data);
+
+    const auto ceHist = CEHistogram::make(hist,
+                                          stats::TypeCounts{{value::TypeTags::NumberInt64, 30},
+                                                            {value::TypeTags::Timestamp, 25},
+                                                            {value::TypeTags::Boolean, 25},
+                                                            {value::TypeTags::Null, 5},
+                                                            {value::TypeTags::Object, 15}},
+                                          totalCnt.toDouble(),
+                                          5,
+                                          20);
     {  // check estimation for Object (expected to fail)
         Interval interval(BSON("" << BSON(""
                                           << "")
@@ -1076,27 +1097,61 @@ DEATH_TEST(HistogramPredicateEstimationTest,
                           true /*endIncluded*/);
         ASSERT_FALSE(
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
-        ASSERT_THROWS_CODE(estimateIntervalCardinality(*ceHist, interval), DBException, 9163900);
+        ASSERT_THROWS_CODE(estimateIntervalCardinality(*ceHist, interval), DBException, 8870500);
     }
+}
 
-    {  // check estimation for [Null, true]
+TEST(HistogramPredicateEstimationTest, MixedTypeIntervalEstimation) {
+    const int64_t startInstant = 1496777923LL;
+    const int64_t endInstant = 1496864323LL;
+    const Timestamp& startTs{Seconds(startInstant), 0};
+    const Timestamp& endTs{Seconds(endInstant), 0};
+    std::vector<BucketData> data{{1, 10.0, 0.0, 0.0},
+                                 {10, 20.0, 0.0, 0.0},
+                                 {Value(startTs), 20.0, 0.0, 0.0},
+                                 {Value(endTs), 5.0, 0.0, 0.0}};
+    const CardinalityEstimate totalCnt{CardinalityType{100.0}, EstimationSource::Code};
+    const ScalarHistogram& hist = createHistogram(data);
+    const auto ceHist = CEHistogram::make(hist,
+                                          stats::TypeCounts{
+                                              {value::TypeTags::MinKey, 1},
+                                              {value::TypeTags::NumberInt64, 30},
+                                              {value::TypeTags::Timestamp, 25},
+                                              {value::TypeTags::Boolean, 25},
+                                              {value::TypeTags::Null, 5},
+                                              {value::TypeTags::Object, 12},
+                                              {value::TypeTags::MaxKey, 2},
+                                          },
+                                          totalCnt.toDouble(),
+                                          5,
+                                          20);
+    {  // [MinKey, MaxKey]
         Interval interval(
-            BSON("" << BSONNULL << "" << true), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_FALSE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
-        ASSERT_EQ(
-            CardinalityEstimate(CardinalityType(75), EstimationSource::Code), /*estimatedCard ,*/
-            estimateIntervalCardinality(*ceHist, interval));
+            BSON("" << MINKEY << "" << MAXKEY), true /*startIncluded*/, true /*endIncluded*/);
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_EQ(CardinalityEstimate(CardinalityType(100), EstimationSource::Code),
+                  estimateIntervalCardinality(*ceHist, interval));
     }
-
-    {  // check estimation for [false, timestamp]
+    {  // [MinKey, endTs]
         Interval interval(
-            BSON("" << false << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_FALSE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
-        ASSERT_EQ(
-            CardinalityEstimate(CardinalityType(50), EstimationSource::Code), /*estimatedCard ,*/
-            estimateIntervalCardinality(*ceHist, interval));
+            BSON("" << MINKEY << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_EQ(CardinalityEstimate(CardinalityType(98), EstimationSource::Code),
+                  estimateIntervalCardinality(*ceHist, interval));
+    }
+    {  // [0.0, MaxKey]
+        Interval interval(
+            BSON("" << 0.0 << "" << MAXKEY), true /*startIncluded*/, true /*endIncluded*/);
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_EQ(CardinalityEstimate(CardinalityType(94), EstimationSource::Code),
+                  estimateIntervalCardinality(*ceHist, interval));
+    }
+    {  // [0.0, endTs]
+        Interval interval(
+            BSON("" << 0.0 << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_EQ(CardinalityEstimate(CardinalityType(92), EstimationSource::Code),
+                  estimateIntervalCardinality(*ceHist, interval));
     }
 }
 

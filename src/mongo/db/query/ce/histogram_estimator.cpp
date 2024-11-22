@@ -65,10 +65,16 @@ bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,
         (stats::sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal) &&
          stats::canEstimateTypeViaHistogram(startTag));
 
-    auto viaTypeCounts = stats::canEstimateTypeViaTypeCounts(
+    auto viaTypeCounts = stats::canEstimateIntervalViaTypeCounts(
         startTag, startVal, interval.startInclusive, endTag, endVal, interval.endInclusive);
 
-    return viaHistogram || viaTypeCounts;
+    // For a mixed-type interval, if both bounds are of estimable types, we can divide the interval
+    // into multiple sub-intervals. The first and last sub-intervals can be estimated using either
+    // histograms or type counts, while the intermediate sub-intervals, which are fully bracketed,
+    // can be estimated using type counts.
+    auto viaBracketization = stats::canEstimateType(startTag) && stats::canEstimateType(endTag);
+
+    return viaHistogram || viaTypeCounts || viaBracketization;
 }
 
 }  // namespace mongo::ce

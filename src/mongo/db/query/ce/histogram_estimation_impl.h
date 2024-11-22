@@ -115,7 +115,7 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
                                           EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
 
 /**
- * Estimates the selectivity of a given interval if histogram estimation is possible. Otherwise,
+ * Estimates the cardinality of a given interval using either histograms or type counts. Otherwise,
  * throw an exception.
  */
 CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,

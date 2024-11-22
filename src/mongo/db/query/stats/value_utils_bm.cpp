@@ -99,9 +99,31 @@ void BM_isFullBracketInterval(benchmark::State& state) {
     sbe::value::ValueGuard startGuard{start}, endGuard{end};
 }
 
+void BM_bracketizeInterval(benchmark::State& state) {
+    auto [startTag, startVal] = makeInt64Value(100);
+    auto [endTag, endVal] = makeBooleanValue(1);
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(
+            bracketizeInterval(startTag, startVal, true, endTag, endVal, false));
+    }
+}
+
+void BM_bracketizeIntervalMinKeyToMaxKey(benchmark::State& state) {
+    auto startTag = sbe::value::TypeTags::MinKey;
+    auto startVal = sbe::value::Value(0);
+    auto endTag = sbe::value::TypeTags::MaxKey;
+    auto endVal = sbe::value::Value(0);
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(
+            bracketizeInterval(startTag, startVal, true, endTag, endVal, false));
+    }
+}
+
 BENCHMARK(BM_sameTypeClass)->Arg(0)->Arg(1)->Arg(2);
 BENCHMARK(BM_sameTypeBracket)->Arg(0)->Arg(1)->Arg(2);
 BENCHMARK(BM_sameTypeClassByComparingMin)->Arg(0)->Arg(1)->Arg(2);
 BENCHMARK(BM_isFullBracketInterval);
+BENCHMARK(BM_bracketizeInterval);
+BENCHMARK(BM_bracketizeIntervalMinKeyToMaxKey);
 
 }  // namespace mongo::stats
