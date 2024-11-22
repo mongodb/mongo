@@ -36,10 +36,10 @@ namespace mongo {
 namespace {
 
 TEST(TimeseriesExtendedRangeSupport, DateOutsideStandardRange) {
-    Date_t minStandard = Date_t::fromDurationSinceEpoch(Seconds(0));
+    Date_t minStandard = Date_t::fromDurationSinceEpoch(Milliseconds(0));
     Date_t maxStandard = Date_t::fromDurationSinceEpoch(Seconds((1LL << 31) - 1));
 
-    Date_t extendedLow = Date_t::fromDurationSinceEpoch(Seconds(-1));
+    Date_t extendedLow = Date_t::fromDurationSinceEpoch(Milliseconds(-1));
     Date_t extendedHigh = Date_t::fromDurationSinceEpoch(Seconds(1LL << 31));
 
     ASSERT_FALSE(timeseries::dateOutsideStandardRange(minStandard));
@@ -82,16 +82,35 @@ TEST(TimeseriesExtendedRangeSupport, BucketsHaveDateOutsideStandardRange) {
              R"({"control": {"min": {"time": {"$date": "2110-01-01T00:00:00.000Z"}}}})")},
     };
 
+    std::vector<InsertStatement> extendedRangeMillisecondsLow = {
+        {7, mongo::fromjson(R"({"control": {"min": {"time": {"$date": -999}}}})")},
+    };
+
+    // This date is one millisecond after the maximum (the largest 32 bit integer)
+    // number of seconds since the epoch.
+    std::vector<InsertStatement> extendedRangeMillisecondsHigh = {
+        {8,
+         mongo::fromjson(
+             R"({"control": {"min": {"time": {"$date": "2038-01-19T03:14:07.001Z"}}}})")},
+    };
+
     ASSERT_FALSE(timeseries::bucketsHaveDateOutsideStandardRange(
         options, standardRange.begin(), standardRange.end()));
     ASSERT_TRUE(timeseries::bucketsHaveDateOutsideStandardRange(
         options, extendedRangeLow.begin(), extendedRangeLow.end()));
     ASSERT_TRUE(timeseries::bucketsHaveDateOutsideStandardRange(
         options, extendedRangeHigh.begin(), extendedRangeHigh.end()));
+    ASSERT_TRUE(timeseries::bucketsHaveDateOutsideStandardRange(
+        options, extendedRangeMillisecondsHigh.begin(), extendedRangeMillisecondsHigh.end()));
 
     std::vector<InsertStatement> mixed = {standardRange[0], standardRange[1], extendedRangeLow[0]};
     ASSERT_TRUE(
         timeseries::bucketsHaveDateOutsideStandardRange(options, mixed.begin(), mixed.end()));
+
+    std::vector<InsertStatement> mixedWithMilliseconds = {standardRange[0],
+                                                          extendedRangeMillisecondsLow[0]};
+    ASSERT_TRUE(timeseries::bucketsHaveDateOutsideStandardRange(
+        options, mixedWithMilliseconds.begin(), mixedWithMilliseconds.end()));
 }
 
 }  // namespace

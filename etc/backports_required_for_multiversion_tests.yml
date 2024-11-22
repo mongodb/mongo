@@ -559,6 +559,8 @@ last-continuous:
     ticket: SERVER-91757
   - test_file: jstests/core/ddl/create_indexes.js
     ticket: SERVER-90952
+  - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
+    ticket: SERVER-94207
   suites: null
 last-lts:
   all:
@@ -1170,4 +1172,6 @@ last-lts:
     ticket: SERVER-91757
   - test_file: jstests/core/ddl/create_indexes.js
     ticket: SERVER-90952
+  - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
+    ticket: SERVER-94207
   suites: null
