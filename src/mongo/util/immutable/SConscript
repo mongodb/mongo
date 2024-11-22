@@ -12,6 +12,7 @@ env.CppUnitTest(
         "immutable_vector_test.cpp",
     ],
     LIBDEPS=[],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.Benchmark(

@@ -130,6 +130,7 @@ mongo_cc_unit_test(
         "system_error_test.cpp",
         "uuid_test.cpp",
     ],
+    tags = ["server-programmability"],
     deps = [
         ":secure_allocator",
         ":system_error",

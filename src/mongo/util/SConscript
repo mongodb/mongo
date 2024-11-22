@@ -69,6 +69,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.CppUnitTest(
@@ -90,6 +91,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.CppUnitTest(
@@ -100,6 +102,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 tcmallocAttrs = None
@@ -174,6 +177,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "$BUILD_DIR/mongo/util/executor_stats",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.Benchmark(
@@ -348,6 +352,7 @@ icuEnv.CppUnitTest(
         "summation",
         "version_impl",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 if not env.TargetOSIs("windows"):
@@ -363,6 +368,7 @@ if not env.TargetOSIs("windows"):
             "signal_handlers",
             "version_impl",
         ],
+        PROVE_ALIASES=["server-programmability"],
     )
 
 if env.TargetOSIs("windows"):
@@ -395,6 +401,7 @@ if use_libunwind:
             "stacktrace_libunwind_test_functions.cpp",
             "stacktrace_libunwind_test.cpp",
         ],
+        PROVE_ALIASES=["server-programmability"],
         # Do not add LIBDEPS the ordinary way here, as they will override
         # the LIBDEPS settings for stacktraceEnv, configured above. If
         # you must add new libdeps here, or for the similar cases
@@ -422,6 +429,7 @@ stacktraceEnv.CppUnitTest(
     EXPORT_SYMBOLS=[
         "mongo_stacktrace_test_detail_testFunctionWithLinkage",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 stacktraceEnv.Benchmark(

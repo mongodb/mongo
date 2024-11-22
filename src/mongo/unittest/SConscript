@@ -76,6 +76,7 @@ env.CppUnitTest(
         "inline_auto_update_test.cpp",
         "bson_test_util_test.cpp",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.Benchmark(

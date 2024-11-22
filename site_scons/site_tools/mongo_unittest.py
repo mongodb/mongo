@@ -70,6 +70,10 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(unit_test_components)
 
+    if "PROVE_ALIASES" in kwargs:
+        for alias in kwargs.get("PROVE_ALIASES"):
+            env.Alias(f"prove-{alias}", env.Alias(f"prove-{target[0]}"))
+
     if not source:
         result = env.BazelProgram(target, source, **kwargs)
     else:

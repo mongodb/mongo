@@ -27,6 +27,7 @@ env.CppUnitTest(
         "$BUILD_DIR/third_party/abseil-cpp/absl_low_level_hash",
         "$BUILD_DIR/third_party/abseil-cpp/absl_raw_hash_set",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 # Specify UNITTEST_HAS_CUSTOM_MAINLINE because it needs low-level control of
@@ -41,6 +42,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/base",
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
+    PROVE_ALIASES=["server-programmability"],
 )
 
 # The tests for `stdx::set_terminate` need to run outside of the mongo unittest harneses.
@@ -61,6 +63,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/base",
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
+    PROVE_ALIASES=["server-programmability"],
 )
 
 # Needs to be a different test -- It has to have direct control over the `main()` entry point.
@@ -73,6 +76,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/base",
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
+    PROVE_ALIASES=["server-programmability"],
 )
 
 # Needs to be a different test -- It has to have direct control over the `main()` entry point.
@@ -97,4 +101,5 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/base",
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
+    PROVE_ALIASES=["server-programmability"],
 )

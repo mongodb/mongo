@@ -15,18 +15,27 @@ env.Library(
 env.CppUnitTest(
     target="util_concurrency_test",
     source=[
-        "ticketholder_test.cpp",
         "spin_lock_test.cpp",
         "thread_pool_test.cpp",
         "with_lock_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "spin_lock",
         "thread_pool",
         "thread_pool_test_fixture",
+    ],
+    PROVE_ALIASES=["server-programmability"],
+)
+
+env.CppUnitTest(
+    target="ticketholder_test",
+    source=[
+        "ticketholder_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "ticketholder",
     ],
 )
@@ -61,4 +70,5 @@ env.CppUnitTest(
         "lock_free_read_list_test.cpp",
     ],
     LIBDEPS=[],
+    PROVE_ALIASES=["server-programmability"],
 )

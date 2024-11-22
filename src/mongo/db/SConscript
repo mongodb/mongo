@@ -171,6 +171,7 @@ env.CppUnitTest(
         "service_context",
         "service_context_test_fixture",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.CppUnitTest(
@@ -194,6 +195,7 @@ env.CppUnitTest(
         "client_out_of_line_executor",
         "concurrency/lock_manager",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.CppUnitTest(
@@ -207,6 +209,7 @@ env.CppUnitTest(
         "mongod_options",
         "server_base",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.CppUnitTest(
@@ -505,6 +508,7 @@ if wiredtiger:
             "shard_role",
             "stats/counters",
         ],
+        PROVE_ALIASES=["server-programmability"],
     )
 
     envWithAsio.CppUnitTest(
@@ -723,6 +727,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/transport/service_entry_point_test_fixture",
         "service_context_d",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.Benchmark(

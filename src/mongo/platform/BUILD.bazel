@@ -67,6 +67,7 @@ mongo_cc_test(
         "visibility_test1.cpp",
         "//src/mongo/util:exit_code.h",
     ],
+    tags = ["server-programmability"],
     deps = [
         ":visibility_test_lib1",
     ],

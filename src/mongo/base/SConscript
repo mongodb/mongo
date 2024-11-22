@@ -30,6 +30,7 @@ env.CppUnitTest(
         "uuid_test.cpp",
     ],
     AIB_COMPONENT="platform",
+    PROVE_ALIASES=["server-programmability"],
     LIBDEPS=[
         "secure_allocator",
         "system_error",

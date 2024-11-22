@@ -73,6 +73,7 @@ env.CppUnitTest(
         "cluster_server_parameter",
         "idl_parser",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.Benchmark(

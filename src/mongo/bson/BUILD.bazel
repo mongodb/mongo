@@ -57,6 +57,7 @@ mongo_cc_unit_test(
         "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
         "//src/mongo/bson/mutable:mutable_bson_test_utils.h",
     ],
+    tags = ["server-programmability"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",

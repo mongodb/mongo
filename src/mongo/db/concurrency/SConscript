@@ -36,6 +36,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/transport/transport_layer_mock",
         "exception_util",
     ],
+    PROVE_ALIASES=["server-programmability"],
 )
 
 env.Benchmark(
