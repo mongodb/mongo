@@ -2883,5 +2883,3 @@ functions:
           - "src/evergreen/run_python_script.sh"
           - "evergreen/activate_task.py"
           - "${task_to_activate}"
-          - "--skip-for-patch-author"
-          - "${skip_for_patch_author}"
