@@ -9,8 +9,6 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
- *   # TODO SERVER-79304 remove this tag.
- *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 
@@ -30,9 +28,7 @@ assert.commandWorked(
 // This test cannot use the index with the key {'time': 1}, since that is the same as the implicitly
 // created shard key and thus we cannot hide the index. We will use a different index here to avoid
 // conflicts.
-// TODO SERVER-79304 the test shouldn't rely on the feature flag.
-let indexField =
-    FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection") ? "a" : "time";
+const indexField = "a";
 assert.commandWorked(coll.createIndex({[indexField]: 1}));
 
 // Tries to convert a time-series secondary index to TTL index.

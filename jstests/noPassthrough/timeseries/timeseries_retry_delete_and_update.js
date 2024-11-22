@@ -6,8 +6,6 @@
  *   requires_replication,
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,
- *   # Needed to run createUnsplittableCollection
- *   featureFlagAuthoritativeShardCollection,
  *   requires_fcv_80
  * ]
  */

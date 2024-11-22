@@ -646,17 +646,6 @@ private:
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
         }
 
-        // TODO SERVER-79304 Remove once shardCollection authoritative version becomes LTS
-        // TODO (SERVER-77915): Remove once 8.0 (trackUnshardedCollections) becomes lastLTS.
-        if (isDowngrading &&
-            (feature_flags::gAuthoritativeShardCollection
-                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                               originalVersion))) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
-        }
-
         // TODO SERVER-87119 remove the following scope once v8.0 branches out
         if (isDowngrading &&
             feature_flags::gConvertToCappedCoordinator.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
@@ -1653,13 +1642,6 @@ private:
     void _finalizeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
-        // TODO SERVER-79304 Remove once shardCollection authoritative version becomes LTS
-        if (role && role->has(ClusterRole::ShardServer) &&
-            feature_flags::gAuthoritativeShardCollection.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre80Compatible);
-        }
 
         // TODO SERVER-77915: Remove once v8.0 branches out.
         if (role && role->has(ClusterRole::ShardServer) &&

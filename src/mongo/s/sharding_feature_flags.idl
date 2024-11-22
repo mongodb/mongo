@@ -74,13 +74,6 @@ feature_flags:
     default: true
     version: 7.1
     shouldBeFCVGated: true
-  # TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
-  featureFlagAuthoritativeShardCollection:
-    description: "Feature flag for enabling the authoritative version of the shardCollection DDL operation."
-    cpp_varname: feature_flags::gAuthoritativeShardCollection
-    default: true
-    version: 8.0
-    shouldBeFCVGated: true
   # TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
   featureFlagBalanceUnshardedCollections:
     description: "Feature flag for enabling the balancing of user unsharded collections"

@@ -287,8 +287,7 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    bool unique,
                                                    bool enforceUniquenessCheck,
                                                    const ShardKeyValidationBehaviors& behaviors,
-                                                   boost::optional<TimeseriesOptions> tsOpts,
-                                                   bool updatedToHandleTimeseriesIndex) {
+                                                   boost::optional<TimeseriesOptions> tsOpts) {
     std::string errMsg;
     if (validShardKeyIndexExists(opCtx,
                                  nss,
@@ -306,11 +305,8 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     // 5. If the shard key index is on a buckets namespace, we need to convert the shard key index.
     // We only do this if the DDL coordinator is running on FCV > 7.3. Previous versions should fall
     // back on the original index created.
-    //
-    // TODO (SERVER-79304): Remove 'updatedToHandleTimeseriesIndex' once 8.0 becomes last LTS, or
-    // update the ticket number to when the parameter can be removed.
     auto indexKeyPatternBSON = shardKeyPattern.toBSON();
-    if (updatedToHandleTimeseriesIndex && tsOpts.has_value()) {
+    if (tsOpts.has_value()) {
         // 'createBucketsShardKeyIndexFromTimeseriesShardKeySpec' expects the shard key to be
         // already "buckets-encoded". For example, shard keys on the timeField should already be
         // changed to use the "control.min.<timeField>". If the shard key is not buckets
@@ -329,14 +325,7 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     // need to call ensureIndex on primary shard, since indexes get copied to receiving shard
     // whenever a migrate occurs. If the collection has a default collation, explicitly send the
     // simple collation as part of the createIndex request.
-
-    // We will only pass 'tsOpts' if 'updatedToHandleTimeseriesIndex' is true, and thus we are
-    // making the updated time-series index for the sharding DDL commands.
-    behaviors.createShardKeyIndex(nss,
-                                  indexKeyPatternBSON,
-                                  defaultCollation,
-                                  unique,
-                                  updatedToHandleTimeseriesIndex ? tsOpts : boost::none);
+    behaviors.createShardKeyIndex(nss, indexKeyPatternBSON, defaultCollation, unique, tsOpts);
     return true;
 }
 

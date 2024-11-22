@@ -38,14 +38,6 @@ imports:
     - "mongo/s/request_types/sharded_ddl_commands.idl"
 
 enums:
-    # TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
-    CreateCollectionCoordinatorPhaseLegacy:
-        description: "Current create collection coordinator's operation state."
-        type: string
-        values:
-            kUnset: "unset"
-            kCommit: "commit"
-    
     CreateCollectionCoordinatorPhase:
         description: "Current create collection coordinator's operation state."
         type: string
@@ -83,24 +75,6 @@ structs:
             timeseries:
                 type: TimeseriesOptions
                 description: "The options to create the time-series collection with."
-                optional: true
-
-    # TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
-    CreateCollectionCoordinatorDocumentLegacy:
-        description: "Object with necessary fields to create a collection"
-        generate_comparison_operators: false
-        strict: false
-        chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
-            ShardsvrCreateCollectionRequest: ShardsvrCreateCollectionRequest
-        fields:
-            phase:
-                type: CreateCollectionCoordinatorPhaseLegacy
-                description: "Coordinator phase."
-                default: kUnset
-            translatedRequestParams:
-                type: TranslatedRequestParams
-                description: "The field is populated only once the kTranslateRequest phase is completed"
                 optional: true
 
     CreateCollectionCoordinatorDocument:

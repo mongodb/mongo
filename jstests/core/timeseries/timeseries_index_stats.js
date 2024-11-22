@@ -12,8 +12,6 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
- *   # TODO SERVER-79304 remove this tag.
- *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -54,10 +52,7 @@ TimeseriesTest.run((insert) => {
     if (FixtureHelpers.isSharded(bucketsColl)) {
         // Expect one additional index, created implicitly when the collection was implicitly
         // sharded.
-        // TODO SERVER-79304 the test shouldn't rely on the feature flag.
-        let shardIndexName = FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection")
-            ? 'tm_1'
-            : 'control.min.tm_1';
+        const shardIndexName = 'tm_1';
         indexKeys[shardIndexName] = {[timeFieldName]: 1};
     }
 

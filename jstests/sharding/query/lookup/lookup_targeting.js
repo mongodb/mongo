@@ -8,8 +8,6 @@
  *   requires_sharding,
  *   requires_spawning_own_processes,
  *   requires_profiling,
- *   # Needed to run createUnsplittableCollection
- *   featureFlagAuthoritativeShardCollection,
  *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *   requires_fcv_80,

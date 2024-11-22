@@ -3,8 +3,6 @@
  * created on a db's primary/non-primary shard.
  *
  * @tags: [
- *   # Needed to run createUnsplittableCollection
- *   featureFlagAuthoritativeShardCollection,
  *   requires_fcv_80
  * ]
  *

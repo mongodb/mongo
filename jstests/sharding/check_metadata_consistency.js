@@ -516,12 +516,6 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 (function testTimeseriesOptionsMismatch() {
     jsTest.log("Executing testTimeseriesOptionsMismatch");
 
-    // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
-    if (!isFcvGraterOrEqualTo('8.0')) {
-        jsTestLog("Skipping timeseriesOptionsMismatch test because required FCV is less than 8.0.");
-        return;
-    }
-
     const db = getNewDb();
     const kSourceCollName = "tracked_collection";
     const kNss = db.getName() + "." + kSourceCollName;
@@ -614,13 +608,6 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 (function testDefaultCollationMismatch1() {
     jsTest.log("Executing testDefaultCollationMismatch1");
 
-    // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
-    if (!isFcvGraterOrEqualTo('8.0')) {
-        jsTestLog(
-            "Skipping testDefaultCollationMismatch2 test because required FCV is less than 8.0.");
-        return;
-    }
-
     const db = getNewDb();
     const kSourceCollName = "tracked_collection";
     const kNss = db.getName() + "." + kSourceCollName;
@@ -665,13 +652,6 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 
 (function testCappedCollectionCantBeSharded() {
     jsTest.log("Executing testCappedCollectionCantBeSharded");
-
-    // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
-    if (!isFcvGraterOrEqualTo('8.0')) {
-        jsTestLog(
-            "Skipping testCappedCollectionCantBeSharded test because required FCV is less than 8.0.");
-        return;
-    }
 
     const db = getNewDb();
     const kSourceCollName = "capped_collection";

@@ -4,8 +4,6 @@
  * collection. Since we use the same coordinator, we both check the createUnsplittableCollection
  * works and that shardCollection won't generate unsplittable collection.
  * @tags: [
- *   # Needed to run createUnsplittableCollection
- *   featureFlagAuthoritativeShardCollection,
  *   assumes_balancer_off,
  *   requires_fcv_80
  * ]

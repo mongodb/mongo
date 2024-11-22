@@ -5,8 +5,6 @@
  *   requires_sharding,
  *   requires_spawning_own_processes,
  *   requires_profiling,
- *   # Needed to run createUnsplittableCollection
- *   featureFlagAuthoritativeShardCollection,
  *   requires_fcv_80
  * ]
  */

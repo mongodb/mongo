@@ -46,13 +46,6 @@ function validateViewCreated(viewName) {
 }
 
 function validateIndexBackingShardKey({coll, expectedKey, usingTimeseriesDefaultKey}) {
-    // The feature flag updates the index backing the shard key. If there is no feature flag we
-    // expect "control.max.time" to not be in the index.
-    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
-    if (!FeatureFlagUtil.isPresentAndEnabled(sDB, "AuthoritativeShardCollection") &&
-        expectedKey.hasOwnProperty("control.max.time") && !usingTimeseriesDefaultKey) {
-        delete expectedKey["control.max.time"];
-    }
     const indexList = coll.getIndexKeys();
     const index = indexList.filter(i => bsonWoCompare(i, expectedKey) === 0);
     assert.eq(1,
@@ -65,7 +58,6 @@ function validateIndexBackingShardKey({coll, expectedKey, usingTimeseriesDefault
 function metaShardKey(implicit) {
     // Command should fail since the 'timeseries' specification does not match that existing
     // collection.
-    // TODO SERVER-79304 remove error code 5731500, now only InvalidOptions is returned.
     if (!implicit) {
         assert.commandWorked(sDB.createCollection('ts', {timeseries}));
         // This index gets created as {meta: 1} on the buckets collection.
@@ -75,7 +67,7 @@ function metaShardKey(implicit) {
             key: {'hostId': 1},
             timeseries: {timeField: 'time'},
         }),
-                                     [5731500, ErrorCodes.InvalidOptions]);
+                                     [ErrorCodes.InvalidOptions]);
     }
 
     assert.commandWorked(
@@ -122,7 +114,6 @@ metaShardKey(true);
 function metaSubFieldShardKey(implicit) {
     // Command should fail since the 'timeseries' specification does not match that existing
     // collection.
-    // TODO SERVER-79304 remove error code 5731500, now only InvalidOptions is returned.
     if (!implicit) {
         assert.commandWorked(sDB.createCollection('ts', {timeseries}));
         // This index gets created as {meta.a: 1} on the buckets collection.
@@ -132,7 +123,7 @@ function metaSubFieldShardKey(implicit) {
             key: {'hostId.a': 1},
             timeseries: {timeField: 'time'},
         }),
-                                     [5731500, ErrorCodes.InvalidOptions]);
+                                     [ErrorCodes.InvalidOptions]);
     }
 
     assert.commandWorked(

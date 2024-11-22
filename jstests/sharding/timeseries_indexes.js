@@ -126,11 +126,7 @@ function generateDoc(time, metaValue) {
 
     assert.commandWorked(bucketsColl.dropIndex({'meta.subField1': 1}));
     indexKeys = bucketsColl.getIndexes().map(x => x.key);
-    let indexesToAdd = {'control.min.time': 1};
-    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
-    if (FeatureFlagUtil.isPresentAndEnabled(mongosDB, "AuthoritativeShardCollection")) {
-        indexesToAdd = {'control.min.time': 1, "control.max.time": 1};
-    }
+    const indexesToAdd = {'control.min.time': 1, "control.max.time": 1};
     assert.sameMembers([indexesToAdd].concat(extraBucketIndexes), indexKeys);
 
     assert.commandWorked(bucketsColl.createIndex({'meta.subField2': 1}));

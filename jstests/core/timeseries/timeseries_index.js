@@ -8,8 +8,6 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
- *   # TODO SERVER-79304 remove this tag.
- *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -96,9 +94,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
         // If our index backs the shard key and the collection is sharded, only 'numExtraIndexes'
         // will appear.
-        // TODO SERVER-79304 the test shouldn't rely on the feature flag.
-        const updateForNewBehavior = FixtureHelpers.isSharded(bucketsColl) && isBackingShardKey &&
-            FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection");
+        const updateForNewBehavior = FixtureHelpers.isSharded(bucketsColl) && isBackingShardKey;
         const numIndexesToCheck = updateForNewBehavior ? numExtraIndexes : 1 + numExtraIndexes;
         assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(spec, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));

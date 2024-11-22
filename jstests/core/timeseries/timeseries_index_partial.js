@@ -10,8 +10,6 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
- *   # TODO SERVER-79304 remove this tag.
- *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -43,9 +41,6 @@ function resetCollection(collation) {
     // If the collection is sharded, expect an implicitly-created index on time. It will appear
     // differently in listIndexes depending on whether you look at the time-series collection or
     // the buckets collection.
-    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
-    const newShardKeyIndex =
-        FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection");
 
     const createTimeseriesSpec = {
         timeseries: {timeField, metaField},
@@ -56,9 +51,8 @@ function resetCollection(collation) {
     if (FixtureHelpers.isSharded(buckets)) {
         const extraBucketIndexesShardedSpec = {
             "v": 2,
-            "key": newShardKeyIndex ? {"control.min.time": 1, "control.max.time": 1}
-                                    : {"control.min.time": 1},
-            "name": newShardKeyIndex ? "time_1" : "control.min.time_1",
+            "key": {"control.min.time": 1, "control.max.time": 1},
+            "name": "time_1",
         };
         extraBucketIndexes.push(addCollation(extraBucketIndexesShardedSpec, collation));
     }
@@ -180,12 +174,7 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     {
         // Note on implicitly sharded collections this index is already made and this operation is a
         // no-op.
-        // TODO SERVER-79304 the test shouldn't rely on the feature flag.
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection")) {
-            assert.commandWorked(coll.createIndex({[timeField]: 1}));
-        } else if (!FixtureHelpers.isSharded(buckets)) {
-            assert.commandWorked(coll.createIndex({[timeField]: 1}));
-        }
+        assert.commandWorked(coll.createIndex({[timeField]: 1}));
 
         const t0 = ISODate('2000-01-01T00:00:00Z');
         const t1 = ISODate('2000-01-01T00:00:01Z');

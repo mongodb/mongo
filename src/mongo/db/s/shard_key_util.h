@@ -192,8 +192,6 @@ private:
  *
  * 4. If the request concerns a timeseries collection, 'nss' must refer to the buckets namespace,
  *    'tsOpts' must have a value, and 'shardKeyPattern' must already be buckets-encoded.
- *    TODO (SERVER-79304): Remove 'updatedToHandleTimeseriesIndex' once 8.0 becomes last LTS. We
- *    will only rewrite the index if 'updatedToHandleTimeseriesIndex' is true.
  *
  * After validating these constraints:
  *
@@ -212,8 +210,7 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    bool unique,
                                                    bool enforceUniquenessCheck,
                                                    const ShardKeyValidationBehaviors& behaviors,
-                                                   boost::optional<TimeseriesOptions> tsOpts,
-                                                   bool updatedToHandleTimeseriesIndex);
+                                                   boost::optional<TimeseriesOptions> tsOpts);
 /**
  * Compares the proposed shard key with the collection's existing indexes to ensure they are a legal
  * combination.

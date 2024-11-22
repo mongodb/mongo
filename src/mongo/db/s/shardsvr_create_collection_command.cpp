@@ -270,33 +270,24 @@ public:
                 }
 
                 auto coordinatorDoc = [&] {
-                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(
-                            (*optFixedFcvRegion)->acquireFCVSnapshot())) {
-                        const DDLCoordinatorTypeEnum coordType =
-                            DDLCoordinatorTypeEnum::kCreateCollection;
-                        auto doc = CreateCollectionCoordinatorDocument();
-                        doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
-                        doc.setShardsvrCreateCollectionRequest(requestToForward);
-                        return doc.toBSON();
-                    } else {
-                        const DDLCoordinatorTypeEnum coordType =
-                            DDLCoordinatorTypeEnum::kCreateCollectionPre80Compatible;
-                        auto doc = CreateCollectionCoordinatorDocumentLegacy();
-                        doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
-                        doc.setShardsvrCreateCollectionRequest(requestToForward);
-                        return doc.toBSON();
-                    }
+                    const DDLCoordinatorTypeEnum coordType =
+                        DDLCoordinatorTypeEnum::kCreateCollection;
+                    auto doc = CreateCollectionCoordinatorDocument();
+                    doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
+                    doc.setShardsvrCreateCollectionRequest(requestToForward);
+                    return doc.toBSON();
                 }();
 
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                auto instance = service->getOrCreateInstance(
-                    opCtx, coordinatorDoc.copy(), false /* checkOptions */);
+                const auto coordinator = [&] {
+                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                    return checked_pointer_cast<CreateCollectionCoordinator>(
+                        service->getOrCreateInstance(
+                            opCtx, coordinatorDoc.copy(), false /*checkOptions*/));
+                }();
                 try {
-                    instance->checkIfOptionsConflict(coordinatorDoc);
+                    coordinator->checkIfOptionsConflict(coordinatorDoc);
                 } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
-                    const auto& ongoingCoordinatorReq =
-                        dynamic_pointer_cast<CreateCollectionResponseProvider>(instance)
-                            ->getOriginalRequest();
+                    const auto& ongoingCoordinatorReq = coordinator->getOriginalRequest();
                     const auto shouldSerializeRequests =
                         requestsShouldBeSerialized(opCtx, requestToForward, ongoingCoordinatorReq);
                     if (shouldSerializeRequests) {
@@ -310,10 +301,7 @@ public:
                                     "error"_attr = ex);
                         // Release FCV region and wait for incompatible coordinator to finish
                         optFixedFcvRegion.reset();
-                        (dynamic_pointer_cast<ShardingDDLCoordinator>(instance))
-                            ->getCompletionFuture()
-                            .getNoThrow(opCtx)
-                            .ignore();
+                        coordinator->getCompletionFuture().getNoThrow(opCtx).ignore();
                         continue;
                     }
 
@@ -324,8 +312,7 @@ public:
 
                 // Release FCV region and wait for coordinator completion
                 optFixedFcvRegion.reset();
-                return (dynamic_pointer_cast<CreateCollectionResponseProvider>(instance))
-                    ->getResult(opCtx);
+                return coordinator->getResult(opCtx);
             }
         }
 

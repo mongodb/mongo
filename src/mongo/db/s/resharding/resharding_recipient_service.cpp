@@ -775,8 +775,7 @@ void ReshardingRecipientService::RecipientStateMachine::
                                 false /* unique */,
                                 true /* enforceUniquenessCheck */,
                                 behaviors,
-                                collectionOptions.timeseries /* tsOpts */,
-                                true /* updatedToHandleTimeseriesIndex */);
+                                collectionOptions.timeseries /* tsOpts */);
                         } else {
                             LOGV2(9197501,
                                   "Skip checking for the shard key index since "
@@ -807,8 +806,7 @@ void ReshardingRecipientService::RecipientStateMachine::
                             true /* enforceUniquenessCheck */,
                             shardkeyutil::ValidationBehaviorsShardCollection(
                                 opCtx.get(), ShardingState::get(opCtx.get())->shardId()),
-                            boost::none /* tsOpts */,
-                            false /* updatedToHandleTimeseriesIndex */);
+                            boost::none /* tsOpts */);
                     } else {
                         LOGV2(9197502,
                               "Skip checking for the shard key index since 'implicitlyCreateIndex' "
@@ -1001,8 +999,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                false /* unique */,
                                true /* enforceUniquenessCheck */,
                                behaviors,
-                               collectionOptions.timeseries /* tsOpts */,
-                               true /* updatedToHandleTimeseriesIndex */);
+                               collectionOptions.timeseries /* tsOpts */);
                        }
                    } else {
                        LOGV2(9197503,

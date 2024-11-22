@@ -131,8 +131,7 @@ function runTest(testCase, minRequiredVersion = null) {
     jsTest.log("Case collection: timeseries / collection: sharded timeseries with different opts.");
     runTest(() => {
         createWorked(kColl, tsOptions);
-        // TODO SERVER-79304 remove error code 5731500, now only InvalidOptions is returned.
-        shardCollectionFailed(kColl, tsOptions2, [5731500, ErrorCodes.InvalidOptions]);
+        shardCollectionFailed(kColl, tsOptions2, [ErrorCodes.InvalidOptions]);
     });
 }
 
@@ -148,8 +147,7 @@ function runTest(testCase, minRequiredVersion = null) {
         "Case collection: bucket timeseries / collection: sharded timeseries different options.");
     runTest(() => {
         createWorked(kBucket, tsOptions);
-        // TODO SERVER-79304 remove error code 5731500, now only InvalidOptions is returned.
-        shardCollectionFailed(kColl, tsOptions2, [5731500, ErrorCodes.InvalidOptions]);
+        shardCollectionFailed(kColl, tsOptions2, [ErrorCodes.InvalidOptions]);
     });
 
     jsTest.log("Case collection: bucket timeseries / collection: sharded timeseries.");
@@ -199,10 +197,7 @@ function runTest(testCase, minRequiredVersion = null) {
     jsTest.log("Case collection: sharded standard / collection: sharded timeseries.");
     runTest(() => {
         shardCollectionWorked(kColl);
-        // TODO SERVER-79304 remove error code AlreadyInitialized, now only InvalidOptions is
-        // returned.
-        shardCollectionFailed(
-            kColl, tsOptions, [ErrorCodes.InvalidOptions, ErrorCodes.AlreadyInitialized]);
+        shardCollectionFailed(kColl, tsOptions, [ErrorCodes.InvalidOptions]);
     });
 }
 

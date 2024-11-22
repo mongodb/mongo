@@ -49,8 +49,6 @@ enums:
             kDropCollection: "dropCollection_V2"
             kRenameCollection: "renameCollection_V2"
             kCreateCollection: "createCollection_V4"
-            # TODO SERVER-79304: Remove once 8.0 becomes last LTS
-            kCreateCollectionPre80Compatible: "createCollection_V3"
             kRefineCollectionShardKey: "refineCollectionShardKey_V2"
             kSetAllowMigrations: "setAllowMigrations"
             kCollMod: "collMod_V3"

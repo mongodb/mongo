@@ -3,7 +3,6 @@
  * needed to rollback or continue the operation.
  *
  * @tags: [
- *    featureFlagAuthoritativeShardCollection,
  *    requires_fcv_80
  * ]
  */

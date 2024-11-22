@@ -94,98 +94,15 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
 
 }  // namespace create_collection_util
 
-// This interface allows the retrieval of the outcome of a shardCollection request (which may be
-// served by different types of Coordinator)
-class CreateCollectionResponseProvider {
-public:
-    virtual const ShardsvrCreateCollectionRequest& getOriginalRequest() = 0;
-    virtual CreateCollectionResponse getResult(OperationContext* opCtx) = 0;
-    virtual ~CreateCollectionResponseProvider() {}
-};
-
 struct OptionsAndIndexes {
     BSONObj options;
     std::vector<BSONObj> indexSpecs;
     BSONObj idIndexSpec;
 };
 
-// TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
-class CreateCollectionCoordinatorLegacy
-    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocumentLegacy,
-                                               CreateCollectionCoordinatorPhaseLegacyEnum>,
-      public CreateCollectionResponseProvider {
-public:
-    using CoordDoc = CreateCollectionCoordinatorDocumentLegacy;
-    using Phase = CreateCollectionCoordinatorPhaseLegacyEnum;
-
-    CreateCollectionCoordinatorLegacy(ShardingDDLCoordinatorService* service,
-                                      const BSONObj& initialState)
-        : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
-          _request(_doc.getShardsvrCreateCollectionRequest()),
-          _critSecReason(BSON("command"
-                              << "createCollection"
-                              << "ns"
-                              << NamespaceStringUtil::serialize(
-                                     originalNss(), SerializationContext::stateDefault()))) {}
-
-    ~CreateCollectionCoordinatorLegacy() override = default;
-
-
-    void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
-
-    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
-
-    /**
-     * Waits for the termination of the parent DDLCoordinator (so all the resources are liberated)
-     * and then return the
-     */
-    CreateCollectionResponse getResult(OperationContext* opCtx) override;
-
-    const ShardsvrCreateCollectionRequest& getOriginalRequest() override {
-        return _request;
-    };
-
-protected:
-    const NamespaceString& nss() const override;
-
-private:
-    StringData serializePhase(const Phase& phase) const override {
-        return CreateCollectionCoordinatorPhaseLegacy_serializer(phase);
-    }
-
-    OptionsAndIndexes _getCollectionOptionsAndIndexes(OperationContext* opCtx,
-                                                      const NamespaceStringOrUUID& nssOrUUID);
-
-    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                  const CancellationToken& token) noexcept override;
-
-    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                         const CancellationToken& token,
-                                         const Status& status) noexcept override;
-
-    TranslatedRequestParams _translateRequestParameters(OperationContext* opCtx);
-
-    const mongo::ShardsvrCreateCollectionRequest _request;
-
-    const BSONObj _critSecReason;
-
-    // Set on successful completion of the coordinator
-    boost::optional<CreateCollectionResponse> _result;
-
-    // The fields below are only populated if the coordinator enters in the branch where the
-    // collection is not already sharded (i.e., they will not be present on early return)
-
-    boost::optional<UUID> _collectionUUID;
-
-    std::unique_ptr<InitialSplitPolicy> _splitPolicy;
-    boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
-    boost::optional<bool> _collectionEmpty;
-};
-
 class CreateCollectionCoordinator
     : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocument,
-                                               CreateCollectionCoordinatorPhaseEnum>,
-      public CreateCollectionResponseProvider {
+                                               CreateCollectionCoordinatorPhaseEnum> {
 public:
     using CoordDoc = CreateCollectionCoordinatorDocument;
     using Phase = CreateCollectionCoordinatorPhaseEnum;
@@ -206,9 +123,9 @@ public:
 
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
-    CreateCollectionResponse getResult(OperationContext* opCtx) override;
+    CreateCollectionResponse getResult(OperationContext* opCtx);
 
-    const ShardsvrCreateCollectionRequest& getOriginalRequest() override {
+    const ShardsvrCreateCollectionRequest& getOriginalRequest() {
         return _request;
     };
 
