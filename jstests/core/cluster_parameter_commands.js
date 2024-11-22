@@ -50,8 +50,7 @@ let conn = db.getMongo();
 // returns the updated value.
 
 // We need to use assert.soon because, when running against an embedded router,
-// we might not see updates right away. TODO SERVER-86543 update this if we guarantee
-// strong consistency for getClusterParameter.
+// we might not see updates right away.
 for (const [name, data] of Object.entries(kTestOnlyClusterParameters)) {
     if (data.hasOwnProperty('featureFlag')) {
         // Skip testing feature-flag-gated params for now.
