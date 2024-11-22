@@ -61,7 +61,7 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientGRPCStream::_makeSession
             ->getTransportLayerManager()
             ->getFirstTransportLayer<transport::grpc::GRPCTransportLayer>();
     invariant(grpcLayer);
-    return grpcLayer->connectWithAuthToken(host, std::move(timeout), _authToken);
+    return grpcLayer->connectWithAuthToken(host, sslMode, std::move(timeout), _authToken);
 }
 
 void DBClientGRPCStream::_reconnectSession() {

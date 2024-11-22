@@ -57,6 +57,8 @@ class GRPCClientTest : public ServiceContextTest {
 public:
     virtual void setUp() override {
         getServiceContext()->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
+
+        sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_preferSSL);
     }
 
     std::shared_ptr<GRPCClient> makeClient(
@@ -161,6 +163,9 @@ public:
                 [](auto) {}, makeClientThreadBody(testCase.shouldSucceed), testCase.serverOptions);
         }
     }
+
+private:
+    test::SSLGlobalParamsGuard _sslGlobalParamsGuard;
 };
 
 TEST_F(GRPCClientTest, GRPCClientConnect) {

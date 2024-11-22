@@ -258,14 +258,25 @@ public:
         // operations.
         _pool = std::make_shared<ChannelPool<std::shared_ptr<::grpc::Channel>, Stub>>(
             svcCtx->getFastClockSource(),
-            // The SSL mode resolver callback always returns true here because the current
-            // implemention of Server requires the use of SSL. If that ever needs to change, this
-            // resolver will need to be updated.
-            [](auto) { return true; },
+            [](ConnectSSLMode sslMode) {
+#ifndef MONGO_CONFIG_SSL
+                if (sslMode == kEnableSSL) {
+                    uasserted(ErrorCodes::InvalidSSLConfiguration,
+                              "SSL requested but not supported");
+                }
+#else
+                auto globalSSLMode =
+                    static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
+
+                return (sslMode == kEnableSSL ||
+                        (sslMode == kGlobalSSLMode &&
+                         ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
+                          (globalSSLMode == SSLParams::SSLMode_requireSSL))));
+#endif
+            },
             [&](const HostAndPort& remote, bool useSSL) {
-                invariant(useSSL, "SSL is required when using gRPC");
                 auto uri = util::toGRPCFormattedURI(remote);
-                auto credentials = util::isUnixSchemeGRPCFormattedURI(uri)
+                auto credentials = !useSSL || util::isUnixSchemeGRPCFormattedURI(uri)
                     ? ::grpc::InsecureChannelCredentials()
                     : ::grpc::experimental::TlsCredentials(_makeTlsOptions());
 
@@ -287,8 +298,10 @@ public:
         _prunerService.start(svcCtx, _pool);
     }
 
-    auto createStub(const HostAndPort& remote, Milliseconds connectTimeout) {
-        return _pool->createStub(std::move(remote), ConnectSSLMode::kEnableSSL, connectTimeout);
+    auto createStub(const HostAndPort& remote,
+                    ConnectSSLMode sslMode,
+                    Milliseconds connectTimeout) {
+        return _pool->createStub(std::move(remote), sslMode, connectTimeout);
     }
 
     void stop() {
@@ -371,8 +384,8 @@ void GRPCClient::shutdown() {
 Client::CtxAndStream GRPCClient::_streamFactory(const HostAndPort& remote,
                                                 Milliseconds connectTimeout,
                                                 const ConnectOptions& options) {
-    auto stub =
-        static_cast<StubFactoryImpl&>(*_stubFactory).createStub(std::move(remote), connectTimeout);
+    auto stub = static_cast<StubFactoryImpl&>(*_stubFactory)
+                    .createStub(std::move(remote), options.sslMode, connectTimeout);
     auto ctx = std::make_shared<GRPCClientContext>();
     setMetadataOnClientContext(*ctx, options);
     if (options.authToken) {

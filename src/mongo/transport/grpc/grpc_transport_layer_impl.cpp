@@ -221,10 +221,13 @@ Status GRPCTransportLayerImpl::start() {
 }
 
 StatusWith<std::shared_ptr<Session>> GRPCTransportLayerImpl::connectWithAuthToken(
-    HostAndPort peer, Milliseconds timeout, boost::optional<std::string> authToken) {
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    Milliseconds timeout,
+    boost::optional<std::string> authToken) {
     try {
         invariant(_client);
-        return _client->connect(std::move(peer), timeout, {std::move(authToken)});
+        return _client->connect(std::move(peer), timeout, {std::move(authToken), sslMode});
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -237,14 +240,9 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerImpl::connect(
     const boost::optional<TransientSSLParams>& transientSSLParams) {
     try {
         iassert(ErrorCodes::InvalidSSLConfiguration,
-                "SSL must be enabled when using gRPC",
-                sslMode == ConnectSSLMode::kEnableSSL ||
-                    (sslMode == transport::ConnectSSLMode::kGlobalSSLMode &&
-                     sslGlobalParams.sslMode.load() != SSLParams::SSLModes::SSLMode_disabled));
-        iassert(ErrorCodes::InvalidSSLConfiguration,
                 "Transient SSL parameters are not supported when using gRPC",
                 !transientSSLParams);
-        return connectWithAuthToken(std::move(peer), timeout);
+        return connectWithAuthToken(std::move(peer), sslMode, timeout);
     } catch (const DBException& e) {
         return e.toStatus();
     }

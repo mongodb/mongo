@@ -68,6 +68,7 @@ public:
 
     StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
+        ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<std::string> authToken = boost::none) override;
 

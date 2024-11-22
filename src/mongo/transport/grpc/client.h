@@ -73,6 +73,7 @@ public:
 
     struct ConnectOptions {
         boost::optional<std::string> authToken = {};
+        ConnectSSLMode sslMode = ConnectSSLMode::kGlobalSSLMode;
     };
 
     std::shared_ptr<EgressSession> connect(const HostAndPort& remote,

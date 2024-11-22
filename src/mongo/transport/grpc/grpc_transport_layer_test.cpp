@@ -438,6 +438,24 @@ TEST_F(GRPCTransportLayerTest, ConnectionError) {
         CommandServiceTestFixtures::makeTLOptions());
 }
 
+TEST_F(GRPCTransportLayerTest, SSLModeMismatch) {
+    runWithTL(
+        makeNoopRPCHandler(),
+        [&](auto& tl) {
+            auto tryConnect = [&] {
+                auto status = tl.connect(tl.getListeningAddresses().at(0),
+                                         ConnectSSLMode::kDisableSSL,
+                                         CommandServiceTestFixtures::kDefaultConnectTimeout);
+                ASSERT_NOT_OK(status);
+                ASSERT_TRUE(ErrorCodes::isNetworkError(status.getStatus()));
+            };
+            tryConnect();
+            // Ensure second attempt on already created channel object also gracefully fails.
+            tryConnect();
+        },
+        CommandServiceTestFixtures::makeTLOptions());
+}
+
 TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
     auto tl = makeTL();
     auto client = std::make_shared<GRPCClient>(

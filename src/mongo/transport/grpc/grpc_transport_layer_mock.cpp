@@ -120,13 +120,16 @@ void GRPCTransportLayerMock::shutdown() {
 }
 
 StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connectWithAuthToken(
-    HostAndPort peer, Milliseconds timeout, boost::optional<std::string> authToken) {
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    Milliseconds timeout,
+    boost::optional<std::string> authToken) {
     if (!_client) {
         return Status(
             ErrorCodes::IllegalOperation,
             "start() must have been called with useEgress = true before attempting to connect");
     }
-    return _client->connect(std::move(peer), std::move(timeout), {std::move(authToken)});
+    return _client->connect(std::move(peer), std::move(timeout), {std::move(authToken), sslMode});
 }
 
 StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connect(
@@ -134,7 +137,7 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connect(
     ConnectSSLMode sslMode,
     Milliseconds timeout,
     const boost::optional<TransientSSLParams>& transientSSLParams) {
-    return connectWithAuthToken(std::move(peer), std::move(timeout));
+    return connectWithAuthToken(std::move(peer), sslMode, std::move(timeout));
 }
 
 const std::vector<HostAndPort>& GRPCTransportLayerMock::getListeningAddresses() const {
