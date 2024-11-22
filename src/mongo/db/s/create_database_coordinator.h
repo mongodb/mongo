@@ -59,7 +59,7 @@ private:
     }
 
     bool _mustAlwaysMakeProgress() override {
-        return _doc.getPhase() >= Phase::kCommitOnShardingCatalog;
+        return _doc.getPhase() >= Phase::kEnterCriticalSectionOnPrimary;
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

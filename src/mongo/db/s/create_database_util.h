@@ -86,6 +86,12 @@ boost::optional<DatabaseType> checkForExistingDatabaseWithDifferentOptions(
     const boost::optional<ShardId>& optResolvedPrimaryShard);
 
 /**
+ * Checks if there is a document with {_id: dbName} in 'config.dropPendingDBs' collection, which is
+ * used to serialize dropDatabase followed by a concurrent createDatabase correctly.
+ */
+bool checkIfDropPendingDB(OperationContext* opCtx, const DatabaseName& dbName);
+
+/**
  * If there was no explicit dbPrimary shard choosen by the caller, then select the least loaded
  * non-draining shard.
  */

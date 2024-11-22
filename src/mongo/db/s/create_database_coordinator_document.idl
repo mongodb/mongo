@@ -40,6 +40,7 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kEnterCriticalSectionOnPrimary: "enterCriticalSectionOnPrimary"
             kCommitOnShardingCatalog: "commitOnShardingCatalog"
 
 structs:

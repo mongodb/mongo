@@ -60,10 +60,22 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
-            if (_doc.getPhase() < Phase::kCommitOnShardingCatalog) {
+            if (_doc.getPhase() < Phase::kEnterCriticalSectionOnPrimary) {
                 _checkPreconditions();
             }
         })
+        .then(_buildPhaseHandler(
+            Phase::kEnterCriticalSectionOnPrimary,
+            [this, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+
+                // Fails and retries if a previous dropDatabase is not complete yet.
+                uassert(ErrorCodes::DatabaseDropPending,
+                        fmt::format("Database {} is being dropped. Will automatically retry",
+                                    nss().dbName().toStringForErrorMsg()),
+                        create_database_util::checkIfDropPendingDB(opCtx, nss().dbName()));
+            }))
         .then(_buildPhaseHandler(
             Phase::kCommitOnShardingCatalog,
             [this, anchor = shared_from_this()] {

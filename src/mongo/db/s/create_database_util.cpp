@@ -172,6 +172,16 @@ boost::optional<DatabaseType> checkForExistingDatabaseWithDifferentOptions(
     return boost::none;
 }
 
+bool checkIfDropPendingDB(OperationContext* opCtx, const DatabaseName& dbName) {
+    const auto dbMatchFilterCaseInsensitive = constructDbMatchFilterCaseInsensitive(
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
+
+    DBDirectClient client(opCtx);
+    return client
+        .findOne(NamespaceString::kConfigDropPendingDBsNamespace, dbMatchFilterCaseInsensitive)
+        .isEmpty();
+}
+
 ShardId getCandidatePrimaryShard(OperationContext* opCtx,
                                  const boost::optional<ShardId>& optResolvedPrimaryShard) {
     return optResolvedPrimaryShard ? *optResolvedPrimaryShard
