@@ -95,7 +95,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
@@ -479,6 +481,53 @@ TEST_F(LogV2Test, MissingAttrInLogging) {
         LOGV2(6636803, "Log missing {attr}");
         ASSERT(StringData(lines->back()).startsWith("Exception during log"_sd));
     }
+}
+
+// Tests for the LOGV2_PROD_ONLY level. In a testing environment, this should behave like a debug-1
+// log but in a production environment like a default (debug-0) log.
+TEST_F(LogV2Test, ProdOnlyLevelInProd) {
+    auto lines = makeLineCapture(PlainFormatter());
+
+    BSONObjBuilder builder;
+    fmt::memory_buffer buffer;
+    LogComponentSettings settings;
+
+    // In a non-testing environment check that the log behaves like a level 0 log.
+    RAIIServerParameterControllerForTest enableTestCommandsController{"enableTestCommands", false};
+
+    // Test the log is logged under default verbosity.
+    LOGV2_PROD_ONLY(9708202, "test level in prod 1");
+    ASSERT(lines->size() != 0);
+    ASSERT_EQUALS(lines->back(), "test level in prod 1");
+
+    RAIIServerParameterControllerForTest logVerbosityController{"logLevel", 1};
+
+    // Test that we also see the log under debug-1.
+    LOGV2_PROD_ONLY(9708203, "test level in prod 2");
+    ASSERT(lines->size() != 0);
+    ASSERT_EQUALS(lines->back(), "test level in prod 2");
+}
+
+TEST_F(LogV2Test, ProdOnlyLevelInTest) {
+    auto lines = makeLineCapture(PlainFormatter());
+
+    BSONObjBuilder builder;
+    fmt::memory_buffer buffer;
+    LogComponentSettings settings;
+
+    // Make sure test commands are enabled.
+    RAIIServerParameterControllerForTest enableTestCommandsController{"enableTestCommands", true};
+
+    // Test the log is not logged under default verbosity.
+    LOGV2_PROD_ONLY(9708200, "test level in testing 1");
+    ASSERT_EQUALS(lines->size(), 0);
+
+    RAIIServerParameterControllerForTest logVerbosityController{"logLevel", 1};
+
+    // Test that we see the log under debug-1.
+    LOGV2_PROD_ONLY(9708201, "test level in testing 2");
+    ASSERT(lines->size() != 0);
+    ASSERT_EQUALS(lines->back(), "test level in testing 2");
 }
 
 namespace bl_sinks = boost::log::sinks;

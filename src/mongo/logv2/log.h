@@ -266,6 +266,27 @@
     LOGV2_DEBUG_OPTIONS(                  \
         ID, DLEVEL, ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, MSG, ##__VA_ARGS__)
 
+/**
+ * Logs like a default (debug-0) level log in production, but debug-1 log in testing. This log level
+ * is for log lines that may be spammy in testing but are more rare in production. As such, they may
+ * be useful in investigations. This level also preserves backwards compatibility for logs that are
+ * no longer as useful as when they were introduced. It is preferred to use LOGV2 or LOGV2_DEBUG
+ * over this macro as it introduces a difference between testing and production.
+ *
+ * To ensure logs with this macro are tested, if using this macro make sure that the log's code
+ * path is run in a test where the verbosity for the log's component is set to at least 1.
+ *
+ * See LOGV2() for documentation of the other parameters
+ */
+#define LOGV2_PROD_ONLY(ID, MSG, ...)   \
+    do {                                \
+        if (getTestCommandsEnabled()) { \
+            LOGV2_DEBUG(ID, 1, MSG);    \
+        } else {                        \
+            LOGV2(ID, MSG);             \
+        }                               \
+    } while (false);
+
 namespace mongo::logv2 {
 inline bool shouldLog(LogComponent logComponent, LogSeverity severity) {
     return LogManager::global().getGlobalSettings().shouldLog(logComponent, severity);
