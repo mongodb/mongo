@@ -318,3 +318,12 @@ filters:
   - "shardsvr_notify_sharding_event_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "document_source_visitor_docs_needed_bounds.cpp":
+    approvers:
+      - 10gen/query-integration-search
+  - "shard_filtering_util*":
+    approvers:
+      - 10gen/query-execution-router-query-exec
+  - "sharding_server_status.cpp":
+    approvers:
+      - 10gen/query-integration-observability

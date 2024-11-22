@@ -17,3 +17,6 @@ filters:
   - "*resource_consumption*":
     approvers:
       - 10gen/server-storage-execution
+  - "operation_latency_histogram*":
+    approvers:
+      - 10gen/query-integration-observability

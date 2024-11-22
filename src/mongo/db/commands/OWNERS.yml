@@ -117,3 +117,9 @@ filters:
   - "dbhash*":
     approvers:
       - 10gen/server-rss-sydney
+  - "server_status*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "sysprofile*":
+    approvers:
+      - 10gen/query-execution

@@ -25,6 +25,11 @@ filters:
     approvers:
       - 10gen/query-integration-staff-leads
 
+  # 'ExtensionsCallbackReal' is tied to $text and $where parsing, and is therefore owned by QI.
+  - "extensions_callback_real*":
+    approvers:
+      - 10gen/query-integration-staff-leads
+
   # These files are related to boolean simplification and thus owned by QO.
   - "expression_bitset_tree_converter*":
     approvers:

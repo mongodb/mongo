@@ -29,6 +29,18 @@ filters:
   - "querytests.cpp":
     approvers:
       - 10gen/query-execution
+  - "counttests.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "documentsourcetests.cpp":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "extensions_callback_real_test.cpp":
+    approvers:
+      - 10gen/query-integration-staff-leads
+  - "matchertests.cpp":
+    approvers:
+      - 10gen/query-execution
   - "updatetests.cpp":
     approvers:
       - 10gen/query-execution

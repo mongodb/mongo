@@ -144,3 +144,12 @@ filters:
   - "*metadata_consistency*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "cluster_cursor_stats.cpp":
+    approvers:
+      - 10gen/query-execution-router-query-exec
+  - "cluster_write*":
+    approvers:
+      - 10gen/query-execution-router-query-exec
+  - "shard_targeting_helpers*":
+    approvers:
+      - 10gen/query-optimization-cluster-planning

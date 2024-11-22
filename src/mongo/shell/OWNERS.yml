@@ -54,3 +54,6 @@ filters:
   - "utils*":
     approvers:
       - 10gen/devprod-correctness
+  - "named_pipe_test_helper*":
+    approvers:
+      - 10gen/query-integration-analytic-extensions

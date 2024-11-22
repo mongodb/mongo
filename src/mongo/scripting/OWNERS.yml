@@ -1,5 +1,12 @@
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-programmability
+      - 10gen/query-integration-javascript
   - "dbdirectclient_factory.*":
     approvers:
       - 10gen/server-programmability

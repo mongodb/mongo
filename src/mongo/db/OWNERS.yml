@@ -154,3 +154,15 @@ filters:
   - "dbcommands.idl":
     approvers:
       - 10gen/server-storage-execution
+  - "bulk_write_shard_test.cpp":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "change_collection_expired*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "multi_key_path_tracker*":
+    approvers:
+      - 10gen/query-execution-indexing
+  - "yieldable.h":
+    approvers:
+      - 10gen/query-execution-yielding

@@ -117,3 +117,9 @@ filters:
   - "local_oplog_info*":
     approvers:
       - 10gen/server-replication
+  - "document_validation*":
+    approvers:
+      - 10gen/query-execution-doc-validation
+  - "external_data_source_scope_guard*":
+    approvers:
+      - 10gen/query-integration-analytic-extensions
