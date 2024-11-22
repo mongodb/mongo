@@ -138,6 +138,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/enable_change_stream.py @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/run_query_stats.py @10gen/query-integration-observability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/smoke_tests/OWNERS.yml
+/buildscripts/smoke_tests/**/server_programmability.yml @10gen/server-programmability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/tracing_profiler/OWNERS.yml
 /buildscripts/tracing_profiler/**/* @10gen/query @svc-auto-approve-bot
 
@@ -588,6 +591,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/server_parameters/OWNERS.yml
 /jstests/noPassthrough/server_parameters/**/* @10gen/server-programmability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/noPassthrough/startup_shutdown/OWNERS.yml
+/jstests/noPassthrough/startup_shutdown/**/* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/timeseries/OWNERS.yml
 /jstests/noPassthrough/timeseries/**/* @10gen/server-storage-execution @svc-auto-approve-bot
