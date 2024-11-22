@@ -48,9 +48,11 @@
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -98,6 +100,44 @@ std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContex
 std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     return {"_id"};  // Nothing is sharded.
+}
+
+std::vector<DatabaseName> NonShardServerProcessInterface::getAllDatabases(
+    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    DBDirectClient dbClient(opCtx);
+    auto databasesResponse = dbClient.getDatabaseInfos(
+        BSONObj() /* filter */, true /* nameOnly */, true /* authorizedDatabases */);
+
+    std::vector<DatabaseName> databases;
+    databases.reserve(databasesResponse.size());
+    std::transform(
+        databasesResponse.begin(),
+        databasesResponse.end(),
+        std::back_inserter(databases),
+        [&tenantId](const BSONObj& dbBSON) {
+            const auto& dbStr = dbBSON.getStringField(ListDatabasesReplyItem::kNameFieldName);
+            tassert(9525810,
+                    str::stream() << "Missing '" << ListDatabasesReplyItem::kNameFieldName
+                                  << "'field on listDatabases output.",
+                    !dbStr.empty());
+            return DatabaseNameUtil::deserialize(
+                tenantId, dbStr, SerializationContext::stateDefault());
+        });
+
+    return databases;
+}
+
+std::vector<BSONObj> NonShardServerProcessInterface::runListCollections(OperationContext* opCtx,
+                                                                        const DatabaseName& db,
+                                                                        bool addPrimaryShard) {
+    DBDirectClient dbClient(opCtx);
+    const auto collectionsList = dbClient.getCollectionInfos(db);
+
+    std::vector<BSONObj> collections;
+    collections.reserve(collectionsList.size());
+    std::move(collectionsList.begin(), collectionsList.end(), std::back_inserter(collections));
+
+    return collections;
 }
 
 boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(

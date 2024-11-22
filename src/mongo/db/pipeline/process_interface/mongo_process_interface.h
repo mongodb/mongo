@@ -634,6 +634,19 @@ public:
         ChunkVersion targetCollectionPlacementVersion) const = 0;
 
     /**
+     * Get all the databases from the server.
+     */
+    virtual std::vector<DatabaseName> getAllDatabases(OperationContext* opCtx,
+                                                      boost::optional<TenantId> tenantId) = 0;
+
+    /**
+     * Run listCollections command for the given database.
+     */
+    virtual std::vector<BSONObj> runListCollections(OperationContext* opCtx,
+                                                    const DatabaseName& db,
+                                                    bool addPrimaryShard = false) = 0;
+
+    /**
      * Used to enforce the constraint that the foreign collection must be unsharded.
      */
     class ScopedExpectUnshardedCollection {

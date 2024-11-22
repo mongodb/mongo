@@ -221,6 +221,7 @@ enum class DocumentSourceType {
     kInternalDensify,                       // DocumentSourceInternalDensify
     kInternalGeoNearDistance,               // DocumentSourceInternalGeoNearDistance
     kInternalInhibitOptimization,           // DocumentSourceInternalInhibitOptimization
+    kInternalListCollections,               // DocumentSourceInternalListCollections
     kInternalProjection,                    // DocumentSourceInternalProjection
     kInternalReplaceRoot,                   // DocumentSourceInternalReplaceRoot
     kInternalSearchIdLookUp,                // DocumentSourceInternalSearchIdLookUp

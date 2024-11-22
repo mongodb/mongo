@@ -71,6 +71,12 @@ function runCommandWithReadAndWriteConcerns(
             shouldForceReadConcern = false;
         }
 
+        if (OverrideHelpers.isAggregationWithInternalListCollections(commandName, commandObj)) {
+            // The $_internalListCollections stage can only be used with readConcern={level:
+            // "local"}.
+            shouldForceReadConcern = false;
+        }
+
         if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObj)) {
             // The $out stage can only be used with readConcern={level: "local"} or
             // readConcern={level: "majority"}

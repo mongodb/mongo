@@ -143,6 +143,8 @@ ALLOWED_NEW_COMPLEX_ACCESS_CHECKS:
   aggregate:
     # Added in 6.3 due to the new $_analyzeShardKeyReadWriteDistribution stage.
     - "check_cursor_session_privilege"
+    # Added in 8.1 due to the new $_internalListCollections stage.
+    - "is_authorized_for_any_action_on_any_resource_in_db"
   count:
     # Added in 8.1 because the count command was changed from a BasicCommand to an IDL
     # Typed command. BasicCommands do not perform contract verification at the end of the

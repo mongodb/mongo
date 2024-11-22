@@ -46,7 +46,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_merge.h"
@@ -302,64 +301,18 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
                  });
 }
 
-BSONObj ShardServerProcessInterface::_runListCollectionsCommand(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-    return router.route(
-        opCtx,
-        "ShardServerProcessInterface::runListCollectionsCommand",
-        [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-            ListCollections listCollectionsCmd;
-            listCollectionsCmd.setDbName(nss.dbName());
-            listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
-            generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
-
-            const auto shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
-            Shard::QueryResponse resultCollections;
-
-            try {
-                resultCollections = uassertStatusOK(shard->runExhaustiveCursorCommand(
-                    opCtx,
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    nss.dbName(),
-                    listCollectionsCmd.toBSON(),
-                    Milliseconds(-1)));
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                return BSONObj{};
-            }
-
-            if (resultCollections.docs.empty()) {
-                return BSONObj{};
-            }
-            for (const BSONObj& bsonObj : resultCollections.docs) {
-                // Return the entire 'listCollections' response for the first element which matches
-                // on name.
-                const BSONElement nameElement = bsonObj["name"];
-                if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
-                    continue;
-                }
-
-                return bsonObj.getOwned();
-
-                tassert(5983900,
-                        str::stream()
-                            << "Expected at most one collection with the name "
-                            << nss.toStringForErrorMsg() << ": " << resultCollections.docs.size(),
-                        resultCollections.docs.size() <= 1);
-            }
-
-            return BSONObj{};
-        });
-};
-
 BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
     if (nss.isNamespaceAlwaysUntracked()) {
         return getCollectionOptionsLocally(opCtx, nss);
     };
 
-    BSONObj listCollectionsResult = _runListCollectionsCommand(opCtx, nss);
+    const auto response = _runListCollectionsCommandOnAShardedCluster(opCtx, nss);
+    if (response.empty()) {
+        return BSONObj{};
+    }
+
+    BSONObj listCollectionsResult = response[0].getOwned();
     const BSONElement optionsElement = listCollectionsResult["options"];
     if (optionsElement) {
         auto optionObj = optionsElement.Obj();
@@ -383,10 +336,11 @@ query_shape::CollectionType ShardServerProcessInterface::getCollectionType(
         return getCollectionTypeLocally(opCtx, nss);
     };
 
-    BSONObj listCollectionsResult = _runListCollectionsCommand(opCtx, nss);
-    if (listCollectionsResult.isEmpty()) {
+    const auto response = _runListCollectionsCommandOnAShardedCluster(opCtx, nss);
+    if (response.empty()) {
         return query_shape::CollectionType::kNonExistent;
     }
+    const BSONObj& listCollectionsResult = response[0];
 
     const StringData typeString = listCollectionsResult["type"].valueStringDataSafe();
     tassert(9072002,
@@ -423,6 +377,18 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
             return {std::make_move_iterator(indexes.begin()),
                     std::make_move_iterator(indexes.end())};
         });
+}
+
+std::vector<DatabaseName> ShardServerProcessInterface::getAllDatabases(
+    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    return _getAllDatabasesOnAShardedCluster(opCtx, tenantId);
+}
+
+std::vector<BSONObj> ShardServerProcessInterface::runListCollections(OperationContext* opCtx,
+                                                                     const DatabaseName& db,
+                                                                     bool addPrimaryShard) {
+    return _runListCollectionsCommandOnAShardedCluster(
+        opCtx, NamespaceStringUtil::deserialize(db, ""), addPrimaryShard);
 }
 
 void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCtx,

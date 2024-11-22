@@ -51,6 +51,7 @@ selector:
     # e.g. reading system.views, dropping or creating system collections.
     - jstests/core/**/list_collections_no_views.js
     - jstests/core/**/rename_collection_system_db.js
+    - jstests/core/catalog/agg_internal_list_collections_stage.js
     - jstests/core/views/invalid_system_views.js
     - jstests/core/views/view_with_invalid_dbname.js
     - jstests/core/views/views_creation.js

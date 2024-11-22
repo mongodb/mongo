@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
+#include "mongo/db/pipeline/document_source_internal_list_collections.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_internal_shardserver_info.h"
 #include "mongo/db/pipeline/document_source_internal_shred_documents.h"
@@ -154,6 +155,7 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceInternalDensify,
                        DocumentSourceInternalGeoNearDistance,
                        DocumentSourceInternalInhibitOptimization,
+                       DocumentSourceInternalListCollections,
                        DocumentSourceInternalSearchIdLookUp,
                        DocumentSourceInternalSearchMongotRemote,
                        DocumentSourceInternalSetWindowFields,

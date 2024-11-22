@@ -128,6 +128,9 @@ filters:
   - "document_source_internal_all_collection_stats*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "document_source_internal_list_collections*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*list_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing

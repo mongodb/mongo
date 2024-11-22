@@ -193,6 +193,13 @@ public:
                             const WriteConcernOptions& wc,
                             boost::optional<OID> targetEpoch) final;
 
+    std::vector<DatabaseName> getAllDatabases(OperationContext* opCtx,
+                                              boost::optional<TenantId> tenantId) final;
+
+    std::vector<BSONObj> runListCollections(OperationContext* opCtx,
+                                            const DatabaseName& db,
+                                            bool addPrimaryShard) final;
+
 protected:
     /**
      * Utility to share a common collection creation implementation.
@@ -205,12 +212,6 @@ protected:
 private:
     boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,
                                                              const NamespaceString& ns) final;
-
-    /**
-     * Utility to run a 'listCollections' command on the primary. This is used to confirm different
-     * collection properties, such as collection options and if the collection exists.
-     */
-    BSONObj _runListCollectionsCommand(OperationContext* opCtx, const NamespaceString& nss);
 };
 
 }  // namespace mongo

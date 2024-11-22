@@ -299,6 +299,18 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocumentLocally(
     MONGO_UNREACHABLE_TASSERT(6148001);
 }
 
+std::vector<DatabaseName> MongosProcessInterface::getAllDatabases(
+    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    return _getAllDatabasesOnAShardedCluster(opCtx, tenantId);
+}
+
+std::vector<BSONObj> MongosProcessInterface::runListCollections(OperationContext* opCtx,
+                                                                const DatabaseName& db,
+                                                                bool addPrimaryShard) {
+    return _runListCollectionsCommandOnAShardedCluster(
+        opCtx, NamespaceStringUtil::deserialize(db, ""), addPrimaryShard);
+}
+
 BSONObj MongosProcessInterface::_reportCurrentOpForClient(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Client* client,
