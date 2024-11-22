@@ -112,7 +112,8 @@ public:
 
     bool writeOutAndNumber(std::fstream&, WriteOutOptions);
 
-    void writeOutHeader(std::fstream& fs) const;
+    template <bool IncludeComments>
+    void writeOutHeader(std::fstream&) const;
 
 protected:
     void parseHeader(std::fstream& fs);

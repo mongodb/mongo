@@ -275,7 +275,8 @@ void QueryFile::parseHeader(std::fstream& fs) {
 void QueryFile::printAndExtractFailedQueries(const std::vector<size_t>& failedQueryIds) const {
     const auto failPath = std::filesystem::path{_filePath}.replace_extension(".fail");
     auto fs = std::fstream{failPath, std::ios::out | std::ios::trunc};
-    writeOutHeader(fs);
+    // Write out header without comments.
+    writeOutHeader<false>(fs);
 
     // Print and write the failed queries to a temp file for feature processing.
     printFailedQueriesHelper(failedQueryIds, &fs);
@@ -286,13 +287,20 @@ void QueryFile::printAndExtractFailedQueries(const std::vector<size_t>& failedQu
         << "python3 src/mongo/db/query/query_tester/scripts/extract_failed_test_to_pickle.py "
         << getMongoRepoRoot() << " " << kFeatureExtractorDir << " " << kTmpFailureFile << " "
         << std::filesystem::path{failPath}.replace_extension().string();
-    const auto swRes = shellExec(pyCmd.str(), kShellTimeout, kShellMaxLen, true);
-    uassert(9699501,
-            str::stream() << "Failed to extract " << failPath.string() << " to pickle.",
-            swRes.isOK());
-
-    // Clean up temp .fail file containing failed queries.
-    std::filesystem::remove(failPath);
+    if (const auto swRes = shellExec(pyCmd.str(), kShellTimeout, kShellMaxLen, true);
+        swRes.isOK()) {
+        // Clean up temp .fail file containing failed queries on success.
+        std::filesystem::remove(failPath);
+    } else {
+        // No clean up on failure.
+        uasserted(9699501,
+                  str::stream{}
+                      << "Failed to extract " << failPath.string()
+                      << " to pickle. To manually retry, run `python3 "
+                         "src/mongo/db/query/query_tester/scripts/extract_failed_test_to_pickle.py "
+                         "<mongo_repo_root> <feature_extractor_dir> <output_prefix> <path to .fail "
+                         "file without extension>` from the mongo repo root.");
+    }
 }
 
 void QueryFile::printFailedQueries(const std::vector<size_t>& failedQueryIds) const {
@@ -446,7 +454,8 @@ bool QueryFile::writeAndValidate(const ModeOption mode,
 }
 
 bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
-    writeOutHeader(fs);
+    // Write out header with comments.
+    writeOutHeader<true>(fs);
     // Newline after the header is included in the write-out before each test.
 
     // Write out each test.
@@ -460,35 +469,49 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
     return true;
 }
 
+template <bool IncludeComments>
 void QueryFile::writeOutHeader(std::fstream& fs) const {
-    // Write out the header.
+    // Write the test name, without extension.
     auto nameNoExtension = getTestNameFromFilePath(_filePath);
-    for (const auto& comment : _comments.preName) {
-        fs << comment << std::endl;
+    if constexpr (IncludeComments) {
+        for (const auto& comment : _comments.preName) {
+            fs << comment << std::endl;
+        }
     }
     fs << nameNoExtension << std::endl;
-    for (const auto& comment : _comments.preCollName) {
-        fs << comment << std::endl;
+
+    // Write the database name.
+    if constexpr (IncludeComments) {
+        for (const auto& comment : _comments.preCollName) {
+            fs << comment << std::endl;
+        }
     }
     fs << _databaseNeeded << std::endl;
 
-    // Interleave comments and coll file lines.
-    auto commentItr = _comments.preCollFiles.begin();
-    for (const auto& coll : _collectionsNeeded) {
-        if (commentItr != _comments.preCollFiles.end()) {
+    if constexpr (IncludeComments) {
+        // Interleave comments and coll file lines.
+        auto commentItr = _comments.preCollFiles.begin();
+        for (const auto& coll : _collectionsNeeded) {
+            if (commentItr != _comments.preCollFiles.end()) {
+                for (const auto& comment : *commentItr) {
+                    fs << comment << std::endl;
+                }
+                ++commentItr;
+            }
+            fs << coll << std::endl;
+        }
+
+        // Drain the remaining comments. In practice, there should only be at most one more entry in
+        // _comments.preCollFiles than in _collectionsNeeded.
+        for (; commentItr != _comments.preCollFiles.end(); ++commentItr) {
             for (const auto& comment : *commentItr) {
                 fs << comment << std::endl;
             }
-            ++commentItr;
         }
-        fs << coll << std::endl;
-    }
-
-    // Drain the remaining comments. In practice, there should only be at most one more entry in
-    // _comments.preCollFiles than in _collectionsNeeded.
-    for (; commentItr != _comments.preCollFiles.end(); ++commentItr) {
-        for (const auto& comment : *commentItr) {
-            fs << comment << std::endl;
+    } else {
+        // Write out collection files.
+        for (const auto& coll : _collectionsNeeded) {
+            fs << coll << std::endl;
         }
     }
 }

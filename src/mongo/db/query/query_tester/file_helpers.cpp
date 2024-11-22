@@ -97,7 +97,9 @@ std::string discoverMongoRepoRoot() {
     const auto gitCmd = std::string{"git rev-parse --show-toplevel"};
     const auto res = shellExec(gitCmd, kShellTimeout, kShellMaxLen, true);
     if (!res.isOK()) {
-        uasserted(9699502, "Error: Unable to execute git command. Ensure this is in a Git repo.");
+        uasserted(9699502,
+                  "Error: Unable to execute git command. Ensure this is run from within the mongo "
+                  "git repo.");
     }
     auto repoRoot = res.getValue();
     // Trim trailing whitespace.
