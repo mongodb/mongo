@@ -938,6 +938,10 @@ std::vector<ProcessId> getRunningMongoChildProcessIds() {
     return outPids;
 }
 
+std::vector<ProcessId> getRegisteredPidsHistory() {
+    return ProgramRegistry::get(getGlobalServiceContext())->getRegisteredPidsHistory();
+}
+
 BSONObj RunningMongoChildProcessIds(const BSONObj&, void*) {
     std::vector<ProcessId> pids = getRunningMongoChildProcessIds();
     BSONObjBuilder bob;

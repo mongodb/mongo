@@ -188,6 +188,7 @@ void ProgramRegistry::registerProgram(ProcessId pid, int port) {
                           << " is already in use",
             !isPidRegistered(pid));
     _registeredPids.emplace(pid);
+    _registeredPidsHistory.push_back(pid);
     if (port != -1) {
         _portToPidMap.emplace(port, pid);
     }
@@ -335,6 +336,11 @@ void ProgramRegistry::getRegisteredPids(vector<ProcessId>& pids) {
     for (const auto& pid : _registeredPids) {
         pids.emplace_back(pid);
     }
+}
+
+std::vector<ProcessId> ProgramRegistry::getRegisteredPidsHistory() {
+    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    return _registeredPidsHistory;
 }
 
 #ifdef _WIN32

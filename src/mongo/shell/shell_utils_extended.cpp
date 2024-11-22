@@ -136,22 +136,6 @@ BSONObj listFiles(const BSONObj& _args, void* data) {
     return ret.obj();
 }
 
-BSONObj ls(const BSONObj& args, void* data) {
-    BSONArrayBuilder ret;
-    BSONObj o = listFiles(args, data);
-    if (!o.isEmpty()) {
-        for (auto&& elem : o.firstElement().Obj()) {
-            BSONObj f = elem.Obj();
-            string name = f["name"].String();
-            if (f["isDirectory"].trueValue()) {
-                name += '/';
-            }
-            ret << name;
-        }
-    }
-    return BSON("" << ret.arr());
-}
-
 /** Set process wide current working directory. */
 BSONObj cd(const BSONObj& args, void* data) {
     uassert(16830, "cd requires one argument -- cd(directory)", args.nFields() == 1);
@@ -342,21 +326,6 @@ BSONObj copyDir(const BSONObj& args, void* data) {
     boost::filesystem::copy(source, destination, boost::filesystem::copy_options::recursive);
 
     return undefinedReturn;
-}
-
-BSONObj removeFile(const BSONObj& args, void* data) {
-    BSONElement e = singleArg(args);
-    bool found = false;
-
-    boost::filesystem::path root(e.str());
-    if (boost::filesystem::exists(root)) {
-        found = true;
-        boost::filesystem::remove_all(root);
-    }
-
-    BSONObjBuilder b;
-    b.appendBool("removed", found);
-    return b.obj();
 }
 
 /**
@@ -757,6 +726,37 @@ BSONObj getStringWidth(const BSONObj& a, void* data) {
 }
 
 }  // namespace
+
+BSONObj ls(const BSONObj& args, void* data) {
+    BSONArrayBuilder ret;
+    BSONObj o = listFiles(args, data);
+    if (!o.isEmpty()) {
+        for (auto&& elem : o.firstElement().Obj()) {
+            BSONObj f = elem.Obj();
+            string name = f["name"].String();
+            if (f["isDirectory"].trueValue()) {
+                name += '/';
+            }
+            ret << name;
+        }
+    }
+    return BSON("" << ret.arr());
+}
+
+BSONObj removeFile(const BSONObj& args, void* data) {
+    BSONElement e = singleArg(args);
+    bool found = false;
+
+    boost::filesystem::path root(e.str());
+    if (boost::filesystem::exists(root)) {
+        found = true;
+        boost::filesystem::remove_all(root);
+    }
+
+    BSONObjBuilder b;
+    b.appendBool("removed", found);
+    return b.obj();
+}
 
 void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("getHostName", getHostName);

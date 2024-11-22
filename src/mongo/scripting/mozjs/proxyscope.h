@@ -140,6 +140,8 @@ public:
 
     std::string getError() override;
 
+    std::string getBaseURL() const override;
+
     bool hasOutOfMemoryException() override;
 
     void gc() override;

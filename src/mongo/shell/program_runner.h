@@ -105,6 +105,8 @@ public:
     bool isPidDead(ProcessId pids, int* exit_code = nullptr);
     void getRegisteredPorts(std::vector<int>& ports);
     void getRegisteredPids(std::vector<ProcessId>& pids);
+    /** Return a list of every processids ever registered. */
+    std::vector<ProcessId> getRegisteredPidsHistory();
 
 private:
     void updatePidExitCode(ProcessId pid, int exitCode);
@@ -113,6 +115,7 @@ private:
     friend class ProgramRunner;
 
     stdx::unordered_set<ProcessId> _registeredPids;
+    std::vector<ProcessId> _registeredPidsHistory;
     stdx::unordered_map<int, ProcessId> _portToPidMap;
     stdx::unordered_map<ProcessId, int> _pidToExitCode;
     stdx::unordered_map<ProcessId, stdx::thread> _outputReaderThreads;

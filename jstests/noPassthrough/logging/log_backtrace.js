@@ -4,6 +4,10 @@
  * @tags: [requires_persistence]
  */
 
+// Because this test intentionally crashes the server via an fassert, we need to instruct the
+// shell to clean up the core dump that is left behind.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
+
 function waitFailedToStart(pid, exitCode) {
     assert.soon(function() {
         return !checkProgram(pid).alive;

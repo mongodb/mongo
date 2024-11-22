@@ -48,6 +48,9 @@ public:
     bool init(JSContext* ctx, const std::string& loadPath);
     JSObject* loadRootModuleFromPath(JSContext* cx, const std::string& path);
     JSObject* loadRootModuleFromSource(JSContext* cx, const std::string& path, StringData source);
+    std::string getBaseURL() const {
+        return _baseUrl;
+    };
 
 private:
     static std::string resolveBaseUrl(JSContext* cx, const std::string& loadPath);

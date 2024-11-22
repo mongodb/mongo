@@ -16,6 +16,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 TestData.skipCheckDBHashes = true;  // the set is not consistent when we shutdown the test
+// Because this test intentionally causes the server to crash, we need to instruct the
+// shell to clean up the core dump that is left behind.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 const dbName = "testdb";
 const collName = "testcoll";

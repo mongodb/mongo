@@ -531,6 +531,8 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
                 "Failed to initialize ModuleLoader",
                 _moduleLoader->init(_context, engine->getLoadPath()));
 
+        _baseURL = _moduleLoader->getBaseURL();
+
         _checkErrorState(JS::InitRealmStandardClasses(_context));
 
         installBSONTypes();
@@ -575,6 +577,10 @@ MozJSImplScope::~MozJSImplScope() {
     }
 
     unregisterOperation();
+}
+
+std::string MozJSImplScope::getBaseURL() const {
+    return _baseURL;
 }
 
 bool MozJSImplScope::hasOutOfMemoryException() {

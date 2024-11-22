@@ -8,6 +8,10 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+// Because this test intentionally crashes the server, we instruct the
+// the shell to clean up after us and remove the core dump.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
+
 function makeShutdownByCrashFn(crashHow) {
     return function(conn) {
         var admin = conn.getDB("admin");

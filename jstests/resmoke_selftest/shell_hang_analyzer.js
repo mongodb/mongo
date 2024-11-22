@@ -7,6 +7,10 @@ const anyLineMatches = function(lines, rex) {
     return false;
 };
 
+// Because this test intentionally crashes the server, we instruct the
+// the shell to clean up after us and remove the core dump.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
+
 (function() {
 
 /*

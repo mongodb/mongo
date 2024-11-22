@@ -101,6 +101,10 @@ std::string MozJSProxyScope::getError() {
     return out;
 }
 
+std::string MozJSProxyScope::getBaseURL() const {
+    return _implScope->getBaseURL();
+}
+
 bool MozJSProxyScope::hasOutOfMemoryException() {
     bool out;
     runWithoutInterruptionExceptAtGlobalShutdown(

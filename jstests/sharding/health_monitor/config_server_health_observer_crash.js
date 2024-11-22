@@ -18,6 +18,9 @@ const kActiveFaultDurationSec = 12;
 
 // Crashed mongos will remain holding its socket as a zombie for some time.
 TestData.ignoreUnterminatedProcesses = true;
+// Because this test intentionally causes the server to crash, we need to instruct the
+// shell to clean up the core dump that is left behind.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 // Checking index consistency involves talking to the primary config server which is blackholed from
 // the mongos in this test.

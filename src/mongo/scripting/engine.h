@@ -127,6 +127,8 @@ public:
 
     virtual std::string getError() = 0;
 
+    virtual std::string getBaseURL() const = 0;
+
     virtual bool hasOutOfMemoryException() = 0;
 
     virtual void kill() = 0;

@@ -59,6 +59,9 @@ int KillMongoProgramInstances(int signal = SIGTERM);
 // Returns true if there are running child processes.
 std::vector<ProcessId> getRunningMongoChildProcessIds();
 
+// Returns a list of all process IDs, dead or alive.
+std::vector<ProcessId> getRegisteredPidsHistory();
+
 void installShellUtilsLauncher(Scope& scope);
 
 }  // namespace shell_utils

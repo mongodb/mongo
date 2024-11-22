@@ -36,5 +36,7 @@ class Scope;
 
 namespace shell_utils {
 void installShellUtilsExtended(Scope& scope);
-}
+BSONObj ls(const BSONObj& args, void* data);
+BSONObj removeFile(const BSONObj& args, void* data);
+}  // namespace shell_utils
 }  // namespace mongo

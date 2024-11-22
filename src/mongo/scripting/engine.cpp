@@ -527,6 +527,9 @@ public:
     string getError() override {
         return _real->getError();
     }
+    string getBaseURL() const override {
+        return _real->getBaseURL();
+    }
     bool hasOutOfMemoryException() override {
         return _real->hasOutOfMemoryException();
     }

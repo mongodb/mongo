@@ -101,6 +101,7 @@
 #include "mongo/shell/program_runner.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/utility.h"
@@ -258,6 +259,7 @@ enum ShellExitCode : int {
     kMongorcError = -5,
     kUnterminatedProcess = -6,
     kProcessTerminationError = -7,
+    kUnexpectedCoreDumpFound = -8,
 };
 
 Scope* shellMainScope;
@@ -1099,6 +1101,60 @@ int mongo_main(int argc, char* argv[]) {
                     std::cout << "Ignoring unterminated processes since "
                                  "TestData.ignoreUnterminatedProcesses is true"
                               << std::endl;
+                }
+            }
+
+            // If any core dumps exist from the test that ran, then that means the test unexpectedly
+            // left a core dump behind.
+            pids = mongo::shell_utils::getRegisteredPidsHistory();
+            std::cout << "All pids dead / alive (" << pids.size() << "): ";
+            for (const auto pid : pids) {
+                std::cout << pid << ", ";
+            }
+            std::cout << std::endl;
+
+            // Iterate through files to see if we find a dump file containing a pid of a program
+            // belonging to the test that ran.
+            std::cout << "Searching for files in: " << shellMainScope->getBaseURL() << std::endl;
+            auto files = mongo::shell_utils::ls(BSON("" << shellMainScope->getBaseURL()), nullptr);
+            std::vector<std::string> coreDumpsFound;
+            for (const auto& elem : files[""].Array()) {
+                auto fileName = elem.String();
+                for (const auto& pid : pids) {
+                    if (fileName.find("dump_") != std::string::npos &&
+                        fileName.find("." + pid.toString() + ".core") != std::string::npos) {
+                        std::cout << "Found a core dump '" << fileName << "'" << std::endl;
+                        coreDumpsFound.push_back(fileName);
+                    }
+                }
+            }
+
+            if (!coreDumpsFound.empty()) {
+                auto code =
+                    "function() { return typeof TestData === 'object' && TestData !== null && "
+                    "TestData.hasOwnProperty('cleanUpCoreDumpsFromExpectedCrash') && "
+                    "TestData.cleanUpCoreDumpsFromExpectedCrash === true; }"_sd;
+                shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
+                bool cleanUpCoreDumpsFromExpectedCrash =
+                    shellMainScope->getBoolean("__returnValue");
+
+                if (!cleanUpCoreDumpsFromExpectedCrash) {
+                    // We unexpectedly found core dumps for this test.
+                    std::cout << "exiting with a failure due to finding core dumps unexpectedly, "
+                                 "the variable TestData.cleanUpCoreDumpsFromExpectedCrash may be "
+                                 "missing from the test."
+                              << std::endl;
+                    std::cout << "exiting with code " << static_cast<int>(kUnexpectedCoreDumpFound)
+                              << std::endl;
+                    return kUnexpectedCoreDumpFound;
+                } else {
+                    // If we expected to find core dumps, then clean the core dumps up.
+                    for (const auto& dumpFile : coreDumpsFound) {
+                        std::cout << "TestData.cleanUpCoreDumpsFromExpectedCrash is set; deleting "
+                                     "core dump '"
+                                  << dumpFile << "'" << std::endl;
+                        mongo::shell_utils::removeFile(BSON("" << dumpFile), nullptr);
+                    }
                 }
             }
         }

@@ -14,6 +14,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // which only includes majority committed data on standalones, to diverge. Therefore skip
 // validating fast count.
 TestData.skipEnforceFastCountOnValidate = true;
+// Because this test intentionally crashes the server via an fassert, we need to instruct the
+// shell to clean up the core dump that is left behind.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 const s =
     new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});

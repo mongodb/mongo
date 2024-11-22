@@ -146,6 +146,8 @@ public:
 
     std::string getError() override;
 
+    std::string getBaseURL() const override;
+
     bool hasOutOfMemoryException() override;
 
     void gc() override;
@@ -515,6 +517,7 @@ private:
     std::string _parentStack;
     std::size_t _generation;
     bool _requireOwnedObjects;
+    std::string _baseURL;
     bool _hasOutOfMemoryException;
 
     bool _inReportError;

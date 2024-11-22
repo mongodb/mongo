@@ -16,6 +16,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // into an insert, we play forward to have more documents than expected (or the reverse observation
 // for adding a delete oplog entry).
 TestData.skipEnforceFastCountOnValidate = true;
+// Because this test intentionally crashes the server, we instruct the
+// the shell to clean up after us and remove the core dump.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 const ops = ["Update", "Delete", "Insert"];
 const oplogApplicationResults = ["Success", "CrudError", "NamespaceNotFound"];
