@@ -4669,7 +4669,12 @@ namespace detail
       }
       run_it& operator=(BOOST_THREAD_RV_REF(run_it) x) BOOST_NOEXCEPT {
         if (this != &x) {
-          that_=x.that;
+// MongoDB modification. In the original version, x.that_ is misspelled as x.that. Normally, a
+// compiler would only diagnose this issue if this template struct were ever instantiated as that
+// would cause the compiler to attempt the instantiation and fail on all candidates. Clang 19 is
+// able to recognize that this issue occurs independently of the template arguments and is present
+// in every possible template instantiation, and diagnoses the issue as an error.
+          that_=x.that_;
           x.that_.reset();
         }
         return *this;
