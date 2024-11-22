@@ -34,10 +34,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"
+#include "mongo/db/query/stats/collection_statistics_mock.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -121,18 +123,22 @@ std::unique_ptr<QuerySolution> makeCollScanPlan(std::unique_ptr<MatchExpression>
     return solution;
 }
 
-IndexBounds makePointIntervalBounds(double point, std::string fieldName) {
+OrderedIntervalList makePointInterval(double point, std::string fieldName) {
     OrderedIntervalList oil(fieldName);
     oil.intervals.emplace_back(IndexBoundsBuilder::makePointInterval(point));
+    return oil;
+}
+
+IndexBounds makePointIntervalBounds(double point, std::string fieldName) {
     IndexBounds bounds;
-    bounds.fields.emplace_back(std::move(oil));
+    bounds.fields.emplace_back(makePointInterval(point, fieldName));
     return bounds;
 }
 
 IndexBounds makeRangeIntervalBounds(const BSONObj& range,
                                     BoundInclusion boundInclusion,
                                     std::string fieldName) {
-    OrderedIntervalList oilRange;
+    OrderedIntervalList oilRange(fieldName);
     oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(range, boundInclusion));
     IndexBounds rangeBounds;
     rangeBounds.fields.push_back(oilRange);
@@ -146,6 +152,34 @@ CardinalityEstimate getPlanCE(const QuerySolution& plan, double collCE) {
     CardinalityEstimator estimator{stats, qsnEstimates, QueryPlanRankerModeEnum::kHeuristicCE};
     estimator.estimatePlan(plan);
     return qsnEstimates.at(plan.root()).outCE;
+}
+
+CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan,
+                                       stats::CollectionStatisticsMock stats) {
+    EstimateMap qsnEstimates;
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    CardinalityEstimator estimator{stats, qsnEstimates, QueryPlanRankerModeEnum::kHistogramCE};
+    estimator.estimatePlan(plan);
+    return qsnEstimates.at(plan.root()).outCE;
+}
+
+stats::CollectionStatisticsMock makeCollStatsWithHistograms() {
+    stats::CollectionStatisticsMock stats(1000);
+    std::vector<ce::BucketData> data{
+        {0 /*bucketBoundary*/, 10 /*equalFreq*/, 90 /*rangeFreq*/, 5 /*ndv*/},
+        {5, 100, 100, 0},
+        {6, 700, 0, 0}};
+    stats.addHistogram(
+        "a",
+        stats::CEHistogram::make(ce::createHistogram(data),
+                                 stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, 1000}},
+                                 1000));
+    stats.addHistogram(
+        "b",
+        stats::CEHistogram::make(ce::createHistogram(data),
+                                 stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, 1000}},
+                                 1000));
+    return stats;
 }
 
 TEST(CardinalityEstimator, PointInterval) {
@@ -444,6 +478,45 @@ TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
 
     ASSERT_EQ(e1, e2);
     ASSERT_EQ(e1, makeCard(20.8395));
+}
+
+TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinality) {
+    // Plan 1: Ixscan(a: (5, inf]) -> Fetch
+    std::vector<std::string> indexFields = {"a"};
+    IndexBounds bounds =
+        makeRangeIntervalBounds(BSON("" << 5 << " " << std::numeric_limits<double>::infinity()),
+                                BoundInclusion::kIncludeEndKeyOnly,
+                                indexFields[0]);
+    auto plan1 = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
+
+    // Plan 2: CollScan(a > 5)
+    BSONObj query = fromjson("{a: {$gt: 5}}");
+    auto plan2 = makeCollScanPlan(parse(query));
+
+    auto collStats = makeCollStatsWithHistograms();
+    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collStats);
+    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collStats);
+    ASSERT_EQ(e1, e2);
+    ASSERT_GT(e1, zeroCE);
+}
+
+TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveSameCardinality) {
+    // Plan 1: Ixscan(a: [5, 5], b: [6, 6]) -> Fetch
+    std::vector<std::string> indexFields = {"a", "b"};
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointInterval(5, indexFields[0]));
+    bounds.fields.push_back(makePointInterval(6, indexFields[1]));
+    auto plan1 = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
+
+    // Plan 2: CollScan(a == 5 AND b == 6)
+    BSONObj query = fromjson("{a: 5, b: 6}");
+    auto plan2 = makeCollScanPlan(parse(query));
+
+    auto collStats = makeCollStatsWithHistograms();
+    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collStats);
+    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collStats);
+    ASSERT_EQ(e1, e2);
+    ASSERT_GT(e1, zeroCE);
 }
 
 }  // unnamed namespace

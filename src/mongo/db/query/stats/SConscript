@@ -70,7 +70,6 @@ env.CppUnitTest(
 env.Library(
     target="stats_test_utils",
     source=[
-        "collection_statistics_mock.cpp",
         "rand_utils.cpp",
         "rand_utils_new.cpp",
         "maxdiff_test_utils.cpp",

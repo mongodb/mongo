@@ -96,3 +96,16 @@ mongo_cc_library(
         "//src/mongo/db:sbe_values",
     ],
 )
+
+mongo_cc_library(
+    name = "collection_statistics_mock",
+    srcs = [
+        "collection_statistics_mock.cpp",
+    ],
+    hdrs = [
+        "collection_statistics_mock.h",
+    ],
+    deps = [
+        ":collection_statistics_interface",
+    ],
+)

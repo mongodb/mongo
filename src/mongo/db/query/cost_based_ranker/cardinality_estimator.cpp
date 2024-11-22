@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo::cost_based_ranker {
@@ -244,21 +245,52 @@ CardinalityEstimate CardinalityEstimator::indexUnionCard(const T* node) {
  * MatchExpressions
  */
 CardinalityEstimate CardinalityEstimator::estimate(const ComparisonMatchExpression* node) {
-    /*
-     Check if there is an estimate in the cache
-     if not get the best representative from the equivalence grouping
-     Then estimate the representative.
+    // We can use a histogram to estimate this MatchExpression by constructing the corresponding
+    // interval and estimating that.
+    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE) {
+        auto histogram = _collStats.getHistogram(std::string(node->path()));
+        tassert(
+            9708801, str::stream{} << "no histogram found for path: " << node->path(), histogram);
 
-     EstimationSource estimatorSrc = chooseEstimator(nodeType, est policy, stats, etc ...);
-     CardinalityEstimate ce = applyEstimator(estimatorSrc, node);
-       if (estimatorSrc == Histogram)
-         - convert node to interval
-         - call estimateCardinality(hist, _inputCard, interval, true)
-       else if (estimationSrc == Sampling)
-         - call estimateSamplingCardinality(node)
-       else if (estimationSrc == Heuristics)
-         - call estimateFilter(node)
-    */
+        // Generate a fake catalog index object representing a single non-multikey field. We don't
+        // care whether the field is actually multikey or not because both cases will generate the
+        // same bounds for a ComparisonMatchExpression.
+        static IndexEntry fakeIndex(BSONObj::kEmptyObject /* keyPattern */,
+                                    INDEX_BTREE,
+                                    IndexDescriptor::IndexVersion::kV2,
+                                    false /* multikey */,
+                                    {} /* multikeyPaths */,
+                                    {} /* multikeyPathSet */,
+                                    false /* sparse */,
+                                    false /* unique */,
+                                    CoreIndexInfo::Identifier("idx"),
+                                    nullptr /* filterExpression */,
+                                    BSONObj::kEmptyObject /* infoObj */,
+                                    nullptr /* collatorInterface */,
+                                    nullptr /* wildcardProjection */);
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(
+            node, node->getData(), fakeIndex, &oil, &tightness, nullptr /* ietBuilder */);
+        // We expect a simple comparison MatchExpression to generate exact bounds.
+        tassert(9708802,
+                str::stream{} << "encountered unimplemented case where index bounds are non-exact: "
+                              << oil.toString(true),
+                tightness == IndexBoundsBuilder::EXACT ||
+                    tightness == IndexBoundsBuilder::EXACT_MAYBE_COVERED);
+        tassert(9708803,
+                str::stream{}
+                    << "encountered unimplemented case where index bounds have multiple intervals: "
+                    << oil.toString(false),
+                oil.intervals.size() == 1);
+        const auto& interval = oil.intervals.front();
+        tassert(9708804,
+                str::stream{} << "encountered interval which is unestimatable: "
+                              << interval.toString(true),
+                ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true));
+        return ce::HistogramEstimator::estimateCardinality(*histogram, _inputCard, interval, true);
+    }
+
     SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
     return sel * _inputCard;
 }
