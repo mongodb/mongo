@@ -5,13 +5,13 @@ filters:
       - 10gen/query
   - "analyze_plan.js":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-explain
   - "aggregation_pipeline_utils.js":
     approvers:
       - 10gen/query
   - "change_stream*.js":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-change-streams
   - "geo*.js":
     approvers:
       - 10gen/query-integration
@@ -20,10 +20,10 @@ filters:
       - 10gen/query-integration
   - "query_settings*.js":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-query-settings
   - "sbe*.js":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-sbe
   - "wildcard_index_helpers.js":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-planner

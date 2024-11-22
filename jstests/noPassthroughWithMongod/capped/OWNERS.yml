@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-storage-execution
+  - "getmore_awaitdata_opcounters.js":
+    approvers:
+      - 10gen/query-execution-client-cursor

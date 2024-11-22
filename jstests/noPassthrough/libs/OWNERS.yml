@@ -6,3 +6,6 @@ filters:
   - "*index_build*":
     approvers:
       - 10gen/server-storage-execution
+  - "*change_stream*":
+    approvers:
+      - 10gen/query-execution-change-streams

@@ -9,3 +9,6 @@ filters:
   - "del.js":
     approvers:
       - 10gen/server-storage-execution
+  - "update_serializability*":
+    approvers:
+      - 10gen/query-execution-write-exec

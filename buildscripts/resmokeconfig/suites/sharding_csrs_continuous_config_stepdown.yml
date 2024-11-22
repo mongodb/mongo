@@ -121,12 +121,12 @@ selector:
     - jstests/sharding/shard4.js
     - jstests/sharding/shard5.js
     - jstests/sharding/split_stale_mongos.js
-    - jstests/sharding/stale_mongos_updates_and_removes.js
+    - jstests/sharding/query/update/stale_mongos_updates_and_removes.js
     - jstests/sharding/zero_shard_version.js
     # Already stop or blackholes the primary of the CSRS config shard
     - jstests/sharding/all_shard_and_config_hosts_brought_down_one_by_one.js
     - jstests/sharding/all_config_servers_blackholed_from_mongos.js
-    - jstests/sharding/batch_write_command_sharded.js
+    - jstests/sharding/query/batch_write_command_sharded.js
     - jstests/sharding/config_rs_no_primary.js
     - jstests/sharding/startup_with_all_configs_down.js
     - jstests/sharding/lagged_config_secondary.js
@@ -216,10 +216,10 @@ selector:
     - jstests/sharding/move_primary_with_writes.js
 
     # Expects same CSRS primary and shard primary throughout the test
-    - jstests/sharding/api_params_nontransaction_sharded.js
-    - jstests/sharding/api_params_nontransaction_unsharded.js
-    - jstests/sharding/api_params_transaction_sharded.js
-    - jstests/sharding/api_params_transaction_unsharded.js
+    - jstests/sharding/query/api_version/api_params_nontransaction_sharded.js
+    - jstests/sharding/query/api_version/api_params_nontransaction_unsharded.js
+    - jstests/sharding/query/api_version/api_params_transaction_sharded.js
+    - jstests/sharding/query/api_version/api_params_transaction_unsharded.js
 
     # These tests use the resharding test fixture, which performs its own addShard. Config server stepdowns can
     # interrupt the addShard operation resulting in the test cluster not being initalized properly.
@@ -273,8 +273,8 @@ selector:
     # resumable changestream errors right now.
     # TODO (SERVER-97414): we could make these tests use the ChangeStreamTest fixture and
     # then remove them from the exclusion list.
-    - jstests/sharding/api_version_stage_allowance_checks.js
-    - jstests/sharding/log_remote_op_wait.js
+    - jstests/sharding/query/api_version/api_version_stage_allowance_checks.js
+    - jstests/sharding/query/log_remote_op_wait.js
     - jstests/sharding/query/change_streams/change_stream_against_shard_mongod.js
     - jstests/sharding/query/change_streams/change_stream_chunk_migration.js
     - jstests/sharding/query/change_streams/change_stream_empty_apply_ops.js
@@ -306,7 +306,7 @@ selector:
     - jstests/sharding/query/explain/explain_cmd.js
     - jstests/sharding/resharding_change_stream_namespace_filtering.js
     - jstests/sharding/resharding_oplog_sync_agg_resume_token.js
-    - jstests/sharding/timeseries_change_stream_no_orphans.js
+    - jstests/sharding/timeseries/timeseries_change_stream_no_orphans.js
 
   exclude_with_any_tags:
     - does_not_support_stepdowns

@@ -2,4 +2,31 @@ version: 1.0.0
 filters:
   - "*golden_overrides.js":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-golden-test
+  - "*changestream*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "*query_settings*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "implicit_wildcard_indexes.js":
+    approvers:
+      - 10gen/query-execution-indexing
+  - "implicitly_wrap_pipelines_in_facets.js":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "*bulk_write.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "implicit_timeseries_collections.js":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "query_shape_hash_stability.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "rerun_queries.js":
+    approvers:
+      - 10gen/query-optimization-plan-cache
+  - "set_api*":
+    approvers:
+      - 10gen/query-optimization-parsers

@@ -1,5 +1,14 @@
 version: 1.0.0
 filters:
+  - "batched_multi_deletes*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "bulk_write*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "bulk_write_currentop.js":
+    approvers:
+      - 10gen/query-integration-observability
   - "*capped_deletes*":
     approvers:
       - 10gen/server-storage-execution

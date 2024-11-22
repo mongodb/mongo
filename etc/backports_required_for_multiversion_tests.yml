@@ -191,7 +191,7 @@ last-continuous:
       ticket: SERVER-87285
     - test_file: jstests/core/exhaust.js
       ticket: SERVER-87285
-    - test_file: jstests/sharding/timeseries_sharding_admin_commands.js
+    - test_file: jstests/sharding/timeseries/timeseries_sharding_admin_commands.js
       ticket: SERVER-80690
     - test_file: jstests/core/sparse_index_supports_ne_null.js
       ticket: SERVER-37164
@@ -245,9 +245,9 @@ last-continuous:
       ticket: SERVER-91195
     - test_file: jstests/replsets/timeseries_mixed_schema_bucket_initial_sync.js
       ticket: SERVER-91195
-    - test_file: jstests/sharding/timeseries_shard_collection_with_deprecation_message.js
+    - test_file: jstests/sharding/timeseries/timeseries_shard_collection_with_deprecation_message.js
       ticket: SERVER-88647
-    - test_file: jstests/sharding/timeseries_out_conflicting_namespace_on_shard.js
+    - test_file: jstests/sharding/timeseries/timeseries_out_conflicting_namespace_on_shard.js
       ticket: SERVER-90720
     - test_file: jstests/sharding/sharded_data_distribution.js
       ticket: SERVER-91522
@@ -319,11 +319,11 @@ last-continuous:
       ticket: SERVER-94156
     - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
       ticket: SERVER-94207
-    - test_file: jstests/sharding/explain_find_transformed_query.js
+    - test_file: jstests/sharding/query/explain/explain_find_transformed_query.js
       ticket: SERVER-82471
     - test_file: jstests/change_streams/ddl_abort_index_build_event.js
       ticket: SERVER-93154
-    - test_file: jstests/sharding/timeseries_query_extended_range.js
+    - test_file: jstests/sharding/timeseries/timeseries_query_extended_range.js
       ticket: SERVER-73641
     - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
       ticket: SERVER-95075
@@ -533,7 +533,7 @@ last-lts:
       ticket: SERVER-87285
     - test_file: jstests/core/exhaust.js
       ticket: SERVER-87285
-    - test_file: jstests/sharding/timeseries_sharding_admin_commands.js
+    - test_file: jstests/sharding/timeseries/timeseries_sharding_admin_commands.js
       ticket: SERVER-80690
     - test_file: jstests/core/sparse_index_supports_ne_null.js
       ticket: SERVER-37164
@@ -615,9 +615,9 @@ last-lts:
       ticket: SERVER-91195
     - test_file: jstests/replsets/timeseries_mixed_schema_bucket_initial_sync.js
       ticket: SERVER-91195
-    - test_file: jstests/sharding/timeseries_shard_collection_with_deprecation_message.js
+    - test_file: jstests/sharding/timeseries/timeseries_shard_collection_with_deprecation_message.js
       ticket: SERVER-88647
-    - test_file: jstests/sharding/timeseries_out_conflicting_namespace_on_shard.js
+    - test_file: jstests/sharding/timeseries/timeseries_out_conflicting_namespace_on_shard.js
       ticket: SERVER-90720
     - test_file: jstests/sharding/sharded_data_distribution.js
       ticket: SERVER-91522
@@ -693,11 +693,11 @@ last-lts:
       ticket: SERVER-94156
     - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
       ticket: SERVER-94207
-    - test_file: jstests/sharding/explain_find_transformed_query.js
+    - test_file: jstests/sharding/query/explain/explain_find_transformed_query.js
       ticket: SERVER-82471
     - test_file: jstests/change_streams/ddl_abort_index_build_event.js
       ticket: SERVER-93154
-    - test_file: jstests/sharding/timeseries_query_extended_range.js
+    - test_file: jstests/sharding/timeseries/timeseries_query_extended_range.js
       ticket: SERVER-73641
     - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
       ticket: SERVER-95075

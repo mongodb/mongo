@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "bit_update_mixed_fcv.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "view_definition_feature_compatibility_version.js":
+    approvers:
+      - 10gen/query-optimization-views
