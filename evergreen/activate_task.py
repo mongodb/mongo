@@ -1,15 +1,21 @@
 """Script that activates the input task on the same variant as the running task"""
 
+from typing import Optional
+
 import typer
 
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.read_config import read_config_file
 
 
-def main(task_name: str):
+def main(task_name: str, skip_for_patch_author: Optional[str] = None):
     expansions_file = "../expansions.yml"
     expansions = read_config_file(expansions_file)
     evg_api = evergreen_conn.get_evergreen_api()
+
+    # Skip activation if the patch author is the excluded user
+    if expansions.get("author") == skip_for_patch_author:
+        return
 
     variant_id = expansions.get("build_id")
     variant = evg_api.build_by_id(variant_id)
