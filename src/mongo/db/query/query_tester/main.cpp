@@ -134,7 +134,6 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
 
         // Treat data load errors as failures, too.
         try {
-            currFile.readInEntireFile(mode);
             currFile.readInEntireFile(mode, startRange, endRange);
             currFile.loadCollections(conn.get(), dropData, loadData, prevFileCollections);
         } catch (const std::exception& exception) {
