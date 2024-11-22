@@ -66,7 +66,7 @@ BSONObj MongotTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
 
     boost::optional<long long> docsNeeded = _getNextDocsRequested(totalNumReceived);
 
-    // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
+    // TODO SERVER-92576 Remove docsRequested.
     if (_currentBatchSize.has_value() || docsNeeded.has_value()) {
         BSONObjBuilder getMoreBob;
         getMoreRequest.serialize(&getMoreBob);

@@ -57,12 +57,6 @@ feature_flags:
       version: 8.0
       shouldBeFCVGated: true
 
-    featureFlagSearchBatchSizeLimit:
-      description: "Feature flag to enable the search batchsize and limit optimization."
-      cpp_varname: gFeatureFlagSearchBatchSizeLimit
-      default: true
-      shouldBeFCVGated: false
-
     featureFlagAggOutTimeseries:
       description: "Feature flag for enabling support for $out to write to time-series collections"
       cpp_varname: gFeatureFlagAggOutTimeseries

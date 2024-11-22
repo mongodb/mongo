@@ -279,19 +279,14 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         ? boost::make_optional<long long>(*spec.getMongotDocsRequested())
         : boost::none;
 
-    // We disable setting docsRequested if we're already setting batchSize or if
-    // the docsRequested feature flag (featureFlagSearchBatchSizeLimit) is disabled.
-    // TODO SERVER-74941 Remove docsRequested alongside featureFlagSearchBatchSizeLimit.
-    // (Ignore FCV check): This feature is enabled on an earlier FCV.
-    if (batchSize.has_value() ||
-        !feature_flags::gFeatureFlagSearchBatchSizeLimit.isEnabledAndIgnoreFCVUnsafe()) {
+    // TODO SERVER-92576 Remove docsRequested.
+    if (batchSize.has_value()) {
+        // We disable setting docsRequested if we're already setting batchSize.
         docsRequested = boost::none;
-    } else {
+    } else if (docsRequested.has_value()) {
         // If we're enabling the docsRequested option, min/max bounds can be set to the
         // docsRequested value.
-        if (docsRequested.has_value()) {
-            bounds = DocsNeededBounds(*docsRequested, *docsRequested);
-        }
+        bounds = DocsNeededBounds(*docsRequested, *docsRequested);
     }
 
     auto getMoreStrategy = std::make_unique<executor::MongotTaskExecutorCursorGetMoreStrategy>(
