@@ -1358,8 +1358,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // failed addShard/removeShard operation.
     resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
-    const auto name = shardId.toString();
-    audit::logRemoveShard(opCtx->getClient(), name);
+    const auto shardName = shardId.toString();
+    audit::logRemoveShard(opCtx->getClient(), shardName);
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
@@ -1374,7 +1374,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                   kConfigReadSelector,
                                                   repl::ReadConcernLevel::kLocalReadConcern,
                                                   NamespaceString::kConfigsvrShardsNamespace,
-                                                  BSON(ShardType::name() << name),
+                                                  BSON(ShardType::name() << shardName),
                                                   BSONObj(),
                                                   1));
 
@@ -1391,12 +1391,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     const auto shard = uassertStatusOK(ShardType::fromBSON(findShardResponse.docs[0]));
+    const auto replicaSetName =
+        uassertStatusOK(ConnectionString::parse(shard.getHost())).getReplicaSetName();
 
     // Find how many *other* shards exist, which are *not* currently draining
     const auto countOtherNotDrainingShards = uassertStatusOK(_runCountCommandOnConfig(
         opCtx,
         NamespaceString::kConfigsvrShardsNamespace,
-        BSON(ShardType::name() << NE << name << ShardType::draining.ne(true))));
+        BSON(ShardType::name() << NE << shardName << ShardType::draining.ne(true))));
     uassert(ErrorCodes::IllegalOperation,
             "Operation not allowed because it would remove the last shard",
             countOtherNotDrainingShards > 0);
@@ -1404,7 +1406,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Ensure there are no non-empty zones that only belong to this shard
     for (auto& zoneName : shard.getTags()) {
         auto isRequiredByZone = uassertStatusOK(
-            _isShardRequiredByZoneStillInUse(opCtx, kConfigReadSelector, name, zoneName));
+            _isShardRequiredByZoneStillInUse(opCtx, kConfigReadSelector, shardName, zoneName));
         uassert(ErrorCodes::ZoneStillInUse,
                 str::stream()
                     << "Operation not allowed because it would remove the only shard for zone "
@@ -1417,17 +1419,17 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         uassertStatusOK(_runCountCommandOnConfig(
             opCtx,
             NamespaceString::kConfigsvrShardsNamespace,
-            BSON(ShardType::name() << name << ShardType::draining(true)))) > 0;
+            BSON(ShardType::name() << shardName << ShardType::draining(true)))) > 0;
 
     if (!isShardCurrentlyDraining) {
-        LOGV2(21945, "Going to start draining shard", "shardId"_attr = name);
+        LOGV2(21945, "Going to start draining shard", "shardId"_attr = shardName);
 
         // Record start in changelog
         uassertStatusOK(
             ShardingLogging::get(opCtx)->logChangeChecked(opCtx,
                                                           "removeShard.start",
                                                           NamespaceString::kEmpty,
-                                                          BSON("shard" << name),
+                                                          BSON("shard" << shardName),
                                                           ShardingCatalogClient::kLocalWriteConcern,
                                                           _localConfigShard,
                                                           _localCatalogClient.get()));
@@ -1435,7 +1437,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         uassertStatusOKWithContext(_localCatalogClient->updateConfigDocument(
                                        opCtx,
                                        NamespaceString::kConfigsvrShardsNamespace,
-                                       BSON(ShardType::name() << name),
+                                       BSON(ShardType::name() << shardName),
                                        BSON("$set" << BSON(ShardType::draining(true))),
                                        false,
                                        ShardingCatalogClient::kLocalWriteConcern),
@@ -1454,17 +1456,17 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // shard.
     const auto getDrainingProgress = [&]() -> RemoveShardProgress::DrainingShardUsage {
         const auto chunkCount = uassertStatusOK(_runCountCommandOnConfig(
-            opCtx, NamespaceString::kConfigsvrChunksNamespace, BSON(ChunkType::shard(name))));
+            opCtx, NamespaceString::kConfigsvrChunksNamespace, BSON(ChunkType::shard(shardName))));
 
         const auto databaseCount = uassertStatusOK(
             _runCountCommandOnConfig(opCtx,
                                      NamespaceString::kConfigDatabasesNamespace,
-                                     BSON(DatabaseType::kPrimaryFieldName << name)));
+                                     BSON(DatabaseType::kPrimaryFieldName << shardName)));
 
         const auto jumboCount = uassertStatusOK(
             _runCountCommandOnConfig(opCtx,
                                      NamespaceString::kConfigsvrChunksNamespace,
-                                     BSON(ChunkType::shard(name) << ChunkType::jumbo(true))));
+                                     BSON(ChunkType::shard(shardName) << ChunkType::jumbo(true))));
 
         return {chunkCount, databaseCount, jumboCount};
     };
@@ -1549,7 +1551,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         auto trackedDBs =
             _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
 
-        LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = name);
+        LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = shardName);
 
         for (auto&& db : trackedDBs) {
             tassert(7783700,
@@ -1568,7 +1570,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
         // Now actually drop the databases; each request must either succeed or resolve into a
         // no-op.
-        LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = name);
+        LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = shardName);
 
         for (auto&& db : trackedDBs) {
             const auto dropStatus = dropDatabase(opCtx, db.getDbName(), true /*markFromMigrate*/);
@@ -1595,7 +1597,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     // Draining is done, now finish removing the shard.
-    LOGV2(21949, "Going to remove shard", "shardId"_attr = name);
+    LOGV2(21949, "Going to remove shard", "shardId"_attr = shardName);
 
     // Synchronize the control shard selection, the shard's document removal, and the topology time
     // update to exclude potential race conditions in case of concurrent add/remove shard
@@ -1609,7 +1611,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         NamespaceString::kConfigsvrShardsNamespace,
-        BSON(ShardType::name.ne(name)),
+        BSON(ShardType::name.ne(shardName)),
         {},
         1);
     auto controlShardResponse = uassertStatusOK(controlShardQueryStatus);
@@ -1625,7 +1627,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
     // Remove the shard's document and update topologyTime within a transaction.
-    _removeShardInTransaction(opCtx, name, controlShardName, newTopologyTime.asTimestamp());
+    _removeShardInTransaction(opCtx, shardName, controlShardName, newTopologyTime.asTimestamp());
 
     // Release the shard membership lock since the set cluster parameter operation below
     // require taking this lock.
@@ -1645,14 +1647,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     if (shardId != ShardId::kConfigServerId) {
         // Don't remove the config shard's RSM because it is used to target the config server.
-        ReplicaSetMonitor::remove(name);
+        ReplicaSetMonitor::remove(replicaSetName);
     }
 
     // Record finish in changelog
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "removeShard",
                                            NamespaceString::kEmpty,
-                                           BSON("shard" << name),
+                                           BSON("shard" << shardName),
                                            ShardingCatalogClient::kLocalWriteConcern,
                                            _localConfigShard,
                                            _localCatalogClient.get());
