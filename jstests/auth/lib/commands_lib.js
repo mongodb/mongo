@@ -7921,10 +7921,10 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnly,
         },
         {
-          testname: "aggregate_$externalAPI",
+          testname: "aggregate_$https",
           command: {
               aggregate: "foo",
-              pipeline: [{$externalAPI: {}}],
+              pipeline: [{$https: {}}],
               cursor: {},
           },
           // TODO SERVER-74961: Windows is not yet supported in stream processing.
