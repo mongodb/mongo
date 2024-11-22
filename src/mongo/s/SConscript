@@ -61,54 +61,6 @@ env.BazelProgram(
     ],
 )
 
-env.Library(
-    target="sharding_test_fixture_common",
-    source=[
-        "$BUILD_DIR/mongo/db/s/shard_server_catalog_cache_loader_mock.cpp",
-        "catalog_cache_loader_mock.cpp",
-        "catalog_cache_mock.cpp",
-        "config_server_catalog_cache_loader_mock.cpp",
-        "sharding_test_fixture_common.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/remote_command_targeter_mock",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/executor/network_interface_mock",
-        "$BUILD_DIR/mongo/executor/network_test_env",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "grid",
-        "write_ops/batch_write_types",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "resource_yielders",
-        "sharding_router_api",
-    ],
-)
-
-env.Library(
-    target="sharding_mongos_test_fixture",
-    source=[
-        "catalog_cache_test_fixture.cpp",
-        "sharding_mongos_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
-        "$BUILD_DIR/mongo/executor/task_executor_pool",
-        "$BUILD_DIR/mongo/transport/transport_layer_mock",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "catalog/sharding_catalog_client_impl",
-        "sharding_router_api",
-        "sharding_task_executor",
-        "sharding_test_fixture_common",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "sharding_initialization",
-    ],
-)
-
 env.CppUnitTest(
     target="multi_statement_transaction_requests_sender_test",
     source=[

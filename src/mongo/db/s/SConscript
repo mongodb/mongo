@@ -4,55 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="sharding_mongod_test_fixture",
-    source=[
-        "sharding_mongod_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/s/sharding_test_fixture_common",
-        "sharding_runtime_d",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
-        "$BUILD_DIR/mongo/db/op_observer/operation_logger_impl",
-        "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
-    ],
-)
-
-env.Library(
-    target="shard_server_test_fixture",
-    source=[
-        "shard_server_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "sharding_mongod_test_fixture",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl",
-    ],
-)
-
-env.Library(
-    target="config_server_test_fixture",
-    source=[
-        "config/config_server_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "sharding_mongod_test_fixture",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
-        "$BUILD_DIR/mongo/db/op_observer/operation_logger_impl",
-        "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl",
-    ],
-)
-
 env.CppUnitTest(
     target="shard_server_op_observer_test",
     source=[],

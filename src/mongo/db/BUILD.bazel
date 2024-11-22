@@ -669,6 +669,37 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "shard_role_test",
+    srcs = [
+        "catalog_raii_test.cpp",
+        "d_concurrency_test.cpp",
+        "database_name_test.cpp",
+        "db_raii_multi_collection_test.cpp",
+        "db_raii_test.cpp",
+        "shard_role_test.cpp",
+        "//src/mongo/db/catalog:database_holder_mock.h",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":query_exec",
+        ":shard_role",
+        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/catalog:catalog_control",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/query/client_cursor",
+        "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
 mongo_cc_library(
     name = "dbdirectclient",
     srcs = [

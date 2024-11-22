@@ -5,41 +5,8 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="cluster_server_parameter_test",
-    source=[
-        "cluster_server_parameter_common_test.cpp",
-        "cluster_server_parameter_initializer_test.cpp",
-        "cluster_server_parameter_op_observer_test.cpp",
-        "cluster_server_parameter_refresher_test.cpp",
-        "cluster_server_parameter_server_status_test.cpp",
-        "cluster_server_parameter_test_util.cpp",
-        "cluster_server_parameter_test_gen.cpp",
-        "cluster_parameter_synchronization_helpers_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/change_stream_options_manager",
-        "$BUILD_DIR/mongo/db/commands/create_command",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
-        "$BUILD_DIR/mongo/db/query/client_cursor/cursor_response_idl",
-        "$BUILD_DIR/mongo/db/query/query_settings/manager",
-        "$BUILD_DIR/mongo/db/repl/oplog",
-        "$BUILD_DIR/mongo/db/repl/oplog_interface_local",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
-        "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/s/sharding_mongos_test_fixture",
-        "$BUILD_DIR/mongo/util/signal_handlers",
-        "cluster_parameter_synchronization_helpers",
-        "cluster_server_parameter",
-        "cluster_server_parameter_common",
-        "cluster_server_parameter_initializer",
-        "cluster_server_parameter_op_observer",
-        "cluster_server_parameter_refresher",
-        "cluster_server_parameter_server_status",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

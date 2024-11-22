@@ -1026,6 +1026,59 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "sharding_mongod_test_fixture",
+    srcs = [
+        "sharding_mongod_test_fixture.cpp",
+    ],
+    hdrs = [
+        "sharding_mongod_test_fixture.h",
+        "//src/mongo/db/repl:replication_recovery_mock.h",
+    ],
+    deps = [
+        ":sharding_runtime_d",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/s:sharding_test_fixture_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_server_test_fixture",
+    srcs = [
+        "shard_server_test_fixture.cpp",
+    ],
+    hdrs = [
+        "shard_server_test_fixture.h",
+    ],
+    deps = [
+        ":sharding_mongod_test_fixture",
+        "//src/mongo/s/catalog:sharding_catalog_client_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "config_server_test_fixture",
+    srcs = [
+        "//src/mongo/db/s/config:config_server_test_fixture.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/s/config:config_server_test_fixture.h",
+    ],
+    deps = [
+        ":sharding_mongod_test_fixture",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/s/catalog:sharding_catalog_client_impl",
+    ],
+)
+
+mongo_cc_library(
     name = "sharding_commands_d",
     srcs = [
         "analyze_shard_key_cmd.cpp",

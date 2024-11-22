@@ -576,34 +576,6 @@ if wiredtiger:
     )
 
     envWithAsio.CppUnitTest(
-        target="shard_role_test",
-        source=[
-            "d_concurrency_test.cpp",
-            "database_name_test.cpp",
-            "db_raii_multi_collection_test.cpp",
-            "db_raii_test.cpp",
-            "shard_role_test.cpp",
-            "catalog_raii_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/db/catalog/catalog_control",
-            "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
-            "$BUILD_DIR/mongo/util/concurrency/ticketholder",
-            "$BUILD_DIR/mongo/util/progress_meter",
-            "admission/ticketholder_manager",
-            "catalog/catalog_test_fixture",
-            "catalog/collection_uuid_mismatch_info",
-            "catalog/database_holder",
-            "collection_crud/collection_crud",
-            "concurrency/exception_util",
-            "query_exec",
-            "s/shard_server_test_fixture",
-            "s/sharding_runtime_d",
-            "shard_role",
-        ],
-    )
-
-    envWithAsio.CppUnitTest(
         target="vector_clock_test",
         source=[
             "keys_collection_document_test.cpp",
@@ -628,6 +600,12 @@ if wiredtiger:
             "vector_clock_mutable",
         ],
     )
+
+env.CppUnitTest(
+    target="shard_role_test",
+    source=[],
+    LIBDEPS=[],
+)
 
 # These unit tests rely on the config_server_test_fixture, which
 # globally alters the state of the system to be in config server

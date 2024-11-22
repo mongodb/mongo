@@ -251,6 +251,47 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
+    name = "cluster_server_parameter_test",
+    srcs = [
+        "cluster_parameter_synchronization_helpers_test.cpp",
+        "cluster_server_parameter_common_test.cpp",
+        "cluster_server_parameter_initializer_test.cpp",
+        "cluster_server_parameter_op_observer_test.cpp",
+        "cluster_server_parameter_refresher_test.cpp",
+        "cluster_server_parameter_server_status_test.cpp",
+        "cluster_server_parameter_test_util.cpp",
+        "cluster_server_parameter_test_util.h",
+        ":cluster_server_parameter_test_gen",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":cluster_parameter_synchronization_helpers",
+        ":cluster_server_parameter",
+        ":cluster_server_parameter_common",
+        ":cluster_server_parameter_initializer",
+        ":cluster_server_parameter_op_observer",
+        ":cluster_server_parameter_refresher",
+        ":cluster_server_parameter_server_status",
+        "//src/mongo/db:change_stream_options_manager",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/commands:create_command",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_util",
+        "//src/mongo/db/query/client_cursor:cursor_response_idl",
+        "//src/mongo/db/query/query_settings:manager",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:oplog_interface_local",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/util:signal_handlers",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "idl_test",
     srcs = [
         "command_generic_argument_test.cpp",

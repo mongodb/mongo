@@ -1025,3 +1025,58 @@ mongo_cc_binary(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "sharding_test_fixture_common",
+    srcs = [
+        "catalog_cache_loader_mock.cpp",
+        "catalog_cache_mock.cpp",
+        "config_server_catalog_cache_loader_mock.cpp",
+        "sharding_test_fixture_common.cpp",
+        "//src/mongo/db/s:shard_server_catalog_cache_loader_mock.cpp",
+    ],
+    hdrs = [
+        "catalog_cache_loader_mock.h",
+        "catalog_cache_mock.h",
+        "config_server_catalog_cache_loader_mock.h",
+        "sharding_test_fixture_common.h",
+        "//src/mongo/db/s:shard_server_catalog_cache_loader_mock.h",
+    ],
+    deps = [
+        ":grid",
+        ":resource_yielders",
+        ":sharding_router_api",
+        "//src/mongo/client:remote_command_targeter_mock",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/transaction",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:network_test_env",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/s/write_ops:batch_write_types",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_mongos_test_fixture",
+    srcs = [
+        "catalog_cache_test_fixture.cpp",
+        "sharding_mongos_test_fixture.cpp",
+    ],
+    hdrs = [
+        "catalog_cache_test_fixture.h",
+        "sharding_mongos_test_fixture.h",
+    ],
+    deps = [
+        ":sharding_initialization",
+        ":sharding_router_api",
+        ":sharding_task_executor",
+        ":sharding_test_fixture_common",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/db/transaction",
+        "//src/mongo/executor:task_executor_pool",
+        "//src/mongo/s/catalog:sharding_catalog_client_impl",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
