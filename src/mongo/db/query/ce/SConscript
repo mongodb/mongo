@@ -4,50 +4,22 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="ce_test_utils",
-    source=[
-        "test_utils.cpp",
-        "histogram_accuracy_test_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/ce/histogram_estimator",
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
-        "$BUILD_DIR/mongo/db/sbe_values",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
 env.CppUnitTest(
     target="histogram_estimation_test",
-    source=[
-        "histogram_estimator_test.cpp",
-        "histogram_estimation_impl_test.cpp",
-    ],
-    LIBDEPS=[
-        "ce_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="maxdiff_histogram_test",
-    source=[
-        "maxdiff_histogram_test.cpp",
-    ],
-    LIBDEPS=[
-        "ce_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="generated_histograms_test",
-    source=[
-        "generated_histograms_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "ce_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

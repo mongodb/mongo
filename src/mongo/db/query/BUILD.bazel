@@ -410,6 +410,13 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "index_bounds_builder_test_fixture",
+    hdrs = [
+        "index_bounds_builder_test_fixture.h",
+    ],
+)
+
+mongo_cc_library(
     name = "query_planner",
     srcs = [
         "distinct_access.cpp",
@@ -657,6 +664,22 @@ mongo_cc_unit_test(
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_test_service_context",
+    srcs = [
+        "query_test_service_context.cpp",
+    ],
+    hdrs = [
+        "query_test_service_context.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/s:grid",
     ],
 )
 

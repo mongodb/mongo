@@ -2,17 +2,6 @@
 
 Import("env")
 
-env.Library(
-    target="document_value_test_util",
-    source=[
-        "document_value_test_util.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "document_value",
-    ],
-)
-
 env.Benchmark(
     target="document_bm",
     source=[

@@ -34,7 +34,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/index_bounds_builder_test.h"
+#include "mongo/db/query/index_bounds_builder_test_fixture.h"
 #include "mongo/db/query/stats/test_utils.h"
 
 #include "mongo/db/query/interval.h"

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,6 +7,109 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_library(
+    name = "histogram_common",
+    hdrs = [
+        "histogram_common.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "histogram_estimation_impl",
+    srcs = [
+        "histogram_estimation_impl.cpp",
+    ],
+    hdrs = [
+        "histogram_estimation_impl.h",
+    ],
+    deps = [
+        ":histogram_common",
+        "//src/mongo/db/query:query_index_bounds",
+        "//src/mongo/db/query/cost_based_ranker:estimates",
+        "//src/mongo/db/query/stats:stats_histograms",
+    ],
+)
+
+mongo_cc_library(
+    name = "ce_test_utils",
+    srcs = [
+        "histogram_accuracy_test_utils.cpp",
+        "test_utils.cpp",
+    ],
+    hdrs = [
+        "histogram_accuracy_test_utils.h",
+        "test_utils.h",
+    ],
+    deps = [
+        ":histogram_estimator",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "sampling_estimator",
+    srcs = [
+        "sampling_estimator_impl.cpp",
+    ],
+    hdrs = [
+        "sampling_estimator.h",
+        "sampling_estimator_impl.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/query/cost_based_ranker:estimates",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "histogram_estimation_test",
+    srcs = [
+        "histogram_estimation_impl_test.cpp",
+        "histogram_estimator_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":ce_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "maxdiff_histogram_test",
+    srcs = [
+        "maxdiff_histogram_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":ce_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "generated_histograms_test",
+    srcs = [
+        "generated_histograms_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":ce_test_utils",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+# Despite the name, this is not a unit test:
+# it's a utility that measures the accuracy of histogram CE.
+mongo_cc_binary(
+    name = "histogram_estimation_accuracy_test",
+    srcs = [
+        "histogram_accuracy_test.cpp",
+    ],
+    deps = [
+        ":ce_test_utils",
+    ],
 )
 
 mongo_cc_library(
