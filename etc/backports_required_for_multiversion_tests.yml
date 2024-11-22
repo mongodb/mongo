@@ -731,6 +731,38 @@ last-lts:
       ticket: SERVER-95976
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
       ticket: SERVER-95976
+    - test_file: jstests/concurrency/fsm_workloads/timeseries/timeseries_reshard_with_inserts.js
+      ticket: SERVER-93149
+    - test_file: jstests/noPassthrough/move_collection_not_tracked.js
+      ticket: SERVER-93149
+    - test_file: jstests/noPassthrough/query/out_merge/out_timeseries_cleans_up_bucket_collections.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/move_primary_failpoint.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/move_timeseries.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_disallow_writes.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_nonempty_stash.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_stash_resolution.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_ttl_deletes.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_validation.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/resharding_ts_resume_agg_token.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/resharding_ts_txn_cloner.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/unshard_timeseries.js
+      ticket: SERVER-93149
+    - test_file: jstests/sharding/timeseries_insert_move_collection.js
+      ticket: SERVER-93149
+    - test_file: jstests/core_sharding/resharding/reshard_collection_timeseries.js
+      ticket: SERVER-93149
     - test_file: jstests/core/timeseries/timeseries_group_aggregations.js
       ticket: SERVER-93874
     - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js

@@ -6,10 +6,10 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_persistence,
+ *   requires_fcv_80,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -29,10 +29,6 @@ const kOutPipeline = [{$out: {db: kDbName, coll: kOutCollName, timeseries: {time
 const kPrimary = st.shard0.shardName;
 const kOther = st.shard1.shardName;
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: kPrimary}));
-
-// TODO SERVER-93149: Remove 'reshardingForTimeseriesFeatureFlagEnabled' checks.
-const reshardingForTimeseriesFeatureFlagEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(testDB, "FeatureFlagReshardingForTimeseries");
 
 function listCollections(collName) {
     return testDB.getCollectionNames().filter(coll => coll === collName);
@@ -146,10 +142,8 @@ function testReplacingExistingCollectionOnSameShard(shard) {
     // same shard, but the view will always exist on the primary shard.
     assert.commandWorked(testDB.runCommand({create: kOutCollName, timeseries: {timeField: "t"}}));
     assert.commandWorked(testDB[kOutCollName].insert({a: 1, t: ISODate()}));
-    if (reshardingForTimeseriesFeatureFlagEnabled) {
-        assert.commandWorked(st.s.adminCommand(
-            {moveCollection: testDB[kOutCollName].getFullName(), toShard: shard}));
-    }
+    assert.commandWorked(
+        st.s.adminCommand({moveCollection: testDB[kOutCollName].getFullName(), toShard: shard}));
 
     let bucketCollections = listCollections(kOutBucketsCollName);
     assert.eq(1, bucketCollections.length, bucketCollections);
@@ -169,9 +163,7 @@ function testReplacingExistingCollectionOnSameShard(shard) {
 }
 
 testReplacingExistingCollectionOnSameShard(kPrimary);
-if (reshardingForTimeseriesFeatureFlagEnabled) {
-    testReplacingExistingCollectionOnSameShard(kOther);
-}
+testReplacingExistingCollectionOnSameShard(kOther);
 
 // Validates $out should not clean up the buckets collection if the command is interrupted when the
 // view exists. The source and output collections will be on different shards.
@@ -234,8 +226,5 @@ function testReplacingExistingCollectionOnDifferentShard() {
     assert.eq(1, view.length, view);
 }
 
-if (reshardingForTimeseriesFeatureFlagEnabled) {
-    testReplacingExistingCollectionOnDifferentShard();
-}
-
+testReplacingExistingCollectionOnDifferentShard();
 st.stop();

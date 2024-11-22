@@ -1,6 +1,5 @@
 // Basic tests for resharding for timeseries collection.
 // @tags: [
-//   featureFlagReshardingForTimeseries,
 //   featureFlagMoveCollection,
 //   multiversion_incompatible,
 //   assumes_balancer_off,
