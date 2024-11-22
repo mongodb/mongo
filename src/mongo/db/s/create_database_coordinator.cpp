@@ -106,13 +106,6 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                     _result = ConfigsvrCreateDatabaseResponse(createdDatabase.getVersion());
                 }
             }))
-        .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            const auto& dbName = nss().dbName();
-            RoutingInformationCache::get(opCtx)->purgeDatabase(dbName);
-            return status;
-        })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
                 return Status::OK();

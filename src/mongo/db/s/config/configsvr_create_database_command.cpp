@@ -129,7 +129,6 @@ public:
                     // database exists. If the database is not found take the lock and try again.
                     if (auto existingDatabase = create_database_util::findDatabaseExactMatch(
                             opCtx, dbNameStr, optResolvedPrimaryShard)) {
-                        RoutingInformationCache::get(opCtx)->purgeDatabase(dbName);
                         return Response(existingDatabase->getVersion());
                     }
 
