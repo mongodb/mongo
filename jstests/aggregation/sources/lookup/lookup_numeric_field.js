@@ -8,6 +8,7 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getWinningPlan.
+load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
 
 const outer = db.outer;
 const inner = db.inner;
@@ -112,8 +113,7 @@ function testGraphLookupFieldTraversal(localField, localDoc, shouldMatchDoc, pre
     testLookupFieldTraversal("a.b.c.1", {a: {b: {c: [1, 3]}}}, true, ["a", "b", "c"]);
 
     // TODO after SERVER-76470 this should be able to be removed.
-    if (assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-            .internalQueryFrameworkControl == "forceClassicEngine") {
+    if (checkSbeCompletelyDisabled(db)) {
         // These are cases where "00"-type fields are treated as an index, and SBE does not behave
         // this way.
         testLookupFieldTraversal("a.00", {a: [3]}, true, ["a"]);

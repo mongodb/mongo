@@ -1,4 +1,4 @@
-# Build variants for testing the classic engine.
+# Build variants for testing the sbe engine.
 
 variables:
 - &linux_x86_dynamic_compile_variant_dependency
@@ -45,10 +45,10 @@ variables:
 - ubsan_options: &ubsan_options UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
 buildvariants:
-- &enterprise-rhel-8-64-bit-dynamic-classic-engine
+- &enterprise-rhel-8-64-bit-dynamic-sbe-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: enterprise-rhel-8-64-bit-dynamic-classic-engine
-  display_name: "Shared Library Enterprise RHEL 8 (Classic Engine)"
+  name: enterprise-rhel-8-64-bit-dynamic-sbe-engine
+  display_name: "Shared Library Enterprise RHEL 8 (SBE)"
   cron: "0 0 * * 0"  # once a week (Sunday midnight UTC)
   run_on:
   - rhel80-small
@@ -60,7 +60,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --mongodSetParameters="{internalQueryFrameworkControl: trySbeRestricted}"
       --excludeWithAnyTags=requires_latch_analyzer
     large_distro_name: rhel80-medium
   depends_on:
@@ -72,8 +72,8 @@ buildvariants:
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
   tasks:
-  - name: .aggfuzzer !.sbe_only
-  - name: .aggregation !.sbe_only
+  - name: .aggfuzzer !.column_store
+  - name: .aggregation !.column_store
   - name: .auth
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
@@ -83,7 +83,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .encrypt
-  - name: .jscore .common !jsCore !.sbe_only
+  - name: .jscore .common !jsCore !.column_store
   - name: .jstestfuzz !.flow_control
   - name: .misc_js
   - name: .multi_shard
@@ -152,8 +152,8 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
 
-- name: &rhel8-debug-asan-classic-engine rhel8-debug-asan-classic-engine
-  display_name: "* ASAN Enterprise RHEL 8 DEBUG (Classic Engine)"
+- name: &rhel8-debug-asan-sbe-engine rhel8-debug-asan-sbe-engine
+  display_name: "* ASAN Enterprise RHEL 8 DEBUG (SBE)"
   cron: "0 0 * * 2"  # once a week (Tuesday midnight UTC)
   run_on:
   - rhel80-build
@@ -173,9 +173,9 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
-    compile_variant: *rhel8-debug-asan-classic-engine
+    compile_variant: *rhel8-debug-asan-sbe-engine
     test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --mongodSetParameters="{internalQueryFrameworkControl: trySbeRestricted}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
@@ -189,7 +189,7 @@ buildvariants:
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
-  - name: .aggregation !.sbe_only
+  - name: .aggregation !.column_store
   - name: .auth
   - name: audit
   - name: .benchmarks
@@ -205,7 +205,7 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
-  - name: .jscore .common !.sbe_only
+  - name: .jscore .common !.column_store
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -235,8 +235,8 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: &rhel8-debug-ubsan-classic-engine rhel8-debug-ubsan-classic-engine
-  display_name: "* UBSAN Enterprise RHEL 8 DEBUG (Classic Engine)"
+- name: &rhel8-debug-ubsan-sbe-engine rhel8-debug-ubsan-sbe-engine
+  display_name: "* UBSAN Enterprise RHEL 8 DEBUG (SBE)"
   cron: "0 0 * * 4"  # once a week (Thursday midnight UTC)
   run_on:
   - rhel80-build
@@ -247,7 +247,7 @@ buildvariants:
       archive-mongocryptd-debug
     lang_environment: LANG=C
     san_options: *ubsan_options
-    compile_variant: *rhel8-debug-ubsan-classic-engine
+    compile_variant: *rhel8-debug-ubsan-sbe-engine
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --dbg=on
@@ -257,7 +257,7 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --mongodSetParameters="{internalQueryFrameworkControl: trySbeRestricted}"
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
@@ -269,7 +269,7 @@ buildvariants:
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
-  - name: .aggregation !.sbe_only
+  - name: .aggregation !.column_store
   - name: .auth
   - name: audit
   - name: .benchmarks
@@ -283,7 +283,7 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
-  - name: .jscore .common !.sbe_only
+  - name: .jscore .common !.column_store
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema

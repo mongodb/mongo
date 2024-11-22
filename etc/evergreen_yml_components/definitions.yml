@@ -3879,7 +3879,7 @@ tasks:
 ## Standalone fuzzer for checking columnstore index correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_columnstore_fuzzer_gen
-  tags: ["aggfuzzer", "common", "columnstore", "require_npm", "random_name", "sbe_only", "feature_flag_guarded"]
+  tags: ["aggfuzzer", "common", "require_npm", "random_name", "column_store", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4745,7 +4745,7 @@ tasks:
   name: aggregation_column_store_index_passthrough
   # TODO SERVER-75026 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
   # variants.
-  tags: ["aggregation", "sbe_only", "feature_flag_guarded"]
+  tags: ["aggregation", "column_store", "feature_flag_guarded"]
   depends_on:
   - name: aggregation
   commands:
@@ -5535,7 +5535,7 @@ tasks:
   # variants.
   depends_on:
   - name: jsCore
-  tags: ["jscore", "sbe_only", "feature_flag_guarded"]
+  tags: ["jscore", "column_store", "feature_flag_guarded"]
   commands:
   - func: "do setup"
   - func: "run tests"
