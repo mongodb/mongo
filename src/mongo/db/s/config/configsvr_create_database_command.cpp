@@ -125,13 +125,6 @@ public:
                         return Response(dbt.getVersion());
                     };
                 } else {
-                    // First perform an optimistic attempt without taking the lock to check if
-                    // database exists. If the database is not found take the lock and try again.
-                    if (auto existingDatabase = create_database_util::findDatabaseExactMatch(
-                            opCtx, dbNameStr, optResolvedPrimaryShard)) {
-                        return Response(existingDatabase->getVersion());
-                    }
-
                     CreateDatabaseCoordinatorDocument coordinatorDoc;
                     coordinatorDoc.setShardingDDLCoordinatorMetadata(
                         {{NamespaceString(dbName), DDLCoordinatorTypeEnum::kCreateDatabase}});
