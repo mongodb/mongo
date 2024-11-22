@@ -50,6 +50,7 @@ static constexpr auto kFeatureExtractorDir = std::string_view{"/home/ubuntu/feat
 static constexpr auto kShellMaxLen = std::numeric_limits<size_t>::max();
 static constexpr auto kShellTimeout = Milliseconds{60 * 60 * 1000};  // 1 hour
 
+enum class ErrorLogLevel { kSimple, kVerbose, kExtractFeatures };
 enum class WriteOutOptions { kNone, kResult, kOnelineResult };
 
 class ConditionalColor {

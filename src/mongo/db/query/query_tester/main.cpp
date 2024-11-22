@@ -120,7 +120,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const WriteOutOptions outOpt,
                    const ModeOption mode,
                    const bool populateAndExit,
-                   const bool verbose) {
+                   const ErrorLogLevel errorLogLevel) {
     // Run the tests.
     auto versionInfo = MockVersionInfo{};
     auto conn = buildConn(uriString, &versionInfo, mode);
@@ -154,7 +154,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         const bool hasFailures = [&](const auto& testPath) {
             try {
                 currFile.runTestFile(conn.get(), mode);
-                return !currFile.writeAndValidate(mode, outOpt, verbose);
+                return !currFile.writeAndValidate(mode, outOpt, errorLogLevel);
             } catch (const std::exception& exception) {
                 std::cerr << std::endl
                           << testPath.string() << std::endl
@@ -187,8 +187,15 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         std::cout << std::endl << "All tests passed!" << std::endl;
         return 0;
     } else {
-        printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
-        if (verbose) {
+        if (errorLogLevel == ErrorLogLevel::kSimple) {
+            std::cout
+                << "Tests failed! Run with -v and optionally --extractFeatures for more details."
+                << std::endl;
+        } else {
+            printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
+        }
+
+        if (errorLogLevel == ErrorLogLevel::kExtractFeatures) {
             const auto pyCmd = std::stringstream{}
                 << "python3 src/mongo/db/query/query_tester/scripts/extract_pickle_to_json.py "
                 << getMongoRepoRoot() << " " << kFeatureExtractorDir << " " << kTmpFailureFile;
@@ -204,6 +211,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
 
             std::filesystem::remove(queryFeaturesFile);
         }
+
         return 1;
     }
 }
@@ -253,6 +261,10 @@ void printHelpString() {
          "before this argument. "
          "Should "
          "be followed by two integers in ascending order"},
+        {"-v (verbose)", "Appends a summary of failing queries to an unsuccessful test file run."},
+        {"--extractFeatures",
+         "Extracts metadata about most common features across failed queries for an enriched "
+         "debugging experience."},
         {"--populateAndExit", "Only drop and load data. No tests are run."}};
     for (const auto& [key, val] : helpMap) {
         std::cout << key << ": " << val << std::endl;
@@ -267,6 +279,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto expectingNumAt = size_t{0} - 1;
     auto runningPartialFile = false;
     auto dropOpt = false;
+    auto extractFeatures = false;
     auto loadOpt = false;
     auto outOpt = WriteOutOptions::kNone;
     auto mongoURIString = boost::optional<std::string>{};
@@ -331,6 +344,8 @@ int queryTesterMain(const int argc, const char** const argv) {
             expectingNumAt = argNum + 1;
         } else if (parsedArgs[argNum] == "-v") {
             verbose = true;
+        } else if (parsedArgs[argNum] == "--extractFeatures") {
+            extractFeatures = true;
         } else {
             exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
         }
@@ -341,20 +356,33 @@ int queryTesterMain(const int argc, const char** const argv) {
         std::cout << "Using default URI of " << mongoURIString.get() << std::endl;
     }
 
+    auto errorLogLevel = [&extractFeatures, &verbose]() -> ErrorLogLevel {
+        if (extractFeatures) {
+            return ErrorLogLevel::kExtractFeatures;
+        } else if (verbose) {
+            return ErrorLogLevel::kVerbose;
+        } else {
+            return ErrorLogLevel::kSimple;
+        }
+    }();
+
     // Validate some flag conditions.
     for (const auto& [condition, message] : std::map<bool, std::string>{
              {mode == ModeOption::Compare && outOpt != WriteOutOptions::kNone,
               "--mode compare and --out are incompatible."},
              // Cannot write out if only running part of a file.
              {runningPartialFile && outOpt != WriteOutOptions::kNone,
-              "--out not supported with either -n or -r"},
+              "--out not supported with either -n or -r."},
              {mode == ModeOption::Normalize && (dropOpt || loadOpt),
               "--drop and --load are incompatible with --mode normalize."},
              {populateAndExit && testsToRun.size() != 1,
               "--populateAndExit must be specified with a single test file."},
              {testsToRun.empty(), "Make sure to provide QueryTester with a .test file."},
-             {verbose && mode != ModeOption::Compare,
-              "option -v must be specified with --mode compare."}}) {
+             {errorLogLevel == ErrorLogLevel::kVerbose && mode != ModeOption::Compare,
+              "option -v must be specified with --mode compare."},
+             {errorLogLevel == ErrorLogLevel::kExtractFeatures &&
+                  (mode != ModeOption::Compare || !verbose),
+              "--extractFeatures be specified with --mode compare and option -v (verbose)."}}) {
         if (condition) {
             exitWithError(1, message);
         }
@@ -375,7 +403,7 @@ int queryTesterMain(const int argc, const char** const argv) {
                               outOpt,
                               mode,
                               populateAndExit,
-                              verbose);
+                              errorLogLevel);
     } catch (AssertionException& ex) {
         exitWithError(1, ex.reason());
     }

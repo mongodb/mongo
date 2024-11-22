@@ -401,16 +401,16 @@ std::string QueryFile::serializeStateForDebug() const {
 
 bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
                                  const std::filesystem::path& actualPath,
-                                 const bool verbose) {
+                                 const ErrorLogLevel errorLogLevel) {
     if (const auto& diffOutput = gitDiff(expectedPath, actualPath); !diffOutput.empty()) {
         // Write out the diff output.
         std::cout << diffOutput << std::endl;
 
         const auto& failedTestNums = getFailedTestNums(diffOutput);
         if (!failedTestNums.empty()) {
-            if (verbose) {
+            if (errorLogLevel == ErrorLogLevel::kExtractFeatures) {
                 printAndExtractFailedQueries(failedTestNums);
-            } else {
+            } else if (errorLogLevel == ErrorLogLevel::kVerbose) {
                 printFailedQueries(failedTestNums);
             }
             _failedQueryCount += failedTestNums.size();
@@ -428,7 +428,7 @@ bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
 
 bool QueryFile::writeAndValidate(const ModeOption mode,
                                  const WriteOutOptions writeOutOpts,
-                                 const bool verbose) {
+                                 const ErrorLogLevel errorLogLevel) {
     // Set up the text-based diff environment.
     std::filesystem::create_directories(_actualPath.parent_path());
     auto actualStream = std::fstream{_actualPath, std::ios::out | std::ios::trunc};
@@ -441,7 +441,7 @@ bool QueryFile::writeAndValidate(const ModeOption mode,
     // One big comparison, all at once.
     if (mode == ModeOption::Compare ||
         (mode == ModeOption::Normalize && writeOutOpts == WriteOutOptions::kNone)) {
-        return textBasedCompare(_expectedPath, _actualPath, verbose);
+        return textBasedCompare(_expectedPath, _actualPath, errorLogLevel);
     } else {
         const bool includeResults = writeOutOpts == WriteOutOptions::kResult ||
             writeOutOpts == WriteOutOptions::kOnelineResult;
