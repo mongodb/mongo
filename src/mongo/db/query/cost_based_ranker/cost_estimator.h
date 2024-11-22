@@ -32,17 +32,59 @@
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stats/collection_statistics.h"
 
 namespace mongo::cost_based_ranker {
 
-/**
- * Estimate the costs of the given QuerySolution tree. For every QuerySolutionNode in the tree,
- * insert an entry into the EstimateMap out-param.
- */
-void estimatePlanCost(const QuerySolution& plan,
-                      QueryPlanRankerModeEnum mode,
-                      const stats::CollectionStatistics& collStats,
-                      EstimateMap& estimateMap);
+class CostEstimator {
+public:
+    CostEstimator(EstimateMap& estimateMap) : _estimateMap{estimateMap} {};
+
+    void estimatePlan(const QuerySolution& plan) {
+        costTree(plan.root());
+    }
+
+private:
+    CostEstimate costTree(const QuerySolutionNode* node);
+
+    CostEstimate costNode(const QuerySolutionNode* node,
+                          const CardinalityEstimate& ce,
+                          const std::vector<CostEstimate>& childCosts,
+                          const std::vector<CardinalityEstimate>& childCEs);
+
+    // Cost coefficients based on Bonsai cost calibration
+    static const CostCoefficient defaultIncrement;
+
+    static const CostCoefficient filterStartup;
+    static const CostCoefficient filterIncrement;
+
+    static const CostCoefficient collScanStartup;
+    static const CostCoefficient collScanIncrement;
+
+    static const CostCoefficient virtScanStartup;
+    static const CostCoefficient virtScanIncrement;
+
+    static const CostCoefficient indexScanStartup;
+    static const CostCoefficient indexScanIncrement;
+
+    static const CostCoefficient fetchStartup;
+    static const CostCoefficient fetchIncrement;
+
+    static const CostCoefficient mergeJoinStartup;
+    static const CostCoefficient mergeJoinIncrement;
+
+    // TODO SPM-3658: all constants below need calibration
+    static const CostCoefficient hashJoinStartup;
+    static const CostCoefficient hashJoinBuild;
+    static const CostCoefficient hashJoinIncrement;
+
+    static const CostCoefficient sortStartup;
+    static const CostCoefficient sortIncrement;
+    static const CostCoefficient sortWithLimitIncrement;
+
+    static const CostCoefficient sortedMergeStartup;
+    static const CostCoefficient sortedMergeIncrement;
+
+    EstimateMap& _estimateMap;
+};
 
 }  // namespace mongo::cost_based_ranker

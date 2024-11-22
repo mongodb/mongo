@@ -68,6 +68,11 @@ CardinalityEstimate CardinalityEstimator::estimate(const QuerySolutionNode* node
             ce = indexUnionCard(static_cast<const MergeSortNode*>(node));
             isConjunctionBreaker = true;
             break;
+        case STAGE_SORT_DEFAULT:
+        case STAGE_SORT_SIMPLE:
+            ce = _inputCard;
+            isConjunctionBreaker = true;
+            break;
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9586709);
     }

@@ -60,8 +60,9 @@ public:
     CardinalityEstimator(const stats::CollectionStatistics& collStats,
                          EstimateMap& qsnEstimates,
                          QueryPlanRankerModeEnum rankerMode)
-        : _inputCard{CardinalityEstimate{CardinalityType{collStats.getCardinality()},
-                                         EstimationSource::Metadata}},
+        : _collCard{CardinalityEstimate{CardinalityType{collStats.getCardinality()},
+                                        EstimationSource::Metadata}},
+          _inputCard{_collCard},
           _collStats(collStats),
           _qsnEstimates{qsnEstimates},
           _rankerMode(rankerMode) {}
@@ -73,6 +74,10 @@ public:
     CardinalityEstimator& operator=(CardinalityEstimator&&) = delete;
 
     void estimatePlan(const QuerySolution& plan) {
+        // Restore initial state so that the estimator can be reused for multiple plans.
+        _inputCard = _collCard;
+        _conjSels.clear();
+
         estimate(plan.root());
     }
 
@@ -128,6 +133,8 @@ private:
         _conjSels.erase(_conjSels.end() - oldSize, _conjSels.end());
     }
 
+    const CardinalityEstimate _collCard;
+
     // The input cardinality of the last complete conjunction. This conjunction may consist of a
     // chain of QSN nodes (an implicit conjunction) including all intervals and filter expressions
     // in those nodes.
@@ -148,7 +155,7 @@ private:
     EstimateMap& _qsnEstimates;
 
     // The cardinality estimate mode we are using for estimates.
-    QueryPlanRankerModeEnum _rankerMode;
+    const QueryPlanRankerModeEnum _rankerMode;
 };
 
 }  // namespace mongo::cost_based_ranker

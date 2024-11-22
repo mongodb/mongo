@@ -80,7 +80,8 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/cost_based_ranker/qsn_estimator.h"
+#include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
+#include "mongo/db/query/cost_based_ranker/cost_estimator.h"
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
@@ -1637,15 +1638,20 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus();
     }
-    // This is a temporary stub implementation of CBR which arbitrarily picks the last of the
-    // enumerated plans.
+
+    // TODO SERVER-97529: This is a temporary stub implementation of CBR which arbitrarily picks
+    // the last of the enumerated plans.
 
     EstimateMap estimates;
+    CardinalityEstimator cardEstimator(
+        *params.mainCollectionInfo.collStats,
+        estimates,
+        query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode());
+    CostEstimator costEstimator(estimates);
+
     for (auto&& soln : statusWithMultiPlanSolns.getValue()) {
-        estimatePlanCost(*soln,
-                         query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
-                         *params.mainCollectionInfo.collStats,
-                         estimates);
+        cardEstimator.estimatePlan(*soln);
+        costEstimator.estimatePlan(*soln);
     }
 
     std::vector<std::unique_ptr<QuerySolution>> acceptedSoln;

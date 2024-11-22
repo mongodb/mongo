@@ -28,12 +28,12 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "qsn_estimator",
+    name = "cost_estimator",
     srcs = [
-        "qsn_estimator.cpp",
+        "cost_estimator.cpp",
     ],
     hdrs = [
-        "qsn_estimator.h",
+        "cost_estimator.h",
         "//src/mongo/db/query:query_solution.h",
     ],
     deps = [
