@@ -1,0 +1,22 @@
+version: 1.0.0
+options:
+  no_parent_owners: true
+filters:
+  - "bulk_write.yml":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "change_streams*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "multiplan_single_solutions.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "query_settings.yml":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "repeat_queries.yml":
+    approvers:
+      - 10gen/query-optimization-plan-cache
+  - "stepdown_primary_change_streams.yml":
+    approvers:
+      - 10gen/query-execution-change-streams

@@ -8,3 +8,12 @@ filters:
   - "queryable_server_hook.py":
     approvers:
       - 10gen/server-rss-sydney
+  - "change_streams.py":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "enable_change_stream.py":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "run_query_stats.py":
+    approvers:
+      - 10gen/query-integration-observability

@@ -2,6 +2,90 @@ version: 1.0.0
 options:
   no_parent_owners: true
 filters:
+  - "aggregation*":
+    approvers:
+      - 10gen/query
+  - "aggregation_disabled_optimization.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation_embedded_router_jscore_passthrough.yml":
+    approvers:
+      - 10gen/query-optimization-cluster-planning
+  - "aggregation_repeat_queries_multiplan_single_solutions.yml":
+    approvers:
+      - 10gen/query-optimization-runtime-planners
+  - "aggregation_unsplittable_collections_on_random_shard_passthrough*":
+    approvers:
+      - 10gen/query-optimization-cluster-planning
+  - "aggregation_facet_unwind_passthrough.yml":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "aggregation_sharded_collections_causally_consistent_passthrough.yml":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "aggregation_sharded_collections_embedded_router_jscore_passthrough.yml":
+    approvers:
+      - 10gen/query-optimization-cluster-planning
+  - "aggregation_secondary_reads.yml":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "benchmarks_abt_lowering.yml":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "benchmarks_expression.yml":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "benchmarks_expression_sbe.yml":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "benchmarks_query.yml":
+    approvers:
+      - 10gen/query
+  - "bulk_write*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "bulk_write_multi_op_sharded_collections_jscore_passthrough.yml":
+    approvers:
+      - 10gen/query-execution-router-write-exec
+  - "change_streams*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "clustered_collection_passthrough.yml":
+    approvers:
+      - 10gen/query-execution
+  - "core_wildcard_indexes.yml":
+    approvers:
+      - 10gen/query-execution-indexing
+  - "fle*":
+    approvers:
+      - 10gen/query-integration-fle
+  - "json_schema.yml":
+    approvers:
+      - 10gen/query-execution
+  - "mql_model*":
+    approvers:
+      - 10gen/query-execution
+  - "query_stats*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "query_tester_self_test.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "search*":
+    approvers:
+      - 10gen/query-integration-search-testing
+  - "sharding_clustered_collections.yml":
+    approvers:
+      - 10gen/query-execution-router-query-exec
+  - "unittests_query.yml":
+    approvers:
+      - 10gen/query
+  - "update_fuzzer*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "vector_search*":
+    approvers:
+      - 10gen/query-integration-search
   - "query_golden*":
     approvers:
       - 10gen/query-optimization-golden-test

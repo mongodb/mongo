@@ -475,6 +475,10 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         files = os.listdir(root)
         all_files = {}
         for filename in files:
+            # As written, this function assumes that all 'yml' files are suite definitions. This
+            # isn't true for OWNERS files, so we skip them.
+            if filename == "OWNERS.yml":
+                continue
             (short_name, ext) = os.path.splitext(filename)
             if ext in (".yml", ".yaml"):
                 all_files[short_name] = os.path.join(root, filename)

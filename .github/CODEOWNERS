@@ -57,8 +57,68 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/OWNERS.yml
 /buildscripts/resmokeconfig/matrix_suites/**/*
 
+# The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/mappings/OWNERS.yml
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/*
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_expression_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_sharded_collections_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_sharded_collections_query_shape_hash_stability.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/bulk_write* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/bulk_write_sharded* @10gen/query-execution-router-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/core_repeat_queries.yml @10gen/query-optimization-plan-cache @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_jscore_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_jscore_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/update_fuzzer* @10gen/query-execution-write-exec @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/overrides/OWNERS.yml
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/*
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/bulk_write.yml @10gen/query-execution-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/multiplan_single_solutions.yml @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/query_settings.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/repeat_queries.yml @10gen/query-optimization-plan-cache @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/stepdown_primary_change_streams.yml @10gen/query-execution-change-streams @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
 /buildscripts/resmokeconfig/suites/**/*
+/buildscripts/resmokeconfig/suites/**/aggregation* @10gen/query @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_disabled_optimization.yml @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_embedded_router_jscore_passthrough.yml @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_repeat_queries_multiplan_single_solutions.yml @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_unsplittable_collections_on_random_shard_passthrough* @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_facet_unwind_passthrough.yml @10gen/query-execution-aggregation @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_sharded_collections_causally_consistent_passthrough.yml @10gen/query-execution-aggregation @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_sharded_collections_embedded_router_jscore_passthrough.yml @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/aggregation_secondary_reads.yml @10gen/query-execution-aggregation @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/benchmarks_abt_lowering.yml @10gen/query-execution-sbe @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/benchmarks_expression.yml @10gen/query-execution-aggregation @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/benchmarks_expression_sbe.yml @10gen/query-execution-sbe @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/benchmarks_query.yml @10gen/query @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/bulk_write* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/bulk_write_multi_op_sharded_collections_jscore_passthrough.yml @10gen/query-execution-router-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/clustered_collection_passthrough.yml @10gen/query-execution @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/core_wildcard_indexes.yml @10gen/query-execution-indexing @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/fle* @10gen/query-integration-fle @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/json_schema.yml @10gen/query-execution @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/mql_model* @10gen/query-execution @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/query_tester_self_test.yml @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/search* @10gen/query-integration-search-testing @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/sharding_clustered_collections.yml @10gen/query-execution-router-query-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/unittests_query.yml @10gen/query @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/update_fuzzer* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/vector_search* @10gen/query-integration-search @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_golden* @10gen/query-optimization-golden-test @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/queryable_wt* @10gen/server-rss-sydney @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/read_only* @10gen/server-rss-sydney @svc-auto-approve-bot
@@ -74,6 +134,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/*
 /buildscripts/resmokelib/testing/hooks/**/analyze_shard_key.py @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/queryable_server_hook.py @10gen/server-rss-sydney @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/change_streams.py @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/enable_change_stream.py @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/run_query_stats.py @10gen/query-integration-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tracing_profiler/OWNERS.yml
 /buildscripts/tracing_profiler/**/* @10gen/query @svc-auto-approve-bot
