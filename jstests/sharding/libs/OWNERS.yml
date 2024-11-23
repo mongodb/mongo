@@ -1,8 +1,5 @@
 version: 1.0.0
 filters:
-  - "timeseries_update_multi_util.js":
-    approvers:
-      - 10gen/query-integration-timeseries
   - "chunk_bounds_util.js":
     approvers:
       - 10gen/server-cluster-scalability
@@ -12,6 +9,3 @@ filters:
   - "zone_changes_util.js":
     approvers:
       - 10gen/server-cluster-scalability
-  - "mongos_api_params_util.js":
-    approvers:
-      - 10gen/query-optimization-parsers

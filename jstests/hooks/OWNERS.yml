@@ -3,6 +3,3 @@ filters:
   - "run_analyze_shard_key_background.js":
     approvers:
       - 10gen/server-cluster-scalability
-  - "run_enable_change_stream.js":
-    approvers:
-      - 10gen/query-execution-change-streams

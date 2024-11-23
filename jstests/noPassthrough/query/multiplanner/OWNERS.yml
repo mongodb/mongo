@@ -2,4 +2,4 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization

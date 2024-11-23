@@ -1,8 +1,0 @@
-version: 1.0.0
-filters:
-  - "conc_update.js":
-    approvers:
-      - 10gen/query-execution-write-exec
-  - "geo_array1.js":
-    approvers:
-      - 10gen/query-integration-geo

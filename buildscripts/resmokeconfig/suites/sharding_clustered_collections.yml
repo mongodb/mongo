@@ -9,7 +9,7 @@ selector:
     - jstests/sharding/shard2.js
     # Expects the collection creation options not to change.
     - jstests/sharding/move_primary_with_writes.js
-    - jstests/sharding/timeseries/timeseries_user_system_buckets_sharding.js
+    - jstests/sharding/timeseries_user_system_buckets_sharding.js
     # Expects to use the SBE plan cache
     - jstests/sharding/invalidate_plan_cache_entries_when_collection_generation_changes.js
     # TODO SERVER-85395: remove the following exclusion together with the test

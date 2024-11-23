@@ -152,6 +152,7 @@ selector:
     - jstests/core/query/top/top_drop.js
     # Buckets collection creates compounded secondary indexes, which is not compatible with wildcard indexes.
     - jstests/core/compound_index_max_fields.js
+    - jstests/core/compound_wildcard_index_validation.js
     - jstests/core/write/update/update_with_pipeline.js
     # Operations not allowed on views.
     - jstests/core/datasize2.js # locking
@@ -168,7 +169,7 @@ selector:
     - jstests/core/write/find_and_modify/find_and_modify_server6865.js # $elemMatch
     # Time-series collections are views which don't support map-reduce
     - jstests/core/commands_namespace_parsing.js
-    - jstests/core/query/map_reduce/constructors.js
+    - jstests/core/constructors.js
     - jstests/core/query/function_string_representations.js
     - jstests/core/query/map_reduce/map_reduce_validation.js
     - jstests/core/query/map_reduce/mr_single_reduce.js

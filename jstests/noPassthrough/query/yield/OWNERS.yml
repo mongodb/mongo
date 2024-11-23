@@ -2,7 +2,4 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution-yielding
-  - "child_op_numyields.js":
-    approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-execution

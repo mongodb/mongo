@@ -17,7 +17,7 @@
 #
 # Examples:
 #
-#   JS test failed: jstests/sharding/query/exact_shard_key_target.js
+#   JS test failed: jstests/sharding/exact_shard_key_target.js
 #     in task_name: sharding_csrs_continuous_config_stepdown_WT
 # on build_variant: any
 #   with distro_id: any
@@ -44,5 +44,5 @@
 
 selector:
   js_test:
-    # jstests/sharding/query/exact_shard_key_target.js:
+    # jstests/sharding/exact_shard_key_target.js:
     # - retry_on_failure|sharding_csrs_continuous_config_stepdown_WT

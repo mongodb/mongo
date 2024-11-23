@@ -1,5 +1,0 @@
-version: 1.0.0
-filters:
-  - "set_profiling*":
-    approvers:
-      - 10gen/query-integration-observability

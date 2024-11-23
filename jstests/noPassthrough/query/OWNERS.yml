@@ -3,24 +3,21 @@ filters:
   - "*":
     approvers:
       - 10gen/query
-  - "cluster_analyze_command.js":
-    approvers:
-      - 10gen/query-optimization-statistics
   - "and_hash.js":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "and_sorted.js":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "doc_validation_options_logging.js":
     approvers:
-      - 10gen/query-execution-doc-validation
+      - 10gen/query-execution
   - "query_settings*":
     approvers:
-      - 10gen/query-execution-query-settings
+      - 10gen/query-execution
   - "sbe*":
     approvers:
-      - 10gen/query-execution-sbe
+      - 10gen/query-execution
   - "match_expression_optimization_failpoint.js":
     approvers:
       - 10gen/query-optimization
@@ -29,46 +26,16 @@ filters:
       - 10gen/query-optimization
   - "noFetchBonus.js":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "optimize_sharded_sample_with_orphaned_docs.js":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization
   - "or_pushdown_disable_optimization.js":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "search_hybrid_scoring_feature_flag_test.js":
     approvers:
       - 10gen/query-integration-search
   - "set_window_fields_read_concern_snapshot.js":
     approvers:
       - 10gen/query-integration-analytic-extensions
-  - "analyze*":
-    approvers:
-      - 10gen/query-optimization-statistics
-  - "commands_preserve_exec_error_code.js":
-    approvers:
-      - 10gen/query-execution
-  - "compute_mode.js":
-    approvers:
-      - 10gen/query-integration-analytic-extensions
-  - "external_data_source*":
-    approvers:
-      - 10gen/query-integration-analytic-extensions
-  - "fail_point_getmore_after_cursor_checkout.js":
-    approvers:
-      - 10gen/query-execution-client-cursor
-  - "external_sort_find.js":
-    approvers:
-      - 10gen/query-execution
-  - "fast_path_counters.js":
-    approvers:
-      - 10gen/query-execution
-  - "kill_pinned_cursor.js":
-    approvers:
-      - 10gen/query-execution-client-cursor
-  - "missing_shard_key.js":
-    approvers:
-      - 10gen/query-execution-router-query-exec
-  - "parse_zone_info.js":
-    approvers:
-      - 10gen/query-execution-datetime
