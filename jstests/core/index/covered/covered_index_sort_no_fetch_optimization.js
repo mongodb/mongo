@@ -9,7 +9,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
 import {
     getWinningPlanFromExplain,
     isIndexOnly,
@@ -36,7 +35,17 @@ const kBlockingSort = true;
 const kNonBlockingSort = false;
 
 function assertExpectedResult(findCmd, expectedResult, isCovered, isBlockingSort) {
-    const result = exhaustFindCursorAndReturnResults(db, findCmd);
+    const filter = findCmd["filter"];
+    const projection = findCmd["projection"];
+    const sort = findCmd["sort"];
+    const hint = findCmd["hint"] ? findCmd["hint"] : {};
+    const collation = findCmd["collation"] ? findCmd["collation"] : {};
+
+    // Use coll.find() syntax instead of db.runCommand() so we can use the toArray() function. This
+    // is important when 'internalQueryFindCommandBatchSize' is less than the result size and the
+    // cursor.firstBatch returned from db.runCommand() doesn't contain all the results.
+    const result =
+        coll.find(filter, projection).collation(collation).hint(hint).sort(sort).toArray();
     assert.eq(result, expectedResult, result);
 
     const explainResult =

@@ -13,7 +13,6 @@
  *   requires_timeseries,
  * ]
  */
-import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -38,10 +37,13 @@ function runTest({command, expectedResult, expectedDirection}) {
         const result = assert.commandWorked(db.runCommand(command));
         assert.docEq(expectedResult, result.cursor.firstBatch);
     } else {
-        // Exhaust the cursor when the cursor/batch size isn't specified to ensure that we return
-        // all results even if the value of internalQueryFindCommandBatchSize is less than the
-        // result size.
-        const result = exhaustFindCursorAndReturnResults(db, command);
+        // Use coll.find() syntax instead of db.runCommand() so we can use the toArray() function.
+        // This is important when 'internalQueryFindCommandBatchSize' is less than the result size
+        // and the cursor.firstBatch returned from db.runCommand() doesn't contain all the results.
+        const filter = command["filter"];
+        const hint = command["hint"] ? command["hint"] : {};
+
+        const result = coll.find(filter).hint(hint).toArray();
         assert.docEq(expectedResult, result);
     }
 
