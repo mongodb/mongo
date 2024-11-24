@@ -1619,6 +1619,7 @@ scan_worker(void *arg)
         wtperf->scan = true;
         items = 0;
         while (items < tot_items && !wtperf->stop) {
+            ++thread->scan.ops;
             cursor = cursors[map_key_to_table(opts, cur_id) - table_start];
             generate_key(opts, key_buf, cur_id);
             cursor->set_key(cursor, key_buf);
@@ -1639,7 +1640,6 @@ scan_worker(void *arg)
             }
         }
         wtperf->scan = false;
-        ++thread->scan.ops;
     }
 
     if (session != NULL && ((ret = session->close(session, NULL)) != 0)) {
@@ -2509,7 +2509,8 @@ start_run(WTPERF *wtperf)
         wtperf->ckpt_ops = sum_ckpt_ops(wtperf);
         wtperf->flush_ops = sum_flush_ops(wtperf);
         wtperf->scan_ops = sum_scan_ops(wtperf);
-        total_ops = wtperf->insert_ops + wtperf->modify_ops + wtperf->read_ops + wtperf->update_ops;
+        total_ops = wtperf->insert_ops + wtperf->modify_ops + wtperf->read_ops +
+          wtperf->update_ops + wtperf->scan_ops;
 
         lprintf(wtperf, 0, 1,
           "Executed %" PRIu64 " insert operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
@@ -2531,10 +2532,13 @@ start_run(WTPERF *wtperf)
           "Executed %" PRIu64 " update operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
           wtperf->update_ops, (wtperf->update_ops * 100) / total_ops,
           wtperf->update_ops / wtperf->testsec);
+        lprintf(wtperf, 0, 1,
+          "Executed %" PRIu64 " scan operations (%" PRIu64 "%%) %" PRIu64 " ops/sec",
+          wtperf->scan_ops, (wtperf->scan_ops * 100) / total_ops,
+          wtperf->scan_ops / wtperf->testsec);
         lprintf(wtperf, 0, 1, "Executed %" PRIu64 " backup operations", wtperf->backup_ops);
         lprintf(wtperf, 0, 1, "Executed %" PRIu64 " checkpoint operations", wtperf->ckpt_ops);
         lprintf(wtperf, 0, 1, "Executed %" PRIu64 " flush_tier operations", wtperf->flush_ops);
-        lprintf(wtperf, 0, 1, "Executed %" PRIu64 " scan operations", wtperf->scan_ops);
 
         latency_print(wtperf);
     }
