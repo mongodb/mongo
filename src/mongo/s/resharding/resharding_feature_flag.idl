@@ -54,11 +54,11 @@ feature_flags:
         default: true
         version: 8.0
         shouldBeFCVGated: true
+    # TODO SERVER-93149: Enable 'featureFlagReshardingForTimeseries' by default.
     featureFlagReshardingForTimeseries:
         description: "Feature flag for enabling resharding a timeseries collection."
         cpp_varname: gFeatureFlagReshardingForTimeseries
-        default: true
-        version: 8.0
+        default: false
         shouldBeFCVGated: true
     featureFlagRelaxedMode:
         description: "Feature flag for implmenting relaxed resharding mode."

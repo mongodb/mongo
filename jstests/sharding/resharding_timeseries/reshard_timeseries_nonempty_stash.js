@@ -1,5 +1,6 @@
 // Test nonempty temporary output _id conflict stash collection abort for resharding timeseries.
 // @tags: [
+//   featureFlagReshardingForTimeseries,
 //   requires_fcv_80,
 // ]
 //

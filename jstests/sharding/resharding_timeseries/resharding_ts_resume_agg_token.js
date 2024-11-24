@@ -2,6 +2,7 @@
  * Tests $_requestResumeToken in aggregate command on timeseries buckets collection.
  *
  * @tags: [
+ *  featureFlagReshardingForTimeseries,
  *  requires_fcv_80,
  * ]
  */

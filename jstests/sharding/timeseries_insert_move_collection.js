@@ -5,7 +5,7 @@
  * @tags: [
  *   requires_timeseries,
  *   uses_parallel_shell,
- *   requires_fcv_80,
+ *   featureFlagReshardingForTimeseries,
  * ]
  */
 

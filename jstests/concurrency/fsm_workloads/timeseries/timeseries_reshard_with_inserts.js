@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_timeseries,
  *   requires_sharding,
+ *   featureFlagReshardingForTimeseries,
  *   does_not_support_transactions,
  *   assumes_balancer_off,
  *   requires_fcv_80,

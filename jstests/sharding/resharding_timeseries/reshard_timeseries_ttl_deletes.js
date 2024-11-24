@@ -3,6 +3,7 @@
  * - the resharding source collection and copied to the resharding temporary collection.
  * - the resharded collection after resharding is complete.
  * @tags: [
+ *    featureFlagReshardingForTimeseries,
  *    requires_fcv_80,
  * ]
  */

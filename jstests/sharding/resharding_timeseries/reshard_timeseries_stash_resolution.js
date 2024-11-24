@@ -1,6 +1,7 @@
 // Test temporary output _id conflict stash collection resolution behaviour for resharding
 // timeseries.
 // @tags: [
+//   featureFlagReshardingForTimeseries,
 //   requires_fcv_80,
 // ]
 //

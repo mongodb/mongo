@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   uses_atclustertime,
+ *   featureFlagReshardingForTimeseries,
  *   requires_fcv_80,
  * ]
  */

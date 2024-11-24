@@ -2,6 +2,7 @@
  * Tests that writes are disallowed while in kCommitted for timeseries resharded collections.
  *
  * @tags: [
+ *   featureFlagReshardingForTimeseries,
  *   requires_fcv_80,
  * ]
  */
