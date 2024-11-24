@@ -297,41 +297,57 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
         }
 
         bool ready = collection->isIndexReady(indexName);
-        if (!ready) {
-            if (!isPointInTimeRead) {
-                // When initializing the indexes at the latest timestamp for existing collections,
-                // the only non-ready indexes will be two-phase index builds. Unfinished
-                // single-phase index builds are dropped during startup and rollback.
-                auto buildUUID = collection->getIndexBuildUUID(indexName);
-                invariant(buildUUID,
-                          str::stream() << "collection: " << collection->ns().toStringForErrorMsg()
-                                        << "index:" << indexName);
-            }
+        try {
+            if (!ready) {
+                if (!isPointInTimeRead) {
+                    // When initializing the indexes at the latest timestamp for existing
+                    // collections, the only non-ready indexes will be two-phase index builds.
+                    // Unfinished single-phase index builds are dropped during startup and rollback.
+                    auto buildUUID = collection->getIndexBuildUUID(indexName);
+                    invariant(buildUUID,
+                              str::stream()
+                                  << "collection: " << collection->ns().toStringForErrorMsg()
+                                  << "index:" << indexName);
+                }
 
-            // We intentionally do not drop or rebuild unfinished two-phase index builds before
-            // initializing the IndexCatalog when starting a replica set member in standalone mode.
-            // This is because the index build cannot complete until it receives a replicated commit
-            // or abort oplog entry. When performing a point-in-time read, this non-ready index may
-            // represent a single-phase index build.
-            if (replSetMemberInStandaloneMode) {
-                // Indicate that this index is "frozen". It is not ready but is not currently in
-                // progress either. These indexes may be dropped.
-                auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kFrozen;
-                IndexCatalogEntry* entry =
-                    createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-                fassert(31433, !entry->isReady());
+                // We intentionally do not drop or rebuild unfinished two-phase index builds before
+                // initializing the IndexCatalog when starting a replica set member in standalone
+                // mode. This is because the index build cannot complete until it receives a
+                // replicated commit or abort oplog entry. When performing a point-in-time read,
+                // this non-ready index may represent a single-phase index build.
+                if (replSetMemberInStandaloneMode) {
+                    // Indicate that this index is "frozen". It is not ready but is not currently in
+                    // progress either. These indexes may be dropped.
+                    auto flags =
+                        CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kFrozen;
+                    IndexCatalogEntry* entry =
+                        createIndexEntry(opCtx, collection, std::move(descriptor), flags);
+                    fassert(31433, !entry->isReady());
+                } else {
+                    // Initializing with unfinished indexes may occur during rollback or startup.
+                    auto flags = CreateIndexEntryFlags::kInitFromDisk;
+                    IndexCatalogEntry* entry =
+                        createIndexEntry(opCtx, collection, std::move(descriptor), flags);
+                    fassert(4505500, !entry->isReady());
+                }
             } else {
-                // Initializing with unfinished indexes may occur during rollback or startup.
-                auto flags = CreateIndexEntryFlags::kInitFromDisk;
+                auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
                 IndexCatalogEntry* entry =
                     createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-                fassert(4505500, !entry->isReady());
+                fassert(17340, entry->isReady());
             }
-        } else {
-            auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
-            IndexCatalogEntry* entry =
-                createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-            fassert(17340, entry->isReady());
+        } catch (const ExceptionFor<ErrorCodes::CannotCreateIndex>& ex) {
+            // Offline validation runs against older versions of MongoDB, so index registration
+            // failures are tolerable. The known case is for GeoHaystack indexes in <4.4
+            if (!storageGlobalParams.validate) {
+                throw;
+            }
+            LOGV2_ERROR(9534800,
+                        "Failed to register index. It will not be validated",
+                        "ns"_attr = collection->ns(),
+                        "indexName"_attr = indexName,
+                        "error"_attr = ex.toString());
+            continue;
         }
     }
 
@@ -618,6 +634,9 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         if (storageGlobalParams.repair &&
             status.code() == ErrorCodes::InvalidIndexSpecificationOption) {
             uasserted(ErrorCodes::InvalidIndexSpecificationOption, status.reason());
+        }
+        if (storageGlobalParams.validate && status.code() == ErrorCodes::CannotCreateIndex) {
+            uassertStatusOK(status);
         }
 
         LOGV2_FATAL(28782,

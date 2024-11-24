@@ -870,6 +870,12 @@ boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged()
         return data["value"].Bool();
     }
 
+    // Offline validation doesn't initialize FCV in order to validate older MongoDB instances
+    // TODO(SERVER-96993) Re-evaluate if true makes sense as default for older versions
+    if (storageGlobalParams.validate) {
+        return true;
+    }
+
     if (!feature_flags::gTSBucketingParametersUnchanged.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Pessimistically return true because v7.1+ versions may have missed cloning this catalog
