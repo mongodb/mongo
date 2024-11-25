@@ -55,8 +55,6 @@ mongo_cc_unit_test(
         "simple_bsonobj_comparator_test.cpp",
         "//src/mongo/bson:bsonelement_comparator.h",
         "//src/mongo/bson:bsonobj_comparator.h",
-        "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
-        "//src/mongo/bson/mutable:mutable_bson_test_utils.h",
     ],
     tags = ["server-programmability"],
     deps = [

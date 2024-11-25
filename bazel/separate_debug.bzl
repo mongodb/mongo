@@ -284,10 +284,10 @@ def linux_extraction(ctx, cc_toolchain, inputs):
     # The final program binary depends on the existence of the dependent dynamic library files. With
     # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
     # output set.
-    dynamic_deps_runfiles = None
+    dynamic_deps_runfiles = ctx.runfiles(files = [])
     if ctx.attr.type == "program":
         dynamic_deps = get_transitive_dyn_libs(ctx.attr.deps)
-        dynamic_deps_runfiles = ctx.runfiles(files = get_transitive_dyn_libs(ctx.attr.deps))
+        dynamic_deps_runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles.merge(ctx.runfiles(files = get_transitive_dyn_libs(ctx.attr.deps)))
         outputs.extend(dynamic_deps)
 
     provided_info = [
@@ -360,8 +360,11 @@ def macos_extraction(ctx, cc_toolchain, inputs):
     # The final program binary depends on the existence of the dependent dynamic library files. With
     # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
     # output set.
+    dynamic_deps_runfiles = ctx.runfiles(files = [])
     if ctx.attr.type == "program":
-        outputs.extend(get_transitive_dyn_libs(ctx.attr.deps))
+        dynamic_deps = get_transitive_dyn_libs(ctx.attr.deps)
+        dynamic_deps_runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles.merge(ctx.runfiles(files = get_transitive_dyn_libs(ctx.attr.deps)))
+        outputs.extend(dynamic_deps)
 
     provided_info = [
         DefaultInfo(
@@ -435,6 +438,7 @@ def windows_extraction(ctx, cc_toolchain, inputs):
         DefaultInfo(
             files = depset(outputs),
             executable = output if ctx.attr.type == "program" else None,
+            runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles,
         ),
         create_new_ccinfo_library(ctx, cc_toolchain, output_dynamic_library, output_library, ctx.attr.cc_shared_library),
     ]

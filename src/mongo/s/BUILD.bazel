@@ -110,6 +110,7 @@ mongo_cc_library(
         "stale_shard_version_helpers.h",
         "transaction_router.h",
         "transaction_router_resource_yielder.h",
+        "//src/mongo/db/stats:single_transaction_stats.h",
     ],
     deps = [
         ":async_requests_sender",
@@ -130,6 +131,7 @@ mongo_cc_library(
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db/session:sessions_collection",
+        "//src/mongo/db/stats:transaction_stats",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
@@ -485,6 +487,9 @@ mongo_cc_library(
         "//src/mongo/s:catalog_cache_loader.h",
         "//src/mongo/s:grid.h",
         "//src/mongo/s:transaction_router.h",
+        "//src/mongo/db/stats:single_transaction_stats.h",
+        "//src/mongo/util/concurrency:ticketholder_queue_stats.h",
+        "//src/mongo/db/admission:ingress_admission_context.h",
         "//src/mongo/util:future_util.h",
     ],
     hdrs = [
@@ -521,14 +526,6 @@ mongo_cc_library(
         "//src/mongo/db/session:kill_sessions_gen",
         "//src/mongo/s/client:shard_gen",
     ],
-    header_deps = [
-        "//src/mongo/db/s:forwardable_operation_metadata",
-        "//src/mongo/db:write_block_bypass",
-        "//src/mongo/db/stats:transaction_stats",
-        "//src/mongo/s/catalog:sharding_catalog_client",
-        "//src/mongo/util/concurrency:thread_pool",
-        ":mongos_server_parameters",
-    ],
     deps = [
         "//src/mongo/client:connection_string",
         "//src/mongo/db/commands:create_command",
@@ -555,7 +552,6 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/executor:async_rpc_error_info",
-        "//src/mongo/rpc:message",
         "//src/mongo/util:caching",
     ],
 )

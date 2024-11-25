@@ -25,6 +25,9 @@ mongo_cc_library(
 idl_generator(
     name = "collection_options_gen",
     src = "collection_options.idl",
+    hdrs = [
+        "//src/mongo/db/catalog:collection_options_validation.h",
+    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -265,6 +268,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role_api_stor_ex",
         "//src/mongo/db/storage:storage_options",
     ],
 )

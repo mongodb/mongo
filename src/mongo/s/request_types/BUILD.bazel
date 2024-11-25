@@ -261,6 +261,9 @@ idl_generator(
 idl_generator(
     name = "set_allow_migrations_gen",
     src = "set_allow_migrations.idl",
+    hdrs = [
+        "//src/mongo/db/s:forwardable_operation_metadata.h",
+    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/s:sharding_ddl_coordinator_gen",

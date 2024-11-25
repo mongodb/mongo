@@ -276,6 +276,10 @@ mongo_cc_library(
     name = "index_entry_comparison",
     srcs = [
         "index_entry_comparison.cpp",
+        "//src/mongo/db/catalog:index_catalog.h",
+        "//src/mongo/db/catalog:index_catalog_entry.h",
+        "//src/mongo/db/index:index_descriptor.h",
+        "//src/mongo/db/index:index_descriptor_fwd.h",
     ],
     hdrs = [
         "index_entry_comparison.h",
@@ -283,7 +287,6 @@ mongo_cc_library(
     deps = [
         ":duplicate_key_error_info",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/catalog:index_catalog",
         "//src/mongo/db/storage/key_string",
     ],
 )

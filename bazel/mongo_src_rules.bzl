@@ -1986,7 +1986,7 @@ def mongo_cc_unit_test(
         header_deps = header_deps,
         visibility = visibility,
         data = data,
-        tags = tags + ["no-remote-exec", "no-remote-cache"],
+        tags = tags,
         copts = copts,
         linkopts = linkopts,
         includes = includes,

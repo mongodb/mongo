@@ -25,6 +25,9 @@ mongo_cc_library(
         # Note: Only used here and for the corresponding test. consider moving.
         "//src/mongo/logv2:log_capture_backend.h",
         "//src/mongo/bson/mutable:mutable_bson_test_utils.h",
+        "//src/mongo/bson/mutable:document.h",
+        "//src/mongo/bson/mutable:const_element.h",
+        "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
     ],
     hdrs = [
         "assert.h",
@@ -42,10 +45,6 @@ mongo_cc_library(
         "temp_dir.h",
         "thread_assertion_monitor.h",
         "unittest.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/timeseries:bucket_compression",
-        "//src/mongo/bson/mutable:mutable_bson",
     ],
     deps = [
         ":golden_test_base",

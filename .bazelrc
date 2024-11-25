@@ -32,7 +32,8 @@ build --strategy=CppArchive=local
 build --strategy=SolibSymlink=local
 build --strategy=StripDebuginfo=local
 build --strategy=ExtractDebuginfo=local
-build --modify_execution_info=^(CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo)$=+no-remote-cache
+build --strategy=TestRunner=local
+build --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo)$=+no-remote-cache
 
 # Aliases for config flags
 build --flag_alias=linkstatic=//bazel/config:linkstatic

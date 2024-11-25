@@ -43,7 +43,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/util/concurrency:ticketholder",
     ],
@@ -106,7 +105,6 @@ mongo_cc_library(
         "execution_admission_context.h",
     ],
     deps = [
-        "//src/mongo/db:service_context",
         "//src/mongo/util/concurrency:admission_context",
     ],
 )

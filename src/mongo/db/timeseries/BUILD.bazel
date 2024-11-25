@@ -12,6 +12,9 @@ exports_files(
 idl_generator(
     name = "timeseries_gen",
     src = "timeseries.idl",
+    hdrs = [
+        "//src/mongo/db/timeseries:timeseries_global_options.h",
+    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],

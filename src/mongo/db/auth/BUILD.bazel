@@ -876,6 +876,9 @@ mongo_cc_unit_test(
         "//bazel/config:ssl_enabled": ["sasl_x509_test.cpp"],
         "//conditions:default": [],
     }),
+    data = [
+        "//jstests/libs:server.pem",
+    ],
     deps = [
         ":address_restriction",
         ":auth_op_observer",

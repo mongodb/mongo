@@ -58,10 +58,10 @@ mongo_cc_library(
         "locker.h",
         "replication_state_transition_lock_guard.h",
         "resource_catalog.h",
+        "//src/mongo:core_headers",
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/admission:ticketholder_manager",
         "//src/mongo/db/concurrency:flow_control_ticketholder",  # TODO(SERVER-93876): Remove.

@@ -129,6 +129,7 @@ mongo_cc_unit_test(
         "string_data_test.cpp",
         "system_error_test.cpp",
         "uuid_test.cpp",
+        "//src/mongo/base:data_type_validated.h",
     ],
     tags = ["server-programmability"],
     deps = [

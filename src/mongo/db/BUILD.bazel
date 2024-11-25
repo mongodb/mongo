@@ -740,6 +740,7 @@ mongo_cc_library(
         ":shard_role_api_stor_ex",
         ":write_block_bypass",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/catalog:index_catalog",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/storage:write_unit_of_work",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
@@ -952,7 +953,6 @@ mongo_cc_library(
     deps = [
         ":server_base",
         "//src/mongo/db/catalog:collection_options",
-        "//src/mongo/db/catalog:index_catalog",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/s:common_s",
     ],
@@ -1119,6 +1119,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "service_context_test_fixture.h",
+        "//src/mongo/db/admission:ingress_admission_context.h",
         "//src/mongo/db/catalog:external_data_source_scope_guard.h",
         "//src/mongo/db/exec:and_common.h",
         "//src/mongo/db/exec:and_hash.h",
@@ -1238,8 +1239,10 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops:parsed_delete.h",
         "//src/mongo/db/query/write_ops:parsed_update.h",
         "//src/mongo/db/query/write_ops:update_result.h",
+        "//src/mongo/db/stats:single_transaction_stats.h",
         "//src/mongo/db/storage:test_harness_helper.h",
         "//src/mongo/util:roaring_bitmaps.h",
+        "//src/mongo/util/concurrency:ticketholder_queue_stats.h",
     ],
     header_deps = [
         "//src/mongo/unittest",
@@ -2148,6 +2151,7 @@ mongo_cc_library(
     deps = [
         "multi_key_path_tracker",
         "server_base",
+        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:write_unit_of_work",

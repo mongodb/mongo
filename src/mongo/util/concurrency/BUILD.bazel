@@ -60,7 +60,6 @@ mongo_cc_library(
     deps = [
         ":admission_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-93876): Remove.
         "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-93876): Remove.
         "//src/third_party/boost:boost_log",  # TODO(SERVER-93876): Remove.
