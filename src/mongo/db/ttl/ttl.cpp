@@ -468,6 +468,12 @@ void TTLMonitor::shutdown() {
 }
 
 void TTLMonitor::_doTTLPass(OperationContext* opCtx) {
+    // Don't do work if we are a secondary (TTL will be handled by primary)
+    auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoordinator && replCoordinator->getSettings().isReplSet() &&
+        !replCoordinator->getMemberState().primary()) {
+        return;
+    }
 
     hangTTLMonitorBetweenPasses.pauseWhileSet(opCtx);
 

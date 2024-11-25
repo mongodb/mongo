@@ -229,6 +229,38 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
+TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    client.createCollection(nss);
+
+    createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
+
+    client.insertExpiredDocs(nss, "x", 100);
+    ASSERT_EQ(client.count(nss), 100);
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx());
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    auto initTTLPasses = getTTLPasses();
+    auto initTTLSubPasses = getTTLSubPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // No documents are removed, no passes are incremented.
+    ASSERT_EQ(client.count(nss), 100);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses);
+    ASSERT_EQ(getTTLSubPasses(), initTTLSubPasses);
+}
+
 TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
