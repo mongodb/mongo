@@ -2178,6 +2178,23 @@ clustered collection can be arbitrarily long, its size is appended at the end an
 right-to-left over up to 4 bytes, using the lower 7 bits of a byte, the high bit serving as a
 continuation bit.
 
+## Legacy Catalog Formats That Still Require Support
+
+### Legacy Indexes
+
+We perform stricter checks in index key pattern validation to v:2 indexes, limiting indexes created
+in MongoDB 3.4+ to the following:
+
+- numbers > 0 (ascending)
+- numbers < 0 (descending)
+- strings (special index types)
+
+However, legacy indexes (indexes that were created pre-3.4) still need to be handled in the case
+where a customer with legacy indexes upgrades to MongoDB 3.4+. The server treats any non-negative
+numerical index key and non-numerical index key value as an ascending index, and treats negative
+numerical values as descending. The exception to this is any form of a negative 0 (-0, -0.0, etc);
+these are treated as ascending. Details on how these values are treated can be found in [ordering.h](https://github.com/10gen/mongo/blob/master/src/mongo/bson/ordering.h), and examples of legacy indexes can be found in [this test](https://github.com/10gen/mongo/blob/master/src/mongo/bson/ordering_test.cpp).
+
 # Glossary
 
 **DDL**: Acronym for Data Description Language or Data Definition Language used generally in the

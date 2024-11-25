@@ -80,6 +80,12 @@ public:
         return bits & mask;
     }
 
+    /**
+     * Returns an ordering that contains bits indicating whether index key specs are ascending or
+     * descending. Any non-numerical types are treated as ascending; only negative numerical
+     * values (double, int, long, Decimal) are treated as descending. The exception to this is any
+     * form of a negative 0 (-0, -0.0, etc) — these are treated as ascending.
+     */
     static Ordering make(const BSONObj& obj) {
         uint32_t b = 0;
         BSONObjIterator k(obj);

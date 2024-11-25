@@ -51,6 +51,7 @@ mongo_cc_unit_test(
         "bsonelement_test.cpp",
         "bsonobjbuilder_test.cpp",
         "oid_test.cpp",
+        "ordering_test.cpp",
         "simple_bsonobj_comparator_test.cpp",
         "//src/mongo/bson:bsonelement_comparator.h",
         "//src/mongo/bson:bsonobj_comparator.h",
