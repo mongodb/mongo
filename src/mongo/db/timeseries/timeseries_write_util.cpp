@@ -50,7 +50,8 @@ boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
     const BSONObj& metadata,
     StringDataMap<BSONObjBuilder>& dataBuilders,
     const boost::optional<TimeseriesOptions>& options = boost::none,
-    const boost::optional<const StringData::ComparatorInterface*>& comparator = boost::none) {
+    const boost::optional<const StringData::ComparatorInterface*>& comparator = boost::none,
+    const boost::optional<Date_t> currentMinTime = boost::none) {
     bucket_catalog::MinMax minmax;
     bool computeMinmax = options && comparator;
 
@@ -77,8 +78,10 @@ boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
 
     // Rounds the minimum timestamp and updates the min time field.
     if (computeMinmax) {
-        auto minTime = roundTimestampToGranularity(
-            minmax.min().getField(options->getTimeField()).Date(), *options);
+        auto minTime = (currentMinTime != boost::none)
+            ? currentMinTime.get()
+            : roundTimestampToGranularity(minmax.min().getField(options->getTimeField()).Date(),
+                                          *options);
         auto controlDoc =
             bucket_catalog::buildControlMinTimestampDoc(options->getTimeField(), minTime);
         minmax.update(controlDoc, /*metaField=*/boost::none, *comparator);
@@ -133,10 +136,11 @@ BSONObj makeNewDocumentForWrite(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     const boost::optional<TimeseriesOptions>& options,
-    const boost::optional<const StringData::ComparatorInterface*>& comparator) {
+    const boost::optional<const StringData::ComparatorInterface*>& comparator,
+    const boost::optional<Date_t> currentMinTime) {
     StringDataMap<BSONObjBuilder> dataBuilders;
-    auto minmax =
-        processTimeseriesMeasurements(measurements, metadata, dataBuilders, options, comparator);
+    auto minmax = processTimeseriesMeasurements(
+        measurements, metadata, dataBuilders, options, comparator, currentMinTime);
 
     invariant(minmax);
 

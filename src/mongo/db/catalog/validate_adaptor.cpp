@@ -235,8 +235,15 @@ Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
     auto checkMinAndMaxMatch = [&]() {
         const auto options = coll->getTimeseriesOptions().value();
         if (fieldName == options.getTimeField()) {
-            return controlMin.Date() ==
-                timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(), options) &&
+            // We only check that the max exactly matches the measurements, because with
+            // measurement-level deletes it is possible that the earliest measurements got deleted.
+            // Since we keep the bucket's minTime unchanged in that case, we cannot rely on the
+            // minTime always corresponding with what the actual minimum measurement time is. We
+            // can, however, rely on the fact that the rounded time of the earliest measurement is
+            // at greater than or equal to the control.min time-field.
+            // TODO (SERVER-94872): Reinstate the strict equality check.
+            return timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(),
+                                                           options) >= controlMin.Date() &&
                 controlMax.Date() == max.getField(fieldName).Date();
         } else {
             return controlMin.wrap().woCompare(min) == 0 && controlMax.wrap().woCompare(max) == 0;

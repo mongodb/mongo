@@ -52,7 +52,8 @@ BSONObj makeNewDocumentForWrite(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     const boost::optional<TimeseriesOptions>& options,
-    const boost::optional<const StringData::ComparatorInterface*>& comparator);
+    const boost::optional<const StringData::ComparatorInterface*>& comparator,
+    boost::optional<Date_t> currentMinTime);
 
 /**
  * Performs modifications atomically for a user command on a time-series collection.

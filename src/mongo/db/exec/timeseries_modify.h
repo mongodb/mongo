@@ -92,6 +92,7 @@ private:
         WorkingSetID bucketWsmId,
         const std::vector<BSONObj>& unchangedMeasurements,
         const std::vector<BSONObj>& deletedMeasurements,
+        Date_t& currentMinTime,
         bool bucketFromMigrate);
 
     /**
