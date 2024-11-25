@@ -45,7 +45,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/shard_filterer_factory_mock.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -267,6 +267,78 @@ TEST_F(SbeStageBuilderTest, VirtualScanWithFilter) {
         ASSERT_BSONOBJ_EQ(bo, BSON("a" << ++index << "b" << 2));
     }
     ASSERT_EQ(index, 3);
+}
+
+class GoldenSbeStageBuilderTest : public GoldenSbeStageBuilderTestFixture {
+public:
+    void setUp() override {
+        SbeStageBuilderTestFixture::setUp();
+        _expCtx = new ExpressionContextForTest();
+    }
+
+    void tearDown() override {
+        _expCtx = nullptr;
+        SbeStageBuilderTestFixture::tearDown();
+    }
+
+    void createCollection(const std::vector<BSONObj>& docs,
+                          boost::optional<BSONObj> indexKeyPattern) {
+        // Create collection and index
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), _nss, CollectionOptions()));
+        if (indexKeyPattern) {
+            ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+                operationContext(),
+                _nss,
+                {BSON("v" << 2 << "name" << DBClientBase::genIndexName(*indexKeyPattern) << "key"
+                          << *indexKeyPattern)}));
+        }
+        insertDocuments(docs);
+    }
+
+protected:
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+};
+
+IndexEntry makeIndexEntry(BSONObj keyPattern) {
+    return {keyPattern,
+            IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+            IndexDescriptor::kLatestIndexVersion,
+            false /* multiKey */,
+            {{}, {}} /* multiKeyPaths */,
+            {} /* multikeyPathSet */,
+            false /* sp */,
+            false /* unq */,
+            CoreIndexInfo::Identifier(DBClientBase::genIndexName(keyPattern)),
+            nullptr /* fe */,
+            {} /* io */,
+            nullptr /* ci */,
+            nullptr /* wildcardProjection */};
+}
+
+TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
+    createCollection(
+        {fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}"), fromjson("{_id: 2, a: 3}")},
+        BSON("a" << 1));
+    // Build COUNT_SCAN node
+    auto csn = std::make_unique<CountScanNode>(makeIndexEntry(BSON("a" << 1)));
+    csn->startKey = BSON("a" << MinKey);
+    csn->startKeyInclusive = false;
+    csn->endKey = BSON("a" << MaxKey);
+    csn->endKeyInclusive = false;
+    // Build GROUP node
+    auto bson = fromjson("{count: {$count: {}}}");
+    VariablesParseState vps = _expCtx->variablesParseState;
+    auto groupByExpression = ExpressionFieldPath::parse(_expCtx.get(), "$_id", vps);
+    auto groupNode = std::make_unique<GroupNode>(
+        std::move(csn),
+        groupByExpression,
+        std::vector<AccumulationStatement>{
+            AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["count"], vps)},
+        false /*doingMerge*/,
+        true /*shouldProduceBson*/);
+
+    runTest(std::move(groupNode), BSON_ARRAY(BSON("_id" << BSONNULL << "count" << 3)));
 }
 
 }  // namespace mongo

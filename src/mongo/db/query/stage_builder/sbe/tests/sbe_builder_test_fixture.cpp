@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -45,11 +46,14 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
+
+unittest::GoldenTestConfig goldenTestConfigSbe{"src/mongo/db/test_output/query/stage_builder/sbe"};
+
 std::unique_ptr<QuerySolution> SbeStageBuilderTestFixture::makeQuerySolution(
     std::unique_ptr<QuerySolutionNode> root) {
     auto querySoln = std::make_unique<QuerySolution>();
@@ -112,6 +116,69 @@ SbeStageBuilderTestFixture::buildPlanStage(
     // which is created here owns the 'expCtx' which is deleted with the canonical query at the end
     // of this function.
     return {slots, std::move(stage), std::move(data), expCtx};
+}
+
+void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode> root,
+                                               const mongo::BSONArray& expectedValue) {
+    auto querySolution = makeQuerySolution(std::move(root));
+
+    // Translate the QuerySolution tree to an sbe::PlanStage.
+    AutoGetCollection localColl(operationContext(), _nss, LockMode::MODE_IS);
+    MultipleCollectionAccessor colls(*localColl);
+    auto [resultSlots, stage, data, _] = buildPlanStage(std::move(querySolution),
+                                                        colls,
+                                                        false /*hasRecordId*/,
+                                                        nullptr /*shard filterer*/,
+                                                        nullptr /*collator*/);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
+    ASSERT_EQ(resultAccessors.size(), 1u);
+
+    // Print the stage explain output and verify.
+    _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    _gctx->outStream() << replaceUuid(sbe::DebugPrinter().print(*stage.get()), localColl->uuid());
+    _gctx->outStream() << std::endl;
+    _gctx->verifyOutput();
+
+    // Execute the plan to verify explain output is correct.
+    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessors[0]);
+    sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
+    sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+
+    ASSERT_TRUE(PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
+        << "expected: " << std::make_pair(expectedTag, expectedVal)
+        << " but got: " << std::make_pair(resultsTag, resultsVal);
+}
+
+std::string GoldenSbeStageBuilderTestFixture::replaceUuid(std::string input, UUID uuid) {
+    auto uuidStr = uuid.toString();
+    std::string replace_by = "UUID";
+    // Find the first occurrence of the uuid
+    size_t pos = input.find(uuidStr);
+
+    // Iterate through the string and replace all occurrences
+    while (pos != std::string::npos) {
+        // Replace the uuid with the constant string
+        input.replace(pos, uuidStr.size(), replace_by);
+
+        // Find the next occurrence of the uuid
+        pos = input.find(uuidStr, pos + replace_by.size());
+    }
+
+    return input;
+}
+
+void GoldenSbeStageBuilderTestFixture::insertDocuments(const std::vector<BSONObj>& docs) {
+    std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
+
+    AutoGetCollection agc(operationContext(), _nss, LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(collection_internal::insertDocuments(
+            operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+        wuow.commit();
+    }
 }
 
 }  // namespace mongo

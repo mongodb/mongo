@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/window_function/window_function_set_union.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 

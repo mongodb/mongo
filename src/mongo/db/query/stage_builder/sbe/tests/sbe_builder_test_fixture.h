@@ -46,9 +46,15 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+using namespace mongo::unittest;
+using namespace mongo::unittest::match;
+
 /**
  * SbeStageBuilderTestFixture is a unittest fixture that can be used to facilitate testing the
  * translation of a QuerySolution tree to an sbe PlanStage tree.
@@ -65,8 +71,6 @@ namespace mongo {
  */
 class SbeStageBuilderTestFixture : public sbe::PlanStageTestFixture {
 public:
-    SbeStageBuilderTestFixture() = default;
-
     /**
      * Makes a QuerySolution from a QuerySolutionNode.
      */
@@ -111,6 +115,24 @@ public:
 protected:
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder");
+};
+
+extern unittest::GoldenTestConfig goldenTestConfigSbe;
+
+class GoldenSbeStageBuilderTestFixture : public SbeStageBuilderTestFixture {
+public:
+    GoldenSbeStageBuilderTestFixture()
+        : _gctx(std::make_unique<GoldenTestContext>(&goldenTestConfigSbe)) {
+        _gctx->validateOnClose(false);
+    }
+
+protected:
+    // Random uuid will fail the golden data test, replace it to a constant string.
+    std::string replaceUuid(std::string input, UUID uuid);
+    void insertDocuments(const std::vector<BSONObj>& docs);
+    void runTest(std::unique_ptr<QuerySolutionNode> root, const mongo::BSONArray& expectedValue);
+
+    std::unique_ptr<GoldenTestContext> _gctx;
 };
 
 }  // namespace mongo
