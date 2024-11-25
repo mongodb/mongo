@@ -158,10 +158,6 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
     }
 
     if (status == ::errSecSuccess) {
-        status = ::SSLSetPeerID(_ssl.get(), _ssl.get(), sizeof(native_handle_type));
-    }
-
-    if (status == ::errSecSuccess) {
         status = ::SSLSetIOFuncs(_ssl.get(), read_func, write_func);
     }
 
