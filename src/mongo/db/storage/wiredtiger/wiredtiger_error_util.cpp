@@ -54,7 +54,7 @@ bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
     }
 
     StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue(
-        session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY);
+        session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY_LEAF);
     if (!cacheDirtyBytes.isOK()) {
         tasserted(6190901,
                   str::stream() << "unable to gather the WT connection's cache dirty bytes: "
