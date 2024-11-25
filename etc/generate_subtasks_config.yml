@@ -46,12 +46,12 @@ build_variant_large_distro_exceptions:
   - rhel8
   - rhel8-debug-asan
   - rhel8-debug-asan-all-feature-flags
-  - rhel8-debug-asan-sbe-engine
+  - rhel8-debug-asan-classic-engine
   - rhel8-debug-aubsan-lite
   - rhel8-debug-suggested
   - rhel8-debug-ubsan
   - rhel8-debug-ubsan-all-feature-flags
-  - rhel8-debug-ubsan-sbe-engine
+  - rhel8-debug-ubsan-classic-engine
   - rhel-8-arm64
   - rhel90
   - rhel90-arm64

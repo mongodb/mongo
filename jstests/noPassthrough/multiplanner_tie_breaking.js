@@ -11,7 +11,6 @@
 (function() {
 "use strict";
 load("jstests/libs/analyze_plan.js");  // For getPlanStages()
-load("jstests/libs/sbe_util.js");      // For 'checkSbeCompletelyDisabled'
 
 function testTieBreaking(breakTies, expectedPlanCount, checkAgainstOriginal) {
     const expectedDocsExamined = 1;
@@ -51,13 +50,12 @@ function testTieBreakingScenarios(expectedPlanCount, checkAgainstOriginal) {
 }
 
 // Make sure we are testing on the classic engine.
-const conn = MongoRunner.runMongod();
-assert.neq(null, conn, 'mongod was unable to start up');
+const options = {
+    setParameter: {internalQueryFrameworkControl: "forceClassicEngine"}
+};
+const conn = MongoRunner.runMongod(options);
+assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
 const db = conn.getDB('test');
-if (!checkSbeCompletelyDisabled(db)) {
-    jsTestLog("Skipping test because SBE is enabled");
-    quit();
-}
 
 const coll = db.multiplanner_tie_breaking;
 coll.drop();

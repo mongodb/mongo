@@ -885,7 +885,7 @@ server_parameters:
       name: QueryFrameworkControl
       data: synchronized_value<QueryFrameworkControlEnum>
     default:
-      expr: QueryFrameworkControlEnum::kForceClassicEngine
+      expr: QueryFrameworkControlEnum::kTrySbeRestricted
 
   internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin:
     description: "Up to what number of documents do we choose the hash join algorithm when $lookup
