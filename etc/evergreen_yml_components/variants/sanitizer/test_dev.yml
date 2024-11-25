@@ -150,7 +150,6 @@ variables:
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
-    gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
