@@ -30,7 +30,6 @@ checkpoint.log_size=65
 checkpoint.wait=66
 disk.checksum=off
 disk.data_extend=0
-disk.direct_io=1
 disk.encryption=none
 disk.firstfit=0
 disk.mmap=1

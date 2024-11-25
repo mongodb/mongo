@@ -56,29 +56,17 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         aligned = even or os.name == "nt"
         copy_wiredtiger_home(self, olddir, newdir, aligned)
 
-        # Half the time try to rename a table and the other half try
-        # to remove a table.  They should fail.
-        if not even:
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.rename(
-                self.emptyuri, self.newuri, None))
-        else:
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.drop(self.emptyuri, None))
+        # Try to remove a table. It should fail.
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.drop(self.emptyuri, None))
 
         # Now simulate fsyncUnlock by closing the backup cursor.
         cbkup.close()
 
         # Once the backup cursor is closed we should be able to perform
-        # schema operations.  Test that and then reset the files to their
-        # expected initial names.
-        if not even:
-            self.session.rename(self.emptyuri, self.newuri, None)
-            self.session.drop(self.newuri, None)
-            self.session.create(self.emptyuri, self.create_params)
-        else:
-            self.session.drop(self.emptyuri, None)
-            self.session.create(self.emptyuri, self.create_params)
+        # schema operations.
+        self.session.drop(self.emptyuri, None)
+        self.session.create(self.emptyuri, self.create_params)
 
         # Open the new directory and verify
         conn = self.setUpConnectionOpen(newdir)

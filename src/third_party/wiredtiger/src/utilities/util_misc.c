@@ -128,25 +128,13 @@ format:
 
 /*
  * util_flush --
- *     Flush the file successfully, or drop it.
+ *     Flush the database successfully, or drop the file.
  */
 int
 util_flush(WT_SESSION *session, const char *uri)
 {
     WT_DECL_RET;
-    size_t len;
-    char *buf;
-
-    len = strlen(uri) + 100;
-    if ((buf = util_malloc(len)) == NULL)
-        return (util_err(session, errno, NULL));
-
-    if ((ret = __wt_snprintf(buf, len, "target=(\"%s\")", uri)) != 0) {
-        util_free(buf);
-        return (util_err(session, ret, NULL));
-    }
-    ret = session->checkpoint(session, buf);
-    util_free(buf);
+    ret = session->checkpoint(session, NULL);
 
     if (ret == 0)
         return (0);

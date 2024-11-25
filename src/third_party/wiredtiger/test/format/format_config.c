@@ -30,7 +30,6 @@
 
 static void config_backup_incr(void);
 static void config_backup_incr_granularity(void);
-static void config_backup_incr_log_compatibility_check(void);
 static void config_backward_compatible(void);
 static void config_cache(void);
 static void config_checkpoint(void);
@@ -38,7 +37,6 @@ static void config_checksum(TABLE *);
 static void config_chunk_cache(void);
 static void config_compact(void);
 static void config_compression(TABLE *, const char *);
-static void config_directio(void);
 static void config_encryption(void);
 static bool config_explicit(TABLE *, const char *);
 static const char *config_file_type(u_int);
@@ -46,7 +44,7 @@ static bool config_fix(TABLE *);
 static void config_in_memory(void);
 static void config_in_memory_reset(void);
 static void config_lsm_reset(TABLE *);
-static void config_map_backup_incr(const char *, u_int *);
+static void config_map_backup_incr(const char *, bool *);
 static void config_map_checkpoint(const char *, u_int *);
 static void config_map_file_type(const char *, u_int *);
 static void config_mirrors(void);
@@ -322,15 +320,13 @@ config_table(TABLE *table, void *arg)
     table->max_mem_page = MEGABYTE(TV(BTREE_MEMORY_PAGE_MAX));
 
     /*
-     * Keep the number of rows and keys/values small for in-memory and direct I/O runs (overflow
-     * items aren't an issue for in-memory configurations and it helps prevents cache overflow, and
-     * direct I/O can be so slow the additional I/O for overflow items causes eviction to stall).
+     * Keep the number of rows and keys/values small for in-memory (overflow items aren't an issue
+     * for in-memory configurations and it helps prevents cache overflow).
      */
-    if (GV(RUNS_IN_MEMORY) || GV(DISK_DIRECT_IO)) {
+    if (GV(RUNS_IN_MEMORY)) {
         /*
          * Always limit the row count if it's greater than one million and in memory wasn't
-         * explicitly set. Direct IO is always explicitly set, never limit the row count because the
-         * user has taken control.
+         * explicitly set.
          */
         if (GV(RUNS_IN_MEMORY) && TV(RUNS_ROWS) > WT_MILLION &&
           config_explicit(NULL, "runs.in_memory")) {
@@ -521,7 +517,6 @@ config_run(void)
     config_backup_incr();                            /* Incremental backup */
     config_checkpoint();                             /* Checkpoints */
     config_compression(NULL, "logging.compression"); /* Logging compression */
-    config_directio();                               /* Direct I/O */
     config_encryption();                             /* Encryption */
     config_in_memory_reset();                        /* Reset in-memory as needed */
     config_backward_compatible();                    /* Reset backward compatibility as needed */
@@ -555,9 +550,7 @@ config_backup_incr(void)
      * file removal doesn't seem as useful as testing backup, let the backup configuration override.
      */
     if (config_explicit(NULL, "backup.incremental")) {
-        if (g.backup_incr_flag == INCREMENTAL_LOG)
-            config_backup_incr_log_compatibility_check();
-        if (g.backup_incr_flag == INCREMENTAL_BLOCK)
+        if (g.backup_incr)
             config_backup_incr_granularity();
         return;
     }
@@ -566,26 +559,14 @@ config_backup_incr(void)
      * Choose a type of incremental backup, where the log remove setting can eliminate incremental
      * backup based on log files.
      */
-    switch (mmrand(&g.extra_rnd, 1, 10)) {
-    case 1: /* 30% full backup only */
+    switch (mmrand(&g.extra_rnd, 1, 5)) {
+    case 1: /* 40% full backup only */
     case 2:
-    case 3:
         config_off(NULL, "backup.incremental");
         break;
-    case 4: /* 30% log based incremental */
+    case 3: /* 60% block based incremental */
+    case 4:
     case 5:
-    case 6:
-        if (!GV(LOGGING_REMOVE) || !config_explicit(NULL, "logging.remove")) {
-            if (GV(LOGGING_REMOVE))
-                config_off(NULL, "logging.remove");
-            config_single(NULL, "backup.incremental=log", false);
-            break;
-        }
-    /* FALLTHROUGH */
-    case 7: /* 40% block based incremental */
-    case 8:
-    case 9:
-    case 10:
         config_single(NULL, "backup.incremental=block", false);
         config_backup_incr_granularity();
         break;
@@ -929,61 +910,6 @@ config_compression(TABLE *table, const char *conf_name)
 }
 
 /*
- * config_directio --
- *     Direct I/O configuration.
- */
-static void
-config_directio(void)
-{
-    /*
-     * We don't roll the dice and set direct I/O, it has to be set explicitly. If there are any
-     * incompatible configurations set explicitly, turn off direct I/O, otherwise turn off the
-     * incompatible configurations.
-     */
-    if (!GV(DISK_DIRECT_IO))
-        return;
-    testutil_assert(config_explicit(NULL, "disk.direct_io") == true);
-
-#undef DIO_CHECK
-#define DIO_CHECK(name, flag)                                                       \
-    if (GV(flag)) {                                                                 \
-        if (config_explicit(NULL, name)) {                                          \
-            WARN("%s not supported with direct I/O, turning off direct I/O", name); \
-            config_off(NULL, "disk.direct_io");                                     \
-            return;                                                                 \
-        }                                                                           \
-        config_off(NULL, name);                                                     \
-    }
-
-    /*
-     * Direct I/O may not work with backups, doing copies through the buffer cache after configuring
-     * direct I/O in Linux won't work. If direct I/O is configured, turn off backups.
-     */
-    DIO_CHECK("backup", BACKUP);
-
-    /* Direct I/O may not work with imports for the same reason as for backups. */
-    DIO_CHECK("import", IMPORT);
-
-    /*
-     * Direct I/O may not work with mmap. Theoretically, Linux ignores direct I/O configurations in
-     * the presence of shared cache configurations (including mmap), but we've seen file corruption
-     * and it doesn't make much sense (the library disallows the combination).
-     */
-    DIO_CHECK("disk.mmap_all", DISK_MMAP_ALL);
-
-    /*
-     * Turn off all external programs. Direct I/O is really, really slow on some machines and it can
-     * take hours for a job to run. External programs don't have timers running so it looks like
-     * format just hung, and the 15-minute timeout isn't effective. We could play games to handle
-     * child process termination, but it's not worth the effort.
-     */
-    DIO_CHECK("ops.salvage", OPS_SALVAGE);
-
-    /* Direct I/O needs buffer alignment to be set automatically. */
-    DIO_CHECK("buffer_alignment", BUFFER_ALIGNMENT);
-}
-
-/*
  * config_encryption --
  *     Encryption configuration.
  */
@@ -1127,25 +1053,6 @@ config_in_memory_reset(void)
 }
 
 /*
- * config_backup_incr_log_compatibility_check --
- *     Backup incremental log compatibility check.
- */
-static void
-config_backup_incr_log_compatibility_check(void)
-{
-    /*
-     * Incremental backup using log files is incompatible with automatic log file removal. Disable
-     * logging removal if log incremental backup is set.
-     */
-    if (GV(LOGGING_REMOVE) && config_explicit(NULL, "logging.remove"))
-        WARN("%s",
-          "backup.incremental=log is incompatible with logging.remove, turning off "
-          "logging.remove");
-    if (GV(LOGGING_REMOVE))
-        config_off(NULL, "logging.remove");
-}
-
-/*
  * config_lsm_reset --
  *     LSM configuration review.
  */
@@ -1175,14 +1082,14 @@ config_lsm_reset(TABLE *table)
     config_off(NULL, "transaction.timestamps");
 
     /*
-     * LSM does not work with block-based incremental backup, change the incremental backup
+     * LSM does not work with block-based incremental backup, disable the incremental backup
      * mechanism if configured to be block based.
      */
     if (GV(BACKUP)) {
         if (config_explicit(NULL, "backup.incremental"))
             testutil_die(
               EINVAL, "LSM (currently) incompatible with incremental backup configurations");
-        config_single(NULL, "backup.incremental=log", false);
+        config_single(NULL, "backup.incremental=off", false);
     }
 }
 
@@ -2115,7 +2022,7 @@ config_single(TABLE *table, const char *s, bool explicit)
             equalp = "off";
 
         if (strncmp(s, "backup.incremental", strlen("backup.incremental")) == 0)
-            config_map_backup_incr(equalp, &g.backup_incr_flag);
+            config_map_backup_incr(equalp, &g.backup_incr);
         else if (strncmp(s, "checkpoint", strlen("checkpoint")) == 0)
             config_map_checkpoint(equalp, &g.checkpoint_config);
         else if (strncmp(s, "runs.source", strlen("runs.source")) == 0 &&
@@ -2288,17 +2195,18 @@ config_map_file_type(const char *s, u_int *vp)
 
 /*
  * config_map_backup_incr --
- *     Map a incremental backup configuration to a flag.
+ *     Map an incremental backup configuration to a flag.
  */
 static void
-config_map_backup_incr(const char *s, u_int *vp)
+config_map_backup_incr(const char *s, bool *vp)
 {
     if (strcmp(s, "block") == 0)
-        *vp = INCREMENTAL_BLOCK;
-    else if (strcmp(s, "log") == 0)
-        *vp = INCREMENTAL_LOG;
+        *vp = true;
     else if (strcmp(s, "off") == 0)
-        *vp = INCREMENTAL_OFF;
+        *vp = false;
+    /* Compatibility for old configurations. */
+    else if (strcmp(s, "log") == 0)
+        *vp = false;
     else
         testutil_die(EINVAL, "illegal incremental backup configuration: %s", s);
 }

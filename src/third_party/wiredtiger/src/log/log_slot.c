@@ -456,7 +456,6 @@ __wti_log_slot_init(WT_SESSION_IMPL *session, bool alloc)
     if (alloc) {
         log->slot_buf_size = (uint32_t)WT_MIN((size_t)log_mgr->file_max / 10, WT_LOG_SLOT_BUF_SIZE);
         for (i = 0; i < WT_SLOT_POOL; i++) {
-            F_SET(&log->slot_pool[i].slot_buf, WT_ITEM_ALIGNED);
             WT_ERR(__wt_buf_init(session, &log->slot_pool[i].slot_buf, log->slot_buf_size));
             F_SET_ATOMIC_16(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
         }

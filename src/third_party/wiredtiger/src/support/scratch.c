@@ -48,12 +48,8 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
      * This function is also used to ensure data is local to the buffer, check to see if we actually
      * need to grow anything.
      */
-    if (size > buf->memsize) {
-        if (F_ISSET(buf, WT_ITEM_ALIGNED))
-            WT_RET(__wt_realloc_aligned(session, &buf->memsize, size, &buf->mem));
-        else
-            WT_RET(__wt_realloc_noclear(session, &buf->memsize, size, &buf->mem));
-    }
+    if (size > buf->memsize)
+        WT_RET(__wt_realloc_noclear(session, &buf->memsize, size, &buf->mem));
 
     if (buf->data == NULL) {
         buf->data = buf->mem;
@@ -342,9 +338,6 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
         best = slot;
 
         WT_ERR(__wt_calloc_one(session, best));
-
-        /* Scratch buffers must be aligned. */
-        F_SET(*best, WT_ITEM_ALIGNED);
     }
 
     /* Grow the buffer as necessary and return. */

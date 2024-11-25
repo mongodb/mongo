@@ -29,26 +29,6 @@
 #include "wt_internal.h"
 
 /*
- * This LWN article (https://lwn.net/Articles/731706/) describes a potential problem when mmap is
- * used over a direct-access (DAX) file system. If a new block is created and then the file is
- * memory-mapped and the client writes to that block via mmap directly into storage (via DAX),
- * the file system may not know that the data was written, so it may not flush the metadata
- * prior to data being written. Therefore, the block may be reallocated or lost upon crash.
- *
- * WiredTiger currently disallows using the mmap option with the direct I/O option. We are relying
- * on the user correctly specifying the direct I/O option if they mount a file system as DAX. If
- * we did not wish to rely on the user supplying the correct flags, we have two options:
- *
- * (1) Use MAP_SYNC flag available on some versions of Linux. The downside is being Linux-specific
- *     and not extensively tested (this is a recent flag).
- *
- * (2) Always fsync when we unmap the file. In our implementation, if a session extends the file by
- *     writing a new block beyond the current file size, we always unmap the file and then re-map it
- *     before allowing any reads or writes via mmap into the new block. If we sync the file upon
- *     unmapping, we will be certain that the metadata is persistent.
- */
-
-/*
  * __posix_file_size --
  *     Get the size of a file in bytes, by file handle.
  */
@@ -543,12 +523,6 @@ __posix_file_read(
       "read: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT, file_handle->name, pfh->fd, offset,
       len);
 
-    /* Assert direct I/O is aligned and a multiple of the alignment. */
-    WT_ASSERT(session,
-      !pfh->direct_io || S2C(session)->buffer_alignment == 0 ||
-        (!((uintptr_t)buf & (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-          len >= S2C(session)->buffer_alignment && len % S2C(session)->buffer_alignment == 0));
-
     /* Break reads larger than 1GB into 1GB chunks. */
     nr = 0;
     for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
@@ -715,12 +689,6 @@ __posix_file_write(
     __wt_verbose_debug2(session, WT_VERB_WRITE,
       "write: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT, file_handle->name, pfh->fd,
       offset, len);
-
-    /* Assert direct I/O is aligned and a multiple of the alignment. */
-    WT_ASSERT(session,
-      !pfh->direct_io || S2C(session)->buffer_alignment == 0 ||
-        (!((uintptr_t)buf & (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-          len >= S2C(session)->buffer_alignment && len % S2C(session)->buffer_alignment == 0));
 
     /* Break writes larger than 1GB into 1GB chunks. */
     for (addr = buf; len > 0; addr += nw, len -= (size_t)nw, offset += nw) {
@@ -899,14 +867,6 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
      */
     f |= O_CLOEXEC;
 #endif
-#ifdef O_DIRECT
-    /* Direct I/O. */
-    if (LF_ISSET(WT_FS_OPEN_DIRECTIO)) {
-        f |= O_DIRECT;
-        pfh->direct_io = true;
-    } else
-        pfh->direct_io = false;
-#endif
 #ifdef O_NOATIME
     /* Avoid updating metadata for read-only workloads. */
     if (file_type == WT_FS_OPEN_FILE_TYPE_DATA)
@@ -926,11 +886,7 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
     /* Create/Open the file. */
     WT_SYSCALL_RETRY(((pfh->fd = open(name, f, mode)) == -1 ? -1 : 0), ret);
     if (ret != 0)
-        WT_ERR_MSG(session, ret,
-          pfh->direct_io ? "%s: handle-open: open: failed with direct I/O configured, some "
-                           "filesystem types do not support direct I/O" :
-                           "%s: handle-open: open",
-          name);
+        WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
 
 #ifdef __linux__
     /*
@@ -950,7 +906,7 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
      * If the user set an access pattern hint, call fadvise now. Ignore fadvise when doing direct
      * I/O, the kernel cache isn't interesting.
      */
-    if (!pfh->direct_io && file_type == WT_FS_OPEN_FILE_TYPE_DATA &&
+    if (file_type == WT_FS_OPEN_FILE_TYPE_DATA &&
       LF_ISSET(WT_FS_OPEN_ACCESS_RAND | WT_FS_OPEN_ACCESS_SEQ)) {
         advise_flag = 0;
         if (LF_ISSET(WT_FS_OPEN_ACCESS_RAND))
@@ -988,11 +944,8 @@ directory_open:
 
     file_handle->close = __posix_file_close;
 #if defined(HAVE_POSIX_FADVISE)
-    /*
-     * Ignore fadvise when doing direct I/O, the kernel cache isn't interesting.
-     */
-    if (!pfh->direct_io)
-        file_handle->fh_advise = __posix_file_advise;
+
+    file_handle->fh_advise = __posix_file_advise;
 #endif
     file_handle->fh_extend = __wti_posix_file_extend;
     file_handle->fh_lock = __posix_file_lock;

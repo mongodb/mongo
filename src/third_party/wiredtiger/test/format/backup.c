@@ -361,7 +361,7 @@ restore_backup_info(WT_SESSION *session, ACTIVE_FILES *active)
     uint32_t i;
     char buf[512], *path;
 
-    testutil_assert(g.backup_incr_flag == INCREMENTAL_BLOCK);
+    testutil_assert(g.backup_incr);
     len = strlen(g.home) + strlen(BACKUP_INFO_FILE) + 2;
     path = dmalloc(len);
     testutil_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE);
@@ -435,7 +435,7 @@ save_backup_info(ACTIVE_FILES *active, uint64_t id)
     uint32_t i;
     char *from_path, *to_path;
 
-    if (g.backup_incr_flag != INCREMENTAL_BLOCK)
+    if (!g.backup_incr)
         return;
     len = strlen(g.home) + strlen(BACKUP_INFO_FILE_TMP) + 2;
     from_path = dmalloc(len);
@@ -526,8 +526,7 @@ backup(void *arg)
      * that we can take an incremental backup and use the older id as a source identifier. We force
      * that only if the restore function was successful in restoring the backup information.
      */
-    if (g.reopen && g.backup_incr_flag == INCREMENTAL_BLOCK &&
-      restore_backup_info(session, &active[0]) == RESTORE_SUCCESS) {
+    if (g.reopen && g.backup_incr && restore_backup_info(session, &active[0]) == RESTORE_SUCCESS) {
         incr_full = false;
         full = false;
         incremental = 1;
@@ -557,7 +556,7 @@ backup(void *arg)
             break;
         }
 
-        if (g.backup_incr_flag == INCREMENTAL_BLOCK) {
+        if (g.backup_incr) {
             /*
              * If we're doing a full backup as the start of the incremental backup, only send in an
              * identifier for this one. Also set the block granularity.
@@ -590,18 +589,6 @@ backup(void *arg)
             config = cfg;
             /* Free up the old active file list we're going to overwrite. */
             active_files_free(active_now);
-        } else if (GV(LOGGING) && g.backup_incr_flag == INCREMENTAL_LOG) {
-            if (incr_full) {
-                config = NULL;
-                full = true;
-                incr_full = false;
-            } else {
-                testutil_snprintf(cfg, sizeof(cfg), "target=(\"log:\")");
-                config = cfg;
-                full = false;
-                /* Restart a full incremental every once in a while. */
-                incr_full = mmrand(&g.extra_rnd, 1, 8) == 1;
-            }
         } else {
             config = NULL;
             full = true;
@@ -639,7 +626,7 @@ backup(void *arg)
         while ((ret = backup_cursor->next(backup_cursor)) == 0) {
             testutil_check(backup_cursor->get_key(backup_cursor, &key));
             trace_msg(session, "Backup #%u copy file %s start", counter, key);
-            if (g.backup_incr_flag == INCREMENTAL_BLOCK) {
+            if (g.backup_incr) {
                 if (full)
                     testutil_copy_file(session, key);
                 else
@@ -652,10 +639,6 @@ backup(void *arg)
         }
         if (ret != WT_NOTFOUND)
             testutil_die(ret, "backup-cursor");
-
-        /* After a log-based incremental backup, truncate the log files. */
-        if (g.backup_incr_flag == INCREMENTAL_LOG)
-            testutil_check(session->truncate(session, "log:", backup_cursor, NULL, NULL));
 
         testutil_check(backup_cursor->close(backup_cursor));
         if (config == NULL)
@@ -678,9 +661,7 @@ backup(void *arg)
          */
         if (full) {
             incremental = 1;
-            if (g.backup_incr_flag == INCREMENTAL_LOG)
-                incremental = GV(LOGGING_REMOVE) ? 1 : mmrand(&g.extra_rnd, 1, 8);
-            else if (g.backup_incr_flag == INCREMENTAL_BLOCK)
+            if (g.backup_incr)
                 incremental = mmrand(&g.extra_rnd, 1, 8);
         }
         if (--incremental == 0) {

@@ -275,6 +275,7 @@ err:
 static int
 __metadata_load_bulk(WT_SESSION_IMPL *session)
 {
+    WT_CONFIG_ITEM cval;
     WT_CURSOR *cursor;
     WT_DECL_RET;
     uint32_t allocsize;
@@ -303,7 +304,9 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
          */
         WT_ERR(cursor->get_value(cursor, &value));
         filecfg[1] = value;
-        WT_ERR(__wt_direct_io_size_check(session, filecfg, "allocation_size", &allocsize));
+        WT_ERR(__wt_config_gets(session, filecfg, "allocation_size", &cval));
+        allocsize = (uint32_t)cval.val;
+
         WT_ERR(__wt_block_manager_create(session, key, allocsize));
     }
     WT_ERR_NOTFOUND_OK(ret, false);
@@ -476,7 +479,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
     WT_DECL_RET;
     uint64_t i;
     char *metaconf, *unused_value;
-    bool exist_backup, exist_incr, exist_isrc, exist_turtle;
+    bool exist_backup, exist_turtle;
     bool load, load_turtle, validate_turtle;
 
     conn = S2C(session);
@@ -510,8 +513,6 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
      * turtle file and an incremental backup file, that is an error. Otherwise, if there's already a
      * turtle file, we're done.
      */
-    WT_ERR(__wt_fs_exist(session, WT_LOGINCR_BACKUP, &exist_incr));
-    WT_ERR(__wt_fs_exist(session, WT_LOGINCR_SRC, &exist_isrc));
     WT_ERR(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist_backup));
     WT_ERR(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist_turtle));
 
@@ -537,12 +538,6 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
             validate_turtle = true;
 
         /*
-         * We need to detect the difference between a source database that may have crashed with an
-         * incremental backup file and a destination database that incorrectly ran recovery.
-         */
-        if (exist_incr && !exist_isrc)
-            WT_ERR_MSG(session, EINVAL, "Incremental backup after running recovery is not allowed");
-        /*
          * If we have a backup file and metadata and turtle files, we want to recreate the metadata
          * from the backup.
          */
@@ -558,9 +553,6 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
     } else
         load = true;
     if (load) {
-        if (exist_incr)
-            F_SET(conn, WT_CONN_WAS_BACKUP);
-
         /*
          * Verifying the metadata is incompatible with restarting from a backup because the verify
          * call will rewrite the metadata's checkpoint and could lead to skipping recovery. Test

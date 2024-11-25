@@ -203,50 +203,6 @@ of cursor has its own \c next method that causes it to return information about 
 of this file that need to be copied.  The code to implement incremental cursors
 is in \c src/cursor/cur_backup_incr.c .
 
-@section arch_cursor_join Join cursors
-
-Join cursors implement a join mechanism for WiredTiger.  The idea is that joins can be configured
-by opening a special join cursor on a table, and attaching the table's index cursors to it, to
-return rows that match a filter, like:
-```
-(row.price > 100 and row.price <= 200) and row.in_stock < 10
-```
-Building up the conditions essentially creates a tree that is used for evaluation.  This is stored
-in \c WT_CURSOR_JOIN, and is returned as the cursor object.  Entries in the tree representing
-an index's participation in one clause are stored in \c WT_CURSOR_JOIN_ENTRY objects.  \c WT_CURSOR_JOIN and
-\c WT_CURSOR_JOIN_ENTRY objects can be composed in a hierarchical manner, representing the shape of the tree representing
-the query.  These two structures are somewhat static, being created when the join is created.
-
-The join cursor contains a pointer to a \c WT_CURSOR_JOIN_ITER, which in some sense encodes the "position"
-of the cursor.  To get the next row that satisfies a join requires that multiple cursors be iterated.
-Generally, the "left-most" index cursor is iterated first.  Using the example above, the \c price
-index would be iterated, skipping over any entries that did not satisfy `(row.price > 100 and row.price <= 200)`.
-Then other cursors are checked to see that any other conditions are satisfied.
-The join may be configured to use Bloom filters, and when that occurs,
-\c WT_CURSOR_JOIN_ENTRIES contain the bloom filter for individual index checks.  This allows checks
-to occur quickly, at the expense of an initialization that occurs when the cursor begins iteration.
-
-During a join cursor iteration, multiple \c WT_CURSOR_JOIN_ITER objects may be created.
-There is one \c WT_CURSOR_JOIN_ITER object corresponding to each level of nesting (queries can have
-arbitrary nesting of \c AND/OR).  Each \c WT_CURSOR_JOIN_ITER allows the question to be asked: does
-the current position of the main table cursor satisfy the join conditions for this part of the join tree?
-
-Part of the reason for this dynamic structure is that disjunctions may require some dynamic action.
-Consider
-```
-(row.price > 100 and row.in_stock < 10) .... or (row.aisle == 12 and row.on_sale == 1)
-```
-The last part of the query (being part of an OR clause) will be first executed after a number of items
-are returned that satisfy the first part of the query.  If the join cursor is closed before then,
-it would be a waste to have opened subordinate cursors on the \c aisle and \c on_sale indices, and
-potentially computed bloom filters, etc.
-
-When positioned on an entry that represents a nested join, a new child \c WT_CURSOR_JOIN_ITER is
-created that will be bound to the nested \c WT_CURSOR_JOIN. That iterator is then used to generate candidate
-primary keys. When its iteration is completed, that iterator is destroyed and the parent iterator
-advances to the next entry. Thus, depending on how deeply joins are nested, a similarly deep
-stack of iterators is created.
-
 @section arch_cursor_duplicate Duplicating cursors
 
 Cursors may be duplicated, this occurs by passing a cursor to be duplicated as part of the

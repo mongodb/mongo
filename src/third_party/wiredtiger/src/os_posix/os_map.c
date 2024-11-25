@@ -28,13 +28,6 @@ __wti_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void **mapped_region
     pfh = (WT_FILE_HANDLE_POSIX *)fh;
 
     /*
-     * Mapping isn't possible if direct I/O configured for the file, the Linux open(2) documentation
-     * says applications should avoid mixing mmap(2) of files with direct I/O to the same files.
-     */
-    if (pfh->direct_io)
-        return (__wt_set_return(session, ENOTSUP));
-
-    /*
      * There's no locking here to prevent the underlying file from changing underneath us, our
      * caller needs to ensure consistency of the mapped region vs. any other file activity.
      */

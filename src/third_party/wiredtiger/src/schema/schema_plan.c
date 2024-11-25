@@ -228,13 +228,8 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns,
                 WT_RET(__wt_buf_catfmt(session, plan, "%c", WT_PROJ_REUSE));
             current_col = col + 1;
         }
-        /*
-         * We may fail to find a column if it is a custom extractor. In that case, treat it as the
-         * first value column: we only ever use such plans to extract the primary key from the
-         * index.
-         */
-        if (ret == WT_NOTFOUND)
-            WT_RET(__wt_buf_catfmt(session, plan, "0%c%c", WT_PROJ_VALUE, WT_PROJ_NEXT));
+
+        WT_RET_NOTFOUND_OK(ret);
     }
     WT_RET_TEST(ret != WT_NOTFOUND, ret);
 

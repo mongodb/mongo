@@ -97,7 +97,6 @@ src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_hs.c
 src/cursor/cur_index.c
-src/cursor/cur_join.c
 src/cursor/cur_metadata.c
 src/cursor/cur_stat.c
 src/cursor/cur_std.c
@@ -199,7 +198,6 @@ src/schema/schema_list.c
 src/schema/schema_open.c
 src/schema/schema_plan.c
 src/schema/schema_project.c
-src/schema/schema_rename.c
 src/schema/schema_stat.c
 src/schema/schema_truncate.c
 src/schema/schema_util.c

@@ -72,7 +72,6 @@ struct __wt_data_source;    typedef struct __wt_data_source WT_DATA_SOURCE;
 struct __wt_encryptor;      typedef struct __wt_encryptor WT_ENCRYPTOR;
 struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
 struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
-struct __wt_extractor;      typedef struct __wt_extractor WT_EXTRACTOR;
 struct __wt_file_handle;    typedef struct __wt_file_handle WT_FILE_HANDLE;
 struct __wt_file_system;    typedef struct __wt_file_system WT_FILE_SYSTEM;
 struct __wt_item;       typedef struct __wt_item WT_ITEM;
@@ -116,8 +115,7 @@ struct __wt_item {
 
     /*! Object flags (internal use). */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_ITEM_ALIGNED 0x1u
-#define WT_ITEM_INUSE   0x2u
+#define WT_ITEM_INUSE   0x1u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 #endif
@@ -783,18 +781,17 @@ struct __wt_cursor {
 #define WT_CURSTD_HS_READ_ALL       0x000100000ull
 #define WT_CURSTD_HS_READ_COMMITTED 0x000200000ull
 #define WT_CURSTD_IGNORE_TOMBSTONE  0x000400000ull
-#define WT_CURSTD_JOINED        0x000800000ull
-#define WT_CURSTD_KEY_EXT       0x001000000ull /* Key points out of tree. */
-#define WT_CURSTD_KEY_INT       0x002000000ull /* Key points into tree. */
-#define WT_CURSTD_KEY_ONLY      0x004000000ull
-#define WT_CURSTD_META_INUSE        0x008000000ull
-#define WT_CURSTD_OPEN          0x010000000ull
-#define WT_CURSTD_OVERWRITE     0x020000000ull
-#define WT_CURSTD_RAW           0x040000000ull
-#define WT_CURSTD_RAW_SEARCH        0x080000000ull
-#define WT_CURSTD_VALUE_EXT     0x100000000ull /* Value points out of tree. */
-#define WT_CURSTD_VALUE_INT     0x200000000ull /* Value points into tree. */
-#define WT_CURSTD_VERSION_CURSOR    0x400000000ull /* Version cursor. */
+#define WT_CURSTD_KEY_EXT       0x000800000ull /* Key points out of tree. */
+#define WT_CURSTD_KEY_INT       0x001000000ull /* Key points into tree. */
+#define WT_CURSTD_KEY_ONLY      0x002000000ull
+#define WT_CURSTD_META_INUSE        0x004000000ull
+#define WT_CURSTD_OPEN          0x008000000ull
+#define WT_CURSTD_OVERWRITE     0x010000000ull
+#define WT_CURSTD_RAW           0x020000000ull
+#define WT_CURSTD_RAW_SEARCH        0x040000000ull
+#define WT_CURSTD_VALUE_EXT     0x080000000ull /* Value points out of tree. */
+#define WT_CURSTD_VALUE_INT     0x100000000ull /* Value points into tree. */
+#define WT_CURSTD_VERSION_CURSOR    0x200000000ull /* Version cursor. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
 #define WT_CURSTD_KEY_SET   (WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define WT_CURSTD_VALUE_SET (WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
@@ -1220,8 +1217,6 @@ struct __wt_session {
      * @config{exclusive, fail if the object exists.  When false (the default)\, if the object
      * exists\, check that its settings match the specified configuration., a boolean flag; default
      * \c false.}
-     * @config{extractor, configure a custom extractor for indices.  Permitted values are \c "none"
-     * or an extractor name created with WT_CONNECTION::add_extractor., a string; default \c none.}
      * @config{format, the file format., a string\, chosen from the following options: \c "btree";
      * default \c btree.}
      * @config{ignore_in_memory_cache_size, allow update and insert operations to proceed even if
@@ -1460,67 +1455,6 @@ struct __wt_session {
         const char *name, const char *config);
 
     /*!
-     * Join a join cursor with a reference cursor.
-     *
-     * @snippet ex_schema.c Join cursors
-     *
-     * @param session the session handle
-     * @param join_cursor a cursor that was opened using a
-     * \c "join:" URI. It may not have been used for any operations
-     * other than other join calls.
-     * @param ref_cursor an index cursor having the same base table
-     * as the join_cursor, or a table cursor open on the same base table,
-     * or another join cursor. Unless the ref_cursor is another join
-     * cursor, it must be positioned.
-     *
-     * The ref_cursor limits the results seen by iterating the
-     * join_cursor to table items referred to by the key in this
-     * index. The set of keys referred to is modified by the compare
-     * config option.
-     *
-     * Multiple join calls builds up a set of ref_cursors, and
-     * by default, the results seen by iteration are the intersection
-     * of the cursor ranges participating in the join. When configured
-     * with \c "operation=or", the results seen are the union of
-     * the participating cursor ranges.
-     *
-     * After the join call completes, the ref_cursor cursor may not be
-     * used for any purpose other than get_key and get_value. Any other
-     * cursor method (e.g. next, prev,close) will fail. When the
-     * join_cursor is closed, the ref_cursor is made available for
-     * general use again. The application should close ref_cursor when
-     * finished with it, although not before the join_cursor is closed.
-     *
-     * @configstart{WT_SESSION.join, see dist/api_data.py}
-     * @config{bloom_bit_count, the number of bits used per item for the Bloom filter., an integer
-     * between \c 2 and \c 1000; default \c 16.}
-     * @config{bloom_false_positives, return all values that pass the Bloom filter\, without
-     * eliminating any false positives., a boolean flag; default \c false.}
-     * @config{bloom_hash_count, the number of hash values per item for the Bloom filter., an
-     * integer between \c 2 and \c 100; default \c 8.}
-     * @config{compare, modifies the set of items to be returned so that the index key satisfies the
-     * given comparison relative to the key set in this cursor., a string\, chosen from the
-     * following options: \c "eq"\, \c "ge"\, \c "gt"\, \c "le"\, \c "lt"; default \c "eq".}
-     * @config{count, set an approximate count of the elements that would be included in the join.
-     * This is used in sizing the Bloom filter\, and also influences evaluation order for cursors in
-     * the join.  When the count is equal for multiple Bloom filters in a composition of joins\, the
-     * Bloom filter may be shared., an integer; default \c 0.}
-     * @config{operation, the operation applied between this and other joined cursors.  When
-     * "operation=and" is specified\, all the conditions implied by joins must be satisfied for an
-     * entry to be returned by the join cursor; when "operation=or" is specified\, only one must be
-     * satisfied.  All cursors joined to a join cursor must have matching operations., a string\,
-     * chosen from the following options: \c "and"\, \c "or"; default \c "and".}
-     * @config{strategy, when set to \c bloom\, a Bloom filter is created and populated for this
-     * index.  This has an up front cost but may reduce the number of accesses to the main table
-     * when iterating the joined cursor.  The \c bloom setting requires that \c count be set., a
-     * string\, chosen from the following options: \c "bloom"\, \c "default"; default empty.}
-     * @configend
-     * @errors
-     */
-    int __F(join)(WT_SESSION *session, WT_CURSOR *join_cursor,
-        WT_CURSOR *ref_cursor, const char *config);
-
-    /*!
      * Flush the log.
      *
      * WT_SESSION::log_flush will fail if logging is not enabled.
@@ -1546,24 +1480,6 @@ struct __wt_session {
      * @errors
      */
     int __F(log_printf)(WT_SESSION *session, const char *format, ...);
-
-    /*!
-     * Rename an object.
-     *
-     * @not_transactional
-     *
-     * @snippet ex_all.c Rename a table
-     *
-     * @exclusive
-     *
-     * @param session the session handle
-     * @param uri the current URI of the object, such as \c "table:old"
-     * @param newuri the new URI of the object, such as \c "table:new"
-     * @configempty{WT_SESSION.rename, see dist/api_data.py}
-     * @ebusy_errors
-     */
-    int __F(rename)(WT_SESSION *session,
-        const char *uri, const char *newuri, const char *config);
 
     /*!
      * Reset the session handle.
@@ -1637,11 +1553,6 @@ struct __wt_session {
      * Any specified cursors end with no position, and subsequent calls to
      * the WT_CURSOR::next (WT_CURSOR::prev) method will iterate from the
      * beginning (end) of the table.
-     *
-     * Example: truncate a backup cursor.  This operation removes all log files that
-     * have been returned by the backup cursor.  It can be used to remove log
-     * files after copying them during @ref backup_incremental.
-     * @snippet ex_backup.c Truncate a backup cursor
      *
      * @param session the session handle
      * @param name the URI of the table or file to truncate, or \c "log:"
@@ -2015,9 +1926,6 @@ struct __wt_session {
      * \c false.}
      * @config{name, if set\, specify a name for the checkpoint (note that checkpoints including LSM
      * trees may not be named)., a string; default empty.}
-     * @config{target, if non-empty\, checkpoint the list of objects.  Checkpointing a list of
-     * objects separately from a database-wide checkpoint can lead to data inconsistencies; see @ref
-     * checkpoint_target for more information., a list of strings; default empty.}
      * @config{use_timestamp, if true (the default)\, create the checkpoint as of the last stable
      * timestamp if timestamps are in use\, or with all committed updates if there is no stable
      * timestamp set.  If false\, always generate a checkpoint with all committed updates\, ignoring
@@ -2855,24 +2763,6 @@ struct __wt_connection {
         const char *name, WT_ENCRYPTOR *encryptor, const char *config);
 
     /*!
-     * Add a custom extractor for index keys or column groups.
-     *
-     * The application must first implement the WT_EXTRACTOR interface and
-     * then register the implementation with WiredTiger:
-     *
-     * @snippet ex_all.c WT_EXTRACTOR register
-     *
-     * @param connection the connection handle
-     * @param name the name of the extractor to be used in calls to
-     *  WT_SESSION::create, may not be \c "none"
-     * @param extractor the application-supplied extractor
-     * @configempty{WT_CONNECTION.add_extractor, see dist/api_data.py}
-     * @errors
-     */
-    int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
-        WT_EXTRACTOR *extractor, const char *config);
-
-    /*!
      * Configure a custom file system.
      *
      * This method can only be called from an early loaded extension
@@ -2988,12 +2878,6 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a
  * string; default empty.}
  * @config{ ),,}
- * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for I/O. The default
- * value of -1 indicates a platform-specific alignment value should be used (4KB on Linux systems
- * when direct I/O is configured\, zero elsewhere). If the configured alignment is larger than
- * default or configured object page sizes\, file allocation and page sizes are silently increased
- * to the buffer alignment size.  Requires the \c posix_memalign API. See @ref
- * tuning_system_buffer_cache_direct_io., an integer between \c -1 and \c 1MB; default \c -1.}
  * @config{builtin_extension_config, A structure where the keys are the names of builtin extensions
  * and the values are passed to WT_CONNECTION::load_extension as the \c config parameter (for
  * example\, <code>builtin_extension_config={zlib={compression_level=3}}</code>)., a string; default
@@ -3142,15 +3026,6 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty page evictions
  * through forcing update restore eviction., a boolean flag; default \c false.}
  * @config{ ),,}
- * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
- * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring
- * \c direct_io requires care; see @ref tuning_system_buffer_cache_direct_io for important warnings.
- * Including \c "data" will cause WiredTiger data files\, including WiredTiger internal data files\,
- * to use direct I/O; including \c "log" will cause WiredTiger log files to use direct I/O;
- * including \c "checkpoint" will cause WiredTiger data files opened using a (read-only) checkpoint
- * cursor to use direct I/O. \c direct_io should be combined with \c write_through to get the
- * equivalent of \c O_DIRECT on Windows., a list\, with values chosen from the following options: \c
- * "checkpoint"\, \c "data"\, \c "log"; default empty.}
  * @config{encryption = (, configure an encryptor for system wide metadata and logs.  If a system
  * wide encryptor is set\, it is also used for encrypting data files and tables\, unless encryption
  * configuration is explicitly set for them when they are created with WT_SESSION::create., a set of
@@ -3351,8 +3226,8 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{mmap, Use memory mapping when accessing files in a read-only mode., a boolean flag;
  * default \c true.}
- * @config{mmap_all, Use memory mapping to read and write all data files.  May not be configured
- * with direct I/O., a boolean flag; default \c false.}
+ * @config{mmap_all, Use memory mapping to read and write all data files., a boolean flag; default
+ * \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically start an RPC server
  * for primary processes and use RPC for secondary processes). <b>Not yet supported in
  * WiredTiger</b>., a boolean flag; default \c false.}
@@ -3472,12 +3347,10 @@ struct __wt_connection {
  * WiredTiger metadata., a boolean flag; default \c false.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files.  Ignored on
  * non-Windows systems.  Options are given as a list\, such as <code>"write_through=[data]"</code>.
- * Configuring \c write_through requires care; see @ref tuning_system_buffer_cache_direct_io for
- * important warnings.  Including \c "data" will cause WiredTiger data files to write through
- * cache\, including \c "log" will cause WiredTiger log files to write through cache.  \c
- * write_through should be combined with \c direct_io to get the equivalent of POSIX \c O_DIRECT on
- * Windows., a list\, with values chosen from the following options: \c "data"\, \c "log"; default
- * empty.}
+ * Configuring \c write_through requires care; see @ref write_through Including \c "data" will cause
+ * WiredTiger data files to write through cache\, including \c "log" will cause WiredTiger log files
+ * to write through cache., a list\, with values chosen from the following options: \c "data"\, \c
+ * "log"; default empty.}
  * @configend
  * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
  * appear in the WiredTiger home directory, they are read for configuration
@@ -4244,7 +4117,7 @@ struct __wt_collator {
 
     /*!
      * If non-NULL a callback performed when the data source is closed
-     * for customized extractors otherwise when the database is closed.
+     * for customized collators otherwise when the database is closed.
      *
      * The WT_COLLATOR::terminate callback is intended to allow cleanup;
      * the handle will not be subsequently accessed by WiredTiger.
@@ -4703,60 +4576,6 @@ struct __wt_encryptor {
     int (*terminate)(WT_ENCRYPTOR *encryptor, WT_SESSION *session);
 };
 
-/*!
- * The interface implemented by applications to provide custom extraction of
- * index keys or column group values.
- *
- * Applications register implementations with WiredTiger by calling
- * WT_CONNECTION::add_extractor.  See @ref custom_extractors for more
- * information.
- *
- * @snippet ex_all.c WT_EXTRACTOR register
- */
-struct __wt_extractor {
-    /*!
-     * Callback to extract a value for an index or column group.
-     *
-     * @errors
-     *
-     * @snippet ex_all.c WT_EXTRACTOR
-     *
-     * @param extractor the WT_EXTRACTOR implementation
-     * @param session the current WiredTiger session
-     * @param key the table key in raw format, see @ref cursor_raw for
-     *  details
-     * @param value the table value in raw format, see @ref cursor_raw for
-     *  details
-     * @param[out] result_cursor the method should call WT_CURSOR::set_key
-     *  and WT_CURSOR::insert on this cursor to return a key.  The \c
-     *  key_format of the cursor will match that passed to
-     *  WT_SESSION::create for the index.  Multiple index keys can be
-     *  created for each record by calling WT_CURSOR::insert multiple
-     *  times.
-     */
-    int (*extract)(WT_EXTRACTOR *extractor, WT_SESSION *session,
-        const WT_ITEM *key, const WT_ITEM *value,
-        WT_CURSOR *result_cursor);
-
-    /*!
-     * If non-NULL, this callback is called to customize the extractor for
-     * each index.  If the callback returns a non-NULL extractor, that
-     * instance is used instead of this one for all comparisons.
-     */
-    int (*customize)(WT_EXTRACTOR *extractor, WT_SESSION *session,
-        const char *uri, WT_CONFIG_ITEM *appcfg, WT_EXTRACTOR **customp);
-
-    /*!
-     * If non-NULL a callback performed when the index or column group
-     * is closed for customized extractors otherwise when the database
-     * is closed.
-     *
-     * The WT_EXTRACTOR::terminate callback is intended to allow cleanup;
-     * the handle will not be subsequently accessed by WiredTiger.
-     */
-    int (*terminate)(WT_EXTRACTOR *extractor, WT_SESSION *session);
-};
-
 /*! WT_FILE_SYSTEM::open_file file types */
 typedef enum {
     WT_FS_OPEN_FILE_TYPE_CHECKPOINT,/*!< open a data file checkpoint */
@@ -4773,8 +4592,6 @@ typedef enum {
 #define WT_FS_OPEN_ACCESS_SEQ   0x0
 /*! WT_FILE_SYSTEM::open_file flags: create if does not exist */
 #define WT_FS_OPEN_CREATE   0x0
-/*! WT_FILE_SYSTEM::open_file flags: direct I/O requested */
-#define WT_FS_OPEN_DIRECTIO 0x0
 /*! WT_FILE_SYSTEM::open_file flags: file creation must be durable */
 #define WT_FS_OPEN_DURABLE  0x0
 /*!
@@ -4791,15 +4608,14 @@ typedef enum {
 #define WT_FS_DURABLE       0x0
 #else
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_FS_OPEN_ACCESS_RAND  0x001u
-#define WT_FS_OPEN_ACCESS_SEQ   0x002u
-#define WT_FS_OPEN_CREATE   0x004u
-#define WT_FS_OPEN_DIRECTIO 0x008u
-#define WT_FS_OPEN_DURABLE  0x010u
-#define WT_FS_OPEN_EXCLUSIVE    0x020u
-#define WT_FS_OPEN_FIXED    0x040u   /* Path not home relative (internal) */
-#define WT_FS_OPEN_FORCE_MMAP 0x080u
-#define WT_FS_OPEN_READONLY 0x100u
+#define WT_FS_OPEN_ACCESS_RAND  0x01u
+#define WT_FS_OPEN_ACCESS_SEQ   0x02u
+#define WT_FS_OPEN_CREATE   0x04u
+#define WT_FS_OPEN_DURABLE  0x08u
+#define WT_FS_OPEN_EXCLUSIVE    0x10u
+#define WT_FS_OPEN_FIXED    0x20u   /* Path not home relative (internal) */
+#define WT_FS_OPEN_FORCE_MMAP 0x40u
+#define WT_FS_OPEN_READONLY 0x80u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
@@ -4898,7 +4714,7 @@ struct __wt_file_system {
      *    The file type is provided to allow optimization for different file
      *    access patterns.
      * @param flags flags indicating how to open the file, one or more of
-     *    ::WT_FS_OPEN_CREATE, ::WT_FS_OPEN_DIRECTIO, ::WT_FS_OPEN_DURABLE,
+     *    ::WT_FS_OPEN_CREATE, ::, ::WT_FS_OPEN_DURABLE,
      *    ::WT_FS_OPEN_EXCLUSIVE or ::WT_FS_OPEN_READONLY.
      * @param[out] file_handlep the handle to the newly opened file. File
      *    system implementations must allocate memory for the handle and
@@ -7002,230 +6818,226 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1623
 /*! session: table drop successful calls */
 #define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1624
-/*! session: table rename failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1625
-/*! session: table rename successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1626
 /*! session: table salvage failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1627
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1625
 /*! session: table salvage successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1628
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1626
 /*! session: table truncate failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1629
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1627
 /*! session: table truncate successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1630
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1628
 /*! session: table verify failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1631
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1629
 /*! session: table verify successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1632
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1630
 /*! session: tiered operations dequeued and processed */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_DEQUEUED		1633
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_DEQUEUED		1631
 /*! session: tiered operations removed without processing */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_REMOVED		1634
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_REMOVED		1632
 /*! session: tiered operations scheduled */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_CREATED		1635
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_CREATED		1633
 /*! session: tiered storage local retention time (secs) */
-#define	WT_STAT_CONN_TIERED_RETENTION			1636
+#define	WT_STAT_CONN_TIERED_RETENTION			1634
 /*! thread-state: active filesystem fsync calls */
-#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1637
+#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1635
 /*! thread-state: active filesystem read calls */
-#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1638
+#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1636
 /*! thread-state: active filesystem write calls */
-#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1639
+#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1637
 /*! thread-yield: application thread operations waiting for cache */
-#define	WT_STAT_CONN_APPLICATION_CACHE_OPS		1640
+#define	WT_STAT_CONN_APPLICATION_CACHE_OPS		1638
 /*! thread-yield: application thread snapshot refreshed for eviction */
-#define	WT_STAT_CONN_APPLICATION_EVICT_SNAPSHOT_REFRESHED	1641
+#define	WT_STAT_CONN_APPLICATION_EVICT_SNAPSHOT_REFRESHED	1639
 /*! thread-yield: application thread time waiting for cache (usecs) */
-#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1642
+#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1640
 /*!
  * thread-yield: connection close blocked waiting for transaction state
  * stabilization
  */
-#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1643
+#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1641
 /*! thread-yield: connection close yielded for lsm manager shutdown */
-#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1644
+#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1642
 /*! thread-yield: data handle lock yielded */
-#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1645
+#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1643
 /*!
  * thread-yield: get reference for page index and slot time sleeping
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1646
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1644
 /*! thread-yield: page access yielded due to prepare state change */
-#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1647
+#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1645
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1648
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1646
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1649
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1647
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1650
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1648
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1651
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1649
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1652
+#define	WT_STAT_CONN_PAGE_SLEEP				1650
 /*!
  * thread-yield: page delete rollback time sleeping for state change
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1653
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1651
 /*! thread-yield: page reconciliation yielded due to child modification */
-#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1654
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1652
 /*! transaction: Number of prepared updates */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES		1655
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES		1653
 /*! transaction: Number of prepared updates committed */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_COMMITTED	1656
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_COMMITTED	1654
 /*! transaction: Number of prepared updates repeated on the same key */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_KEY_REPEATED	1657
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_KEY_REPEATED	1655
 /*! transaction: Number of prepared updates rolled back */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_ROLLEDBACK	1658
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_ROLLEDBACK	1656
 /*!
  * transaction: a reader raced with a prepared transaction commit and
  * skipped an update or updates
  */
-#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_COMMIT	1659
+#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_COMMIT	1657
 /*! transaction: number of times overflow removed value is read */
-#define	WT_STAT_CONN_TXN_READ_OVERFLOW_REMOVE		1660
+#define	WT_STAT_CONN_TXN_READ_OVERFLOW_REMOVE		1658
 /*! transaction: oldest pinned transaction ID rolled back for eviction */
-#define	WT_STAT_CONN_TXN_ROLLBACK_OLDEST_PINNED		1661
+#define	WT_STAT_CONN_TXN_ROLLBACK_OLDEST_PINNED		1659
 /*! transaction: prepared transactions */
-#define	WT_STAT_CONN_TXN_PREPARE			1662
+#define	WT_STAT_CONN_TXN_PREPARE			1660
 /*! transaction: prepared transactions committed */
-#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1663
+#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1661
 /*! transaction: prepared transactions currently active */
-#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1664
+#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1662
 /*! transaction: prepared transactions rolled back */
-#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1665
+#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1663
 /*! transaction: query timestamp calls */
-#define	WT_STAT_CONN_TXN_QUERY_TS			1666
+#define	WT_STAT_CONN_TXN_QUERY_TS			1664
 /*! transaction: race to read prepared update retry */
-#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_UPDATE	1667
+#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_UPDATE	1665
 /*! transaction: rollback to stable calls */
-#define	WT_STAT_CONN_TXN_RTS				1668
+#define	WT_STAT_CONN_TXN_RTS				1666
 /*!
  * transaction: rollback to stable history store keys that would have
  * been swept in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS_DRYRUN	1669
+#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS_DRYRUN	1667
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1670
+#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1668
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1671
+#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1669
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1672
+#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1670
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1673
+#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1671
 /*!
  * transaction: rollback to stable keys that would have been removed in
  * non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED_DRYRUN	1674
+#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED_DRYRUN	1672
 /*!
  * transaction: rollback to stable keys that would have been restored in
  * non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED_DRYRUN	1675
+#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED_DRYRUN	1673
 /*! transaction: rollback to stable pages visited */
-#define	WT_STAT_CONN_TXN_RTS_PAGES_VISITED		1676
+#define	WT_STAT_CONN_TXN_RTS_PAGES_VISITED		1674
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1677
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1675
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1678
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1676
 /*! transaction: rollback to stable skipping delete rle */
-#define	WT_STAT_CONN_TXN_RTS_DELETE_RLE_SKIPPED		1679
+#define	WT_STAT_CONN_TXN_RTS_DELETE_RLE_SKIPPED		1677
 /*! transaction: rollback to stable skipping stable rle */
-#define	WT_STAT_CONN_TXN_RTS_STABLE_RLE_SKIPPED		1680
+#define	WT_STAT_CONN_TXN_RTS_STABLE_RLE_SKIPPED		1678
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1681
+#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1679
 /*!
  * transaction: rollback to stable tombstones from history store that
  * would have been restored in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES_DRYRUN	1682
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES_DRYRUN	1680
 /*! transaction: rollback to stable tree walk skipping pages */
-#define	WT_STAT_CONN_TXN_RTS_TREE_WALK_SKIP_PAGES	1683
+#define	WT_STAT_CONN_TXN_RTS_TREE_WALK_SKIP_PAGES	1681
 /*! transaction: rollback to stable updates aborted */
-#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED		1684
+#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED		1682
 /*!
  * transaction: rollback to stable updates from history store that would
  * have been restored in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES_DRYRUN	1685
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES_DRYRUN	1683
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1686
+#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1684
 /*!
  * transaction: rollback to stable updates that would have been aborted
  * in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED_DRYRUN		1687
+#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED_DRYRUN		1685
 /*!
  * transaction: rollback to stable updates that would have been removed
  * from history store in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED_DRYRUN		1688
+#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED_DRYRUN		1686
 /*! transaction: sessions scanned in each walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_SESSIONS_WALKED		1689
+#define	WT_STAT_CONN_TXN_SESSIONS_WALKED		1687
 /*! transaction: set timestamp calls */
-#define	WT_STAT_CONN_TXN_SET_TS				1690
+#define	WT_STAT_CONN_TXN_SET_TS				1688
 /*! transaction: set timestamp durable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_DURABLE			1691
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE			1689
 /*! transaction: set timestamp durable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_DURABLE_UPD		1692
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE_UPD		1690
 /*! transaction: set timestamp force calls */
-#define	WT_STAT_CONN_TXN_SET_TS_FORCE			1693
+#define	WT_STAT_CONN_TXN_SET_TS_FORCE			1691
 /*!
  * transaction: set timestamp global oldest timestamp set to be more
  * recent than the global stable timestamp
  */
-#define	WT_STAT_CONN_TXN_SET_TS_OUT_OF_ORDER		1694
+#define	WT_STAT_CONN_TXN_SET_TS_OUT_OF_ORDER		1692
 /*! transaction: set timestamp oldest calls */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1695
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1693
 /*! transaction: set timestamp oldest updates */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1696
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1694
 /*! transaction: set timestamp stable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1697
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1695
 /*! transaction: set timestamp stable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1698
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1696
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1699
+#define	WT_STAT_CONN_TXN_BEGIN				1697
 /*!
  * transaction: transaction checkpoint history store file duration
  * (usecs)
  */
-#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		1700
+#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		1698
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1701
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1699
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1702
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1700
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1703
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1701
 /*! transaction: transaction range of timestamps pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1704
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1702
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * active read timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1705
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1703
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1706
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1704
 /*! transaction: transaction read timestamp of the oldest active reader */
-#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1707
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1705
 /*! transaction: transaction rollback to stable currently running */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1708
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1706
 /*! transaction: transaction walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1709
+#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1707
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1710
+#define	WT_STAT_CONN_TXN_COMMIT				1708
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1711
+#define	WT_STAT_CONN_TXN_ROLLBACK			1709
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1712
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1710
 
 /*!
  * @}
@@ -8142,23 +7954,6 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED_DRYRUN		2297
 /*! transaction: update conflicts */
 #define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2298
-
-/*!
- * @}
- * @name Statistics for join cursors
- * @anchor statistics_join
- * @{
- */
-/*! join: accesses to the main table */
-#define	WT_STAT_JOIN_MAIN_ACCESS			3000
-/*! join: bloom filter false positives */
-#define	WT_STAT_JOIN_BLOOM_FALSE_POSITIVE		3001
-/*! join: checks that conditions of membership are satisfied */
-#define	WT_STAT_JOIN_MEMBERSHIP_CHECK			3002
-/*! join: items inserted into a bloom filter */
-#define	WT_STAT_JOIN_BLOOM_INSERT			3003
-/*! join: items iterated */
-#define	WT_STAT_JOIN_ITERATED				3004
 
 /*!
  * @}

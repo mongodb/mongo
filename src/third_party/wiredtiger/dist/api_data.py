@@ -454,9 +454,6 @@ table_only_config = [
 ]
 
 index_only_config = [
-    Config('extractor', 'none', r'''
-        configure a custom extractor for indices. Permitted values are \c "none" or an extractor
-        name created with WT_CONNECTION::add_extractor'''),
     Config('immutable', 'false', r'''
         configure the index to be immutable -- that is, the index is not changed by any update to
         a record in the table''',
@@ -465,11 +462,7 @@ index_only_config = [
 
 colgroup_meta = common_meta + source_meta
 
-index_meta = format_meta + source_meta + index_only_config + [
-    Config('index_key_columns', '', r'''
-        number of public key columns''',
-        type='int', undoc=True),
-]
+index_meta = format_meta + source_meta + index_only_config
 
 table_meta = format_meta + table_only_config
 
@@ -1190,14 +1183,9 @@ wiredtiger_open_common =\
         the list from the reconstructed metadata. The target list must include URIs of type
         \c table:''',
         type='list'),
-    Config('buffer_alignment', '-1', r'''
-        in-memory alignment (in bytes) for buffers used for I/O. The default value of -1
-        indicates a platform-specific alignment value should be used (4KB on Linux systems when
-        direct I/O is configured, zero elsewhere). If the configured alignment is larger than
-        default or configured object page sizes, file allocation and page sizes are silently
-        increased to the buffer alignment size. Requires the \c posix_memalign API. See @ref
-        tuning_system_buffer_cache_direct_io''',
-        min='-1', max='1MB'),
+    Config('buffer_alignment', '', r'''
+        this option is no longer supported, retained for backward compatibility.''',
+        min='-1', max='1MB', undoc=True),
     Config('builtin_extension_config', '', r'''
         A structure where the keys are the names of builtin extensions and the values are
         passed to WT_CONNECTION::load_extension as the \c config parameter (for example,
@@ -1214,15 +1202,8 @@ wiredtiger_open_common =\
         are compiled internally when the connection is opened.''',
         min='500'),
     Config('direct_io', '', r'''
-        Use \c O_DIRECT on POSIX systems, and \c FILE_FLAG_NO_BUFFERING on Windows to access files.
-        Options are given as a list, such as <code>"direct_io=[data]"</code>. Configuring \c
-        direct_io requires care; see @ref tuning_system_buffer_cache_direct_io for important
-        warnings. Including \c "data" will cause WiredTiger data files, including WiredTiger
-        internal data files, to use direct I/O; including \c "log" will cause WiredTiger log
-        files to use direct I/O; including \c "checkpoint" will cause WiredTiger data files
-        opened using a (read-only) checkpoint cursor to use direct I/O. \c direct_io should
-        be combined with \c write_through to get the equivalent of \c O_DIRECT on Windows''',
-        type='list', choices=['checkpoint', 'data', 'log']),
+        this option is no longer supported, retained for backward compatibility.''',
+        type='list', undoc=True),
     Config('encryption', '', r'''
         configure an encryptor for system wide metadata and logs. If a system wide encryptor is
         set, it is also used for encrypting data files and tables, unless encryption configuration
@@ -1272,8 +1253,7 @@ wiredtiger_open_common =\
         Use memory mapping when accessing files in a read-only mode''',
         type='boolean'),
     Config('mmap_all', 'false', r'''
-        Use memory mapping to read and write all data files. May not be configured with direct
-        I/O''',
+        Use memory mapping to read and write all data files.''',
         type='boolean'),
     Config('multiprocess', 'false', r'''
         permit sharing between processes (will automatically start an RPC server for primary
@@ -1328,12 +1308,11 @@ wiredtiger_open_common =\
         type='boolean'),
     Config('write_through', '', r'''
         Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files. Ignored on non-Windows
-        systems. Options are given as a list, such as <code>"write_through=[data]"</code>.
-        Configuring \c write_through requires care; see @ref tuning_system_buffer_cache_direct_io
-        for important warnings. Including \c "data" will cause WiredTiger data files to write
-        through cache, including \c "log" will cause WiredTiger log files to write through
-        cache. \c write_through should be combined with \c direct_io to get the equivalent of
-        POSIX \c O_DIRECT on Windows''',
+        systems. Options are given as a list, such as <code>"write_through=[data]"</code>. 
+        Configuring \c write_through requires care; see @ref write_through
+        Including \c "data" will cause WiredTiger data files to write through cache, including 
+        \c "log" will cause WiredTiger log files to write through
+        cache.''',
         type='list', choices=['data', 'log']),
 ]
 
@@ -1514,39 +1493,6 @@ methods = {
         type='boolean', undoc=True),
 ]),
 
-'WT_SESSION.join' : Method([
-    Config('compare', '"eq"', r'''
-        modifies the set of items to be returned so that the index key satisfies the given
-        comparison relative to the key set in this cursor''',
-        choices=['eq', 'ge', 'gt', 'le', 'lt']),
-    Config('count', '0', r'''
-        set an approximate count of the elements that would be included in the join. This is
-        used in sizing the Bloom filter, and also influences evaluation order for cursors in
-        the join. When the count is equal for multiple Bloom filters in a composition of joins,
-        the Bloom filter may be shared''',
-        type='int'),
-    Config('bloom_bit_count', '16', r'''
-        the number of bits used per item for the Bloom filter''',
-        min='2', max='1000'),
-    Config('bloom_false_positives', 'false', r'''
-        return all values that pass the Bloom filter, without eliminating any false positives''',
-        type='boolean'),
-    Config('bloom_hash_count', '8', r'''
-        the number of hash values per item for the Bloom filter''',
-        min='2', max='100'),
-    Config('operation', '"and"', r'''
-        the operation applied between this and other joined cursors. When "operation=and"
-        is specified, all the conditions implied by joins must be satisfied for an entry to be
-        returned by the join cursor; when "operation=or" is specified, only one must be satisfied.
-        All cursors joined to a join cursor must have matching operations''',
-        choices=['and', 'or']),
-    Config('strategy', '', r'''
-        when set to \c bloom, a Bloom filter is created and populated for this index. This has an
-        up front cost but may reduce the number of accesses to the main table when iterating
-        the joined cursor. The \c bloom setting requires that \c count be set''',
-        choices=['bloom', 'default']),
-]),
-
 'WT_SESSION.log_flush' : Method([
     Config('sync', 'on', r'''
         forcibly flush the log and wait for it to achieve the synchronization level specified.
@@ -1709,7 +1655,6 @@ methods = {
 ]),
 
 'WT_SESSION.reset_snapshot' : Method([]),
-'WT_SESSION.rename' : Method([]),
 'WT_SESSION.reset' : Method([]),
 'WT_SESSION.salvage' : Method([
     Config('force', 'false', r'''
@@ -1951,11 +1896,6 @@ methods = {
     Config('name', '', r'''
         if set, specify a name for the checkpoint (note that checkpoints including LSM trees
         may not be named)'''),
-    Config('target', '', r'''
-        if non-empty, checkpoint the list of objects. Checkpointing a list of objects separately
-        from a database-wide checkpoint can lead to data inconsistencies; see @ref checkpoint_target
-        for more information''',
-        type='list'),
     Config('use_timestamp', 'true', r'''
         if true (the default), create the checkpoint as of the last stable timestamp if timestamps
         are in use, or with all committed  updates if there is no stable timestamp set. If false,
@@ -1967,7 +1907,6 @@ methods = {
 'WT_CONNECTION.add_compressor' : Method([]),
 'WT_CONNECTION.add_data_source' : Method([]),
 'WT_CONNECTION.add_encryptor' : Method([]),
-'WT_CONNECTION.add_extractor' : Method([]),
 'WT_CONNECTION.add_storage_source' : Method([]),
 'WT_CONNECTION.close' : Method([
     Config('final_flush', 'false', r'''

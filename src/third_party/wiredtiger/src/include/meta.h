@@ -22,8 +22,6 @@
 #define WT_BACKUP_TMP "WiredTiger.backup.tmp"  /* Backup tmp file */
 #define WT_EXPORT_BACKUP "WiredTiger.export"   /* Export backup file */
 #define WT_METADATA_BACKUP "WiredTiger.backup" /* Hot backup file */
-#define WT_LOGINCR_BACKUP "WiredTiger.ibackup" /* Log incremental backup */
-#define WT_LOGINCR_SRC "WiredTiger.isrc"       /* Log incremental source */
 
 #define WT_METADATA_TURTLE "WiredTiger.turtle"         /* Metadata metadata */
 #define WT_METADATA_TURTLE_SET "WiredTiger.turtle.set" /* Turtle temp file */

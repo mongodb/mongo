@@ -8,5 +8,3 @@ runs.timer=5:8
 runs.type=row,var
 # Disable in memory while making progress on setup with Antithesis
 runs.in_memory=0
-# Always disable directio
-disk.direct_io=0

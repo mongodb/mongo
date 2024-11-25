@@ -103,7 +103,6 @@ create_write_buffer(WT_BM *bm, std::shared_ptr<mock_session> session, std::strin
     test_and_validate_write_size(bm, session, buf_memsize, allocation_size);
 
     // Initialize the buffer with aligned size.
-    F_SET(buf, WT_ITEM_ALIGNED);
     REQUIRE(__wt_buf_initsize(session->get_wt_session_impl(), buf, buf_memsize) == 0);
 
     /*

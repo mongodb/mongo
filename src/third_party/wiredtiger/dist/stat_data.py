@@ -109,10 +109,6 @@ class EvictStat(Stat):
     prefix = 'cache'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, EvictStat.prefix, desc, flags)
-class JoinStat(Stat):
-    prefix = 'join'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, JoinStat.prefix, desc, flags)
 class LockStat(Stat):
     prefix = 'lock'
     def __init__(self, name, desc, flags=''):
@@ -712,8 +708,6 @@ conn_stats = [
     SessionOpStat('session_table_create_success', 'table create successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_drop_fail', 'table drop failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_drop_success', 'table drop successful calls', 'no_clear,no_scale'),
-    SessionOpStat('session_table_rename_fail', 'table rename failed calls', 'no_clear,no_scale'),
-    SessionOpStat('session_table_rename_success', 'table rename successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_salvage_fail', 'table salvage failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_salvage_success', 'table salvage successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
@@ -1186,17 +1180,6 @@ conn_dsrc_stats = [
     TxnStat('txn_rts_sweep_hs_keys', 'rollback to stable sweeping history store keys'),
     TxnStat('txn_rts_sweep_hs_keys_dryrun', 'rollback to stable history store keys that would have been swept in non-dryrun mode'),
     TxnStat('txn_update_conflict', 'update conflicts'),
-]
-
-##########################################
-# Cursor Join statistics
-##########################################
-join_stats = [
-    JoinStat('bloom_false_positive', 'bloom filter false positives'),
-    JoinStat('bloom_insert', 'items inserted into a bloom filter'),
-    JoinStat('iterated', 'items iterated'),
-    JoinStat('main_access', 'accesses to the main table'),
-    JoinStat('membership_check', 'checks that conditions of membership are satisfied'),
 ]
 
 ##########################################

@@ -924,15 +924,20 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     /*
      * Get the allocation size. Allocation sizes must be a power-of-two, nothing else makes sense.
      */
-    WT_RET(__wt_direct_io_size_check(session, cfg, "allocation_size", &btree->allocsize));
+    WT_RET(__wt_config_gets(session, cfg, "allocation_size", &cval));
+    btree->allocsize = (uint32_t)cval.val;
+
     if (!__wt_ispo2(btree->allocsize))
         WT_RET_MSG(session, EINVAL, "the allocation size must be a power of two");
 
     /*
      * Get the internal/leaf page sizes. All page sizes must be in units of the allocation size.
      */
-    WT_RET(__wt_direct_io_size_check(session, cfg, "internal_page_max", &btree->maxintlpage));
-    WT_RET(__wt_direct_io_size_check(session, cfg, "leaf_page_max", &btree->maxleafpage));
+    WT_RET(__wt_config_gets(session, cfg, "internal_page_max", &cval));
+    btree->maxintlpage = (uint32_t)cval.val;
+    WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
+    btree->maxleafpage = (uint32_t)cval.val;
+
     if (btree->maxintlpage < btree->allocsize || btree->maxintlpage % btree->allocsize != 0 ||
       btree->maxleafpage < btree->allocsize || btree->maxleafpage % btree->allocsize != 0)
         WT_RET_MSG(session, EINVAL,

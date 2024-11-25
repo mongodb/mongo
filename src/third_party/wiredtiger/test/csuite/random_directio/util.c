@@ -32,6 +32,7 @@
 
 #define ALIGN_UP(p, n) ((p) % (n) == 0 ? (p) : ((p) + (n) - ((p) % (n))))
 #define ALIGN_DOWN(p, n) ((p) - ((p) % (n)))
+#define BUFFER_ALIGNMENT_DEFAULT 4096
 
 /*
  * util.c
@@ -105,7 +106,7 @@ copy_directory_int(const char *fromdir, const char *todir, bool directio)
          */
         if (buf == NULL) {
             if (directio) {
-                blksize = (size_t)WT_MAX(sb.st_blksize, WT_BUFFER_ALIGNMENT_DEFAULT);
+                blksize = (size_t)WT_MAX(sb.st_blksize, BUFFER_ALIGNMENT_DEFAULT);
                 testutil_assert(blksize < COPY_BUF_SIZE);
                 /*
                  * Make sure we have plenty of room for adjusting the pointer.

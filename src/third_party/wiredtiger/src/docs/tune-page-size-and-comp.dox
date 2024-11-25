@@ -199,8 +199,8 @@ storing small amounts of data and overflow items.
  - default : 4 KB
  - Motivation to tune the value:
 \n Most applications should not need to tune the allocation size.
-   - To be compatible with virtual memory page sizes and direct I/O requirements
-on the platform (4KB for most common server platforms)
+   - To be compatible with virtual memory page sizes
+on the platform (4KB for most common server platforms).
    - Smaller values decrease the file space required by overflow items.
    - For example, if the allocation size is set to 4KB, an overflow item of
 18,000 bytes requires 5 allocation units and wastes about 2KB of space. If the

@@ -53,7 +53,6 @@ each of which is ordered by one or more columns.
 - @subpage compact
 - @subpage in_memory
 - @subpage eviction
-- @subpage cursor_join
 - @subpage cursor_log
 - @subpage operation_tracking
 - @subpage shared_cache
@@ -63,7 +62,6 @@ each of which is ordered by one or more columns.
 <h2>Extending WiredTiger</h2>
 - @subpage extensions
 - @subpage custom_collators
-- @subpage custom_extractors
 - @subpage custom_data_sources
 - @subpage custom_file_systems
 - @subpage custom_storage_sources

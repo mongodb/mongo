@@ -2094,7 +2094,7 @@ tasks:
       - func: "fetch artifacts"
       - func: "unit test"
         vars:
-          unit_test_args: -v 2 -R cursor13 join02 join07 schema03 timestamp22
+          unit_test_args: -v 2 -R cursor13 schema03 timestamp22
 
   - name: unit-test-hook-tiered
     tags: ["python"]
@@ -2195,8 +2195,8 @@ tasks:
             done
 
   - name: csuite-long-running
-    # Set 5 hours timeout (60 * 60 * 5)
-    exec_timeout_secs: 18000
+    # Set 6 hours timeout (60 * 60 * 6 = 21600)
+    exec_timeout_secs: 21600
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2779,20 +2779,6 @@ tasks:
       - func: "configure wiredtiger"
       - func: "make wiredtiger"
       - func: "make check all"
-
-  # Use format.sh to run tests in parallel for just under two hours (the
-  # default Evergreen timeout) on the higher spec build distros. This allows
-  # us to perform multiple test runs while ensuring a long-running config does
-  # not result in an Evergreen test timeout failure. This test is run on a
-  # higher spec distro due to historical issues with timeout failures. Consider
-  # reducing the parallelism if frequent timeouts occur.
-  - name: linux-directio
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "format test script"
-        vars:
-          format_test_script_args: -t 110 direct_io=1
 
   - name: package
     commands:
@@ -5379,8 +5365,6 @@ buildvariants:
     - name: unit-test-extra-long
       distros: ubuntu2004-large
     - name: static-wt-build-test
-    - name: linux-directio
-      distros: ubuntu2004-build
     - name: format-mirror-test
     - name: format-smoke-test
     - name: format-failure-configs-test
@@ -5665,8 +5649,6 @@ buildvariants:
     - name: make-check-test
     - name: fops
     - name: time-shift-sensitivity-test
-    - name: linux-directio
-      distros: rhel80-build
     - name: syscall-linux
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
@@ -5798,8 +5780,6 @@ buildvariants:
       distros: ubuntu2004-arm64-large
     - name: format-smoke-test
     - name: format-stress-pull-request-test
-    - name: linux-directio
-      distros: ubuntu2004-arm64-large
     - name: long-test
       distros: ubuntu2004-arm64-large
     - name: make-check-test
@@ -5840,8 +5820,6 @@ buildvariants:
       distros: amazon2-arm64-large
     - name: format-smoke-test
     - name: format-stress-pull-request-test
-    - name: linux-directio
-      distros: amazon2-arm64-large
     - name: long-test
       distros: amazon2-arm64-large
     - name: make-check-test
@@ -5886,8 +5864,6 @@ buildvariants:
     - name: unit-test
     - name: format-smoke-test
     - name: fops
-    - name: linux-directio
-      distros: ubuntu2004-large
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: spinlock-gcc-test
@@ -5914,8 +5890,6 @@ buildvariants:
     - name: unit-test
     - name: format-smoke-test
     - name: fops
-    - name: linux-directio
-      distros: ubuntu2004-arm64-large
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: spinlock-gcc-test

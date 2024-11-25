@@ -57,13 +57,13 @@ def tty(message):
 #
 #   API functions
 #      potentially any WiredTiger API functions that a hook creator wishes to modify (like
-#      Session.rename).  In Python most everything is an object.  Of course an instance of
-#      "Session" is an object, but also the "Session" class itself is an object.  The Session.rename
-#      function is also an object (of a certain form that can be called).  Also in Python,
+#      Session.remove). In Python most everything is an object.  Of course an instance of
+#      "Session" is an object, but also the "Session" class itself is an object. The Session.remove
+#      function is also an object (of a certain form that can be called). Also in Python,
 #      attributes on an object don't have to be "pre-declared", they can be created at any time.
-#      So it's easy to imagine assigning Session._rename_orig to be (the original value of)
-#      Session.rename, and then assigning Session.rename to be some other function object, that
-#      knows how to do something and then perhaps calls Session._rename_orig .  This is the
+#      So it's easy to imagine assigning Session._remove_orig to be (the original value of)
+#      Session.remove, and then assigning Session.remove to be some other function object, that
+#      knows how to do something and then perhaps calls Session._remove_orig .  This is the
 #      essence of the hook concept.
 #
 #  Hook Creator:

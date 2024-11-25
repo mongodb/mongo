@@ -139,7 +139,6 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wti_conn_remove_compressor(session));
     WT_TRET(__wti_conn_remove_data_source(session));
     WT_TRET(__wti_conn_remove_encryptor(session));
-    WT_TRET(__wti_conn_remove_extractor(session));
     WT_TRET(__wti_conn_remove_storage_source(session));
 
     /* Disconnect from shared cache - must be before cache destroy. */

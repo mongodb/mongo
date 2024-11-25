@@ -61,27 +61,15 @@ class test_import04(test_import_base):
     nrows = 100
     scenarios = make_scenarios([
         ('simple_table', dict(
-            is_simple = True,
             keys=[k for k in range(1, nrows+1)],
             values=random.sample(range(1000000), k=nrows),
             config='key_format=r,value_format=i')),
         ('table_with_named_columns', dict(
-            is_simple = False,
             keys=[k for k in range(1, 7)],
             values=[('Australia', 'Canberra', 1),('Japan', 'Tokyo', 2),('Italy', 'Rome', 3),
               ('China', 'Beijing', 4),('Germany', 'Berlin', 5),('South Korea', 'Seoul', 6)],
             config='columns=(id,country,capital,population),key_format=r,value_format=SSi')),
     ])
-
-    # Test table projections.
-    def check_projections(self, uri, keys, values):
-        for i in range(0, len(keys)):
-            self.check_record(uri + '(country,capital)',
-                              keys[i], [values[i][0], values[i][1]])
-            self.check_record(uri + '(country,population)',
-                              keys[i], [values[i][0], values[i][2]])
-            self.check_record(uri + '(capital,population)',
-                              keys[i], [values[i][1], values[i][2]])
 
     def test_table_import(self):
         # Add some data and checkpoint.
@@ -114,10 +102,6 @@ class test_import04(test_import_base):
 
         # Check the inserted values are in the table.
         self.check(uri, keys[:max_idx], values[:max_idx])
-
-        # Check against projections when the table is not simple.
-        if not self.is_simple:
-            self.check_projections(uri, keys[:max_idx], values[:max_idx])
 
         # Export the metadata for the table.
         original_db_file_uri = 'file:' + original_db_table + '.wt'
@@ -196,8 +180,6 @@ class test_import04(test_import_base):
 
         # Check that the previously inserted values survived the import.
         self.check(uri, keys[:max_idx], values[:max_idx])
-        if not self.is_simple:
-            self.check_projections(uri, keys[:max_idx], values[:max_idx])
 
         # Compare configuration metadata.
         c = self.session.open_cursor('metadata:', None, None)
@@ -211,8 +193,6 @@ class test_import04(test_import_base):
         for i in range(min_idx, max_idx):
             self.update(uri, keys[i], values[i], ts[i])
         self.check(uri, keys, values)
-        if not self.is_simple:
-            self.check_projections(uri, keys, values)
 
         # Perform a checkpoint.
         self.session.checkpoint()

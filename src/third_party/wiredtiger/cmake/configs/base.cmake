@@ -94,12 +94,6 @@ config_bool(
     DEPENDS "WT_LINUX OR WT_DARWIN"
 )
 
-config_string(
-    WT_BUFFER_ALIGNMENT_DEFAULT
-    "WiredTiger buffer boundary alignment"
-    DEFAULT 0
-)
-
 config_bool(
     HAVE_DIAGNOSTIC
     "Enable WiredTiger diagnostics. Automatically enables debug info."

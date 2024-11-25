@@ -79,8 +79,6 @@ static const char *list[] = {
   "ops.pct.delete",
   "dictionary=",
   "btree.dictionary",
-  "direct_io=",
-  "disk.direct_io",
   "encryption=",
   "disk.encryption",
   "evict_max=",

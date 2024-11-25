@@ -34,7 +34,7 @@ from wtscenario import make_scenarios
 
 # test_schema08.py
 #    Test schema operations on recovery.
-# Test all schema operations alter, create, drop, rename.
+# Test all schema operations alter, create, drop.
 # After doing the operation, create a backup copy of the directory,
 # walk the log recording each LSN, truncate the backup copy of the
 # log walking backward from the LSNs and then run recovery.
@@ -54,7 +54,6 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
         ('none', dict(schema_ops='none')),
         ('alter', dict(schema_ops='alter')),
         ('drop', dict(schema_ops='drop')),
-        ('rename', dict(schema_ops='rename')),
     ]
     ckpt = [
         ('no_ckpt', dict(ckpt=False)),
@@ -83,9 +82,6 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
             self.do_alter(uri, suburi)
         elif (self.schema_ops == 'drop'):
             self.session.drop(uri, None)
-        elif (self.schema_ops == 'rename'):
-            newuri = self.uri + "new-table"
-            self.session.rename(uri, newuri, None)
 
     # Count actual log records in the log. Log cursors walk the individual
     # operations of a transaction as well as the entire record. Skip counting
@@ -158,8 +154,8 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
     # Test that creating and dropping tables does not write individual
     # log records.
     def test_schema08_create(self):
-        if self.is_tiered_scenario() and (self.uri == 'lsm:' or self.uri == 'file:' or self.schema_ops == 'rename'):
-            self.skipTest('Tiered storage does not support LSM or file URIs, and also does not support the rename operation.')
+        if self.is_tiered_scenario() and (self.uri == 'lsm:' or self.uri == 'file:'):
+            self.skipTest('Tiered storage does not support LSM or file URIs.')
 
         self.count = 0
         self.lsns = []

@@ -3,10 +3,7 @@
 Create, insert and access a simple table.
 
 @example ex_backup.c
-Shows how to use log-based incremental backup.
-
-@example ex_backup_block.c
-Shows how to use block-based incremental backup.
+Shows how to use incremental backup.
 
 @example ex_call_center.c
 A more complex schema based on a call center example, showing how to map
@@ -22,11 +19,8 @@ Shows some common cursor types and operations.
 Shows how to extend WiredTiger with a simple encryption algorithm.
 
 @example ex_extending.c
-Shows how to extend WiredTiger with application-specific collations,
-extractors and cursor types.
-
-@example ex_extractor.c
-Shows how to extend WiredTiger with a more complex custom extractor.
+Shows how to extend WiredTiger with application-specific collations
+and cursor types.
 
 @example ex_extra_diagnostics.c
 This is an example demonstrating how to enable and update extra diagnostic code at runtime.

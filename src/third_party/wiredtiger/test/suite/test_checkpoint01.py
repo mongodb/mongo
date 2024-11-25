@@ -219,41 +219,6 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
         self.assertEqual(cursor[ds.key(10)], value)
         cursor.close()
 
-    @wttest.skip_for_hook("tiered", "tiered tables do not support named checkpoints")
-    def test_checkpoint_target(self):
-        # Create 3 objects, change one record to an easily recognizable string.
-        uri = self.uri + '1'
-        ds1 = SimpleDataSet(self, uri, 100, key_format=self.fmt)
-        ds1.populate()
-        self.update(uri, ds1, 'ORIGINAL')
-
-        uri = self.uri + '2'
-        ds2 = SimpleDataSet(self, uri, 100, key_format=self.fmt)
-        ds2.populate()
-        self.update(uri, ds2, 'ORIGINAL')
-
-        uri = self.uri + '3'
-        ds3 = SimpleDataSet(self, uri, 100, key_format=self.fmt)
-        ds3.populate()
-        self.update(uri, ds3, 'ORIGINAL')
-
-        # Checkpoint all three objects.
-        self.session.checkpoint("name=checkpoint-1")
-
-        # Update all 3 objects, then checkpoint two of the objects with the
-        # same checkpoint name.
-        self.update(self.uri + '1', ds1, 'UPDATE')
-        self.update(self.uri + '2', ds2, 'UPDATE')
-        self.update(self.uri + '3', ds3, 'UPDATE')
-        target = 'target=("' + self.uri + '1"' + ',"' + self.uri + '2")'
-        self.session.checkpoint("name=checkpoint-1," + target)
-
-        # Confirm the checkpoint has the old value in objects that weren't
-        # checkpointed, and the new value in objects that were checkpointed.
-        self.check(self.uri + '1', ds1, 'UPDATE')
-        self.check(self.uri + '2', ds2, 'UPDATE')
-        self.check(self.uri + '3', ds3, 'ORIGINAL')
-
 # Check that you can't write checkpoint cursors.
 class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([

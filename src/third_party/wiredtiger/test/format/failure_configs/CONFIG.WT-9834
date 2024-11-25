@@ -17,7 +17,6 @@ checkpoint=on
 checkpoint.log_size=94
 checkpoint.wait=20
 disk.data_extend=1
-disk.direct_io=0
 disk.encryption=rotn-7
 disk.mmap=1
 disk.mmap_all=0

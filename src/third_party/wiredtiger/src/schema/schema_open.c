@@ -158,9 +158,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
           session, idx->name, &cval, &metadata, &idx->collator, &idx->collator_owned));
     }
 
-    WT_ERR(__wt_extractor_config(
-      session, idx->name, idx->config, &idx->extractor, &idx->extractor_owned));
-
     WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &idx->key_format));
 
@@ -181,18 +178,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
         WT_ERR(__wt_buf_catfmt(session, buf, "%.*s,", (int)ckey.len, ckey.str));
     if (ret != WT_NOTFOUND)
         goto err;
-
-    /*
-     * If we didn't find any columns, the index must have an extractor. We don't rely on this
-     * unconditionally because it was only added to the metadata after version 2.3.1.
-     */
-    if (npublic_cols == 0) {
-        WT_ERR(__wt_config_getones(session, idx->config, "index_key_columns", &cval));
-        npublic_cols = (u_int)cval.val;
-        WT_ASSERT(session, npublic_cols != 0);
-        for (i = 0; i < npublic_cols; i++)
-            WT_ERR(__wt_buf_catfmt(session, buf, "\"bad col\","));
-    }
 
     /*
      * Now add any primary key columns from the table that are not already part of the index key.
@@ -224,13 +209,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
     WT_ERR(__wt_buf_init(session, buf, 0));
     WT_ERR(__wti_struct_truncate(session, idx->key_format, npublic_cols, buf));
     WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->idxkey_format));
-
-    /*
-     * Add a trailing padding byte to the format. This ensures that there will be no special
-     * optimization of the last column, so the primary key columns can be simply appended.
-     */
-    WT_ERR(__wt_buf_catfmt(session, buf, "x"));
-    WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->exkey_format));
 
     /* By default, index cursor values are the table value columns. */
     /* TODO Optimize to use index columns in preference to table lookups. */

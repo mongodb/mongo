@@ -6,12 +6,9 @@ set(WT_OS "linux" CACHE STRING "")
 set(WT_POSIX ON CACHE BOOL "")
 
 # Linux requires '_GNU_SOURCE' to be defined for access to GNU/Linux extension functions
-# e.g. Access to O_DIRECT on Linux. Append this macro to our compiler flags for Linux-based
+# e.g. Access to 'pthread_setname_np' on Linux. Append this macro to our compiler flags for Linux-based
 # builds.
 add_cmake_flag(CMAKE_C_FLAGS -D_GNU_SOURCE)
-
-# Linux requires buffers aligned to 4KB boundaries for O_DIRECT to work.
-set(WT_BUFFER_ALIGNMENT_DEFAULT "4096" CACHE STRING "")
 
 # ARMv8-A is the 64-bit ARM architecture, turn on the optional CRC.
 # If the compilation check in rcpc_test passes also turn on the RCpc instructions.

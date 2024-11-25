@@ -61,16 +61,6 @@ signal_handler(int signo)
 static void
 signal_timer(int signo)
 {
-    /*
-     * Direct I/O configurations can result in really long run times depending on how the test
-     * machine is configured. If a direct I/O run timed out, don't bother dropping core.
-     */
-    if (GV(DISK_DIRECT_IO)) {
-        fprintf(stderr, "format direct I/O configuration timed out\n");
-        fprintf(stderr, "format caught signal %d, exiting with error\n", signo);
-        fflush(stderr);
-        exit(EXIT_FAILURE);
-    }
 
     /* Note, format.sh checks for this message, so be cautious in changing the format. */
     fprintf(stderr, "format alarm timed out\n");

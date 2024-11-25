@@ -198,7 +198,7 @@ __curstat_next(WT_CURSOR *cursor)
 
     /* Initialize on demand. */
     if (cst->notinitialized) {
-        WT_ERR(__wt_curstat_init(session, cursor->internal_uri, NULL, cst->cfg, cst));
+        WT_ERR(__wt_curstat_init(session, cursor->internal_uri, cst->cfg, cst));
         cst->notinitialized = false;
     }
 
@@ -241,7 +241,7 @@ __curstat_prev(WT_CURSOR *cursor)
 
     /* Initialize on demand. */
     if (cst->notinitialized) {
-        WT_ERR(__wt_curstat_init(session, cursor->internal_uri, NULL, cst->cfg, cst));
+        WT_ERR(__wt_curstat_init(session, cursor->internal_uri, cst->cfg, cst));
         cst->notinitialized = false;
     }
 
@@ -312,7 +312,7 @@ __curstat_search(WT_CURSOR *cursor)
 
     /* Initialize on demand. */
     if (cst->notinitialized) {
-        WT_ERR(__wt_curstat_init(session, cursor->internal_uri, NULL, cst->cfg, cst));
+        WT_ERR(__wt_curstat_init(session, cursor->internal_uri, cst->cfg, cst));
         cst->notinitialized = false;
     }
 
@@ -461,94 +461,6 @@ __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
 }
 
 /*
- * __curstat_join_next_set --
- *     Advance to another index used in a join to give another set of statistics.
- */
-static int
-__curstat_join_next_set(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst, bool forw, bool init)
-{
-    WT_CURSOR_JOIN *cjoin;
-    WT_JOIN_STATS_GROUP *join_group;
-    ssize_t pos;
-
-    join_group = &cst->u.join_stats_group;
-    cjoin = join_group->join_cursor;
-    if (init)
-        pos = forw ? 0 : (ssize_t)cjoin->entries_next - 1;
-    else
-        pos = join_group->join_cursor_entry + (forw ? 1 : -1);
-    if (pos < 0 || (size_t)pos >= cjoin->entries_next)
-        return (WT_NOTFOUND);
-
-    join_group->join_cursor_entry = pos;
-    if (cjoin->entries[pos].index == NULL) {
-        WT_ASSERT(session, WT_PREFIX_MATCH(cjoin->iface.uri, "join:"));
-        join_group->desc_prefix = cjoin->iface.uri + 5;
-    } else
-        join_group->desc_prefix = cjoin->entries[pos].index->name;
-    join_group->join_stats = cjoin->entries[pos].stats;
-    if (!init)
-        cst->key = forw ? WT_STAT_KEY_MIN(cst) : WT_STAT_KEY_MAX(cst);
-    return (0);
-}
-
-/*
- * __curstat_join_desc --
- *     Assemble the description field based on current index and statistic.
- */
-static int
-__curstat_join_desc(WT_CURSOR_STAT *cst, int slot, const char **resultp)
-{
-    WT_JOIN_STATS_GROUP *sgrp;
-    WT_SESSION_IMPL *session;
-    size_t len;
-    const char *static_desc;
-
-    sgrp = &cst->u.join_stats_group;
-    session = CUR2S(sgrp->join_cursor);
-    WT_RET(__wt_stat_join_desc(cst, slot, &static_desc));
-
-    /*
-     * We conceptually want to insert the index name between the "join: " and the following
-     * description. Skip past the first part.
-     */
-    WT_PREFIX_SKIP_REQUIRED(session, static_desc, "join: ");
-    len = strlen("join: ") + strlen(sgrp->desc_prefix) + strlen(": ") + strlen(static_desc) + 1;
-    WT_RET(__wt_realloc_noclear(session, NULL, len, &cst->desc_buf));
-    WT_RET(__wt_snprintf(cst->desc_buf, len, "join: %s: %s", sgrp->desc_prefix, static_desc));
-    *resultp = cst->desc_buf;
-    return (0);
-}
-
-/*
- * __curstat_join_init --
- *     Initialize the statistics for a joined cursor.
- */
-static int
-__curstat_join_init(
-  WT_SESSION_IMPL *session, WT_CURSOR *curjoin, const char *cfg[], WT_CURSOR_STAT *cst)
-{
-    WT_CURSOR_JOIN *cjoin;
-
-    WT_UNUSED(cfg);
-
-    if (curjoin == NULL && cst->u.join_stats_group.join_cursor != NULL)
-        curjoin = &cst->u.join_stats_group.join_cursor->iface;
-    if (curjoin == NULL || !WT_PREFIX_MATCH(curjoin->uri, "join:"))
-        WT_RET_MSG(session, EINVAL, "join cursor must be used with statistics:join");
-    cjoin = (WT_CURSOR_JOIN *)curjoin;
-    memset(&cst->u.join_stats_group, 0, sizeof(WT_JOIN_STATS_GROUP));
-    cst->u.join_stats_group.join_cursor = cjoin;
-
-    cst->stats = (int64_t *)&cst->u.join_stats_group.join_stats;
-    cst->stats_base = WT_JOIN_STATS_BASE;
-    cst->stats_count = sizeof(WT_JOIN_STATS) / sizeof(int64_t);
-    cst->stats_desc = __curstat_join_desc;
-    cst->next_set = __curstat_join_next_set;
-    return (0);
-}
-
-/*
  * __curstat_session_init --
  *     Initialize the statistics for a session.
  */
@@ -573,8 +485,7 @@ __curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
  *     Initialize a statistics cursor.
  */
 int
-__wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin, const char *cfg[],
-  WT_CURSOR_STAT *cst)
+__wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
     const char *dsrc_uri;
 
@@ -587,9 +498,7 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin,
     WT_ASSERT(session, F_ISSET(S2C(session), WT_CONN_RECOVERY_COMPLETE));
     dsrc_uri = uri + strlen("statistics:");
 
-    if (strcmp(dsrc_uri, "join") == 0)
-        WT_RET(__curstat_join_init(session, curjoin, cfg, cst));
-    else if (strcmp(dsrc_uri, "session") == 0) {
+    if (strcmp(dsrc_uri, "session") == 0) {
         __curstat_session_init(session, cst);
         return (0);
     } else if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
@@ -615,8 +524,7 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin,
  *     WT_SESSION->open_cursor method for the statistics cursor type.
  */
 int
-__wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, const char *cfg[],
-  WT_CURSOR **cursorp)
+__wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
@@ -754,7 +662,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
      * initialization with aggregating statistics for upper-level objects like tables so we need a
      * valid set of statistics before the open returns.
      */
-    WT_ERR(__wt_curstat_init(session, uri, other, cst->cfg, cst));
+    WT_ERR(__wt_curstat_init(session, uri, cst->cfg, cst));
     cst->notinitialized = false;
 
     /* The cursor isn't yet positioned. */

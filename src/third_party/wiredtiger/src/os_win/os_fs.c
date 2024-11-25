@@ -267,12 +267,6 @@ __win_file_read(
 
     nr = 0;
 
-    /* Assert direct I/O is aligned and a multiple of the alignment. */
-    WT_ASSERT(session,
-      !win_fh->direct_io || S2C(session)->buffer_alignment == 0 ||
-        (!((uintptr_t)buf & (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-          len >= S2C(session)->buffer_alignment && len % S2C(session)->buffer_alignment == 0));
-
     /* Break reads larger than 1GB into 1GB chunks. */
     for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
         chunk = (DWORD)WT_MIN(len, WT_GIGABYTE);
@@ -414,12 +408,6 @@ __win_file_write(
 
     nw = 0;
 
-    /* Assert direct I/O is aligned and a multiple of the alignment. */
-    WT_ASSERT(session,
-      !win_fh->direct_io || S2C(session)->buffer_alignment == 0 ||
-        (!((uintptr_t)buf & (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-          len >= S2C(session)->buffer_alignment && len % S2C(session)->buffer_alignment == 0));
-
     /* Break writes larger than 1GB into 1GB chunks. */
     for (addr = buf; len > 0; addr += nw, len -= (size_t)nw, offset += nw) {
         chunk = (DWORD)WT_MIN(len, WT_GIGABYTE);
@@ -464,7 +452,6 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     *file_handlep = NULL;
 
     WT_RET(__wt_calloc_one(session, &win_fh));
-    win_fh->direct_io = false;
 
     /* Set up error handling. */
     win_fh->filehandle = win_fh->filehandle_secondary = INVALID_HANDLE_VALUE;
@@ -499,13 +486,6 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     } else
         dwCreationDisposition = OPEN_EXISTING;
 
-    /* Direct I/O. */
-    if (LF_ISSET(WT_FS_OPEN_DIRECTIO)) {
-        f |= FILE_FLAG_NO_BUFFERING;
-        win_fh->direct_io = true;
-    }
-
-    /* FILE_FLAG_WRITE_THROUGH does not require aligned buffers */
     if (FLD_ISSET(conn->write_through, file_type))
         f |= FILE_FLAG_WRITE_THROUGH;
 
@@ -529,12 +509,8 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
         if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
             windows_error = __wt_getlasterror();
             ret = __wt_map_windows_error(windows_error);
-            __wt_err(session, ret,
-              win_fh->direct_io ?
-                "%s: handle-open: CreateFileW: failed with direct I/O configured, some filesystem "
-                "types do not support direct I/O: %s" :
-                "%s: handle-open: CreateFileW: %s",
-              name, __wt_formatmessage(session, windows_error));
+            __wt_err(session, ret, "%s: handle-open: CreateFileW: %s", name,
+              __wt_formatmessage(session, windows_error));
             WT_ERR(ret);
         }
     }

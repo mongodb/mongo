@@ -36,7 +36,6 @@ debug.slow_checkpoint=0
 debug.table_logging=0
 debug.update_restore_evict=0
 disk.data_extend=1
-disk.direct_io=0
 disk.encryption=rotn-7
 disk.mmap=0
 disk.mmap_all=1

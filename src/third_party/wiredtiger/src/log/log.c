@@ -786,13 +786,12 @@ __log_file_header(WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, bool pre
     log = conn->log_mgr.log;
 
     /*
-     * Set up the log descriptor record. Use a scratch buffer to get correct alignment for direct
-     * I/O.
+     * Set up the log descriptor record.
      */
-    WT_ASSERT(session, sizeof(WT_LOG_DESC) < log->allocsize);
-    WT_RET(__wt_scr_alloc(session, log->allocsize, &buf));
-    memset(buf->mem, 0, log->allocsize);
-    buf->size = log->allocsize;
+    WT_ASSERT(session, sizeof(WT_LOG_DESC) < WT_LOG_ALIGN);
+    WT_RET(__wt_scr_alloc(session, WT_LOG_ALIGN, &buf));
+    memset(buf->mem, 0, WT_LOG_ALIGN);
+    buf->size = WT_LOG_ALIGN;
 
     logrec = (WT_LOG_RECORD *)buf->mem;
     desc = (WT_LOG_DESC *)logrec->record;
@@ -808,10 +807,10 @@ __log_file_header(WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, bool pre
      * The checksum is (potentially) returned in a big-endian format, swap it into place in a
      * separate step.
      */
-    logrec->len = log->allocsize;
+    logrec->len = WT_LOG_ALIGN;
     logrec->checksum = 0;
     __wti_log_record_byteswap(logrec);
-    logrec->checksum = __wt_checksum(logrec, log->allocsize);
+    logrec->checksum = __wt_checksum(logrec, WT_LOG_ALIGN);
 #ifdef WORDS_BIGENDIAN
     logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif
@@ -830,7 +829,7 @@ __log_file_header(WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, bool pre
         tmp.slot_fh = fh;
     } else {
         WT_ASSERT(session, fh == NULL);
-        WT_ERR(__wti_log_acquire(session, log->allocsize, &tmp));
+        WT_ERR(__wti_log_acquire(session, WT_LOG_ALIGN, &tmp));
     }
     WT_ERR(__wti_log_fill(session, &myslot, true, buf, NULL));
     /*
@@ -852,12 +851,10 @@ err:
 static int
 __log_openfile(WT_SESSION_IMPL *session, uint32_t id, uint32_t flags, WT_FH **fhp)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     u_int wtopen_flags;
 
-    conn = S2C(session);
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     /*
      * If we are creating the file then we use a temporary file name. Otherwise it is a log file
@@ -871,8 +868,6 @@ __log_openfile(WT_SESSION_IMPL *session, uint32_t id, uint32_t flags, WT_FH **fh
         WT_ERR(__wt_log_filename(session, id, WT_LOG_FILENAME, buf));
     }
     __wt_verbose(session, WT_VERB_LOG, "opening log %s", (const char *)buf->data);
-    if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
-        FLD_SET(wtopen_flags, WT_FS_OPEN_DIRECTIO);
     WT_ERR(__wt_open(session, buf->data, WT_FS_OPEN_FILE_TYPE_LOG, wtopen_flags, fhp));
 err:
     __wt_scr_free(session, &buf);
@@ -892,7 +887,6 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     WT_FH *fh;
-    WT_LOG *log;
     WT_LOG_DESC *desc;
     WT_LOG_MANAGER *log_mgr;
     WT_LOG_RECORD *logrec;
@@ -903,18 +897,11 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
     conn = S2C(session);
     fh = NULL;
     log_mgr = &conn->log_mgr;
-    log = log_mgr->log;
     need_salvage = false;
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     salvage_mode = (need_salvagep != NULL && F_ISSET(conn, WT_CONN_SALVAGE));
 
-    if (log == NULL) {
-        if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
-            allocsize = (uint32_t)conn->buffer_alignment;
-        else
-            allocsize = WT_LOG_ALIGN;
-    } else
-        allocsize = log->allocsize;
+    allocsize = WT_LOG_ALIGN;
     if (lsnp != NULL)
         WT_ZERO_LSN(lsnp);
     WT_ERR(__wt_buf_grow(session, buf, allocsize));
@@ -1800,10 +1787,9 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size, wt_off_t 
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_LOG *log;
     WT_LOG_RECORD *logrec;
     wt_off_t off, remainder;
-    size_t alignedsz, allocsize, buf_left, bufsz, rdlen;
+    size_t allocsize, buf_left, bufsz, rdlen;
     char *buf, *p, *zerobuf;
     bool corrupt;
 
@@ -1811,7 +1797,6 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size, wt_off_t 
     corrupt = *hole = false;
 
     conn = S2C(session);
-    log = conn->log_mgr.log;
     remainder = log_size - offset;
 
     /*
@@ -1820,20 +1805,12 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size, wt_off_t 
      * file has a hole in it.
      */
     buf = zerobuf = NULL;
-    if (log == NULL || log->allocsize < WT_MEGABYTE)
-        bufsz = WT_MEGABYTE;
-    else
-        bufsz = log->allocsize;
+    bufsz = WT_MEGABYTE;
 
     if ((size_t)remainder < bufsz)
         bufsz = (size_t)remainder;
     WT_RET(__wt_calloc_def(session, bufsz, &buf));
     WT_ERR(__wt_calloc_def(session, bufsz, &zerobuf));
-    if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG)) {
-        alignedsz = bufsz;
-        WT_ERR(__wt_realloc_aligned(session, &bufsz, alignedsz, &buf));
-        WT_ERR(__wt_realloc_aligned(session, &bufsz, alignedsz, &zerobuf));
-    }
 
     /*
      * Read in a chunk starting at the given offset. Compare against a known zero byte chunk.
@@ -1841,7 +1818,7 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size, wt_off_t 
     for (off = offset; remainder > 0; remainder -= (wt_off_t)rdlen, off += (wt_off_t)rdlen) {
         rdlen = WT_MIN(bufsz, (size_t)remainder);
         WT_ERR(__log_fs_read(session, fh, off, rdlen, buf));
-        allocsize = (log == NULL ? WT_LOG_ALIGN : log->allocsize);
+        allocsize = WT_LOG_ALIGN;
         if (memcmp(buf, zerobuf, rdlen) != 0) {
             /*
              * Find where the next log record starts after the hole.
@@ -2109,8 +2086,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *start_lsnp, WT_LSN *end_lsnp, ui
      * logging is currently enabled or not.
      */
     lastlog = 0;
+    allocsize = WT_LOG_ALIGN;
     if (log != NULL) {
-        allocsize = log->allocsize;
         WT_ASSIGN_LSN(&end_lsn, &log->alloc_lsn);
         WT_ASSIGN_LSN(&start_lsn, &log->first_lsn);
         if (start_lsnp == NULL) {
@@ -2129,7 +2106,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *start_lsnp, WT_LSN *end_lsnp, ui
          * Set allocsize to the minimum alignment it could be. Larger records and larger allocation
          * boundaries should always be a multiple of this.
          */
-        allocsize = WT_LOG_ALIGN;
         firstlog = UINT32_MAX;
         WT_RET(__log_get_files(session, WT_LOG_FILENAME, &logfiles, &logcount));
         if (logcount == 0)
@@ -2313,7 +2289,7 @@ advance:
                 break;
             }
             /*
-             * We need to round up and read in the full padded record, especially for direct I/O.
+             * We need to round up, and read in the full padded record.
              */
             WT_ERR(__wt_buf_grow(session, buf, rdup_len));
             WT_ERR(
@@ -2529,7 +2505,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, uint32_t
     if (!F_ISSET(log, WT_LOG_OPENED) || F_ISSET(conn, WT_CONN_READONLY))
         return (0);
     ip = record;
-    if ((compressor = conn->log_mgr.compressor) != NULL && record->size < log->allocsize) {
+    if ((compressor = conn->log_mgr.compressor) != NULL && record->size < WT_LOG_ALIGN) {
         WT_STAT_CONN_INCR(session, log_compress_small);
     } else if (compressor != NULL) {
         /* Skip the log header */
@@ -2567,7 +2543,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, uint32_t
          * output requires), it just means the uncompressed version is as good as it gets, and
          * that's what we use.
          */
-        if (compression_failed || result_len / log->allocsize >= record->size / log->allocsize)
+        if (compression_failed || result_len / WT_LOG_ALIGN >= record->size / WT_LOG_ALIGN)
             WT_STAT_CONN_INCR(session, log_compress_write_fails);
         else {
             WT_STAT_CONN_INCR(session, log_compress_writes);
@@ -2642,14 +2618,11 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     memset(&myslot, 0, sizeof(myslot));
     /*
      * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a header at the beginning
-     * for us to fill in.
-     *
-     * If using direct_io, the caller should pass us an aligned record. But we need to make sure it
-     * is big enough and zero-filled so that we can write the full amount. Do this whether or not
-     * direct_io is in use because it makes the reading code cleaner.
+     * for us to fill in. Make sure the record is big enough and zero-filled so that we can write
+     * the full amount because it makes the reading code cleaner.
      */
     WT_STAT_CONN_INCRV(session, log_bytes_payload, record->size);
-    rdup_len = __wt_rduppo2((uint32_t)record->size, log->allocsize);
+    rdup_len = __wt_rduppo2((uint32_t)record->size, WT_LOG_ALIGN);
     WT_ERR(__wt_buf_grow(session, record, rdup_len));
     WT_ASSERT(session, record->data == record->mem);
     /*

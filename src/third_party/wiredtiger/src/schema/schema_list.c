@@ -182,13 +182,6 @@ __wti_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
         idx->collator_owned = 0;
     }
 
-    /* If there is a custom extractor configured, terminate it. */
-    if (idx->extractor != NULL && idx->extractor_owned && idx->extractor->terminate != NULL) {
-        WT_TRET(idx->extractor->terminate(idx->extractor, &session->iface));
-        idx->extractor = NULL;
-        idx->extractor_owned = 0;
-    }
-
     __wt_free(session, idx->name);
     __wt_free(session, idx->source);
     __wt_free(session, idx->config);
@@ -196,7 +189,6 @@ __wti_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
     __wt_free(session, idx->key_plan);
     __wt_free(session, idx->value_plan);
     __wt_free(session, idx->idxkey_format);
-    __wt_free(session, idx->exkey_format);
     __wt_free(session, idx);
 
     return (ret);

@@ -237,16 +237,6 @@ struct __wt_named_encryptor {
 };
 
 /*
- * WT_NAMED_EXTRACTOR --
- *	An extractor list entry
- */
-struct __wt_named_extractor {
-    const char *name;                    /* Name of extractor */
-    WT_EXTRACTOR *extractor;             /* User supplied object */
-    TAILQ_ENTRY(__wt_named_extractor) q; /* Linked list of extractors */
-};
-
-/*
  * WT_NAMED_STORAGE_SOURCE --
  *	A storage source list entry
  */
@@ -695,9 +685,6 @@ struct __wt_connection_impl {
     WT_SPINLOCK encryptor_lock; /* Encryptor list lock */
     TAILQ_HEAD(__wt_encrypt_qh, __wt_named_encryptor) encryptqh;
 
-    /* Locked: extractor list */
-    TAILQ_HEAD(__wt_extractor_qh, __wt_named_extractor) extractorqh;
-
     /* Locked: storage source list */
     WT_SPINLOCK storage_lock; /* Storage source list lock */
     TAILQ_HEAD(__wt_storage_source_qh, __wt_named_storage_source) storagesrcqh;
@@ -711,9 +698,6 @@ struct __wt_connection_impl {
     uint32_t conf_size;       /* In use size of user compiled configuration array */
     uint32_t conf_max;        /* Allocated size of user compiled configuration array */
 
-    /* If non-zero, all buffers used for I/O will be aligned to this. */
-    size_t buffer_alignment;
-
     wt_shared uint64_t stashed_bytes; /* Atomic: stashed memory statistics */
     wt_shared uint64_t stashed_objects;
 
@@ -725,12 +709,10 @@ struct __wt_connection_impl {
     wt_off_t data_extend_len; /* file_extend data length */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_DIRECT_IO_CHECKPOINT 0x1ull /* Checkpoints */
-#define WT_DIRECT_IO_DATA 0x2ull       /* Data files */
-#define WT_DIRECT_IO_LOG 0x4ull        /* Log files */
-                                       /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t direct_io;                /* O_DIRECT, FILE_FLAG_NO_BUFFERING */
-    uint64_t write_through;            /* FILE_FLAG_WRITE_THROUGH */
+#define WT_FILE_TYPE_DATA 0x1ull /* Data files */
+#define WT_FILE_TYPE_LOG 0x2ull  /* Log files */
+                                 /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
+    uint64_t write_through;      /* FILE_FLAG_WRITE_THROUGH */
 
     bool mmap;     /* use mmap when reading checkpoints */
     bool mmap_all; /* use mmap for all I/O on data files */

@@ -33,15 +33,11 @@ struct __wt_index {
     WT_COLLATOR *collator; /* Custom collator */
     int collator_owned;    /* Collator is owned by this index */
 
-    WT_EXTRACTOR *extractor; /* Custom key extractor */
-    int extractor_owned;     /* Extractor is owned by this index */
-
     const char *key_format; /* Key format */
     const char *key_plan;   /* Key projection plan */
     const char *value_plan; /* Value projection plan */
 
     const char *idxkey_format; /* Index key format (hides primary) */
-    const char *exkey_format;  /* Key format for custom extractors */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_INDEX_IMMUTABLE 0x1u

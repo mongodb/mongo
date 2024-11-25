@@ -127,7 +127,6 @@ struct __wt_file_handle_win {
     HANDLE filehandle;           /* Windows file handle */
     HANDLE filehandle_secondary; /* Windows file handle
                                     for file size changes */
-    bool direct_io;              /* O_DIRECT configured */
     DWORD desired_access;        /* Read-only or read/write */
 };
 
@@ -140,8 +139,6 @@ struct __wt_file_handle_posix {
      * POSIX specific file handle fields
      */
     int fd; /* POSIX file handle */
-
-    bool direct_io; /* O_DIRECT configured */
 
     /* The memory buffer and variables if we use mmap for I/O */
     uint8_t *mmap_buf;

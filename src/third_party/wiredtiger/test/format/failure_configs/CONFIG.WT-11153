@@ -3,13 +3,12 @@
 ############################################
 assert.read_timestamp=0
 backup=1
-backup.incremental=log
+backup.incremental=block
 backup.incr_granularity=10053
 block_cache=0
 block_cache.cache_on_checkpoint=0
 block_cache.cache_on_writes=1
 block_cache.size=51
-buffer_alignment=1
 cache=638
 cache.evict_max=5
 cache.eviction_dirty_target=0
@@ -28,7 +27,6 @@ debug.slow_checkpoint=0
 debug.table_logging=0
 debug.update_restore_evict=0
 disk.data_extend=0
-disk.direct_io=0
 disk.encryption=rotn-7
 disk.mmap=1
 disk.mmap_all=0

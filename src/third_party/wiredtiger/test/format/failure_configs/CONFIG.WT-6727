@@ -31,7 +31,6 @@ checkpoint.log_size=64
 checkpoint.wait=34
 disk.checksum=uncompressed
 disk.data_extend=0
-disk.direct_io=0
 disk.encryption=none
 disk.firstfit=0
 disk.mmap=1

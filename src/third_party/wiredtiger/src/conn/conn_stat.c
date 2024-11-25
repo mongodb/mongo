@@ -344,7 +344,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
      * If we don't find an underlying object, silently ignore it, the object may exist only
      * intermittently.
      */
-    if ((ret = __wt_curstat_open(session, uri, NULL, cfg, &cursor)) != 0) {
+    if ((ret = __wt_curstat_open(session, uri, cfg, &cursor)) != 0) {
         if (ret == EBUSY || ret == ENOENT || ret == WT_NOTFOUND)
             ret = 0;
         goto err;

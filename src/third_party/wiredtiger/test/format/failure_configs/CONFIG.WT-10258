@@ -18,7 +18,6 @@ checkpoint.wait=42
 debug.realloc_exact=0
 debug.realloc_malloc=0
 disk.data_extend=1
-disk.direct_io=0
 disk.encryption=none
 disk.mmap=1
 disk.mmap_all=0

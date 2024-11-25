@@ -28,7 +28,6 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     TAILQ_INIT(&conn->collqh);                /* Collator list */
     TAILQ_INIT(&conn->compqh);                /* Compressor list */
     TAILQ_INIT(&conn->encryptqh);             /* Encryptor list */
-    TAILQ_INIT(&conn->extractorqh);           /* Extractor list */
     TAILQ_INIT(&conn->storagesrcqh);          /* Storage source list */
     TAILQ_INIT(&conn->tieredqh);              /* Tiered work unit list */
     TAILQ_INIT(&conn->pfqh);                  /* Pre-fetch reference list */

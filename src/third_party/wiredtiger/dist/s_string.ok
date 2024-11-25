@@ -54,7 +54,6 @@ CAS
 CBT
 CCCCCCCCCCCCCCCCCC
 CELLs
-CET
 CHUNKCACHE
 CKPT
 CLOEXEC
@@ -64,7 +63,6 @@ CONFIG
 CPP
 CPUs
 CRC
-CSV
 CURSORs
 CURSTD
 CallsCustDate
@@ -89,10 +87,8 @@ Crt
 Crummey
 CustomersPhone
 Cygwin
-DAX
 DESC
 DHANDLE
-DIRECTIO
 DNE
 DONTNEED
 DS
@@ -235,7 +231,6 @@ LogSystemInterface
 MADV
 MALLOC
 MEM
-MEMALIGN
 MERCHANTABILITY
 MONGODB
 MOVEFILE
@@ -355,7 +350,6 @@ SIMD
 SLVG
 SMT
 SPINLOCK
-SSHH
 SSq
 STATP
 STR
@@ -638,7 +632,6 @@ cryptobad
 cryptographic
 cstring
 csuite
-csv
 ctime
 ctype
 curbackup
@@ -646,11 +639,9 @@ curbt
 curbulk
 curconfig
 curdump
-curextract
 curfile
 curhs
 curindex
-curjoin
 curlog
 curmetadata
 cursoring
@@ -708,7 +699,6 @@ difftime
 dir
 directio
 dirlist
-disjunction
 disproportionally
 dlclose
 dlh
@@ -819,7 +809,6 @@ gb
 gcc
 gcp
 gdb
-ge
 getenv
 getlasterror
 getline
@@ -864,7 +853,6 @@ iS
 iSh
 iaa
 iaaInterface
-ibackup
 icount
 idlems
 idx
@@ -873,8 +861,6 @@ iface
 ifdef's
 iiSii
 iiiS
-iiii
-iiu
 ikey
 im
 img
@@ -915,9 +901,7 @@ ishst
 islocked
 ispo
 isprint
-isrc
 isspace
-iter
 jjj
 js
 json
@@ -1005,7 +989,6 @@ mb
 mbll
 mbss
 mem
-memalign
 membar
 memcmp
 memcpy
@@ -1055,7 +1038,6 @@ nentries
 nentriesp
 newbar
 newfile
-newuri
 newv
 nextprev
 nf
@@ -1232,7 +1214,6 @@ runone
 runtime
 rw
 rwlock
-sH
 sHQ
 sXXXXXX
 sanitizer
@@ -1333,7 +1314,6 @@ sz
 t's
 tIf
 tV
-tablename
 td
 teardown
 tempdir
@@ -1375,7 +1355,6 @@ txt
 typedef
 typeof
 uS
-ui
 uint
 uintAny
 ulock
@@ -1397,7 +1376,6 @@ uninstantiated
 unistd
 unlink
 unmap
-unmapping
 unmerged
 unmodify
 unmount

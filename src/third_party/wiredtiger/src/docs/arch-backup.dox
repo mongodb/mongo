@@ -3,19 +3,18 @@
 # Overview #
 
 Backup in WiredTiger can be performed using the \c "backup:" cursor. WiredTiger
-supports four types of backups.
+supports three types of backups.
 
 1. Full database
 2. Block-based incremental backup
-3. Log-based incremental backup
-4. Target backup
+3. Target backup
 
-The following page describes how backup works inside the WiredTiger. Please refer to
+The following page describes how backup works inside WiredTiger. Please refer to
 @ref backup for details on how to use each of these types of backups.
 
 # Full database #
 
-When the application opens the backup cursor, internally WiredTiger generates a list of all
+When the application opens a backup cursor, internally WiredTiger generates a list of all
 files in the database that are necessary for the backup and creates a file which contains the
 snapshot of the metadata called WiredTiger.backup. WiredTiger takes both the checkpoint and schema
 locks to block database file modifications to generate a list of files required for backup and is
@@ -24,7 +23,7 @@ time the backup starts exist for the entire time the backup cursor is open. This
 applies to all files in the database, not just files that are included in the generated list. The
 WiredTiger.backup file is also included in the backup list and is used upon the startup of a backup, to
 create the WiredTiger.wt metadata file. After WiredTiger.wt is created the WiredTiger.backup file
-is removed. Note that we do not use the WiredTiger.wt as the metadata source and it is not included
+is removed. Note that we do not use WiredTiger.wt as the metadata source and it is not included
 in the backup list, because the metadata can be modified after the list has been generated.
 
 WiredTiger log files are also part of the generated file list for backup. There is a contract
@@ -45,30 +44,20 @@ Block-based incremental backup is performed by tracking the modified blocks in t
 Whenever a new checkpoint occurs on a file, any new or modified blocks in this checkpoint are
 recorded as a bit string. This bit string information is updated with every new checkpoint.
 
-Whenever the incremental backup cursor is opened to perform the backup, WiredTiger returns all
+Whenever an incremental backup cursor is opened to perform a backup, WiredTiger returns all
 the file offsets and sizes that are modified from the previous source backup identifier.
 WiredTiger returns the full file information to be copied for all the new files that are created,
 renamed or imported into the database after the incremental backup cursor is opened. Refer to
-@ref backup_incremental-block for more information on how to use the block-based incremental backup.
-
-# Log-based incremental backup #
-
-When the backup cursor is opened with the \c target configuration string as \c "target=(\"log:\\")"
-the log-based incremental backup is performed by adding all the existing log files in the database
-to the list of files that needs to be copied. Applications wanting to use log files for incremental
-backup must first disable automatic log file removal using the \c "log=(remove=false)" configuration
-to ::wiredtiger_open. By default, WiredTiger automatically removes log files no longer required
-for recovery. Refer to @ref backup_incremental for more information on how to use the log-based
-incremental backup.
+@ref backup_incremental-block for more information on how to use block-based incremental backup.
 
 # Target backup #
 
-When the backup cursor is opened with the \c target configuration string as \c "target=",
-WiredTiger internally generates a list of targeted files instead of all files like the full backup.
+When a backup cursor is opened with the \c target configuration string as \c "target=",
+WiredTiger internally generates a list of targeted files instead of all files like a full backup.
 If the targeted object is a table, all the indexes and column groups of the table are also backed up.
 
 Note: There can only be one backup cursor open at a time unless using duplicate backup
-cursors. The duplicate backup cursors are used for catching up with the log files or with
+cursors. Duplicate backup cursors are used for catching up with log files or with
 block-based incremental backup. Please refer to @ref backup_duplicate for more details.
 
 */

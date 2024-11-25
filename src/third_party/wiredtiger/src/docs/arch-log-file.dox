@@ -26,10 +26,7 @@ the header as the first record in the log file. Writing the system record
 is part of creating the new log file.
 
 All records in the log, including the header, are subject to the minimum record
-size. Typically that is 128 bytes. That value may be changed if direct I/O for
-logging is turned on. When enabling direct I/O via \c direct_io=log to ::wiredtiger_open
-then the minimum alignment is the value specified for \c buffer_alignment.
-In all other cases it is 128 bytes.
+size, which is 128 bytes.
 
 The reason that 128 bytes was chosen as the minimum record size was to eliminate any
 possibility of false sharing in memory and invalidating cache lines when multiple

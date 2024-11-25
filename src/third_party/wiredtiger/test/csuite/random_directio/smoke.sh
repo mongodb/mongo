@@ -35,8 +35,8 @@ for threads in $TEST_THREADS; do
         # reliably pass.  'verbose' can be added to any.
         #$RUN_TEST -T $threads -S create,integrated,create_check      || exit 1
         #$RUN_TEST -T $threads -S create,integrated,drop,drop_check   || exit 1
-        #$RUN_TEST -T $threads -S create,integrated,rename            || exit 1
-        #$RUN_TEST -T $threads -S create,integrated,rename,drop_check || exit 1
+        #$RUN_TEST -T $threads -S create,integrated                   || exit 1
+        #$RUN_TEST -T $threads -S create,integrated,drop_check        || exit 1
         #$RUN_TEST -T $threads -S all,verbose                         || exit 1
     done
 done

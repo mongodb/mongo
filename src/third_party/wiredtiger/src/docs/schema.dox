@@ -187,9 +187,7 @@ to \c scanf, and takes a list of pointers to values in the same order:
 @snippet ex_all.c Get the cursor's record number key
 @snippet ex_all.c Get the cursor's composite key
 
-Cursors for a table have the same value format as the table, unless a
-projection is configured with WT_SESSION::open_cursor.  See
-@ref cursor_projections for more information.
+Cursors for a table have the same value format as the table.
 
 WT_CURSOR::set_value is used to set value columns, and
 WT_CURSOR::get_value is used to get value columns, in the same way as
@@ -329,44 +327,6 @@ the index it is possible to corrupt data.
 An example of using an immutable index is:
 
 @snippet ex_schema.c Create an immutable index
-
-@section schema_index_projections Index cursor projections
-
-By default, index cursors return all of the table's value columns from
-WT_CURSOR::get_value.
-The application can specify that a subset of the
-usual columns should be returned in calls to
-WT_CURSOR::get_value
-by appending a list of columns to the \c uri parameter of the
-WT_SESSION::open_cursor call.  This is called a \em projection, see
-@ref cursor_projections for more details.
-
-In the case of index cursors, a projection can be used to avoid lookups
-in column groups that do not hold columns relevant to the operation.
-
-The following example will return just the table's primary key (a record
-number, in this case) from the index:
-
-@snippet ex_schema.c Return the table's record number key using an index
-
-Here is an example of a projection that returns a subset of columns from
-the index:
-
-@snippet ex_schema.c Return a subset of the value columns from an index
-
-For performance reasons, it may be desirable to include all columns for
-a performance-critical operation in an index, so that it is possible to
-perform index-only lookups where no column group from the table is
-accessed.  In this case, all of the "hot" columns should be included in the
-index (always list the "real" index key columns first, so they will
-determine the sort order).  Then, open a cursor on the index that doesn't
-return any value columns, and no column group will be accessed.
-
-@snippet ex_schema.c Access only the index
-
-Index cursors for column-store objects may not be created using the
-record number as the index key (there is no use for a secondary index
-on a column-store where the index key is the record number).
 
 @section schema_examples Code samples
 

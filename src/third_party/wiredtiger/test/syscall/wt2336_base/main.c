@@ -82,16 +82,11 @@ main(int argc, char *argv[])
         fail(ret);
 
     usleep(100);
-    fprintf(stderr, SEPARATOR "rename\n");
-
-    if ((ret = session->rename(session, "table:hello", "table:world", NULL)) != 0)
-        fail(ret);
-
     fflush(stdout);
     fprintf(stderr, SEPARATOR "drop\n");
     fflush(stdout);
 
-    if ((ret = session->drop(session, "table:world", NULL)) != 0)
+    if ((ret = session->drop(session, "table:hello", NULL)) != 0)
         fail(ret);
 
     fprintf(stderr, SEPARATOR "WT_CONNECTION::close\n");

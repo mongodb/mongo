@@ -26,20 +26,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ex_backup.c
- * 	demonstrates how to use incremental backup and log files.
+ * 	demonstrates how to use incremental backup.
  */
 #include <test_util.h>
 
-static const char *const home = "WT_HOME_LOG";
-static const char *const home_full = "WT_HOME_LOG_FULL";
-static const char *const home_incr = "WT_HOME_LOG_INCR";
+static const char *const home = "WT_BLOCK";
+static const char *const home_full = "WT_BLOCK_LOG_FULL";
+static const char *const home_incr = "WT_BLOCK_LOG_INCR";
+static const char *const logpath = "logpath";
 
-static const char *const full_out = "./backup_full";
-static const char *const incr_out = "./backup_incr";
+#define WTLOG "WiredTigerLog"
+#define WTLOGLEN strlen(WTLOG)
 
-static const char *const uri = "table:logtest";
+static const char *const full_out = "./backup_block_full";
+static const char *const incr_out = "./backup_block_incr";
 
-#define CONN_CONFIG "create,cache_size=100MB,log=(enabled=true,file_max=100K,remove=false)"
+static const char *const uri = "table:main";
+static const char *const uri2 = "table:extra";
+
+typedef struct __filelist {
+    const char *name;
+    bool exist;
+} FILELIST;
+
+static FILELIST *last_flist = NULL;
+static size_t filelist_count = 0;
+
+#define FLIST_INIT 16
+
+#define CONN_CONFIG "create,cache_size=100MB,log=(enabled=true,path=logpath,file_max=100K)"
 #define MAX_ITERATIONS 5
 #define MAX_KEYS 10000
 
@@ -58,13 +73,13 @@ compare_backups(int i)
      * directory.
      */
     if (i == 0)
-        testutil_system("../../wt -R -h %s dump logtest > %s.%d", home, full_out, i);
+        testutil_system("../../wt -R -h %s dump main > %s.%d", home, full_out, i);
     else
-        testutil_system("../../wt -R -h %s.%d dump logtest > %s.%d", home_full, i, full_out, i);
+        testutil_system("../../wt -R -h %s.%d dump main > %s.%d", home_full, i, full_out, i);
     /*
      * Now run dump on the incremental directory.
      */
-    testutil_system("../../wt -R -h %s.%d dump logtest > %s.%d", home_incr, i, incr_out, i);
+    testutil_system("../../wt -R -h %s.%d dump main > %s.%d", home_incr, i, incr_out, i);
 
     /*
      * Compare the files.
@@ -105,43 +120,129 @@ setup_directories(void)
          * For incremental backups we need 0-N. The 0 incremental directory will compare with the
          * original at the end.
          */
-        testutil_system("rm -rf %s.%d && mkdir %s.%d", home_incr, i, home_incr, i);
+        testutil_system("rm -rf %s.%d && mkdir -p %s.%d/%s", home_incr, i, home_incr, i, logpath);
         if (i == 0)
             continue;
         /*
          * For full backups we need 1-N.
          */
-        testutil_system("rm -rf %s.%d && mkdir %s.%d", home_full, i, home_full, i);
+        testutil_system("rm -rf %s.%d && mkdir -p %s.%d/%s", home_full, i, home_full, i, logpath);
     }
 }
 
 static void
-add_work(WT_SESSION *session, int iter)
+add_work(WT_SESSION *session, int iter, int iterj)
 {
-    WT_CURSOR *cursor;
+    WT_CURSOR *cursor, *cursor2;
     int i;
-    char k[32], v[32];
+    char k[64], v[64];
 
     error_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
+    /*
+     * Only on even iterations add content to the extra table. This illustrates and shows that
+     * sometimes only some tables will be updated.
+     */
+    cursor2 = NULL;
+    if (iter % 2 == 0)
+        error_check(session->open_cursor(session, uri2, NULL, NULL, &cursor2));
     /*
      * Perform some operations with individual auto-commit transactions.
      */
     for (i = 0; i < MAX_KEYS; i++) {
-        (void)snprintf(k, sizeof(k), "key.%d.%d", iter, i);
-        (void)snprintf(v, sizeof(v), "value.%d.%d", iter, i);
+        (void)snprintf(k, sizeof(k), "key.%d.%d.%d", iter, iterj, i);
+        (void)snprintf(v, sizeof(v), "value.%d.%d.%d", iter, iterj, i);
         cursor->set_key(cursor, k);
         cursor->set_value(cursor, v);
         error_check(cursor->insert(cursor));
+        if (cursor2 != NULL) {
+            cursor2->set_key(cursor2, k);
+            cursor2->set_value(cursor2, v);
+            error_check(cursor2->insert(cursor2));
+        }
     }
     error_check(cursor->close(cursor));
+    if (cursor2 != NULL)
+        error_check(cursor2->close(cursor2));
+}
+
+static int
+finalize_files(FILELIST *flistp, size_t count)
+{
+    size_t i;
+
+    /*
+     * Process files that were removed. Any file that is not marked in the previous list as existing
+     * in this iteration should be removed. Free all previous filenames as we go along. Then free
+     * the overall list.
+     */
+    for (i = 0; i < filelist_count; ++i) {
+        if (last_flist[i].name == NULL)
+            break;
+        if (!last_flist[i].exist) {
+            testutil_system("rm WT_BLOCK_LOG_*/%s%s",
+              strncmp(last_flist[i].name, WTLOG, WTLOGLEN) == 0 ? "logpath/" : "",
+              last_flist[i].name);
+        }
+        free((void *)last_flist[i].name);
+    }
+    free(last_flist);
+
+    /* Set up the current list as the new previous list. */
+    last_flist = flistp;
+    filelist_count = count;
+    return (0);
+}
+
+/*
+ * Process a file name. Build up a list of current file names. But also process the file names from
+ * the previous iteration. Mark any name we see as existing so that the finalize function can remove
+ * any that don't exist. We walk the list each time. This is slow.
+ */
+static int
+process_file(FILELIST **flistp, size_t *countp, size_t *allocp, const char *filename)
+{
+    FILELIST *flist;
+    size_t alloc, i, new, orig;
+
+    /* Build up the current list, growing as needed. */
+    i = *countp;
+    alloc = *allocp;
+    flist = *flistp;
+    if (i == alloc) {
+        orig = alloc * sizeof(FILELIST);
+        new = orig * 2;
+        flist = realloc(flist, new);
+        testutil_assert(flist != NULL);
+        memset(flist + alloc, 0, new - orig);
+        *allocp = alloc * 2;
+        *flistp = flist;
+    }
+
+    flist[i].name = strdup(filename);
+    flist[i].exist = false;
+    ++(*countp);
+
+    /* Check against the previous list. */
+    for (i = 0; i < filelist_count; ++i) {
+        /* If name is NULL, we've reached the end of the list. */
+        if (last_flist[i].name == NULL)
+            break;
+        if (strcmp(filename, last_flist[i].name) == 0) {
+            last_flist[i].exist = true;
+            break;
+        }
+    }
+    return (0);
 }
 
 static void
 take_full_backup(WT_SESSION *session, int i)
 {
+    FILELIST *flist;
     WT_CURSOR *cursor;
+    size_t alloc, count;
     int j, ret;
-    char h[256];
+    char buf[1024], f[256], h[256];
     const char *filename, *hdir;
 
     /*
@@ -153,80 +254,188 @@ take_full_backup(WT_SESSION *session, int i)
         hdir = h;
     } else
         hdir = home_incr;
-    error_check(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
+    if (i == 0) {
+        (void)snprintf(
+          buf, sizeof(buf), "incremental=(granularity=1M,enabled=true,this_id=\"ID%d\")", i);
+        error_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
+    } else
+        error_check(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
 
+    count = 0;
+    alloc = FLIST_INIT;
+    flist = calloc(alloc, sizeof(FILELIST));
+    testutil_assert(flist != NULL);
     while ((ret = cursor->next(cursor)) == 0) {
         error_check(cursor->get_key(cursor, &filename));
+        error_check(process_file(&flist, &count, &alloc, filename));
+
+        /*
+         * If it is a log file, prepend the path for cp.
+         */
+        if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+            (void)snprintf(f, sizeof(f), "%s/%s", logpath, filename);
+        else
+            (void)snprintf(f, sizeof(f), "%s", filename);
+
         if (i == 0)
             /*
              * Take a full backup into each incremental directory.
              */
             for (j = 0; j < MAX_ITERATIONS; j++) {
                 (void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
-                testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
+                testutil_system("cp %s/%s %s/%s", home, f, h, f);
             }
-        else {
-            (void)snprintf(h, sizeof(h), "%s.%d", home_full, i);
-            testutil_system("cp %s/%s %s/%s", home, filename, hdir, filename);
-        }
+        else
+            testutil_system("cp %s/%s %s/%s", home, f, hdir, f);
     }
     scan_end_check(ret == WT_NOTFOUND);
     error_check(cursor->close(cursor));
+    error_check(finalize_files(flist, count));
 }
 
 static void
 take_incr_backup(WT_SESSION *session, int i)
 {
-    WT_CURSOR *cursor;
-    int j, ret;
-    char h[256];
-    const char *filename;
+    FILELIST *flist;
+    WT_CURSOR *backup_cur, *incr_cur;
+    uint64_t offset, size, type;
+    size_t alloc, count, rdsize, tmp_sz;
+    int j, ret, rfd, wfd;
+    char buf[1024], h[256], *tmp;
+    const char *filename, *idstr;
+    bool first;
 
-    error_check(session->open_cursor(session, "backup:", NULL, "target=(\"log:\")", &cursor));
+    tmp = NULL;
+    tmp_sz = 0;
+    /*! [Query existing IDs] */
+    error_check(session->open_cursor(session, "backup:query_id", NULL, NULL, &backup_cur));
+    while ((ret = backup_cur->next(backup_cur)) == 0) {
+        error_check(backup_cur->get_key(backup_cur, &idstr));
+        printf("Existing incremental ID string: %s\n", idstr);
+    }
+    error_check(backup_cur->close(backup_cur));
+    /*! [Query existing IDs] */
 
-    while ((ret = cursor->next(cursor)) == 0) {
-        error_check(cursor->get_key(cursor, &filename));
-        /*
-         * Copy into the 0 incremental directory and then each of the incremental directories for
-         * this iteration and later.
-         */
+    /* Open the backup data source for incremental backup. */
+    (void)snprintf(buf, sizeof(buf), "incremental=(src_id=\"ID%d\",this_id=\"ID%d\"%s)", i - 1, i,
+      i % 2 == 0 ? "" : ",consolidate=true");
+    error_check(session->open_cursor(session, "backup:", NULL, buf, &backup_cur));
+    rfd = wfd = -1;
+    count = 0;
+    alloc = FLIST_INIT;
+    flist = calloc(alloc, sizeof(FILELIST));
+    testutil_assert(flist != NULL);
+    /* For each file listed, open a duplicate backup cursor and copy the blocks. */
+    while ((ret = backup_cur->next(backup_cur)) == 0) {
+        error_check(backup_cur->get_key(backup_cur, &filename));
+        error_check(process_file(&flist, &count, &alloc, filename));
         (void)snprintf(h, sizeof(h), "%s.0", home_incr);
-        testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
+        if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+            testutil_system("cp %s/%s/%s %s/%s/%s", home, logpath, filename, h, logpath, filename);
+        else
+            testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
+        first = true;
+
+        (void)snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
+        error_check(session->open_cursor(session, NULL, backup_cur, buf, &incr_cur));
+        while ((ret = incr_cur->next(incr_cur)) == 0) {
+            error_check(incr_cur->get_key(incr_cur, &offset, &size, &type));
+            scan_end_check(type == WT_BACKUP_FILE || type == WT_BACKUP_RANGE);
+            if (type == WT_BACKUP_RANGE) {
+                /*
+                 * We should never get a range key after a whole file so the read file descriptor
+                 * should be valid. If the read descriptor is valid, so is the write one.
+                 */
+                if (tmp_sz < size) {
+                    tmp = realloc(tmp, size);
+                    testutil_assert(tmp != NULL);
+                    tmp_sz = size;
+                }
+                if (first) {
+                    (void)snprintf(buf, sizeof(buf), "%s/%s", home, filename);
+                    error_sys_check(rfd = open(buf, O_RDONLY, 0));
+                    (void)snprintf(h, sizeof(h), "%s.%d", home_incr, i);
+                    (void)snprintf(buf, sizeof(buf), "%s/%s", h, filename);
+                    error_sys_check(wfd = open(buf, O_WRONLY | O_CREAT, 0));
+                    first = false;
+                }
+
+                /*
+                 * Don't use the system checker for lseek. The system check macro uses an int which
+                 * is often 4 bytes and checks for any negative value. The offset returned from
+                 * lseek is 8 bytes and we can have a false positive error check.
+                 */
+                if (lseek(rfd, (wt_off_t)offset, SEEK_SET) == -1)
+                    testutil_die(errno, "lseek: read");
+                error_sys_check(rdsize = (size_t)read(rfd, tmp, (size_t)size));
+                if (lseek(wfd, (wt_off_t)offset, SEEK_SET) == -1)
+                    testutil_die(errno, "lseek: write");
+                /* Use the read size since we may have read less than the granularity. */
+                error_sys_check(write(wfd, tmp, rdsize));
+            } else {
+                /* Whole file, so close both files and just copy the whole thing. */
+                testutil_assert(first == true);
+                rfd = wfd = -1;
+                if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+                    testutil_system(
+                      "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h, logpath, filename);
+                else
+                    testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
+            }
+        }
+        scan_end_check(ret == WT_NOTFOUND);
+        /* Done processing this file. Close incremental cursor. */
+        error_check(incr_cur->close(incr_cur));
+
+        /* Close file descriptors if they're open. */
+        if (rfd != -1) {
+            error_check(close(rfd));
+            error_check(close(wfd));
+        }
+        /*
+         * For each file, we want to copy the file into each of the later incremental directories so
+         * that they start out at the same for the next incremental round. We then check each
+         * incremental directory along the way.
+         */
         for (j = i; j < MAX_ITERATIONS; j++) {
             (void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
-            testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
+            if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+                testutil_system(
+                  "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h, logpath, filename);
+            else
+                testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
         }
     }
     scan_end_check(ret == WT_NOTFOUND);
 
-    /*
-     * With an incremental cursor, we want to truncate on the backup cursor to remove the logs. Only
-     * do this if the copy process was entirely successful.
-     */
-    /*! [Truncate a backup cursor] */
-    error_check(session->truncate(session, "log:", cursor, NULL, NULL));
-    /*! [Truncate a backup cursor] */
-    error_check(cursor->close(cursor));
+    /* Done processing all files. Close backup cursor. */
+    error_check(backup_cur->close(backup_cur));
+    error_check(finalize_files(flist, count));
+    free(tmp);
 }
 
 int
 main(int argc, char *argv[])
 {
+    struct stat sb;
     WT_CONNECTION *wt_conn;
+    WT_CURSOR *backup_cur;
     WT_SESSION *session;
-    int i;
+    int i, j, ret;
+    char cmd_buf[256], *idstr;
 
     (void)argc; /* Unused variable */
     (void)testutil_set_progname(argv);
 
-    testutil_system("rm -rf %s && mkdir %s", home, home);
+    testutil_system("rm -rf %s && mkdir -p %s/%s", home, home, logpath);
     error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
 
     setup_directories();
     error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));
     error_check(session->create(session, uri, "key_format=S,value_format=S"));
+    error_check(session->create(session, uri2, "key_format=S,value_format=S"));
     printf("Adding initial data\n");
-    add_work(session, 0);
+    add_work(session, 0, 0);
 
     printf("Taking initial backup\n");
     take_full_backup(session, 0);
@@ -235,8 +444,12 @@ main(int argc, char *argv[])
 
     for (i = 1; i < MAX_ITERATIONS; i++) {
         printf("Iteration %d: adding data\n", i);
-        add_work(session, i);
-        error_check(session->checkpoint(session, NULL));
+        /* For each iteration we may add work and checkpoint multiple times. */
+        for (j = 0; j < i; j++) {
+            add_work(session, i, j);
+            error_check(session->checkpoint(session, NULL));
+        }
+
         /*
          * The full backup here is only needed for testing and comparison purposes. A normal
          * incremental backup procedure would not include this.
@@ -254,6 +467,37 @@ main(int argc, char *argv[])
         error_check(compare_backups(i));
     }
 
+    printf("Close and reopen the connection\n");
+    /*
+     * Close and reopen the connection to illustrate the durability of ID information.
+     */
+    error_check(wt_conn->close(wt_conn, NULL));
+    error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
+    error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));
+
+    printf("Verify query after reopen\n");
+    error_check(session->open_cursor(session, "backup:query_id", NULL, NULL, &backup_cur));
+    while ((ret = backup_cur->next(backup_cur)) == 0) {
+        error_check(backup_cur->get_key(backup_cur, &idstr));
+        printf("Existing incremental ID string: %s\n", idstr);
+    }
+    error_check(backup_cur->close(backup_cur));
+
+    /*
+     * We should have an entry for i-1 and i-2. Use the older one.
+     */
+    (void)snprintf(
+      cmd_buf, sizeof(cmd_buf), "incremental=(src_id=\"ID%d\",this_id=\"ID%d\")", i - 2, i);
+    error_check(session->open_cursor(session, "backup:", NULL, cmd_buf, &backup_cur));
+    error_check(backup_cur->close(backup_cur));
+
+    /*
+     * After we're done, release resources. Test the force stop setting.
+     */
+    (void)snprintf(cmd_buf, sizeof(cmd_buf), "incremental=(force_stop=true)");
+    error_check(session->open_cursor(session, "backup:", NULL, cmd_buf, &backup_cur));
+    error_check(backup_cur->close(backup_cur));
+
     /*
      * Close the connection. We're done and want to run the final comparison between the incremental
      * and original.
@@ -262,6 +506,29 @@ main(int argc, char *argv[])
 
     printf("Final comparison: dumping and comparing data\n");
     error_check(compare_backups(0));
+    for (i = 0; i < (int)filelist_count; ++i) {
+        if (last_flist[i].name == NULL)
+            break;
+        free((void *)last_flist[i].name);
+    }
+    free(last_flist);
+
+    /*
+     * Reopen the connection to verify that the forced stop should remove incremental information.
+     */
+    error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
+    error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));
+    /*
+     * We should not have any information.
+     */
+    (void)snprintf(
+      cmd_buf, sizeof(cmd_buf), "incremental=(src_id=\"ID%d\",this_id=\"ID%d\")", i - 2, i);
+    testutil_assert(session->open_cursor(session, "backup:", NULL, cmd_buf, &backup_cur) == ENOENT);
+    error_check(wt_conn->close(wt_conn, NULL));
+
+    (void)snprintf(cmd_buf, sizeof(cmd_buf), "%s/WiredTiger.backup.block", home);
+    ret = stat(cmd_buf, &sb);
+    testutil_assert(ret == -1 && errno == ENOENT);
 
     return (EXIT_SUCCESS);
 }

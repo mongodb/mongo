@@ -68,15 +68,3 @@ class test_bug012(wttest.WiredTigerTestCase):
         msg = '/unknown compressor/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
             self.session.create('table:A', 'block_compressor="xyzzy"'), msg)
-
-    # Test that we detect illegal extractors.
-    #
-    # This test is a little fragile, we're depending on ComplexDataSet to do
-    # the heavy-lifting, so if that function changes, this could break.
-    def test_illegal_extractor(self):
-        ds = ComplexDataSet(self, 'table:A', 10)
-        ds.populate()
-        msg = '/unknown extractor/'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            self.session.create('index:A:xyzzy',
-            'key_format=S,columns=(column2),extractor="xyzzy"'), msg)

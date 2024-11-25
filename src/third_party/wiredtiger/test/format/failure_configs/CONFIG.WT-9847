@@ -3,7 +3,7 @@
 ############################################
 assert.read_timestamp=0
 backup=1
-backup.incremental=log
+backup.incremental=block
 backup.incr_granularity=1721
 block_cache=0
 block_cache.cache_on_checkpoint=0
@@ -16,7 +16,6 @@ checkpoint=wiredtiger
 checkpoint.log_size=75
 checkpoint.wait=7
 disk.data_extend=0
-disk.direct_io=0
 disk.encryption=none
 disk.mmap=1
 disk.mmap_all=0

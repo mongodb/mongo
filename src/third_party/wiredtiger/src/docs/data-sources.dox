@@ -13,10 +13,6 @@ The following are the builtin basic cursor types:
 	index cursor,
 	key=index key\, value=table value(s) with optional projection
 	of columns}
-@row{<tt>join:table:\<table name\>[\<projection\>]</tt>,
-	join cursor,
-	key=table key\, value=table value(s) with optional projection
-	of columns}
 </table>
 Some administrative tasks can be accomplished using the following special
 cursor types that give access to data managed by WiredTiger:
@@ -46,7 +42,7 @@ cursor types that give access to data managed by WiredTiger:
 	key=<code>string</code>\, value=<code>string</code>\,<br>
 	see @ref metadata for details}
 @row{<tt>statistics:[\<data source URI\>]</tt>,
-	database\, data source\, join or session statistics cursor,
+	database\, data source\ or session statistics cursor,
 	key=<code>int id</code>\,<br>
 	value=<code>(string description\,
 	string value\, uint64_t value)</code>\,<br>
@@ -103,9 +99,7 @@ WT_SESSION::create method.
 
 A cursor opened on an index has the specified index columns as its key,
 accessed by WT_CURSOR::set_key and WT_CURSOR::get_key.  The value columns
-default to returning the value columns from the table, but this can be
-overridden by configuring a projection cursor (see @ref cursor_projections),
-which can access the table key columns or a subset of the value columns.
+default to returning the value columns from the table.
 
 @subsection data_statistics Statistics Data
 
@@ -114,9 +108,7 @@ WiredTiger database as well as statistics for individual data sources.
 The statistics are at two levels: per-database and per-individual data
 source.  Database-wide statistics are retrieved with the \c "statistics:"
 URI; individual data source statistics are available by specifying
-\c "statistics:<data source URI>". Statistics about a join cursor can be
-retrieved by specifying \c "statistics:join" and supplying the join cursor as an
-argument in the SESSION::open_cursor call. Statistics about a session can be
+\c "statistics:<data source URI>". Statistics about a session can be
 retrieved by specifying \c "statistics:session".
 
 The statistic key is an integer from the list of keys in
@@ -138,10 +130,6 @@ WiredTiger engine:
 The following is an example of printing statistics about a table:
 
 @snippet ex_stat.c statistics table function
-
-The following is an example of printing statistics about a join cursor:
-
-@snippet ex_stat.c statistics join cursor function
 
 The following is an example of printing statistics about a session cursor:
 

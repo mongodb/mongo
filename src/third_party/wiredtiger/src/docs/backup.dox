@@ -184,61 +184,7 @@ can only be one backup cursor of any type open at a time.
 
 An example of opening the backup data source to query incremental identifiers:
 
-@snippet ex_backup_block.c Query existing IDs
-
-@section backup_incremental Log-based Incremental backup
-
-Once a backup has been done, it can be rolled forward incrementally by
-adding log files to the backup copy. Adding log files to the copy
-decreases potential data loss from switching to the copy, but increases
-the recovery time necessary to switch to the copy.  To reset the
-recovery time necessary to switch to the copy, perform a full backup of
-the database.  For example, an application might do a full backup of the
-database once a week during a quiet period, and then incrementally copy
-new log files into the backup directory for the rest of the week.
-Incremental backups may also save time when the tables are very large.
-
-@copydoc doc_bulk_durability
-
-By default, WiredTiger automatically removes log files no longer
-required for recovery.  Applications wanting to use log files for
-incremental backup must first disable automatic log file removal using
-the \c "log=(remove=false)" configuration to ::wiredtiger_open.
-
-The following is the procedure for incrementally backing up a database
-and removing log files from the original database home:
-
-1. Perform a full backup of the database (as described above).
-
-2. Open a cursor on the \c "backup:" data source, configured with the
-   \c "target=(\"log:\\")" target specified, which begins the process
-   of an incremental backup.
-
-3. Copy each log file returned by the WT_CURSOR::next method to the backup
-   directory.  It is not an error to copy a log file which has been copied
-   before, but care should be taken to ensure each log file is completely copied
-   as the most recent log file may grow in size while being copied.
-
-4. If all log files have been successfully copied, remove the log
-   files by calling the WT_SESSION::truncate method with the URI
-   <code>log:</code> and specifying the backup cursor as the start
-   cursor to that method. (Note there is no requirement backups be
-   coordinated with database checkpoints, however, an incremental backup
-   will repeatedly copy the same files, and will not make additional log
-   files available for removal, unless there was a checkpoint after the
-   previous incremental backup.)
-
-5. Close the backup cursor.
-
-Steps 2-5 can be repeated any number of times before step 1 is repeated.
-Full and incremental backups may be repeated as long as the backup
-database directory has not been opened and recovery run.  Once recovery
-has run in a backup directory, you can no longer back up to that
-database directory.
-
-An example of opening the backup data source for log-based incremental backup:
-
-@snippet ex_all.c incremental backup
+@snippet ex_backup.c Query existing IDs
 
 @section backup_export Export tables using backup cursor
 
@@ -249,15 +195,5 @@ The cursor operates like a normal backup cursor, it can be used to iterate over 
 for a backup. The main difference is that ::wiredtiger_open will
 ignore \c WiredTiger.export, it will not try to start the system using the file nor delete it.
 As with all backup cursors, there can only be one backup cursor of any type open at a time.
-
-@section backup_o_direct Backup and O_DIRECT
-
-Many Linux systems do not support mixing \c O_DIRECT and memory mapping
-or normal I/O to the same file.   If \c O_DIRECT is configured for data
-or log files on Linux systems (using the wiredtiger_open \c direct_io
-configuration), any program used to copy files during backup should also
-specify \c O_DIRECT when configuring its file access.  Likewise, when
-\c O_DIRECT is not configured by the database application, programs
-copying files should not configure \c O_DIRECT.
 
 */
