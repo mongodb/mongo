@@ -265,7 +265,7 @@ selector:
     # TODO(SERVER-85322): Try to include this test(s).
     - jstests/core/query/resume_query.js
     - jstests/core/query/resume_query_from_non_existent_record.js
-    # TODO(SERVER-82059): Try to include this test(s).
+    # Inserting into a time-series collection does not replace top-level empty timestamps.
     - jstests/core/ts1.js
     # Cursor manipulation incompatible with count 'applySkipLimit' option.
     - jstests/core/query/count/count2.js
