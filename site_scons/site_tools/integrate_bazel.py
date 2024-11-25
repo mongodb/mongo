@@ -360,6 +360,13 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
     )
 
     os.close(child_fd)
+
+    # Timeout when stuck scheduling without making progress for more than 10 minutes
+    # Ex string:
+    # [21,537 / 21,603] [Sched] Compiling src/mongo/db/s/migration_chunk_cloner_source.cpp; 1424s
+    last_sched_target_progress = ""
+    sched_time_start = 0
+    sched_timeout_sec = 60 * 10
     try:
         # This loop will terminate with an EOF or EOI when the process ends.
         while True:
@@ -373,7 +380,20 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
                 if not data:  # EOF
                     break
 
-            write_bazel_build_output(data.decode())
+            line = data.decode()
+            write_bazel_build_output(line)
+            if "[Sched]" in line:
+                target_progress = line.split("[Sched]")[0].strip()
+                if len(target_progress) > 0:
+                    if last_sched_target_progress == target_progress:
+                        if time.time() - sched_time_start > sched_timeout_sec:
+                            write_bazel_build_output("Stuck scheduling for too long, terminating")
+                            bazel_proc.kill()
+                            bazel_proc.wait()
+                            raise subprocess.CalledProcessError(-1, bazel_cmd, "", "")
+                    else:
+                        sched_time_start = time.time()
+                    last_sched_target_progress = target_progress
     finally:
         os.close(parent_fd)
         if bazel_proc.poll() is None:
