@@ -54,6 +54,9 @@ selector:
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/concurrency/fsm_workloads/cleanup_orphaned_while_migrating.js
 
+    # TODO SERVER-97434: Re-enable this test once completed.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_reopening_respects_control_closed.js
+
   exclude_with_any_tags:
     - requires_standalone
     - assumes_against_mongod_not_mongos
