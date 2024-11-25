@@ -56,7 +56,7 @@ selector:
     # TODO: SERVER-85773 Reenable the following test once `cloneCollectionAsCapped` is supported on any shard
     - jstests/core/ddl/capped_convertToCapped1.js
 
-    # TODO: SERVER-96790 re-enable this test
+    # TODO: SERVER-97219 re-enable this test
     - jstests/core_sharding/move_collection/move_collection_basic.js
     - jstests/core_sharding/move_collection/move_collection_capped_collection.js
 
