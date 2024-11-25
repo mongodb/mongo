@@ -231,6 +231,7 @@ def bazel_builder_action(
                     if os.path.exists(str(t)):
                         os.remove(str(t))
                     os.link(s, str(t))
+                    os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
                 else:
                     print(
                         f"Copying {s} to {t} instead of hardlinking because files are on different mounts."
