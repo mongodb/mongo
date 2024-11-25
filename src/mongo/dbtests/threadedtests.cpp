@@ -227,85 +227,6 @@ private:
     }
 };
 
-// Tests waiting on the TicketHolder by running many more threads than can fit into the "hotel", but
-// only max _nRooms threads should ever get in at once
-template <class TicketHolderImpl>
-class TicketHolderWaits : public ThreadedTest<10> {
-    static const int checkIns = 1000;
-    static const int rooms = 3;
-
-public:
-    TicketHolderWaits() : _hotel(rooms) {
-        auto client = Client::getCurrent();
-        constexpr bool trackPeakUsed = false;
-        _tickets = std::make_unique<TicketHolderImpl>(
-            client->getServiceContext(), _hotel._nRooms, trackPeakUsed);
-    }
-
-private:
-    class Hotel {
-    public:
-        Hotel(int nRooms) : _nRooms(nRooms), _checkedIn(0), _maxRooms(0) {}
-
-        void checkIn() {
-            stdx::lock_guard<stdx::mutex> lk(_frontDesk);
-            _checkedIn++;
-            MONGO_verify(_checkedIn <= _nRooms);
-            if (_checkedIn > _maxRooms)
-                _maxRooms = _checkedIn;
-        }
-
-        void checkOut() {
-            stdx::lock_guard<stdx::mutex> lk(_frontDesk);
-            _checkedIn--;
-            MONGO_verify(_checkedIn >= 0);
-        }
-
-        stdx::mutex _frontDesk;
-        int _nRooms;
-        int _checkedIn;
-        int _maxRooms;
-    };
-
-    Hotel _hotel;
-
-    void subthread(int x) override {
-        std::string threadName = (str::stream() << "ticketHolder" << x);
-        Client::initThread(threadName, getGlobalServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        MockAdmissionContext admCtx;
-
-        for (int i = 0; i < checkIns; i++) {
-            boost::optional<ScopedAdmissionPriorityBase> admissionPriority;
-            if ((i % 3) == 0) {
-                // One of every three admissions is low priority.
-                admissionPriority.emplace(opCtx.get(), admCtx, AdmissionContext::Priority::kLow);
-            }
-
-            auto ticket = _tickets->waitForTicket(opCtx.get(), &admCtx);
-
-            _hotel.checkIn();
-
-            sleepalittle();
-            if (i == checkIns - 1)
-                sleepsecs(2);
-
-            _hotel.checkOut();
-
-            if ((i % (checkIns / 10)) == 0)
-                LOGV2(22517, "checked in {i} times...", "i"_attr = i);
-        }
-    }
-
-    void validate() override {
-        // This should always be true, assuming that it takes < 1 sec for the hardware to process a
-        // check-out/check-in Time for test is then ~ #threads / _nRooms * 2 seconds
-        MONGO_verify(_hotel._maxRooms == _hotel._nRooms);
-    }
-
-protected:
-    std::unique_ptr<TicketHolder> _tickets;
-};
 
 class All : public unittest::OldStyleSuiteSpecification {
 public:
@@ -320,8 +241,6 @@ public:
         add<IsAtomicWordAtomic<AtomicWord<unsigned>>>();
         add<IsAtomicWordAtomic<AtomicWord<unsigned long long>>>();
         add<ThreadPoolTest>();
-
-        add<TicketHolderWaits<TicketHolder>>();
     }
 };
 

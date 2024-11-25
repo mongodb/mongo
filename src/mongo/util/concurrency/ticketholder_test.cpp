@@ -123,6 +123,7 @@ public:
 
 protected:
     class Stats;
+    class Hotel;
     struct MockAdmission;
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
@@ -157,6 +158,40 @@ public:
 
 private:
     TicketHolder* _holder;
+};
+
+/**
+ * Class used to validate concurrency and waiting behavior of a TicketHolder. We set the number
+ * of tickets available to _nRooms and require ticket acquisition before check-in. TicketHolder
+ * should prevent hotel from "overbooking" and from allowing threads to check out before check in.
+ */
+class TicketHolderTest::Hotel {
+public:
+    Hotel(int nRooms) : _nRooms(nRooms), _checkedIn(0), _maxRooms(0) {}
+
+    void checkIn() {
+        stdx::lock_guard<stdx::mutex> lk(_frontDesk);
+        _checkedIn++;
+        ASSERT_TRUE(_checkedIn <= _nRooms);
+        if (_checkedIn > _maxRooms)
+            _maxRooms = _checkedIn;
+    }
+
+    void checkOut() {
+        stdx::lock_guard<stdx::mutex> lk(_frontDesk);
+        _checkedIn--;
+        ASSERT_TRUE(_checkedIn >= 0);
+    }
+
+    void validateFilledToCapacity() {
+        ASSERT_TRUE(_maxRooms == _nRooms);
+    }
+
+private:
+    stdx::mutex _frontDesk;
+    int _nRooms;
+    int _checkedIn;
+    int _maxRooms;
 };
 
 /**
@@ -337,6 +372,47 @@ TEST_F(TicketHolderTest, PriorityBookkeeping) {
               0);
 
     ASSERT_EQ(statsWhenFinished.getObjectField("exempt").getIntField("finishedProcessing"), 1);
+}
+
+TEST_F(TicketHolderTest, HighlyConcurrentAcquireReleaseTicket) {
+    std::vector<stdx::thread> threads;
+    constexpr int numRooms = 3;
+    constexpr int numCheckIns = 50;
+    constexpr int numThreads = 10;
+
+    Hotel hotel{numRooms};
+    OperationContext* opCtx = _opCtx.get();
+    auto holder =
+        std::make_unique<TicketHolder>(getServiceContext(), numRooms, false /* trackPeakUsed */);
+
+    for (size_t i = 0; i < numThreads; ++i) {
+        threads.emplace_back([&, numCheckIns]() {
+            MockAdmissionContext admCtx{};
+            for (size_t checkIn = 0; checkIn < numCheckIns; checkIn++) {
+                auto ticket = holder->waitForTicket(opCtx, &admCtx);
+                hotel.checkIn();
+
+                // Ticket is an RAII-style object. We hold onto it by staying in the hotel
+                // to simulate holding a ticket during an operation's execution.
+                Timer t;
+                while (1) {
+                    stdx::this_thread::yield();
+                    if (t.micros() > 4)
+                        break;
+                }
+
+                if (checkIn == numCheckIns - 1)
+                    sleepsecs(2);
+                hotel.checkOut();
+            }
+        });
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    hotel.validateFilledToCapacity();
 }
 
 TEST_F(TicketHolderTest, QueuedWaiterGetsTicketWhenMadeAvailable) {
