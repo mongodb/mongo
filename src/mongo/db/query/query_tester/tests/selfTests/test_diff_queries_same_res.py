@@ -7,5 +7,5 @@ from testlib.test_utils import (
 )
 
 exit_code, output = run_mongotest(("diff_queries_same_res",), Mode.COMPARE)
-assert_exit_code(exit_code, ExitCode.FAILURE)
+assert_exit_code(exit_code, ExitCode.FAILURE, output)
 assert_output_contains(output, "diff --git")
