@@ -44,6 +44,10 @@ function testShardingCommand(command) {
     let commandObj = {};
     commandObj[command] = kDbName + '.basic';
 
+    if (command === "reshardCollection") {
+        commandObj['numInitialChunks'] = 1;
+    }
+
     jsTestLog('Fail ' + command + ' if shard key is an encrypted field');
     commandObj['key'] = {firstName: 1};
     res = mongos.adminCommand(commandObj);

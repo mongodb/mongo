@@ -31,7 +31,8 @@ const reshardingPauseBeforeInsertCoordinatorDocFailpoint =
     configureFailPoint(st.configRS.getPrimary(), "pauseBeforeInsertCoordinatorDoc");
 
 assert.commandFailedWithCode(
-    db.adminCommand({reshardCollection: ns, key: {newKey: 1}, maxTimeMS: 1000}),
+    db.adminCommand(
+        {reshardCollection: ns, key: {newKey: 1}, maxTimeMS: 1000, numInitialChunks: 1}),
     ErrorCodes.MaxTimeMSExpired);
 
 // Wait for resharding to start running on the configsvr
@@ -53,7 +54,8 @@ assert.commandFailedWithCode(db.runCommand({drop: collName, maxTimeMS: 5000}),
 
 // Finish resharding
 reshardingPauseBeforeInsertCoordinatorDocFailpoint.off();
-assert.commandWorked(db.adminCommand({reshardCollection: ns, key: {newKey: 1}}));
+assert.commandWorked(
+    db.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}));
 
 // Now the drop can complete
 assert.commandWorked(db.runCommand({drop: collName}));

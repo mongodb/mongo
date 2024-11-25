@@ -276,7 +276,13 @@ const st = new ShardingTest({mongos: 1, shards: 2});
 
             // On parallel shell, start resharding
             const joinResharding = startParallelShell(() => {
-                assert.commandWorked(db.adminCommand({reshardCollection: 'test.foo', key: {y: 1}}));
+                assert.commandWorked(db.adminCommand({
+                    reshardCollection: 'test.foo',
+                    key: {y: 1},
+                    // We set this to 2 because we want there to be one chunk on each shard post
+                    // resharding for tests below.
+                    numInitialChunks: 2,
+                }));
             }, st.s.port);
 
             // Await configsvr to have done its part of the commit.

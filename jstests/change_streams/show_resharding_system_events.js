@@ -56,6 +56,7 @@ const oldUUID = getCollectionUuid(testColl);
 assert.commandWorked(st.s.adminCommand({
     reshardCollection: testColl.getFullName(),
     key: {a: 1},
+    numInitialChunks: 1,
 }));
 
 // Get the UUID of the collection after resharding.
@@ -106,8 +107,13 @@ const expectedReshardingEvents = [
         ns: origNs,
         collectionUUID: oldUUID,
         operationType: "reshardCollection",
-        operationDescription:
-            {reshardUUID: newUUID, shardKey: {a: 1}, oldShardKey: {_id: 1}, unique: false}
+        operationDescription: {
+            reshardUUID: newUUID,
+            shardKey: {a: 1},
+            oldShardKey: {_id: 1},
+            unique: false,
+            numInitialChunks: NumberLong(1)
+        }
     },
     {
         ns: origNs,
