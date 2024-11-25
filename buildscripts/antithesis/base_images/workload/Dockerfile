@@ -26,6 +26,9 @@ RUN python -m pip install --upgrade pip wheel
 ARG LLVM_VERSION=12
 RUN apt-get install -y llvm-${LLVM_VERSION}
 
+# Ensure that libc debugsymbols are on the machine
+RUN apt-get install -y libc6-dbg
+
 # Copy TSAN suppressions
 COPY tsan.suppressions /etc/tsan.suppressions
 
