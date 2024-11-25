@@ -3507,6 +3507,32 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_library(
+    name = "read_write_concern_defaults_mock",
+    srcs = [
+        "read_write_concern_defaults_cache_lookup_mock.cpp",
+        "read_write_concern_defaults_cache_lookup_mock.h",
+    ],
+    deps = [
+        ":read_write_concern_defaults",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "service_entry_point_shard_role_test",
+    srcs = [
+        "service_entry_point_shard_role_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":service_context_d",
+        "//src/mongo/transport:service_entry_point_test_fixture",
+    ],
+)
+
 # TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:baton.h to //src/mongo/db:service_context
 filegroup(
     name = "baton_hdrs",

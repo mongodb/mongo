@@ -291,6 +291,24 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "service_entry_point_test_fixture",
+    srcs = [
+        "service_entry_point_test_fixture.cpp",
+        "service_entry_point_test_fixture.h",
+        "//src/mongo/db/storage:storage_engine_mock.h",
+    ],
+    deps = [
+        "//src/mongo/db:read_write_concern_defaults_mock",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/repl:hello_command",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
 # TODO(SERVER-96852): Remove cycle created by moving //src/mongo/transport:session.h to //src/mongo/transport:transport_layer_common
 filegroup(
     name = "session_hdrs",

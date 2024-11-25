@@ -28,6 +28,7 @@ if get_option("link-model") == "dynamic":
         target="visibility1_test",
         source=[],
         LIBDEPS=[],
+        PROVE_ALIASES=["server-programmability"],
     )
 
     env.CppUnitTest(

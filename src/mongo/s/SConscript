@@ -186,15 +186,6 @@ env.Benchmark(
 
 env.CppUnitTest(
     target="service_entry_point_router_role_test",
-    source=[
-        "service_entry_point_router_role_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authserver",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/rpc/message",
-        "$BUILD_DIR/mongo/transport/service_entry_point_test_fixture",
-        "$BUILD_DIR/mongo/util/version_impl",
-        "startup_initialization",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

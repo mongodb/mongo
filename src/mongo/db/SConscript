@@ -144,16 +144,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target="read_write_concern_defaults_mock",
-    source=[
-        "read_write_concern_defaults_cache_lookup_mock.cpp",
-    ],
-    LIBDEPS=[
-        "read_write_concern_defaults",
-    ],
-)
-
 env.CppUnitTest(
     target="default_baton_test",
     source=[
@@ -687,13 +677,8 @@ env.Benchmark(
 
 env.CppUnitTest(
     target="service_entry_point_shard_role_test",
-    source=[
-        "service_entry_point_shard_role_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/transport/service_entry_point_test_fixture",
-        "service_context_d",
-    ],
+    source=[],
+    LIBDEPS=[],
     PROVE_ALIASES=["server-programmability"],
 )
 

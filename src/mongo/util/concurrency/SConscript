@@ -4,26 +4,10 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="thread_pool_test_fixture",
-    source=["thread_pool_test_common.cpp", "thread_pool_test_fixture.cpp"],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-    ],
-)
-
 env.CppUnitTest(
     target="util_concurrency_test",
-    source=[
-        "spin_lock_test.cpp",
-        "thread_pool_test.cpp",
-        "with_lock_test.cpp",
-    ],
-    LIBDEPS=[
-        "spin_lock",
-        "thread_pool",
-        "thread_pool_test_fixture",
-    ],
+    source=[],
+    LIBDEPS=[],
     PROVE_ALIASES=["server-programmability"],
 )
 
@@ -36,7 +20,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "ticketholder",
+        "$BUILD_DIR/mongo/util/concurrency/ticketholder",
     ],
 )
 
@@ -66,9 +50,7 @@ env.Benchmark(
 
 env.CppUnitTest(
     target="lock_free_read_list_test",
-    source=[
-        "lock_free_read_list_test.cpp",
-    ],
+    source=[],
     LIBDEPS=[],
     PROVE_ALIASES=["server-programmability"],
 )
