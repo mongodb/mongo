@@ -105,6 +105,8 @@ public:
             configSvrCommitMergeAllChunksOnShard.setShard(request().getShard());
             configSvrCommitMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
                 request().getMaxNumberOfChunksToMerge());
+            configSvrCommitMergeAllChunksOnShard.setMaxTimeProcessingChunksMS(
+                request().getMaxTimeProcessingChunksMS());
             configSvrCommitMergeAllChunksOnShard.setWriteConcern(
                 generic_argument_util::kMajorityWriteConcern);
 

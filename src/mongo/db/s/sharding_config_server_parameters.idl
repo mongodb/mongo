@@ -124,3 +124,13 @@ server_parameters:
         cpp_varname: shardedIndexConsistencyCheckIntervalMS
         default: 600000
         redact: false
+
+    autoMergerMaxTimeProcessingChunksMS::
+        description: >-
+            Maximum time in milliseconds the command mergeAllChunksOnShard scheduled by the 
+            autoMerger will spend looking for mergeable chunks.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: autoMergerMaxTimeProcessingChunksMS
+        default: 500 # 500 milliseconds
+        redact: false
