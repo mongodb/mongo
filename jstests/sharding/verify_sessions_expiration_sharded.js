@@ -14,7 +14,7 @@
 //    replace it in the config.system.sessions collection.
 //
 // @tags: [
-//    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+//    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
 //    embedded_router_incompatible,
 // ]
 

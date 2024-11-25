@@ -8,7 +8,7 @@
  * Shard targeting logic for $lookup changed in 7.3 and may not match the expected behavior in a
  * multiversion environment.
  * @tags: [
- *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *    requires_fcv_81,
  * ]

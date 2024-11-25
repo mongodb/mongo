@@ -8,7 +8,7 @@
  *   requires_sharding,
  *   requires_spawning_own_processes,
  *   requires_profiling,
- *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *   requires_fcv_80,
  *   # TODO (SERVER-89166) Remove the multiversion_incompatible once the bug is fixed

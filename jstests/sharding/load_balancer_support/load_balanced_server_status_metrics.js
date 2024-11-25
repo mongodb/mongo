@@ -4,7 +4,7 @@
  *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
  *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  *   requires_fcv_80,
- *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

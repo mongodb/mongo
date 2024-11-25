@@ -5,7 +5,7 @@
  * Checking UUID and index consistency involves talking to config servers through mongos, but mongos
  * is blackholed from the config servers in this test.
  * @tags: [
- *    # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

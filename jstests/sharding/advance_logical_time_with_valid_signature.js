@@ -2,7 +2,7 @@
  * Tests that the mongo shell can use a cluster time with a valid signature to advance a server's
  * cluster time.
  * @tags: [
- *    # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

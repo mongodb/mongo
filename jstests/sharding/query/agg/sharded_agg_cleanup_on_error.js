@@ -10,7 +10,7 @@
  *   requires_sharding,
  *   # This test uses a new $_internalSplitPipeline syntax introduced in 8.0.
  *   requires_fcv_80,
- *    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

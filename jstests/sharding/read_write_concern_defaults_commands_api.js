@@ -1,7 +1,7 @@
 // Tests the basic API of the getDefaultRWConcern and setDefaultRWConcern commands and their
 // associated persisted state against different topologies.
 // @tags: [
-//    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+//    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
 //    embedded_router_incompatible,
 // ]
 // Asserts a set/get default RWC command response or persisted document contains the expected

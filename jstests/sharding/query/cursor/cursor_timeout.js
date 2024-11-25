@@ -17,7 +17,7 @@
 // @tags: [
 //   requires_fcv_51,
 //   requires_sharding,
-//   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+//   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
 // ]
 // This test manually simulates a session, which is not compatible with implicit sessions.

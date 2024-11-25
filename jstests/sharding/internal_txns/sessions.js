@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_60,
- *    # TODO (SERVER-88122): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *   uses_transactions,
  * ]

@@ -7,7 +7,7 @@
  *   # Slow Windows machines cause this test to be flakey. Further reducing the number of samples we
  *   # take would make the test less useful on Linux variants so we just don't run on Windows.
  *   incompatible_with_windows_tls,
- *    # TODO (SERVER-88122): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

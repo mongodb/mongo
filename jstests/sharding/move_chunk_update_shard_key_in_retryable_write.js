@@ -9,7 +9,7 @@
  * @tags: [
  *    uses_transactions,
  *    uses_multi_shard_transaction,
- *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

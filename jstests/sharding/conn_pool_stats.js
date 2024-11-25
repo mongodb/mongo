@@ -6,7 +6,7 @@
  * @tags: [
  *   config_shard_incompatible,
  *   requires_fcv_63,
- *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

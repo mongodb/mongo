@@ -3,7 +3,7 @@
  * shard, and for a sharded collection the command sends and checks shard versions and only
  * targets the shard that owns the MinKey chunk.
  * @tags: [
- *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

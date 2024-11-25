@@ -2,7 +2,7 @@
  * Test that a mongos-only aggregation pipeline is explainable, and that the resulting explain plan
  * confirms that the pipeline ran entirely on mongoS.
  * @tags: [
- *    # TODO (SERVER-88125): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */

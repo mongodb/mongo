@@ -3,7 +3,7 @@
 // Requires FCV 5.3 since $mergeCursors was added to explain output in 5.3.
 // @tags: [
 //   requires_fcv_53,
-//   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
+//   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";

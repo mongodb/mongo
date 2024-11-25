@@ -3,7 +3,7 @@
  *
  *  @tags: [
  *    multiversion_incompatible,
- *    # TODO (SERVER-88126): Re-enable this test or add an explanation why it is incompatible.
+ *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  * ]
  */
