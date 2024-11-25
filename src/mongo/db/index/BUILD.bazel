@@ -75,6 +75,7 @@ mongo_cc_library(
         "wildcard_access_method.h",
         "wildcard_key_generator.h",
         "wildcard_validation.h",
+        "//src/mongo/db/exec:index_path_projection.h",
     ],
     deps = [
         ":expression_params",
