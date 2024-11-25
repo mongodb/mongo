@@ -440,7 +440,7 @@ bool WiredTigerSessionCache::isEphemeral() {
 UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
-    invariant(!(_shuttingDown.loadRelaxed() & kShuttingDownMask));
+    invariant(!(_shuttingDown.load() & kShuttingDownMask));
 
     {
         stdx::lock_guard<Latch> lock(_cacheLock);
