@@ -153,6 +153,7 @@ class _FixtureConfig(object):
         self.MONGOD_EXECUTABLE = config.MONGOD_EXECUTABLE
         self.DEFAULT_MONGOD_EXECUTABLE = config.DEFAULT_MONGOD_EXECUTABLE
         self.MONGOD_SET_PARAMETERS = config.MONGOD_SET_PARAMETERS
+        self.MONGOD_EXTRA_CONFIG = config.MONGOD_EXTRA_CONFIG
         self.FIXTURE_SUBDIR = config.FIXTURE_SUBDIR
         self.AUTO_KILL = config.AUTO_KILL
         self.ALWAYS_USE_LOG_FILES = config.ALWAYS_USE_LOG_FILES

@@ -478,6 +478,12 @@ MONGOD_EXECUTABLE = None
 # The --setParameter options passed to mongod.
 MONGOD_SET_PARAMETERS = []
 
+# Extra configurations for mongod (i.e. ones that aren't setParameters). Unlike other configuration
+# options, these "extra" configs are only used to invoke resmoke's standalone mongod instance. Extra
+# configs are a dictionary of {flag: bool, ...} which will become command-line args to mongod of the
+# form "--flag" if true, and nothing if false.
+MONGOD_EXTRA_CONFIG = {}
+
 # The path to the mongos executable used by resmoke.py.
 MONGOS_EXECUTABLE = None
 

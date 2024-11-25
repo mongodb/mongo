@@ -423,6 +423,16 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
     return ret
 
 
+def generate_mongod_extra_configs(rng):
+    """Return a dictionary with values for each additional (i.e. not setParameter) mongod config."""
+    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_extra_configs
+
+    return {
+        key: generate_normal_mongo_parameters(rng, value)
+        for key, value in config_fuzzer_extra_configs["mongod"].items()
+    }
+
+
 def generate_mongos_parameters(rng):
     """Return a dictionary with values for each mongos parameter."""
     from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
@@ -459,6 +469,7 @@ def fuzz_mongod_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
 
     return (
         utils.dump_yaml(ret),
+        generate_mongod_extra_configs(rng),
         generate_eviction_configs(rng, fuzzer_stress_mode),
         generate_table_configs(rng),
         generate_table_configs(rng),

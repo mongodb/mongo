@@ -27,10 +27,15 @@ class GenerateFuzzConfig(Subcommand):
         filename = "mongod.conf"
         output_file = os.path.join(self._output_path, filename)
         user_param = utils.dump_yaml({})
-        set_parameters, wt_engine_config, wt_coll_config, wt_index_config, encryption_config = (
-            mongo_fuzzer_configs.fuzz_mongod_set_parameters(
-                self._mongod_mode, self._seed, user_param
-            )
+        (
+            set_parameters,
+            extra_configs,
+            wt_engine_config,
+            wt_coll_config,
+            wt_index_config,
+            encryption_config,
+        ) = mongo_fuzzer_configs.fuzz_mongod_set_parameters(
+            self._mongod_mode, self._seed, user_param
         )
         set_parameters = utils.load_yaml(set_parameters)
         # This is moved from Jepsen mongod.conf to have only one setParameter key value pair.
@@ -39,11 +44,15 @@ class GenerateFuzzConfig(Subcommand):
         conf = {
             "setParameter": set_parameters,
             "storage": {
+                "directoryPerDB": extra_configs.pop("directoryperdb"),
                 "wiredTiger": {
-                    "engineConfig": {"configString": wt_engine_config},
+                    "engineConfig": {
+                        "configString": wt_engine_config,
+                        "directoryForIndexes": extra_configs.pop("wiredTigerDirectoryForIndexes"),
+                    },
                     "collectionConfig": {"configString": wt_coll_config},
                     "indexConfig": {"configString": wt_index_config},
-                }
+                },
             },
         }
         if encryption_config:

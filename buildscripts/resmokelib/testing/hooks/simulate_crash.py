@@ -16,6 +16,7 @@ import time
 
 import pymongo
 
+from buildscripts.resmokelib import config
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.testing.hooks import bghook
 
@@ -71,32 +72,45 @@ class SimulateCrash(bghook.BGHook):
             )
 
             try:
-                for tup in os.walk(node.get_dbpath_prefix(), followlinks=True):
-                    if tup[0].endswith("/diagnostic.data") or tup[0].endswith("/_tmp"):
-                        continue
-                    if "/simulateCrashes" in tup[0]:
-                        continue
-                    for filename in tup[-1]:
-                        if "Preplog" in filename:
-                            continue
-                        fqfn = "/".join([tup[0], filename])
-                        self.copy_file(
-                            node.get_dbpath_prefix(),
-                            fqfn,
-                            node.get_dbpath_prefix()
-                            + "/simulateCrashes/{}".format(self.backup_num),
-                        )
+                self.capture_db(node.get_dbpath_prefix())
             finally:
                 node.mongod.resume()
 
+    def capture_db(self, dbpath):
+        """Makes a lightweight copy of the given database at '<dbpath>/simulateCrashes/<backup_num>'.
+
+        "Lightweight" here means that it excludes unnecessary files e.g. temporaries and diagnostics.
+
+        Note: the directory structure wiredtiger creates can vary, due to configurations like
+        --directoryPerDb or --wiredTigerDirectoryForIndexes, so it is necessary to recursively copy
+        directories and files.
+        """
+        for current_path, _, filenames in os.walk(dbpath, followlinks=True):
+            if (
+                current_path.endswith(os.path.sep + "diagnostic.data")
+                or current_path.endswith(os.path.sep + "_tmp")
+                or os.path.sep + "simulateCrashes" in current_path
+            ):
+                continue
+            dest_root = os.path.join(dbpath, "simulateCrashes", "{}".format(self.backup_num))
+            rel_path = os.path.relpath(current_path, start=dbpath)
+            os.makedirs(os.path.join(dest_root, rel_path), exist_ok=True)
+            for filename in filenames:
+                if "Preplog" in filename:
+                    continue
+                absolute_filepath = os.path.join(current_path, filename)
+                self.copy_file(dbpath, absolute_filepath, dest_root)
+
     @classmethod
-    def copy_file(cls, root, fqfn, new_root):
-        """Copy a file."""
-        in_fd = os.open(fqfn, os.O_RDONLY)
+    def copy_file(cls, root, absolute_filepath, new_root):
+        """Copy a file in |root| at |absolute_filepath| into |new_root|, maintaining its relative position.
+
+        For example: '/a/b/c' if copied from '/a/b' to '/x' would yield '/x/c'.
+        """
+        in_fd = os.open(absolute_filepath, os.O_RDONLY)
         in_bytes = os.stat(in_fd).st_size
 
-        rel = fqfn[len(root) :]
-        os.makedirs(new_root + "/journal", exist_ok=True)
+        rel = absolute_filepath[len(root) :]
         out_fd = os.open(new_root + rel, os.O_WRONLY | os.O_CREAT)
 
         total_bytes_sent = 0
@@ -117,6 +131,12 @@ class SimulateCrash(bghook.BGHook):
                 "Starting to validate. DBPath: {} Port: {}".format(path, self.validate_port)
             )
 
+            # When restarting the node for validation purposes, we need to mirror some
+            # configuration options applied to the original standalone invocation.
+            extra_configs = [
+                "--" + cfg_k for (cfg_k, cfg_v) in config.MONGOD_EXTRA_CONFIG.items() if cfg_v
+            ]
+
             mdb = process.Process(
                 self.logger,
                 [
@@ -129,7 +149,8 @@ class SimulateCrash(bghook.BGHook):
                     "enableTestCommands=1",
                     "--setParameter",
                     "testingDiagnosticsEnabled=1",
-                ],
+                ]
+                + extra_configs,
             )
             mdb.start()
 

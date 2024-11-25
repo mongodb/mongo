@@ -468,6 +468,7 @@ class MongodLauncher(object):
             "wiredTigerEngineConfigString": self.config.WT_ENGINE_CONFIG,
             "wiredTigerIndexConfigString": self.config.WT_INDEX_CONFIG,
         }
+        shortcut_opts.update(self.config.MONGOD_EXTRA_CONFIG)
 
         if self.config.STORAGE_ENGINE == "inMemory":
             shortcut_opts["inMemorySizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
@@ -484,7 +485,7 @@ class MongodLauncher(object):
             process_kwargs["env_vars"] = env_vars
 
         # These options are just flags, so they should not take a value.
-        opts_without_vals = "logappend"
+        allowed_opts_without_vals = ["logappend", "directoryperdb", "wiredTigerDirectoryForIndexes"]
 
         # Ensure that config servers run with journaling enabled.
         if "configsvr" in mongod_options:
@@ -499,7 +500,7 @@ class MongodLauncher(object):
         # Command line options override the YAML configuration.
         for opt_name in shortcut_opts:
             opt_value = shortcut_opts[opt_name]
-            if opt_name in opts_without_vals:
+            if opt_name in allowed_opts_without_vals:
                 # Options that are specified as --flag on the command line are represented by a boolean
                 # value where True indicates that the flag should be included in 'kwargs'.
                 if opt_value:

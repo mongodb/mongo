@@ -447,3 +447,11 @@ config_fuzzer_params = {
         },
     },
 }
+
+config_fuzzer_extra_configs = {
+    "mongod": {
+        "directoryperdb": {"choices": [True, False]},
+        "wiredTigerDirectoryForIndexes": {"choices": [True, False]},
+    },
+    "mongos": {},
+}

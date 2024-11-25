@@ -353,7 +353,7 @@ class TestRunner(Subcommand):
         items = ", ".join(format_item(k, v) for k, v in set_parameters.items())
         return f"{{{items}}}"
 
-    def _get_fuzzed_param_log_str(self, binary_name_str, set_parameters):
+    def _get_fuzzed_param_log_str(self, binary_name_str, set_parameters, extra_configs=False):
         """
         Formats a string containing the fuzzed parameter's name, the fuzzed parameter's values, and the fuzzed parameters' min and maxes for logging.
 
@@ -371,9 +371,14 @@ class TestRunner(Subcommand):
         chunkMigrationConcurrency: 4, min: 1, max: 16, options: [1, 4, 16]
         ...
         """
-        from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+        from buildscripts.resmokelib.config_fuzzer_limits import (
+            config_fuzzer_extra_configs,
+            config_fuzzer_params,
+        )
 
         param_limits = config_fuzzer_params[binary_name_str]
+        if extra_configs:
+            param_limits = config_fuzzer_extra_configs[binary_name_str]
         local_args = to_local_args()
         local_args = strip_fuzz_config_params(local_args)
         params_str = ""
@@ -495,6 +500,12 @@ class TestRunner(Subcommand):
             params_str = self._get_fuzzed_param_log_str("mongod", config.MONGOD_SET_PARAMETERS)
             self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s", params_str)
 
+        if config.FUZZ_MONGOD_CONFIGS:
+            params_str = self._get_fuzzed_param_log_str(
+                "mongod", utils.dump_yaml(config.MONGOD_EXTRA_CONFIG), extra_configs=True
+            )
+            self._resmoke_logger.info("Fuzzed mongod extra configs:\n%s", params_str)
+
         if config.FUZZ_MONGOS_CONFIGS:
             params_str = self._get_fuzzed_param_log_str("mongos", config.MONGOS_SET_PARAMETERS)
             self._resmoke_logger.info("Fuzzed mongosSetParameters:\n%s", params_str)
@@ -592,6 +603,11 @@ class TestRunner(Subcommand):
 
         if config.MONGOD_SET_PARAMETERS:
             local_resmoke_invocation_with_params += f" --mongodSetParameters='{self._get_fuzzed_param_resmoke_invocation(config.MONGOD_SET_PARAMETERS)}'"
+
+        if config.MONGOD_EXTRA_CONFIG:
+            for k, v in config.MONGOD_EXTRA_CONFIG.items():
+                if v:
+                    local_resmoke_invocation_with_params += f" --{k}"
 
         if config.MONGOS_SET_PARAMETERS:
             local_resmoke_invocation_with_params += f" --mongosSetParameters='{self._get_fuzzed_param_resmoke_invocation(config.MONGOS_SET_PARAMETERS)}'"

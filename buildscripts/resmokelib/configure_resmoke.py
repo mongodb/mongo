@@ -464,6 +464,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
             _config.CONFIG_FUZZ_SEED = int(_config.CONFIG_FUZZ_SEED)
         (
             _config.MONGOD_SET_PARAMETERS,
+            _config.MONGOD_EXTRA_CONFIG,
             _config.WT_ENGINE_CONFIG,
             _config.WT_COLL_CONFIG,
             _config.WT_INDEX_CONFIG,
