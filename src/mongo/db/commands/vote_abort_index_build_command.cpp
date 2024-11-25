@@ -129,9 +129,7 @@ public:
     };
 };
 
-MONGO_REGISTER_COMMAND(VoteAbortIndexBuildCommand)
-    .requiresFeatureFlag(&feature_flags::gIndexBuildGracefulErrorHandling)
-    .forShard();
+MONGO_REGISTER_COMMAND(VoteAbortIndexBuildCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

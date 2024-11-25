@@ -125,8 +125,6 @@ void IndexBuildState::setState(State state,
 
 bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentState,
                                               IndexBuildState::State newState) const {
-    const auto graceful = feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     switch (currentState) {
         case IndexBuildState::State::kSetup:
             return
@@ -167,14 +165,14 @@ bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentStat
                 newState == IndexBuildState::State::kAborted ||
                 // The oplog applier is externally aborting the index build while applying
                 // 'abortIndexBuild'.
-                (graceful && newState == IndexBuildState::State::kExternalAbort);
+                newState == IndexBuildState::State::kExternalAbort;
 
         case IndexBuildState::State::kFailureCleanUp:
             return
                 // A primary node completed self-abort or abort for shutdown.
                 newState == IndexBuildState::State::kAborted ||
                 // We are waiting for the current primary to abort the index build.
-                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort);
+                newState == IndexBuildState::State::kAwaitPrimaryAbort;
 
         case IndexBuildState::State::kExternalAbort:
             // The external aborter has finished cleaned up the index build.

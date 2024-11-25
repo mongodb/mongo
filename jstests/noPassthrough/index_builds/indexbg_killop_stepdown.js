@@ -7,7 +7,6 @@
  * ]
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -71,45 +70,19 @@ assert.commandWorked(
 
 awaitIndexBuild();
 
-const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGracefulErrorHandling");
-if (!gracefulIndexBuildFlag) {
-    // We expect the node to crash without this feature enabled.
-    assert.soon(function() {
-        return rawMongoProgramOutput(".*").search(/Fatal assertion.*51101/) >= 0;
-    });
-
-    // After restarting the old primary, we expect that the index build completes successfully.
-    rst.stop(
-        primary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
-    rst.start(primary.nodeId, undefined, true /* restart */);
-}
-
 // Wait for primary and secondaries to reach goal state, and for the index build to complete.
 primary = rst.waitForPrimary();
 rst.awaitSecondaryNodes();
 rst.awaitReplication();
 
-if (gracefulIndexBuildFlag) {
-    // "Index build: joined after abort".
-    checkLog.containsJson(primary, 20655);
+// "Index build: joined after abort".
+checkLog.containsJson(primary, 20655);
 
-    // Wait for the index build to complete.
-    rst.awaitReplication();
+// Wait for the index build to complete.
+rst.awaitReplication();
 
-    // Verify that the interrupted index build was aborted.
-    IndexBuildTest.assertIndexes(rst.getPrimary().getDB('test').getCollection('test'), 1, ['_id_']);
-    IndexBuildTest.assertIndexes(
-        rst.getSecondary().getDB('test').getCollection('test'), 1, ['_id_']);
-
-} else {
-    // Verify that the stepped up node completed the index build.
-    IndexBuildTest.assertIndexes(
-        rst.getPrimary().getDB('test').getCollection('test'), 2, ['_id_', 'a_1']);
-    IndexBuildTest.assertIndexes(
-        rst.getSecondary().getDB('test').getCollection('test'), 2, ['_id_', 'a_1']);
-
-    // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
-    TestData.skipEnforceFastCountOnValidate = true;
-}
+// Verify that the interrupted index build was aborted.
+IndexBuildTest.assertIndexes(rst.getPrimary().getDB('test').getCollection('test'), 1, ['_id_']);
+IndexBuildTest.assertIndexes(rst.getSecondary().getDB('test').getCollection('test'), 1, ['_id_']);
 
 rst.stopSet();

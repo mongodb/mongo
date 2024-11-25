@@ -6,7 +6,6 @@
  *   requires_replication,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -46,13 +45,8 @@ assert.commandWorked(primaryColl.insert({a: 1}));
 let secondary = rst.getSecondary();
 IndexBuildTest.pauseIndexBuilds(secondary);
 
-const gracefulIndexBuildFlag =
-    FeatureFlagUtil.isEnabled(primaryDB, "IndexBuildGracefulErrorHandling");
-
-const createIdx = (gracefulIndexBuildFlag)
-    ? IndexBuildTest.startIndexBuild(
-          primary, primaryColl.getFullName(), {a: 1}, {}, ErrorCodes.IndexBuildAborted)
-    : IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1});
+const createIdx = IndexBuildTest.startIndexBuild(
+    primary, primaryColl.getFullName(), {a: 1}, {}, ErrorCodes.IndexBuildAborted);
 
 // When the index build starts, find its op id.
 let secondaryDB = secondary.getDB(primaryDB.getName());
@@ -70,21 +64,8 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
 // primary to abort the index build.
 assert.commandWorked(secondaryDB.killOp(opId));
 
-if (!gracefulIndexBuildFlag) {
-    // We expect this to crash the secondary because this error is not recoverable
-    assert.soon(function() {
-        return rawMongoProgramOutput(".*").search(/Fatal assertion.*(51101)/) >= 0;
-    });
-
-    // After restarting the secondary, expect that the index build completes successfully.
-    rst.stop(
-        secondary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
-    rst.start(secondary.nodeId, undefined, true /* restart */);
-
-} else {
-    // Expect the secondary to successfully prevent the primary from committing the index build.
-    checkLog.containsJson(secondary, 20655);
-}
+// Expect the secondary to successfully prevent the primary from committing the index build.
+checkLog.containsJson(secondary, 20655);
 
 primary = rst.getPrimary();
 rst.awaitSecondaryNodes();
@@ -102,14 +83,8 @@ rst.awaitReplication();
 // on the primary and secondary.
 createIdx();
 
-if (!gracefulIndexBuildFlag) {
-    // Check that index was created despite the attempted killOp().
-    IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
-    IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
-} else {
-    // Check that index was aborted by the killOp().
-    IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
-    IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
-}
+// Check that index was aborted by the killOp().
+IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
 
 rst.stopSet();

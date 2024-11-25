@@ -5,7 +5,6 @@
  *   requires_replication,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -70,20 +69,12 @@ checkLog.containsJson(primary, 20663);
 // Kill the index build.
 assert.commandWorked(secondaryDB.killOp(opId));
 
-const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGracefulErrorHandling");
-if (!gracefulIndexBuildFlag) {
-    // We expect this to crash the secondary because this error is not recoverable
-    assert.soon(function() {
-        return rawMongoProgramOutput(".*").search(/Fatal assertion.*(51101)/) >= 0;
-    });
-} else {
-    // Expect the secondary to crash. Depending on timing, this can be either because the secondary
-    // was waiting for a primary abort when a 'commitIndexBuild' is applied, or because the build
-    // fails and tries to request an abort while a 'commitIndexBuild' is being applied.
-    assert.soon(function() {
-        return rawMongoProgramOutput(".*").search(/Fatal assertion.*(7329403|7329407)/) >= 0;
-    });
-}
+// Expect the secondary to crash. Depending on timing, this can be either because the secondary
+// was waiting for a primary abort when a 'commitIndexBuild' is applied, or because the build
+// fails and tries to request an abort while a 'commitIndexBuild' is being applied.
+assert.soon(function() {
+    return rawMongoProgramOutput(".*").search(/Fatal assertion.*(7329403|7329407)/) >= 0;
+});
 
 // After restarting the secondary, expect that the index build completes successfully.
 rst.stop(secondary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});

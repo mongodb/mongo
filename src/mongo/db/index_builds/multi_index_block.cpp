@@ -165,17 +165,11 @@ auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
 }
 
 bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collection) {
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // Always suppress.
-        return true;
-    }
     invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool isPrimary = replCoord->canAcceptWritesFor(opCtx, collection->ns());
 
-    // When graceful index build cancellation in enabled, primaries do not need
-    // to suppress key generation errors other than duplicate key. The error
+    // Primaries do not need to suppress key generation errors other than duplicate key. The error
     // should be surfaced and cause immediate abort of the index build.
 
     // This is true because primaries are guaranteed to have a consistent view of data. To receive a

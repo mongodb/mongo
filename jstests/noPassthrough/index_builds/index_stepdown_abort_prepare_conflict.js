@@ -21,7 +21,6 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 import {waitForState} from "jstests/replsets/rslib.js";
@@ -44,21 +43,14 @@ assert.commandWorked(
 // Enable fail point which makes hybrid index build to hang before it aborts.
 var failPoint;
 
-const gracefulIndexBuildFeatureFlag =
-    FeatureFlagUtil.isEnabled(primary, "IndexBuildGracefulErrorHandling");
-if (gracefulIndexBuildFeatureFlag) {
-    // If this feature flag is enabled, index builds fail immediately instead of suppressing errors
-    // until the commit phase, and always signal the primary for abort (even if it is itself). Abort
-    // is only ever performed in the command thread, which is interrupted by replication state
-    // transitions and retried. Abort in this case is not susceptible to the deadlock.
-    // To test this, we block the index build before it starts scanning. When unblocked, it will try
-    // to abort the build after the prepared transaction is holding the lock.
-    failPoint = "hangAfterInitializingIndexBuild";
-} else {
-    // Whe the feature flag is off, the build is aborted while retrying the skipped record during
-    // commit phase.
-    failPoint = "hangAfterIndexBuildSecondDrain";
-}
+// Index builds fail immediately instead of suppressing errors until the commit phase, and always
+// signal the primary for abort (even if it is itself). Abort is only ever performed in the command
+// thread, which is interrupted by replication state transitions and retried. Abort in this case is
+// not susceptible to the deadlock. To test this, we block the index build before it starts
+// scanning. When unblocked, it will try to abort the build after the prepared transaction is
+// holding the lock.
+failPoint = "hangAfterInitializingIndexBuild";
+
 let res =
     assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
 let timesEntered = res.count;

@@ -608,15 +608,6 @@ IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
         }
 
         void act(OperationContext* opCtx, int64_t availableBytes) noexcept final {
-            if (!feature_flags::gIndexBuildGracefulErrorHandling
-                     .isEnabledUseLastLTSFCVWhenUninitialized(
-                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                LOGV2(6826200,
-                      "Index build: disk space monitor detected we're low on storage space but "
-                      "'featureFlagIndexBuildGracefulErrorHandling' is disabled. Ignoring it");
-                return;
-            }
-
             if (_coord->noIndexBuildInProgress()) {
                 // Avoid excessive logging when no index builds are in progress. Nothing prevents an
                 // index build from starting after this check.  Subsequent calls will see any
@@ -2760,11 +2751,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
             // its own. This can happen if an error is thrown, it is interrupted by a user killop,
             // or is killed internally by something like the DiskSpaceMonitor. Voting for abort is
             // only allowed if the node did not previously attempt to vote for commit.
-
-            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-            if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                replState->canVoteForAbort()) {
+            if (replState->canVoteForAbort()) {
                 // Always request an abort to the primary node, even if we are primary. If
                 // primary, the signal will loop back and cause an asynchronous external
                 // index build abort.
@@ -2871,10 +2858,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     }
 
     // If the index build has already been cleaned-up because it encountered an error, there is no
-    // work to do. If feature flag IndexBuildGracefulErrorHandling is not enabled, the most routine
-    // case is for this to be due to a self-abort caused by constraint checking during the commit
-    // phase. If an external abort was requested, cleanup is handled by the requester, and there is
-    // nothing to do.
+    // work to do. If an external abort was requested, cleanup is handled by the requester, and
+    // there is nothing to do.
     if (replState->isAborted() || replState->isExternalAbort()) {
         uassertStatusOK(status);
     }
@@ -2899,62 +2884,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         hangIndexBuildBeforeAbortCleanUp.pauseWhileSet();
     }
 
-    // If IndexBuildGracefulErrorHandling is not enabled, crash on unexpected build errors. When the
-    // feature flag is enabled, two-phase builds can handle unexpected errors by requesting an abort
-    // to the primary node. Single-phase builds can also abort immediately, as the primary or
-    // standalone is the only node aware of the build.
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // Index builds only check index constraints when committing. If an error occurs at that
-        // point, then the build is cleaned up while still holding the appropriate locks. The only
-        // errors that we cannot anticipate are user interrupts and shutdown errors.
-        if (status == ErrorCodes::OutOfDiskSpace) {
-            LOGV2_ERROR(5642401,
-                        "Index build unable to proceed due to insufficient disk space",
-                        "error"_attr = status);
-            fassertFailedNoTrace(5642402);
-        }
-
-        // WARNING: Do not add new exemptions to this assertion! If this assertion is failing, an
-        // exception escaped during this index build. The solution should not be to add an exemption
-        // for that exception. We should instead address the problem by preventing that exception
-        // from being thrown in the first place.
-        //
-        // Simultaneous index builds are not resilient to arbitrary exceptions being thrown.
-        // Secondaries will only abort when the primary replicates an abortIndexBuild oplog entry,
-        // and primaries should only abort when they can guarantee the node will not step down.
-        //
-        // At this point, an exception was thrown, we released our locks, and our index build state
-        // is not resumable. If we were primary when the exception was thrown, we are no longer
-        // guaranteed to be primary at this point. If we were never primary or are no longer
-        // primary, we will fatally assert. If we are still primary, we can hope to quickly
-        // re-acquire our locks and abort the index build without issue. We will always fatally
-        // assert in debug builds.
-        //
-        // Solutions to fixing this failing assertion may include:
-        // * Suppress the errors during the index build and re-check the assertions that lead to the
-        //   error at commit time once we have acquired all of the appropriate locks in
-        //   _insertKeysFromSideTablesAndCommit().
-        // * Explicitly abort the index build with abortIndexBuildByBuildUUID() before performing an
-        //   operation that causes the index build to throw an error.
-        if (opCtx->checkForInterruptNoAssert().isOK()) {
-            if (TestingProctor::instance().isEnabled()) {
-                LOGV2_FATAL(6967700,
-                            "Unexpected error code during index build cleanup",
-                            "error"_attr = status);
-            } else {
-                // Note: Even if we don't fatally assert, if the node has stepped-down from being
-                // primary, then we will still crash shortly after this. As a secondary, index
-                // builds must succeed, and if we are in this path, the index build failed without
-                // being explicitly aborted by the primary. Only if we're lucky enough to still be
-                // primary will we abort the index build without any nodes crashing.
-                LOGV2_WARNING(6967701,
-                              "Unexpected error code during index build cleanup",
-                              "error"_attr = status);
-            }
-        }
-    }
-
+    // Two-phase builds can handle unexpected errors by requesting an abort to the primary node.
+    // Single-phase builds can also abort immediately, as the primary or standalone is the only node
+    // aware of the build.
     _cleanUpAfterFailure(opCtx, collection, replState, indexBuildOptions);
 
     // Any error that escapes at this point is not fatal and can be handled by the caller.

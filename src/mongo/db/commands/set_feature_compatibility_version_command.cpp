@@ -450,9 +450,6 @@ public:
                         "transitional stage due to 'failBeforeTransitioning' failpoint set",
                         !failBeforeTransitioning.shouldFail());
 
-                ScopedPostFCVDocumentUpdateActions postUpdateAction =
-                    _prepareTransitionalState(opCtx, actualVersion, requestedVersion);
-
                 // If this is a config server, then there must be no active
                 // SetClusterParameterCoordinator instances active when downgrading.
                 if (role && role->has(ClusterRole::ConfigServer)) {
@@ -1389,74 +1386,6 @@ private:
              fmt::format("FCV downgrading to {} and pauseMigrationsDuringMultiUpdates is not "
                          "supported on this version",
                          toString(requestedVersion))});
-    }
-
-    /**
-     * May contain actions to perfom after the FCV document update. Execution occurs when the object
-     * goes out of scope.
-     */
-    using ScopedPostFCVDocumentUpdateActions = ScopeGuard<std::function<void()>>;
-
-    /**
-     * Actions to be performed before the FCV document is set into upgrading or downgrading
-     * transitional state. The returned object may contain post-update actions which are executed
-     * when it goes out of scope, so it must be properly scoped to expire after the FCV document has
-     * been updated. The assumption is that the provided opCtx is still valid by the time the action
-     * is executed.
-     */
-    ScopedPostFCVDocumentUpdateActions _prepareTransitionalState(
-        OperationContext* opCtx,
-        multiversion::FeatureCompatibilityVersion actualVersion,
-        multiversion::FeatureCompatibilityVersion requestedVersion) {
-
-        // Any actions to be performed post-update must also be performed in case of interruption
-        // during this function.
-        std::vector<std::function<void()>> postUpdateActions;
-        ScopeGuard postUpdateActionsGuard([&postUpdateActions]() {
-            for (const auto& action : postUpdateActions) {
-                action();
-            }
-        });
-
-        // TODO (SERVER-68290): Remove index build abort due to FCV downgrade once the
-        // feature flag is removed.
-        if (feature_flags::gIndexBuildGracefulErrorHandling
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, actualVersion)) {
-            invariant(requestedVersion < actualVersion);
-            const auto reason = fmt::format("FCV downgrade in progress, from {} to {}.",
-                                            toString(actualVersion),
-                                            toString(requestedVersion));
-
-            const auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-            // Block new index builds before writing the transitional FCV state, which will cause
-            // new feature flag checks to consider it disabled.
-            indexBuildsCoord->setNewIndexBuildsBlocked(true, reason);
-            // New index builds will be unblocked after ScopedPostFCVDocumentUpdateActions goes out
-            // of scope once the FCV document has been updated.
-            postUpdateActions.push_back(
-                [indexBuildsCoord] { indexBuildsCoord->setNewIndexBuildsBlocked(false); });
-
-            if (hangAfterBlockingIndexBuildsForFcvDowngrade.shouldFail()) {
-                LOGV2(7738704, "Hanging for failpoint hangAfterBlockingIndexBuildsForFcvDowngrade");
-                hangAfterBlockingIndexBuildsForFcvDowngrade.pauseWhileSet(opCtx);
-            }
-
-            // While new index builds are blocked, abort all existing index builds and wait for
-            // them.
-            indexBuildsCoord->abortAllIndexBuildsWithReason(opCtx, reason);
-            // Some index builds might already be committing or aborting, in which case the above
-            // call does not wait for them. Wait for the rest of the index builds.
-            indexBuildsCoord->waitForAllIndexBuildsToStop(opCtx);
-        }
-
-        postUpdateActionsGuard.dismiss();
-        const auto runAllActions = [postUpdateActions = std::move(postUpdateActions)]() {
-            for (const auto& action : postUpdateActions) {
-                action();
-            }
-        };
-
-        return {runAllActions};
     }
 
     // _prepareToDowngrade performs all actions and checks that need to be done before proceeding to
