@@ -5,6 +5,7 @@
 import {
     getQueryStatsFindCmd,
     getQueryStatsKeyHashes,
+    getQueryStatsServerParameters,
     getQueryStatsShapeHashes
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -12,7 +13,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const replTest = new ReplSetTest({name: 'queryStatsKeyShapeHashTest', nodes: 2});
 
 // Turn on the collecting of query stats metrics.
-replTest.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
+replTest.startSet(getQueryStatsServerParameters());
 replTest.initiate();
 
 const conn = replTest.getPrimary();

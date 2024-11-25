@@ -6,7 +6,8 @@ import "jstests/multiVersion/libs/multi_rs.js";
 
 import {
     getQueryStatsFindCmd,
-    getQueryStatsKeyHashes
+    getQueryStatsKeyHashes,
+    getQueryStatsServerParameters
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -16,7 +17,7 @@ const rst = new ReplSetTest({
 });
 
 // Turn on the collecting of query stats metrics.
-rst.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
+rst.startSet(getQueryStatsServerParameters());
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let conn = rst.getPrimary();

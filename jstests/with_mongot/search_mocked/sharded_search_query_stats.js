@@ -3,7 +3,10 @@
  * @tags: [featureFlagQueryStats]
  */
 
-import {getQueryStatsAggCmd} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryStatsAggCmd,
+    getQueryStatsServerParameters
+} from "jstests/libs/query/query_stats_utils.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mockPlanShardedSearchResponse,
@@ -25,7 +28,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     },
     verbose: 5,
     mongos: 1,
-    mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}}
+    mongosOptions: getQueryStatsServerParameters()
 });
 stWithMock.start();
 const st = stWithMock.st;

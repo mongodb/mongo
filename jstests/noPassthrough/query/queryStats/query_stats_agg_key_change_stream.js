@@ -6,8 +6,9 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getLatestQueryStatsEntry,
+    getQueryStatsServerParameters,
     getValueAtPath,
-    runCommandAndValidateQueryStats,
+    runCommandAndValidateQueryStats
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -178,7 +179,7 @@ function validateChangeStreamAggKey(conn) {
 {
     // Test the non-sharded case.
     const rst = new ReplSetTest({nodes: 2});
-    rst.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
+    rst.startSet(getQueryStatsServerParameters());
     rst.initiate();
     rst.getPrimary().getDB("admin").setLogLevel(3, "queryStats");
 

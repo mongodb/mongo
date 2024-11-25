@@ -14,6 +14,7 @@ import {
     checkChangeStreamEntry,
     getLatestQueryStatsEntry,
     getQueryStats,
+    getQueryStatsServerParameters,
     resetQueryStatsStore
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -54,7 +55,7 @@ function runTest(conn) {
 {
     // Test the non-sharded case.
     const rst = new ReplSetTest({nodes: 2});
-    rst.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
+    rst.startSet(getQueryStatsServerParameters());
     rst.initiate();
     rst.getPrimary().getDB("admin").setLogLevel(3, "queryStats");
     runTest(rst.getPrimary());

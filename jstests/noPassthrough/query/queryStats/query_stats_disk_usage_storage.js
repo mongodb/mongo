@@ -16,7 +16,8 @@ import {
     getDistinctQueryStatsKey,
     getFindQueryStatsKey,
     getQueryStatsCountCmd,
-    getQueryStatsDistinctCmd
+    getQueryStatsDistinctCmd,
+    getQueryStatsServerParameters
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -170,8 +171,9 @@ function runStorageStatsTestCount(conn, coll) {
  * @param {Function} callback - The function that makes assertions about metrics.
  */
 function runTestMongod(setupConn, collName, callback) {
-    const conn = MongoRunner.runMongod(Object.assign(
-        defaultOptions(), {restart: true, cleanData: false, dbpath: setupConn.dbpath}));
+    const conn = MongoRunner.runMongod(
+        Object.assign(getQueryStatsServerParameters(),
+                      {restart: true, cleanData: false, dbpath: setupConn.dbpath}));
     const coll = conn.getDB("test")[collName];
     callback(conn, coll);
     MongoRunner.stopMongod(conn);
@@ -220,15 +222,8 @@ function runTestMongos(st, collName, callback) {
  * TESTS
  */
 
-// The options passed to runMongod, rst.startSet(), and others, sometimes get modified by those
-// functions. So instead of having a single global constant that we pass around (risking
-// modification), we return the defaults from a function.
-function defaultOptions() {
-    return {setParameter: {internalQueryStatsRateLimit: -1}};
-}
-
 {
-    const setupConn = MongoRunner.runMongod(defaultOptions());
+    const setupConn = MongoRunner.runMongod(getQueryStatsServerParameters());
     const setupColl = makeUnshardedCollection(setupConn);
     const collName = setupColl.getName();
     MongoRunner.stopMongod(setupConn);
@@ -239,7 +234,7 @@ function defaultOptions() {
 }
 
 {
-    const rst = new ReplSetTest({nodes: 3, nodeOptions: defaultOptions()});
+    const rst = new ReplSetTest({nodes: 3, nodeOptions: getQueryStatsServerParameters()});
     rst.startSet();
     rst.initiate();
     const collName = makeUnshardedCollection(rst.getPrimary()).getName();
@@ -251,7 +246,8 @@ function defaultOptions() {
 }
 
 {
-    const st = new ShardingTest({shards: 2, other: {mongosOptions: defaultOptions()}});
+    const st =
+        new ShardingTest({shards: 2, other: {mongosOptions: getQueryStatsServerParameters()}});
     const testDB = st.s.getDB("test");
     assert.commandWorked(
         testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));

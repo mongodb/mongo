@@ -4,7 +4,10 @@
  * versioning are included for good measure.
  * @tags: [requires_fcv_71]
  */
-import {getLatestQueryStatsEntry} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getLatestQueryStatsEntry,
+    getQueryStatsServerParameters
+} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({
@@ -16,7 +19,7 @@ const replTest = new ReplSetTest({
 });
 
 // Turn on the collecting of query stats metrics.
-replTest.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
+replTest.startSet(getQueryStatsServerParameters());
 replTest.initiate();
 
 const primary = replTest.getPrimary();
