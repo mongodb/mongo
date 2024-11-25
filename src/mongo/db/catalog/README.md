@@ -1939,6 +1939,8 @@ A new truncate marker is created when the in-progress marker segment contains mo
 complete the segment; and the oldest truncate marker's oplog is deleted when the oplog size exceeds
 its cap size setting.
 
+Oplog sampling and marker generation is skipped when using `--restore` or `--magicRestore`.
+
 ### Special Timestamps That Will Not Be Truncated
 
 The WiredTiger integration layer's `OplogTruncateMarkers` implementation will stall deletion waiting for
