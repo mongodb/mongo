@@ -66,6 +66,23 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: 'hashed'}
 const ns1CollectionVersion = getExpectedCollectionVersion(ns1);
 const ns2CollectionVersion = getExpectedCollectionVersion(ns2);
 
+// Make sure the shard has refreshed it's routing cache for ns1 and ns2.
+{
+    const db = st.s.getDB(dbName);
+    const coll1 = db[collName1];
+    const coll2 = db[collName2];
+
+    assert.commandWorked(coll1.insert({x: 1}));
+    assert.commandWorked(coll2.insert({x: 1}));
+
+    // Run $lookup with each namespace as secondary collection. The shard will need to route for
+    // that collection, so it will refresh its routing cache.
+    coll1.aggregate(
+        [{$lookup: {from: coll2.getName(), localField: 'x', foreignField: 'x', as: 'out'}}]);
+    coll2.aggregate(
+        [{$lookup: {from: coll1.getName(), localField: 'x', foreignField: 'x', as: 'out'}}]);
+}
+
 // Check that when no gossip is requested to the shard, then the shard does not gossip back
 // anything.
 {
