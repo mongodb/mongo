@@ -316,7 +316,7 @@ TEST(TDigestTest, Incorporate_OnlyInfinities) {
     for (size_t i = 70; i < 100; ++i) {
         inputs[i] = inf;
     }
-    auto seed = time(nullptr);
+    auto seed = 1782061;  // arbitrary
     LOGV2(7429515, "Incorporate_OnlyInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
@@ -359,7 +359,7 @@ TEST(TDigestTest, Incorporate_WithInfinities) {
         inputs[i] = inf;
     }
     vector<double> sorted = inputs;  // sorted by construction
-    auto seed = time(nullptr);
+    auto seed = 2681321;             // arbitrary
     LOGV2(7429511, "Incorporate_WithInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
@@ -448,7 +448,7 @@ TEST(TDigestTest, Incorporate_Great_And_Small) {
     vector<double> sorted = inputs;
     std::sort(sorted.begin(), sorted.end());
 
-    auto seed = time(nullptr);
+    auto seed = 1684021;  // arbitrary
     LOGV2(7429512, "Incorporate_Great_And_Small", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
@@ -791,9 +791,6 @@ TEST(TDigestTest, PreciseOnSmallDataset_k2) {
 template <typename TDist>
 vector<double> generateData(
     TDist& dist, size_t n, size_t dupes, bool keepDupesTogether, long seed) {
-    if (seed == 0) {
-        seed = time(nullptr);
-    }
     LOGV2(7429513, "generateData", "seed"_attr = seed);
     std::mt19937 generator(seed);
 
@@ -863,7 +860,7 @@ void runTestWithDataGenerator(TDigest::ScalingFunction k_limit,
                               double accuracy,
                               const char* msg) {
     vector<double> inputs =
-        dg(100'000 /* nUnique */, 1 /* dupes */, true /* keepDupesTogether*/, 0 /*seed*/);
+        dg(100'000 /* nUnique */, 1 /* dupes */, true /* keepDupesTogether*/, 7610021 /*seed*/);
 
     const int delta = 500;
     TDigest digest(k_limit, delta);
@@ -969,7 +966,7 @@ void runTestWithDuplicatesInData(DataGenerator dg,
                                  double accuracy,
                                  const char* msg) {
     const int delta = 500;
-    vector<double> inputs = dg(n, dupes, keepDupesTogether, 0 /*seed*/);
+    vector<double> inputs = dg(n, dupes, keepDupesTogether, 8235521 /*seed*/);
 
     TDigest digest(TDigest::k2_limit, delta);
     for (auto val : inputs) {
@@ -1086,7 +1083,7 @@ TEST(TDigestTest, Duplicates_two_clusters) {
         sorted[i] = 42;
     }
     vector<double> inputs = sorted;
-    auto seed = time(nullptr);
+    auto seed = 7711122;  // arbitrary
     LOGV2(7429514, "Duplicates_two_clusters", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
@@ -1182,7 +1179,7 @@ std::pair<vector<vector<int>> /*errors*/, vector<int> /*# centroids*/> generateA
     vector<vector<int>> errors(deltas.size(), vector<int>(percentiles.size(), 0));
     vector<int> n_centroids(deltas.size(), 0);
 
-    long seed = time(nullptr);
+    long seed = 5670398;  // arbitrary
     for (int i = 0; i < nIterations; ++i) {
         std::cout << "*** iteration " << i << std::endl;
         vector<double> data = dg(nUnique, 1 /* dupes */, false /* keepDupesTogether */, ++seed);
