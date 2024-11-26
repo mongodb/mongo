@@ -285,6 +285,7 @@ buildifier
 bazel/coverity/analysis/BUILD.bazel
 .bazel_include_info.json
 .bazel_header_list_cache
+.bazel_real
 MODULE.bazel
 MODULE.bazel.lock
 # generated configs for external fixture suites
