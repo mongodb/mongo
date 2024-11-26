@@ -48,6 +48,11 @@ public:
                           std::unique_ptr<ResourceYielder> resourceYielder);
 
     /**
+     * Returns a const reference to the AsyncResultsMergerParams owned by the AsyncResultsMerger.
+     */
+    const AsyncResultsMergerParams& asyncResultsMergerParams() const;
+
+    /**
      * Blocks until the next result is available or an error is detected.
      */
     StatusWith<ClusterQueryResult> next(OperationContext*);

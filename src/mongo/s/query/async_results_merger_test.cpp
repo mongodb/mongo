@@ -2194,5 +2194,27 @@ TEST_F(AsyncResultsMergerTest, ShouldNotScheduleGetMoresWithoutAnOperationContex
     killFuture.wait();
 }
 
+TEST_F(AsyncResultsMergerTest, CanAccessParams) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // Check actual parameters.
+    ASSERT_EQ(kTestNss, arm->params().getNss());
+    ASSERT_EQ(1, arm->params().getRemotes().size());
+
+    // Schedule requests. We need to do this because the dtor of AsyncResultsMerger fires an
+    // assertion if the remotes are not exhausted and the AsyncResultsMerger hasn't been killed.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}"), fromjson("{_id: 3}")};
+    responses.emplace_back(kTestNss, CursorId(0), batch);
+    scheduleNetworkResponses(std::move(responses));
+
+    // Now the AsyncResultsMerger can go out of scope without triggering the assertion failure.
+    ASSERT_TRUE(arm->remotesExhausted());
+}
+
 }  // namespace
 }  // namespace mongo
