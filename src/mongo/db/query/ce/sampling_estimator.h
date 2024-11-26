@@ -29,122 +29,29 @@
 
 #pragma once
 
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
-#include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/stage_builder/sbe/builder.h"
 
 namespace mongo::ce {
 
 using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
 
-/**
- * This CE Estimator estimates cardinality of predicates by running a filter/MatchExpression against
- * a generated sample. The sample will be generated either in a random walk fashion or by a
- * chunk-based sampling method. The sample is generated once and is stored in memory for one
- * optimization request for a query
- */
 class SamplingEstimator {
 public:
-    enum class SamplingStyle { kRandom, kChunk };
-
-    /**
-     * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
-     * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
-     * sampling method.
-     */
-    SamplingEstimator(OperationContext* opCtx,
-                      const MultipleCollectionAccessor& collections,
-                      SamplingEstimator::SamplingStyle samplingStyle,
-                      CardinalityEstimate collectionCard);
-
-    /*
-     * This constructor allows the caller to specify the sample size if necessary. This constructor
-     * is useful when a certain scale of sample is more appropriate, for example, the planner wants
-     * to do preliminary data distribution analysis with a small sample size. Testing cases may
-     * require only a small sample.
-     */
-    SamplingEstimator(OperationContext* opCtx,
-                      const MultipleCollectionAccessor& collections,
-                      size_t sampleSize,
-                      SamplingEstimator::SamplingStyle samplingStyle,
-                      CardinalityEstimate collectionCard);
-    ~SamplingEstimator();
+    virtual ~SamplingEstimator() {}
 
     /**
      * Estimates the Cardinality of a filter/MatchExpression by running the given ME against the
      * sample.
      */
-    CardinalityEstimate estimateCardinality(const MatchExpression* expr);
+    virtual CardinalityEstimate estimateCardinality(const MatchExpression* expr) const = 0;
 
     /**
      * Batch Estimates the Cardinality of a vector of filter/MatchExpression by running the given
      * MEs against the sample.
      */
-    std::vector<CardinalityEstimate> estimateCardinality(const std::vector<MatchExpression*>& expr);
-
-    /*
-     * Generates a sample using a random cursor. The caller can call this function to draw a sample
-     * of 'sampleSize'. If it's a re-sample request, the old sample will be freed and replaced by
-     * the new sample.
-     */
-    void generateRandomSample(size_t sampleSize);
-    void generateRandomSample();
-
-    /*
-     * Generates a sample using a chunk-based sampling method. The sample consists of multiple
-     * random chunks. Similar to the other sampling function, the caller can call this function to
-     * re-sample. The old sample will be freed.
-     */
-    void generateChunkSample(size_t sampleSize);
-    void generateChunkSample();
-
-    /*
-     * Returns the sample size calculated by SamplingEstimator.
-     */
-    inline size_t getSampleSize() {
-        return _sampleSize;
-    }
-
-protected:
-    /*
-     * This helper creates a CanonicalQuery for the sampling plan.
-     */
-    static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
-                                                              OperationContext* opCtx,
-                                                              size_t sampleSize);
-
-    double getCollCard() {
-        return _collectionCard.cardinality().v();
-    }
-
-    // The sample is stored in memory for estimating the cardinality of all predicates of one query
-    // request. The sample will be freed on destruction of the SamplingEstimator instance or when a
-    // re-sample is requested. A new sample will replace this.
-    std::vector<BSONObj> _sample;
-
-private:
-    /**
-     * Constructs a sampling SBE plan using the random-walk method.
-     * The SBE plan consists of a sbe::ScanStage which uses a random cursor to read documents
-     * randomly from the collection and a sbe::LimitSkipStage on the top of the scan stage to limit
-     * '_sampleSize' of the documents for the sample.
-     */
-    std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-    generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy);
-
-    /*
-     * The SamplingEstimator calculates the size of a sample based on the confidence level and
-     * margin of error required.
-     */
-    size_t calculateSampleSize();
-
-    OperationContext* _opCtx;
-    // The collection the sampling plan runs against and is the one accessed by the query being
-    // optimized.
-    const MultipleCollectionAccessor& _collections;
-    size_t _sampleSize;
-
-    CardinalityEstimate _collectionCard;
+    virtual std::vector<CardinalityEstimate> estimateCardinality(
+        const std::vector<MatchExpression*>& expr) const = 0;
 };
 
 }  // namespace mongo::ce

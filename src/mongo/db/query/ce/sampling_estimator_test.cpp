@@ -35,7 +35,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/sampling_estimator.h"
+#include "mongo/db/query/ce/sampling_estimator_impl.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -51,9 +51,9 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const size_t kSampleSize = 5;
 
-class SamplingEstimatorForTesting : public SamplingEstimator {
+class SamplingEstimatorForTesting : public SamplingEstimatorImpl {
 public:
-    using SamplingEstimator::SamplingEstimator;
+    using SamplingEstimatorImpl::SamplingEstimatorImpl;
 
     const std::vector<BSONObj>& getSample() {
         return _sample;
@@ -62,11 +62,11 @@ public:
     static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
                                                               OperationContext* opCtx,
                                                               size_t sampleSize) {
-        return SamplingEstimator::makeCanonicalQuery(nss, opCtx, sampleSize);
+        return SamplingEstimatorImpl::makeCanonicalQuery(nss, opCtx, sampleSize);
     }
 
     double getCollCard() {
-        return SamplingEstimator::getCollCard();
+        return SamplingEstimatorImpl::getCollCard();
     }
 
     // Help function to compute the margin of error for the given sample size. The z parameter
@@ -175,7 +175,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
                                                   kSampleSize,
-                                                  SamplingEstimator::SamplingStyle::kRandom,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   makeCardinalityEstimate(10));
 
     auto sample = samplingEstimator.getSample();
@@ -193,11 +193,12 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
                                             {});
 
     // A sample was generated on construction with size being the pre-determined size.
-    SamplingEstimatorForTesting samplingEstimator(operationContext(),
-                                                  colls,
-                                                  kSampleSize,
-                                                  SamplingEstimator::SamplingStyle::kRandom,
-                                                  makeCardinalityEstimate(10));
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        kSampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        makeCardinalityEstimate(10));
 
     auto sample = samplingEstimator.getSample();
     ASSERT_EQUALS(sample.size(), kSampleSize);
@@ -221,11 +222,12 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
                                             false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
                                             {});
 
-    SamplingEstimatorForTesting samplingEstimator(operationContext(),
-                                                  colls,
-                                                  sampleSize,
-                                                  SamplingEstimator::SamplingStyle::kRandom,
-                                                  makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        makeCardinalityEstimate(card));
 
     {  // All documents in the collection satisfy the predicate.
         auto operand = BSON("$lt" << 100);
@@ -274,11 +276,12 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
                                             false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
                                             {});
 
-    SamplingEstimatorForTesting samplingEstimator(operationContext(),
-                                                  colls,
-                                                  sampleSize,
-                                                  SamplingEstimator::SamplingStyle::kRandom,
-                                                  makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        makeCardinalityEstimate(card));
 
     {  // Range predicate on "a" with 20% selectivity: a > 40 && a < 60.
         auto operand1 = BSON("$gte" << 40);
@@ -353,11 +356,12 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
                                             false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
                                             {});
 
-    SamplingEstimatorForTesting samplingEstimator(operationContext(),
-                                                  colls,
-                                                  sampleSize,
-                                                  SamplingEstimator::SamplingStyle::kRandom,
-                                                  makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        makeCardinalityEstimate(card));
 
     auto operand1 = BSON("$lt" << 30);
     LTMatchExpression lt("a"_sd, operand1["$lt"]);

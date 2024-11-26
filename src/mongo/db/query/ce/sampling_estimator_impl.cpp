@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/sampling_estimator.h"
+#include "mongo/db/query/ce/sampling_estimator_impl.h"
 
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -37,12 +37,11 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/platform/basic.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
 
 namespace mongo::ce {
-std::unique_ptr<CanonicalQuery> SamplingEstimator::makeCanonicalQuery(const NamespaceString& nss,
-                                                                      OperationContext* opCtx,
-                                                                      size_t sampleSize) {
+std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeCanonicalQuery(
+    const NamespaceString& nss, OperationContext* opCtx, size_t sampleSize) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
     findCommand->setLimit(sampleSize);
 
@@ -58,13 +57,13 @@ std::unique_ptr<CanonicalQuery> SamplingEstimator::makeCanonicalQuery(const Name
 /*
  * The sample size is calculated based on the confidence level and margin of error required.
  */
-size_t SamplingEstimator::calculateSampleSize() {
+size_t SamplingEstimatorImpl::calculateSampleSize() {
     // TODO SERVER-94063: Calculate the sample size.
     return 500;
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-SamplingEstimator::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy) {
+SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy) {
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
@@ -104,7 +103,7 @@ SamplingEstimator::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy) {
     return {std::move(stage), std::move(data)};
 }
 
-void SamplingEstimator::generateRandomSample(size_t sampleSize) {
+void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
     _sampleSize = sampleSize;
@@ -144,22 +143,22 @@ void SamplingEstimator::generateRandomSample(size_t sampleSize) {
     return;
 }
 
-void SamplingEstimator::generateRandomSample() {
+void SamplingEstimatorImpl::generateRandomSample() {
     generateRandomSample(_sampleSize);
     return;
 }
 
-void SamplingEstimator::generateChunkSample(size_t sampleSize) {
+void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
     // TODO SERVER-93729: Implement chunk-based sampling CE approach.
     return;
 }
 
-void SamplingEstimator::generateChunkSample() {
+void SamplingEstimatorImpl::generateChunkSample() {
     generateChunkSample(_sampleSize);
     return;
 }
 
-CardinalityEstimate SamplingEstimator::estimateCardinality(const MatchExpression* expr) {
+CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpression* expr) const {
     size_t cnt = 0;
     for (const auto& doc : _sample) {
         if (expr->matchesBSON(doc, nullptr)) {
@@ -172,8 +171,8 @@ CardinalityEstimate SamplingEstimator::estimateCardinality(const MatchExpression
     return ce;
 }
 
-std::vector<CardinalityEstimate> SamplingEstimator::estimateCardinality(
-    const std::vector<MatchExpression*>& expressions) {
+std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
+    const std::vector<MatchExpression*>& expressions) const {
     std::vector<CardinalityEstimate> estimates;
     for (auto& expr : expressions) {
         estimates.push_back(estimateCardinality(expr));
@@ -182,11 +181,11 @@ std::vector<CardinalityEstimate> SamplingEstimator::estimateCardinality(
     return estimates;
 }
 
-SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
-                                     const MultipleCollectionAccessor& collections,
-                                     size_t sampleSize,
-                                     SamplingStyle samplingStyle,
-                                     CardinalityEstimate collectionCard)
+SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
+                                             const MultipleCollectionAccessor& collections,
+                                             size_t sampleSize,
+                                             SamplingStyle samplingStyle,
+                                             CardinalityEstimate collectionCard)
     : _opCtx(opCtx),
       _collections(collections),
       _sampleSize(sampleSize),
@@ -199,12 +198,13 @@ SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
     }
 }
 
-SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
-                                     const MultipleCollectionAccessor& collections,
-                                     SamplingStyle samplingStyle,
-                                     CardinalityEstimate collectionCard)
-    : SamplingEstimator(opCtx, collections, calculateSampleSize(), samplingStyle, collectionCard) {}
+SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
+                                             const MultipleCollectionAccessor& collections,
+                                             SamplingStyle samplingStyle,
+                                             CardinalityEstimate collectionCard)
+    : SamplingEstimatorImpl(
+          opCtx, collections, calculateSampleSize(), samplingStyle, collectionCard) {}
 
-SamplingEstimator::~SamplingEstimator() {}
+SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
 }  // namespace mongo::ce

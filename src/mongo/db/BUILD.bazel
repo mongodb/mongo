@@ -1,6 +1,6 @@
+load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_idl_library")
 load("//bazel/config:render_template.bzl", "render_template")
-load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -1076,6 +1076,7 @@ mongo_cc_library(
         "//src/mongo/db/query:sbe_trial_runtime_executor.cpp",
         "//src/mongo/db/query:shard_filterer_factory_impl.cpp",
         "//src/mongo/db/query:wildcard_multikey_paths.cpp",
+        "//src/mongo/db/query/ce:sampling_estimator_impl.cpp",
         "//src/mongo/db/query/classic_runtime_planner:cached_planner.cpp",
         "//src/mongo/db/query/classic_runtime_planner:idhack_planner.cpp",
         "//src/mongo/db/query/classic_runtime_planner:multi_planner.cpp",
@@ -1208,6 +1209,7 @@ mongo_cc_library(
         "//src/mongo/db/query:shard_filterer_factory_impl.h",
         "//src/mongo/db/query:shard_filterer_factory_interface.h",
         "//src/mongo/db/query:wildcard_multikey_paths.h",
+        "//src/mongo/db/query/ce:sampling_estimator_impl.h",
         "//src/mongo/db/query/classic_runtime_planner:planner_interface.h",
         "//src/mongo/db/query/classic_runtime_planner_for_sbe:planner_interface.h",
         "//src/mongo/db/query/stage_builder:classic_stage_builder.h",
@@ -1288,7 +1290,9 @@ mongo_cc_library(
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/mongo/db/query/ce:sampling_estimator_interface",
         "//src/mongo/db/query/client_cursor",
+        "//src/mongo/db/query/cost_based_ranker:estimates",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings",
         "//src/mongo/db/query/write_ops:delete_request_idl",

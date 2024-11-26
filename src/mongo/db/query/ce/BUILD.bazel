@@ -25,3 +25,13 @@ mongo_cc_library(
         "//src/mongo/db/query/stats:stats_histograms",
     ],
 )
+
+mongo_cc_library(
+    name = "sampling_estimator_interface",
+    hdrs = [
+        "sampling_estimator.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+    ],
+)
