@@ -1701,6 +1701,7 @@ DB.prototype.checkMetadataConsistency = function(options = {}) {
 };
 
 DB.prototype.getDatabasePrimaryShardId = function() {
+    // TODO SERVER-92098 user $listDatabases to retrieve primary shard
     let x = this.getSiblingDB('config').databases.findOne({_id: this.getName()});
     if (!x) {
         throw Error(`Database '${this.getName()}' not found`);

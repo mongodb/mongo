@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "move_primary*":
+    approvers:
+      - 10gen/server-catalog-and-routing

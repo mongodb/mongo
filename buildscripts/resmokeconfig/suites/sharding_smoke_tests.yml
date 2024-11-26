@@ -25,7 +25,7 @@ selector:
     - jstests/core_sharding/resharding/reshard_collection_timeseries.js
 
     # movePrimary smoke tests
-    - jstests/core_sharding/move_primary.js
+    - jstests/core_sharding/ddl/move_primary.js
 
     # moveCollection smoke tests
     - jstests/core_sharding/move_collection/move_collection_basic.js

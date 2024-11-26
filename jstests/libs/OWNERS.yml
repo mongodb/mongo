@@ -9,3 +9,6 @@ filters:
   - "*golden_test.js":
     approvers:
       - 10gen/query-optimization
+  - "sharded_cluster_fixture_helpers.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
