@@ -1368,11 +1368,6 @@ public:
  */
 PrfBlock PrfBlockfromCDR(const ConstDataRange& block);
 
-template <typename TokenT>
-TokenT FLETokenFromCDR(const ConstDataRange& block) {
-    return TokenT(PrfBlockfromCDR(block));
-}
-
 ConstDataRange binDataToCDR(BSONElement element);
 
 template <typename T>

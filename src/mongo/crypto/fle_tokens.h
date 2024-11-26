@@ -34,10 +34,7 @@
 #include <vector>
 
 #include "mongo/base/data_range.h"
-
-namespace mongo {
-
-using PrfBlock = std::array<std::uint8_t, 32>;
+#include "mongo/base/string_data.h"
 
 /*
  * The many token types are derived from the index key
@@ -80,99 +77,138 @@ using PrfBlock = std::array<std::uint8_t, 32>;
  * AnchorPaddingKeyToken = HMAC(AnchorPaddingRootToken, 1) = S1_d = F^(S^esc_fd)(1)
  * AnchorPaddingValueToken = HMAC(AnchorPaddingRootToken, 2) =  S2_d = F^(S^esc_fd)(2)
  */
-enum class FLETokenType {
-    CollectionsLevel1Token,
-    ServerDataEncryptionLevel1Token,
 
-    EDCToken,
-    ESCToken,
-    ECOCToken,
+namespace mongo {
+// Forward declare to avoid including the header file.
+class MongoCryptBuffer;
 
-    EDCDerivedFromDataToken,
-    ESCDerivedFromDataToken,
+using PrfBlock = std::array<std::uint8_t, 32>;
 
-    EDCDerivedFromDataTokenAndContentionFactorToken,
-    ESCDerivedFromDataTokenAndContentionFactorToken,
+// An abstract class that all tokens derive from.
+// Enables reduced code for common functions in fle_crypto.
+class FLEToken {
+public:
+    virtual ~FLEToken() {}
 
-    EDCTwiceDerivedToken,
-    ESCTwiceDerivedTagToken,
-    ESCTwiceDerivedValueToken,
+    virtual StringData name() const = 0;
 
-    // v2 tokens
-    ServerTokenDerivationLevel1Token,
-    ServerDerivedFromDataToken,
-    ServerCountAndContentionFactorEncryptionToken,
-    ServerZerosEncryptionToken,
-
-    // range protocol v2 tokens
-    AnchorPaddingRootToken,
-    AnchorPaddingKeyToken,
-    AnchorPaddingValueToken,
+    virtual PrfBlock asPrfBlock() const = 0;
+    virtual MongoCryptBuffer asMongoCryptBuffer() const = 0;
+    virtual ConstDataRange toCDR() const = 0;
 };
 
-/**
- * Templated C++ class that contains a token. A templated class is used to create a strongly typed
- * API that is hard to misuse.
- */
-template <FLETokenType TokenT>
-struct FLEToken {
-    FLEToken() = default;
+}  // namespace mongo
 
-    FLEToken(PrfBlock dataIn) : data(std::move(dataIn)) {}
+#define FLE_TOKEN_TYPE_MC(TokenType) mc_##TokenType##_t
+#define FLE_CRYPTO_TOKEN_FWD(TokenType) \
+    typedef struct FLE_TOKEN_TYPE_MC(TokenType) FLE_TOKEN_TYPE_MC(TokenType);
 
-    static FLEToken parse(ConstDataRange block) {
-        uassert(9616300, "Invalid prf length", block.length() == sizeof(PrfBlock));
-
-        PrfBlock ret;
-        std::copy(block.data(), block.data() + block.length(), ret.data());
-        return FLEToken(std::move(ret));
+// Variadic arguments represent parameters for the token's ::deriveFrom function.
+#define FLE_TOKEN_DECL_CLASS(TokenType, ...)                                   \
+    /* Forward declare the type name */                                        \
+    FLE_CRYPTO_TOKEN_FWD(TokenType)                                            \
+    namespace mongo {                                                          \
+    class TokenType : public FLEToken {                                        \
+    public:                                                                    \
+        /* Default constructor */                                              \
+        TokenType();                                                           \
+                                                                               \
+        /* mc_##TokenType##_t constructor */                                   \
+        TokenType(FLE_TOKEN_TYPE_MC(TokenType) * token);                       \
+                                                                               \
+        /* Copy constructor */                                                 \
+        TokenType(const TokenType& other);                                     \
+                                                                               \
+        /* Assignment operator */                                              \
+        TokenType& operator=(const TokenType& other);                          \
+                                                                               \
+        /* Move constructor */                                                 \
+        TokenType(TokenType&& other);                                          \
+                                                                               \
+        /* Move assignemnt operator */                                         \
+        TokenType& operator=(TokenType&& other);                               \
+                                                                               \
+        /* Destructor */                                                       \
+        ~TokenType() override;                                                 \
+                                                                               \
+        const FLE_TOKEN_TYPE_MC(TokenType) * get() const;                      \
+                                                                               \
+        /* Construct from a PrfBlock */                                        \
+        explicit TokenType(const PrfBlock& block);                             \
+                                                                               \
+        PrfBlock asPrfBlock() const override;                                  \
+        MongoCryptBuffer asMongoCryptBuffer() const override;                  \
+        ConstDataRange toCDR() const override;                                 \
+                                                                               \
+        bool operator==(const TokenType& other) const;                         \
+        bool operator!=(const TokenType& other) const;                         \
+                                                                               \
+        static TokenType parse(ConstDataRange block);                          \
+        static TokenType deriveFrom(__VA_ARGS__);                              \
+                                                                               \
+        template <typename H>                                                  \
+        friend H AbslHashValue(H h, const TokenType& token) {                  \
+            return H::combine(std::move(h), token.name(), token.asPrfBlock()); \
+        }                                                                      \
+                                                                               \
+        StringData name() const override {                                     \
+            return StringData(#TokenType);                                     \
+        }                                                                      \
+                                                                               \
+    private:                                                                   \
+        FLE_TOKEN_TYPE_MC(TokenType) * _token;                                 \
+                                                                               \
+        void initializeFromBuffer(MongoCryptBuffer buffer);                    \
+    };                                                                         \
     }
 
-    ConstDataRange toCDR() const {
-        return ConstDataRange(data.data(), data.data() + data.size());
-    }
+// Declare the classes by passing through the name and a variable amount of parameters that define
+// how each token should be able to be derived. See the comment at the top of the file for more
+// specific details.
+FLE_TOKEN_DECL_CLASS(CollectionsLevel1Token, const MongoCryptBuffer& buf)
+FLE_TOKEN_DECL_CLASS(ServerDataEncryptionLevel1Token, const MongoCryptBuffer& buf)
 
-    bool operator==(const FLEToken<TokenT>& other) const {
-        return (type == other.type) && (data == other.data);
-    }
+FLE_TOKEN_DECL_CLASS(EDCToken, const CollectionsLevel1Token& parent)
+FLE_TOKEN_DECL_CLASS(ESCToken, const CollectionsLevel1Token& parent)
+FLE_TOKEN_DECL_CLASS(ECOCToken, const CollectionsLevel1Token& parent)
 
-    bool operator!=(const FLEToken<TokenT>& other) const {
-        return !(*this == other);
-    }
+FLE_TOKEN_DECL_CLASS(EDCDerivedFromDataToken, const EDCToken& parent, ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ESCDerivedFromDataToken, const ESCToken& parent, ConstDataRange cdr)
 
-    template <typename H>
-    friend H AbslHashValue(H h, const FLEToken<TokenT>& token) {
-        return H::combine(std::move(h), token.type, token.data);
-    }
+FLE_TOKEN_DECL_CLASS(EDCDerivedFromDataTokenAndContentionFactor,
+                     const EDCDerivedFromDataToken& parent,
+                     std::uint64_t arg)
+FLE_TOKEN_DECL_CLASS(ESCDerivedFromDataTokenAndContentionFactor,
+                     const ESCDerivedFromDataToken& parent,
+                     std::uint64_t arg)
 
-    FLETokenType type{TokenT};
-    PrfBlock data;
-};
+FLE_TOKEN_DECL_CLASS(EDCTwiceDerivedToken, const EDCDerivedFromDataTokenAndContentionFactor& parent)
+FLE_TOKEN_DECL_CLASS(ESCTwiceDerivedTagToken,
+                     const ESCDerivedFromDataTokenAndContentionFactor& parent)
+FLE_TOKEN_DECL_CLASS(ESCTwiceDerivedValueToken,
+                     const ESCDerivedFromDataTokenAndContentionFactor& parent)
 
-using CollectionsLevel1Token = FLEToken<FLETokenType::CollectionsLevel1Token>;
-using ServerDataEncryptionLevel1Token = FLEToken<FLETokenType::ServerDataEncryptionLevel1Token>;
-using EDCToken = FLEToken<FLETokenType::EDCToken>;
-using ESCToken = FLEToken<FLETokenType::ESCToken>;
-using ECOCToken = FLEToken<FLETokenType::ECOCToken>;
-using EDCDerivedFromDataToken = FLEToken<FLETokenType::EDCDerivedFromDataToken>;
-using ESCDerivedFromDataToken = FLEToken<FLETokenType::ESCDerivedFromDataToken>;
-using EDCDerivedFromDataTokenAndContentionFactorToken =
-    FLEToken<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>;
-using ESCDerivedFromDataTokenAndContentionFactorToken =
-    FLEToken<FLETokenType::ESCDerivedFromDataTokenAndContentionFactorToken>;
-using EDCTwiceDerivedToken = FLEToken<FLETokenType::EDCTwiceDerivedToken>;
-using ESCTwiceDerivedTagToken = FLEToken<FLETokenType::ESCTwiceDerivedTagToken>;
-using ESCTwiceDerivedValueToken = FLEToken<FLETokenType::ESCTwiceDerivedValueToken>;
+FLE_TOKEN_DECL_CLASS(ServerTokenDerivationLevel1Token, const MongoCryptBuffer& buf)
+FLE_TOKEN_DECL_CLASS(ServerDerivedFromDataToken,
+                     const ServerTokenDerivationLevel1Token& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ServerCountAndContentionFactorEncryptionToken,
+                     const ServerDerivedFromDataToken& parent)
+FLE_TOKEN_DECL_CLASS(ServerZerosEncryptionToken, const ServerDerivedFromDataToken& parent)
 
-using ServerTokenDerivationLevel1Token = FLEToken<FLETokenType::ServerTokenDerivationLevel1Token>;
-using ServerDerivedFromDataToken = FLEToken<FLETokenType::ServerDerivedFromDataToken>;
-using ServerCountAndContentionFactorEncryptionToken =
-    FLEToken<FLETokenType::ServerCountAndContentionFactorEncryptionToken>;
-using ServerZerosEncryptionToken = FLEToken<FLETokenType::ServerZerosEncryptionToken>;
+FLE_TOKEN_DECL_CLASS(AnchorPaddingTokenRoot, const ESCToken& parent)
+FLE_TOKEN_DECL_CLASS(AnchorPaddingKeyToken, const AnchorPaddingTokenRoot& parent)
+FLE_TOKEN_DECL_CLASS(AnchorPaddingValueToken, const AnchorPaddingTokenRoot& parent)
 
-using AnchorPaddingRootToken = FLEToken<FLETokenType::AnchorPaddingRootToken>;
-using AnchorPaddingKeyToken = FLEToken<FLETokenType::AnchorPaddingKeyToken>;
-using AnchorPaddingValueToken = FLEToken<FLETokenType::AnchorPaddingValueToken>;
+#undef FLE_TOKEN_TYPE_MC
+#undef FLE_CRYPTO_TOKEN_FWD
+#undef FLE_TOKEN_DECL_CLASS
+
+namespace mongo {
+// Some keys have slightly different names in the server repo compared to libmongocrypt.
+using EDCDerivedFromDataTokenAndContentionFactorToken = EDCDerivedFromDataTokenAndContentionFactor;
+using ESCDerivedFromDataTokenAndContentionFactorToken = ESCDerivedFromDataTokenAndContentionFactor;
+using AnchorPaddingRootToken = AnchorPaddingTokenRoot;
 
 /**
  * Values of ECOC documents in Queryable Encryption protocol version 2

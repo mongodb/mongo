@@ -3930,7 +3930,7 @@ intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* c
                 serverTokenPair.second.length() == sizeof(PrfBlock));
 
     return new ExpressionInternalFLEEqual(
-        expCtx, std::move(fieldExpr), PrfBlockfromCDR(serverTokenPair.second));
+        expCtx, std::move(fieldExpr), ServerZerosEncryptionToken::parse(serverTokenPair.second));
 }
 
 Value toValue(const std::array<std::uint8_t, 32>& buf) {
@@ -3939,10 +3939,10 @@ Value toValue(const std::array<std::uint8_t, 32>& buf) {
 }
 
 Value ExpressionInternalFLEEqual::serialize(const SerializationOptions& options) const {
-    return Value(
-        Document{{kInternalFleEq,
-                  Document{{"field", _children[0]->serialize(options)},
-                           {"server", toValue((_evaluatorV2.zerosDecryptionTokens()[0]).data)}}}});
+    return Value(Document{
+        {kInternalFleEq,
+         Document{{"field", _children[0]->serialize(options)},
+                  {"server", toValue((_evaluatorV2.zerosDecryptionTokens()[0]).asPrfBlock())}}}});
 }
 
 Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* variables) const {
@@ -4011,7 +4011,7 @@ Value ExpressionInternalFLEBetween::serialize(const SerializationOptions& option
     std::vector<Value> serverDerivedValues;
     serverDerivedValues.reserve(_evaluatorV2.zerosDecryptionTokens().size());
     for (auto& token : _evaluatorV2.zerosDecryptionTokens()) {
-        serverDerivedValues.push_back(toValue(token.data));
+        serverDerivedValues.push_back(toValue(token.asPrfBlock()));
     }
     return Value(Document{{kInternalFleBetween,
                            Document{{"field", _children[0]->serialize(options)},

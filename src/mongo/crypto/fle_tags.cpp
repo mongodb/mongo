@@ -118,7 +118,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(FLETagQueryInterface
         auto edcToken =
             DerivedToken::generateEDCDerivedFromDataTokenAndContentionFactorToken(d, cf);
 
-        FLEEdgePrfBlock edgeSet{escToken.data, edcToken.data};
+        FLEEdgePrfBlock edgeSet{escToken.asPrfBlock(), edcToken.asPrfBlock()};
 
         blocks.push_back(edgeSet);
     }
