@@ -52,7 +52,7 @@ structs:
         description: An optional pipeline to apply to the collection being unioned.
         optional: true
         type: array<object>
-      # TODO SERVER-74941 We may be able to remove limit alongside docsRequested.
+      # TODO SERVER-92576 We may be able to remove limit alongside docsRequested.
       limit:
         description: A limit copied from the merging part of the pipeline.
         optional: true
