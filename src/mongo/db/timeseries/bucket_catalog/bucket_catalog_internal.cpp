@@ -1192,7 +1192,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
             timeField = {tf.data(), tf.size()};
         }
 
-        closeArchivedBucket(catalog, bucketId, timeField, closedBuckets);
+        closeArchivedBucket(catalog, bucketId, timeField, stats, closedBuckets);
 
         if (timeFieldIt != stripe.collectionTimeFields.end()) {
             int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
@@ -1585,6 +1585,7 @@ void closeOpenBucket(BucketCatalog& catalog,
 void closeArchivedBucket(BucketCatalog& catalog,
                          const BucketId& bucket,
                          StringData timeField,
+                         ExecutionStatsController& stats,
                          ClosedBuckets& closedBuckets) {
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -1594,11 +1595,8 @@ void closeArchivedBucket(BucketCatalog& catalog,
     }
 
     try {
-        closedBuckets.emplace_back(&catalog.bucketStateRegistry,
-                                   bucket,
-                                   timeField.toString(),
-                                   boost::none,
-                                   getOrInitializeExecutionStats(catalog, bucket.collectionUUID));
+        closedBuckets.emplace_back(
+            &catalog.bucketStateRegistry, bucket, timeField.toString(), boost::none, stats);
     } catch (...) {
     }
 }

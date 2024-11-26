@@ -446,6 +446,7 @@ void closeOpenBucket(BucketCatalog& catalog,
 void closeArchivedBucket(BucketCatalog& catalog,
                          const BucketId& bucket,
                          StringData timeField,
+                         ExecutionStatsController& stats,
                          ClosedBuckets& closedBuckets);
 
 }  // namespace mongo::timeseries::bucket_catalog::internal
