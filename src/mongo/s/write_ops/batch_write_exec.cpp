@@ -247,13 +247,11 @@ bool processResponseFromRemote(OperationContext* opCtx,
         trackedErrors.getErrors(ErrorCodes::TenantMigrationAborted);
 
     if (!staleConfigErrors.empty()) {
-        invariant(staleDbErrors.empty());
         noteStaleShardResponses(opCtx, staleConfigErrors, &targeter);
         ++stats->numStaleShardBatches;
     }
 
     if (!staleDbErrors.empty()) {
-        invariant(staleConfigErrors.empty());
         noteStaleDbResponses(opCtx, staleDbErrors, &targeter);
         ++stats->numStaleDbBatches;
     }
@@ -263,7 +261,7 @@ bool processResponseFromRemote(OperationContext* opCtx,
     }
 
     return false;
-}
+}  // processResponseFromRemote
 
 // If the local process experiences an error trying to get the response from remote, process the
 // error. The returned boolean dictates if we should abort the rest of the batch.
