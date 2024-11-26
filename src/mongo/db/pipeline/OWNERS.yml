@@ -69,6 +69,21 @@ filters:
   - "document_source_set_window_fields*":
     approvers:
       - 10gen/query-integration-analytic-extensions
+  - "expression_dependencies*":
+    approvers:
+      - 10gen/query-optimization-heuristic-rewrite
+  - "expression_javascript*":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "expression_js*":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "expression_visitor*":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "expression_walker*":
+    approvers:
+      - 10gen/query-optimization-logical-models
   - "granularity_rounder*":
     approvers:
       - 10gen/query-execution-aggregation
@@ -98,25 +113,31 @@ filters:
   - "percentile_algo*":
     approvers:
       - 10gen/query-integration-analytic-extensions
+  - "pipeline_metadata_tree*":
+    approvers:
+      - 10gen/query-integration-staff-leads
+  - "plan_explainer*":
+    approvers:
+      - 10gen/query-optimization-explain
   - "plan_executor_pipeline*":
     approvers:
       - 10gen/query-execution-aggregation
   - "resume_token*":
     approvers:
       - 10gen/query-execution-change-streams
+  - "sbe_pushdown*":
+    approvers:
+      - 10gen/query-execution-sbe
   - "semantic_analysis*":
     approvers:
       - 10gen/query-optimization-heuristic-rewrite
   - "sequential_document_cache*":
     approvers:
       - 10gen/query-execution-aggregation
-  - "single_document_transformation_processor*":
+  - "*_processor*":
     approvers:
       - 10gen/query-execution-aggregation
   - "tee_buffer*":
-    approvers:
-      - 10gen/query-execution-aggregation
-  - "unwind_processor*":
     approvers:
       - 10gen/query-execution-aggregation
   - "value.idl":

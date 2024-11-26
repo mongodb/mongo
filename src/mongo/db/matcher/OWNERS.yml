@@ -11,10 +11,19 @@ filters:
   - "expression_parser*":
     approvers:
       - 10gen/query-optimization-parsers
+  - "expression_optimize*":
+    approvers:
+      - 10gen/query-optimization-heuristic-rewrite
+  - "expression_parameterization*":
+    approvers:
+      - 10gen/query-optimization-plan-cache
+  - "match_expression_dependencies*":
+    approvers:
+      - 10gen/query-optimization-heuristic-rewrite
   - "rewrite_expr*":
     approvers:
       - 10gen/query-optimization-parsers
-  - "expression_geo*":
+  - "expression_*geo*":
     approvers:
       - 10gen/query-integration-geo
   - "expression_text*":
@@ -24,7 +33,9 @@ filters:
   - "expression_where*":
     approvers:
       - 10gen/query-integration-staff-leads
-
+  - "in_list_data*":
+    approvers:
+      - 10gen/query-optimization-logical-models
   # 'ExtensionsCallbackReal' is tied to $text and $where parsing, and is therefore owned by QI.
   - "extensions_callback_real*":
     approvers:

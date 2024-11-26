@@ -1020,10 +1020,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/matcher/**/* @10gen/query @svc-auto-approve-bot
 /src/mongo/db/matcher/**/doc_validation* @10gen/query-execution-doc-validation @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_parser* @10gen/query-optimization-parsers @svc-auto-approve-bot
+/src/mongo/db/matcher/**/expression_optimize* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
+/src/mongo/db/matcher/**/expression_parameterization* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
+/src/mongo/db/matcher/**/match_expression_dependencies* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
 /src/mongo/db/matcher/**/rewrite_expr* @10gen/query-optimization-parsers @svc-auto-approve-bot
-/src/mongo/db/matcher/**/expression_geo* @10gen/query-integration-geo @svc-auto-approve-bot
+/src/mongo/db/matcher/**/expression_*geo* @10gen/query-integration-geo @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_text* @10gen/query-integration-staff-leads @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_where* @10gen/query-integration-staff-leads @svc-auto-approve-bot
+/src/mongo/db/matcher/**/in_list_data* @10gen/query-optimization-logical-models @svc-auto-approve-bot
 /src/mongo/db/matcher/**/extensions_callback_real* @10gen/query-integration-staff-leads @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_bitset_tree_converter* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_restorer* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
@@ -1161,6 +1165,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_score* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_score_fusion* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_set_window_fields* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression_dependencies* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression_javascript* @10gen/query-integration-javascript @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression_js* @10gen/query-integration-javascript @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression_visitor* @10gen/query-optimization-logical-models @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression_walker* @10gen/query-optimization-logical-models @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/granularity_rounder* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/javascript_execution* @10gen/query-integration-javascript @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/make_js_function* @10gen/query-integration-javascript @svc-auto-approve-bot
@@ -1170,13 +1179,15 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/sharded_agg_helpers* @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/merge_processor* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/percentile_algo* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/pipeline_metadata_tree* @10gen/query-integration-staff-leads @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/plan_explainer* @10gen/query-optimization-explain @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/plan_executor_pipeline* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/resume_token* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/sbe_pushdown* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/semantic_analysis* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/sequential_document_cache* @10gen/query-execution-aggregation @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/single_document_transformation_processor* @10gen/query-execution-aggregation @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/*_processor* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/tee_buffer* @10gen/query-execution-aggregation @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/unwind_processor* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/value.idl @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_coll_stats* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_internal_all_collection_stats* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1188,6 +1199,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/search/**/* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/search/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/pipeline/visitors/OWNERS.yml
+/src/mongo/db/pipeline/visitors/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/pipeline/visitors/**/*docs_needed_bounds* @10gen/query-integration-search @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/pipeline/window_function/OWNERS.yml
 /src/mongo/db/pipeline/window_function/**/* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/window_function/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
@@ -1197,8 +1212,15 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/OWNERS.yml
 /src/mongo/db/query/**/* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/**/analyze* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_index_usage_tracker* @10gen/query-execution-index-access-stats @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_query_info* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/**/eof_node_type* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/explain* @10gen/query-optimization-explain @svc-auto-approve-bot
+/src/mongo/db/query/**/expression_walker* @10gen/query-optimization-logical-models @svc-auto-approve-bot
+/src/mongo/db/query/**/index_bounds.* @10gen/query-optimization-planner @svc-auto-approve-bot
+/src/mongo/db/query/**/indexability* @10gen/query-optimization-planner @svc-auto-approve-bot
+/src/mongo/db/query/**/plan_summary_stats* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/*query_settings* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /src/mongo/db/query/**/mock_yield_policies.h @10gen/query-execution-yielding @svc-auto-approve-bot
 /src/mongo/db/query/**/*yield_policy* @10gen/query-execution-yielding @svc-auto-approve-bot
@@ -1207,7 +1229,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/sbe* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/db/query/**/*geo* @10gen/query-integration-geo @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_explainer* @10gen/query-optimization-explain @svc-auto-approve-bot
-/src/mongo/db/query/**/explain_common* @10gen/query-optimization-explain @svc-auto-approve-bot
 /src/mongo/db/query/**/bind_input_params* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/query/**/interval_evaluation_tree* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/query/**/partitioned_cache.h @10gen/query-optimization-plan-cache @svc-auto-approve-bot

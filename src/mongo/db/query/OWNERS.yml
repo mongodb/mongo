@@ -6,6 +6,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "analyze*":
+    approvers:
+      - 10gen/query-optimization
   - "collection_index_usage_tracker*":
     approvers:
       - 10gen/query-execution-index-access-stats
@@ -15,6 +18,24 @@ filters:
       # optimization component, while the update and stats tracking components are owned by query
       # execution. As such, this can be split between the two teams once these files are split up.
       - 10gen/query
+  - "eof_node_type*":
+    approvers:
+      - 10gen/query-optimization
+  - "explain*":
+    approvers:
+      - 10gen/query-optimization-explain
+  - "expression_walker*":
+    approvers:
+      - 10gen/query-optimization-logical-models
+  - "index_bounds.*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "indexability*":
+    approvers:
+      - 10gen/query-optimization-planner
+  - "plan_summary_stats*":
+    approvers:
+      - 10gen/query-execution
   - "*query_settings*":
     approvers:
       - 10gen/query-execution-query-settings
@@ -37,9 +58,6 @@ filters:
     approvers:
       - 10gen/query-integration-geo
   - "plan_explainer*":
-    approvers:
-      - 10gen/query-optimization-explain
-  - "explain_common*":
     approvers:
       - 10gen/query-optimization-explain
   - "bind_input_params*":
