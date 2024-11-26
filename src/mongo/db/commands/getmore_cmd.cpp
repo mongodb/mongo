@@ -364,7 +364,7 @@ public:
          * be returned by this getMore.
          *
          * Returns true if the cursor should be saved for subsequent getMores, and false otherwise.
-         * Fills out *numResults with the number of documents in the batch, which must be
+         * Fills out 'numResults' with the number of documents in the batch, which must be
          * initialized to zero by the caller.
          *
          * Throws an exception on failure.
@@ -387,9 +387,14 @@ public:
             try {
                 while (!FindCommon::enoughForGetMore(batchSize, *numResults) &&
                        PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
+                    auto nextPostBatchResumeToken = exec->getPostBatchResumeToken();
+
                     // If adding this object will cause us to exceed the message size limit, then we
                     // stash it for later.
-                    if (!FindCommon::haveSpaceForNext(obj, *numResults, nextBatch->bytesUsed())) {
+                    if (!FindCommon::haveSpaceForNext(obj,
+                                                      *numResults,
+                                                      nextBatch->bytesUsed() +
+                                                          nextPostBatchResumeToken.objsize())) {
                         exec->stashResult(obj);
                         break;
                     }
@@ -398,7 +403,7 @@ public:
                     awaitDataState(opCtx).shouldWaitForInserts = false;
 
                     // If this executor produces a postBatchResumeToken, add it to the response.
-                    nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
+                    nextBatch->setPostBatchResumeToken(nextPostBatchResumeToken);
 
                     // At this point, we know that there will be at least one document in this
                     // batch. Reserve an initial estimated number of bytes for the response.
