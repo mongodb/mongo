@@ -7,7 +7,6 @@
 # "Bazel aquery failed." because it is reading this files stdout as aquery output
 
 bazel_real="$BAZEL_REAL"
-echo $BAZEL_REAL > ".bazel_real"
 bazelrc_xcode_lines=()
 
 if [[ -z "${BAZELISK_SKIP_WRAPPER}" ]]; then

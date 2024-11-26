@@ -55,7 +55,6 @@ variables:
       - func: "save UndoDB recordings"
       - func: "save unstripped dbtest"
       - func: "save bazel headers"
-      - func: "save bazel jvm dump"
       - func: "save hang analyzer debugger files"
       - func: "save disk statistics"
       - func: "save system resource information"
