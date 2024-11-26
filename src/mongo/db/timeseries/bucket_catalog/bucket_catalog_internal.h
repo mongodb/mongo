@@ -216,7 +216,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     InsertContext& insertContext,
     Bucket& existingBucket,
     const Date_t& time,
-    uint64_t storageCacheSize,
+    uint64_t storageCacheSizeBytes,
     const StringDataComparator* comparator,
     Bucket* excludedBucket = nullptr,
     boost::optional<RolloverAction> excludedAction = boost::none);
@@ -261,7 +261,7 @@ boost::optional<OID> findArchivedCandidate(
  * buckets. Returns a pair of the effective value that respects the absolute bucket max and min
  * sizes and the raw value.
  */
-std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSize,
+std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
                                                          uint32_t workloadCardinality);
 
 /**
@@ -276,7 +276,7 @@ InsertResult getReopeningContext(BucketCatalog& catalog,
                                  uint64_t catalogEra,
                                  AllowQueryBasedReopening allowQueryBasedReopening,
                                  const Date_t& time,
-                                 uint64_t storageCacheSize);
+                                 uint64_t storageCacheSizeBytes);
 
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
@@ -375,7 +375,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
     const Date_t& time,
-    uint64_t storageCacheSize,
+    uint64_t storageCacheSizeBytes,
     const StringDataComparator* comparator);
 
 /**
@@ -444,7 +444,7 @@ void closeOpenBucket(BucketCatalog& catalog,
  * Close an archived bucket, setting the state appropriately and removing it from the catalog.
  */
 void closeArchivedBucket(BucketCatalog& catalog,
-                         const BucketId& bucket,
+                         const BucketId& bucketId,
                          StringData timeField,
                          ExecutionStatsController& stats,
                          ClosedBuckets& closedBuckets);

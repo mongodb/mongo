@@ -78,7 +78,7 @@ constexpr StringData kNumClosedDueToReopening = "numBucketsClosedDueToReopening"
 constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
 constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
 
-static constexpr uint64_t kStorageCacheSize = 1024 * 1024 * 1024;
+static constexpr uint64_t kStorageCacheSizeBytes = 1024 * 1024 * 1024;
 
 class BucketCatalogTest : public CatalogTestFixture {
 protected:
@@ -297,7 +297,7 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
                          CombineWithInsertsFromOtherClients::kAllow,
                          std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                          std::get<Date_t>(insertContextAndTime),
-                         kStorageCacheSize);
+                         kStorageCacheSizeBytes);
     auto& batch = get<SuccessfulInsertion>(result.getValue()).batch;
     _commit(ns, batch, numPreviouslyCommittedMeasurements);
 }
@@ -320,7 +320,7 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
                   combine,
                   std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                   std::get<Date_t>(insertContextAndTime),
-                  kStorageCacheSize);
+                  kStorageCacheSizeBytes);
 }
 
 StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_tryInsertOneHelper(
@@ -341,7 +341,7 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
                      combine,
                      std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                      std::get<Date_t>(insertContextAndTime),
-                     kStorageCacheSize);
+                     kStorageCacheSizeBytes);
 }
 
 StatusWith<mongo::timeseries::bucket_catalog::InsertResult>
@@ -365,7 +365,7 @@ BucketCatalogTest::_insertOneWithReopeningContextHelper(
                                       reopeningContext,
                                       std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                                       std::get<Date_t>(insertContextAndTime),
-                                      kStorageCacheSize);
+                                      kStorageCacheSizeBytes);
 }
 
 long long BucketCatalogTest::_getExecutionStat(const UUID& uuid, StringData stat) {
@@ -2520,31 +2520,31 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
 
 TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSize) {
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
-        /*storageCacheSize=*/128 * 1000 * 1000, /*workloadCardinality=*/1000);
+        /*storageCacheSizeBytes=*/128 * 1000 * 1000, /*workloadCardinality=*/1000);
     ASSERT_EQ(effectiveMaxSize, 64 * 1000);
     ASSERT_EQ(cacheDerivedBucketMaxSize, 64 * 1000);
 
     std::tie(effectiveMaxSize, cacheDerivedBucketMaxSize) = internal::getCacheDerivedBucketMaxSize(
-        /*storageCacheSize=*/0, /*workloadCardinality=*/1000);
+        /*storageCacheSizeBytes=*/0, /*workloadCardinality=*/1000);
     ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
     ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
 
     std::tie(effectiveMaxSize, cacheDerivedBucketMaxSize) = internal::getCacheDerivedBucketMaxSize(
-        /*storageCacheSize=*/128 * 1000 * 1000, /*workloadCardinality=*/0);
+        /*storageCacheSizeBytes=*/128 * 1000 * 1000, /*workloadCardinality=*/0);
     ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
     ASSERT_EQ(cacheDerivedBucketMaxSize, INT_MAX);
 }
 
 TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMax) {
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
-        /*storageCacheSize=*/gTimeseriesBucketMaxSize * 10, /*workloadCardinality=*/1);
+        /*storageCacheSizeBytes=*/gTimeseriesBucketMaxSize * 10, /*workloadCardinality=*/1);
     ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
     ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMaxSize * 5);
 }
 
 TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMin) {
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
-        /*storageCacheSize=*/1, /*workloadCardinality=*/1);
+        /*storageCacheSizeBytes=*/1, /*workloadCardinality=*/1);
     ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
     ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
 }

@@ -603,7 +603,7 @@ std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
     return batch;
 }
 
-uint64_t getStorageCacheSize(OperationContext* opCtx) {
+uint64_t getStorageCacheSizeBytes(OperationContext* opCtx) {
     return opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
         1024;
 }
@@ -671,7 +671,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                                                   combine,
                                                   insertContext,
                                                   time,
-                                                  getStorageCacheSize(opCtx));
+                                                  getStorageCacheSizeBytes(opCtx));
         if (!swResult.isOK()) {
             return swResult;
         }
@@ -716,7 +716,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                         reopeningContext,
                         insertContext,
                         time,
-                        getStorageCacheSize(opCtx));
+                        getStorageCacheSizeBytes(opCtx));
                 },
                 [](bucket_catalog::InsertWaiter& waiter)
                     -> StatusWith<bucket_catalog::InsertResult> {
@@ -1162,7 +1162,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                             std::get<bucket_catalog::InsertContext>(
                                 insertContextAndDate.getValue()),
                             std::get<Date_t>(insertContextAndDate.getValue()),
-                            getStorageCacheSize(opCtx));
+                            getStorageCacheSizeBytes(opCtx));
                     }
                 }
                 return result;
@@ -1176,7 +1176,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                 combine,
                 std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
                 std::get<Date_t>(insertContextAndDate.getValue()),
-                getStorageCacheSize(opCtx));
+                getStorageCacheSizeBytes(opCtx));
     }
     MONGO_UNREACHABLE;
 }

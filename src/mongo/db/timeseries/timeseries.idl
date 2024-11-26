@@ -35,7 +35,7 @@ imports:
 
 server_parameters:
     "performTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening":
-        description: "Whether or not to perform data integrity checks when inserting measurements 
+        description: "Whether or not to perform data integrity checks when inserting measurements
                       into compressed time-series buckets that are reopened. On by default, can be
                       turned off for a performance boost."
         set_at: [ startup, runtime ]
@@ -73,11 +73,11 @@ server_parameters:
 
     "timeseriesIdleBucketExpiryMemoryUsageThreshold":
         description: "The threshold in percentage of system memory or bytes for bucket catalog memory
-                      usage above which idle buckets will be expired. If set to a number between 1-100, 
-                      the threshold will be interpreted as a percentage of system memory. 
-                      If set to a number larger than 100 it will be interpreted as a number of bytes 
-                      for the threshold. If set to zero or a non-positive number it will automatically be 
-                      over-written to be 5% of system memory."
+                      usage above which idle buckets will be expired. If set to a number between 1-100,
+                      the threshold will be interpreted as a percentage of system memory.
+                      If set to a number larger than 100 it will be interpreted as a number of bytes
+                      for the threshold. If set to zero or a non-positive number it will automatically be
+                      over-written to be the default value, a certain percentage of system memory."
         set_at: [ startup, runtime ]
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes"
         default: 5
@@ -115,7 +115,7 @@ server_parameters:
         redact: false
 
     "timeseriesBucketMinSize":
-        description: "If there is high memory pressure on the system, we will lower the maximum 
+        description: "If there is high memory pressure on the system, we will lower the maximum
                       size (in bytes) of measurements we pack into buckets. This value represents
                       the absolute lowest size we will limit buckets to."
         set_at: [ startup, runtime ]
@@ -164,7 +164,7 @@ structs:
         query_shape_component: true
         fields:
             timeField:
-                description: "The name of the top-level field to be used for time. Inserted 
+                description: "The name of the top-level field to be used for time. Inserted
                               documents must have this field, and the field must be of the BSON UTC
                               datetime type (0x9)"
                 type: string
@@ -174,7 +174,7 @@ structs:
                     callback: "validateTimeAndMetaField"
             metaField:
                 description: "The name of the top-level field describing the series. This field is
-                              used to group related data and may be of any BSON type. This may not 
+                              used to group related data and may be of any BSON type. This may not
                               be \"_id\" or the same as 'timeField'."
                 type: string
                 optional: true
@@ -189,8 +189,8 @@ structs:
                 stability: stable
                 query_shape: parameter
             bucketRoundingSeconds:
-                description: "Used to determine the minimum time boundary when opening a new bucket 
-                              by rounding the first timestamp down to the next multiple of this 
+                description: "Used to determine the minimum time boundary when opening a new bucket
+                              by rounding the first timestamp down to the next multiple of this
                               value. Specified in seconds."
                 type: safeInt
                 optional: true

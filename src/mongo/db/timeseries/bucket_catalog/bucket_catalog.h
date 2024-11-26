@@ -269,7 +269,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                    CombineWithInsertsFromOtherClients combine,
                                    InsertContext& insertContext,
                                    const Date_t& time,
-                                   uint64_t storageCacheSize);
+                                   uint64_t storageCacheSizeBytes);
 
 /**
  * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
@@ -288,7 +288,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                                     ReopeningContext& reopeningContext,
                                                     InsertContext& insertContext,
                                                     const Date_t& time,
-                                                    uint64_t storageCacheSize);
+                                                    uint64_t storageCacheSizeBytes);
 
 /**
  * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
@@ -304,7 +304,7 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
                                 CombineWithInsertsFromOtherClients combine,
                                 InsertContext& insertContext,
                                 const Date_t& time,
-                                uint64_t storageCacheSize);
+                                uint64_t storageCacheSizeBytes);
 
 /**
  * If a 'tryInsert' call returns a 'InsertWaiter' object, the caller should use this function to
@@ -435,7 +435,7 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const UUID& collectionUUID,
                                                             const StringDataComparator* comparator,
                                                             const TimeseriesOptions& options,
-                                                            const BSONObj& doc);
+                                                            const BSONObj& measurementDoc);
 
 
 }  // namespace mongo::timeseries::bucket_catalog

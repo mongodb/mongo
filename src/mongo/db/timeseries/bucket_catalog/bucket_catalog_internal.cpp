@@ -736,7 +736,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     InsertContext& insertContext,
     Bucket& existingBucket,
     const Date_t& time,
-    uint64_t storageCacheSize,
+    uint64_t storageCacheSizeBytes,
     const StringDataComparator* comparator,
     Bucket* excludedBucket,
     boost::optional<RolloverAction> excludedAction) {
@@ -757,7 +757,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                     sizesToBeAdded,
                                     mode,
                                     time,
-                                    storageCacheSize,
+                                    storageCacheSizeBytes,
                                     comparator);
         if ((action == RolloverAction::kSoftClose || action == RolloverAction::kArchive) &&
             mode == AllowBucketCreation::kNo) {
@@ -994,7 +994,7 @@ boost::optional<OID> findArchivedCandidate(
     return it->second.oid;
 }
 
-std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSize,
+std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
                                                          uint32_t workloadCardinality) {
     if (workloadCardinality == 0) {
         return {gTimeseriesBucketMaxSize, INT_MAX};
@@ -1002,7 +1002,7 @@ std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSi
 
     uint64_t intMax = static_cast<uint64_t>(std::numeric_limits<int32_t>::max());
     int32_t derivedMaxSize = std::max(
-        static_cast<int32_t>(std::min(storageCacheSize / (2 * workloadCardinality), intMax)),
+        static_cast<int32_t>(std::min(storageCacheSizeBytes / (2 * workloadCardinality), intMax)),
         gTimeseriesBucketMinSize.load());
     return {std::min(gTimeseriesBucketMaxSize, derivedMaxSize), derivedMaxSize};
 }
@@ -1014,7 +1014,7 @@ InsertResult getReopeningContext(BucketCatalog& catalog,
                                  uint64_t catalogEra,
                                  AllowQueryBasedReopening allowQueryBasedReopening,
                                  const Date_t& time,
-                                 uint64_t storageCacheSize) {
+                                 uint64_t storageCacheSizeBytes) {
     if (auto archived = findArchivedCandidate(catalog, stripe, stripeLock, info, time)) {
         // Synchronize concurrent disk accesses. An outstanding query-based reopening request for
         // this series or an outstanding archived-based reopening request or prepared batch for this
@@ -1050,7 +1050,7 @@ InsertResult getReopeningContext(BucketCatalog& catalog,
 
     // Derive the maximum bucket size.
     auto [bucketMaxSize, _] = getCacheDerivedBucketMaxSize(
-        storageCacheSize, catalog.globalExecutionStats.numActiveBuckets.loadRelaxed());
+        storageCacheSizeBytes, catalog.globalExecutionStats.numActiveBuckets.loadRelaxed());
 
     return ReopeningContext{catalog,
                             stripe,
@@ -1350,7 +1350,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
     const Date_t& time,
-    uint64_t storageCacheSize,
+    uint64_t storageCacheSizeBytes,
     const StringDataComparator* comparator) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
@@ -1388,7 +1388,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     // In scenarios where we have a high cardinality workload and face increased cache pressure we
     // will decrease the size of buckets before we close them.
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] =
-        getCacheDerivedBucketMaxSize(storageCacheSize, numberOfActiveBuckets);
+        getCacheDerivedBucketMaxSize(storageCacheSizeBytes, numberOfActiveBuckets);
 
     // We restrict the ceiling of the bucket max size under cache pressure.
     int32_t absoluteMaxSize =
@@ -1583,20 +1583,20 @@ void closeOpenBucket(BucketCatalog& catalog,
 }
 
 void closeArchivedBucket(BucketCatalog& catalog,
-                         const BucketId& bucket,
+                         const BucketId& bucketId,
                          StringData timeField,
                          ExecutionStatsController& stats,
                          ClosedBuckets& closedBuckets) {
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(catalog.bucketStateRegistry, bucket);
+        stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
         return;
     }
 
     try {
         closedBuckets.emplace_back(
-            &catalog.bucketStateRegistry, bucket, timeField.toString(), boost::none, stats);
+            &catalog.bucketStateRegistry, bucketId, timeField.toString(), boost::none, stats);
     } catch (...) {
     }
 }

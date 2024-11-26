@@ -29,6 +29,7 @@
 
 #include <cstdint>
 
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/processinfo.h"
 
@@ -40,7 +41,10 @@ AtomicWord<long long> gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes{1048
 uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() {
     long long userValue = gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes.load();
     if (userValue <= 0) {
-        userValue = 5;  // Negative values are interpreted as 5% of system memory
+        userValue =
+            kTimeseriesIdleBucketExpiryMemoryUsageThresholdDefault;  // Non-positive values are
+                                                                     // interpreted as default
+                                                                     // percentage of system memory
     }
 
     if (userValue <= 100) {

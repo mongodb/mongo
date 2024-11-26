@@ -256,7 +256,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                    CombineWithInsertsFromOtherClients combine,
                                    InsertContext& insertContext,
                                    const Date_t& time,
-                                   uint64_t storageCacheSize) {
+                                   uint64_t storageCacheSizeBytes) {
     // Save the catalog era value from before we make any further checks. This guarantees that we
     // don't miss a direct write that happens sometime in between our decision to potentially reopen
     // a bucket below, and actually reopening it in a subsequent reentrant call. Any direct write
@@ -286,7 +286,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                    catalogEra,
                                    internal::AllowQueryBasedReopening::kAllow,
                                    time,
-                                   storageCacheSize);
+                                   storageCacheSizeBytes);
     }
 
     auto insertionResult = insertIntoBucket(catalog,
@@ -299,7 +299,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                             insertContext,
                                             *bucket,
                                             time,
-                                            storageCacheSize,
+                                            storageCacheSizeBytes,
                                             comparator);
     // If our insert was successful, return a SuccessfulInsertion with our
     // WriteBatch.
@@ -328,7 +328,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                                insertContext,
                                                *alternate,
                                                time,
-                                               storageCacheSize,
+                                               storageCacheSizeBytes,
                                                comparator,
                                                bucket,
                                                *reason == RolloverReason::kTimeBackward
@@ -353,7 +353,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                    ? internal::AllowQueryBasedReopening::kAllow
                                    : internal::AllowQueryBasedReopening::kDisallow,
                                time,
-                               storageCacheSize);
+                               storageCacheSizeBytes);
 }
 
 StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
@@ -364,7 +364,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                                     ReopeningContext& reopeningContext,
                                                     InsertContext& insertContext,
                                                     const Date_t& time,
-                                                    uint64_t storageCacheSize) {
+                                                    uint64_t storageCacheSizeBytes) {
     updateBucketFetchAndQueryStats(reopeningContext, insertContext.stats);
 
     // We try to create a bucket in-memory from one on disk that we can potentially insert our
@@ -430,7 +430,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                                     insertContext,
                                                     bucket,
                                                     time,
-                                                    storageCacheSize,
+                                                    storageCacheSizeBytes,
                                                     comparator);
             auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
             invariant(batch);
@@ -464,7 +464,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                             insertContext,
                                             *bucket,
                                             time,
-                                            storageCacheSize,
+                                            storageCacheSizeBytes,
                                             comparator);
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
@@ -478,7 +478,7 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
                                 CombineWithInsertsFromOtherClients combine,
                                 InsertContext& insertContext,
                                 const Date_t& time,
-                                uint64_t storageCacheSize) {
+                                uint64_t storageCacheSizeBytes) {
     auto& stripe = *catalog.stripes[insertContext.stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
@@ -501,7 +501,7 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
                                             insertContext,
                                             *bucket,
                                             time,
-                                            storageCacheSize,
+                                            storageCacheSizeBytes,
                                             comparator);
 
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
@@ -797,13 +797,13 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const UUID& collectionUUID,
                                                             const StringDataComparator* comparator,
                                                             const TimeseriesOptions& options,
-                                                            const BSONObj& doc) {
+                                                            const BSONObj& measurementDoc) {
     auto res = internal::extractBucketingParameters(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsByKey),
         collectionUUID,
         comparator,
         options,
-        doc);
+        measurementDoc);
     if (!res.isOK()) {
         return res.getStatus();
     }
