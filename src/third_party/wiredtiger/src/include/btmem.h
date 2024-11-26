@@ -1461,17 +1461,9 @@ struct __wt_col_fix_auxiliary_header {
  * examining an index, we don't want the oldest split generation to move forward and potentially
  * free it.
  */
-#define WT_ENTER_PAGE_INDEX(session)                                         \
-    do {                                                                     \
-        uint64_t __prev_split_gen = __wt_session_gen(session, WT_GEN_SPLIT); \
-        if (__prev_split_gen == 0)                                           \
-            __wt_session_gen_enter(session, WT_GEN_SPLIT);
+#define WT_ENTER_PAGE_INDEX(session) WT_ENTER_GENERATION((session), WT_GEN_SPLIT);
 
-#define WT_LEAVE_PAGE_INDEX(session)                   \
-    if (__prev_split_gen == 0)                         \
-        __wt_session_gen_leave(session, WT_GEN_SPLIT); \
-    }                                                  \
-    while (0)
+#define WT_LEAVE_PAGE_INDEX(session) WT_LEAVE_GENERATION((session), WT_GEN_SPLIT);
 
 #define WT_WITH_PAGE_INDEX(session, e) \
     WT_ENTER_PAGE_INDEX(session);      \

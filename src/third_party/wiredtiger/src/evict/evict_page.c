@@ -179,14 +179,13 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_DECL_RET;
     WT_PAGE *page;
     uint8_t stats_flags;
-    bool clean_page, closing, inmem_split, tree_dead, local_gen;
+    bool clean_page, closing, inmem_split, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
     stats_flags = 0;
     clean_page = false;
-    local_gen = false;
 
     __wt_verbose(
       session, WT_VERB_EVICT, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
@@ -205,13 +204,12 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     }
 
     /*
-     * Enter the eviction generation. If we re-enter eviction, leave the previous generation (which
-     * must be as low as the current generation), untouched.
+     * Enter the eviction and split generation. If we re-enter eviction, leave the previous
+     * generation (eviction or split) generation (which must be as low as the current generation),
+     * untouched.
      */
-    if (__wt_session_gen(session, WT_GEN_EVICT) == 0) {
-        local_gen = true;
-        __wt_session_gen_enter(session, WT_GEN_EVICT);
-    }
+    WT_ENTER_GENERATION(session, WT_GEN_EVICT);
+    WT_ENTER_GENERATION(session, WT_GEN_SPLIT);
 
     /*
      * Immediately increment the forcible eviction counter, we might do an in-memory split and not
@@ -326,8 +324,8 @@ done:
     __evict_stats_update(session, stats_flags);
 
     /* Leave any local eviction generation. */
-    if (local_gen)
-        __wt_session_gen_leave(session, WT_GEN_EVICT);
+    WT_LEAVE_GENERATION(session, WT_GEN_SPLIT);
+    WT_LEAVE_GENERATION(session, WT_GEN_EVICT);
 
     return (ret);
 }

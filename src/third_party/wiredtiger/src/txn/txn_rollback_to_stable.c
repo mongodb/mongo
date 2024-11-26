@@ -1360,10 +1360,10 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
               WT_READ_NO_EVICT | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL)) == 0 &&
       ref != NULL) {
         __rollback_progress_msg(session, rollback_timer, 0, 0, &rollback_msg_count, true);
-        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
             WT_WITH_PAGE_INDEX(
               session, ret = __rollback_abort_fast_truncate(session, ref, rollback_timestamp));
-        else
+        } else
             WT_RET(__rollback_abort_updates(session, ref, rollback_timestamp));
     }
 

@@ -17,7 +17,7 @@ We also suggest <a href="https://ninja-build.org/">Ninja</a> and
 First, clone the repository:
 
 @code
-git clone git://github.com/wiredtiger/wiredtiger.git
+git clone https://github.com/wiredtiger/wiredtiger.git
 @endcode
 
 Now proceed with @ref posix_building.
