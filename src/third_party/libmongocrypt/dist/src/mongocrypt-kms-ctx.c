@@ -1121,7 +1121,7 @@ done:
 }
 
 bool mongocrypt_kms_ctx_fail(mongocrypt_kms_ctx_t *kms) {
-    if (!kms) {
+    if (!kms || !kms->retry_enabled) {
         return false;
     }
 

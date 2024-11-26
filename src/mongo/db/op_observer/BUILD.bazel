@@ -25,7 +25,6 @@ mongo_cc_library(
         "//src/mongo/crypto:fle_crypto_predicate.h",
         "//src/mongo/crypto:fle_crypto_types.h",
         "//src/mongo/crypto:fle_data_frames.h",
-        "//src/mongo/crypto:fle_key_types.h",
         "//src/mongo/crypto:fle_stats_gen",
         "//src/mongo/crypto:fle_tokens.h",
         "//src/mongo/crypto:symmetric_crypto.h",

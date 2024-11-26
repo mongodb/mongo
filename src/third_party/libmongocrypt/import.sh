@@ -43,8 +43,7 @@ if [ ! -d $SRC ]; then
     $GIT_EXE clone https://github.com/mongodb/libmongocrypt $CLONE_DEST
 
     pushd $SRC
-    # TODO: SERVER-97433 Revert back to `$VERSION` upon new release of libmongocrypt
-    $GIT_EXE checkout 24fb3f5a91e4d4e88511a7e18393184f2c3ec97b
+    $GIT_EXE checkout $VERSION
     popd
 fi
 

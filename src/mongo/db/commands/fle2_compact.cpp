@@ -158,7 +158,7 @@ FLEEdgeCountInfo fetchEdgeCountInfo(FLEQueryInterface* queryImpl,
                                     FLEQueryInterface::TagQueryType queryType,
                                     const StringData queryTypeStr) {
     std::vector<std::vector<FLEEdgePrfBlock>> tags;
-    tags.emplace_back().push_back(FLEEdgePrfBlock{token.asPrfBlock(), boost::none});
+    tags.emplace_back().push_back(FLEEdgePrfBlock{token.data, boost::none});
     auto countInfoSets = queryImpl->getTags(escNss, tags, queryType);
     uassert(7517100,
             str::stream() << "getQueryableEncryptionCountInfo for " << queryTypeStr

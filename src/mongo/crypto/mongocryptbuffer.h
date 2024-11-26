@@ -81,7 +81,7 @@ public:
      * Hold a reference to the data in buffer.
      * The original buffer MUST remain alive while using this object.
      */
-    static MongoCryptBuffer borrow(const _mongocrypt_buffer_t* src);
+    static MongoCryptBuffer borrow(_mongocrypt_buffer_t* src);
 
     /**
      * Indicates if the currently held _mongocrypt_buffer_t is "owned";

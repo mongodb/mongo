@@ -70,10 +70,10 @@ MongoCryptBuffer MongoCryptBuffer::borrow(ConstDataRange src) {
     return ret;
 }
 
-MongoCryptBuffer MongoCryptBuffer::borrow(const _mongocrypt_buffer_t* src) {
+MongoCryptBuffer MongoCryptBuffer::borrow(_mongocrypt_buffer_t* src) {
     MongoCryptBuffer ret;
     auto* dest = ret.get();
-    *dest = *const_cast<_mongocrypt_buffer_t*>(src);
+    *dest = *src;
     // We do not own our copy, it belongs to the donor.
     dest->owned = false;
     return ret;

@@ -38,19 +38,11 @@
         _mongocrypt_buffer_cleanup(&self->data);                                                                       \
         bson_free(self);                                                                                               \
     }                                                                                                                  \
-    /* Constructor. Shallow copy from raw buffer */                                                                    \
+    /* Constructor. From raw buffer */                                                                                 \
     T *BSON_CONCAT(Prefix, _new_from_buffer)(_mongocrypt_buffer_t * buf) {                                             \
         BSON_ASSERT(buf->len == MONGOCRYPT_HMAC_SHA256_LEN);                                                           \
         T *t = bson_malloc(sizeof(T));                                                                                 \
         _mongocrypt_buffer_set_to(buf, &t->data);                                                                      \
-        return t;                                                                                                      \
-    }                                                                                                                  \
-    /* Constructor. Deep copy from raw buffer */                                                                       \
-    T *BSON_CONCAT(Prefix, _new_from_buffer_copy)(_mongocrypt_buffer_t * buf) {                                        \
-        BSON_ASSERT(buf->len == MONGOCRYPT_HMAC_SHA256_LEN);                                                           \
-        T *t = bson_malloc(sizeof(T));                                                                                 \
-        _mongocrypt_buffer_init(&t->data);                                                                             \
-        _mongocrypt_buffer_copy_to(buf, &t->data);                                                                     \
         return t;                                                                                                      \
     }                                                                                                                  \
     /* Constructor. Parameter list given as variadic args. */                                                          \
@@ -185,9 +177,3 @@ DEF_TOKEN_TYPE(mc_AnchorPaddingTokenRoot, const mc_ESCToken_t *ESCToken) {
 }
 
 #undef ANCHOR_PADDING_TOKEN_D_LENGTH
-
-DEF_TOKEN_TYPE(mc_AnchorPaddingKeyToken, const mc_AnchorPaddingTokenRoot_t *anchorPaddingToken)
-IMPL_TOKEN_NEW_CONST(mc_AnchorPaddingKeyToken, mc_AnchorPaddingTokenRoot_get(anchorPaddingToken), 1)
-
-DEF_TOKEN_TYPE(mc_AnchorPaddingValueToken, const mc_AnchorPaddingTokenRoot_t *anchorPaddingToken)
-IMPL_TOKEN_NEW_CONST(mc_AnchorPaddingValueToken, mc_AnchorPaddingTokenRoot_get(anchorPaddingToken), 2)
