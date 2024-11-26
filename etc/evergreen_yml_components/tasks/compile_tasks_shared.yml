@@ -146,6 +146,7 @@ tasks:
       - func: "activate task"
         vars:
           task_to_activate: ${archive_dist_test_debug_task_name|archive_dist_test_debug}
+          skip_for_patch_author: sys-perf-user
       - func: "scons compile"
         vars:
           targets: >-
