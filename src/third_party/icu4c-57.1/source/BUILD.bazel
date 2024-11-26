@@ -253,6 +253,7 @@ mongo_cc_library(
     local_defines = [
         "U_COMMON_IMPLEMENTATION=1",
     ],
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "icu_data",
     ],
