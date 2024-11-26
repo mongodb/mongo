@@ -64,12 +64,12 @@
           <File Id="f_mongoldap" Name="mongoldap.exe" Source="$(var.BinarySource)\mongoldap.exe"
                 DiskId="1" KeyPath="yes"/>
         </Component>
-        <Component Id="c_sasl" Guid="6632B1B8-9F0C-452C-9101-BE6044471CAC">
-          <File Id="f_sasl" Name="libsasl.dll" Source="$(var.SaslSource)\libsasl.dll"
+        <Component Id="c_sasl" Guid="3460AC1F-E308-4B4B-A411-4E62F187CD47">
+          <File Id="f_sasl" Name="sasl2.dll" Source="$(var.SaslSource)\sasl2.dll"
                 DiskId="1" KeyPath="yes" />
         </Component>
-        <Component Id="c_saslPdb" Guid="84DE7D8C-A6D6-4A23-935F-F0FFE3BBC52B">
-          <File Id="f_saslPdb" Name="libsasl.pdb" Source="$(var.SaslSource)\libsasl.pdb"
+        <Component Id="c_saslPdb" Guid="2C67AC4C-BA55-48B8-A378-5F946461E5E2">
+          <File Id="f_saslPdb" Name="sasl2.pdb" Source="$(var.SaslSource)\sasl2.pdb"
                 DiskId="1" KeyPath="yes" />
         </Component>
         <Component Id="c_mongocryptd" Guid="D243D194-B765-4DF8-BC67-8F4C329AD1B5">

@@ -50,6 +50,7 @@ sourcesList = [
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = env.Dir("$BUILD_DIR").path
 toolBuildDir = buildDir + r'\mongo'
+buildRoot = env.Dir('$BUILD_ROOT').path
 
 enterprisebase = 'src\mongo\db\modules\enterprise'
 enterpriseToolBuildDir = buildDir + r'\mongo\db\modules\enterprise'
@@ -120,7 +121,7 @@ candle_targets = env.Command(
         ' -dTargetDir=' + buildDir + r'\msi'
         ' -dTargetExt=.msi'
         ' -dTargetFileName=${SERVER_ARCHIVE}'
-        r' -dSaslSource=c:\sasl\bin'
+        r' -dSaslSource=' + buildRoot + r'\sasl_2_1_28\bin'
         r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] + ' -out ' + buildDir + r'\msi\\'
         ' -arch ' + msi_platform + ' -ext "$WIXUIEXT"'
         ' -ext "$WIXUTILEXT"'
