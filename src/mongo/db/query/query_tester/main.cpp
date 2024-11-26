@@ -125,7 +125,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     auto versionInfo = MockVersionInfo{};
     auto conn = buildConn(uriString, &versionInfo, mode);
     // Track collections loaded in the previous test file.
-    auto prevFileCollections = std::set<std::string>{};
+    auto prevFileCollections = std::set<CollectionSpec>{};
     auto failedTestFiles = std::vector<std::filesystem::path>{};
     auto failedQueryCount = size_t{0};
     auto totalTestsRun = size_t{0};

@@ -67,10 +67,10 @@ public:
      * Drops collections in a test file that haven't been dropped as of the previous file.
      */
     void dropStaleCollections(DBClientConnection*,
-                              const std::set<std::string>& prevFileCollections) const;
+                              const std::set<CollectionSpec>& prevFileCollections) const;
 
     std::string generateFailureReport() const;
-    std::vector<std::string>& getCollectionsNeeded();
+    const std::vector<CollectionSpec>& getCollectionsNeeded() const;
     size_t getFailedQueryCount() const;
     size_t getTestsRun() const;
 
@@ -81,7 +81,7 @@ public:
     void loadCollections(DBClientConnection*,
                          bool dropData,
                          bool loadData,
-                         const std::set<std::string>& prevFileCollections) const;
+                         const std::set<CollectionSpec>& prevFileCollections) const;
 
     /**
      * Print out failed test numbers and their corresponding queries. Optionally, with the -v
@@ -120,7 +120,7 @@ public:
 protected:
     void parseHeader(std::fstream& fs);
     const std::filesystem::path _filePath;
-    std::vector<std::string> _collectionsNeeded;
+    std::vector<CollectionSpec> _collectionsNeeded;
     std::string _databaseNeeded;
     std::vector<Test> _tests;
     size_t _testsRun;
