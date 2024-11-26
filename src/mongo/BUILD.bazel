@@ -512,6 +512,7 @@ filegroup(
         "//src/mongo/db/commands:set_feature_compatibility_version_gen",
         "//src/mongo/db/commands:test_commands_enabled.h",
         "//src/mongo/db/concurrency:d_concurrency.h",
+        "//src/mongo/db/exec:exec_shard_filter_policy.h",
         "//src/mongo/db/exec:shard_filterer.h",
         "//src/mongo/db/exec:working_set.h",
         "//src/mongo/db/exec:working_set_common.h",

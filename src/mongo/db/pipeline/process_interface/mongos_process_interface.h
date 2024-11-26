@@ -265,7 +265,8 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest,
-        bool shouldUseCollectionDefaultCollator) final {
+        bool shouldUseCollectionDefaultCollator,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final {
         // It is not meaningful to perform a "local read" on mongos.
         MONGO_UNREACHABLE;
     }

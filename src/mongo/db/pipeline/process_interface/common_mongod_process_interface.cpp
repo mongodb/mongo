@@ -533,7 +533,8 @@ std::unique_ptr<Pipeline, PipelineDeleter>
 CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     Pipeline* ownedPipeline,
     boost::optional<const AggregateCommandRequest&> aggRequest,
-    bool shouldUseCollectionDefaultCollator) {
+    bool shouldUseCollectionDefaultCollator,
+    ExecShardFilterPolicy shardFilterPolicy) {
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
@@ -612,8 +613,11 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
                                           isAnySecondaryCollectionNotLocal,
                                       secondaryNamespaces};
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
-    PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-        holder, expCtx->getNamespaceString(), resolvedAggRequest, pipeline.get());
+    PipelineD::buildAndAttachInnerQueryExecutorToPipeline(holder,
+                                                          expCtx->getNamespaceString(),
+                                                          resolvedAggRequest,
+                                                          pipeline.get(),
+                                                          shardFilterPolicy);
 
     return pipeline;
 }

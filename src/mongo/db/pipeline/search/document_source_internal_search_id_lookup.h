@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/document_source.h"
 
@@ -49,11 +50,12 @@ public:
      * Creates an $_internalSearchIdLookup stage. "elem" must be an empty object.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    DocumentSourceInternalSearchIdLookUp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-    DocumentSourceInternalSearchIdLookUp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                         long long limit);
+    DocumentSourceInternalSearchIdLookUp(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        long long limit = 0,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
     const char* getSourceName() const final;
 
@@ -184,6 +186,7 @@ private:
     DocumentSource::GetNextResult doGetNext() final;
 
     long long _limit = 0;
+    ExecShardFilterPolicy _shardFilterPolicy = AutomaticShardFiltering{};
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics =
         std::make_shared<SearchIdLookupMetrics>();

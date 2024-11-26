@@ -39,7 +39,6 @@
 
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
@@ -80,46 +79,6 @@ void desugarSearchPipeline(Pipeline* pipeline) {
             auto desugaredPipeline =
                 dynamic_cast<DocumentSourceVectorSearch*>(vectorSearchStage.get())->desugar();
             sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
-            Pipeline::stitch(&sources);
-        }
-    }
-}
-
-void injectShardFilter(Pipeline* pipeline) {
-    auto& sources = pipeline->getSources();
-    auto internalSearchLookupIt = sources.begin();
-    // Bail early if the pipeline is not $_internalSearchMongotRemote stage.
-    if (internalSearchLookupIt == sources.end() ||
-        (mongo::DocumentSourceInternalSearchMongotRemote::kStageName !=
-             (*internalSearchLookupIt)->getSourceName() &&
-         mongo::DocumentSourceVectorSearch::kStageName !=
-             (*internalSearchLookupIt)->getSourceName())) {
-        return;
-    }
-
-    while (internalSearchLookupIt != sources.end()) {
-        if (DocumentSourceInternalSearchIdLookUp::kStageName ==
-            (*internalSearchLookupIt)->getSourceName()) {
-            break;
-        }
-        internalSearchLookupIt++;
-    }
-
-    if (internalSearchLookupIt != sources.end()) {
-        auto expCtx = pipeline->getContext();
-        if (OperationShardingState::isComingFromRouter(expCtx->getOperationContext())) {
-            // We can only rely on the ownership filter if the operation is coming from the router
-            // (i.e. it is versioned).
-            auto collectionFilter =
-                CollectionShardingState::acquire(expCtx->getOperationContext(),
-                                                 expCtx->getNamespaceString())
-                    ->getOwnershipFilter(
-                        expCtx->getOperationContext(),
-                        CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
-            auto doc = new DocumentSourceInternalShardFilter(
-                expCtx, std::make_unique<ShardFiltererImpl>(std::move(collectionFilter)));
-            internalSearchLookupIt++;
-            sources.insert(internalSearchLookupIt, doc);
             Pipeline::stitch(&sources);
         }
     }
@@ -384,7 +343,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     boost::optional<int64_t> userBatchSize) {
     // First, desuguar $search, and inject shard filterer.
     desugarSearchPipeline(origPipeline);
-    injectShardFilter(origPipeline);
 
     // TODO SERVER-94874 Establish mongot cursor for $searchMeta queries too.
     if ((expCtx->getExplain() &&

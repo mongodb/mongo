@@ -44,31 +44,15 @@ REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
                          AllowedWithApiStrict::kInternal);
 
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
-    const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx) {
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    long long limit,
+    ExecShardFilterPolicy shardFilterPolicy)
+    : DocumentSource(kStageName, expCtx), _limit(limit), _shardFilterPolicy(shardFilterPolicy) {
 
     // When search query is being run on a view, we need to store the view pipeline to append to
     // the end of the idLookup's subpipeline.
-    if (pExpCtx->getViewNS()) {
-        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->getViewNS());
-        _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
-    }
-    // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
-    // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
-    // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
-    // part of a $lookup sub-pipeline, the sub-pipeline gets parsed anew for every document the
-    // stage processes, but each parse uses the same expression context.
-    _searchIdLookupMetrics->resetIdLookupMetrics();
-}
-
-DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
-    const intrusive_ptr<ExpressionContext>& pExpCtx, long long limit)
-    : DocumentSource(kStageName, pExpCtx), _limit(limit) {
-
-    // When search query is being run on a view, we need to store the view pipeline to append to
-    // the end of the idLookup's subpipeline.
-    if (pExpCtx->getViewNS()) {
-        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->getViewNS());
+    if (expCtx->getViewNS()) {
+        auto resolvedNamespace = expCtx->getResolvedNamespace(*expCtx->getViewNS());
         _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
     }
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
@@ -80,7 +64,7 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
@@ -91,9 +75,10 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBs
         DocumentSourceIdLookupSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
     if (searchIdLookupSpec.getLimit()) {
-        return new DocumentSourceInternalSearchIdLookUp(pExpCtx, *searchIdLookupSpec.getLimit());
+        return make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx,
+                                                                    *searchIdLookupSpec.getLimit());
     }
-    return new DocumentSourceInternalSearchIdLookUp(pExpCtx);
+    return make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx);
 }
 
 Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions& opts) const {
@@ -174,7 +159,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
 
             pipeline =
                 pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-                    pipeline.release());
+                    pipeline.release(), boost::none, false, _shardFilterPolicy);
 
             result = pipeline->getNext();
             if (auto next = pipeline->getNext()) {

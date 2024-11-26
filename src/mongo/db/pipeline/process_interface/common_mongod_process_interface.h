@@ -128,7 +128,8 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        bool shouldUseCollectionDefaultCollator = false) final;
+        bool shouldUseCollectionDefaultCollator = false,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
     boost::optional<ShardId> getShardId(OperationContext* opCtx) const final;
