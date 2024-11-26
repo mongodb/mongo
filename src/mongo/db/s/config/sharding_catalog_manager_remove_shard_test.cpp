@@ -110,7 +110,7 @@ protected:
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
-            ->onShardingInitialization(operationContext(), true);
+            ->initializeIfNeeded(operationContext(), /* term */ 1);
 
         // Updating the cluster cardinality parameter and blocking ShardingDDLCoordinators require
         // the primary only services to have been set up.
@@ -126,7 +126,7 @@ protected:
     void tearDown() override {
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::off);
         _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::off);
-        TransactionCoordinatorService::get(operationContext())->onStepDown();
+        TransactionCoordinatorService::get(operationContext())->interrupt();
         ConfigServerTestFixture::tearDown();
     }
 

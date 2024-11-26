@@ -734,8 +734,9 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
         !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
 
     // Start transaction coordinator service only if the node is the primary of a replica set.
-    TransactionCoordinatorService::get(opCtx)->onShardingInitialization(
-        opCtx, isReplSet && isStandaloneOrPrimary);
+    if (isReplSet && isStandaloneOrPrimary) {
+        TransactionCoordinatorService::get(opCtx)->initializeIfNeeded(opCtx, replCoord->getTerm());
+    }
 
     LOGV2(22071,
           "Finished initializing sharding components",

@@ -89,9 +89,9 @@ Status stepDownForShutdown(OperationContext* opCtx,
             LOGV2_WARNING(4719000, "Error stepping down during force shutdown", "error"_attr = e);
         }
 
-        // Even if the ReplicationCoordinator failed to step down, ensure we still shut down the
-        // TransactionCoordinatorService (see SERVER-45009)
-        TransactionCoordinatorService::get(opCtx)->onStepDown();
+        // Even if the ReplicationCoordinator failed to step down, ensure we still interrupt the
+        // TransactionCoordinatorService (see SERVER-45009).
+        TransactionCoordinatorService::get(opCtx)->interrupt();
     }
     return Status::OK();
 }

@@ -158,7 +158,7 @@ private:
      *
      * Throws on errors.
      */
-    void _shardingOnTransitionToPrimaryHook(OperationContext* opCtx);
+    void _shardingOnTransitionToPrimaryHook(OperationContext* opCtx, long long term);
 
     /**
      * Drops all temporary collections on all databases except "local".

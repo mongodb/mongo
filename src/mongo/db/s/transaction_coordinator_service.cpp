@@ -76,7 +76,7 @@ const auto transactionCoordinatorServiceDecoration =
 TransactionCoordinatorService::TransactionCoordinatorService() = default;
 
 TransactionCoordinatorService::~TransactionCoordinatorService() {
-    joinPreviousRound();
+    _joinAndCleanup();
 }
 
 TransactionCoordinatorService* TransactionCoordinatorService::get(OperationContext* opCtx) {
@@ -92,7 +92,7 @@ void TransactionCoordinatorService::createCoordinator(
     LogicalSessionId lsid,
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     Date_t commitDeadline) {
-    auto cas = _getCatalogAndScheduler(opCtx);
+    auto cas = getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
     auto& scheduler = cas->scheduler;
 
@@ -139,7 +139,7 @@ void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
 
     std::shared_ptr<CatalogAndScheduler> cas;
     try {
-        cas = _getCatalogAndScheduler(opCtx);
+        cas = getCatalogAndScheduler(opCtx);
     } catch (ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
         // If we are not primary, don't include any output for transaction coordinators in
         // the curOp command.
@@ -176,7 +176,7 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
                                                 LogicalSessionId lsid,
                                                 TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                                                 const std::set<ShardId>& participantList) {
-    auto cas = _getCatalogAndScheduler(opCtx);
+    auto cas = getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
     auto coordinator = catalog.get(opCtx, lsid, txnNumberAndRetryCounter);
@@ -196,7 +196,7 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorSer
     OperationContext* opCtx,
     LogicalSessionId lsid,
     TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
-    auto cas = _getCatalogAndScheduler(opCtx);
+    auto cas = getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
     auto coordinator = catalog.get(opCtx, lsid, txnNumberAndRetryCounter);
@@ -213,28 +213,32 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorSer
         : coordinator->onDecisionAcknowledged();
 }
 
-void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
-                                             Milliseconds recoveryDelayForTesting) {
+void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
+    OperationContext* opCtx,
+    LogicalSessionId lsid,
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
     // TODO: SERVER-82965 Remove early return
     if (!ShardingState::get(opCtx)->enabled()) {
         return;
     }
 
-    joinPreviousRound();
+    auto cas = getCatalogAndScheduler(opCtx);
+    auto& catalog = cas->catalog;
 
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    if (_isShuttingDown) {
-        return;
+    // No need to look at every coordinator since we cancel old coordinators when adding new ones.
+    if (auto latestTxnNumberRetryCounterAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
+        if (txnNumberAndRetryCounter == latestTxnNumberRetryCounterAndCoordinator->first) {
+            latestTxnNumberRetryCounterAndCoordinator->second->cancelIfCommitNotYetStarted();
+        }
     }
+}
 
-    invariant(!_catalogAndScheduler);
-    _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
-    _cancelSource = CancellationSource();
-
+void TransactionCoordinatorService::_scheduleRecoveryTask(OperationContext* opCtx,
+                                                          Milliseconds recoveryDelay) {
     auto future =
         _catalogAndScheduler->scheduler
             .scheduleWorkIn(
-                recoveryDelayForTesting,
+                recoveryDelay,
                 [catalogAndScheduler = _catalogAndScheduler,
                  cancelSource = _cancelSource](OperationContext* opCtx) {
                     if (MONGO_unlikely(hangBeforeTxnCoordinatorOnStepUpWork.shouldFail())) {
@@ -318,7 +322,49 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
     _catalogAndScheduler->recoveryTaskCompleted.emplace(std::move(future));
 }
 
-void TransactionCoordinatorService::onStepDown() {
+void TransactionCoordinatorService::initializeIfNeeded(OperationContext* opCtx,
+                                                       long long term,
+                                                       Milliseconds recoveryDelay) {
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    LOGV2(9307800,
+          "Starting TransactionCoordinatorService initialization for specified term if needed.",
+          "Current Initialized Term"_attr = _initTerm,
+          "Specified Term"_attr = term);
+
+    if (_isShuttingDown || _isInitializing || _initTerm >= term) {
+        return;
+    } else if (_catalogAndScheduler) {
+        _initTerm = term;
+        return;
+    }
+
+    _isInitializing = true;
+    auto resetInitializing = [&]() {
+        _isInitializing = false;
+    };
+    try {
+        ul.unlock();
+        _joinAndCleanup();
+        ul.lock();
+
+        LOGV2(9307801, "Creating the transaction catalog and scheduler for primary node.");
+        _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
+        _cancelSource = CancellationSource();
+        _initTerm = term;
+
+        _scheduleRecoveryTask(opCtx, recoveryDelay);
+        resetInitializing();
+    } catch (...) {
+        if (!ul.owns_lock()) {
+            ul.lock();
+        }
+
+        resetInitializing();
+        throw;
+    }
+}
+
+void TransactionCoordinatorService::interrupt() {
     {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (!_catalogAndScheduler)
@@ -328,7 +374,7 @@ void TransactionCoordinatorService::onStepDown() {
     }
 
     _cancelSource.cancel();
-    _catalogAndSchedulerToCleanup->onStepDown();
+    _catalogAndSchedulerToCleanup->interrupt();
 }
 
 void TransactionCoordinatorService::shutdown() {
@@ -336,29 +382,12 @@ void TransactionCoordinatorService::shutdown() {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
         _isShuttingDown = true;
     }
-    onStepDown();
-    joinPreviousRound();
-}
-
-void TransactionCoordinatorService::onShardingInitialization(OperationContext* opCtx,
-                                                             bool isPrimary) {
-    if (!isPrimary)
-        return;
-
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    if (_isShuttingDown) {
-        return;
-    }
-
-    invariant(!_catalogAndScheduler);
-    _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
-
-    _catalogAndScheduler->catalog.exitStepUp(Status::OK());
-    _catalogAndScheduler->recoveryTaskCompleted.emplace(Future<void>::makeReady());
+    interrupt();
+    _joinAndCleanup();
 }
 
 std::shared_ptr<TransactionCoordinatorService::CatalogAndScheduler>
-TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) {
+TransactionCoordinatorService::getCatalogAndScheduler(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> ul(_mutex);
     uassert(ErrorCodes::NotWritablePrimary,
             "Transaction coordinator is not a primary",
@@ -367,21 +396,17 @@ TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) 
     return _catalogAndScheduler;
 }
 
-void TransactionCoordinatorService::joinPreviousRound() {
+void TransactionCoordinatorService::_joinAndCleanup() {
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-    // onStepDown must have been called
     invariant(!_catalogAndScheduler);
-
     if (!_catalogAndSchedulerToCleanup)
         return;
 
     auto schedulerToCleanup = _catalogAndSchedulerToCleanup;
-
     ul.unlock();
 
     LOGV2(22454, "Waiting for coordinator tasks from previous term to complete");
-
     // Block until all coordinators scheduled the previous time the service was primary to have
     // drained. Because the scheduler was interrupted, it should be extremely rare for there to be
     // any coordinators left, so if this actually causes blocking, it would most likely be a bug.
@@ -391,7 +416,7 @@ void TransactionCoordinatorService::joinPreviousRound() {
     _catalogAndSchedulerToCleanup.reset();
 }
 
-void TransactionCoordinatorService::CatalogAndScheduler::onStepDown() {
+void TransactionCoordinatorService::CatalogAndScheduler::interrupt() {
     scheduler.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown,
                         "Transaction coordinator service stepping down"});
     catalog.onStepDown();
@@ -400,26 +425,6 @@ void TransactionCoordinatorService::CatalogAndScheduler::onStepDown() {
 void TransactionCoordinatorService::CatalogAndScheduler::join() {
     recoveryTaskCompleted->wait();
     catalog.join();
-}
-
-void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
-    OperationContext* opCtx,
-    LogicalSessionId lsid,
-    TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
-    // TODO: SERVER-82965 Remove early return
-    if (!ShardingState::get(opCtx)->enabled()) {
-        return;
-    }
-
-    auto cas = _getCatalogAndScheduler(opCtx);
-    auto& catalog = cas->catalog;
-
-    // No need to look at every coordinator since we cancel old coordinators when adding new ones.
-    if (auto latestTxnNumberRetryCounterAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
-        if (txnNumberAndRetryCounter == latestTxnNumberRetryCounterAndCoordinator->first) {
-            latestTxnNumberRetryCounterAndCoordinator->second->cancelIfCommitNotYetStarted();
-        }
-    }
 }
 
 }  // namespace mongo

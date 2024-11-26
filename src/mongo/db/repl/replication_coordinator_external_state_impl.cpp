@@ -684,7 +684,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     // Enable write blocking bypass to allow dropping tmp collections when user writes are blocked.
     WriteBlockBypass::get(opCtx).set(true);
 
-    _shardingOnTransitionToPrimaryHook(opCtx);
+    _shardingOnTransitionToPrimaryHook(opCtx, replCoord->getTerm());
 
     _dropAllTempCollections(opCtx);
 
@@ -999,12 +999,12 @@ void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
 void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();
-        TransactionCoordinatorService::get(_service)->onStepDown();
+        TransactionCoordinatorService::get(_service)->interrupt();
     }
     if (ShardingState::get(_service)->enabled()) {
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Called earlier for config servers.
-            TransactionCoordinatorService::get(_service)->onStepDown();
+            TransactionCoordinatorService::get(_service)->interrupt();
         }
 
         // TODO SERVER-84243: replace with cache for filtering metadata
@@ -1062,7 +1062,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
 }
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, long long term) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         Status status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
         if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
@@ -1105,7 +1105,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
 
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
-        TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+        TransactionCoordinatorService::get(_service)->initializeIfNeeded(opCtx, term);
 
         // TODO SERVER-84243: replace with cache for filtering metadata
         FilteringMetadataCache::get(_service)->onStepUp();
@@ -1118,7 +1118,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
             if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 // Called earlier for config servers.
-                TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+                TransactionCoordinatorService::get(_service)->initializeIfNeeded(opCtx, term);
                 FilteringMetadataCache::get(opCtx)->onStepUp();
             }
 
