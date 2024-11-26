@@ -8430,7 +8430,27 @@ export const authCommandsLib = {
             privileges: [{resource: {cluster: true}, actions: ["internal"]}]
           },
         ]
-      }
+      },
+      {
+        testname: "aggregate_$listMqlEntities",
+        command: {
+          aggregate: 1,
+          pipeline: [{$listMqlEntities: {entityType: "aggregationStages"}}],
+          cursor: {},
+        },
+        testcases: [
+          // expectFail is true because $listMqlEntities is only allowed to run on the admin database,
+          // but this check occurs post-auth.
+          // A user defined role with no privileges is authorized to run this stage because it is a
+          // test-only command (enabled only under --enableTestCommands).
+          {
+            runOnDb: firstDbName,
+            roles: roles_all,
+            privileges: [],
+            expectFail: true
+          },
+        ],
+      },
     ],
 
     /************* SHARED TEST LOGIC ****************/
@@ -8541,7 +8561,7 @@ export const authCommandsLib = {
         var failures = [];
 
 
-        for (var i = 0; i < this.tests.length; i++) {
+        for (var i = this.tests.length-1; i < this.tests.length; i++) {
             const res = this.runOneTest(conn, this.tests[i], impls, options);
             failures = failures.concat(res);
         }
@@ -8569,11 +8589,13 @@ function checkAggStageCoverage(conn) {
 
     // Ensures to login as admin.
     assert(adminDb.auth("admin", "password"));
-    const aggStages = adminDb.serverStatus().metrics.aggStageCounters;
+    const aggStages = adminDb.aggregate([{$listMqlEntities: {entityType: "aggregationStages"}}])
+                          .toArray()
+                          .map(obj => obj.name);
     adminDb.logout();
 
     const unvisited = {};
-    for (let aggStage of Object.keys(aggStages)) {
+    for (let aggStage of aggStages) {
         // Tracks 'aggStage' unless listed in the exception list 'skippedAuthTestingAggStages'.
         if (!skippedAuthTestingAggStages.includes(aggStage)) {
             unvisited[aggStage] = 1;

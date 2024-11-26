@@ -64,11 +64,12 @@
 
 namespace mongo {
 
-using Parser = DocumentSource::Parser;
 using boost::intrusive_ptr;
 using std::list;
 using std::string;
 using std::vector;
+
+StringMap<DocumentSource::ParserRegistration> DocumentSource::parserMap;
 
 DocumentSource::DocumentSource(const StringData stageName,
                                const intrusive_ptr<ExpressionContext>& pCtx)
@@ -81,15 +82,6 @@ DocumentSource::DocumentSource(const StringData stageName,
         }
     }
 }
-
-namespace {
-struct ParserRegistration {
-    Parser parser;
-    boost::optional<FeatureFlag> featureFlag;
-};
-// Used to keep track of which DocumentSources are registered under which name.
-static StringMap<ParserRegistration> parserMap;
-}  // namespace
 
 void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
                                         PlanSummaryStats& planSummaryStats) {

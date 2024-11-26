@@ -235,6 +235,7 @@ enum class DocumentSourceType {
     kLimit,                                 // DocumentSourceLimit
     kListCatalog,                           // DocumentSourceListCatalog
     kListLocalSessions,                     // DocumentSourceListLocalSessions
+    kListMqlEntities,                       // DocumentSourceListMqlEntities
     kListSampledQueries,                    // DocumentSourceListSampledQueries
     kListSearchIndexes,                     // DocumentSourceListSearchIndexes
     kLookUp,                                // DocumentSourceLookUp
@@ -291,6 +292,11 @@ public:
     using TransactionRequirement = StageConstraints::TransactionRequirement;
     using LookupRequirement = StageConstraints::LookupRequirement;
     using UnionRequirement = StageConstraints::UnionRequirement;
+
+    struct ParserRegistration {
+        DocumentSource::Parser parser;
+        boost::optional<FeatureFlag> featureFlag;
+    };
 
     /**
      * This is what is returned from the main DocumentSource API: getNext(). It is essentially a
@@ -969,6 +975,14 @@ protected:
     }};
 
 private:
+    // Give access to 'parserMap' for the implementation of $listMqlEntities but hiding 'parserMap'
+    // from all other DocumentSource implementations.
+    friend class DocumentSourceListMqlEntities;
+
+    // Used to keep track of which DocumentSources are registered under which name. Initialized
+    // during process initialization and const thereafter.
+    static StringMap<ParserRegistration> parserMap;
+
     CommonStats _commonStats;
 
     /**

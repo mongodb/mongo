@@ -107,6 +107,7 @@ mongo_cc_library(
         "document_source_internal_all_collection_stats_gen",
         "document_source_internal_apply_oplog_update_gen",
         "document_source_internal_projection_gen",
+        "document_source_list_mql_entities_gen",
         "document_source_list_sampled_queries_gen",
         "document_source_list_sessions_gen",
         "document_source_merge_gen",
@@ -456,6 +457,7 @@ mongo_cc_library(
         "document_source_list_cached_and_active_users.cpp",
         "document_source_list_catalog.cpp",
         "document_source_list_local_sessions.cpp",
+        "document_source_list_mql_entities.cpp",
         "document_source_list_sampled_queries.cpp",
         "document_source_list_sessions.cpp",
         "document_source_lookup.cpp",
@@ -561,6 +563,7 @@ mongo_cc_library(
         "document_source_list_cached_and_active_users.h",
         "document_source_list_catalog.h",
         "document_source_list_local_sessions.h",
+        "document_source_list_mql_entities.h",
         "document_source_list_sampled_queries.h",
         "document_source_list_sessions.h",
         "document_source_lookup.h",
@@ -965,6 +968,14 @@ idl_generator(
 idl_generator(
     name = "expression_parser_gen",
     src = "expression_parser.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_list_mql_entities_gen",
+    src = "document_source_list_mql_entities.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
