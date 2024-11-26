@@ -21,8 +21,6 @@
 #
 """Pseudo-builders for building and registering unit tests."""
 
-import os
-
 from site_scons.mongo import insort_wrapper
 
 LAST_TEST_GROUP = 0

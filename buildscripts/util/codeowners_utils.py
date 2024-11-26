@@ -2,7 +2,7 @@ import fnmatch
 import os
 import re
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import yaml
 

@@ -89,9 +89,7 @@ def run_mongotest(
         Tuple containing the exit code and output (as bytes) from the mongotest execution.
     """
     if out_result and mode == Mode.COMPARE:
-        sys.exit(
-            f"Mode must be set to RUN or NORMALIZE if we want to produce output .result files."
-        )
+        sys.exit("Mode must be set to RUN or NORMALIZE if we want to produce output .result files.")
 
     # Retrieve mongotest binary path and mongod uri from command line arguments
     mongotest, uri = _get_mongotest_args()

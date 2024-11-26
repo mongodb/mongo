@@ -21,7 +21,6 @@ from typing import Any, Dict, List, Set, Tuple
 
 import distro
 import git
-import mongo.platform as mongo_platform
 import psutil
 import requests
 import SCons
@@ -1227,7 +1226,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         if not validate_remote_execution_certs(env):
             sys.exit(1)
 
-        if env.GetOption("bazel-dynamic-execution") == True:
+        if env.GetOption("bazel-dynamic-execution"):
             try:
                 docker_detected = (
                     subprocess.run(["docker", "info"], capture_output=True).returncode == 0

@@ -26,7 +26,7 @@ def retry_coveralls_report(args: list):
     proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
     print(proc.stdout)
     if proc.returncode != 0:
-        raise RuntimeError(f"Coveralls report failed, see above process output for details.")
+        raise RuntimeError("Coveralls report failed, see above process output for details.")
 
 
 @retry.retry(tries=3, delay=5)
@@ -41,7 +41,7 @@ def retry_coveralls_post(coveralls_report: str):
 
 def download_coveralls_reporter(url: str, sha: str):
     print(f"Downloading coveralls from {url}")
-    tar_location = f"coveralls.tar.gz"
+    tar_location = "coveralls.tar.gz"
     retry_download(url, tar_location)
     with tarfile.open(tar_location, "r:gz") as tar:
         tar.extractall()
@@ -49,7 +49,7 @@ def download_coveralls_reporter(url: str, sha: str):
 
     if not os.path.exists("coveralls"):
         raise RuntimeError(
-            f"Coveralls was successfully downloaded but the binary was not found in the expected location."
+            "Coveralls was successfully downloaded but the binary was not found in the expected location."
         )
 
     sha256_hash = hashlib.sha256()

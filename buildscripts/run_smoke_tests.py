@@ -88,7 +88,7 @@ def run_resmoke_suite(
 
     cmd_str = shlex.join(resmoke_cmd)
     if dry_run:
-        log.info(f"Skipping resmoke invocation (dry-run)", cmd=cmd_str)
+        log.info("Skipping resmoke invocation (dry-run)", cmd=cmd_str)
         return
 
     log.info("Running resmoke", cmd=cmd_str)

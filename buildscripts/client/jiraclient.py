@@ -6,7 +6,6 @@ from typing import Any, Dict, Iterable, Optional, Sequence
 
 from jira import JIRA, Issue
 from jira.client import ResultList
-from jira.resilientsession import ResilientSession
 from pydantic import BaseSettings
 
 ASSIGNED_TEAMS_FIELD = "customfield_12751"

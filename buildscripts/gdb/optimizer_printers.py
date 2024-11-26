@@ -9,7 +9,7 @@ import gdb.printing
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo import get_boost_optional, lookup_type
+    from buildscripts.gdb.mongo import lookup_type
 
 OPTIMIZER_NS = "mongo::optimizer"
 

@@ -375,10 +375,6 @@ config_fuzzer_params = {
             "max": 4096,
             "fuzz_at": ["startup"],
         },
-        "warmMinConnectionsInShardingTaskExecutorPoolOnStartup": {
-            "choices": [True, False],
-            "fuzz_at": ["startup"],
-        },
         "diagnosticDataCollectionEnabled": {
             "choices": [True, False],
             "fuzz_at": ["startup"],

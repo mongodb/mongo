@@ -1,7 +1,6 @@
 """Driver of the test execution framework."""
 
 import threading
-import time
 from logging import Logger
 from typing import Generic, List, Optional, TypeVar, Union
 

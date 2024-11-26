@@ -239,7 +239,7 @@ class HeaderFixer:
         ]
 
     def _create_jira_ticket(self, header: str) -> str:
-        summary = f"Fix cycle created by " + header
+        summary = "Fix cycle created by " + header
         header_file_path = header.replace(":", "/")[2:]
         assigned_teams = self.owners.get_jira_team_owner(header_file_path)
         if not assigned_teams:

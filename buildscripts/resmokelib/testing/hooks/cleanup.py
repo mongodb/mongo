@@ -4,7 +4,6 @@ import os
 
 import pymongo
 
-from buildscripts.resmokelib.testing.fixtures.interface import MultiClusterFixture
 from buildscripts.resmokelib.testing.hooks import interface
 
 
