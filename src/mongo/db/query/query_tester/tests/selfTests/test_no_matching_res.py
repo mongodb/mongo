@@ -7,5 +7,5 @@ from testlib.test_utils import (
 )
 
 exit_code, output = run_mongotest(("no_matching_res",), Mode.COMPARE)
-assert_exit_code(exit_code, ExitCode.FAILURE, output)
+assert_exit_code(exit_code, ExitCode.FAILURE)
 assert_output_contains(output, "A corresponding .results file must exist in compare mode")

@@ -7,7 +7,7 @@ from testlib.test_utils import (
 )
 
 exit_code, output = run_mongotest(("mismatched_countA", "mismatched_countB"), Mode.COMPARE)
-assert_exit_code(exit_code, ExitCode.FAILURE, output)
+assert_exit_code(exit_code, ExitCode.FAILURE)
 assert_output_contains(
     output, ':sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit: 5}], cursor: {}}'
 )

@@ -26,8 +26,8 @@ def assert_output_contains(actual: bytes, expected: str):
     assert expected.encode("utf-8") in actual, f"Expected '{expected}' in output but got '{actual}'"
 
 
-def assert_exit_code(actual: ExitCode, expected: ExitCode, output: str):
-    assert expected == actual, f"Expected {expected} but got '{actual}' with output: {output}"
+def assert_exit_code(actual: ExitCode, expected: ExitCode):
+    assert expected == actual, f"Expected {expected} but got '{actual}'"
 
 
 def _get_mongotest_args() -> tuple[str, str]:

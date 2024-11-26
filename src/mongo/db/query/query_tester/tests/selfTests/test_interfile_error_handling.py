@@ -7,7 +7,7 @@ from testlib.test_utils import (
 )
 
 exit_code, output = run_mongotest(("bad_queries", "bad_index", "bad_document"), Mode.RUN)
-assert_exit_code(exit_code, ExitCode.FAILURE, output)
+assert_exit_code(exit_code, ExitCode.FAILURE)
 assert_output_contains(output, '''"Unrecognized pipeline stage name: '$firstN'"''')
 assert_output_contains(
     output,
