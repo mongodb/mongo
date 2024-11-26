@@ -4,7 +4,7 @@ buildvariants:
   display_name: "Ninja Build: Enterprise Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
     compile_variant: enterprise-windows-ninja
   tasks:
   - name: compile_ninja_next_TG
@@ -59,7 +59,7 @@ buildvariants:
   display_name: "Ninja Build Profiles: Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
   tasks:
   - name: compile_ninja_default_profile_TG
     distros:

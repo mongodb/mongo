@@ -96,6 +96,14 @@ components:
     team_owner: "Service Architecture"
     upgrade_suppression: TODO SERVER-74870
 
+  "Cyrus SASL":
+    homepage_url: https://www.cyrusimap.org/sasl/
+    open_hub_url: https://openhub.net/p/cyrus-sasl
+    release_monitoring_id: 13280
+    # Empty since the library is linked and not in the source tree
+    local_directory_path:
+    team_owner: "Server Security"
+
   "dcleblanc/SafeInt":
     homepage_url: https://github.com/dcleblanc/SafeInt
     open_hub_url: https://www.openhub.net/p/SafeInt

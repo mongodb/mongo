@@ -171,8 +171,6 @@ variables:
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
     num_scons_link_jobs_available: 0.5
@@ -762,8 +760,6 @@ buildvariants:
       --opt=off
       --ssl
       MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
     num_scons_link_jobs_available: 0.25
@@ -1644,8 +1640,6 @@ buildvariants:
   expansions:
     num_scons_link_jobs_available: 0.1
     compile_flags: >-
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
     python: '/cygdrive/c/python/python37/python.exe'
@@ -2796,8 +2790,6 @@ buildvariants:
     # --link-model=dynamic is set by visiblity_test's task_compile_flags
     # expansion
     compile_flags: >-
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
       --modules=
