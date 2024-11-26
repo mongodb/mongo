@@ -1927,6 +1927,24 @@ bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
         return false;
     }
 
+    // Check that collation of the query matches the unique index. To avoid calling
+    // CollatorFactoryInterface when possible, first check the simple collator case.
+    const auto& canonicalQuery = *parsedUpdate.getParsedQuery();
+    bool queryHasSimpleCollator = canonicalQuery.getCollator() == nullptr;
+    bool indexHasSimpleCollator = errorInfo.getCollation().isEmpty();
+    if (queryHasSimpleCollator != indexHasSimpleCollator) {
+        return false;
+    }
+
+    if (!indexHasSimpleCollator) {
+        auto indexCollator = uassertStatusOK(
+            CollatorFactoryInterface::get(canonicalQuery.getOpCtx()->getServiceContext())
+                ->makeFromBSON(errorInfo.getCollation()));
+        if (!CollatorInterface::collatorsMatch(canonicalQuery.getCollator(), indexCollator.get())) {
+            return false;
+        }
+    }
+
     auto keyValue = errorInfo.getDuplicatedKeyValue();
 
     BSONObjIterator keyPatternIter(keyPattern);

@@ -561,6 +561,8 @@ last-continuous:
     ticket: SERVER-92904
   - test_file: jstests/core/ddl/create_indexes.js
     ticket: SERVER-90952
+  - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
+    ticket: SERVER-84089
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-94207
   suites: null
@@ -1176,6 +1178,8 @@ last-lts:
     ticket: SERVER-92904
   - test_file: jstests/core/ddl/create_indexes.js
     ticket: SERVER-90952
+  - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
+    ticket: SERVER-84089
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-94207
   suites: null

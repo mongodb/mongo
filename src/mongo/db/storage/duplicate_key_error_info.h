@@ -81,6 +81,10 @@ public:
         return _duplicateRid;
     }
 
+    const BSONObj& getCollation() const {
+        return _collation;
+    }
+
 private:
     BSONObj _keyPattern;
     BSONObj _keyValue;
