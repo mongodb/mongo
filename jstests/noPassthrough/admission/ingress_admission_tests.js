@@ -3,27 +3,10 @@
  * @tags: [requires_fcv_80]
  */
 
+import {waitForCurOpByComment} from "jstests/libs/curop_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-
-/**
- * Find one specific command in current ops, by its comment
- */
-function findCurOpByComment(db, comment) {
-    const ops = db.currentOp({"command.comment": comment}).inprog;
-    if (ops.length == 0) {
-        return null;
-    }
-    return ops[0];
-}
-
-/**
- * Wait until the operation we're running is blocked by ingress admission control.
- */
-function waitUntilIngressAdmissionIsBlocked(db) {
-    assert.soon(() => db.serverStatus().queues.ingress.available == 0);
-}
 
 /**
  * Test that we are not allowed to set the pool size to a negative value.
@@ -41,7 +24,7 @@ function testCurrentOp(conn, db, collName) {
     const kComment = "ingress admission queue curop test";
 
     // run a parallel shell that can wait for admission control
-    let parallelShell = startParallelShell(
+    const parallelShell = startParallelShell(
         funWithArgs((dbName, collName, comment) => {
             let testDB = db.getSiblingDB(dbName);
 
@@ -53,24 +36,15 @@ function testCurrentOp(conn, db, collName) {
             assert.commandWorked(testDB.runCommand({count: collName, comment: comment}));
         }, db.getName(), collName, kComment), conn.port, false);
 
-    // wait until the parallel shell has blocked the ingress admission
-    waitUntilIngressAdmissionIsBlocked(db);
-
     // confirm that our operation is waiting for ingress admission
-    assert.soon(() => {
-        const op = findCurOpByComment(db, kComment);
-        if (op == null) {
-            return false;
-        }
+    const opsBeforeAdmission =
+        waitForCurOpByComment(db, kComment, {"currentQueue.name": "ingress"});
 
-        const blockedAtIngressQueue = op.currentQueue && op.currentQueue.name === 'ingress';
-        if (blockedAtIngressQueue) {
-            // while here, also assert that current queue dwell time is reflect in the total
-            assert.gte(op.queues.ingress.totalTimeQueuedMicros, op.currentQueue.timeQueuedMicros);
-        }
-
-        return blockedAtIngressQueue;
-    });
+    // while here, also assert that current queue dwell time is reflect in the total
+    assert.eq(opsBeforeAdmission.length, 1);
+    const opBeforeAdmission = opsBeforeAdmission[0];
+    assert.gte(opBeforeAdmission.queues.ingress.totalTimeQueuedMicros,
+               opBeforeAdmission.currentQueue.timeQueuedMicros);
 
     // make sure the operation hangs after it was admitted
     const fp = configureFailPoint(conn, "waitAfterCommandFinishesExecution", {commands: ["count"]});
@@ -80,21 +54,13 @@ function testCurrentOp(conn, db, collName) {
         db.adminCommand({setParameter: 1, ingressAdmissionControllerTicketPoolSize: 1}));
 
     // confirm that our operation is no longer waiting for ingress admission
-    assert.soon(() => {
-        const op = findCurOpByComment(db, kComment);
-        if (op == null) {
-            return false;
-        }
+    const opsAtferAdmission = waitForCurOpByComment(db, kComment, {currentQueue: null});
 
-        const notCurrentlyQueued = op.currentQueue == null;
-        if (notCurrentlyQueued) {
-            // while here, validate that the operation was admitted and is holding a ticket
-            assert.gte(op.queues.ingress.admissions, 1);
-            assert(op.queues.ingress.isHoldingTicket);
-        }
-
-        return notCurrentlyQueued;
-    });
+    // while here, validate that the operation was admitted and is holding a ticket
+    assert.eq(opsAtferAdmission.length, 1);
+    const opAtferAdmission = opsAtferAdmission[0];
+    assert.gte(opAtferAdmission.queues.ingress.admissions, 1);
+    assert(opAtferAdmission.queues.ingress.isHoldingTicket);
 
     fp.off();
     parallelShell();
@@ -106,14 +72,15 @@ function testCurrentOp(conn, db, collName) {
 function testSlowQueryLog(conn, db, collName) {
     const kDelayMillis = 50;
     const kDelayMicros = kDelayMillis * 1000;
+    const kComment = "ingress admission queue curop test slow query";
 
     // clear server log to make sure there's only one slow log entry when we check
     assert.commandWorked(db.adminCommand({clearLog: "global"}));
 
     // run a parallel shell that can wait for admission control
-    let parallelShell =
-        startParallelShell(funWithArgs((dbName, collName) => {
-                               let testDB = db.getSiblingDB(dbName);
+    const parallelShell =
+        startParallelShell(funWithArgs((dbName, collName, comment) => {
+                               const testDB = db.getSiblingDB(dbName);
 
                                // report every command as slow
                                testDB.setProfilingLevel(0, -1);
@@ -123,11 +90,11 @@ function testSlowQueryLog(conn, db, collName) {
                                    {setParameter: 1, ingressAdmissionControllerTicketPoolSize: 0}));
 
                                // wait until the command has been admitted
-                               assert.commandWorked(testDB.runCommand({count: collName}));
-                           }, db.getName(), collName), conn.port, false);
+                               assert.commandWorked(testDB.runCommand({count: collName, comment}));
+                           }, db.getName(), collName, kComment), conn.port, false);
 
-    // wait until the parallel shell has blocked the ingress admission
-    waitUntilIngressAdmissionIsBlocked(db);
+    // confirm that our operation is waiting for ingress admission
+    waitForCurOpByComment(db, kComment, {"currentQueue.name": "ingress"});
 
     // make sure the reported ingress admission wait time will be at least kDelayMillis
     sleep(kDelayMillis);

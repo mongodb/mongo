@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/stdx/thread.h"
+#include "mongo/util/system_tick_source.h"
 #include <concepts>
 #include <memory>
 
@@ -64,6 +65,9 @@ public:
         : ServiceContextTest(
               std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
                   nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {}
+
+    TicketHolderTest(std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalServiceCtx)
+        : ServiceContextTest{std::move(scopedGlobalServiceCtx)} {}
 
     static inline const Milliseconds kSleepTime{1};
 
@@ -760,7 +764,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
     // The fifth ticket is getting aquired after waiting
     boost::optional<Ticket> ticket;
     _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        // We can gst a ticket when one is available
+        // We can get a ticket when one is available
         ticket = std::move(ticketFuture).get(_opCtx.get());
     });
 
@@ -777,5 +781,74 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 4);
     ASSERT_EQ(holder->outof(), 4);
+}
+
+// For the following test, we need a real source of tick
+class TicketHolderTestTick : public TicketHolderTest {
+public:
+    TicketHolderTestTick()
+        : TicketHolderTest{std::make_unique<ScopedGlobalServiceContextForTest>(
+              ServiceContext::make(nullptr, nullptr, makeSystemTickSource()))} {}
+};
+
+TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
+    constexpr int initialNumTickets = 0;
+    auto holder = std::make_unique<TicketHolder>(getServiceContext(),
+                                                 initialNumTickets,
+                                                 false /* trackPeakUsed */,
+                                                 TicketHolder::ResizePolicy::kImmediate);
+
+
+    // Verify we have no tickets
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 0);
+    ASSERT_EQ(holder->outof(), 0);
+
+    // We aquire a ticket in another thread.
+    // The waiting will cause totalTimeQueueMicros to be accumulated.
+    // Since no ticket are available, the thread will wait until we resize.
+    MockAdmission releaseWaiterAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
+    Future<Ticket> ticketFuture = spawn([&]() {
+        return holder->waitForTicket(releaseWaiterAdmission.opCtx.get(),
+                                     &releaseWaiterAdmission.admCtx);
+    });
+
+    // We wait until ticketFuture is actually waiting for the ticket or until timeout exceeded
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        waitUntilCanceled(*_opCtx, [&] {
+            return releaseWaiterAdmission.admCtx.startQueueingTime() != boost::none;
+        });
+    });
+
+    // We wait for 50 millisecond so that totalTimeQueuedMicros gets increased
+    stdx::this_thread::sleep_for(50'000us);
+
+    // After waiting, we let the ticket through.
+    holder->resize(_opCtx.get(), 1);
+
+    // We block until we acquire the ticket
+    boost::optional<Ticket> ticket;
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        // We can get a ticket when one is available
+        ticket = std::move(ticketFuture).get(_opCtx.get());
+    });
+
+    // The total time queued is supposed to be equal or bigger than the time we waited before
+    // resizing
+    auto const totalTimeQueue = releaseWaiterAdmission.admCtx.totalTimeQueuedMicros();
+    ASSERT_GTE(totalTimeQueue, Microseconds{50'000});
+
+    // ensure 0 are now available and 1 are in-use
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->available(), 0);
+    ASSERT_EQ(holder->outof(), 1);
+
+    // Releasing the ticket
+    ticket.reset();
+
+    // ensure 1 are now available and 0 are in-use
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 1);
+    ASSERT_EQ(holder->outof(), 1);
 }
 }  // namespace
