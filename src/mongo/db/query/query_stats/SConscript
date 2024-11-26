@@ -28,6 +28,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "$BUILD_DIR/mongo/util/version_impl",
         "query_stats",
         "rate_limiting",
     ],

@@ -62,6 +62,7 @@ selector:
     - does_not_support_repeated_reads
     - requires_profiling
     - requires_fsync
+    - known_query_shape_computation_problem
   roots:
     - jstests/aggregation/**/*.js
 test_kind: js_test

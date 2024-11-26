@@ -158,6 +158,15 @@ boost::optional<std::set<FieldPath>> convertToFieldPaths(
     }
     return fieldPaths;
 }
+
+auto withErrorContext(const auto&& callback, StringData errorMessage) {
+    try {
+        return callback();
+    } catch (DBException& ex) {
+        ex.addContext(errorMessage);
+        throw;
+    }
+}
 }  // namespace
 
 std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed::parse(
@@ -386,7 +395,12 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
                 expCtxWithLetVariables->variables.seedVariablesWithLetParameters(
                     expCtxWithLetVariables.get(), cleanLetSpecBuilder.obj());
             }
-            return Pipeline::parse(pipeline.value(), expCtxWithLetVariables)->serializeToBson(opts);
+            return withErrorContext(
+                [&]() {
+                    return Pipeline::parse(pipeline.value(), expCtxWithLetVariables)
+                        ->serializeToBson(opts);
+                },
+                "Error parsing $merge.whenMatched pipeline"_sd);
         }()});
     spec.setWhenNotMatched(descriptor.mode.second);
     spec.setOn([&]() {

@@ -48,6 +48,7 @@ selector:
     - requires_profiling
     # Running $queryStats will increment these counters which can screw up some test assertions.
     - inspects_command_opcounters
+    - known_query_shape_computation_problem
 
 executor:
   archive:

@@ -56,6 +56,11 @@
       - does_not_support_repeated_reads
       - requires_profiling
       - requires_fsync
+      # There are some cases where an invalid query will cause us to fail in unexpected ways when
+      # the query shape is also computed. See SERVER-96850 for example. This is generally not
+      # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
+      # them.
+      - known_query_shape_computation_problem
 
 - name: common_aggregation_excludes
   value:
@@ -82,6 +87,11 @@
       - does_not_support_repeated_reads
       - requires_profiling
       - requires_fsync
+      # There are some cases where an invalid query will cause us to fail in unexpected ways when
+      # the query shape is also computed. See SERVER-96850 for example. This is generally not
+      # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
+      # them.
+      - known_query_shape_computation_problem
 
 - name: fallback_core_excludes
   value:

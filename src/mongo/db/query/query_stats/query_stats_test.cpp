@@ -172,7 +172,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
     }
 }
 
-DEATH_TEST_REGEX_F(QueryStatsTest, RegisterRequestAbsorbsErrors, "Tripwire assertion.*9423101") {
+TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
 
     auto opCtx = makeOperationContext();
@@ -210,13 +210,15 @@ DEATH_TEST_REGEX_F(QueryStatsTest, RegisterRequestAbsorbsErrors, "Tripwire asser
 
     // This should hit our tripwire assertion.
     opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
-    ASSERT_THROWS(query_stats::registerRequest(opCtx.get(),
-                                               nss,
-                                               [&]() {
-                                                   uasserted(ErrorCodes::BadValue, "fake error");
-                                                   return nullptr;
-                                               }),
-                  DBException);
+    ASSERT_THROWS_CODE(query_stats::registerRequest(opCtx.get(),
+                                                    nss,
+                                                    [&]() {
+                                                        uasserted(ErrorCodes::BadValue,
+                                                                  "fake error");
+                                                        return nullptr;
+                                                    }),
+                       DBException,
+                       ErrorCodes::QueryStatsFailedToRecord);
 }
 
 }  // namespace mongo::query_stats

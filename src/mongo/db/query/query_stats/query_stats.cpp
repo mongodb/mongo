@@ -50,6 +50,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/server_options.h"
@@ -59,6 +60,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/buildinfo.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
@@ -368,9 +370,19 @@ void registerRequest(OperationContext* opCtx,
                     "status"_attr = status,
                     "command"_attr = cmdObj);
         if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
-            tasserted(9423101,
-                      str::stream() << "Failed to create query stats store key. Status: " << status
-                                    << " Command: " << cmdObj);
+            // uassert rather than tassert so that we avoid creating fatal failures on queries that
+            // were going to fail anyway, but trigger the error here first. A query that ONLY fails
+            // when query stats is enabled will still be surfaced by the uassert.
+            // Note that in the former case, these queries will fail with a different error code
+            // than they would have otherwise. Since this block is only applicable in test
+            // environments, this is fine. We make this tradeoff because it is desirable to have
+            // real bugs clearly surfaced as query stats issues.
+            // Finally, note that jstestfuzz looks for this error code in particular and can surface
+            // novel instances of this failure to us, but allow some known hard-to-fix cases to
+            // pass.
+            uasserted(Status{QueryStatsFailedToRecordInfo(
+                                 cmdObj, status, getBuildInfoVersionOnly().getVersion()),
+                             "Failed to create query stats store key"});
         }
 
         return;

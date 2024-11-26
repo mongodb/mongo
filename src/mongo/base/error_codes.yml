@@ -812,6 +812,11 @@ error_codes:
   - {code: 432, name: OfflineValidationFailedToComplete}
   - {code: 433, name: AdmissionQueueOverflow}
   - {code: 434, name: NoDistinctScansForDistinctEligibleQuery}
+  - {
+      code: 435,
+      name: QueryStatsFailedToRecord,
+      extra: QueryStatsFailedToRecordInfo,
+    }
 
   # Error codes 4000-8999 are reserved.
 

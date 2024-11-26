@@ -117,6 +117,7 @@ selector:
     - does_not_support_repeated_reads
     - requires_profiling
     - requires_fsync
+    - known_query_shape_computation_problem
     - uses_parallel_shell
   roots:
     - jstests/core/**/*.js

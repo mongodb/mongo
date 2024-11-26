@@ -31,6 +31,7 @@ mongo_cc_library(
         "optimizer_metrics_stats_entry.cpp",
         "query_stats.cpp",
         "query_stats_entry.cpp",
+        "query_stats_failed_to_record_info.cpp",
         "query_stats_helpers.h",
         "supplemental_metrics_stats.cpp",
         "vector_search_stats_entry.cpp",
@@ -41,6 +42,7 @@ mongo_cc_library(
         "optimizer_metrics_stats_entry.h",
         "query_stats.h",
         "query_stats_entry.h",
+        "query_stats_failed_to_record_info.h",
         "supplemental_metrics_stats.h",
         "vector_search_stats_entry.h",
     ],
@@ -60,6 +62,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:client_metadata",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:buildinfo",
         "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
