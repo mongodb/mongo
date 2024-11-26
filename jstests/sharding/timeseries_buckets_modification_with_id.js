@@ -2,9 +2,6 @@
  * Tests deleteOne works correctly on time-series buckets collections.
  */
 
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
 const mongos = st.s;
@@ -69,4 +66,3 @@ runTest({
         removeValidateFn);
 
 st.stop();
-})();

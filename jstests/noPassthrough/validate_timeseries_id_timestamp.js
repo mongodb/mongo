@@ -8,8 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 let testCount = 0;
 const collNamePrefix = "validate_timeseries_id_timestamp";
 const bucketNamePrefix = "system.buckets.validate_timeseries_id_timestamp";
@@ -17,6 +15,9 @@ let collName = collNamePrefix + testCount;
 let bucketName = bucketNamePrefix + testCount;
 let coll = null;
 let bucket = null;
+
+const conn = MongoRunner.runMongod();
+const db = conn.getDB(jsTestName());
 
 jsTestLog(
     "Running the validate command to check time-series bucket OID timestamp and min timestamp equivalence.");
@@ -29,7 +30,7 @@ assert.commandWorked(db.createCollection(
 coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 
-// Inserts documents into a bucket. Checks no issues are found.
+// Inserts documents into a bucket. Checks that no issues are found.
 coll.insertMany(
     [...Array(10).keys()].map(i => ({
                                   "metadata": {"sensorId": testCount, "type": "temperature"},
@@ -43,7 +44,7 @@ assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);
 
 // Inserts documents into another bucket but manually changes the min timestamp. Expects
-// warnings from validation.
+// errors from validation.
 testCount += 1;
 collName = collNamePrefix + testCount;
 bucketName = bucketNamePrefix + testCount;
@@ -61,7 +62,8 @@ coll.insertMany(
     {ordered: false});
 bucket.updateOne({"meta.sensorId": testCount}, {"$set": {"control.min.timestamp": ISODate()}});
 res = coll.validate();
-assert(res.valid, tojson(res));
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
-})();
+assert.eq(res.errors.length, 1);
+
+MongoRunner.stopMongod(conn, null, {skipValidation: true});

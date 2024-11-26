@@ -5,14 +5,14 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-"use strict";
-
 const collPrefix = "validate_timeseries_minmax";
 const bucketPrefix = "system.buckets.validate_timeseries_minmax";
 let collName = "validate_timeseries_minmax";
 let bucketName = "system.buckets.validate_timeseries_minmax";
 let testCount = 0;
+
+const conn = MongoRunner.runMongod();
+const db = conn.getDB(jsTestName());
 
 const weatherData = [
     {
@@ -159,8 +159,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.temp": -200}}));
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.temp": 500}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' min and max temperature without an update in recorded temperature, when
@@ -175,8 +175,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.temp": -200}}));
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.temp": 500}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' max _id without an update in recorded temperature.
@@ -188,8 +188,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(
     bucket.update({}, {"$set": {"control.max._id": ObjectId("62bcc728f3c51f43297eea43")}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' min timestamp without an update in recorded temperature.
@@ -201,8 +201,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(
     bucket.update({}, {"$set": {"control.min.timestamp": ISODate("2021-05-19T13:00:00.000Z")}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Adds an extra field to the 'control' min object.
@@ -213,8 +213,8 @@ coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.extra": 10}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with string min/max values are caught.
@@ -227,8 +227,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.str": "-200"}}));
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.str": "zzz"}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with array values are caught.
@@ -240,8 +240,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(
     bucket.update({}, {"$set": {"control.max.arr": ["zzzzz", {"field": -2}, 30]}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with nested objects are caught.
@@ -252,8 +252,8 @@ coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.obj": {"nestedObj": {"field": 2}}}}));
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests collections with 'control.version' : 2.
@@ -262,10 +262,10 @@ setUpCollection(lotsOfData);
 coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 bucket.updateOne({"meta.sensorId": 2, "control.version": 2}, {"$set": {"control.max.temp": 800}});
-res = bucket.validate();
-assert(res.valid, tojson(res));
+res = bucket.validate({checkBSONConformance: true});
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
+assert.eq(res.errors.length, 1);
 
 // "Checks no errors are thrown with a valid closed bucket."
 jsTestLog(
@@ -288,4 +288,5 @@ res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);
-})();
+
+MongoRunner.stopMongod(conn, null, {skipValidation: true});

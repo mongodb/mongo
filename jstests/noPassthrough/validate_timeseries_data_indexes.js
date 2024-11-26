@@ -4,14 +4,14 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-"use strict";
-
 const collPrefix = "validate_timeseries_data_indexes";
 const bucketPrefix = "system.buckets.validate_timeseries_data_indexes";
 let collName = collPrefix;
 let bucketName = bucketPrefix;
 let testCount = 0;
+
+const conn = MongoRunner.runMongod();
+const db = conn.getDB(jsTestName());
 
 const weatherData = [
     {
@@ -57,8 +57,8 @@ let coll = db.getCollection(collName);
 let bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.0": "data.temp.a"}}));
 let res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Non-increasing index.
@@ -74,8 +74,8 @@ assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.a": "data.temp.1"
 assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.b": "data.temp.0"}}));
 printjson(bucket.find().toArray());
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Out-of-range index.
@@ -87,8 +87,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.1": "data.temp.10"}}));
 printjson(bucket.find().toArray());
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Negative index.
@@ -99,8 +99,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.0": "data.temp.-1"}}));
 printjson(bucket.find().toArray());
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Missing time field index.
@@ -111,7 +111,8 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$unset": {"data.timestamp.1": ""}}));
 printjson(bucket.find().toArray());
 res = assert.commandWorked(coll.validate());
-assert(res.valid, tojson(res));
-assert(res.warnings.length == 1, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
-})();
+
+MongoRunner.stopMongod(conn, null, {skipValidation: true});

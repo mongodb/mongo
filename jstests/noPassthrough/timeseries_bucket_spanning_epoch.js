@@ -13,7 +13,9 @@
  * ]
  */
 
-(function() {
+const conn = MongoRunner.runMongod();
+const dbName = jsTestName();
+const db = conn.getDB(dbName);
 
 // Test that measurements spanning the Unix Epoch end up in the same bucket.
 (function testUnixEpoch() {
@@ -84,4 +86,5 @@
     assert.commandWorked(coll.insert({m: 2, t: ISODate("1969-05-18T00:00:00.000Z")}));
     assert.eq(2, bucketsColl.find().itcount());
 })();
-})();
+
+MongoRunner.stopMongod(conn);

@@ -7,8 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 let testCount = 0;
 const collNamePrefix = "validate_timeseries_count";
 const bucketNamePrefix = "system.buckets.validate_timeseries_count";
@@ -16,6 +14,9 @@ let collName = collNamePrefix + testCount;
 let bucketName = bucketNamePrefix + testCount;
 let coll = null;
 let bucket = null;
+
+const conn = MongoRunner.runMongod();
+const db = conn.getDB(jsTestName());
 
 jsTestLog(
     "Running the validate command to check that time-series bucket 'control.count' matches the number of measurements in version-2 buckets.");
@@ -59,7 +60,7 @@ coll.insertMany([...Array(1002).keys()].map(i => ({
                 {ordered: false});
 bucket.updateOne({"meta.sensorId": 2, 'control.version': 2}, {"$set": {"control.count": 10}});
 res = bucket.validate();
-assert(res.valid, tojson(res));
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
-})();
+assert.eq(res.errors.length, 1);
+MongoRunner.stopMongod(conn, null, {skipValidation: true});
