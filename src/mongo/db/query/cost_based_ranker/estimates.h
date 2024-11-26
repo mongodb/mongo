@@ -43,7 +43,7 @@ namespace mongo::cost_based_ranker {
 /**
  * Convert nanoseconds to milliseconds.
  */
-constexpr long double operator""_ms(long double v) {
+constexpr double operator""_ms(long double v) {
     return v * 1.0e-6;
 }
 
