@@ -2140,7 +2140,7 @@ tasks:
   ################################################
 
   - <<: *gen_task_template
-    name: aggregation_unsplittable_collections_on_random_shard_passthrough
+    name: aggregation_unsplittable_collections_on_random_shard_passthrough_gen
     # TODO SERVER-83445 Enable on non-all-feature-flag variants.
     tags:
       [
@@ -2148,14 +2148,11 @@ tasks:
         "default",
         "unsplittable_collections",
       ]
-    depends_on:
-      - name: aggregation
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions
+    name: aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_gen
     # TODO SERVER-83445 Enable on non-all-feature-flag variants.
     tags:
       [
@@ -2163,11 +2160,8 @@ tasks:
         "default",
         "unsplittable_collections",
       ]
-    depends_on:
-      - name: aggregation
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: causally_consistent_jscore_passthrough_auth_gen
