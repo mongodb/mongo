@@ -735,6 +735,61 @@ TEST_F(UnwindStageTest, UnwindIncludesIndexPathWhenIncludingIndex) {
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("arrIndex"));
 }
 
+TEST_F(UnwindStageTest, UnwindIndexPathIsSamePathAsArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("array");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto source = DocumentSourceMock::createForTest(
+        {Document{{"array", vector<Value>{Value(10), Value(20)}}},
+         Document{{"array", vector<Value>{Value(30), Value(40)}}}},
+        getExpCtx());
+
+    unwind->setSource(source.get());
+
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(1));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(1));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsParentOfArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("obj");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "obj.array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto source = DocumentSourceMock::createForTest(
+        {Document{{"obj", Document{{"array", vector<Value>{Value(10), Value(20)}}}}},
+         Document{{"obj", Document{{"array", vector<Value>{Value(30), Value(40)}}}}}},
+        getExpCtx());
+
+    unwind->setSource(source.get());
+
+    Document res;
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(1));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(1));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsChildOfArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("array.index");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto source = DocumentSourceMock::createForTest(
+        {Document{{"array", vector<Value>{Value(10), Value(20)}}},
+         Document{{"array", vector<Value>{Value(30), Value(40)}}}},
+        getExpCtx());
+
+    unwind->setSource(source.get());
+
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+}
+
 //
 // Error cases.
 //

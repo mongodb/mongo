@@ -161,6 +161,14 @@ public:
 
     FieldPath concat(const FieldPath& tail) const;
 
+    bool isPrefixOf(const FieldPath& rhsPath) const {
+        const auto& lhsStr = fullPath();
+        const auto& rhsStr = rhsPath.fullPath();
+        return lhsStr.size() < rhsStr.size()
+            ? rhsStr.starts_with(lhsStr) && rhsStr[lhsStr.size()] == '.'
+            : lhsStr == rhsStr;
+    }
+
 private:
     FieldPath(std::string string, std::vector<size_t> dots, std::vector<size_t> hashes)
         : _fieldPath(std::move(string)),
