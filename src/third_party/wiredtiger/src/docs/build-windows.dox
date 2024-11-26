@@ -8,7 +8,7 @@ and proceed with @ref windows_building
 First, clone the repository:
 
 @code
-git clone git://github.com/wiredtiger/wiredtiger.git
+git clone https://github.com/wiredtiger/wiredtiger.git
 @endcode
 
 Now proceed with @ref windows_building

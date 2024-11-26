@@ -30,7 +30,27 @@ functions:
     command: git.get_project
     params:
       directory: wiredtiger
-  "fetch artifacts" :
+  "generate github token": &gen_github_token
+    command: github.generate_token
+    params:
+      owner: wiredtiger
+      repo: automation-scripts
+      expansion_name: generated_token
+      permissions:
+          metadata: read
+          contents: read
+  "get automation-scripts": &get_automation_scripts
+    command: shell.exec
+    type: setup
+    params:
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        if ! [ -d "./automation-scripts" ]; then
+          git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git
+        fi
+  "fetch artifacts":
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -132,8 +152,7 @@ functions:
       script: |
         # Fetch the gperftools library.
         if [[ "${posix_configure_flags|}" =~ (tcmalloc|TCMALLOC) ]]; then
-          git clone git@github.com:wiredtiger/automation-scripts.git
-          . automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} ${is_cmake_build|false}
+          . ../automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} ${is_cmake_build|false}
         fi
         
         set -o errexit
@@ -262,6 +281,8 @@ functions:
           fi
         fi
   "compile wiredtiger":
+    - *gen_github_token
+    - *get_automation_scripts
     - *configure_wiredtiger
     - *make_wiredtiger
   "compile wiredtiger no linux ftruncate":
@@ -363,7 +384,7 @@ functions:
             exit 0
           fi
 
-          git clone git@github.com:wiredtiger/wiredtiger.github.com.git
+          git clone https://github.com/wiredtiger/wiredtiger.github.com.git
           cd wiredtiger.github.com
 
           # Branches to update are defined through an expansion variable.
@@ -685,6 +706,8 @@ functions:
           ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out.json ${wtarg}
 
   "upload-perf-test-stats":
+    - *gen_github_token
+    - *get_automation_scripts
     - command: shell.exec
       params:
         working_dir: "wiredtiger/cmake_build/bench/wtperf"
@@ -695,8 +718,7 @@ functions:
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
           ${pip3_binary} install pymongo[srv]==3.12.2
-          git clone git@github.com:wiredtiger/automation-scripts.git
-          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -f test_stats/atlas_out.json -b ${branch_name}
+          ${python_binary} ../automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -f test_stats/atlas_out.json -b ${branch_name}
     - command: perf.send
       params:
         file: ./wiredtiger/cmake_build/bench/wtperf/test_stats/evergreen_out.json
@@ -2267,6 +2289,8 @@ tasks:
   - name: configure-combinations
     commands:
       - func: "get project"
+      - func: "generate github token"
+      - func: "get automation-scripts"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/test/evergreen"
@@ -2541,6 +2565,8 @@ tasks:
   - name: long-test
     commands:
       - func: "get project"
+      - func: "generate github token"
+      - func: "get automation-scripts"
       - func: "configure wiredtiger"
         vars:
           configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-g -Werror"

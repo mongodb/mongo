@@ -16,7 +16,7 @@ when configuring and building WiredTiger.
 First, clone the repository:
 
 @code
-git clone git://github.com/wiredtiger/wiredtiger.git
+git clone https://github.com/wiredtiger/wiredtiger.git
 @endcode
 
 Second, run \c autogen.sh to create the \c configure script:
