@@ -1,50 +1,22 @@
-# Execution Internals
+# Catalog Internals
 
-The storage execution layer provides an interface for higher level MongoDB components, including
-query, replication and sharding, to all storage engines compatible with MongoDB. It maintains a
-catalog, in-memory and on-disk, of collections and indexes. It also implements an additional (to
-whatever a storage engine implements) concurrency control layer to safely modify the catalog while
-sustaining correct and consistent collection and index data formatting.
-
-Execution facilitates reads and writes to the storage engine with various persistence guarantees,
-builds indexes, supports replication rollback, manages oplog visibility, repairs data corruption
-and inconsistencies, and much more.
-
-The main code highlights are: the storage integration layer found in the [**storage/**][] directory;
-the lock manager and lock helpers found in the [**concurrency/**][] directory; the catalog found in
-the [**catalog/**][] directory; the index build code found in many directories; the various types of
-index implementations found in the [**index/**][] directory; the sorter found in the
-[**sorter/**][] directory; and the time-series bucket catalog found in the [**timeseries/**][]
-directory.
-
-[**storage/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/storage
-[**concurrency/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/concurrency
-[**catalog/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/catalog
-[**index/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/index
-[**sorter/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/sorter
-[**timeseries/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/timeseries
-
-For more information on the Storage Engine API, see the [storage/README][].
-
-For more information on time-series collections, see the [timeseries/README][].
-
-[storage/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md
-[timeseries/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/timeseries/README.md
-
-# The Catalog
-
-The catalog is where MongoDB stores information about the collections and indexes for a MongoDB
+The catalog is where MongoDB stores information about the collections and indexes for a replica set
 node. In some contexts we refer to this as metadata and to operations changing this metadata as
 [DDL](#glossary) (Data Definition Language) operations. The catalog is persisted as a table with
 BSON documents that each describe properties of a collection and its indexes. An in-memory catalog
-caches the most recent catalog information for more efficient access.
+caches this data for more efficient access.
+
+The catalog provides a mapping from logical user-level namespaces to durable storage engine entities and provides a concurrency control layer to safely modify collections and indexes metadata for DDL operations.
+
+See the [Storage Engine API](../storage/README.md) for relevant information.
 
 ## Durable Catalog
 
-The durable catalog is persisted as a table with the `_mdb_catalog` [ident](#glossary). Each entry
-in this table is indexed with a 64-bit `RecordId`, referred to as the catalog ID, and contains a
-BSON document that describes the properties of a collection and its indexes. The `DurableCatalog`
-class allows read and write access to the durable data.
+The durable catalog is persisted as a table with the `_mdb_catalog`
+[ident](../storage/README.md#idents). Each entry in this table is indexed with a 64-bit `RecordId`,
+referred to as the catalog ID, and contains a BSON document that describes the properties of a
+collection and its indexes. The `DurableCatalog` class allows read and write access to the durable
+data.
 
 Starting in v5.2, catalog entries for time-series collections have a new flag called
 `timeseriesBucketsMayHaveMixedSchemaData` in the `md` field. Time-series collections upgraded from
@@ -97,7 +69,7 @@ Example command invocation and output from
 > const adminDB = db.getSiblingDB('admin');
 > adminDB.aggregate([{$listCatalog: {}}]);
 
-Collectionless $listCatalog: [
+Collection-less $listCatalog: [
     {
         "db" : "test",
         "name" : "system.views",
@@ -248,7 +220,7 @@ using the default or user-provided
 [list_catalog_read_concern.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/noPassthrough/list_catalog_read_concern.js#L46)
 contains examples of using $listCatalog with a variety of read concern settings.
 
-The tradtional alternative would have involved a `listDatabases` command followed by a series of
+The traditional alternative would have involved a `listDatabases` command followed by a series of
 `listCollections` and `listIndexes` calls, with the downside of reading the catalog at a different
 point in time during each command invocation.
 
@@ -357,9 +329,13 @@ cache of the [durable catalog](#durable-catalog) state. It provides the followin
   lookup to support rollback to a point in time.
 - Ensures `Collection` objects are in-sync with opened storage snapshots.
 
+### Concurrency Control
+
+See [Concurrency Control](../concurrency/README.md)
+
 ### Synchronization
 
-Catalog access is synchronized using [Multiversion concurrency control] where readers operate on
+Catalog access is synchronized using multi-version concurrency control where readers operate on
 immutable catalog, collection and index instances. Writes use [copy-on-write][] to create newer
 versions of the catalog, collection and index instances to be changed, contents are copied from the
 previous latest version. Readers holding on to a catalog instance will thus not observe any writes
@@ -408,11 +384,11 @@ In addition `Collection` objects have shared ownership of:
 
 A writable `Collection` may only be requested in an active [WriteUnitOfWork](#WriteUnitOfWork). The
 new `Collection` instance is installed in the catalog when the storage transaction commits as the
-first `onCommit` [Changes](#Changes) that run. This means that it is not allowed to perform any
-modification to catalog, collection or index instances in `onCommit` handlers. Such modifications
-would break the immutability property of these instances for readers. If the storage transaction
-rolls back then the writable `Collection` object is simply discarded and no change is ever made to
-the catalog.
+first `onCommit` [Changes](../storage/README.md#changes) that run. This means that it is not allowed
+to perform any modification to catalog, collection or index instances in `onCommit` handlers. Such
+modifications would break the immutability property of these instances for readers. If the storage
+transaction rolls back then the writable `Collection` object is simply discarded and no change is
+ever made to the catalog.
 
 A writable `Collection` is a clone of the existing `Collection`, members are either deep or
 shallowed copied. Notably, a shallow copy is made for the [`IndexCatalog`](#index-catalog).
@@ -512,10 +488,11 @@ The `CollectionCatalog` contains a mapping of `Namespace` and `UUID` to the `cat
 timestamps back to the oldest timestamp. These are used for efficient lookups into the durable
 catalog, and are resilient to create, drop and rename operations.
 
-Operations that use collection locks (in any [lockmode](#lock-modes)) can rely on the catalog
-information of the collection not changing. However, when unlocking and then relocking, not only
-should operations recheck catalog information to ensure it is still valid, they should also make
-sure to abandon the storage snapshot, so it is consistent with the in memory catalog.
+Operations that use collection locks (in any [lock mode](../concurrency/README.md#lock-modes)) can
+rely on the catalog information of the collection not changing. However, when unlocking and then
+re-locking, not only should operations recheck catalog information to ensure it is still valid, they
+should also make sure to abandon the storage snapshot, so it is consistent with the in memory
+catalog.
 
 ## Two-Phase Collection and Index Drop
 
@@ -540,7 +517,7 @@ sufficiently persisted such that the catalog change will not be rolled back and 
 to the collection or index in-memory state (tracked via the drop token) remains. When no concurrent
 readers of the collection or index are left, the drop token will be the only remaining reference to
 the in-memory state. The drop timestamp must be both older than the timestamp of the last checkpoint
-and the oldest_timestamp. Requiring the drop timestamp to reach the checkpointed time ensures that
+and the oldest_timestamp. Requiring the drop timestamp to reach the checkpoint time ensures that
 startup recovery and rollback via recovery to a stable timestamp, which both recover to the last
 checkpoint, will never be missing collection or index data that should still exist at the checkpoint
 time that is less than the drop timestamp. Requiring the drop timestamp to pass (become older) than
@@ -564,126 +541,6 @@ _Code spelunking starting points:_
 - [_Code that signals the reaper with a
   timestamp_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L932-L949)
 
-# Storage Transactions
-
-Through the pluggable [storage engine API](https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md), MongoDB executes reads and writes on its storage engine
-with [snapshot isolation](#glossary). The structure used to achieve this is the [RecoveryUnit
-class](../storage/recovery_unit.h).
-
-## RecoveryUnit
-
-Each pluggable storage engine for MongoDB must implement `RecoveryUnit` as one of the base classes
-for the storage engine API. Typically, storage engines satisfy the `RecoveryUnit` requirements with
-some form of [snapshot isolation](#glossary) with [transactions](#glossary). Such transactions are
-called storage transactions elsewhere in this document, to differentiate them from the higher-level
-_multi-document transactions_ accessible to users of MongoDB. The RecoveryUnit controls what
-[snapshot](#glossary) a storage engine transaction uses for its reads. In MongoDB, a snapshot is defined by a
-_timestamp_. A snapshot consists of all data committed with a timestamp less than or equal to the
-snapshot's timestamp. No uncommitted data is visible in a snapshot, and data changes in storage
-transactions that commit after a snapshot is created, regardless of their timestamps, are also not
-visible. Generally, one uses a `RecoveryUnit` to perform transactional reads and writes by first
-configuring the `RecoveryUnit` with the desired
-[ReadSource](https://github.com/mongodb/mongo/blob/b2c1fa4f121fdb6cdffa924b802271d68c3367a3/src/mongo/db/storage/recovery_unit.h#L391-L421)
-and then performing the reads and writes using operations on `RecordStore` or `SortedDataInterface`,
-and finally calling `commit()` on the `WriteUnitOfWork` (if performing writes).
-
-## WriteUnitOfWork
-
-A `WriteUnitOfWork` is the mechanism to control how writes are transactionally performed on the
-storage engine. All the writes (and reads) performed within its scope are part of the same storage
-transaction. After all writes have been staged, one must call `commit()` in order to atomically
-commit the transaction to the storage engine. It is illegal to perform writes outside the scope of
-a WriteUnitOfWork since there would be no way to commit them. If the `WriteUnitOfWork` falls out of
-scope before `commit()` is called, the storage transaction is rolled back and all the staged writes
-are lost. Reads can be performed outside of a `WriteUnitOfWork` block; storage transactions outside
-of a `WriteUnitOfWork` are always rolled back, since there are no writes to commit.
-
-## Lazy initialization of storage transactions
-
-Note that storage transactions on WiredTiger are not started at the beginning of a `WriteUnitOfWork`
-block. Instead, the transaction is started implicitly with the first read or write operation. To
-explicitly start a transaction, one can use `RecoveryUnit::preallocateSnapshot()`.
-
-## Changes
-
-One can register a `Change` on a `RecoveryUnit` while in a `WriteUnitOfWork`. This allows extra
-actions to be performed based on whether a `WriteUnitOfWork` commits or rolls back. These actions
-will typically update in-memory state to match what was written in the storage transaction, in a
-transactional way. Note that `Change`s are not executed until the destruction of the
-`WriteUnitOfWork`, which can be long after the storage engine committed. Two-phase locking ensures
-that all locks are held while a Change's `commit()` or `rollback()` function runs.
-
-## StorageUnavailableException
-
-`StorageUnavailableException` indicates that a storage transaction rolled back due to
-resource contention in the storage engine. This exception is the base of exceptions related to
-concurrency (`WriteConflict`) and to those related to cache pressure (`TemporarilyUnavailable` and
-`TransactionTooLargeForCache`).
-
-We recommend using the [writeConflictRetry](https://github.com/mongodb/mongo/blob/9381db6748aada1d9a0056cea0e9899301e7f70b/src/mongo/db/concurrency/exception_util.h#L140)
-helper which transparently handles all exceptions related to this error category.
-
-### WriteConflictException
-
-Writers may conflict with each other when more than one operation stages an uncommitted write to the
-same document concurrently. To force one or more of the writers to retry, the storage engine may
-throw a WriteConflictException at any point, up to and including the call to commit(). This is
-referred to as optimistic concurrency control because it allows uncontended writes to commit
-quickly. Because of this behavior, most WUOWs are enclosed in a writeConflictRetry loop that retries
-the write transaction until it succeeds, accompanied by a bounded exponential back-off.
-
-### TemporarilyUnavailableException
-
-When the server parameter `enableTemporarilyUnavailableExceptions` is enabled (on by default), a
-TemporarilyUnavailableException may be thrown inside the server to indicate that an operation cannot
-complete without blocking and must be retried. The storage engine may throw a
-TemporarilyUnavailableException (converted to a TemporarilyUnavailable error for users) when an
-operation is excessively rolled-back in the storage engine due to cache pressure or any reason that
-would prevent the operation from completing without impacting concurrent operations. The operation
-may be at fault for writing too much uncommitted data, or it may be a victim. That information is
-not exposed. However, if this error is returned, it is likely that the operation was the cause of
-the problem, rather than a victim.
-
-Before 6.0, this type of error was returned as a WriteConflict and retried indefinitely inside a
-writeConflictRetry loop. As of 6.0, MongoDB will retry the operation internally at most
-`temporarilyUnavailableMaxRetries` times, backing off for `temporarilyUnavailableBackoffBaseMs`
-milliseconds, with a linearly-increasing backoff on each attempt. After this point, the error will
-escape the handler and be returned to the client.
-
-If an operation receives a TemporarilyUnavailable error internally, a `temporarilyUnavailableErrors`
-counter will be displayed in the slow query logs and in FTDC.
-
-Notably, this behavior does not apply to multi-document transactions, which continue to return a
-WriteConflict to the client in this scenario without retrying internally.
-
-See
-[wtRcToStatus](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L178-L183)
-where we throw the exception in WiredTiger.
-See [TemporarilyUnavailableException](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/concurrency/temporarily_unavailable_exception.h#L39-L45).
-
-### TransactionTooLargeForCacheException
-
-A TransactionTooLargeForCacheException may be thrown inside the server to indicate that an operation
-was rolled-back and is unlikely to ever complete because the storage engine cache is insufficient,
-even in the absence of concurrent operations. This is determined by a simple heuristic wherein,
-after a rollback, a threshold on the proportion of total dirty cache bytes the running transaction
-can represent and still be considered fullfillable is checked. The threshold can be tuned with the
-`transactionTooLargeForCacheThreshold` parameter. Setting this threshold to its maximum value (1.0)
-causes the check to be skipped and TransactionTooLargeForCacheException to be disabled.
-
-On replica sets, if an operation succeeds on a primary, it should also succeed on a secondary. It
-would be possible to convert to both TemporarilyUnavailableException and WriteConflictException,
-as if TransactionTooLargeForCacheException was disabled. But on secondaries the only
-difference between the two is the rate at which the operation is retried. Hence,
-TransactionTooLargeForCacheException is always converted to a WriteConflictException, which retries
-faster, to avoid stalling replication longer than necessary.
-
-Prior to 6.3, or when TransactionTooLargeForCacheException is disabled, multi-document
-transactions always return a WriteConflictException, which may result in drivers retrying an
-operation indefinitely. For non-multi-document operations, there is a limited number of retries on
-TemporarilyUnavailableException, but it might still be beneficial to not retry operations which are
-unlikely to complete and are disruptive for concurrent operations.
-
 # Read Operations
 
 External reads via the find, count, distinct, aggregation, and mapReduce cmds do not take collection
@@ -699,8 +556,6 @@ or from a call to abandonSnapshot(). Lock-free read operations must re-establish
 after a query yield, just as at the start of a read operation.
 
 See
-[WiredTigerCursor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/wiredtiger/wiredtiger_cursor.cpp#L48),
-[WiredTigerRecoveryUnit::getSession()](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.cpp#L303-L305),
 [~GlobalLock](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/concurrency/d_concurrency.h#L228-L239),
 [PlanYieldPolicy::\_yieldAllLocks()](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/query/plan_yield_policy.cpp#L182),
 [RecoveryUnit::abandonSnapshot()](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/recovery_unit.h#L217).
@@ -805,34 +660,12 @@ to read at
 
 Operations that write to collections and indexes must take collection locks. Storage engines require
 all operations to hold at least a collection IX lock to provide document-level concurrency.
-Operations must perform writes in the scope of a WriteUnitOfWork.
-
-## WriteUnitOfWork
-
-All reads and writes in the scope of a WriteUnitOfWork (WUOW) operate on the same storage engine
-snapshot, and all writes in the scope of a WUOW are transactional; they are either all committed or
-all rolled-back. The WUOW commits writes that took place in its scope by a call to commit(). It
-rolls-back writes when it goes out of scope and its destructor is called before a call to commit().
-
-The WriteUnitOfWork has a [`groupOplogEntries` option](https://github.com/mongodb/mongo/blob/fa32d665bd63de7a9d246fa99df5e30840a931de/src/mongo/db/storage/write_unit_of_work.h#L67)
-to replicate multiple writes transactionally. This option uses the [`BatchedWriteContext` class](https://github.com/mongodb/mongo/blob/9ab71f9b2fac1e384529fafaf2a819ce61834228/src/mongo/db/batched_write_context.h#L46)
-to stage writes and to generate a single applyOps entry at commit, similar to what multi-document
-transactions do via the [`TransactionParticipant` class](https://github.com/mongodb/mongo/blob/219990f17695b0ea4695f827a42a18e012b1e9cf/src/mongo/db/transaction/transaction_participant.h#L82).
-Unlike a multi-document transaction, the applyOps entry lacks the `lsId` and the `txnNumber`
-fields. Callers must ensure that the WriteUnitOfWork does not generate more than 16MB of oplog,
-otherwise the operation will fail with `TransactionTooLarge` code.
-
-As of MongoDB 6.0, the `groupOplogEntries` mode is only used by the [BatchedDeleteStage](https://github.com/mongodb/mongo/blob/9676cf4ad8d537518eb1b570fc79bad4f31d8a79/src/mongo/db/exec/batched_delete_stage.h)
-for efficient mass-deletes.
-
-See
-[WriteUnitOfWork](https://github.com/mongodb/mongo/blob/fa32d665bd63de7a9d246fa99df5e30840a931de/src/mongo/db/storage/write_unit_of_work.h).
+Operations must perform writes in the scope of a [WriteUnitOfWork](../storage/README.md#writeunit).
 
 ## Collection and Index Writes
 
 Collection write operations (inserts, updates, and deletes) perform storage engine writes to both
-the collection's RecordStore and relevant index's SortedDataInterface in the same storage transaction, or
-WUOW. This ensures that completed, not-building indexes are always consistent with collection data.
+the collection's RecordStore and relevant index's SortedDataInterface in the same storage transaction, or WUOW. This ensures that completed, not-building indexes are always consistent with collection data.
 
 ## Vectored Inserts
 
@@ -846,128 +679,6 @@ though all writes took place in a single storage transaction.
 See
 [insertDocuments](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ops/write_ops_exec.cpp#L315)
 and
-[WiredTigerRecordStore::insertRecords](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp#L1494).
-
-# Concurrency Control
-
-Theoretically, one could design a database that used only mutexes to maintain database consistency
-while supporting multiple simultaneous operations; however, this solution would result in pretty bad
-performance and would a be strain on the operating system. Therefore, databases typically use a more
-complex method of coordinating operations. This design consists of Resources (lockable entities),
-some of which may be organized in a Hierarchy, and Locks (requests for access to a resource). A Lock
-Manager is responsible for keeping track of Resources and Locks, and for managing each Resource's
-Lock Queue. The Lock Manager identifies Resources with a ResourceId.
-
-## Resource Hierarchy
-
-In MongoDB, Resources are arranged in a hierarchy, in order to provide an ordering to prevent
-deadlocks when locking multiple Resources, and also as an implementation of Intent Locking (an
-optimization for locking higher level resources). The hierarchy of ResourceTypes is as follows:
-
-1. Global (three - see below)
-1. Database (one per database on the server)
-1. Collection (one per collection on the server)
-
-Each resource must be locked in order from the top. Therefore, if a Collection resource is desired
-to be locked, one must first lock the one Global resource, and then lock the Database resource that
-is the parent of the Collection. Finally, the Collection resource is locked.
-
-In addition to these ResourceTypes, there also exists ResourceMutex, which is independent of this
-hierarchy. One can use ResourceMutex instead of a regular mutex if one desires the features of the
-lock manager, such as fair queuing and the ability to have multiple simultaneous lock holders.
-
-## Lock Modes
-
-The lock manager keeps track of each Resource's _granted locks_ and a queue of _waiting locks_.
-Rather than the binary "locked-or-not" modes of a mutex, a MongoDB lock can have one of several
-_modes_. Modes have different _compatibilities_ with other locks for the same resource. Locks with
-compatible modes can be simultaneously granted to the same resource, while locks with modes that are
-incompatible with any currently granted lock on a resource must wait in the waiting queue for that
-resource until the conflicting granted locks are unlocked. The different types of modes are:
-
-1. X (exclusive): Used to perform writes and reads on the resource.
-2. S (shared): Used to perform only reads on the resource (thus, it is okay to Share with other
-   compatible locks).
-3. IX (intent-exclusive): Used to indicate that an X lock is taken at a level in the hierarchy below
-   this resource. This lock mode is used to block X or S locks on this resource.
-4. IS (intent-shared): Used to indicate that an S lock is taken at a level in the hierarchy below
-   this resource. This lock mode is used to block X locks on this resource.
-
-## Lock Compatibility Matrix
-
-This matrix answers the question, given a granted lock on a resource with the mode given, is a
-requested lock on that same resource with the given mode compatible?
-
-| Requested Mode |           |         | Granted Mode |        |        |
-| :------------- | :-------: | :-----: | :----------: | :----: | :----: |
-|                | MODE_NONE | MODE_IS |   MODE_IX    | MODE_S | MODE_X |
-| MODE_IS        |     Y     |    Y    |      Y       |   Y    |   N    |
-| MODE_IX        |     Y     |    Y    |      Y       |   N    |   N    |
-| MODE_S         |     Y     |    Y    |      N       |   Y    |   N    |
-| MODE_X         |     Y     |    N    |      N       |   N    |   N    |
-
-Typically, locks are granted in the order they are queued, but some LockRequest behaviors can be
-specially selected to break this rule. One behavior is _enqueueAtFront_, which allows important lock
-acquisitions to cut to the front of the line, in order to expedite them. Currently, all mode X and S
-locks for the three Global Resources (Global, MultiDocumentTransactionsBarrier, RSTL) automatically
-use this option.
-Another behavior is _compatibleFirst_, which allows compatible lock requests to cut ahead of others
-waiting in the queue and be granted immediately; note that this mode might starve queued lock
-requests indefinitely.
-
-### Replication State Transition Lock (RSTL)
-
-The Replication State Transition Lock is of ResourceType Global, so it must be locked prior to
-locking any Database level resource. This lock is used to synchronize replica state transitions
-(typically transitions between PRIMARY, SECONDARY, and ROLLBACK states).
-More information on the RSTL is contained in the [Replication Architecture Guide](https://github.com/mongodb/mongo/blob/b4db8c01a13fd70997a05857be17548b0adec020/src/mongo/db/repl/README.md#replication-state-transition-lock)
-
-### Global Lock
-
-The resource known as the Global Lock is of ResourceType Global. It is currently used to
-synchronize shutdown, so that all operations are finished with the storage engine before closing it.
-Certain types of global storage engine operations, such as recoverToStableTimestamp(), also require
-this lock to be held in exclusive mode.
-
-### Tenant Lock
-
-A resource of ResourceType Tenant is used when a database belongs to a tenant. It is used to synchronize
-change streams enablement and disablement for a tenant operation with other operations associated with the tenant.
-Enabling or disabling of change streams (by creating or dropping a change collection) for a tenant takes this lock
-in exclusive (X) mode. Acquiring this resource with an intent lock is an indication that the operation is doing reads (IS)
-or writes (IX) at the database or lower level.
-
-### Database Lock
-
-Any resource of ResourceType Database protects certain database-wide operations such as database
-drop. These operations are being phased out, in the hopes that we can eliminate this ResourceType
-completely.
-
-### Collection Lock
-
-Any resource of ResourceType Collection protects certain collection-wide operations, and in some
-cases also protects the in-memory catalog structure consistency in the face of concurrent readers
-and writers of the catalog. Acquiring this resource with an intent lock is an indication that the
-operation is doing explicit reads (IS) or writes (IX) at the document level. There is no Document
-ResourceType, as locking at this level is done in the storage engine itself for efficiency reasons.
-
-### Document Level Concurrency Control
-
-Each storage engine is responsible for locking at the document level. The WiredTiger storage engine
-uses MVCC [multiversion concurrency control][] along with optimistic locking in order to provide
-concurrency guarantees.
-
-## Two-Phase Locking
-
-The lock manager automatically provides _two-phase locking_ for a given storage transaction.
-Two-phase locking consists of an Expanding phase where locks are acquired but not released, and a
-subsequent Shrinking phase where locks are released but not acquired. By adhering to this protocol,
-a transaction will be guaranteed to be serializable with other concurrent transactions. The
-WriteUnitOfWork class manages two-phase locking in MongoDB. This results in the somewhat unexpected
-behavior of the RAII locking types acquiring locks on resources upon their construction but not
-unlocking the lock upon their destruction when going out of scope. Instead, the responsibility of
-unlocking the locks is transferred to the WriteUnitOfWork destructor. Note this is only true for
-transactions that do writes, and therefore only for code that uses WriteUnitOfWork.
 
 # Indexes
 
@@ -1939,8 +1650,6 @@ A new truncate marker is created when the in-progress marker segment contains mo
 complete the segment; and the oldest truncate marker's oplog is deleted when the oplog size exceeds
 its cap size setting.
 
-Oplog sampling and marker generation is skipped when using `--restore` or `--magicRestore`.
-
 ### Special Timestamps That Will Not Be Truncated
 
 The WiredTiger integration layer's `OplogTruncateMarkers` implementation will stall deletion waiting for
@@ -2142,13 +1851,9 @@ A time-series collection is a view of an internal clustered collection named
 `system.buckets.<name>`, where `<name>` is the name of the time-series collection. The cluster key
 values are ObjectId's.
 
-The TTL monitor will only delete data from a time-series bucket collection when a bucket's minimum
-time, \_id, is past the expiration plus the bucket maximum time span (default 1 hour). This
-procedure avoids deleting buckets with data that is not older than the expiration time.
-
 For more information on time-series collections, see the [timeseries/README][].
 
-[timeseries/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/timeseries/README.md
+[timeseries/README]: ../timeseries/README.md
 
 ## Capped clustered collections
 
@@ -2160,10 +1865,9 @@ inserted. In order to guarantee capped insert-order semantics the caller should 
 increasing cluster key values.
 
 Because unlike regular capped collections, clustered collections do not need to preserve insertion
-order, they allow non-serialised concurrent writes. In order to avoid missing documents while
+order, they allow non-serialized concurrent writes. In order to avoid missing documents while
 tailing a clustered collection, the user is required to enforce visibility rules similar to the ['no
-holes' point](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/catalog/README.md#oplog-visibility).
-Majority read concern is similarly required.
+holes' point](../storage/README.md#oplog-visibility). Majority read concern is similarly required.
 
 ## Clustered RecordIds
 
@@ -2201,37 +1905,9 @@ these are treated as ascending. Details on how these values are treated can be f
 context of relational databases. DDL operations in the MongoDB context include index and collection
 creation or drop, as well as `collMod` operations.
 
-**ident**: An ident is a unique identifier given to a storage engine resource. Collections and
-indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
-as tables. Idents map to files on disk, but with a `.wt` file extension.
-
-Examples:
-
-- collection idents: `collection-<counter>-<random number>`
-- index idents: `index-<counter>-<random number>`
-
-Server flags that alter the form of idents (this applies to indexes as well):
-
-- `--directoryperdb`: `<db name>/collection-<counter>-<random number>`
-- `--wiredTigerDirectoryForIndexes`: `collection/<counter>-<random number>`
-- (both of the above): `<db name>/collection/<counter-<random number>`
-
-**oplog hole**: An uncommitted oplog write that can exist with out-of-order writes when a later
-timestamped write happens to commit first. Oplog holes can exist in-memory and persisted on disk.
-
-**oplogReadTimestamp**: The timestamp used for WT forward cursor oplog reads in order to avoid
-advancing past oplog holes. Tracks in-memory oplog holes.
-
-**oplogTruncateAfterPoint**: The timestamp after which oplog entries will be truncated during
-startup recovery after an unclean shutdown. Tracks persisted oplog holes.
-
-**snapshot**: A snapshot consists of a consistent view of data in the database. In MongoDB, a
-snapshot consists of all data committed with a timestamp less than or equal to the snapshot's
-timestamp.
-
-**snapshot isolation**: A guarantee that all reads in a transaction see the same consistent snapshot
-of the database, and that all writes in a transaction had no conflicts with other concurrent writes,
-if the transaction commits.
+**snapshot**: A snapshot consists of a consistent view of data in the database. When a snapshot is
+opened with a timestamp, snapshot only shows data committed with a timestamp less than or equal
+to the snapshot's timestamp.
 
 **storage transaction**: A concept provided by a pluggable storage engine through which changes to
 data in the database can be performed. In order to satisfy the MongoDB pluggable storage engine
@@ -2244,133 +1920,3 @@ only provides guarantees within one node.
 [`BSONElement::compareElements`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonelement.cpp#L285
 [`Ordering`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/ordering.h
 [initial sync]: ../repl/README.md#initial-sync
-
-# Appendix
-
-## Collection and Index to Table relationship
-
-Creating a collection (record store) or index requires two WT operations that cannot be made
-atomic/transactional. A WT table must be created with
-[WT_SESSION::create](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a358ca4141d59c345f401c58501276bbb "WiredTiger Docs") and an insert/update must be made in the \_mdb_catalog table (MongoDB's
-catalog). MongoDB orders these as such:
-
-1. Create the WT table
-1. Update \_mdb_catalog to reference the table
-
-Note that if the process crashes in between those steps, the collection/index creation never
-succeeded. Upon a restart, the WT table is dangling and can be safely deleted.
-
-Dropping a collection/index follows the same pattern, but in reverse.
-
-1. Delete the table from the \_mdb_catalog
-1. [Drop the WT table](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#adf785ef53c16d9dcc77e22cc04c87b70 "WiredTiger Docs")
-
-In this case, if a crash happens between these steps and the change to the \_mdb_catalog was made
-durable (in modern versions, only possible via a checkpoint; the \_mdb_catalog is not logged), the
-WT table is once again dangling on restart. Note that in the absense of a history, this state is
-indistinguishable from the creation case, establishing a strong invariant.
-
-## Cherry-picked WT log Details
-
-- The WT log is a write ahead log. Before a [transaction commit](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a712226eca5ade5bd123026c624468fa2 "WiredTiger Docs") returns to the application, logged writes
-  must have their log entry bytes written into WiredTiger's log buffer. Depending on `sync` setting,
-  those bytes may or may not be on disk.
-- MongoDB only chooses to log writes to a subset of WT's tables (e.g: the oplog).
-- MongoDB does not `sync` the log on transaction commit. But rather uses the [log
-  flush](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a1843292630960309129dcfe00e1a3817 "WiredTiger Docs") API. This optimization is two-fold. Writes that do not require to be
-  persisted do not need to wait for durability on disk. Second, this pattern allows for batching
-  of writes to go to disk for improved throughput.
-- WiredTiger's log is similar to MongoDB's oplog in that multiple writers can concurrently copy
-  their bytes representing a log record into WiredTiger's log buffer similar to how multiple
-  MongoDB writes can concurrently generate oplog entries.
-- MongoDB's optime generator for the oplog is analogous to WT's LSN (log sequence number)
-  generator. Both are a small critical section to ensure concurrent writes don't get the same
-  timestamp key/memory address to write an oplog entry value/log bytes into.
-- While MongoDB's oplog writes are logical (the key is a timestamp), WT's are obviously more
-  physical (the key is a memory->disk location). WiredTiger is writing to a memory buffer. Thus before a
-  transaction commit can go to the log buffer to "request a slot", it must know how many bytes it's
-  going to write. Compare this to a multi-statement transaction replicating as a single applyOps
-  versus each statement generating an individual oplog entry for each write that's part of the
-  transaction.
-- MongoDB testing sometimes uses a [WT debugging
-  option](https://github.com/mongodb/mongo/blob/a7bd84dc5ad15694864526612bceb3877672d8a9/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L601 "Github") that will write "no-op" log entries for other operations performed on a
-  transaction. Such as setting a timestamp or writing to a table that is not configured to be
-  written to WT's log (e.g: a typical user collection and index).
-
-The most important WT log entry for MongoDB is one that represents an insert into the
-oplog.
-
-```
-  { "lsn" : [1,57984],
-    "hdr_flags" : "compressed",
-    "rec_len" : 384,
-    "mem_len" : 423,
-    "type" : "commit",
-    "txnid" : 118,
-    "ops": [
-		{ "optype": "row_put",
-		  "fileid": 14 0xe,
-		  "key": "\u00e8^\u00eat@\u00ff\u00ff\u00df\u00c2",
-		  "key-hex": "e85eea7440ffffdfc2",
-		  "value": "\u009f\u0000\u0000\u0000\u0002op\u0000\u0002\u0000\u0000\u0000i\u0000\u0002ns\u0000\n\u0000\u0000\u0000test.coll\u0000\u0005ui\u0000\u0010\u0000\u0000\u0000\u0004\u0017\u009d\u00b0\u00fc\u00b2,O\u0004\u0084\u00bdY\u00e9%\u001dm\u00ba\u0003o\u00002\u0000\u0000\u0000\u0007_id\u0000^\u00eatA\u00d4\u0098\u00b7\u008bD\u009b\u00b2\u008c\u0002payload\u0000\u000f\u0000\u0000\u0000data and bytes\u0000\u0000\u0011ts\u0000\u0002\u0000\u0000\u0000At\u00ea^\u0012t\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\twall\u0000\u0085\u001e\u00d6\u00c3r\u0001\u0000\u0000\u0012v\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
-		  "value-bson": {
-				u'ns': u'test.coll',
-				u'o': {u'_id': ObjectId('5eea7441d498b78b449bb28c'), u'payload': u'data and bytes'},
-				u'op': u'i',
-				u't': 1L,
-				u'ts': Timestamp(1592423489, 2),
-				u'ui': UUID('179db0fc-b22c-4f04-84bd-59e9251d6dba'),
-				u'v': 2L,
-				u'wall': datetime.datetime(2020, 6, 17, 19, 51, 29, 157000)}
-      }
-    ]
-  }
-```
-
-- `lsn` is a log sequence number. The WiredTiger log files are named with numbers as a
-  suffix, e.g: `WiredTigerLog.0000000001`. In this example, the LSN's first value `1` maps to log
-  file `0000000001`. The second value `57984` is the byte offset in the file.
-- `hdr_flags` stands for header flags. Think HTTP headers. MongoDB configures WiredTiger to use
-  snappy compression on its journal entries. Small journal entries (< 128 bytes?) won't be
-  compressed.
-- `rec_len` is the number of bytes for the record
-- `type` is...the type of journal entry. The type will be `commit` for application's committing a
-  transaction. Other types are typically for internal WT operations. Examples include `file_sync`,
-  `checkpoint` and `system`.
-- `txnid` is WT's transaction id associated with the log record.
-- `ops` is a list of operations that are part of the transaction. A transaction that inserts two
-  documents and removes a third will see three entries. Two `row_put` operations followed by a
-  `row_remove`.
-- `ops.fileid` refers to the WT table that the operation is performed against. The fileid mapping
-  is held in the `WiredTiger.wt` file (a table within itself). This value is faked for WT's
-  logging debug mode for tables which MongoDB is not logging.
-- `ops.key` and `ops.value` are the binary representations of the inserted document (`value` is omitted
-  for removal).
-- `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
-
-[copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
-[Multiversion concurrency control]: https://en.wikipedia.org/wiki/Multiversion_concurrency_control
-
-## Table of MongoDB <-> WiredTiger <-> Log version numbers
-
-| MongoDB                | WiredTiger | Log |
-| ---------------------- | ---------- | --- |
-| 3.0.15                 | 2.5.3      | 1   |
-| 3.2.20                 | 2.9.2      | 1   |
-| 3.4.15                 | 2.9.2      | 1   |
-| 3.6.4                  | 3.0.1      | 2   |
-| 4.0.16                 | 3.1.1      | 3   |
-| 4.2.1                  | 3.2.2      | 3   |
-| 4.2.6                  | 3.3.0      | 3   |
-| 4.2.6 (blessed by 4.4) | 3.3.0      | 4   |
-| 4.4.0                  | 10.0.0     | 5   |
-| 5.0.0                  | 10.0.1     | 5   |
-| 4.4.11, 5.0.6          | 10.0.2     | 5   |
-| 6.0.0                  | 10.0.2     | 5   |
-| 6.1.0                  | 11.0.1     | 5   |
-| 6.2.0                  | 11.2.0     | 5   |
-| 7.0.0                  | 11.2.0     | 5   |
-| 7.1.0                  | 11.2.0     | 5   |
-| 7.2.0                  | 11.3.0     | 5   |
-| 7.3.0                  | 11.3.0     | 5   |
-| 8.0.0                  | 11.3.0     | 5   |
