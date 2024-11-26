@@ -281,6 +281,14 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataSensitiveType) {
     ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
 }
 
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataVectorType) {
+    BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Vector));
+    BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
+    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Vector);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataBdtCustom) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Function));

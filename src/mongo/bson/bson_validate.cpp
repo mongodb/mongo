@@ -135,6 +135,7 @@ public:
                     case BinDataType::Function:
                     case BinDataType::Sensitive:
                     case BinDataType::bdtCustom:
+                    case BinDataType::Vector:
                         break;
                     case BinDataType::Column:
                         break;
