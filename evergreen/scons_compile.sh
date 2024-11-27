@@ -183,7 +183,7 @@ if [[ -n "${convert_bazel_headers_target}" ]]; then
 fi
 
 eval ${compile_env} $python ./buildscripts/scons.py \
-  ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
+  ${compile_flags} ${task_compile_flags} ${bazel_build_tags} ${task_compile_flags_extra} \
   ${scons_cache_args} $extra_args \
   ${targets} MONGO_VERSION=${version} ${patch_compile_flags} | tee scons_stdout.log
 exit_status=$?

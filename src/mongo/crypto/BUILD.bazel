@@ -404,6 +404,7 @@ mongo_cc_unit_test(
         "//bazel/config:mongo_crypto_openssl": ["jwt_test.cpp"],
         "//conditions:default": [],
     }),
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":aead_encryption",
         ":encrypted_field_config",
@@ -431,6 +432,7 @@ mongo_cc_unit_test(
         "jws_validated_token_test.cpp",
         "jws_validator_test.cpp",
     ],
+    tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
         "//bazel/config:mongo_crypto_openssl": [],
         "//conditions:default": ["@platforms//:incompatible"],
