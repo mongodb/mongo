@@ -73,6 +73,22 @@ overrides:
     - task: buildscripts_test
       exec_timeout: 15
 
+  windows-debug-suggested:
+    - task: buildscripts_test
+      exec_timeout: 15
+
+  enterprise-windows-wtdevelop:
+    - task: buildscripts_test
+      exec_timeout: 15
+
+  windows:
+    - task: buildscripts_test
+      exec_timeout: 15
+
+  enterprise-windows:
+    - task: buildscripts_test
+      exec_timeout: 15
+
   macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
