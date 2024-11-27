@@ -136,8 +136,6 @@ tasks:
         "auth",
         "common",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -181,8 +179,6 @@ tasks:
         "aggregation",
         "unwind",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -205,8 +201,6 @@ tasks:
         "no_async",
         "requires_large_host",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -296,8 +290,6 @@ tasks:
         "no_async",
         "sharded",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -313,8 +305,6 @@ tasks:
         "read_write_concern",
         "requires_large_host",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -347,8 +337,6 @@ tasks:
         "sharded",
         "requires_large_host",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -365,8 +353,6 @@ tasks:
         "sharded",
         "requires_large_host",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -1510,8 +1496,6 @@ tasks:
         "aggregation",
         "common",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -1604,8 +1588,6 @@ tasks:
   - <<: *task_template
     name: aggregation_repeat_queries_multiplan_single_solutions
     tags: ["assigned_to_jira_team_server_query_optimization", "default"]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"

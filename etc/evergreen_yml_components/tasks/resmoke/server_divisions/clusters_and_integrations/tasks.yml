@@ -902,8 +902,6 @@ tasks:
         "aggregation",
         "encrypt",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -921,8 +919,6 @@ tasks:
         "encrypt",
         "gcm",
       ]
-    depends_on:
-      - name: aggregation
     commands:
       - func: "do setup"
       - func: "run tests"
