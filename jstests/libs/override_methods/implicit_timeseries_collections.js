@@ -310,7 +310,7 @@ QuerySettingsIndexHintsTests.prototype.assertIndexScanStage = function(cmd, expe
 QuerySettingsUtils.prototype.assertQueryFramework = function({query, settings, expectedEngine}) {
     // Find commands and aggregations which don't match the constraints from SERVER-88211 are
     // not eligible for SBE on timeseries collections.
-    // TODO SERVER-95264 Extend the support for SBE Pushdowns for time series queries.
+    // TODO SERVER-92864 Remove this exclusion when timeseries queries support running in SBE.
     if (query["find"] || (expectedEngine === "sbe" && !checkSbeFullFeatureFlagEnabled(db))) {
         jsTestLog(
             "Skipping assertions because sbe conditions for timeseries collections are not met.");
