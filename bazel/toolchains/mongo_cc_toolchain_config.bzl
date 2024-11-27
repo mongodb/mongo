@@ -711,6 +711,19 @@ def _impl(ctx):
         ],
     )
 
+    # We do not define an ABI that must be stable from build to build, so inconsistent hardware
+    # interference sizes between builds does not affect correctness.
+    no_interference_size_warning_feature = feature(
+        name = "no_interference_size_warning",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-interference-size"])],
+            ),
+        ],
+    )
+
     features = [
         bin_dirs_feature,
         default_compile_flags_feature,
@@ -751,6 +764,7 @@ def _impl(ctx):
         pessimizing_move_warning_feature,
         no_invalid_offsetof_warning_feature,
         no_class_memaccess_warning_feature,
+        no_interference_size_warning_feature,
     ]
 
     return [
