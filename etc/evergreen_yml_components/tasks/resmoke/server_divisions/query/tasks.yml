@@ -1211,20 +1211,6 @@ tasks:
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           npm_command: jstestfuzz
 
-  - <<: *gen_task_template
-    name: parallel_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_query_execution",
-        "release_critical",
-        "misc_js",
-        "parallel",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
   ## jstestfuzz standalone fuzzer for checking find equivalence with and without plan cache ##
   - <<: *jstestfuzz_template
     name: query_fuzzer_plan_cache_gen

@@ -148,43 +148,6 @@ tests.push(function testUncaughtExceptionInNativeCode() {
                tojson(error.stack));
 });
 
-tests.push(function testUncaughtExceptionFromNestedThreads() {
-    const thread = new Thread(function myFunction1() {
-        /* eslint-disable-next-line no-restricted-syntax */
-        load("jstests/libs/legacyThreadSupport.js");
-
-        const thread = new Thread(function myFunction2() {
-            /* eslint-disable-next-line no-restricted-syntax */
-            load("jstests/libs/legacyThreadSupport.js");
-
-            const thread = new Thread(function myFunction3() {
-                throw new Error("Intentionally thrown inside Thread");
-            });
-
-            thread.start();
-            thread.join();
-        });
-
-        thread.start();
-        thread.join();
-    });
-    thread.start();
-
-    const error = assert.throws(() => thread.join());
-    assert(/Intentionally thrown inside Thread/.test(error.message),
-           () => "Exception didn't include the message from the exception thrown in Thread: " +
-               tojson(error.message));
-    assert(/myFunction3@/.test(error.stack),
-           () => "Exception doesn't contain stack frames from within the innermost Thread: " +
-               tojson(error.stack));
-    assert(/myFunction2@/.test(error.stack),
-           () => "Exception doesn't contain stack frames from within an inner Thread: " +
-               tojson(error.stack));
-    assert(/myFunction1@/.test(error.stack),
-           () => "Exception doesn't contain stack frames from within the outermost Thread: " +
-               tojson(error.stack));
-});
-
 /* main */
 
 tests.forEach((test) => {

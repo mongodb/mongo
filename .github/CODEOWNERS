@@ -679,11 +679,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/ocsp/OWNERS.yml
 /jstests/ocsp/**/* @10gen/server-security @svc-auto-approve-bot
 
-# The following patterns are parsed from ./jstests/parallel/OWNERS.yml
-/jstests/parallel/**/* @10gen/server-programmability @svc-auto-approve-bot
-/jstests/parallel/**/insert.js @10gen/server-storage-execution @svc-auto-approve-bot
-/jstests/parallel/**/del.js @10gen/server-storage-execution @svc-auto-approve-bot
-
 # The following patterns are parsed from ./jstests/query_golden/OWNERS.yml
 /jstests/query_golden/**/* @10gen/query-optimization @svc-auto-approve-bot
 
