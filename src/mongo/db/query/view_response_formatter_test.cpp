@@ -52,12 +52,32 @@ TEST(ViewResponseFormatter, FormatInitialCountResponseSuccessfully) {
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), builder.obj());
 }
 
+TEST(ViewResponseFormatter, FormatInitialCountResponseWithNumberLong) {
+    CursorResponse cr(
+        testNss, testCursor, {BSON("count" << std::numeric_limits<long long>::max())});
+    ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
+    BSONObjBuilder builder;
+    ASSERT_OK(formatter.appendAsCountResponse(&builder, boost::none));
+    ASSERT_BSONOBJ_EQ(BSON("n" << std::numeric_limits<long long>::max() << "ok" << 1),
+                      builder.obj());
+}
+
 TEST(ViewResponseFormatter, FormatSubsequentCountResponseSuccessfully) {
     CursorResponse cr(testNss, testCursor, {BSON("count" << 7)});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::SubsequentResponse));
     BSONObjBuilder builder;
     ASSERT_OK(formatter.appendAsCountResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), builder.obj());
+}
+
+TEST(ViewResponseFormatter, FormatSubsequentCountResponseWithLong) {
+    CursorResponse cr(
+        testNss, testCursor, {BSON("count" << std::numeric_limits<long long>::max())});
+    ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::SubsequentResponse));
+    BSONObjBuilder builder;
+    ASSERT_OK(formatter.appendAsCountResponse(&builder, boost::none));
+    ASSERT_BSONOBJ_EQ(BSON("n" << std::numeric_limits<long long>::max() << "ok" << 1),
+                      builder.obj());
 }
 
 TEST(ViewResponseFormatter, FormatInitialCountResponseWithTenantIdSuccessfully) {
