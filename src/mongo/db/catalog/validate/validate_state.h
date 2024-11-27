@@ -66,12 +66,6 @@ namespace CollectionValidation {
  * Contains information about the collection being validated and the user provided validation
  * options. Additionally it maintains the state of shared objects throughtout the validation, such
  * as locking, cursors and data throttling.
- *
- * TODO (SERVER-93766): Do not subclass ValidationOptions. Going forward we want a clean separation
- * between immutable preconditions of the validation (which needs to be logged in advance), and
- * mutable runtime-state of the validation (which needs to be accounted for memory-limiting
- * purposes), at present ValidateState does both jobs, hence the best idiom ever:
- * subclass-which-takes-a-parent-instance-in-its-constructor paradigm.
  */
 class ValidateState : public ValidationOptions {
     ValidateState(const ValidateState&) = delete;
