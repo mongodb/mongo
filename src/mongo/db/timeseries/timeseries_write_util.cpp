@@ -106,9 +106,10 @@ MONGO_FAIL_POINT_DEFINE(runPostCommitDebugChecks);
 
 // Return a verifierFunction that is used to perform a data integrity check on inserts into
 // a compressed column.
-doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> sortedMeasurements,
-                                            std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                                            OperationSource source) {
+doc_diff::VerifierFunc makeVerifierFunction(
+    std::vector<write_ops_utils::details::Measurement> sortedMeasurements,
+    std::shared_ptr<bucket_catalog::WriteBatch> batch,
+    OperationSource source) {
     return [sortedMeasurements = std::move(sortedMeasurements), batch, source](
                const BSONObj& docToWrite, const BSONObj& pre) {
         timeseriesDataIntegrityCheckFailureUpdate.executeIf(
@@ -123,43 +124,44 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
             [&source](const BSONObj&) { return source == OperationSource::kTimeseriesUpdate; });
 
         using AddAttrsFn = std::function<void(logv2::DynamicAttributes&)>;
-        auto failed =
-            [&sortedMeasurements, &batch, &docToWrite, &pre](
-                StringData reason, AddAttrsFn addAttrsWithoutData, AddAttrsFn addAttrsWithData) {
-                logv2::DynamicAttributes attrs;
-                attrs.add("reason", reason);
-                attrs.add("bucketId", batch->bucketId.oid);
-                attrs.add("collectionUUID", batch->bucketId.collectionUUID);
-                addAttrsWithoutData(attrs);
+        auto failed = [&sortedMeasurements, &batch, &docToWrite, &pre](
+                          StringData reason,
+                          AddAttrsFn addAttrsWithoutData,
+                          AddAttrsFn addAttrsWithData) {
+            logv2::DynamicAttributes attrs;
+            attrs.add("reason", reason);
+            attrs.add("bucketId", batch->bucketId.oid);
+            attrs.add("collectionUUID", batch->bucketId.collectionUUID);
+            addAttrsWithoutData(attrs);
 
-                LOGV2_WARNING(
-                    8807500, "Failed data verification inserting into compressed column", attrs);
+            LOGV2_WARNING(
+                8807500, "Failed data verification inserting into compressed column", attrs);
 
-                attrs = {};
-                auto seqLogDataFields = [](const details::Measurement& measurement) {
-                    return logv2::seqLog(measurement.dataFields);
-                };
-                auto measurementsAttr = logv2::seqLog(
-                    boost::make_transform_iterator(sortedMeasurements.begin(), seqLogDataFields),
-                    boost::make_transform_iterator(sortedMeasurements.end(), seqLogDataFields));
-                attrs.add("measurements", measurementsAttr);
-                auto preAttr = base64::encode(pre.objdata(), pre.objsize());
-                attrs.add("pre", preAttr);
-                auto bucketAttr = base64::encode(docToWrite.objdata(), docToWrite.objsize());
-                attrs.add("bucket", bucketAttr);
-                addAttrsWithData(attrs);
-
-                LOGV2_WARNING_OPTIONS(8807501,
-                                      logv2::LogTruncation::Disabled,
-                                      "Failed data verification inserting into compressed column",
-                                      attrs);
-
-                invariant(!TestingProctor::instance().isEnabled());
-                tasserted(timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
-                                                               batch->bucketId.oid,
-                                                               batch->bucketId.keySignature),
-                          "Failed data verification inserting into compressed column");
+            attrs = {};
+            auto seqLogDataFields = [](const write_ops_utils::details::Measurement& measurement) {
+                return logv2::seqLog(measurement.dataFields);
             };
+            auto measurementsAttr = logv2::seqLog(
+                boost::make_transform_iterator(sortedMeasurements.begin(), seqLogDataFields),
+                boost::make_transform_iterator(sortedMeasurements.end(), seqLogDataFields));
+            attrs.add("measurements", measurementsAttr);
+            auto preAttr = base64::encode(pre.objdata(), pre.objsize());
+            attrs.add("pre", preAttr);
+            auto bucketAttr = base64::encode(docToWrite.objdata(), docToWrite.objsize());
+            attrs.add("bucket", bucketAttr);
+            addAttrsWithData(attrs);
+
+            LOGV2_WARNING_OPTIONS(8807501,
+                                  logv2::LogTruncation::Disabled,
+                                  "Failed data verification inserting into compressed column",
+                                  attrs);
+
+            invariant(!TestingProctor::instance().isEnabled());
+            tasserted(timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
+                                                           batch->bucketId.oid,
+                                                           batch->bucketId.keySignature),
+                      "Failed data verification inserting into compressed column");
+        };
 
         auto actualMeta = docToWrite.getField(kBucketMetaFieldName);
         auto expectedMeta = batch->bucketKey.metadata.element();
@@ -393,7 +395,7 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     bool changedToUnsorted,
-    const std::vector<details::Measurement>& sortedMeasurements) {
+    const std::vector<write_ops_utils::details::Measurement>& sortedMeasurements) {
 
     // Verifier function that will be called when we apply the diff to our bucket and verify that
     // the measurements we inserted appear correctly in the resulting bucket's BSONColumns.
@@ -799,14 +801,14 @@ BSONObj makeTimeseriesInsertCompressedBucketDocument(
 }  // namespace
 
 namespace details {
-std::vector<Measurement> sortMeasurementsOnTimeField(
+std::vector<write_ops_utils::details::Measurement> sortMeasurementsOnTimeField(
     std::shared_ptr<bucket_catalog::WriteBatch> batch) {
-    std::vector<Measurement> measurements;
+    std::vector<write_ops_utils::details::Measurement> measurements;
 
     // Convert measurements in batch from BSONObj to vector of data fields.
     // Store timefield separate to allow simple sort.
     for (auto& measurementObj : batch->measurements) {
-        Measurement measurement;
+        write_ops_utils::details::Measurement measurement;
         for (auto& dataField : measurementObj) {
             StringData key = dataField.fieldNameStringData();
             if (key == batch->bucketKey.metadata.getMetaField()) {
@@ -822,25 +824,14 @@ std::vector<Measurement> sortMeasurementsOnTimeField(
 
     std::sort(measurements.begin(),
               measurements.end(),
-              [](const Measurement& lhs, const Measurement& rhs) {
+              [](const write_ops_utils::details::Measurement& lhs,
+                 const write_ops_utils::details::Measurement& rhs) {
                   return lhs.timeField.date() < rhs.timeField.date();
               });
 
     return measurements;
 }
 }  // namespace details
-
-write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateCommandRequest& wholeOp,
-                                                    size_t opIndex) {
-    write_ops::UpdateCommandRequest singleUpdateOp(wholeOp.getNamespace(),
-                                                   {wholeOp.getUpdates()[opIndex]});
-    auto& commandBase = singleUpdateOp.getWriteCommandRequestBase();
-    commandBase.setOrdered(wholeOp.getOrdered());
-    commandBase.setBypassDocumentValidation(wholeOp.getBypassDocumentValidation());
-    commandBase.setBypassEmptyTsReplacement(wholeOp.getBypassEmptyTsReplacement());
-
-    return singleUpdateOp;
-}
 
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
     uassert(
@@ -1013,7 +1004,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     BucketDocument bucketDoc;
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        std::vector<details::Measurement> sortedMeasurements =
+        std::vector<write_ops_utils::details::Measurement> sortedMeasurements =
             details::sortMeasurementsOnTimeField(batch);
 
         // Insert measurements, and appropriate skips, into all column builders.
@@ -1072,7 +1063,8 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
 
 
     bool changedToUnsorted = false;
-    std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
+    std::vector<write_ops_utils::details::Measurement> sortedMeasurements =
+        sortMeasurementsOnTimeField(batch);
     if (batch->bucketIsSortedByTime &&
         sortedMeasurements.begin()->timeField.timestamp() <
             batch->measurementMap.timeOfLastMeasurement(batch->timeField)) {

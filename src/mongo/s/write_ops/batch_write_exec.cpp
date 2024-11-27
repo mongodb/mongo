@@ -57,7 +57,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/remote_command_response.h"
@@ -599,7 +599,7 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
     }
 
     auto wholeOp = clientRequest.getUpdateRequest();
-    auto singleUpdateOp = timeseries::buildSingleUpdateOp(wholeOp, index);
+    auto singleUpdateOp = timeseries::write_ops::buildSingleUpdateOp(wholeOp, index);
     BatchedCommandRequest singleUpdateRequest(singleUpdateOp);
     const auto stmtId = write_ops::getStmtIdForWriteAt(wholeOp, index);
 

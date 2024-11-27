@@ -35,7 +35,6 @@
 #include <string>
 #include <utility>
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -45,7 +44,6 @@ namespace mongo {
 
 class BSONObj;
 class ExtensionsCallback;
-class NamespaceString;
 class OperationContext;
 
 /**

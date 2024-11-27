@@ -132,6 +132,7 @@
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -1533,7 +1534,7 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
 
     size_t nextOpIndex = 0;
     for (auto&& singleOp : wholeOp.getUpdates()) {
-        auto singleUpdateOp = timeseries::buildSingleUpdateOp(wholeOp, nextOpIndex);
+        auto singleUpdateOp = timeseries::write_ops::buildSingleUpdateOp(wholeOp, nextOpIndex);
         const auto stmtId = write_ops::getStmtIdForWriteAt(wholeOp, nextOpIndex++);
 
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();

@@ -52,16 +52,10 @@
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/write_ops/measurement.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo::timeseries {
-
-/**
- * Constructs an update request using a single update statement at position `opIndex`.
- */
-mongo::write_ops::UpdateCommandRequest buildSingleUpdateOp(
-    const mongo::write_ops::UpdateCommandRequest& wholeOp, size_t opIndex);
-
 
 /**
  * Asserts the buckets collection exists and has valid time-series options.
@@ -346,20 +340,10 @@ getPostCommitDebugChecks(OperationContext*, const NamespaceString&);
 
 namespace details {
 /**
- * Helper for measurement sorting.
- * timeField: {"<timeField>": "2022-06-06T15:34:30.000Z"}
- * dataFields: [{"<timefield>": 2022-06-06T15:34:30.000Z}, {"a": 1}, {"b": 2}]
- */
-struct Measurement {
-    BSONElement timeField;
-    std::vector<BSONElement> dataFields;
-};
-
-/**
  * Returns collection of measurements sorted on time field.
  * Filters out meta field from input and does not include it in output.
  */
-std::vector<Measurement> sortMeasurementsOnTimeField(
+std::vector<write_ops_utils::details::Measurement> sortMeasurementsOnTimeField(
     std::shared_ptr<bucket_catalog::WriteBatch> batch);
 }  // namespace details
 }  // namespace mongo::timeseries

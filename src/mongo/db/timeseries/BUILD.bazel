@@ -109,6 +109,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog:rollover.h",
         "//src/mongo/db/timeseries/bucket_catalog:tracking_contexts.h",
         "//src/mongo/db/timeseries/bucket_catalog:write_batch.h",
+        "//src/mongo/db/timeseries/write_ops:measurement.h",
         "//src/mongo/db/catalog:collection.h",
         "//src/mongo/db/catalog:index_catalog.h",
         "//src/mongo/db/catalog:index_catalog_entry.h",

@@ -4,8 +4,11 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files(
     [
+        "measurement.h",
         "timeseries_write_ops.cpp",
         "timeseries_write_ops.h",
+        "timeseries_write_ops_utils.cpp",
+        "timeseries_write_ops_utils.h",
     ],
 )
 
@@ -35,5 +38,18 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/transaction",
         "//src/mongo/db/update:update_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_write_ops_utils",
+    srcs = [
+        "timeseries_write_ops_utils.cpp",
+    ],
+    hdrs = [
+        "timeseries_write_ops_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
     ],
 )
