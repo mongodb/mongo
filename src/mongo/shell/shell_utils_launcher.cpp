@@ -40,7 +40,6 @@
 #include <iterator>
 #include <map>
 #include <memory>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <system_error>
@@ -89,6 +88,7 @@
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/signal_win32.h"  // IWYU pragma: keep
 #include "mongo/util/text.h"          // IWYU pragma: keep
@@ -146,12 +146,12 @@ void retryWithBackOff(std::function<void(void)> func) {
 #endif
 
 // Filters lines that match the regex pattern
-std::string filterLinesWithRegex(const std::string& input, const std::regex& pattern) {
+std::string filterLinesWithRegex(const std::string& input, const pcre::Regex& regex) {
     std::stringstream ss(input);
     std::string line;
     std::ostringstream result;
     while (std::getline(ss, line)) {
-        if (std::regex_search(line, pattern)) {
+        if (regex.match(line)) {
             result << line << std::endl;
         }
     }
@@ -178,9 +178,9 @@ BSONObj RawMongoProgramOutput(const BSONObj& args, void* data) {
             "A regex pattern must be provided as the only argument. Please ensure you pass a valid "
             "regex string to filter the logs.",
             !singleArg(args).isNaN());
-    std::string regex = singleArg(args).String();
-    std::regex pattern(regex);
-    programLog = filterLinesWithRegex(programLog, pattern);
+    std::string regexPattern = singleArg(args).String();
+    pcre::Regex regex(regexPattern);
+    programLog = filterLinesWithRegex(programLog, regex);
     std::size_t sz = programLog.size();
     uassert(ErrorCodes::BadValue,
             "The filtered logs exceed the BSONObjMaxUserSize limit of 16MB. Please use a more "
