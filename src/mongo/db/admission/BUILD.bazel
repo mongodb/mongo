@@ -41,6 +41,7 @@ mongo_cc_library(
     hdrs = [
         "ticketholder_manager.h",
     ],
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:test_commands_enabled",
