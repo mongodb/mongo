@@ -144,6 +144,18 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
                 static_library = static_lib if cc_shared_library == None else None,
                 alwayslink = True,
             )
+
+            # For some reason Bazel isn't deduplicating the user link flags, which leads to them accumulating
+            # with each layer added. Deduplicate them manually.
+            all_user_link_flags = dict()
+            for flag in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags:
+                all_user_link_flags[flag] = True
+            for input in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[1:]:
+                for flag in input.user_link_flags:
+                    if flag in all_user_link_flags:
+                        all_user_link_flags.pop(flag)
+            all_user_link_flags = [flag for flag, _ in all_user_link_flags.items()]
+
             linker_input = cc_common.create_linker_input(
                 owner = ctx.label,
                 libraries = depset(direct = [direct_lib]),
