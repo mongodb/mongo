@@ -137,8 +137,8 @@ bool readAndInsertNextBatch(DBClientConnection* const conn,
     auto docBuilder = BSONArrayBuilder{};
     auto currentObjSize = 0;
     auto lineFromFile = std::string{};
-    for (readLine(fileToRead, lineFromFile); !fileToRead.eof();
-         readLine(fileToRead, lineFromFile)) {
+    while (!fileToRead.eof()) {
+        readLine(fileToRead, lineFromFile);
         currentObjSize += lineFromFile.size();
         docBuilder.append(fromFuzzerJson(lineFromFile));
         if (currentObjSize > 100000) {
@@ -148,9 +148,15 @@ bool readAndInsertNextBatch(DBClientConnection* const conn,
             return true;
         }
     }
-    bob.append("documents", docBuilder.arr());
-    auto cmd = bob.done();
-    runCommandAssertOK(conn, cmd, dbName);
+    // Don't actually issue the insert if no documents were found.
+    if (currentObjSize > 0) {
+        bob.append("documents", docBuilder.arr());
+        auto cmd = bob.done();
+        runCommandAssertOK(conn, cmd, dbName);
+    } else {
+        std::cerr << "Found no further documents to insert, so skipping the insert call."
+                  << std::endl;
+    }
     return false;
 }
 
@@ -162,7 +168,8 @@ bool readAndLoadCollFile(DBClientConnection* const conn,
     verifyFileStreamGood(collFile, filePath, "Failed to open file");
     // Read in indexes.
     readAndBuildIndexes(conn, dbName, collName, collFile);
-    for (auto needMore = readAndInsertNextBatch(conn, dbName, collName, collFile); needMore;
+    for (auto needMore = readAndInsertNextBatch(conn, dbName, collName, collFile);
+         needMore && !collFile.eof();
          needMore = readAndInsertNextBatch(conn, dbName, collName, collFile)) {
         verifyFileStreamGood(collFile, filePath, "Failed to read batch");
     }
