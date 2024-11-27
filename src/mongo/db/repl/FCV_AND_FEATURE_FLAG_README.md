@@ -148,84 +148,84 @@ for more information on how to add upgrade/downgrade code to the command.
 
 1.  **Transition to `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y`**
 
-        * In the first part, we start transition to `requestedVersion` by [updating the local FCV document to a
+    - In the first part, we start transition to `requestedVersion` by [updating the local FCV document to a
+      `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y` state](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L430-L437), respectively.
 
-    `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y` state](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L430-L437), respectively.
+    - Transitioning to one of the `kUpgradingFrom_X_To_Y`/`kDowngradingFrom_X_To_Y` states updates
+      the FCV document in `admin.system.version` with a new `targetVersion` field. Transitioning to a
+      `kDowngradingFrom_X_to_Y` state in particular will also add a `previousVersion` field along with the
+      `targetVersion` field. These updates are done with `writeConcern: majority`.
 
-        * Transitioning to one of the `kUpgradingFrom_X_To_Y`/`kDowngradingFrom_X_To_Y` states updates
+    - Transitioning to one of the `kUpgradingFrom_X_To_Y`/`kDowngradingFrom_X_to_Y`/`kVersion_Y`(on
+      upgrade) states [sets the `minWireVersion` to `WireVersion::LATEST_WIRE_VERSION`](https://github.com/mongodb/mongo/blob/386b1c0c74aa24c306f0ef5bcbde892aec89c8f6/src/mongo/db/op_observer/fcv_op_observer.cpp#L69)
+      and also [closes all incoming connections from internal clients with lower binary versions](https://github.com/mongodb/mongo/blob/386b1c0c74aa24c306f0ef5bcbde892aec89c8f6/src/mongo/db/op_observer/fcv_op_observer.cpp#L76-L82).
+      The reason we do this on `kDowngradingFrom_X_to_Y` is because we shouldn’t decrease the
+      minWireVersion until we have fully downgraded to the lower FCV in case we get any backwards
+      compatibility breakages, since during `kDowngradingFrom_X_to_Y` we may still be stopping/cleaning up
+      any features from the upgraded FCV. In essence, a node with the upgraded FCV/binary should not be
+      able to communicate with downgraded binary nodes until the FCV is completely downgraded to `kVersion_Y`.
 
-    the FCV document in `admin.system.version` with a new `targetVersion` field. Transitioning to a
-    `kDowngradingFrom_X_to_Y` state in particular will also add a `previousVersion` field along with the
-    `targetVersion` field. These updates are done with `writeConcern: majority`.
+    - **This step is expected to be fast and always succeed** (except if the request parameters fail validation
+      e.g. if the requested FCV is not a valid transition).
 
-        * Transitioning to one of the `kUpgradingFrom_X_To_Y`/`kDowngradingFrom_X_to_Y`/`kVersion_Y`(on
+      Some examples of on-disk representations of the upgrading and downgrading states:
 
-    upgrade) states [sets the `minWireVersion` to `WireVersion::LATEST_WIRE_VERSION`](https://github.com/mongodb/mongo/blob/386b1c0c74aa24c306f0ef5bcbde892aec89c8f6/src/mongo/db/op_observer/fcv_op_observer.cpp#L69)
-    and also [closes all incoming connections from internal clients with lower binary versions](https://github.com/mongodb/mongo/blob/386b1c0c74aa24c306f0ef5bcbde892aec89c8f6/src/mongo/db/op_observer/fcv_op_observer.cpp#L76-L82).
-    The reason we do this on `kDowngradingFrom_X_to_Y` is because we shouldn’t decrease the
-    minWireVersion until we have fully downgraded to the lower FCV in case we get any backwards
-    compatibility breakages, since during `kDowngradingFrom_X_to_Y` we may still be stopping/cleaning up
-    any features from the upgraded FCV. In essence, a node with the upgraded FCV/binary should not be
-    able to communicate with downgraded binary nodes until the FCV is completely downgraded to `kVersion_Y`.
+      ```
+      kUpgradingFrom_5_0_To_5_1:
+      {
+          version: 5.0,
+          targetVersion: 5.1
+      }
 
-        * **This step is expected to be fast and always succeed** (except if the request parameters fail validation
-        e.g. if the requested FCV is not a valid transition).
+      kDowngradingFrom_5_1_To_5_0:
+      {
+          version: 5.0,
+          targetVersion: 5.0,
+          previousVersion: 5.1
+      }
+      ```
 
-Some examples of on-disk representations of the upgrading and downgrading states:
+2.  **Run [`_prepareToUpgrade` or `_prepareToDowngrade`](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L497-L501):**
 
-```
-kUpgradingFrom_5_0_To_5_1:
-{
-    version: 5.0,
-    targetVersion: 5.1
-}
+    - First, we do any actions to prepare for upgrade/downgrade that must be taken before the global lock.
+      For example, we cancel serverless migrations in this step.
+    - Then, the global lock is acquired in shared
+      mode and then released immediately. This creates a barrier and guarantees safety for operations
+      that acquire the global lock either in exclusive or intent exclusive mode. If these operations begin
+      and acquire the global lock prior to the FCV change, they will proceed in the context of the old
+      FCV, and will guarantee to finish before the FCV change takes place. For the operations that begin
+      after the FCV change, they will see the updated FCV and behave accordingly. This also means that
+      in order to make this barrier truly safe, **in any given operation, we should only check the
+      feature flag/FCV after acquiring the appropriate locks**. See the [section about setFCV locks](#setfcv-locks)
+      for more information on the locks used in the setFCV command.
+    - Finally, we check for any user data or settings that will be incompatible on
+      the new FCV, and uassert with the `CannotUpgrade` or `CannotDowngrade` code if the user needs to manually clean up
+      incompatible user data. This is especially important on downgrade.
+    - If an FCV downgrade fails at this point, the user can either remove the incompatible user data and retry the FCV downgrade, or they can upgrade the FCV back to the original FCV.
+    - On this part no metadata cleanup is performed yet.
 
-kDowngradingFrom_5_1_To_5_0:
-{
-    version: 5.0,
-    targetVersion: 5.0,
-    previousVersion: 5.1
-}
-```
+3.  **Complete any [upgrade or downgrade specific code](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L524-L528), done in `_runUpgrade` or `_runDowngrade`.** This may include metadata cleanup.
 
-2. **Run [`_prepareToUpgrade` or `_prepareToDowngrade`](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L497-L501):**
-   _ First, we do any actions to prepare for upgrade/downgrade that must be taken before the global lock.
-   For example, we cancel serverless migrations in this step.
-   _ Then, the global lock is acquired in shared
-   mode and then released immediately. This creates a barrier and guarantees safety for operations
-   that acquire the global lock either in exclusive or intent exclusive mode. If these operations begin
-   and acquire the global lock prior to the FCV change, they will proceed in the context of the old
-   FCV, and will guarantee to finish before the FCV change takes place. For the operations that begin
-   after the FCV change, they will see the updated FCV and behave accordingly. This also means that
-   in order to make this barrier truly safe, **in any given operation, we should only check the
-   feature flag/FCV after acquiring the appropriate locks**. See the [section about setFCV locks](#setfcv-locks)
-   for more information on the locks used in the setFCV command.
-   _ Finally, we check for any user data or settings that will be incompatible on
-   the new FCV, and uassert with the `CannotUpgrade` or `CannotDowngrade` code if the user needs to manually clean up
-   incompatible user data. This is especially important on downgrade.
-   _ If an FCV downgrade fails at this point, the user can either remove the incompatible user data and retry the FCV downgrade, or they can upgrade the FCV back to the original FCV. \* On this part no metadata cleanup is performed yet.
+    - For upgrade, we update metadata to make sure the new features in the upgraded version work for
+      both sharded and non-sharded clusters.
+    - For downgrade, we transition from `kDowngradingFrom_X_to_Y` to
+      `isCleaningServerMetadata`, which indicates that we have started [cleaning up internal server metadata](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1495). Transitioning to
+      `isCleaningServerMetadata` will add a `isCleaningServerMetadata` field, which will be removed upon
+      transitioning to `kVersion_Y`. This update is also done using `writeConcern: majority`.
+      After this point, if the FCV downgrade fails, it is no longer safe to transition back to the original
+      upgraded FCV, and the user must retry the FCV downgrade. Then we perform any internal server downgrade cleanup.
 
-3. **Complete any [upgrade or downgrade specific code](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L524-L528), done in `_runUpgrade` or `_runDowngrade`.** This may include metadata cleanup.
-   _ For upgrade, we update metadata to make sure the new features in the upgraded version work for
-   both sharded and non-sharded clusters.
-   _ For downgrade, we transition from `kDowngradingFrom_X_to_Y` to
-   `isCleaningServerMetadata`, which indicates that we have started [cleaning up internal server metadata](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1495). Transitioning to
-   `isCleaningServerMetadata` will add a `isCleaningServerMetadata` field, which will be removed upon
-   transitioning to `kVersion_Y`. This update is also done using `writeConcern: majority`.
-   After this point, if the FCV downgrade fails, it is no longer safe to transition back to the original
-   upgraded FCV, and the user must retry the FCV downgrade. Then we perform any internal server downgrade cleanup.
+      Examples on-disk representation of the `isCleaningServerMetadata` state:
 
-Examples on-disk representation of the `isCleaningServerMetadata` state:
-
-```
-isCleaningServerMetadata after kDowngradingFrom_5_1_To_5_0:
-{
-    version: 5.0,
-    targetVersion: 5.0,
-    previousVersion: 5.1,
-    isCleaningServerMetadata: true
-}
-```
+      ```
+      isCleaningServerMetadata after kDowngradingFrom_5_1_To_5_0:
+      {
+          version: 5.0,
+          targetVersion: 5.0,
+          previousVersion: 5.1,
+          isCleaningServerMetadata: true
+      }
+      ```
 
 4.  Finally, we [complete transition](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L541-L548) by updating the
     local FCV document to the fully upgraded or downgraded version. As part of transitioning to the
@@ -234,10 +234,10 @@ isCleaningServerMetadata after kDowngradingFrom_5_1_To_5_0:
     reflect the new upgraded or downgraded state. This update is also done using `writeConcern: majority`.
     The new in-memory FCV value will be updated to reflect the on-disk changes.
 
-        * Note that for an FCV upgrade, we do an extra step to run `_finalizeUpgrade` **after** updating
-        the FCV document to fully upgraded. This is for any tasks that cannot be done until after the
-        FCV is fully upgraded, because during `_runUpgrade`, the FCV is still in the transitional state
-        (which behaves like the downgraded FCV)
+    - Note that for an FCV upgrade, we do an extra step to run `_finalizeUpgrade` **after** updating
+      the FCV document to fully upgraded. This is for any tasks that cannot be done until after the
+      FCV is fully upgraded, because during `_runUpgrade`, the FCV is still in the transitional state
+      (which behaves like the downgraded FCV)
 
 ## The SetFCV Command on Sharded Clusters
 
