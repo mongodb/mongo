@@ -405,16 +405,6 @@ void resetSignalHandlers(const std::vector<int>& blocked) {
 #endif
 
 void startSignalProcessingThread(LogFileStatus rotate) {
-#if defined(__linux__)
-    enableSignalTesting.execute([](const BSONObj& data) {
-        auto periodMsElement = data["periodMs"];
-        static constexpr Milliseconds defaultPeriod = Milliseconds(25);
-        Milliseconds periodMs =
-            periodMsElement.eoo() ? defaultPeriod : Milliseconds(periodMsElement.numberInt());
-        startSignalTestingThread(periodMs);
-    });
-#endif  // __linux__
-
 #ifdef _WIN32
     stdx::thread(eventProcessingThread).detach();
 #else
@@ -442,6 +432,16 @@ void startSignalProcessingThread(LogFileStatus rotate) {
     // Spawn a thread to capture the signals we just masked off.
     stdx::thread(signalProcessingThread, rotate).detach();
 #endif
+
+#if defined(__linux__)
+    enableSignalTesting.execute([](const BSONObj& data) {
+        auto periodMsElement = data["periodMs"];
+        static constexpr Milliseconds defaultPeriod = Milliseconds(25);
+        Milliseconds periodMs =
+            periodMsElement.eoo() ? defaultPeriod : Milliseconds(periodMsElement.numberInt());
+        startSignalTestingThread(periodMs);
+    });
+#endif  // __linux__
 }
 
 #ifdef _WIN32
