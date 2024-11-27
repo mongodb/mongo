@@ -8,7 +8,7 @@
 
 #pragma once
 
-#define WT_CHECKPOINT_SESSION_FLAGS (WT_SESSION_CAN_WAIT | WT_SESSION_IGNORE_CACHE_SIZE)
+#include "checkpoint_private.h"
 
 /*
  * Inactive should always be 0. Other states are roughly ordered by appearance in the checkpoint
@@ -44,3 +44,29 @@ struct __wt_checkpoint_cleanup {
     WT_CONDVAR *cond;         /* checkpoint cleanup wait mutex */
     uint64_t interval;        /* Checkpoint cleanup interval */
 };
+
+/* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
+
+extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_checkpoint_progress(WT_SESSION_IMPL *session, bool closing);
+extern void __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize);
+extern void __wt_checkpoint_tree_reconcile_update(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta);
+
+#ifdef HAVE_UNITTEST
+
+#endif
+
+/* DO NOT EDIT: automatically built by prototypes.py: END */

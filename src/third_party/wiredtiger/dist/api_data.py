@@ -629,7 +629,7 @@ connection_runtime_config = [
             if true, control all dirty page evictions through forcing update restore eviction.''',
             type='boolean'),
         Config('eviction_checkpoint_ts_ordering', 'false', r'''
-            if true, act as if eviction is being run in parallel to checkpoint. We should return 
+            if true, act as if eviction is being run in parallel to checkpoint. We should return
             EBUSY in eviction if we detect any timestamp ordering issue.''',
             type='boolean'),
         ]),
@@ -652,6 +652,12 @@ connection_runtime_config = [
                 If no in-memory ref is found on the root page, attempt to locate a random
                 in-memory page by examining all entries on the root page.''',
                 type='boolean'),
+            Config('evict_use_softptr', 'false', r'''
+                Experimental: Use "soft pointers" instead of hard hazard
+                pointers in eviction server to remember its walking position in the tree. This might
+                be preferable to set to "true" if there are many collections. It can improve or
+                degrade performance depending on the workload.''',
+                type='boolean', undoc=True),
             ]),
     Config('eviction_checkpoint_target', '1', r'''
         perform eviction at the beginning of checkpoints to bring the dirty content in cache

@@ -521,6 +521,7 @@ struct __wt_connection_stats {
     int64_t eviction_server_skip_pages_retry;
     int64_t eviction_server_skip_unwanted_pages;
     int64_t eviction_server_skip_unwanted_tree;
+    int64_t eviction_server_skip_trees_too_many_active_walks;
     int64_t eviction_server_skip_checkpointing_trees;
     int64_t eviction_server_skip_trees_stick_in_cache;
     int64_t eviction_server_skip_trees_eviction_disabled;

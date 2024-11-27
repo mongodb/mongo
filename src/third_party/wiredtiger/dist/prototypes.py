@@ -23,7 +23,7 @@ from collections import defaultdict
 # instead of in src/include/. As a result all relevant code is contained to a single folder. 
 # Adding modules to this list will automatically generate those headers, and we expect this list to 
 # grow as we modularise the code base.
-SELF_CONTAINED_MODULES = ["evict", "log", "reconcile"]
+SELF_CONTAINED_MODULES = ["checkpoint", "evict", "log", "reconcile"]
 
 DO_NOT_EDIT_BEGIN = "/* DO NOT EDIT: automatically built by prototypes.py: BEGIN */\n"
 DO_NOT_EDIT_END = "/* DO NOT EDIT: automatically built by prototypes.py: END */\n"

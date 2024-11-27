@@ -50,6 +50,8 @@ src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
 src/call_log/call_log.c
+src/checkpoint/checkpoint_conn.c
+src/checkpoint/checkpoint_txn.c
 src/checksum/arm64/crc32-arm64.c                ARM64_HOST
 src/checksum/loongarch64/crc32-loongarch64.c    LOONGARCH64_HOST
 src/checksum/power8/crc32_wrapper.c             POWERPC_HOST
@@ -78,7 +80,6 @@ src/conn/conn_cache.c
 src/conn/conn_cache_pool.c
 src/conn/conn_capacity.c
 src/conn/conn_chunkcache.c
-src/conn/conn_ckpt.c
 src/conn/conn_compact.c
 src/conn/conn_dhandle.c
 src/conn/conn_handle.c
@@ -237,7 +238,6 @@ src/tiered/tiered_config.c
 src/tiered/tiered_handle.c
 src/tiered/tiered_work.c
 src/txn/txn.c
-src/txn/txn_ckpt.c
 src/txn/txn_log.c
 src/txn/txn_recover.c
 src/txn/txn_timestamp.c

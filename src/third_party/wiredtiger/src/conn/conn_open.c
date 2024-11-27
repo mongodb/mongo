@@ -97,7 +97,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
      * down before the eviction server, and shut all servers down before closing open data handles.
      */
     WT_TRET(__wti_background_compact_server_destroy(session));
-    WT_TRET(__wti_checkpoint_server_destroy(session));
+    WT_TRET(__wt_checkpoint_server_destroy(session));
     WT_TRET(__wti_statlog_destroy(session, true));
     WT_TRET(__wti_tiered_storage_destroy(session, false));
     WT_TRET(__wti_sweep_destroy(session));
@@ -277,7 +277,7 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wti_capacity_server_create(session, cfg));
 
     /* Start the optional checkpoint thread. */
-    WT_RET(__wti_checkpoint_server_create(session, cfg));
+    WT_RET(__wt_checkpoint_server_create(session, cfg));
 
     /* Start pre-fetch utilities. */
     WT_RET(__wti_prefetch_create(session, cfg));

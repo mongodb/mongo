@@ -849,11 +849,9 @@ err:
  *     Internal implementation of the WT_SESSION.alter method.
  */
 static int
-__session_alter_internal(WT_SESSION_IMPL *session, const char *uri, const char *config)
+__session_alter_internal(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
     WT_DECL_RET;
-
-    SESSION_API_CALL(session, ret, alter, config, cfg);
 
     /* In-memory ignores alter operations. */
     if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
@@ -862,12 +860,6 @@ __session_alter_internal(WT_SESSION_IMPL *session, const char *uri, const char *
     /* Disallow objects in the WiredTiger name space. */
     WT_ERR(__wt_str_name_check(session, uri));
 
-    /*
-     * We replace the default configuration listing with the current configuration. Otherwise the
-     * defaults for values that can be altered would override settings used by the user in create.
-     */
-    cfg[0] = cfg[1];
-    cfg[1] = NULL;
     WT_WITH_CHECKPOINT_LOCK(
       session, WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_alter(session, uri, cfg)));
 
@@ -876,7 +868,7 @@ err:
         WT_STAT_CONN_INCR(session, session_table_alter_fail);
     else
         WT_STAT_CONN_INCR(session, session_table_alter_success);
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    return (ret);
 }
 
 /*
@@ -925,20 +917,28 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL(session, ret, alter, config, cfg);
+    /*
+     * We replace the default configuration listing with the current configuration. Otherwise the
+     * defaults for values that can be altered would override settings used by the user in create.
+     */
+    cfg[0] = cfg[1];
+    cfg[1] = NULL;
 
     /*
      * Alter table can return EBUSY error when the table is modified in parallel by eviction. Retry
      * the command after performing a system wide checkpoint. Only retry once to avoid potentially
      * waiting forever.
      */
-    ret = __session_alter_internal(session, uri, config);
+    WT_ERR_ERROR_OK(__session_alter_internal(session, uri, cfg), EBUSY, true);
     if (ret == EBUSY) {
-        WT_RET(__session_blocking_checkpoint(session));
+        WT_ERR(__session_blocking_checkpoint(session));
         WT_STAT_CONN_INCR(session, session_table_alter_trigger_checkpoint);
-        ret = __session_alter_internal(session, uri, config);
+        ret = __session_alter_internal(session, uri, cfg);
     }
 
-    return (ret);
+err:
+    API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*

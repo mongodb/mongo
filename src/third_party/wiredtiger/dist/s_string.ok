@@ -1250,6 +1250,7 @@ sn
 snaplen
 snapsort
 snprintf
+softptr
 sortable
 sp
 spinlock
