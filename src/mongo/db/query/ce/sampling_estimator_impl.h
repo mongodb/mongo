@@ -54,7 +54,9 @@ public:
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
                           SamplingStyle samplingStyle,
-                          CardinalityEstimate collectionCard);
+                          CardinalityEstimate collectionCard,
+                          SamplingConfidenceIntervalEnum ci,
+                          double marginOfError);
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -116,6 +118,8 @@ protected:
     double getCollCard() const {
         return _collectionCard.cardinality().v();
     }
+
+    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError);
 
     // The sample is stored in memory for estimating the cardinality of all predicates of one query
     // request. The sample will be freed on destruction of the SamplingEstimator instance or when a

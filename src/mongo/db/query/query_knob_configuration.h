@@ -47,6 +47,8 @@ public:
 
     QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp() const;
     QueryPlanRankerModeEnum getPlanRankerMode() const;
+    SamplingConfidenceIntervalEnum getConfidenceInterval() const;
+
     bool getSbeDisableGroupPushdownForOp() const;
     bool getSbeDisableLookupPushdownForOp() const;
     bool getSbeDisableTimeSeriesForOp() const;
@@ -68,6 +70,7 @@ public:
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
     QueryPlanRankerModeEnum _planRankerMode;
+    SamplingConfidenceIntervalEnum _samplingConfidenceInterval;
     size_t _planEvaluationMaxResults;
     size_t _maxScansToExplodeValue;
     bool _sbeDisableGroupPushdownValue;

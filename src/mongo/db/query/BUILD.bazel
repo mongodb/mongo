@@ -325,6 +325,7 @@ mongo_cc_library(
         "plan_ranker_mode.cpp",
         "query_feature_flags_gen",
         "query_knobs_gen",
+        "sampling_confidence_interval.cpp",
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
     ],

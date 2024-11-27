@@ -64,6 +64,14 @@ enums:
             kHeuristicCE: "heuristicCE"
             kMultiPlanning: "multiPlanning"
 
+    SamplingConfidenceInterval:
+        description: "Enum for supported confidence intervals for sampling estimates."
+        type: string
+        values:
+            k90: "90"
+            k95: "95"
+            k99: "99"
+
 structs:
   InternalQueryCutoffForSampleFromRandomCursorStorage:
     description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
@@ -1454,6 +1462,31 @@ server_parameters:
       data: synchronized_value<QueryPlanRankerModeEnum>
     default:
       expr: QueryPlanRankerModeEnum::kMultiPlanning
+    redact: false
+
+  samplingConfidenceInterval:
+    description: "Define target confidence interval for sampling cardinality estimates used for
+    cost-based optimization. Supported values are 90%, 95%, and 99%."
+    set_at: [ startup, runtime ]
+    cpp_class:
+      name: SamplingConfidenceInterval
+      data: synchronized_value<SamplingConfidenceIntervalEnum>
+    default:
+      expr: SamplingConfidenceIntervalEnum::k95
+    redact: false
+
+  samplingMarginOfError:
+    description: "Define target margin of error for sampling cardinality estimates used for
+    cost-based optimization. Default value 5%. Limit values to the interval [1, 10].
+    Margins of error smaller than 1% require too large sample size. Margins of error larger
+    than 10% lead to very wide confidence interval and poor estimate accuracy."
+    set_at: [ startup, runtime ]
+    cpp_varname: samplingMarginOfError
+    cpp_vartype: AtomicDouble
+    default: 5.0
+    validator:
+       gte: 1.0
+       lte: 10.0
     redact: false
 
 # Note for adding additional query knobs:

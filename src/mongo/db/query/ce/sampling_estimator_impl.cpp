@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/ce/sampling_estimator_impl.h"
 
+#include <cmath>
+
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -38,6 +40,8 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/platform/basic.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::ce {
 std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeCanonicalQuery(
@@ -54,12 +58,42 @@ std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeCanonicalQuery(
     return std::move(statusWithCQ.getValue());
 }
 
-/*
- * The sample size is calculated based on the confidence level and margin of error required.
+namespace {
+/**
+ * Help function mapping confidence intervals to Z-scores.
+ * A "95 confidence interval" means that 95% of the observations (in our case CEs computed from
+ * samples) lie within that interval. The interval is defined based on a number of standard
+ * deviations(Z-score) from the mean. The Z-score for 95% interval is 1.96, meaning that 95% of the
+ * observations lie within 1.96 standard deviations from the mean.
+ * https://en.wikipedia.org/wiki/Standard_score
  */
-size_t SamplingEstimatorImpl::calculateSampleSize() {
-    // TODO SERVER-94063: Calculate the sample size.
-    return 500;
+double getZScore(SamplingConfidenceIntervalEnum confidenceInterval) {
+    switch (confidenceInterval) {
+        case SamplingConfidenceIntervalEnum::k90:
+            return 1.645;
+        case SamplingConfidenceIntervalEnum::k95:
+            return 1.96;
+        case SamplingConfidenceIntervalEnum::k99:
+            return 2.576;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+}  // namespace
+
+/*
+ * The sample size is calculated based on the confidence level and margin of error(MoE) required.
+ * n = Z^2 / W^2
+ * where Z is the z-score for the confidence interval and
+ * W is the width of the confidence interval, W = 2 * MoE.
+ */
+size_t SamplingEstimatorImpl::calculateSampleSize(SamplingConfidenceIntervalEnum ci,
+                                                  double marginOfError) {
+    uassert(9406301, "Margin of error should be larger than 0.", marginOfError > 0);
+    double z = getZScore(ci);
+    double ciWidth = 2 * marginOfError / 100.0;
+
+    return static_cast<size_t>(std::lround((z * z) / (ciWidth * ciWidth)));
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
@@ -191,6 +225,11 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
       _sampleSize(sampleSize),
       _collectionCard(collectionCard) {
 
+    uassert(9406300,
+            "Sample size cannot be larger than collection cardinality. The sample size can be "
+            "reduced by choosing a larger margin of error.",
+            (double)sampleSize <= collectionCard.cardinality().v());
+
     if (samplingStyle == SamplingStyle::kRandom) {
         generateRandomSample();
     } else {
@@ -201,9 +240,14 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
                                              SamplingStyle samplingStyle,
-                                             CardinalityEstimate collectionCard)
-    : SamplingEstimatorImpl(
-          opCtx, collections, calculateSampleSize(), samplingStyle, collectionCard) {}
+                                             CardinalityEstimate collectionCard,
+                                             SamplingConfidenceIntervalEnum ci,
+                                             double marginOfError)
+    : SamplingEstimatorImpl(opCtx,
+                            collections,
+                            calculateSampleSize(ci, marginOfError),
+                            samplingStyle,
+                            collectionCard) {}
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
