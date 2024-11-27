@@ -77,7 +77,6 @@ mongo_cc_library(
         "shard_key_pattern.h",
         "shard_targeting_helpers.h",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:common",

@@ -146,7 +146,6 @@ mongo_cc_library(
         "-lcrypto",
         "-lssl",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
     target_compatible_with = select({
         "//bazel/config:linux_x86_64": [],
         "//bazel/config:linux_aarch64": [],

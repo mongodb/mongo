@@ -1415,7 +1415,6 @@ def mongo_cc_library(
         additional_linker_inputs = [],
         features = [],
         exec_properties = {},
-        no_undefined_ref_DO_NOT_USE = True,
         **kwargs):
     """Wrapper around cc_library.
 
@@ -1550,14 +1549,6 @@ def mongo_cc_library(
         "//bazel/config:windows_x86_64": [],
     })
 
-    if no_undefined_ref_DO_NOT_USE:
-        undefined_ref_flag = select({
-            "//conditions:default": ["-Wl,-z,defs"],
-            "//bazel/config:sanitize_address_required_settings": [],
-        })
-    else:
-        undefined_ref_flag = []
-
     create_header_dep(
         name = name + HEADER_DEP_SUFFIX,
         header_deps = header_deps,
@@ -1633,7 +1624,7 @@ def mongo_cc_library(
         deps = [name + WITH_DEBUG_SUFFIX],
         visibility = visibility,
         tags = tags,
-        user_link_flags = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags,
+        user_link_flags = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags,
         target_compatible_with = select({
             "//bazel/config:linkstatic_disabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
