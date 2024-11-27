@@ -1014,14 +1014,8 @@ common --bes_keywords=engflow:BuildScmStatus={status}
 
 def setup_bazel_env_vars() -> None:
     # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-    if platform.machine().lower() == "ppc64le":
-        Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.ppc64le"
-        )
-    elif platform.machine().lower() == "s390x":
-        Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.s390x"
-        )
+    if platform.machine().lower() in {"ppc64le", "s390x"}:
+        Globals.bazel_env_variables["JAVA_HOME"] = "/usr/lib/jvm/java-21-openjdk"
 
 
 def setup_max_retry_attempts() -> None:

@@ -45,9 +45,9 @@ fi
 
 # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
 if [[ $ARCH == "ppc64le" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.ppc64le"
+  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
 elif [[ $ARCH == "s390x" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.s390x"
+  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
 fi
 
 # Print command being run to file that can be uploaded
