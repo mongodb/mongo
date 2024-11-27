@@ -11,7 +11,7 @@ from evergreen import EvergreenApi
 
 # pylint: disable=wrong-import-position
 import buildscripts.ciconfig.evergreen as _evergreen
-from buildscripts.burn_in_tests import TaskInfo
+from buildscripts.burn_in_tests import TaskToBurnInInfo, SuiteToBurnInInfo
 from buildscripts.patch_builds.selected_tests.selected_tests_client import SelectedTestsClient, \
     TestMappingsResponse, TestMapping, TestFileInstance, TaskMappingsResponse, TaskMapInstance, \
     TaskMapping
@@ -274,27 +274,29 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
         exclude_task_mock.return_value = False
         tests_by_task = {
             "jsCore_auth":
-                TaskInfo(
+                TaskToBurnInInfo(
                     display_task_name="task 1",
-                    tests=[
-                        "jstests/core/currentop_waiting_for_latch.js",
-                        "jstests/core/latch_analyzer.js",
+                    suites=[
+                        SuiteToBurnInInfo(
+                            name="core_auth",
+                            resmoke_args="",
+                            tests=[
+                                "jstests/core/currentop_waiting_for_latch.js",
+                                "jstests/core/latch_analyzer.js",
+                            ],
+                        ),
                     ],
-                    resmoke_args="",
-                    require_multiversion_setup=False,
-                    distro="",
-                    suite="core_auth",
-                    build_variant="dummy_variant",
                 ),
             "auth_gen":
-                TaskInfo(
+                TaskToBurnInInfo(
                     display_task_name="task 2",
-                    tests=["jstests/auth/auth3.js"],
-                    resmoke_args="",
-                    require_multiversion_setup=False,
-                    distro="",
-                    suite="auth",
-                    build_variant="dummy_variant",
+                    suites=[
+                        SuiteToBurnInInfo(
+                            name="auth",
+                            resmoke_args="",
+                            tests=["jstests/auth/auth3.js"],
+                        ),
+                    ],
                 ),
         }
 
@@ -319,17 +321,18 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
         exclude_task_mock.return_value = True
         tests_by_task = {
             "jsCore_auth":
-                TaskInfo(
+                TaskToBurnInInfo(
                     display_task_name="task 1",
-                    tests=[
-                        "jstests/core/currentop_waiting_for_latch.js",
-                        "jstests/core/latch_analyzer.js",
+                    suites=[
+                        SuiteToBurnInInfo(
+                            name="core",
+                            resmoke_args="",
+                            tests=[
+                                "jstests/core/currentop_waiting_for_latch.js",
+                                "jstests/core/latch_analyzer.js",
+                            ],
+                        ),
                     ],
-                    resmoke_args="",
-                    require_multiversion_setup=False,
-                    distro="",
-                    suite="core",
-                    build_variant="dummy_variant",
                 ),
         }
 
@@ -344,17 +347,18 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
         find_task_mock.return_value = None
         tests_by_task = {
             "jsCore_auth":
-                TaskInfo(
+                TaskToBurnInInfo(
                     display_task_name="task 1",
-                    tests=[
-                        "jstests/core/currentop_waiting_for_latch.js",
-                        "jstests/core/latch_analyzer.js",
+                    suites=[
+                        SuiteToBurnInInfo(
+                            name="core",
+                            resmoke_args="",
+                            tests=[
+                                "jstests/core/currentop_waiting_for_latch.js",
+                                "jstests/core/latch_analyzer.js",
+                            ],
+                        ),
                     ],
-                    resmoke_args="",
-                    require_multiversion_setup=False,
-                    distro="",
-                    suite="core",
-                    build_variant="dummy_variant",
                 ),
         }
 

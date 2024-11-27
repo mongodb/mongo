@@ -141,6 +141,22 @@ tasks:
       vars:
         resmoke_args: "--storageEngine=wiredTiger"
 
+- name: resmoke_multiversion_task_gen
+  depends_on:
+    - name: compile
+  commands:
+    - func: "initialize multiversion tasks"
+      vars:
+        multiversion_sanity_check_last_continuous_new_new_old: last_continuous
+        multiversion_sanity_check_last_continuous_new_old_new: last_continuous
+        multiversion_sanity_check_last_continuous_old_new_new: last_continuous
+        multiversion_sanity_check_last_lts_new_new_old: last_lts
+        multiversion_sanity_check_last_lts_new_old_new: last_lts
+        multiversion_sanity_check_last_lts_old_new_new: last_lts
+    - func: "generate resmoke tasks"
+      vars:
+        resmoke_args: "--storageEngine=wiredTiger"
+
 
 modules:
 - name: render-module
@@ -183,6 +199,7 @@ buildvariants:
   - debian-stretch
   tasks:
   - name: resmoke_task
+  - name: resmoke_multiversion_task_gen
 - name: amazon
   display_name: "! Amazon"
   run_on:

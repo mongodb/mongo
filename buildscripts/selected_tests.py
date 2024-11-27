@@ -35,7 +35,7 @@ from buildscripts.task_generation.task_types.resmoke_tasks import ResmokeGenTask
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
 from buildscripts.burn_in_tests import DEFAULT_REPO_LOCATIONS, create_task_list_for_tests, \
-    TaskInfo
+    TaskToBurnInInfo
 from buildscripts.ciconfig.evergreen import (
     EvergreenProjectConfig,
     Task,
@@ -172,7 +172,7 @@ class TaskConfigService:
                 task_vars = task_def.get("vars", {})
                 break
 
-        task_vars.update({"suite": task.get_suite_name()})
+        task_vars.update({"suite": task.get_suite_names()[0]})
 
         task_name = task.name[:-4] if task.name.endswith("_gen") else task.name
         return {
@@ -182,7 +182,7 @@ class TaskConfigService:
             "large_distro_name": build_variant_config.expansion("large_distro_name"),
         }
 
-    def get_task_configs_for_test_mappings(self, tests_by_task: Dict[str, TaskInfo],
+    def get_task_configs_for_test_mappings(self, tests_by_task: Dict[str, TaskToBurnInInfo],
                                            build_variant_config: Variant) -> Dict[str, dict]:
         """
         For test mappings, generate a dict containing task names and their config settings.
@@ -196,7 +196,8 @@ class TaskConfigService:
             task = _find_task(build_variant_config, task_name)
             if task and not _exclude_task(task):
                 evg_task_config = self.get_evg_task_config(task, build_variant_config)
-                evg_task_config.update({"selected_tests_to_run": set(test_list_info.tests)})
+                evg_task_config.update(
+                    {"selected_tests_to_run": set(test_list_info.collect_suite_tests())})
                 evg_task_configs[task.name] = evg_task_config
 
         return evg_task_configs

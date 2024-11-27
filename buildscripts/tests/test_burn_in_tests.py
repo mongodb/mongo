@@ -4,18 +4,19 @@ from __future__ import absolute_import
 
 import collections
 import datetime
-from io import StringIO
 import os
-import sys
 import subprocess
+import sys
 import unittest
+from io import StringIO
 
-from mock import Mock, patch, MagicMock
 import yaml
+from mock import MagicMock, Mock, patch
 
 import buildscripts.burn_in_tests as under_test
-from buildscripts.ciconfig.evergreen import parse_evergreen_file, VariantTask
 import buildscripts.resmokelib.parser as _parser
+from buildscripts.ciconfig.evergreen import parse_evergreen_file
+
 _parser.set_run_options()
 
 # pylint: disable=missing-docstring,protected-access,too-many-lines,no-self-use
@@ -23,10 +24,16 @@ _parser.set_run_options()
 
 def create_tests_by_task_mock(n_tasks, n_tests):
     return {
-        f"task_{i}_gen": under_test.TaskInfo(display_task_name=f"task_{i}", resmoke_args="", tests=[
-            f"jstests/tests_{j}" for j in range(n_tests)
-        ], require_multiversion_setup=False, distro=f"distro_{i}", suite=f"suite_{i}",
-                                             build_variant="dummy_variant")
+        f"task_{i}_gen": under_test.TaskToBurnInInfo(
+            display_task_name=f"task_{i}",
+            suites=[
+                under_test.SuiteToBurnInInfo(
+                    name=f"suite_{i}",
+                    resmoke_args="",
+                    tests=[f"jstests/tests_{j}" for j in range(n_tests)],
+                ),
+            ],
+        )
         for i in range(n_tasks)
     }
 
@@ -294,9 +301,8 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     variant_task = MagicMock()
     variant_task.name = task_name
     variant_task.generated_task_name = task_name
-    variant_task.get_suite_name.return_value = suite_name
-    variant_task.resmoke_args = f"--suites={suite_name}"
-    variant_task.require_multiversion_setup.return_value = False
+    variant_task.get_suite_names.return_value = [suite_name]
+    variant_task.combined_suite_to_resmoke_args_map = {suite_name: f"--suites={suite_name}"}
     variant_task.run_on = [distro]
     return variant_task
 
@@ -304,11 +310,9 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
 class TestTaskInfo(unittest.TestCase):
     def test_non_generated_task(self):
         suite_name = "suite_1"
-        distro_name = "distro_1"
-        variant = "build_variant"
         evg_conf_mock = MagicMock()
         evg_conf_mock.get_task.return_value.is_generate_resmoke_task = False
-        task_mock = create_variant_task_mock("task 1", suite_name, distro_name)
+        task_mock = create_variant_task_mock("task 1", suite_name)
         test_list = [f"test{i}.js" for i in range(3)]
         tests_by_suite = {
             suite_name: test_list,
@@ -316,91 +320,11 @@ class TestTaskInfo(unittest.TestCase):
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
 
-        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
+        task_info = under_test.TaskToBurnInInfo.from_task(task_mock, tests_by_suite)
 
-        self.assertIn(suite_name, task_info.resmoke_args)
+        self.assertIn(suite_name, task_info.suites[0].name)
         for test in test_list:
-            self.assertIn(test, task_info.tests)
-        self.assertFalse(task_info.require_multiversion_setup)
-        self.assertEqual(distro_name, task_info.distro)
-
-    def test_generated_task_no_large_on_task(self):
-        suite_name = "suite_1"
-        distro_name = "distro_1"
-        variant = "build_variant"
-        evg_conf_mock = MagicMock()
-        task_def_mock = evg_conf_mock.get_task.return_value
-        task_def_mock.is_generate_resmoke_task = True
-        task_def_mock.generate_resmoke_tasks_command = {"vars": {}}
-        task_mock = create_variant_task_mock("task 1", suite_name, distro_name)
-        test_list = [f"test{i}.js" for i in range(3)]
-        tests_by_suite = {
-            suite_name: test_list,
-            "suite 2": [f"test{i}.js" for i in range(1)],
-            "suite 3": [f"test{i}.js" for i in range(2)],
-        }
-
-        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
-
-        self.assertIn(suite_name, task_info.resmoke_args)
-        for test in test_list:
-            self.assertIn(test, task_info.tests)
-        self.assertFalse(task_info.require_multiversion_setup)
-        self.assertEqual(distro_name, task_info.distro)
-
-    def test_generated_task_no_large_on_build_variant(self):
-        suite_name = "suite_1"
-        distro_name = "distro_1"
-        variant = "build_variant"
-        evg_conf_mock = MagicMock()
-        task_def_mock = evg_conf_mock.get_task.return_value
-        task_def_mock.is_generate_resmoke_task = True
-        task_def_mock.generate_resmoke_tasks_command = {"vars": {"use_large_distro": True}}
-        task_mock = create_variant_task_mock("task 1", suite_name, distro_name)
-        test_list = [f"test{i}.js" for i in range(3)]
-        tests_by_suite = {
-            suite_name: test_list,
-            "suite 2": [f"test{i}.js" for i in range(1)],
-            "suite 3": [f"test{i}.js" for i in range(2)],
-        }
-
-        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
-
-        self.assertIn(suite_name, task_info.resmoke_args)
-        for test in test_list:
-            self.assertIn(test, task_info.tests)
-        self.assertFalse(task_info.require_multiversion_setup)
-        self.assertEqual(distro_name, task_info.distro)
-
-    def test_generated_task_large_distro(self):
-        suite_name = "suite_1"
-        distro_name = "distro_1"
-        large_distro_name = "large_distro_1"
-        variant = "build_variant"
-        evg_conf_mock = MagicMock()
-        task_def_mock = evg_conf_mock.get_task.return_value
-        task_def_mock.is_generate_resmoke_task = True
-        task_def_mock.generate_resmoke_tasks_command = {"vars": {"use_large_distro": True}}
-        evg_conf_mock.get_variant.return_value.raw = {
-            "expansions": {
-                "large_distro_name": large_distro_name
-            }
-        }  # yapf: disable
-        task_mock = create_variant_task_mock("task 1", suite_name, distro_name)
-        test_list = [f"test{i}.js" for i in range(3)]
-        tests_by_suite = {
-            suite_name: test_list,
-            "suite 2": [f"test{i}.js" for i in range(1)],
-            "suite 3": [f"test{i}.js" for i in range(2)],
-        }
-
-        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
-
-        self.assertIn(suite_name, task_info.resmoke_args)
-        for test in test_list:
-            self.assertIn(test, task_info.tests)
-        self.assertFalse(task_info.require_multiversion_setup)
-        self.assertEqual(large_distro_name, task_info.distro)
+            self.assertIn(test, task_info.suites[0].tests)
 
 
 class TestCreateTaskList(unittest.TestCase):
@@ -444,11 +368,9 @@ class TestCreateTaskList(unittest.TestCase):
 
         self.assertIn("task 1", task_list)
         task_info = task_list["task 1"]
-        self.assertIn("suite_1", task_info.resmoke_args)
+        self.assertIn("suite_1", task_info.suites[0].resmoke_args)
         for i in range(3):
-            self.assertIn(f"test{i}.js", task_info.tests)
-        self.assertFalse(task_info.require_multiversion_setup)
-        self.assertEqual("distro 1", task_info.distro)
+            self.assertIn(f"test{i}.js", task_info.suites[0].tests)
 
     def test_create_task_list_with_excludes(self):
         variant = "variant name"
