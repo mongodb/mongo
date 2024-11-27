@@ -634,8 +634,14 @@ private:
                                    !inProgressLookup.empty(ul));
         }();
 
-        if (!mustDoAnotherLoop)
+        if (!mustDoAnotherLoop) {
             _inProgressLookups.erase(it);
+        } else if (result.isOK()) {
+            // The fetched value can not satisfy all the enqueued refresh requests over the nss, but
+            // it can still be leveraged as a base version to perform the lookups that are still
+            // pending, optimizing the delta between the cached value and the remote one.
+            inProgressLookup.updateCachedValue(ul, ValueHandle(result.getValue()));
+        }
         ul.unlock();
 
         // The only reason this loop pops the values as it goes and std::moves into the last value
@@ -816,6 +822,10 @@ public:
         _valid = false;
         if (_cancelToken)
             _cancelToken->tryCancel();
+    }
+
+    void updateCachedValue(WithLock, ValueHandle cachedValue) {
+        _cachedValue = std::move(cachedValue);
     }
 
 private:
