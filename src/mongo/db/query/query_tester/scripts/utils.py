@@ -39,7 +39,7 @@ def extract_db_and_coll(fail_filepath: Path) -> Tuple[str, str]:
     with fail_filepath.open(encoding="utf-8") as fail_file:
         lines = [line.strip() for line in fail_file if not line.startswith("//")]
         db = lines[1]
-        coll = lines[2].replace(".coll", "")
+        coll = lines[2].replace(".coll", "").split(" as ")[-1].strip()
     return db, coll
 
 
