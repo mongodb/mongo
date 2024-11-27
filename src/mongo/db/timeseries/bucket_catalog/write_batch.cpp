@@ -35,11 +35,11 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-WriteBatch::WriteBatch(const BucketHandle& b,
+WriteBatch::WriteBatch(const BucketId& b,
                        const BucketKey& k,
                        OperationId o,
                        ExecutionStatsController& s)
-    : bucketHandle(b), bucketKey(k), opId(o), stats(s) {}
+    : bucketId(b), bucketKey(k), opId(o), stats(s) {}
 
 BSONObj WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) {

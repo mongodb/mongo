@@ -127,8 +127,7 @@ BSONObj makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batc
     processTimeseriesMeasurements(
         {batch->measurements.begin(), batch->measurements.end()}, metadata, dataBuilders);
 
-    return makeNewDocument(
-        batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
+    return makeNewDocument(batch->bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
 }
 
 BSONObj makeNewDocumentForWrite(

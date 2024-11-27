@@ -108,5 +108,9 @@ std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
  *
  * To be called from an OpObserver, e.g. in aboutToDelete and onUpdate.
  */
-void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const OID& bucketId);
+void handleDirectWrite(OperationContext* opCtx,
+                       const TimeseriesOptions& options,
+                       const StringData::ComparatorInterface* comparator,
+                       const NamespaceString& ns,
+                       const BSONObj& bucket);
 }  // namespace mongo::timeseries::bucket_catalog

@@ -131,12 +131,12 @@ BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& handle) {
-    auto const& stripe = catalog.stripes[handle.stripe];
+BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {
+    auto const& stripe = catalog.stripes[internal::getStripeNumber(catalog, bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     const Bucket* bucket =
-        internal::findBucket(catalog.bucketStateRegistry, stripe, stripeLock, handle.bucketId);
+        internal::findBucket(catalog.bucketStateRegistry, stripe, stripeLock, bucketId);
     if (!bucket) {
         return {};
     }
@@ -192,7 +192,7 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
         return getBatchStatus();
     }
 
-    auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
@@ -200,7 +200,7 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
                                                   stripeLock,
-                                                  batch->bucketHandle.bucketId,
+                                                  batch->bucketId,
                                                   internal::BucketPrepareAction::kPrepare);
 
     if (isWriteBatchFinished(*batch)) {
@@ -211,12 +211,12 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
         }
         return getBatchStatus();
     } else if (!bucket) {
-        internal::abort(catalog,
-                        stripe,
-                        stripeLock,
-                        batch,
-                        internal::getTimeseriesBucketClearedError(
-                            batch->bucketHandle.bucketId.ns, batch->bucketHandle.bucketId.oid));
+        internal::abort(
+            catalog,
+            stripe,
+            stripeLock,
+            batch,
+            internal::getTimeseriesBucketClearedError(batch->bucketId.ns, batch->bucketId.oid));
         return getBatchStatus();
     }
 
@@ -237,14 +237,14 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
 
     finishWriteBatch(*batch, info);
 
-    auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
                                                   stripeLock,
-                                                  batch->bucketHandle.bucketId,
+                                                  batch->bucketId,
                                                   internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
         bucket->preparedBatch.reset();
@@ -267,7 +267,7 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         // It's possible that we cleared the bucket in between preparing the commit and finishing
         // here. In this case, we should abort any other ongoing batches and clear the bucket from
         // the catalog so it's not hanging around idle.
-        auto it = stripe.openBucketsById.find(batch->bucketHandle.bucketId);
+        auto it = stripe.openBucketsById.find(batch->bucketId);
         if (it != stripe.openBucketsById.end()) {
             bucket = it->second.get();
             bucket->preparedBatch.reset();
@@ -311,15 +311,15 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
         return;
     }
 
-    auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     internal::abort(catalog, stripe, stripeLock, batch, status);
 }
 
-void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid) {
-    invariant(!ns.isTimeseriesBucketsCollection());
-    auto state = addDirectWrite(registry, BucketId{ns, oid});
+void directWriteStart(BucketStateRegistry& registry, const BucketId& bucketId) {
+    invariant(!bucketId.ns.isTimeseriesBucketsCollection());
+    auto state = addDirectWrite(registry, bucketId);
     hangTimeseriesDirectModificationAfterStart.pauseWhileSet();
 
     if (stdx::holds_alternative<DirectWriteCounter>(state)) {
@@ -333,10 +333,10 @@ void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, 
     throwWriteConflictException("Prepared bucket can no longer be inserted into.");
 }
 
-void directWriteFinish(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid) {
-    invariant(!ns.isTimeseriesBucketsCollection());
+void directWriteFinish(BucketStateRegistry& registry, const BucketId& bucketId) {
+    invariant(!bucketId.ns.isTimeseriesBucketsCollection());
     hangTimeseriesDirectModificationBeforeFinish.pauseWhileSet();
-    removeDirectWrite(registry, BucketId{ns, oid});
+    removeDirectWrite(registry, bucketId);
 }
 
 void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear) {
@@ -379,6 +379,17 @@ void clear(BucketCatalog& catalog, StringData dbName) {
     clear(catalog, [dbName = dbName.toString()](const NamespaceString& bucketNs) {
         return bucketNs.db() == dbName;
     });
+}
+
+BucketId extractBucketId(BucketCatalog& bucketCatalog,
+                         const TimeseriesOptions& options,
+                         const StringData::ComparatorInterface* comparator,
+                         const NamespaceString& ns,
+                         const BSONObj& bucket) {
+    const OID bucketOID = bucket[kBucketIdFieldName].OID();
+    const BSONElement metadata = bucket[kBucketMetaFieldName];
+    const BucketKey key{ns, BucketMetadata{metadata, comparator, options.getMetaField()}};
+    return {ns, bucketOID, key.signature()};
 }
 
 void resetBucketOIDCounter() {

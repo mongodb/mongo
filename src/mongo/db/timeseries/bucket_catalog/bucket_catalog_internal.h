@@ -81,9 +81,10 @@ enum class BucketPrepareAction { kPrepare, kUnprepare };
 enum class AllowQueryBasedReopening { kAllow, kDisallow };
 
 /**
- * Maps bucket key to the stripe that is responsible for it.
+ * Maps bucket identifier to the stripe that is responsible for it.
  */
-StripeNumber getStripeNumber(const BucketKey& key);
+StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketKey& key);
+StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucketId);
 
 /**
  * Extracts the information from the input 'doc' that is used to map the document to a bucket.

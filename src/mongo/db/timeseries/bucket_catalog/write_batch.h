@@ -61,14 +61,14 @@ struct CommitInfo {
  */
 struct WriteBatch {
     WriteBatch() = delete;
-    WriteBatch(const BucketHandle& bucketHandle,
+    WriteBatch(const BucketId& bucketId,
                const BucketKey& bucketKey,
                OperationId opId,
                ExecutionStatsController& stats);
 
     BSONObj toBSON() const;
 
-    const BucketHandle bucketHandle;
+    const BucketId bucketId;
     const BucketKey bucketKey;
     const OperationId opId;
     ExecutionStatsController stats;

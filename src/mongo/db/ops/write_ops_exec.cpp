@@ -2084,7 +2084,7 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
         static_cast<bool>(repl::tenantMigrationInfo(opCtx));
     write_ops::UpdateModification u(
         updateBuilder.obj(), write_ops::UpdateModification::DeltaTag{}, options);
-    auto oid = batch->bucketHandle.bucketId.oid;
+    auto oid = batch->bucketId.oid;
     write_ops::UpdateOpEntry update(BSON("_id" << oid), std::move(u));
     invariant(!update.getMulti(), oid.toString());
     invariant(!update.getUpsert(), oid.toString());
@@ -2335,7 +2335,7 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
     write_ops::UpdateCommandRequest op(
         makeTimeseriesBucketsNamespace(ns(request)),
         {makeTimeseriesTransformationOpEntry(
-            opCtx, batch->bucketHandle.bucketId.oid, std::move(bucketDecompressionFunc))});
+            opCtx, batch->bucketId.oid, std::move(bucketDecompressionFunc))});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
 }
@@ -2356,7 +2356,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             const write_ops::InsertCommandRequest& request) try {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
-    auto metadata = getMetadata(bucketCatalog, batch->bucketHandle);
+    auto metadata = getMetadata(bucketCatalog, batch->bucketId);
     auto status = prepareCommit(bucketCatalog, batch);
     if (!status.isOK()) {
         invariant(timeseries::bucket_catalog::isWriteBatchFinished(*batch));
@@ -2366,7 +2366,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
-    const auto docId = batch->bucketHandle.bucketId.oid;
+    const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
         const auto output =
@@ -2455,7 +2455,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
     // Sort by bucket so that preparing the commit for each batch cannot deadlock.
     std::sort(batchesToCommit.begin(), batchesToCommit.end(), [](auto left, auto right) {
-        return left.get()->bucketHandle.bucketId.oid < right.get()->bucketHandle.bucketId.oid;
+        return left.get()->bucketId.oid < right.get()->bucketId.oid;
     });
 
     Status abortStatus = Status::OK();
@@ -2472,7 +2472,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         std::vector<write_ops::UpdateCommandRequest> updateOps;
 
         for (auto batch : batchesToCommit) {
-            auto metadata = getMetadata(bucketCatalog, batch.get()->bucketHandle);
+            auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
             auto prepareCommitStatus = prepareCommit(bucketCatalog, batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;

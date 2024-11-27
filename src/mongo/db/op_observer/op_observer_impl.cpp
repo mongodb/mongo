@@ -993,7 +993,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     } else if (args.coll->ns() == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, args.updateArgs->updatedDoc["_id"], args.updateArgs->updatedDoc);
-    } else if (args.coll->ns().isTimeseriesBucketsCollection()) {
+    } else if (auto options = args.coll->getTimeseriesOptions(); options.has_value()) {
         if (args.updateArgs->source != OperationSource::kTimeseriesInsert) {
             auto mixedSchema = [&args] {
                 auto result = args.coll->doesTimeseriesBucketsDocContainMixedSchemaData(
@@ -1010,8 +1010,16 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                     args.coll->getTimeseriesBucketsMayHaveMixedSchemaData().value_or(false) ||
                     !mixedSchema());
 
-            OID bucketId = args.updateArgs->updatedDoc["_id"].OID();
-            timeseries::bucket_catalog::handleDirectWrite(opCtx, args.coll->ns(), bucketId);
+            timeseries::bucket_catalog::handleDirectWrite(opCtx,
+                                                          options.value(),
+                                                          args.coll->getDefaultCollator(),
+                                                          args.coll->ns(),
+                                                          args.updateArgs->preImageDoc);
+            timeseries::bucket_catalog::handleDirectWrite(opCtx,
+                                                          options.value(),
+                                                          args.coll->getDefaultCollator(),
+                                                          args.coll->ns(),
+                                                          args.updateArgs->updatedDoc);
         }
     }
 }
@@ -1029,9 +1037,9 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
 
     shardObserveAboutToDelete(opCtx, coll->ns(), doc);
 
-    if (coll->ns().isTimeseriesBucketsCollection()) {
-        OID bucketId = doc["_id"].OID();
-        timeseries::bucket_catalog::handleDirectWrite(opCtx, coll->ns(), bucketId);
+    if (auto options = coll->getTimeseriesOptions(); options.has_value()) {
+        timeseries::bucket_catalog::handleDirectWrite(
+            opCtx, options.value(), coll->getDefaultCollator(), coll->ns(), doc);
     }
 }
 

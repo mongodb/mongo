@@ -48,17 +48,14 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatch) {
 
     // Builds a write batch.
     OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
-    bucket_catalog::BucketId bucketId(ns, oid);
     std::uint8_t stripe = 0;
+    bucket_catalog::BucketId bucketId(ns, oid, stripe);
     auto opId = 0;
     bucket_catalog::ExecutionStats globalStats;
     auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
     bucket_catalog::ExecutionStatsController stats(collectionStats, globalStats);
-    auto batch =
-        std::make_shared<bucket_catalog::WriteBatch>(bucket_catalog::BucketHandle{bucketId, stripe},
-                                                     bucket_catalog::BucketKey{ns, {}},
-                                                     opId,
-                                                     stats);
+    auto batch = std::make_shared<bucket_catalog::WriteBatch>(
+        bucketId, bucket_catalog::BucketKey{ns, {}}, opId, stats);
     const std::vector<BSONObj> measurements = {
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":1,"b":1})"),
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})"),
@@ -90,17 +87,14 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
 
     // Builds a write batch.
     OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
-    bucket_catalog::BucketId bucketId(ns, oid);
     std::uint8_t stripe = 0;
+    bucket_catalog::BucketId bucketId(ns, oid, stripe);
     auto opId = 0;
     bucket_catalog::ExecutionStats globalStats;
     auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
     bucket_catalog::ExecutionStatsController stats(collectionStats, globalStats);
-    auto batch =
-        std::make_shared<bucket_catalog::WriteBatch>(bucket_catalog::BucketHandle{bucketId, stripe},
-                                                     bucket_catalog::BucketKey{ns, {}},
-                                                     opId,
-                                                     stats);
+    auto batch = std::make_shared<bucket_catalog::WriteBatch>(
+        bucketId, bucket_catalog::BucketKey{ns, {}}, opId, stats);
     const std::vector<BSONObj> measurements = {
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"meta":{"tag":1},"a":1,"b":1})"),
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"meta":{"tag":1},"a":2,"b":2})"),

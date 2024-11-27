@@ -40,34 +40,13 @@ namespace mongo::timeseries::bucket_catalog {
 /**
  * Identifier to lookup bucket by namespace and OID, with pre-computed hash.
  */
-struct BucketId {
-    using Hash = std::size_t;
-
-    BucketId() = delete;
-    BucketId(const NamespaceString& nss, const OID& oid);
-
-    NamespaceString ns;
-    OID oid;
-    Hash hash;
-
-    bool operator==(const BucketId& other) const {
-        return oid == other.oid && ns == other.ns;
-    }
-    bool operator!=(const BucketId& other) const {
-        return !(*this == other);
-    }
-
-    template <typename H>
-    friend H AbslHashValue(H h, const BucketId& bucketId) {
-        return H::combine(std::move(h), bucketId.oid, bucketId.ns);
-    }
-};
 
 /**
  * Key to lookup open Bucket for namespace and metadata, with pre-computed hash.
  */
 struct BucketKey {
     using Hash = std::size_t;
+    using Signature = std::uint32_t;
 
     BucketKey() = delete;
     BucketKey(const NamespaceString& nss, const BucketMetadata& meta);
@@ -83,18 +62,38 @@ struct BucketKey {
         return !(*this == other);
     }
 
+    Signature signature() const {
+        return static_cast<Signature>(hash & 0xFFFFFFFFull);
+    }
+
     template <typename H>
     friend H AbslHashValue(H h, const BucketKey& key) {
         return H::combine(std::move(h), key.ns, key.metadata);
     }
 };
 
-/**
- * The minimal set of information needed to locate a bucket in the BucketCatalog.
- */
-struct BucketHandle {
-    const BucketId bucketId;
-    const std::uint8_t stripe;
+struct BucketId {
+    using Hash = std::size_t;
+
+    BucketId() = delete;
+    BucketId(const NamespaceString& nss, const OID& oid, BucketKey::Signature keySignature);
+
+    NamespaceString ns;
+    OID oid;
+    BucketKey::Signature keySignature;
+    Hash hash;
+
+    bool operator==(const BucketId& other) const {
+        return oid == other.oid && keySignature == other.keySignature && ns == other.ns;
+    }
+    bool operator!=(const BucketId& other) const {
+        return !(*this == other);
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const BucketId& bucketId) {
+        return H::combine(std::move(h), bucketId.oid, bucketId.keySignature, bucketId.ns);
+    }
 };
 
 /**

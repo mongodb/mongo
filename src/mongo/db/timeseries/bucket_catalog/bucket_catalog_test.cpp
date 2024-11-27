@@ -274,7 +274,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     }
     auto bucket = std::move(res.getValue());
 
-    auto stripeNumber = internal::getStripeNumber(key);
+    auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
 
     // Register the reopened bucket with the catalog.
     auto& stripe = _bucketCatalog->stripes[stripeNumber];
@@ -348,9 +348,9 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
                          CombineWithInsertsFromOtherClients::kAllow);
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
-    auto bucket = batch->bucketHandle;
+    auto bucketId = batch->bucketId;
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
-    ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, bucket));
+    ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, bucketId));
 }
 
 TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
@@ -388,13 +388,13 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << "123"),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketId));
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONObj()),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketId));
     ASSERT(getMetadata(*_bucketCatalog,
-                       stdx::get<SuccessfulInsertion>(result3.getValue()).batch->bucketHandle)
+                       stdx::get<SuccessfulInsertion>(result3.getValue()).batch->bucketId)
                .isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
@@ -431,11 +431,11 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketId));
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketId));
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
@@ -468,12 +468,12 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
         BSON(_metaField << BSONObj(BSON(
                  "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketId));
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONObj(BSON(
                  "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketId));
 }
 
 
@@ -510,13 +510,13 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                  BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON_ARRAY("123"
                                                                                  << "456"))))),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketId));
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONObj(
                  BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON_ARRAY("123"
                                                                                  << "456"))))),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketId));
 }
 
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
@@ -543,9 +543,9 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONNULL),
         getMetadata(*_bucketCatalog,
-                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketId));
     ASSERT(getMetadata(*_bucketCatalog,
-                       stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle)
+                       stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketId)
                .isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
@@ -642,7 +642,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
                          BSON(_timeField << Date_t::now()),
                          CombineWithInsertsFromOtherClients::kAllow);
     auto& batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
-    ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, batch->bucketHandle));
+    ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, batch->bucketId));
 
     _commit(batch, 0);
 }
@@ -658,7 +658,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                          CombineWithInsertsFromOtherClients::kAllow);
     ASSERT(result.isOK());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
-    auto oldId = batch->bucketHandle.bucketId;
+    auto oldId = batch->bucketId;
     _commit(batch, 0);
     ASSERT_EQ(2U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted.count(_timeField)) << batch->toBSON();
@@ -717,7 +717,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                           BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount),
                           CombineWithInsertsFromOtherClients::kAllow);
     auto& batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
-    ASSERT_NE(oldId, batch2->bucketHandle.bucketId);
+    ASSERT_NE(oldId, batch2->bucketId);
     _commit(batch2, 0);
     ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted.size()) << batch2->toBSON();
     ASSERT(batch2->newFieldNamesToBeInserted.count(_timeField)) << batch2->toBSON();
@@ -816,8 +816,7 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     ASSERT_EQ(batch->measurements.size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
 
-    ASSERT_THROWS(directWriteStart(
-                      _bucketCatalog->bucketStateRegistry, _ns1, batch->bucketHandle.bucketId.oid),
+    ASSERT_THROWS(directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId),
                   WriteConflictException);
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
@@ -849,10 +848,10 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                           CombineWithInsertsFromOtherClients::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(batch1, batch2);
-    ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
+    ASSERT_EQ(batch1->bucketId, batch2->bucketId);
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
-    clearBucketState(_bucketCatalog->bucketStateRegistry, batch1->bucketHandle.bucketId);
+    clearBucketState(_bucketCatalog->bucketStateRegistry, batch1->bucketId);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(claimWriteBatchCommitRights(*batch2));
@@ -875,7 +874,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
     ASSERT_NE(batch1, batch3);
     ASSERT_NE(batch2, batch3);
-    ASSERT_NE(batch1->bucketHandle.bucketId, batch3->bucketHandle.bucketId);
+    ASSERT_NE(batch1->bucketId, batch3->bucketId);
     // Clean up this batch
     ASSERT(claimWriteBatchCommitRights(*batch3));
     abort(*_bucketCatalog, batch3, {ErrorCodes::TimeseriesBucketCleared, ""});
@@ -1021,8 +1020,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           CombineWithInsertsFromOtherClients::kDisallow);
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
 
-    ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
-    ASSERT_EQ(batch1->bucketHandle.bucketId, batch3->bucketHandle.bucketId);
+    ASSERT_EQ(batch1->bucketId, batch2->bucketId);
+    ASSERT_EQ(batch1->bucketId, batch3->bucketId);
 
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT(claimWriteBatchCommitRights(*batch2));
@@ -1060,7 +1059,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           BSON(_timeField << Date_t::now()),
                           CombineWithInsertsFromOtherClients::kDisallow);
     auto batch4 = stdx::get<SuccessfulInsertion>(result4.getValue()).batch;
-    ASSERT_NE(batch2->bucketHandle.bucketId, batch4->bucketHandle.bucketId);
+    ASSERT_NE(batch2->bucketId, batch4->bucketId);
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
@@ -1083,7 +1082,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 1 and 2 use the same bucket.
-    ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
+    ASSERT_EQ(batch1->bucketId, batch2->bucketId);
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT(claimWriteBatchCommitRights(*batch2));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
@@ -1105,7 +1104,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
                           BSON(_timeField << Date_t::now()),
                           CombineWithInsertsFromOtherClients::kDisallow);
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
-    ASSERT_NE(batch1->bucketHandle.bucketId, batch3->bucketHandle.bucketId);
+    ASSERT_NE(batch1->bucketId, batch3->bucketId);
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
@@ -1686,7 +1685,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     }
 
     // Actually insert so we do have an open bucket to test against.
-    BucketId bucketId{_ns1, OID::gen()};  // placeholder initialization, will be set properly below
+    BucketId bucketId{
+        _ns1, OID::gen(), 0};  // placeholder initialization, will be set properly below
     {
         auto result = insert(_opCtx,
                              *_bucketCatalog,
@@ -1698,7 +1698,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         ASSERT_OK(result.getStatus());
         auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
         ASSERT(batch);
-        bucketId = batch->bucketHandle.bucketId;
+        bucketId = batch->bucketId;
         ASSERT(claimWriteBatchCommitRights(*batch));
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
         ASSERT_EQ(batch->measurements.size(), 1);
@@ -1752,7 +1752,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
         ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
         auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
-        ASSERT_NE(batch->bucketHandle.bucketId, bucketId);
+        ASSERT_NE(batch->bucketId, bucketId);
         ASSERT(batch);
         ASSERT(claimWriteBatchCommitRights(*batch));
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
@@ -1797,7 +1797,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     ASSERT_OK(result.getStatus());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
-    auto bucketId = batch->bucketHandle.bucketId;
+    auto bucketId = batch->bucketId;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
@@ -1816,7 +1816,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     ASSERT_OK(result.getStatus());
     batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
-    ASSERT_NE(batch->bucketHandle.bucketId, bucketId);
+    ASSERT_NE(batch->bucketId, bucketId);
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
@@ -1840,7 +1840,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_OK(result.getStatus());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
-    auto oldBucketId = batch->bucketHandle.bucketId;
+    auto oldBucketId = batch->bucketId;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
@@ -1877,7 +1877,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_TRUE(stdx::holds_alternative<SuccessfulInsertion>(result.getValue()));
     batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
-    ASSERT_EQ(batch->bucketHandle.bucketId.oid, bucketDoc["_id"].OID());
+    ASSERT_EQ(batch->bucketId.oid, bucketDoc["_id"].OID());
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
@@ -1919,7 +1919,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     ASSERT_OK(result.getStatus());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
-    auto oldBucketId = batch->bucketHandle.bucketId;
+    auto oldBucketId = batch->bucketId;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
@@ -1938,10 +1938,9 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     // If we advance the catalog era, then we shouldn't use a bucket that was fetched during a
     // previous era.
     auto oldCatalogEra = getCurrentEra(_bucketCatalog->bucketStateRegistry);
-    const NamespaceString fakeNs = NamespaceString::createNamespaceString_forTest("test.foo");
-    const auto fakeId = OID();
-    directWriteStart(_bucketCatalog->bucketStateRegistry, fakeNs, fakeId);
-    directWriteFinish(_bucketCatalog->bucketStateRegistry, fakeNs, fakeId);
+    const BucketId fakeId{NamespaceString::createNamespaceString_forTest("test.foo"), OID(), 0};
+    directWriteStart(_bucketCatalog->bucketStateRegistry, fakeId);
+    directWriteFinish(_bucketCatalog->bucketStateRegistry, fakeId);
 
     ReopeningContext reopeningContext{*_bucketCatalog,
                                       _bucketCatalog->stripes[0],
@@ -2102,7 +2101,7 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
     BSONObj doc = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
     BucketKey key{_ns1, BucketMetadata{doc["tag"], nullptr, options.getMetaField()}};
     auto minTime = roundTimestampToGranularity(doc["time"].Date(), options);
-    BucketId id{_ns1, OID::gen()};
+    BucketId id{_ns1, OID::gen(), 0};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id));
     _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
         minTime, ArchivedBucket{id, options.getTimeField().toString()});
@@ -2155,7 +2154,7 @@ TEST_F(BucketCatalogTest,
     BSONObj doc1 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
     BucketKey key{_ns1, BucketMetadata{doc1["tag"], nullptr, options.getMetaField()}};
     auto minTime1 = roundTimestampToGranularity(doc1["time"].Date(), options);
-    BucketId id1{_ns1, OID::gen()};
+    BucketId id1{_ns1, OID::gen(), 0};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id1));
     _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
         minTime1, ArchivedBucket{id1, options.getTimeField().toString()});
@@ -2179,7 +2178,7 @@ TEST_F(BucketCatalogTest,
     // Inject another archived record on the same series, but a different bucket.
     BSONObj doc2 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":"c"})");
     auto minTime2 = roundTimestampToGranularity(doc2["time"].Date(), options);
-    BucketId id2{_ns1, OID::gen()};
+    BucketId id2{_ns1, OID::gen(), 0};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id2));
     _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
         minTime2, ArchivedBucket{id2, options.getTimeField().toString()});

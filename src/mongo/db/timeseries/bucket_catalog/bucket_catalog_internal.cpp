@@ -158,11 +158,18 @@ boost::optional<InsertWaiter> checkForWait(const Stripe& stripe,
 }
 }  // namespace
 
-StripeNumber getStripeNumber(const BucketKey& key) {
+StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketKey& key) {
     if (MONGO_unlikely(alwaysUseSameBucketCatalogStripe.shouldFail())) {
         return 0;
     }
-    return key.hash % BucketCatalog::kNumberOfStripes;
+    return key.hash % catalog.stripes.size();
+}
+
+StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucketId) {
+    if (MONGO_unlikely(alwaysUseSameBucketCatalogStripe.shouldFail())) {
+        return 0;
+    }
+    return bucketId.keySignature % catalog.stripes.size();
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
@@ -385,7 +392,7 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     auto minTime = controlField.getObjectField(kBucketControlMinFieldName)
                        .getField(options.getTimeField())
                        .Date();
-    BucketId bucketId{key.ns, bucketIdElem.OID()};
+    BucketId bucketId{key.ns, bucketIdElem.OID(), key.signature()};
     std::unique_ptr<Bucket> bucket =
         std::make_unique<Bucket>(bucketId, key, options.getTimeField(), minTime, registry);
 
@@ -661,7 +668,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto stripeNumber = getStripeNumber(key);
+    auto stripeNumber = getStripeNumber(catalog, key);
 
     // Save the catalog era value from before we make any further checks. This guarantees that we
     // don't miss a direct write that happens sometime in between our decision to potentially reopen
@@ -802,8 +809,8 @@ void waitToCommitBatch(BucketStateRegistry& registry,
         boost::optional<InsertWaiter> waiter;
         {
             stdx::lock_guard stripeLock{stripe.mutex};
-            Bucket* bucket = useBucket(
-                registry, stripe, stripeLock, batch->bucketHandle.bucketId, IgnoreBucketState::kNo);
+            Bucket* bucket =
+                useBucket(registry, stripe, stripeLock, batch->bucketId, IgnoreBucketState::kNo);
             if (!bucket || isWriteBatchFinished(*batch)) {
                 return;
             }
@@ -817,8 +824,7 @@ void waitToCommitBatch(BucketStateRegistry& registry,
                 // or an archive-based request on this bucket.
                 auto& list = it->second;
                 for (auto&& request : list) {
-                    if (!request->oid.has_value() ||
-                        request->oid.value() == batch->bucketHandle.bucketId.oid) {
+                    if (!request->oid.has_value() || request->oid.value() == batch->bucketId.oid) {
                         waiter = request;
                         break;
                     }
@@ -1053,11 +1059,8 @@ void abort(BucketCatalog& catalog,
            std::shared_ptr<WriteBatch> batch,
            const Status& status) {
     // Before we access the bucket, make sure it's still there.
-    Bucket* bucket = useBucket(catalog.bucketStateRegistry,
-                               stripe,
-                               stripeLock,
-                               batch->bucketHandle.bucketId,
-                               IgnoreBucketState::kYes);
+    Bucket* bucket = useBucket(
+        catalog.bucketStateRegistry, stripe, stripeLock, batch->bucketId, IgnoreBucketState::kYes);
     if (!bucket) {
         // Special case, bucket has already been cleared, and we need only abort this batch.
         abortWriteBatch(*batch, status);
@@ -1237,7 +1240,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     bool inserted = false;
     for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
         std::tie(oid, roundedTime) = generateBucketOID(info.time, info.options);
-        auto bucketId = BucketId{info.key.ns, oid};
+        auto bucketId = BucketId{info.key.ns, oid, info.key.signature()};
         std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
             bucketId,
             std::make_unique<Bucket>(bucketId,
