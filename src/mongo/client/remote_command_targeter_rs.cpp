@@ -135,8 +135,18 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCt
     auto swHostAndPort =
         _rsMonitor->getHostOrRefresh(readPref, opCtx->getCancellationToken()).getNoThrow(opCtx);
 
-    if (maxTimeMsLesser && swHostAndPort.getStatus() == ErrorCodes::FailedToSatisfyReadPreference) {
-        return Status(ErrorCodes::MaxTimeMSExpired, "operation timed out");
+    // If opCtx is interrupted, getHostOrRefresh may be canceled through the token (rather than
+    // opCtx) and therefore we may get a generic FailedToSatisfyReadPreference as tokens do not
+    // propagate errors.
+    // TODO SERVER-95226 : Check if this override is still needed.
+    if (auto status = swHostAndPort.getStatus();
+        status == ErrorCodes::FailedToSatisfyReadPreference) {
+        if (auto ctxStatus = opCtx->checkForInterruptNoAssert(); !ctxStatus.isOK()) {
+            return ctxStatus;
+        } else if (maxTimeMsLesser) {
+            return Status(ErrorCodes::MaxTimeMSExpired,
+                          str::stream() << "operation timed out: " << status.reason());
+        }
     }
 
     return swHostAndPort;
