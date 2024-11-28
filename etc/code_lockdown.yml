@@ -96,6 +96,23 @@ groups:
       - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
       - "<@U02QV8TTGG0>" # steve.tarzia@mongodb.com - Director
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
+  - name: "Developer Productivity"
+    teams:
+      - "Evergreen UI"
+      - "Evergreen App"
+      - "Services & Integrations"
+      - "Runtime Environments"
+      - "DevProd Infrastructure"
+      - "Release Infrastructure"
+      - "Performance Infrastructure"
+      - "Performance Analysis"
+      - "Build"
+      - "Correctness"
+    slack_tags:
+      - "<@U03F4KZUYP5>" # tara.hernandex@mongodb.com - VP
+      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
+      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
+      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
 
 teams:
   #######################################################################
