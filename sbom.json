@@ -1660,7 +1660,7 @@
         "name": ""
       },
       "name": "Snowball Stemming Algorithms",
-      "version": "Unknown",
+      "version": "7b264ffa0f767c579d052fd8142558dc8264d795",
       "licenses": [
         {
           "license": {
@@ -1676,6 +1676,14 @@
         {
           "name": "info_link",
           "value": "https://github.com/snowballstem/snowball"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/libstemmer_c/scripts/import.sh"
         }
       ],
       "type": "library",

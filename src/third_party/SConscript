@@ -204,7 +204,7 @@ if not use_system_version_of_library('tomcrypt'):
 
 if not use_system_version_of_library('stemmer'):
     thirdPartyEnvironmentModifications['stemmer'] = {
-        'CPPPATH': ['#/src/third_party/libstemmer_c/include'],
+        'CPPPATH': ['#/src/third_party/libstemmer_c/dist/include'],
     }
 
 # Note that the wiredtiger.h header is generated, so
