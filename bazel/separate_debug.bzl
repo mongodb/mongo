@@ -159,7 +159,7 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
             linker_input = cc_common.create_linker_input(
                 owner = ctx.label,
                 libraries = depset(direct = [direct_lib]),
-                user_link_flags = all_user_link_flags,
+                user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags,
             )
             linking_context = cc_common.create_linking_context(linker_inputs = depset(direct = [linker_input], transitive = linker_input_deps))
 
