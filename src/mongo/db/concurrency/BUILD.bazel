@@ -60,7 +60,6 @@ mongo_cc_library(
         "resource_catalog.h",
         "//src/mongo:core_headers",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.

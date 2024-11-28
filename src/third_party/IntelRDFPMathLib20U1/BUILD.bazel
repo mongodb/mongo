@@ -144,7 +144,6 @@ mongo_cc_library(
         "EFI2=1",
         "T_FLOAT",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
 )
 
 mongo_cc_library(

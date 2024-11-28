@@ -77,7 +77,6 @@ mongo_cc_library(
         "shard_key_pattern.h",
         "shard_targeting_helpers.h",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:common",
@@ -746,7 +745,6 @@ mongo_cc_library(
         "//src/mongo/s/write_ops:write_op.h",
         "//src/mongo/s/write_ops:write_without_shard_key_util.h",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         ":sharding_router_api",
         "//src/mongo/db:fle_crud",
