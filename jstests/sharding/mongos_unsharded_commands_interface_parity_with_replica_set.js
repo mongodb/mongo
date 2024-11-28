@@ -79,7 +79,9 @@ function joinFilteringMetadataRefresh(db, collName, mongoConfig) {
             let shard = mongoConfig.getPrimaryShard(db.getName());
             const shardVersion = assert.commandWorked(
                 shard.rs.getPrimary().adminCommand({getShardVersion: fullName}));
-            return shardVersion !== 'UNKNOWN';
+            const filteringMetadataState = shardVersion.global;
+            assert(filteringMetadataState !== undefined);
+            return filteringMetadataState !== 'UNKNOWN';
         });
     }
 }
