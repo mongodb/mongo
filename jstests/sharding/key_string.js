@@ -54,13 +54,20 @@ assert.eq("sara,mark,joe,eliot,bob,allan",
           }),
           "sort 2");
 
-// make sure we can't foce a split on an extreme key
-// [allan->joe)
-assert.throws(function() {
-    s.adminCommand({split: "test.foo", middle: {name: "allan"}});
-});
-assert.throws(function() {
-    s.adminCommand({split: "test.foo", middle: {name: "eliot"}});
-});
-
+// TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
+const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    // Ensure it does not fail on boundaries that are already split.
+    assert.eq(true, s.adminCommand({split: "test.foo", middle: {name: "allan"}}));
+    assert.eq(true, s.adminCommand({split: "test.foo", middle: {name: "eliot"}}));
+} else {
+    // make sure we can't force a split on an extreme key
+    // [allan->joe)
+    assert.throws(function() {
+        s.adminCommand({split: "test.foo", middle: {name: "allan"}});
+    });
+    assert.throws(function() {
+        s.adminCommand({split: "test.foo", middle: {name: "eliot"}});
+    });
+}
 s.stop();

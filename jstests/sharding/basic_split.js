@@ -28,8 +28,15 @@ assert.eq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.user', {min: {_i
 assert.commandWorked(configDB.adminCommand({split: 'test.user', middle: {_id: 0}}));
 assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.user', {min: {_id: 0}}));
 
-// Cannot split on existing chunk boundary.
-assert.commandFailed(configDB.adminCommand({split: 'test.user', middle: {_id: 0}}));
+// TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
+const fcvDoc = configDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    // It should not fail on boundaries that have already been split.
+    assert.commandWorked(configDB.adminCommand({split: 'test.user', middle: {_id: 0}}));
+} else {
+    // Cannot split on existing chunk boundary.
+    assert.commandFailed(configDB.adminCommand({split: 'test.user', middle: {_id: 0}}));
+}
 
 // Attempt to split on a value that is not the shard key.
 assert.commandFailed(configDB.adminCommand({split: 'test.user', middle: {x: 100}}));
@@ -85,12 +92,22 @@ assert.eq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.compound', {min:
 assert.commandWorked(configDB.adminCommand({split: 'test.compound', middle: {x: 0, y: 0}}));
 assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.compound', {min: {x: 0, y: 0}}));
 
-// cannot split on existing chunk boundary.
-assert.commandFailed(configDB.adminCommand({split: 'test.compound', middle: {x: 0, y: 0}}));
-assert.commandFailed(
-    configDB.adminCommand({split: 'test.compound', middle: {x: MinKey, y: MinKey}}));
-assert.commandFailed(
-    configDB.adminCommand({split: 'test.compound', middle: {x: MaxKey, y: MaxKey}}));
+// TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    // It should not fail on boundaries that have already been split.
+    assert.commandWorked(configDB.adminCommand({split: 'test.compound', middle: {x: 0, y: 0}}));
+    assert.commandWorked(
+        configDB.adminCommand({split: 'test.compound', middle: {x: MinKey, y: MinKey}}));
+    assert.commandWorked(
+        configDB.adminCommand({split: 'test.compound', middle: {x: MaxKey, y: MaxKey}}));
+} else {
+    // cannot split on existing chunk boundary.
+    assert.commandFailed(configDB.adminCommand({split: 'test.compound', middle: {x: 0, y: 0}}));
+    assert.commandFailed(
+        configDB.adminCommand({split: 'test.compound', middle: {x: MinKey, y: MinKey}}));
+    assert.commandFailed(
+        configDB.adminCommand({split: 'test.compound', middle: {x: MaxKey, y: MaxKey}}));
+}
 
 bulk = testDB.compound.initializeUnorderedBulkOp();
 for (x = -1200; x < 1200; x++) {

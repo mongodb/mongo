@@ -272,10 +272,12 @@ public:
             chunk.emplace(cm.findIntersectingChunkWithSimpleCollation(middle));
 
             if (chunk->getMin().woCompare(middle) == 0 || chunk->getMax().woCompare(middle) == 0) {
-                errmsg = str::stream()
-                    << "new split key " << middle << " is a boundary key of existing chunk "
-                    << "[" << chunk->getMin() << "," << chunk->getMax() << ")";
-                return false;
+                LOGV2_WARNING(9741101,
+                              "New split key is a boundary key of existing chunk",
+                              "middle"_attr = middle,
+                              "chunkMin"_attr = chunk->getMin(),
+                              "chunkMax"_attr = chunk->getMax());
+                return true;
             }
         }
 

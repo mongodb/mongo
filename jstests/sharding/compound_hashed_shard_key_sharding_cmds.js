@@ -110,9 +110,15 @@ function testSplit(shardKey, collName) {
     assert.eq(++totalChunksBefore, findChunksUtil.countChunksForNs(configDB, namespace));
     verifyChunkSplitIntoTwo(namespace, chunkToBeSplit);
 
-    // Cannot split on existing chunk boundary with 'middle'.
-    assert.commandFailed(configDB.adminCommand({split: namespace, middle: chunkToBeSplit.min}));
-
+    // TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
+    const fcvDoc = configDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+        // It should not fail on boundaries that have already been split.
+        assert.commandWorked(configDB.adminCommand({split: namespace, middle: chunkToBeSplit.min}));
+    } else {
+        // Cannot split on existing chunk boundary with 'middle'.
+        assert.commandFailed(configDB.adminCommand({split: namespace, middle: chunkToBeSplit.min}));
+    }
     st.s.getDB("test")[collName].drop();
 }
 
