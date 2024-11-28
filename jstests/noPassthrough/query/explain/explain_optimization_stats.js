@@ -43,7 +43,7 @@ function runTest(db) {
             // Assert the optimizationTimeMillis field is reported in explain as expected.
             const optimizationTimeMillis = collectOptimizationTimeMillis(explain);
             optimizationTimeMillis.forEach(time => assert.gte(time, waitTimeMillis, explain));
-            assert.gte(optimizationTimeMillis.length, 0, explain);
+            assert.gt(optimizationTimeMillis.length, 0, explain);
         });
     }
 }
