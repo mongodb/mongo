@@ -131,10 +131,7 @@ mongo_cc_unit_test(
         "uuid_test.cpp",
         "//src/mongo/base:data_type_validated.h",
     ],
-    tags = [
-        "mongo_unittest_fourth_group",
-        "server-programmability",
-    ],
+    tags = ["server-programmability"],
     deps = [
         ":secure_allocator",
         ":system_error",

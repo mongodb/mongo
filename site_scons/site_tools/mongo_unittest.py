@@ -21,21 +21,20 @@
 #
 """Pseudo-builders for building and registering unit tests."""
 
-import json
-import os
-
-from buildscripts.unittest_grouper import find_group
 from site_scons.mongo import insort_wrapper
+
+LAST_TEST_GROUP = 0
+
+TEST_GROUPS = ["first", "second", "third", "fourth"]
 
 
 def exists(env):
     return True
 
 
-TEST_GROUPS = []
-
-
 def build_cpp_unit_test(env, target, source, **kwargs):
+    global LAST_TEST_GROUP
+
     if not isinstance(target, list):
         target = [target]
 
@@ -43,23 +42,10 @@ def build_cpp_unit_test(env, target, source, **kwargs):
         if not t.endswith("_test"):
             env.ConfError(f"CppUnitTest target `{t}' does not end in `_test'")
 
-    scons_node = env.File(os.path.join(os.getcwd(), str(target[0])))
-    root_path = scons_node.abspath.replace("\\", "/").replace(
-        env.Dir("#").abspath.replace("\\", "/") + "/", ""
-    )
-    if root_path.startswith(env.Dir("$BUILD_DIR").path.replace("\\", "/")):
-        root_path = "src" + root_path[len(env.Dir("$BUILD_DIR").path.replace("\\", "/")) :]
-    root_path = root_path.replace("\\", "/")
-
-    test_group = list(json.loads(find_group([root_path])).keys())[0]
-
-    if test_group not in TEST_GROUPS:
-        TEST_GROUPS.append(test_group)
-        env.TestList(f"$BUILD_ROOT/{test_group}_quarter_unittests.txt", source=[])
-        env.Alias(
-            f"install-{test_group}-quarter-unittests",
-            f"$BUILD_ROOT/{test_group}_quarter_unittests.txt",
-        )
+    test_group = TEST_GROUPS[LAST_TEST_GROUP]
+    LAST_TEST_GROUP += 1
+    if LAST_TEST_GROUP > len(TEST_GROUPS) - 1:
+        LAST_TEST_GROUP = 0
 
     if not kwargs.get("UNITTEST_HAS_CUSTOM_MAINLINE", False):
         libdeps = kwargs.get("LIBDEPS", env.get("LIBDEPS", [])).copy()
@@ -103,6 +89,12 @@ def build_cpp_unit_test(env, target, source, **kwargs):
 
 
 def generate(env):
+    for test_group in TEST_GROUPS:
+        env.TestList(f"$BUILD_ROOT/{test_group}_quarter_unittests.txt", source=[])
+        env.Alias(
+            f"install-{test_group}-quarter-unittests",
+            f"$BUILD_ROOT/{test_group}_quarter_unittests.txt",
+        )
     env.TestList("$UNITTEST_LIST", source=[])
     env.AddMethod(build_cpp_unit_test, "CppUnitTest")
     env.Alias("$UNITTEST_ALIAS", "$UNITTEST_LIST")

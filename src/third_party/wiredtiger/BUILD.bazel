@@ -157,6 +157,5 @@ mongo_cc_binary(
         "//conditions:default": [],
     }),
     local_defines = WT_DEFINES,
-    tags = ["dist_test"],
     deps = ["wiredtiger"],
 )

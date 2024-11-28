@@ -639,13 +639,6 @@ add_option(
 )
 
 add_option(
-    "bazel-build-tag",
-    default=[],
-    action="append",
-    help="Specify additional tags to aggregate for --build_tag_filters",
-)
-
-add_option(
     "streams-release-build",
     default=False,
     action="store_true",
@@ -6654,7 +6647,8 @@ if env.get("__NINJA_NO") != "1":
                         env.GetAutoInstalledFiles(bazel_libdep),
                     )
             except KeyError:
-                pass
+                if env.Verbose():
+                    print(f"BazelAutoInstall not processing non bazel target:\n{libdep_node}")
 
         return target, source
 

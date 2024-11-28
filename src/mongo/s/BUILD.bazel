@@ -1007,10 +1007,6 @@ mongo_cc_binary(
         ],
         "//conditions:default": [],
     }),
-    tags = [
-        "devcore",
-        "dist_test",
-    ],
     #+ env.WindowsResourceFile("mongos.rc"),
     deps = [
         # NOTE: Do not add new deps here unless required by the linker to

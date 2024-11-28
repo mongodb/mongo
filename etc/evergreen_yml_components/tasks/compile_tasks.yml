@@ -185,7 +185,6 @@ tasks:
           targets: >-
             install-all
             archive-all
-          bazel_build_tags: --bazel-build-tag=all
           task_compile_flags: >-
             ICECC=
             CCACHE=
@@ -236,6 +235,48 @@ tasks:
         vars:
           output: build/opt/mongo/db/commands/libfsync_locked.a
 
+  - name: run_bazel_scons_unittest
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "scons compile"
+        vars:
+          targets: >-
+            +visibility_test1 +visibility_test2
+          separate_debug: on
+          task_compile_flags: >-
+            ICECC=
+            --build-profile=opt
+            --ninja=disabled
+            --link-model=dynamic
+            --modules=
+      - func: "verify build output present"
+        vars:
+          output: build/install/bin/visibility_test1
+
+  - name: run_bazel_scons_unittest_sanitize
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "scons compile"
+        vars:
+          targets: >-
+            +visibility_test1 +visibility_test2
+          separate_debug: on
+          task_compile_flags: >-
+            ICECC=
+            --build-profile=san
+            --ninja=disabled
+            --link-model=dynamic
+            --modules=
+      - func: "verify build output present"
+        vars:
+          output: build/install/bin/visibility_test1
+
   - name: run_bazel_program
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
     depends_on:
@@ -246,7 +287,7 @@ tasks:
       - func: "bazel run"
         vars:
           target: >-
-            //src/mongo/platform:visibility1_test
+            //src/mongo/platform:visibility_test1
 
   - <<: *clang_tidy_task_template
     name: run_bazel_clang_tidy
@@ -270,7 +311,7 @@ tasks:
       - func: "bazel run"
         vars:
           target: >-
-            //src/mongo/platform:visibility1_test
+            //src/mongo/platform:visibility_test1
           # TODO DEVPROD-2508 remove dbg flags when compilation_mode is synced with build_mode automatically
           args: >-
             --compilation_mode=dbg
@@ -571,7 +612,6 @@ tasks:
             --force-macos-dynamic-link
             --build-tools=next
           targets: generate-libdeps-graph
-          bazel_build_tags: --bazel-build-tag=all
       - command: subprocess.exec
         params:
           binary: bash
@@ -637,7 +677,6 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-all-meta
-          bazel_build_tags: --bazel-build-tag=all
           compiling_for_test: true
 
   - name: compile_all_but_not_unittests
@@ -650,7 +689,6 @@ tasks:
           targets: install-all-meta-but-not-unittests
           compiling_for_test: true
           task_compile_flags: ${compile_all_but_not_unittests_flags}
-          bazel_build_tags: --bazel-build-tag=-mongo_unittest --bazel-build-tag=mongo_binary --bazel-build-tag=mongo_library
 
   - <<: *clang_tidy_task_template
     name: clang_tidy_1
@@ -705,7 +743,6 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-unittests install-unittests-debug
-          bazel_build_tags: --bazel-build-tag=mongo_unittest
           compiling_for_test: true
 
   - name: compile_and_run_unittests_first_quarter
@@ -720,7 +757,6 @@ tasks:
           targets: install-first-quarter-unittests install-first-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_first_group --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -744,7 +780,6 @@ tasks:
           targets: install-second-quarter-unittests install-second-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_second_group --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -768,7 +803,6 @@ tasks:
           targets: install-third-quarter-unittests install-third-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_third_group --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -792,7 +826,6 @@ tasks:
           targets: install-fourth-quarter-unittests install-fourth-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_fourth_group --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -2040,12 +2073,18 @@ task_groups:
   - <<: *compile_bazel_task_group_template
     name: run_bazel_TG
     tasks:
+      - run_bazel_scons_unittest
       - run_bazel_program
 
   - <<: *compile_task_group_template
     name: bazel_workstation_TG
     tasks:
       - bazel_workstation_unittests
+
+  - <<: *compile_bazel_task_group_template
+    name: compile_bazel_sanitize_TG
+    tasks:
+      - run_bazel_scons_unittest_sanitize
 
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_ninja_TG

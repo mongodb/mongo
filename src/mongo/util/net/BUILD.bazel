@@ -393,7 +393,6 @@ mongo_cc_unit_test(
         "hostandport_test.cpp",
         "http_client_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
     deps = [
         ":http_client",
         ":network",
@@ -410,7 +409,6 @@ mongo_cc_unit_test(
         "ssl_options_test.cpp",
         "//src/mongo/util/cmdline_utils:censor_cmdline_test.h",
     ],
-    tags = ["mongo_unittest_first_group"],
     target_compatible_with = select({
         "//bazel/config:ssl_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],

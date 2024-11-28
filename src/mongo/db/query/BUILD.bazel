@@ -653,7 +653,6 @@ mongo_cc_unit_test(
         "command_diagnostic_printer_test.cpp",
         "//src/mongo/db/query:command_diagnostic_printer.h",
     ],
-    tags = ["mongo_unittest_second_group"],
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:service_context_test_fixture",

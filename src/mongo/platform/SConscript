@@ -38,22 +38,37 @@ env.Benchmark(
 )
 
 if get_option("link-model") == "dynamic":
-    visibility_test1 = env.CppUnitTest(
-        target="visibility1_test",
+    visibility_test1 = env.BazelProgram(
+        target="visibility_test1",
         source=[],
         LIBDEPS=[],
+        AIB_COMPONENT="visibility-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+            "first-quarter-unittests",
+        ],
+        PROVE_ALIASES=["server-programmability"],
     )
+    env.RegisterTest("$UNITTEST_LIST", visibility_test1[0])
 
-    visibility_test2 = env.CppUnitTest(
-        target="visibility2_test",
+    visibility_test2 = env.Program(
+        target="visibility_test2",
         source=[
             "visibility_test2.cpp",
         ],
         LIBDEPS=[
             "visibility_test_lib2",
         ],
+        AIB_COMPONENT="visibility-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+            "first-quarter-unittests",
+        ],
         PROVE_ALIASES=["server-programmability"],
     )
+    env.RegisterTest("$UNITTEST_LIST", visibility_test2[0])
 
 env.CppUnitTest(
     target="rwmutex_test",
