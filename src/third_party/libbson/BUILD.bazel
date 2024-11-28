@@ -67,9 +67,6 @@ mongo_cc_library(
     defines = [
         "BSON_STATIC",
     ],
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     includes = [
         "dist/src/libbson/src",
     ] + select({

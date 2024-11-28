@@ -86,9 +86,6 @@ mongo_cc_library(
     defines = [
         "PCRE2_STATIC",
     ],
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     includes = ["src"],
     local_defines = [
         "PCRE2_CODE_UNIT_WIDTH=8",

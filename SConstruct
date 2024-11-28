@@ -3912,50 +3912,12 @@ def doConfigure(myenv):
         # TODO SERVER-58675 - Remove this suppression after abseil is upgraded
         myenv.AddToCXXFLAGSIfSupported("-Wno-deprecated-builtins")
 
+        # This warning overzealously warns on uses of non-virtual destructors which are benign.
+        myenv.AddToCXXFLAGSIfSupported("-Wno-non-virtual-dtor")
+
         # We do not define an ABI that must be stable from build to build, so inconsistent hardware
         # interference sizes between builds does not affect correctness.
         myenv.AddToCXXFLAGSIfSupported("-Wno-interference-size")
-
-        # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
-        # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
-        # it shouldn't.
-        def CheckNonVirtualDtor(context):
-            test_body = """
-            class Base {
-            public:
-                virtual void foo() const = 0;
-            protected:
-                ~Base() {};
-            };
-
-            class Derived : public Base {
-            public:
-                virtual void foo() const {}
-            };
-            """
-
-            context.Message("Checking if -Wnon-virtual-dtor works reasonably... ")
-            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
-            context.Result(ret)
-            return ret
-
-        myenvClone = myenv.Clone()
-        myenvClone.Append(
-            CCFLAGS=[
-                "$CCFLAGS_WERROR",
-                "-Wnon-virtual-dtor",
-            ],
-        )
-        conf = Configure(
-            myenvClone,
-            help=False,
-            custom_tests={
-                "CheckNonVirtualDtor": CheckNonVirtualDtor,
-            },
-        )
-        if conf.CheckNonVirtualDtor():
-            myenv.Append(CXXFLAGS=["-Wnon-virtual-dtor"])
-        conf.Finish()
 
         # TODO(SERVER-97447): Remove this once we're fully on the v5 toolchain. In the meantime, we
         # need to suppress some warnings that are only recognized by the new compilers.

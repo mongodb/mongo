@@ -57,9 +57,6 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     includes = [
         "zstd/lib",
     ],

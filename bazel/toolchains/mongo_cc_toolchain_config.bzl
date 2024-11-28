@@ -607,9 +607,10 @@ def _impl(ctx):
         ],
     )
 
-    no_warn_non_virtual_detour_feature = feature(
-        name = "no_warn_non_virtual_detour",
-        enabled = False,
+    # This warning overzealously warns on uses of non-virtual destructors which are benign.
+    no_warn_non_virtual_destructor_feature = feature(
+        name = "no_warn_non_virtual_destructor",
+        enabled = True,
         flag_sets = [
             flag_set(
                 actions = all_cpp_compile_actions,
@@ -755,7 +756,7 @@ def _impl(ctx):
         dwarf32_feature,
         dwarf64_feature,
         disable_debug_symbols_feature,
-        no_warn_non_virtual_detour_feature,
+        no_warn_non_virtual_destructor_feature,
         no_deprecated_enum_enum_conversion_feature,
         no_volatile_feature,
         fsized_deallocation_feature,

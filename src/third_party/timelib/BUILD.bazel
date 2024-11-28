@@ -53,11 +53,5 @@ mongo_cc_library(
             "-Wno-implicit-fallthrough",
         ],
     }),
-    features = select({
-        "@platforms//os:windows": [],
-        "//conditions:default": [
-            "no_warn_non_virtual_detour",
-        ],
-    }),
     includes = ["dist"],
 )

@@ -11,9 +11,6 @@ mongo_cc_library(
     hdrs = [
         "dist/roaring.hh",
     ],
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     includes = [
         "dist",
     ],

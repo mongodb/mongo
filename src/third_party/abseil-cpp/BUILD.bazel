@@ -1033,9 +1033,6 @@ mongo_cc_library(
         "dist/absl/flags/reflection.cc",
     ],
     hdrs = ABSEIL_HEADERS,
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     includes = ["dist"],
     skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [

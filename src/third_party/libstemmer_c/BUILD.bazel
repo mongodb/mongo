@@ -54,9 +54,6 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     includes = [
         # from https://github.com/10gen/mongo/blob/master/src/third_party/SConscript#L172-L175
         "include",

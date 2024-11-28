@@ -96,9 +96,6 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    features = [
-        "no_warn_non_virtual_detour",
-    ],
     includes = select({
         "@platforms//cpu:aarch64": [
             "platform/linux_aarch64/install/include",
