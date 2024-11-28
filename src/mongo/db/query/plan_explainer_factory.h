@@ -39,7 +39,6 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/duration.h"
@@ -57,32 +56,6 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root,
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);
-
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const stage_builder::PlanStageData* data,
-                                    const QuerySolution* solution);
-
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const stage_builder::PlanStageData* data,
-                                    const QuerySolution* solution,
-                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-                                    bool isMultiPlan);
-
-/**
- * Factory function used to create and return a PlanExplainer for SBE execution. This overload is
- * used when a plan has been selected using SBE runtime planners. Unlike the classic multiplanner +
- * SBE PlanExplainer, it accepts a vector of rejected candidate plans from the SBE multi-planner.
- */
-std::unique_ptr<PlanExplainer> make(
-    sbe::PlanStage* root,
-    const stage_builder::PlanStageData* data,
-    const QuerySolution* solution,
-    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-    bool isMultiPlan,
-    bool isFromPlanCache,
-    boost::optional<size_t> cachedPlanHash,
-    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-    RemoteExplainVector* remoteExplains = nullptr);
 
 /**
  * Factory function used to create a PlanExplainer for classic multiplanner + SBE execution. It

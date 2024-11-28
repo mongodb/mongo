@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/bind_input_params.h"
@@ -58,16 +59,15 @@ public:
         auto remoteExplains = cq()->getExpCtx()->getExplain()
             ? search_helpers::getSearchRemoteExplains(cq()->getExpCtxRaw(), cq()->cqPipeline())
             : nullptr;
-        return uassertStatusOK(
-            plan_executor_factory::make(opCtx(),
-                                        std::move(canonicalQuery),
-                                        {makeVector(std::move(_candidate)), 0 /*winnerIdx*/},
-                                        collections(),
-                                        plannerOptions(),
-                                        std::move(nss),
-                                        extractSbeYieldPolicy(),
-                                        std::move(remoteCursors),
-                                        std::move(remoteExplains)));
+        return uassertStatusOK(plan_executor_factory::make(opCtx(),
+                                                           std::move(canonicalQuery),
+                                                           std::move(_candidate),
+                                                           collections(),
+                                                           plannerOptions(),
+                                                           std::move(nss),
+                                                           extractSbeYieldPolicy(),
+                                                           std::move(remoteCursors),
+                                                           std::move(remoteExplains)));
     }
 
 private:
@@ -221,14 +221,10 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                                                         std::move(planStageData),
                                                         maxReadsBeforeReplan);
 
-    auto explainer = plan_explainer_factory::make(candidate.root.get(),
-                                                  &candidate.data.stageData,
-                                                  candidate.solution.get(),
-                                                  {},    /* rejectedCandidates */
-                                                  false, /* isMultiPlan */
-                                                  true /* isFromPlanCache */,
-                                                  true /*matchesCachedPlan*/,
-                                                  candidate.data.stageData.debugInfo);
+    auto getPlanSummary = [&]() {
+        return plan_cache_util::buildDebugInfo(candidate.solution.get()).planSummary;
+    };
+
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
         // entry, nor cache the result of replanning.
@@ -236,7 +232,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                     1,
                     "Execution of cached plan failed, falling back to replan",
                     "query"_attr = redact(plannerData.cq->toStringShort()),
-                    "planSummary"_attr = explainer->getPlanSummary(),
+                    "planSummary"_attr = getPlanSummary(),
                     "error"_attr = candidate.status.toString());
         std::string replanReason = str::stream() << "cached plan returned: " << candidate.status;
         recoverWhereExpression(plannerData.cq, std::move(candidate));
@@ -261,7 +257,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
             "decisionReads"_attr = decisionReads,
             "numReads"_attr = numReads,
             "query"_attr = redact(plannerData.cq->toStringShort()),
-            "planSummary"_attr = explainer->getPlanSummary());
+            "planSummary"_attr = getPlanSummary());
 
         deactivateCb(plannerData);
 

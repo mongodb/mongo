@@ -82,7 +82,7 @@ extern FailPoint planExecutorHangBeforeShouldWaitForInserts;
 
 PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  std::unique_ptr<CanonicalQuery> cq,
-                                 sbe::plan_ranker::CandidatePlans candidates,
+                                 sbe::plan_ranker::CandidatePlan plan,
                                  bool returnOwnedBson,
                                  NamespaceString nss,
                                  bool isOpen,
@@ -95,10 +95,10 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _opCtx(opCtx),
       _nss(std::move(nss)),
       _mustReturnOwnedBson(returnOwnedBson),
-      _root{std::move(candidates.winner().root)},
-      _rootData{std::move(candidates.winner().data.stageData)},
-      _solution{std::move(candidates.winner().solution)},
-      _stash{std::move(candidates.winner().results)},
+      _root{std::move(plan.root)},
+      _rootData{std::move(plan.data.stageData)},
+      _solution{std::move(plan.solution)},
+      _stash{std::move(plan.results)},
       _cq{std::move(cq)},
       _yieldPolicy(std::move(yieldPolicy)),
       _remoteCursors(std::move(remoteCursors)),
@@ -148,42 +148,26 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _yieldPolicy->clearRegisteredPlans();
         _yieldPolicy->registerPlan(_root.get());
     }
-    const auto isMultiPlan = candidates.plans.size() > 1 || classicRuntimePlannerStage;
-    const auto isCachedCandidate = candidates.winner().fromPlanCache;
+    const bool isMultiPlan = classicRuntimePlannerStage != nullptr;
+    const bool isCachedCandidate = plan.fromPlanCache;
     if (!_cq || !_cq->getExpCtx()->getExplain()) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
-        candidates.plans.clear();
         classicRuntimePlannerStage.reset();
-    } else {
-        // Keep only rejected candidate plans.
-        candidates.plans.erase(candidates.plans.begin() + candidates.winnerIdx);
     }
 
     if (_solution) {
         _secondaryNssVector = _solution->getAllSecondaryNamespaces(_nss);
     }
 
-    _planExplainer = classicRuntimePlannerStage
-        // Classic multi-planner + SBE
-        ? plan_explainer_factory::make(_root.get(),
-                                       &_rootData,
-                                       _solution.get(),
-                                       isMultiPlan,
-                                       isCachedCandidate,
-                                       cachedPlanHash,
-                                       _rootData.debugInfo,
-                                       std::move(classicRuntimePlannerStage),
-                                       _remoteExplains.get())
-        // SBE runtime planner + SBE
-        : plan_explainer_factory::make(_root.get(),
-                                       &_rootData,
-                                       _solution.get(),
-                                       std::move(candidates.plans),
-                                       isMultiPlan,
-                                       isCachedCandidate,
-                                       cachedPlanHash,
-                                       _rootData.debugInfo,
-                                       _remoteExplains.get());
+    _planExplainer = plan_explainer_factory::make(_root.get(),
+                                                  &_rootData,
+                                                  _solution.get(),
+                                                  isMultiPlan,
+                                                  isCachedCandidate,
+                                                  cachedPlanHash,
+                                                  _rootData.debugInfo,
+                                                  std::move(classicRuntimePlannerStage),
+                                                  _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
 
     if (_remoteCursors) {

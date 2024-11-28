@@ -63,55 +63,6 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplain
     return std::make_unique<PlanExplainerImpl>(root, explainInfo);
 }
 
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const stage_builder::PlanStageData* data,
-                                    const QuerySolution* solution) {
-    return make(root, data, solution, {}, false);
-}
-
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const stage_builder::PlanStageData* data,
-                                    const QuerySolution* solution,
-                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-                                    bool isMultiPlan) {
-    // Pre-compute Debugging info for explain use.
-    auto debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
-        plan_cache_util::buildDebugInfo(solution));
-    return std::make_unique<PlanExplainerSBE>(root,
-                                              data,
-                                              solution,
-                                              std::move(rejectedCandidates),
-                                              isMultiPlan,
-                                              false,       /* isCachedPlan */
-                                              boost::none, /* cachedPlanHash */
-                                              debugInfoSBE);
-}
-
-std::unique_ptr<PlanExplainer> make(
-    sbe::PlanStage* root,
-    const stage_builder::PlanStageData* data,
-    const QuerySolution* solution,
-    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-    bool isMultiPlan,
-    bool isFromPlanCache,
-    boost::optional<size_t> cachedPlanHash,
-    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfoSBE,
-    RemoteExplainVector* remoteExplains) {
-    if (!debugInfoSBE) {
-        debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
-            plan_cache_util::buildDebugInfo(solution));
-    }
-    return std::make_unique<PlanExplainerSBE>(root,
-                                              data,
-                                              solution,
-                                              std::move(rejectedCandidates),
-                                              isMultiPlan,
-                                              isFromPlanCache,
-                                              cachedPlanHash,
-                                              debugInfoSBE,
-                                              remoteExplains);
-}
-
 std::unique_ptr<PlanExplainer> make(
     sbe::PlanStage* root,
     const stage_builder::PlanStageData* data,

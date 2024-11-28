@@ -145,13 +145,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 
 /**
  * Similar to the factory function above in that it also constructs an executor for the winning SBE
- * plan passed in 'candidates' vector. This overload allows callers to pass a pre-existing queue
+ * plan passed as a 'candidate'. This overload allows callers to pass a pre-existing queue
  * ('stash') of BSON objects or record ids to return to the caller.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    sbe::plan_ranker::CandidatePlans candidates,
+    sbe::plan_ranker::CandidatePlan candidate,
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,

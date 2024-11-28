@@ -84,7 +84,7 @@ public:
 
     PlanExecutorSBE(OperationContext* opCtx,
                     std::unique_ptr<CanonicalQuery> cq,
-                    sbe::plan_ranker::CandidatePlans candidates,
+                    sbe::plan_ranker::CandidatePlan plan,
                     bool returnOwnedBson,
                     NamespaceString nss,
                     bool isOpen,
