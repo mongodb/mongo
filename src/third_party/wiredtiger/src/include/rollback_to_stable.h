@@ -85,6 +85,7 @@
             WT_STAT_CONN_DSRC_INCR(session, stat##_dryrun); \
     } while (0)
 
+#define WT_RTS_MAX_WORKERS 10
 /*
  * WT_RTS_WORK_UNIT --
  *  RTS thread operating work unit.
@@ -108,6 +109,9 @@ struct __wt_rollback_to_stable {
     /* RTS thread information. */
     WT_THREAD_GROUP thread_group;
     uint32_t threads_num;
+
+    /* The configuration of RTS worker threads at the connection level. */
+    uint32_t cfg_threads_num;
 
     /* Locked: RTS system work queue. */
     TAILQ_HEAD(__wt_rts_qh, __wt_rts_work_unit) rtsqh;

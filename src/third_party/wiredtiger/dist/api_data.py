@@ -813,6 +813,16 @@ connection_runtime_config = [
                 directory must already exist. If the value is not an absolute path, the path
                 is relative to the database home (see @ref absolute_path for more information)'''),
         ]),
+    Config('rollback_to_stable', '', r'''
+        rollback tables to an earlier point in time, discarding all updates to checkpoint durable
+        tables that have durable times more recent than the current global stable timestamp''',
+        type='category', subconfig=[
+            Config('threads', 4, r'''
+                maximum number of threads WiredTiger will start to help RTS. Each
+                RTS worker thread uses a session from the configured WT_RTS_MAX_WORKERS''',
+                min=0,
+                max=10),    # !!! Must match WT_RTS_MAX_WORKERS
+        ]),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure either a cache_size
         or a shared_cache not both. Enabling a shared cache uses a session from the configured
@@ -2018,8 +2028,9 @@ methods = {
         type='boolean'),
     Config('threads', '4', r'''
         maximum number of threads WiredTiger will start to help RTS. Each
-        RTS worker thread uses a session from the configured session_max''',
-        min=0, max=10),
+        RTS worker thread uses a session from the configured WT_RTS_MAX_WORKERS''',
+        min=0, 
+        max=10),     # !!! Must match WT_RTS_MAX_WORKERS
 ]),
 
 'WT_SESSION.reconfigure' : Method(session_config),

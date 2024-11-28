@@ -2368,6 +2368,13 @@ struct __wt_connection {
      * If the value is not an absolute path\, the path is relative to the database home (see @ref
      * absolute_path for more information)., a string; default \c ".".}
      * @config{ ),,}
+     * @config{rollback_to_stable = (, rollback tables to an earlier point in time\, discarding all
+     * updates to checkpoint durable tables that have durable times more recent than the current
+     * global stable timestamp., a set of related configuration options defined as follows.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, maximum number of threads WiredTiger will start to
+     * help RTS. Each RTS worker thread uses a session from the configured WT_RTS_MAX_WORKERS., an
+     * integer between \c 0 and \c 10; default \c 4.}
+     * @config{ ),,}
      * @config{shared_cache = (, shared cache configuration options.  A database should configure
      * either a cache_size or a shared_cache not both.  Enabling a shared cache uses a session from
      * the configured session_max.  A shared cache can not have absolute values configured for cache
@@ -2642,8 +2649,8 @@ struct __wt_connection {
      * @config{dryrun, perform the checks associated with RTS\, but don't modify any data., a
      * boolean flag; default \c false.}
      * @config{threads, maximum number of threads WiredTiger will start to help RTS. Each RTS worker
-     * thread uses a session from the configured session_max., an integer between \c 0 and \c 10;
-     * default \c 4.}
+     * thread uses a session from the configured WT_RTS_MAX_WORKERS., an integer between \c 0 and \c
+     * 10; default \c 4.}
      * @configend
      * @errors
      * An error should occur only in the case of a system problem, and an application typically
@@ -3255,6 +3262,13 @@ struct __wt_connection {
  * @config{readonly, open connection in read-only mode.  The database must exist.  All methods that
  * may modify a database are disabled.  See @ref readonly for more information., a boolean flag;
  * default \c false.}
+ * @config{rollback_to_stable = (, rollback tables to an earlier point in time\, discarding all
+ * updates to checkpoint durable tables that have durable times more recent than the current global
+ * stable timestamp., a set of related configuration options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, maximum number of threads WiredTiger will start to help
+ * RTS. Each RTS worker thread uses a session from the configured WT_RTS_MAX_WORKERS., an integer
+ * between \c 0 and \c 10; default \c 4.}
+ * @config{ ),,}
  * @config{salvage, open connection and salvage any WiredTiger-owned database and log files that it
  * detects as corrupted.  This call should only be used after getting an error return of
  * WT_TRY_SALVAGE. Salvage rebuilds files in place\, overwriting existing files.  We recommend

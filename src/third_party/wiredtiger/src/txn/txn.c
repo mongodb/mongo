@@ -2597,7 +2597,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
     WT_DECL_RET;
     WT_SESSION_IMPL *s;
     WT_TIMER timer;
-    char ts_string[WT_TS_INT_STRING_SIZE];
+    char conn_rts_cfg[16], ts_string[WT_TS_INT_STRING_SIZE];
     const char *ckpt_cfg;
     bool use_timestamp;
 
@@ -2629,6 +2629,12 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
         if (use_timestamp) {
             const char *rts_cfg[] = {
               WT_CONFIG_BASE(session, WT_CONNECTION_rollback_to_stable), NULL, NULL};
+            if (conn->rts->cfg_threads_num != 0) {
+                WT_RET(__wt_snprintf(
+                  conn_rts_cfg, sizeof(conn_rts_cfg), "threads=%u", conn->rts->cfg_threads_num));
+                rts_cfg[1] = conn_rts_cfg;
+            }
+
             __wt_timer_start(session, &timer);
             __wt_verbose_info(session, WT_VERB_RTS,
               "[SHUTDOWN_INIT] performing shutdown rollback to stable, stable_timestamp=%s",

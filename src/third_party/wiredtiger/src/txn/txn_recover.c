@@ -947,6 +947,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TIMER checkpoint_timer, rts_timer, timer;
     wt_off_t hs_size;
     char *config;
+    char conn_rts_cfg[16];
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool do_checkpoint, eviction_started, hs_exists, needs_rec, rts_executed, was_backup;
 
@@ -1192,6 +1193,12 @@ done:
         const char *rts_cfg[] = {
           WT_CONFIG_BASE(session, WT_CONNECTION_rollback_to_stable), NULL, NULL};
         __wt_timer_start(session, &rts_timer);
+        if (conn->rts->cfg_threads_num != 0) {
+            WT_ERR(__wt_snprintf(
+              conn_rts_cfg, sizeof(conn_rts_cfg), "threads=%u", conn->rts->cfg_threads_num));
+            rts_cfg[1] = conn_rts_cfg;
+        }
+
         /* Start the eviction threads for rollback to stable if not already started. */
         if (!eviction_started) {
             WT_ERR(__wt_evict_threads_create(session));
