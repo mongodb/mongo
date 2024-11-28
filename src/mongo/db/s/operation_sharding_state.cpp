@@ -91,13 +91,8 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     auto& oss = OperationShardingState::get(opCtx);
 
     if (shardVersion && shardVersion != ShardVersion::UNSHARDED()) {
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        if (fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gEnforceRoutingByNamespace.isEnabled(fcvSnapshot)) {
-            tassert(6300900,
-                    "Attaching a shard version requires a non db-only namespace",
-                    !nss.isDbOnly());
-        }
+        tassert(
+            6300900, "Attaching a shard version requires a non db-only namespace", !nss.isDbOnly());
     }
 
     bool shardVersionInserted = false;
