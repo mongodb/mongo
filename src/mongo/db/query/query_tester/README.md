@@ -1,6 +1,12 @@
 # QueryTester
 
-A lightweight testing harness for E2E query result testing.
+**QueryTester** is a test harness designed to streamline E2E logic testing of MongoDB queries. It validates query results by executing them against a live MongoDB instance (i.e. `mongod`, `mongos`, or any system that implements the MongoDB wire protocol) and comparing the output to pre-defined expected results.
+
+QueryTester is ideal for small, reproducible test cases that verify query behavior with minimal setup. This tool follows a focused paradigm, exclusively supporting queries and DML operations with configurable settings. Support for passthroughs may be added in the future.
+
+QueryTester does not currently support extensive setup or complex infrastructure, but it is designed to be extensible, with the potential to handle more complex environments in the future. The overall goal of Tester's design, however, is to validate query logic in a simple, clear, and consistent manner.
+
+Each QueryTester use case expects three files to work together: a `.test`, a `.results`, and a `.coll`. See [below](#file-types-and-formats) for templates of each.
 
 ## Getting Started
 
@@ -53,6 +59,17 @@ After the header, each line is a test line:
 `<testType> {commandToRun}`
 with each test line being followed by a newline.
 
+The template is as follows:
+
+```
+<testName>
+<database>
+<collection file (*.coll)>
+
+<testType> <{commandToRun}>
+... further tests
+```
+
 #### Test Types
 
 | Type                          | Description                                                                                                                                                                                                              |
@@ -71,12 +88,28 @@ with each test line being followed by a newline.
 
 ### .results
 
-See sampleTests/testA.results.
+See `sampleTests/testA.results`.
 These have the same format as .test files above, with the exception that each test must be followed by a line with the expected documents. These are allowed to be on multiple lines, and a result array is read as the line after the test until the next newline.
+
+The template is as follows:
+
+```
+<testName>
+<database>
+<collection file (*.coll)>
+
+<testType> <{commandToRun}>
+[
+    <result 0>,
+    <result 1>,
+    ... further results
+]
+... further tests and results
+```
 
 ### .coll
 
-See sampleTests/basic.coll
+See `sampleTests/basic.coll`.
 These files are split into two sections divided by an empty line.
 Above the empty line are index definitions, one per line. They can be of the form:
 
@@ -87,6 +120,18 @@ Above the empty line are index definitions, one per line. They can be of the for
 Below the empty line are documents, one per line.
 
 These files are referenced by test files, and can/should be shared across tests.
+
+The template is as follows:
+
+```
+<{index}>
+<{index}>
+... further indexes
+
+<{document}>
+<{document}>
+... further documents
+```
 
 ### Comments
 
