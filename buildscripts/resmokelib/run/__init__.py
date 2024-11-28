@@ -147,17 +147,16 @@ class TestRunner(Subcommand):
     def list_suites(self):
         """List the suites that are available to execute."""
         suite_names = suitesconfig.get_named_suites()
-        self._resmoke_logger.info("Suites available to execute:\n%s", "\n".join(suite_names))
+        for suite in suite_names:
+            print(suite)
 
     def find_suites(self):
         """List the suites that run the specified tests."""
         suites = self._get_suites()
         suites_by_test = self._find_suites_by_test(suites)
         for test in sorted(suites_by_test):
-            suite_names = suites_by_test[test]
-            self._resmoke_logger.info(
-                "%s will be run by the following suite(s): %s", test, suite_names
-            )
+            for suite_name in suites_by_test[test]:
+                print(suite_name)
 
     def list_tags(self):
         """
