@@ -3908,10 +3908,6 @@ def doConfigure(myenv):
         # This warning overzealously warns on uses of non-virtual destructors which are benign.
         myenv.AddToCXXFLAGSIfSupported("-Wno-non-virtual-dtor")
 
-        # We do not define an ABI that must be stable from build to build, so inconsistent hardware
-        # interference sizes between builds does not affect correctness.
-        myenv.AddToCXXFLAGSIfSupported("-Wno-interference-size")
-
         # TODO(SERVER-97447): Remove this once we're fully on the v5 toolchain. In the meantime, we
         # need to suppress some warnings that are only recognized by the new compilers.
         myenv.AddToCXXFLAGSIfSupported("-Wno-unknown-warning-option")
