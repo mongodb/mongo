@@ -36,6 +36,9 @@ class ValidateCollections(jsfile.PerClusterDataConsistencyHook):
             self, hook_logger, fixture, js_filename, description, shell_options=shell_options
         )
         self.use_legacy_validate = use_legacy_validate
+        self._catalog_check_js_filename = os.path.join(
+            "jstests", "hooks", "run_check_list_catalog_operations_consistency.js"
+        )
 
     def after_test(self, test, test_report):
         # Break the fixture down into its participant clusters if it is a MultiClusterFixture.
@@ -53,6 +56,12 @@ class ValidateCollections(jsfile.PerClusterDataConsistencyHook):
             )
             hook_test_case.configure(cluster)
             hook_test_case.run_dynamic_test(test_report)
+
+            hook_test_case_catalog_check = jsfile.DynamicJSTestCase.create_after_test(
+                test.logger, test, self, self._catalog_check_js_filename, self._shell_options
+            )
+            hook_test_case_catalog_check.configure(self.fixture)
+            hook_test_case_catalog_check.run_dynamic_test(test_report)
 
 
 class ValidateCollectionsTestCase(jsfile.DynamicJSTestCase):

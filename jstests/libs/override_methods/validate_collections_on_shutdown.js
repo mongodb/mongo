@@ -3,6 +3,9 @@
  * collections and indexes before shutting down a mongod while running JS tests.
  */
 import {validateCollections} from "jstests/hooks/validate_collections.js";
+import {
+    assertCatalogListOperationsConsistencyForDb
+} from "jstests/libs/catalog_list_operations_consistency_validator.js";
 import {CommandSequenceWithRetries} from "jstests/libs/command_sequence_with_retries.js";
 
 MongoRunner.validateCollectionsCallback = function(port, options) {
@@ -147,6 +150,15 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
                     return {
                         shouldStop: true,
                         reason: "collection validation failed " + tojson(validate_res)
+                    };
+                }
+
+                try {
+                    assertCatalogListOperationsConsistencyForDb(conn.getDB(dbName), tenant);
+                } catch (e) {
+                    return {
+                        shouldStop: true,
+                        reason: "catalog list operations consistency check failed " + tojson(e)
                     };
                 }
             } finally {
