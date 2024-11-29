@@ -2,6 +2,7 @@ import argparse
 import glob
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -114,16 +115,16 @@ else:
     if not os.path.islink("bazel-out"):
         shutil.rmtree("bazel-out")
 
-env_flags = os.environ.get("BAZEL_FLAGS", [])
+env_flags = os.environ.get("BAZEL_FLAGS", "")
 if env_flags:
-    print(f"Using shell env BAZEL_FLAGS: {' '.join(env_flags)}")
+    print(f"Using shell env BAZEL_FLAGS: {env_flags}")
 
 if args.verbose:
     extra_args = []
 else:
     extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
 
-extra_args += env_flags
+extra_args += shlex.split(env_flags, posix=(sys.platform != "win32"))
 
 bazel_env = os.environ.copy()
 if ninja_build_info.get("USE_NATIVE_TOOLCHAIN"):
@@ -135,7 +136,7 @@ with tempfile.NamedTemporaryFile(mode="w+", delete=False) as tf:
     tf_name = tf.name
     tpf = f"--target_pattern_file={tf_name}"
     extra_args += [tpf]
-    bazel_cmd = " ".join(ninja_build_info["bazel_cmd"] + extra_args)
+    bazel_cmd = shlex.join(ninja_build_info["bazel_cmd"] + extra_args)
     sys.stderr.write(f"Running bazel command:\n{bazel_cmd} [{len(targets_to_build)} targets...]\n")
     tf.write("\n".join(targets_to_build))
     tf.close()
