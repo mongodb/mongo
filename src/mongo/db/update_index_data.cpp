@@ -32,98 +32,27 @@
 #include <absl/container/btree_set.h>
 #include <boost/container/small_vector.hpp>
 #include <cstddef>
-#include <cstdint>
 
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 
-namespace {
-enum class NumericPathComponentResult {
-    kNumericOrDollar,
-    kConsecutiveNumbers,
-    kNonNumericOrDollar
-};
-
-NumericPathComponentResult checkNumericOrDollarPathComponent(const FieldRef& path,
-                                                             size_t pathIdx,
-                                                             StringData pathComponent) {
-    if (pathComponent == "$"_sd) {
-        return NumericPathComponentResult::kNumericOrDollar;
-    }
-
-    if (FieldRef::isNumericPathComponentLenient(pathComponent)) {
-        // Peek ahead to see if the next component is also all digits. This implies that the
-        // update is attempting to create a numeric field name which would violate the
-        // "ambiguous field name in array" constraint for multi-key indexes. Break early in this
-        // case and conservatively return that this path affects the prefix of the consecutive
-        // numerical path components. For instance, an input such as 'a.0.1.b.c' would return
-        // the canonical index path of 'a'.
-        if ((pathIdx + 1) < path.numParts() &&
-            FieldRef::isNumericPathComponentLenient(path.getPart(pathIdx + 1))) {
-            return NumericPathComponentResult::kConsecutiveNumbers;
-        }
-        return NumericPathComponentResult::kNumericOrDollar;
-    }
-
-    return NumericPathComponentResult::kNonNumericOrDollar;
-}
-
-/**
- * Checks whether a given Document path overlaps with an indexed path
- */
-bool pathOverlaps(const FieldRef& path, const FieldRef& indexedPath) {
-    size_t pathIdx = 0;
-    size_t indexedPathIdx = 0;
-
-    while (pathIdx < path.numParts() && indexedPathIdx < indexedPath.numParts()) {
-        auto pathComponent = path.getPart(pathIdx);
-
-        // The first part of the path must always be a valid field name, since it's not possible to
-        // store a top-level array or '$' field name in a document.
-        if (pathIdx > 0) {
-            NumericPathComponentResult res =
-                checkNumericOrDollarPathComponent(path, pathIdx, pathComponent);
-            if (res == NumericPathComponentResult::kNumericOrDollar) {
-                ++pathIdx;
-                continue;
-            }
-            if (res == NumericPathComponentResult::kConsecutiveNumbers) {
-                // This case implies that the update is attempting to create a numeric field name
-                // which would violate the "ambiguous field name in array" constraint for multi-key
-                // indexes. Break early in this case and conservatively return that this path
-                // affects the prefix of the consecutive numerical path components. For instance, an
-                // input path such as 'a.0.1.b.c' would match indexed path of 'a.d'.
-                return true;
-            }
-        }
-
-        StringData indexedPathComponent = indexedPath.getPart(indexedPathIdx);
-        if (pathComponent != indexedPathComponent) {
-            return false;
-        }
-
-        ++pathIdx;
-        ++indexedPathIdx;
-    }
-
-    return true;
-}
-}  // namespace
-
-
 UpdateIndexData::UpdateIndexData() : _allPathsIndexed(false) {}
 
 void UpdateIndexData::addPath(const FieldRef& path) {
-    _canonicalPaths.insert(getCanonicalIndexField(path));
+    _canonicalPaths.insert(FieldRef::getCanonicalIndexField(path));
 }
 
 void UpdateIndexData::addPathComponent(StringData pathComponent) {
     _pathComponents.insert(pathComponent.toString());
 }
 
-void UpdateIndexData::allPathsIndexed() {
+void UpdateIndexData::setAllPathsIndexed() {
     _allPathsIndexed = true;
+}
+
+bool UpdateIndexData::allPathsIndexed() const {
+    return _allPathsIndexed;
 }
 
 void UpdateIndexData::clear() {
@@ -142,7 +71,7 @@ bool UpdateIndexData::mightBeIndexed(const FieldRef& path) const {
     }
 
     for (const auto& indexedPath : _canonicalPaths) {
-        if (pathOverlaps(path, indexedPath)) {
+        if (FieldRef::pathOverlaps(path, indexedPath)) {
             return true;
         }
     }
@@ -158,35 +87,12 @@ bool UpdateIndexData::mightBeIndexed(const FieldRef& path) const {
     return false;
 }
 
-bool UpdateIndexData::_startsWith(const FieldRef& a, const FieldRef& b) const {
-    return (a == b) || (b.isPrefixOf(a));
+const absl::btree_set<FieldRef>& UpdateIndexData::getCanonicalPaths() const {
+    return _canonicalPaths;
 }
 
-FieldRef UpdateIndexData::getCanonicalIndexField(const FieldRef& path) {
-    if (path.numParts() <= 1)
-        return path;
-
-    // The first part of the path must always be a valid field name, since it's not possible to
-    // store a top-level array or '$' field name in a document.
-    FieldRef buf(path.getPart(0));
-    for (size_t i = 1; i < path.numParts(); ++i) {
-        auto pathComponent = path.getPart(i);
-
-        NumericPathComponentResult res = checkNumericOrDollarPathComponent(path, i, pathComponent);
-        if (res == NumericPathComponentResult::kNumericOrDollar) {
-            continue;
-        }
-        if (res == NumericPathComponentResult::kConsecutiveNumbers) {
-            break;
-        }
-
-        buf.appendPart(pathComponent);
-    }
-
-    return buf;
+const absl::btree_set<std::string>& UpdateIndexData::getPathComponents() const {
+    return _pathComponents;
 }
 
-bool UpdateIndexData::isComponentPartOfCanonicalizedIndexPath(StringData pathComponent) {
-    return pathComponent != "$"_sd && !FieldRef::isNumericPathComponentLenient(pathComponent);
-}
 }  // namespace mongo

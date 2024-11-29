@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -65,7 +64,21 @@ unsigned long getIndexAffectedFromLogEntry(std::vector<const UpdateIndexData*> i
     if (!diff) {
         return (unsigned long)-1;
     }
-    return mongo::doc_diff::anyIndexesMightBeAffected(*diff, indexData).to_ulong();
+    mongo::doc_diff::IndexUpdateIdentifier updateIdentifier{indexData.size() /*numIndexes*/};
+    for (size_t i = 0; i < indexData.size(); i++) {
+        updateIdentifier.addIndex(i /*indexCounter*/, *indexData[i]);
+    }
+
+    // Convert the set bits into a numeric value to return.
+    // This assumes that the value fits into an unsigned long, which is true for the test cases in
+    // this file.
+    doc_diff::IndexSet indexSet = updateIdentifier.determineAffectedIndexes(*diff);
+    unsigned long value = 0;
+    for (size_t pos = indexSet.findFirst(); pos != mongo::doc_diff::IndexSet::npos;
+         pos = indexSet.findNext(pos)) {
+        value |= 1 << pos;
+    }
+    return value;
 }
 
 TEST(DeltaExecutorTest, Delete) {

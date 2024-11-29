@@ -37,31 +37,25 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/update_index_data.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
 class CollatorInterface;
+class ExpressionContext;
 class IndexAccessMethod;
-class IndexDescriptor;
 class MatchExpression;
 class OperationContext;
-class ExpressionContext;
 
 class IndexCatalogEntryImpl : public IndexCatalogEntry {
 public:
@@ -70,6 +64,8 @@ public:
                           const std::string& ident,
                           IndexDescriptor&& descriptor,
                           bool isFrozen);
+
+    ~IndexCatalogEntryImpl() override;
 
     const std::string& getIdent() const final {
         return _shared->_ident;

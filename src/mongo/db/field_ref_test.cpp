@@ -949,5 +949,42 @@ TEST(RemoveFirstPart, RemovingFirstPartFromLongPathMultipleTimes) {
     ASSERT_EQ(path, FieldRef("sixth.seventh.eigth.ninth.tenth"));
 }
 
+TEST(FieldRefCanonicalIndexField, CanonicalIndexField) {
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a")), FieldRef("a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("aaa")), FieldRef("aaa"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.b")), FieldRef("a.b"_sd));
+
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.$")), FieldRef("a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0")), FieldRef("a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.123")), FieldRef("a"_sd));
+
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.$.b")), FieldRef("a.b"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0.b")), FieldRef("a.b"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.123.b")), FieldRef("a.b"_sd));
+
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.$ref")), FieldRef("a.$ref"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.$ref.b")), FieldRef("a.$ref.b"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.c$d.b")), FieldRef("a.c$d.b"_sd));
+
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.123a")), FieldRef("a.123a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.a123")), FieldRef("a.a123"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.123a.b")), FieldRef("a.123a.b"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.a123.b")), FieldRef("a.a123.b"_sd));
+
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.")), FieldRef("a."_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("$")), FieldRef("$"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("$.a")), FieldRef("$.a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.$")), FieldRef("a"_sd));
+}
+
+TEST(FieldRefCanonicalIndexField, CanonicalIndexFieldForNestedNumericFieldNames) {
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0.0")), FieldRef("a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.55.01")), FieldRef("a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0.0.b.1")), FieldRef("a"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0b.1")), FieldRef("a.0b"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0.b.1.2")), FieldRef("a.b"_sd));
+    ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.01.02.b.c")), FieldRef("a"_sd));
+}
+
 }  // namespace
 }  // namespace mongo

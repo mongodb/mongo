@@ -32,6 +32,8 @@ mongo_cc_library(
         "document_diff_applier.cpp",
         "document_diff_calculator.cpp",
         "document_diff_serialization.cpp",
+        "//src/mongo/util:dynamic_bitset.h",
+        "//src/mongo/util:inlined_storage.h",
     ],
     hdrs = [
         "document_diff_applier.h",

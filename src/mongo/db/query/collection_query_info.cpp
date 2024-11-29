@@ -44,11 +44,11 @@
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_access_method.h"
@@ -57,14 +57,17 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
@@ -141,13 +144,7 @@ void CollectionQueryInfo::PlanCacheState::clearPlanCache() {
     planCacheInvalidator.clearPlanCache();
 }
 
-CollectionQueryInfo::CollectionQueryInfo()
-    : _keysComputed{false}, _planCacheState{std::make_shared<PlanCacheState>()} {}
-
-const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx) const {
-    invariant(_keysComputed);
-    return _indexedPaths;
-}
+CollectionQueryInfo::CollectionQueryInfo() : _planCacheState{std::make_shared<PlanCacheState>()} {}
 
 void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
                                                  const IndexAccessMethod* accessMethod,
@@ -161,7 +158,7 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
         // updates, since we do not exhaustively know the set of paths to be indexed.
         if (pathProj->exec()->getType() ==
             TransformerInterface::TransformerType::kExclusionProjection) {
-            outData->allPathsIndexed();
+            outData->setAllPathsIndexed();
         } else {
             // If a subtree was specified in the keyPattern, or if an inclusion projection is
             // present, then we need only index the path(s) preserved by the projection.
@@ -185,7 +182,7 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
         fts::FTSSpec ftsSpec(descriptor->infoObj());
 
         if (ftsSpec.wildcard()) {
-            outData->allPathsIndexed();
+            outData->setAllPathsIndexed();
         } else {
             for (size_t i = 0; i < ftsSpec.numExtraBefore(); ++i) {
                 outData->addPath(FieldRef(ftsSpec.extraBefore(i)));
@@ -220,19 +217,6 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
             outData->addPath(FieldRef(it->first));
         }
     }
-}
-
-void CollectionQueryInfo::computeUpdateIndexData(OperationContext* opCtx, const Collection* coll) {
-    _indexedPaths.clear();
-
-    auto it = coll->getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
-    while (it->more()) {
-        const IndexCatalogEntry* entry = it->next();
-        computeUpdateIndexData(entry, entry->accessMethod(), &_indexedPaths);
-    }
-
-    _keysComputed = true;
 }
 
 void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
@@ -283,6 +267,18 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
     _planCacheState = std::make_shared<PlanCacheState>(opCtx, coll);
 }
 
+PlanCache* CollectionQueryInfo::getPlanCache() const {
+    return &_planCacheState->classicPlanCache;
+}
+
+size_t CollectionQueryInfo::getPlanCacheInvalidatorVersion() const {
+    return _planCacheState->planCacheInvalidator.versionNumber();
+}
+
+const PlanCacheIndexabilityState& CollectionQueryInfo::getPlanCacheIndexabilityState() const {
+    return _planCacheState->planCacheIndexabilityState;
+}
+
 void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
     // Skip registering the index in a --repair, as the server will terminate after
     // the repair operation completes.
@@ -306,8 +302,6 @@ void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
 }
 
 void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const Collection* coll) {
-    _keysComputed = false;
-    computeUpdateIndexData(opCtx, coll);
     updatePlanCacheIndexEntries(opCtx, coll);
 }
 

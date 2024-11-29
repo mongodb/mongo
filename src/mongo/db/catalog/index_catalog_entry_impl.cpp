@@ -144,6 +144,8 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     }
 }
 
+IndexCatalogEntryImpl::~IndexCatalogEntryImpl() = default;
+
 void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) {
     invariant(!_shared->_accessMethod);
     _shared->_accessMethod = std::move(accessMethod);

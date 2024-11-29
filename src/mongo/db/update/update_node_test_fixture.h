@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/bson/json.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_node.h"
@@ -99,9 +98,10 @@ protected:
         if (!diff) {
             return false;
         }
-        return mongo::doc_diff::anyIndexesMightBeAffected(
-                   *diff, std::vector<const UpdateIndexData*>{_indexData.get()})
-            .any();
+
+        mongo::doc_diff::IndexUpdateIdentifier updateIdentifier{1 /*numIndexes*/};
+        updateIdentifier.addIndex(0 /*indexCounter*/, *_indexData);
+        return updateIdentifier.determineAffectedIndexes(*diff).any();
     }
 
     bool getIndexAffectedFromLogEntry() {

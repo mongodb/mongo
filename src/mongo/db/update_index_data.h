@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/update_index_data.h"
 
 namespace mongo {
 
@@ -44,18 +45,6 @@ namespace mongo {
 class UpdateIndexData {
 public:
     UpdateIndexData();
-
-    /**
-     * Returns the canonicalized index form for 'path', removing numerical path components as well
-     * as '$' path components.
-     */
-    static FieldRef getCanonicalIndexField(const FieldRef& path);
-
-    /**
-     * Returns whether the provided path component can be included in the canonicalized index form
-     * of a path.
-     */
-    static bool isComponentPartOfCanonicalizedIndexPath(StringData pathComponent);
 
     /**
      * Register a path.  Any update targeting this path (or a parent of this path) will
@@ -70,10 +59,16 @@ public:
     void addPathComponent(StringData pathComponent);
 
     /**
-     * Register the "wildcard" path.  All updates will trigger a recomputation of the document's
-     * index keys.
+     * Register the "wildcard" path for wildcard indexes or wildcard text indexes.
+     * All updates of a document will trigger a recomputation of the document's index keys for this
+     * index.
      */
-    void allPathsIndexed();
+    void setAllPathsIndexed();
+
+    /**
+     * Returns whether the "wildcard" path was registered before.
+     */
+    bool allPathsIndexed() const;
 
     void clear();
 
@@ -84,15 +79,32 @@ public:
      */
     bool isEmpty() const;
 
+    /**
+     * Get canonical path of each indexed field.
+     */
+    const absl::btree_set<FieldRef>& getCanonicalPaths() const;
+
+    /**
+     * Get all path components.
+     * Path components contain the name(s) of the "language" field(s) in text indexes.
+     */
+    const absl::btree_set<std::string>& getPathComponents() const;
+
 private:
     /**
-     * Returns true if 'b' is a prefix of 'a', or if the two paths are equal.
+     * Canonicalized paths of the index fields.
      */
-    bool _startsWith(const FieldRef& a, const FieldRef& b) const;
-
     absl::btree_set<FieldRef> _canonicalPaths;
+
+    /**
+     * The name(s) of the "language" field(s) in text indexes, if any.
+     */
     absl::btree_set<std::string> _pathComponents;
 
+    /**
+     * Set to true if the index is either a wildcard index ({"$**": 0|1}) or a wildcard text index
+     * ({"$**": "text"}). In this case the index assumes responsibility for all fields.
+     */
     bool _allPathsIndexed;
 };
 }  // namespace mongo

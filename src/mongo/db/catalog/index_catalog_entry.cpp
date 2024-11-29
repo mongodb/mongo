@@ -27,23 +27,19 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
-
 
 namespace mongo {
 
 std::shared_ptr<const IndexCatalogEntry> IndexCatalogEntryContainer::release(
     const IndexDescriptor* desc) {
     for (auto i = _entries.begin(); i != _entries.end(); ++i) {
-        if ((*i)->descriptor() != desc)
-            continue;
-        auto e = std::move(*i);
-        _entries.erase(i);
-        return e;
+        if ((*i)->descriptor() == desc) {
+            auto e = std::move(*i);
+            _entries.erase(i);
+            return e;
+        }
     }
     return nullptr;
 }

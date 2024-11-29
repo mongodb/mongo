@@ -625,8 +625,7 @@ public:
                 builder->append(elt);
 
                 bool isComponentPartOfCanonicalizedIndexPath =
-                    UpdateIndexData::isComponentPartOfCanonicalizedIndexPath(
-                        elt.fieldNameStringData());
+                    FieldRef::isComponentPartOfCanonicalizedIndexPath(elt.fieldNameStringData());
                 // If the path is empty, then the field names are being appended at the top level.
                 // This means that they cannot represent indices of an array, so the 'canonical'
                 // path check does not apply.

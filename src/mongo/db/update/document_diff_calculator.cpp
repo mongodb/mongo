@@ -28,17 +28,17 @@
  */
 
 #include <absl/container/node_hash_map.h>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
-
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
@@ -49,6 +49,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::doc_diff {
@@ -175,7 +176,8 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
     while (preItr.more()) {
         // Note that we don't need to record these into the 'deletes' set because there are no more
         // fields in the post image.
-        invariant(!postItr.more());
+        tassert(7639001, "postItr needs to be empty", !postItr.more());
+
         auto next = (*preItr);
         diffNode->addDelete(next.fieldNameStringData());
         preItr.advance(next);
@@ -273,8 +275,6 @@ void appendFieldNested(std::variant<mutablebson::Element, BSONElement> elt,
 
 void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuilder* bob) {
     for (auto&& [field, child] : node->getChildren()) {
-        StringWrapper wrapper(field);
-        auto fieldName = wrapper.getStr().toString();
         switch (child->type()) {
             case diff_tree::NodeType::kInsert: {
                 appendFieldNested(checked_cast<const diff_tree::InsertNode&>(*child).elt,
@@ -294,17 +294,17 @@ void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuil
                 MONGO_UNIMPLEMENTED;
             }
             case diff_tree::NodeType::kDelete: {
-                bob->append(fieldName, doc_diff::kDeleteSectionFieldName);
+                bob->append(StringData{field}, doc_diff::kDeleteSectionFieldName);
                 break;
             }
             case diff_tree::NodeType::kDocumentSubDiff: {
-                BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                BSONObjBuilder subBob(bob->subobjStart(StringData{field}));
                 serializeInlineDiff(
                     checked_cast<const diff_tree::DocumentSubDiffNode*>(child.get()), &subBob);
                 break;
             }
             case diff_tree::NodeType::kArray: {
-                bob->append(fieldName, doc_diff::kUpdateSectionFieldName);
+                bob->append(StringData{field}, doc_diff::kUpdateSectionFieldName);
                 break;
             }
             case diff_tree::NodeType::kDocumentInsert: {
@@ -314,112 +314,185 @@ void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuil
     }
 }
 
-void anyIndexesMightBeAffected(ArrayDiffReader* reader,
-                               const std::vector<const UpdateIndexData*>& indexData,
-                               FieldRef* fieldRef,
-                               BitVector* result);
+}  // namespace
 
-void anyIndexesMightBeAffected(DocumentDiffReader* reader,
-                               const std::vector<const UpdateIndexData*>& indexData,
-                               FieldRef* fieldRef,
-                               BitVector* result) {
-    boost::optional<StringData> delItem;
-    while ((delItem = reader->nextDelete())) {
-        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, *delItem);
-        for (size_t i = 0; i < indexData.size(); i++) {
-            if (!(*result)[i]) {
-                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+IndexUpdateIdentifier::IndexUpdateIdentifier(size_t numIndexes) : _numIndexes(numIndexes) {}
+
+void IndexUpdateIdentifier::addIndex(size_t indexCounter, const UpdateIndexData& updateIndexData) {
+    tassert(7639000, "indexCounter should be less than _numIndexes", indexCounter < _numIndexes);
+
+    auto addCurrentIndexToIndexSet = [&](IndexSet& indexSet) {
+        indexSet.set(indexCounter);
+    };
+
+    // Add the current index to the index set of wildcard indexes, if the index is a wildcard index.
+    if (updateIndexData.allPathsIndexed()) {
+        addCurrentIndexToIndexSet(_allPathsIndexed);
+        // No need to continue with inserting path-specific data if we get here.
+        return;
+    }
+
+    // Add the current index to the index sets for all canonical paths covered by the index.
+    for (const auto& path : updateIndexData.getCanonicalPaths()) {
+        // Check if we already have an entry for the same path or not.
+        // Note that this loop has O(n x m) runtime complexity where 'n' is the number of canonical
+        // paths in the index entry, and 'm' is the number of existing canonical paths of other
+        // indexes in the same collection. This should not be a problem in practice, as the maximum
+        // number of indexes is limited to currently 64 per collection, and indexes normally tend to
+        // cover only few fields. Also note that for wildcard indexes and wildcard text indexes that
+        // could cover a lot of fields, we do not store any paths here.
+        auto foundPathEntry = std::find_if(_canonicalPathsToIndexSets.begin(),
+                                           _canonicalPathsToIndexSets.end(),
+                                           [&](const auto& entry) { return entry.first == path; });
+        if (foundPathEntry == _canonicalPathsToIndexSets.end()) {
+            // No such entry yet. We create a new one and make 'it' point to it.
+            foundPathEntry = _canonicalPathsToIndexSets.insert(_canonicalPathsToIndexSets.end(),
+                                                               std::make_pair(path, IndexSet{}));
+        }
+        addCurrentIndexToIndexSet(foundPathEntry->second);
+    }
+
+    // Add the current index to an index set associated with each path component used by the current
+    // index.
+    for (const auto& pathComponent : updateIndexData.getPathComponents()) {
+        addCurrentIndexToIndexSet(_pathComponentsToIndexSets[pathComponent]);
+    }
+}
+
+IndexSet IndexUpdateIdentifier::determineAffectedIndexes(const Diff& diff) const {
+    if (diff.isEmpty()) {
+        // No diff -> nothing to do!
+        return IndexSet{};
+    }
+
+    IndexSet indexesToUpdate = _allPathsIndexed;
+    dassert(indexesToUpdate.size() >= _numIndexes);
+
+    DocumentDiffReader reader(diff);
+    FieldRef path;
+    determineAffectedIndexes(&reader, path, indexesToUpdate);
+
+    // Expect that the set of wildcard indexes is a subset of all indexes to be updated.
+    dassert((_allPathsIndexed & indexesToUpdate) == _allPathsIndexed);
+
+    return indexesToUpdate;
+}
+
+void IndexUpdateIdentifier::determineAffectedIndexes(const FieldRef& path,
+                                                     IndexSet& indexesToUpdate) const {
+    for (const auto& indexedPath : _canonicalPathsToIndexSets) {
+        if ((indexesToUpdate & indexedPath.second) == indexedPath.second) {
+            // Already handled all the indexes for which we have canonical paths.
+            // This is an important speedup.
+            continue;
+        }
+        if (FieldRef::pathOverlaps(path, indexedPath.first)) {
+            dassert(indexesToUpdate.size() == indexedPath.second.size());
+            indexesToUpdate |= indexedPath.second;
+        }
+    }
+
+    if (!_pathComponentsToIndexSets.empty()) {
+        for (size_t partIdx = 0; partIdx < path.numParts(); ++partIdx) {
+            // Look up path component in hash table.
+            StringData part = path.getPart(partIdx);
+
+            // Converting to std::string_view here to avoid heap allocations for temporary
+            // std::string lookup values.
+            if (auto foundPathComponent = _pathComponentsToIndexSets.find(std::string_view(part));
+                foundPathComponent != _pathComponentsToIndexSets.end()) {
+                // Path component found. Now add the index positions to the IndexSet.
+                dassert(indexesToUpdate.size() == foundPathComponent->second.size());
+                indexesToUpdate |= foundPathComponent->second;
             }
         }
-        // early exit
-        if (result->all()) {
+    }
+}
+
+void IndexUpdateIdentifier::determineAffectedIndexes(DocumentDiffReader* reader,
+                                                     FieldRef& fieldRef,
+                                                     IndexSet& indexesToUpdate) const {
+    boost::optional<StringData> delItem;
+    while ((delItem = reader->nextDelete())) {
+        FieldRef::FieldRefTempAppend tempAppend(fieldRef, *delItem);
+        determineAffectedIndexes(fieldRef, indexesToUpdate);
+
+        // Early exit if possible.
+        if (indexesToUpdate.count() == _numIndexes) {
             return;
         }
     }
 
     boost::optional<BSONElement> updItem;
     while ((updItem = reader->nextUpdate())) {
-        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, updItem->fieldNameStringData());
-        for (size_t i = 0; i < indexData.size(); i++) {
-            if (!(*result)[i]) {
-                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
-            }
-        }
-        // early exit
-        if (result->all()) {
+        FieldRef::FieldRefTempAppend tempAppend(fieldRef, updItem->fieldNameStringData());
+        determineAffectedIndexes(fieldRef, indexesToUpdate);
+
+        // Early exit.
+        if (indexesToUpdate.count() == _numIndexes) {
             return;
         }
     }
 
     boost::optional<BSONElement> insItem;
     while ((insItem = reader->nextInsert())) {
-        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, insItem->fieldNameStringData());
-        for (size_t i = 0; i < indexData.size(); i++) {
-            if (!(*result)[i]) {
-                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
-            }
-        }
-        // early exit
-        if (result->all()) {
+        FieldRef::FieldRefTempAppend tempAppend(fieldRef, insItem->fieldNameStringData());
+        determineAffectedIndexes(fieldRef, indexesToUpdate);
+
+        // Early exit if possible.
+        if (indexesToUpdate.count() == _numIndexes) {
             return;
         }
     }
 
     for (auto subItem = reader->nextSubDiff(); subItem; subItem = reader->nextSubDiff()) {
-        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, subItem->first);
-        visit(OverloadedVisitor{[&indexData, &fieldRef, &result](DocumentDiffReader& item) {
-                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+        FieldRef::FieldRefTempAppend tempAppend(fieldRef, subItem->first);
+        visit(OverloadedVisitor{[this, &fieldRef, &indexesToUpdate](DocumentDiffReader& item) {
+                                    determineAffectedIndexes(&item, fieldRef, indexesToUpdate);
                                 },
-                                [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
-                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                                [this, &fieldRef, &indexesToUpdate](ArrayDiffReader& item) {
+                                    determineAffectedIndexes(&item, fieldRef, indexesToUpdate);
                                 }},
               subItem->second);
-        // early exit
-        if (result->all()) {
+
+        // Early exit if possible.
+        if (indexesToUpdate.count() == _numIndexes) {
             return;
         }
     }
 }
 
-void anyIndexesMightBeAffected(ArrayDiffReader* reader,
-                               const std::vector<const UpdateIndexData*>& indexData,
-                               FieldRef* fieldRef,
-                               BitVector* result) {
+void IndexUpdateIdentifier::determineAffectedIndexes(ArrayDiffReader* reader,
+                                                     FieldRef& fieldRef,
+                                                     IndexSet& indexesToUpdate) const {
     if (reader->newSize()) {
-        for (size_t i = 0; i < indexData.size(); i++) {
-            if (!(*result)[i]) {
-                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
-            }
-        }
-        // early exit
-        if (result->all()) {
+        determineAffectedIndexes(fieldRef, indexesToUpdate);
+
+        // Early exit if possible.
+        if (indexesToUpdate.count() == _numIndexes) {
             return;
         }
     }
     for (auto item = reader->next(); item; item = reader->next()) {
         auto idxAsStr = std::to_string(item->first);
-        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, idxAsStr);
-        visit(OverloadedVisitor{[&indexData, &fieldRef, &result](BSONElement& update) {
-                                    for (size_t i = 0; i < indexData.size(); i++) {
-                                        if (!(*result)[i]) {
-                                            (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
-                                        }
-                                    }
+        FieldRef::FieldRefTempAppend tempAppend(fieldRef, idxAsStr);
+        visit(OverloadedVisitor{[this, &fieldRef, &indexesToUpdate](BSONElement& update) {
+                                    determineAffectedIndexes(fieldRef, indexesToUpdate);
                                 },
-                                [&indexData, &fieldRef, &result](DocumentDiffReader& item) {
-                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                                [this, &fieldRef, &indexesToUpdate](DocumentDiffReader& item) {
+                                    determineAffectedIndexes(&item, fieldRef, indexesToUpdate);
                                 },
-                                [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
-                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                                [this, &fieldRef, &indexesToUpdate](ArrayDiffReader& item) {
+                                    determineAffectedIndexes(&item, fieldRef, indexesToUpdate);
                                 }},
               item->second);
-        // early exit
-        if (result->all()) {
+
+        // Early exit if possible.
+        if (indexesToUpdate.count() == _numIndexes) {
             return;
         }
     }
 }
-}  // namespace
 
 boost::optional<Diff> computeOplogDiff(const BSONObj& pre, const BSONObj& post, size_t padding) {
     if (auto diffNode = computeDocDiff(pre, post, false /* ignoreSizeLimit */, padding)) {
@@ -431,7 +504,16 @@ boost::optional<Diff> computeOplogDiff(const BSONObj& pre, const BSONObj& post, 
     return {};
 }
 
+
+Diff computeOplogDiff_forTest(const BSONObj& pre, const BSONObj& post) {
+    // Compute the full document differences between 'pre' and 'post'.
+    auto diffNode = computeDocDiff(pre, post, true /* ignoreSizeLimit */, 0 /* padding */);
+    tassert(7639006, "diffNode should always have a value", diffNode);
+    return diffNode->serialize();
+}
+
 boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& post) {
+    // Compute the full document differences between 'pre' and 'post'.
     auto diffNode = computeDocDiff(pre, post, true /* ignoreSizeLimit */, 0);
     BSONObjBuilder bob;
     serializeInlineDiff(diffNode.get(), &bob);
@@ -441,18 +523,4 @@ boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& po
     return bob.obj();
 }
 
-
-BitVector anyIndexesMightBeAffected(const Diff& diff,
-                                    const std::vector<const UpdateIndexData*>& indexData) {
-    invariant(!indexData.empty());
-    BitVector result(indexData.size());
-    if (diff.isEmpty()) {
-        return result;
-    }
-
-    DocumentDiffReader reader(diff);
-    FieldRef path;
-    anyIndexesMightBeAffected(&reader, indexData, &path, &result);
-    return result;
-}
 }  // namespace mongo::doc_diff

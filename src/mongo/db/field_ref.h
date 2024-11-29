@@ -85,6 +85,23 @@ public:
     static bool isNumericPathComponentStrict(StringData component);
 
     /**
+     * Checks whether document path 'path' overlaps with a path of an indexed field 'indexedPath'.
+     */
+    static bool pathOverlaps(const FieldRef& path, const FieldRef& indexedPath);
+
+    /**
+     * Returns the canonicalized index form for 'path', removing numerical path components as well
+     * as '$' path components.
+     */
+    static FieldRef getCanonicalIndexField(const FieldRef& path);
+
+    /**
+     * Returns whether the provided path component can be included in the canonicalized index form
+     * of a path.
+     */
+    static bool isComponentPartOfCanonicalizedIndexPath(StringData pathComponent);
+
+    /**
      * Similar to the function above except strings that contain leading zero's are considered
      * numeric. For instance, the above function would return false for an input "01" however this
      * function will return true.

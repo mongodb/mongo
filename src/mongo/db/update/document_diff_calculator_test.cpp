@@ -40,12 +40,12 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -55,6 +55,516 @@ void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
     ASSERT_EQ(comparator.compare(lhs, rhs), 0);
 }
 
+TEST(IndexUpdateIdentifierTest, Empty) {
+    auto preObj = fromjson("{a: 1}");
+    auto postObj = fromjson("{a: 1, b: 1}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+
+    // No indexes affected because we do not have any.
+    ASSERT_TRUE(updateIdentifier.determineAffectedIndexes(oplogDiff).none());
+}
+
+TEST(IndexUpdateIdentifierTest, EmptyDiff) {
+    auto obj = fromjson("{a: 1}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(obj, obj);
+    ASSERT_TRUE(oplogDiff.isEmpty());
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a"));
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        // No indexes affected because diff is empty.
+        ASSERT_TRUE(updateIdentifier.determineAffectedIndexes(oplogDiff).none());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("a"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        // No indexes affected because diff is empty.
+        ASSERT_TRUE(updateIdentifier.determineAffectedIndexes(oplogDiff).none());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForSingleIndex) {
+    auto preObj = fromjson("{a: 1}");
+    auto postObj = fromjson("{a: 2}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a"));
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("a"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
+    auto preObj = fromjson("{a: {b: 1}}");
+    auto postObj = fromjson("{a: {b: 2}}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a.b"));
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("b.a"));
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_FALSE(affected[0]);
+        ASSERT_EQ(0, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("a"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("b"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("c"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_FALSE(affected[0]);
+        ASSERT_EQ(0, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesAllAffected) {
+    auto preObj = fromjson("{a: 1, b: 1, c: 1}");
+    auto postObj = fromjson("{a: 2, b: 2, c: 2}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a"));
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("b"));
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("c"));
+            updateIdentifier.addIndex(2, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_EQ(3, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("a"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("b"_sd);
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("c"_sd);
+            updateIdentifier.addIndex(2, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_EQ(3, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesSomeAffected) {
+    auto preObj = fromjson("{a: 1, b: 1, c: 1, d: 1}");
+    auto postObj = fromjson("{a: 1, b: 2, c: 1, d: 2}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(4 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a"));
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("b"));
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("c"));
+            updateIdentifier.addIndex(2, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("d"));
+            updateIdentifier.addIndex(3, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_FALSE(affected[0]);
+        ASSERT_TRUE(affected[1]);
+        ASSERT_FALSE(affected[2]);
+        ASSERT_TRUE(affected[3]);
+        ASSERT_EQ(2, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(4 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("a"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("b"_sd);
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("c"_sd);
+            updateIdentifier.addIndex(2, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("d"_sd);
+            updateIdentifier.addIndex(3, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_FALSE(affected[0]);
+        ASSERT_TRUE(affected[1]);
+        ASSERT_FALSE(affected[2]);
+        ASSERT_TRUE(affected[3]);
+        ASSERT_EQ(2, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffOnlyForNonIndexedFields) {
+    auto preObj = fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}");
+    auto postObj = fromjson("{a: 1, b: 2, c: 3, d: 4, e: 1}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a"));
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("e"));
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        // No indexes affected because only non-indexed fields are changed.
+        ASSERT_TRUE(updateIdentifier.determineAffectedIndexes(oplogDiff).none());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("a"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("e"_sd);
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        // No indexes affected because only non-indexed fields are changed.
+        ASSERT_TRUE(updateIdentifier.determineAffectedIndexes(oplogDiff).none());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForArrayField) {
+    auto preObj = fromjson("{a: [0, 1], b: []}");
+    auto postObj = fromjson("{a: [1, 2], b: [1]}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a"));
+            updateIdentifier.addIndex(0, uid);
+        }
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("b"));
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_TRUE(affected[1]);
+        ASSERT_EQ(2, affected.count());
+    }
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("a"_sd);
+            updateIdentifier.addIndex(0, uid);
+        }
+        {
+            UpdateIndexData uid;
+            uid.addPathComponent("b"_sd);
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_TRUE(affected[1]);
+        ASSERT_EQ(2, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForArrayOfObjectsField) {
+    auto preObj = fromjson("{a: [{b: 1}]}");
+    auto postObj = fromjson("{a: [{b: 2}]}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a.b"));
+            updateIdentifier.addIndex(0, uid);
+        }
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("b"));
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_FALSE(affected[1]);
+        ASSERT_EQ(1, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForDollarPrefixField) {
+    auto preObj = fromjson("{a: {$b: 1}, $c: true}");
+    auto postObj = fromjson("{a: {$b: null}, $c: false}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    {
+        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("a.$b"));
+            updateIdentifier.addIndex(0, uid);
+        }
+        {
+            UpdateIndexData uid;
+            uid.addPath(FieldRef("$c"));
+            updateIdentifier.addIndex(1, uid);
+        }
+
+        doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+        ASSERT_TRUE(affected[0]);
+        ASSERT_TRUE(affected[1]);
+        ASSERT_EQ(2, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForSingleWildcardIndex) {
+    auto preObj = fromjson("{a: 1, b: 1, c: 1}");
+    auto postObj = fromjson("{a: 2, b: 2, c: 2}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+    {
+        UpdateIndexData uid;
+
+        // Wildcard index.
+        uid.setAllPathsIndexed();
+        updateIdentifier.addIndex(0, uid);
+    }
+
+    doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+    ASSERT_TRUE(affected[0]);
+    ASSERT_EQ(1, affected.count());
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForMultipleWildcardIndexes) {
+    auto preObj = fromjson("{a: 1, b: 1, c: 1}");
+    auto postObj = fromjson("{a: 2, b: 2, c: 2}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+    {
+        UpdateIndexData uid;
+
+        // Wildcard index.
+        uid.setAllPathsIndexed();
+        updateIdentifier.addIndex(0, uid);
+    }
+
+    {
+        UpdateIndexData uid;
+
+        // Wildcard index.
+        uid.setAllPathsIndexed();
+        updateIdentifier.addIndex(1, uid);
+    }
+
+    {
+        UpdateIndexData uid;
+
+        // Wildcard index.
+        uid.setAllPathsIndexed();
+        updateIdentifier.addIndex(2, uid);
+    }
+
+    doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+    ASSERT_TRUE(affected[0]);
+    ASSERT_TRUE(affected[1]);
+    ASSERT_TRUE(affected[2]);
+    ASSERT_EQ(3, affected.count());
+}
+
+TEST(IndexUpdateIdentifierTest, DiffForWildcardIndexCombination) {
+    auto preObj = fromjson("{a: 1, b: 1, c: 1}");
+    auto postObj = fromjson("{a: 2, b: 1, c: 2}");
+    auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
+
+    doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+    {
+        UpdateIndexData uid;
+        uid.addPath(FieldRef("a"));
+        updateIdentifier.addIndex(0, uid);
+    }
+
+    {
+        UpdateIndexData uid;
+        uid.addPath(FieldRef("b"));
+        updateIdentifier.addIndex(1, uid);
+    }
+
+    {
+        UpdateIndexData uid;
+
+        // Wildcard index.
+        uid.setAllPathsIndexed();
+        updateIdentifier.addIndex(2, uid);
+    }
+
+    doc_diff::IndexSet affected = updateIdentifier.determineAffectedIndexes(oplogDiff);
+    ASSERT_TRUE(affected[0]);
+    ASSERT_FALSE(affected[1]);
+
+    // Wildcard index.
+    ASSERT_TRUE(affected[2]);
+    ASSERT_EQ(2, affected.count());
+}
+
+DEATH_TEST_REGEX(IndexUpdateIdentifierTest,
+                 FailsWhenAnIndexIsAddedWIthWrongCounter,
+                 R"#(Tripwire assertion.*7639000.*indexCounter should be less than _numIndexes)#") {
+    doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+    {
+        UpdateIndexData uid;
+
+        // indexCounter 1 is >= the number of indexes declared for the IndexUpdateIdentifier.
+        updateIdentifier.addIndex(1, uid);
+    }
+}
 
 TEST(DocumentDiffCalculatorTest, SameObjectsNoDiff) {
     auto assertDiffEmpty = [](const BSONObj& doc) {

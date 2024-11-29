@@ -29,34 +29,25 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "mongo/bson/ordering.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
 class CollatorInterface;
 class Collection;
-
 class CollectionPtr;
 class CollectionCatalogEntry;
-
 class Ident;
 class IndexAccessMethod;
 class SortedDataIndexAccessMethod;
-
 class IndexBuildInterceptor;
 class IndexDescriptor;
 class MatchExpression;
@@ -184,8 +175,8 @@ public:
 
 class IndexCatalogEntryContainer {
 public:
-    typedef std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator const_iterator;
-    typedef std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator iterator;
+    using const_iterator = std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator;
+    using iterator = std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator;
 
     const_iterator begin() const {
         return _entries.begin();
@@ -210,7 +201,8 @@ public:
     // -----------------
 
     /**
-     * Removes from _entries and returns the matching entry or NULL if none matches.
+     * Removes an entry matching the descriptor from _entries, and returns the matching entry or
+     * NULL if none matches.
      */
     virtual std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc);
 

@@ -34,22 +34,20 @@
 #include <boost/move/utility_core.hpp>
 #include <cstddef>
 #include <memory>
-#include <utility>
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache/plan_cache_invalidator.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/update_index_data.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 
+class IndexCatalogEntry;
 class IndexDescriptor;
 class OperationContext;
+struct PlanSummaryStats;
+class UpdateIndexData;
 
 /**
  * Query information for a particular point-in-time view of a collection.
@@ -78,28 +76,17 @@ public:
     /**
      * Gets the PlanCache for this collection.
      */
-    PlanCache* getPlanCache() const {
-        return &_planCacheState->classicPlanCache;
-    }
+    PlanCache* getPlanCache() const;
 
     /**
      * Gets the number of the current collection version used for Plan Cache invalidation.
      */
-    size_t getPlanCacheInvalidatorVersion() const {
-        return _planCacheState->planCacheInvalidator.versionNumber();
-    }
+    size_t getPlanCacheInvalidatorVersion() const;
 
     /**
      * Gets the "indexability discriminators" used in the PlanCache for generating plan cache keys.
      */
-    const PlanCacheIndexabilityState& getPlanCacheIndexabilityState() const {
-        return _planCacheState->planCacheIndexabilityState;
-    }
-
-    /* get set of index keys for this namespace.  handy to quickly check if a given
-       field is indexed (Note it might be a secondary component of a compound index.)
-    */
-    const UpdateIndexData& getIndexKeys(OperationContext* opCtx) const;
+    const PlanCacheIndexabilityState& getPlanCacheIndexabilityState() const;
 
     /**
      * Builds internal cache state based on the current state of the Collection's IndexCatalog.
@@ -167,12 +154,7 @@ private:
         PlanCacheIndexabilityState planCacheIndexabilityState;
     };
 
-    void computeUpdateIndexData(OperationContext* opCtx, const Collection* coll);
     void updatePlanCacheIndexEntries(OperationContext* opCtx, const Collection* coll);
-
-    // ---  index keys cache
-    bool _keysComputed;
-    UpdateIndexData _indexedPaths;
 
     std::shared_ptr<PlanCacheState> _planCacheState;
 };

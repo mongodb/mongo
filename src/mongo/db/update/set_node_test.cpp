@@ -1348,9 +1348,10 @@ TEST_F(SetNodeTest, ApplySetFieldInNonExistentNumericFieldDoesNotAffectIndexOnSi
     addIndexedPath("a.1.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    // TODO: SERVER-77344 anyIndexesMightBeAffected is tricked into thinking that inserting a.1 is
-    // going to affect the index on a.1.b, but it doesn't see that the inserted path is actually
-    // a.1.c.
+
+    // TODO: SERVER-77344 IndexUpdateIdentifier::determineAffectedIndexes() is tricked into thinking
+    // that inserting a.1 is going to affect the index on a.1.b, but it doesn't see that the
+    // inserted path is actually a.1.c.
     // ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: {'0': {b: 0}, '1': {c: 2}}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());

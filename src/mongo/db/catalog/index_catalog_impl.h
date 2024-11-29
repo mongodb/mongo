@@ -35,7 +35,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -52,11 +51,11 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/update/document_diff_calculator.h"
 
 namespace mongo {
 
@@ -106,6 +105,11 @@ private:
  */
 class IndexCatalogImpl : public IndexCatalog {
 public:
+    /**
+     * Maximum number of indexes that can be present for any given collection at any given time.
+     */
+    static constexpr int kMaxNumIndexesAllowed = 64;
+
     /**
      * Creates a cloned IndexCatalogImpl. Will make shallow copies of IndexCatalogEntryContainers so
      * the IndexCatalogEntry will be shared across IndexCatalogImpl instances'
@@ -300,6 +304,11 @@ private:
     static const BSONObj _idObj;  // { _id : 1 }
 
     /**
+     * Rebuilds internal data structures for which indexes need to be updated upon write operations.
+     */
+    void _rebuildIndexUpdateIdentifier();
+
+    /**
      * In addition to IndexNames::findPluginName, validates that it is a known index type.
      * If all you need is to check for a certain type, just use IndexNames::findPluginName.
      *
@@ -403,8 +412,34 @@ private:
      */
     IndexCatalogEntry* _getWritableEntry(const IndexDescriptor* descriptor);
 
+    /**
+     * List of indexes that are "ready" in the sense that they are functional and in sync with the
+     * underlying collection's documents. Whenever this container is modified, it is required to
+     * rebuild the data in '_indexUpdateIdentifier'.
+     */
     ReadyIndexCatalogEntryContainer _readyIndexes;
+
+    /**
+     * List of indexes that are currently being built. Not in sync with the underlying collection's
+     * documents (yet). Whenever this container is modified, it is required to rebuild the data in
+     * '_indexUpdateIdentifier'.
+     * Indexes that are completely built will be moved from '_buildingIndexes' to '_readyIndexes'
+     * eventually.
+     */
     IndexCatalogEntryContainer _buildingIndexes;
+
+    /**
+     * List of frozen indexes. These indexes are "disabled" and will not be updated upon new data
+     * modifications.
+     */
     IndexCatalogEntryContainer _frozenIndexes;
+
+    /**
+     * A helper object containing aggregate information about which indexes will be affected by
+     * updates to specific fields. This object needs to be kept in sync with the data contained in
+     * '_readyIndexes' and '_buildingIndexes', by means of calling '_rebuildIndexUpdateIdentifier()'
+     * when one of them gets changed.
+     */
+    boost::optional<doc_diff::IndexUpdateIdentifier> _indexUpdateIdentifier;
 };
 }  // namespace mongo
