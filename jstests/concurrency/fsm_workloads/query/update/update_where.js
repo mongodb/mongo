@@ -9,6 +9,9 @@
  *  requires_getmore,
  *  # Uses multi-update which is non-retryable.
  *  requires_non_retryable_writes,
+ *  # TODO (SERVER-91002): server side javascript execution is deprecated, and the balancer is not
+ *  # compatible with it, once the incompatibility is taken care off we can re-enable this test
+ *  assumes_balancer_off
  * ]
  */
 

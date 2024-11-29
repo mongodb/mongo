@@ -13,6 +13,9 @@
  *  # Uses $where operator
  *  requires_scripting,
  *  requires_getmore,
+ *  # TODO (SERVER-91002): server side javascript execution is deprecated, and the balancer is not
+ *  # compatible with it, once the incompatibility is taken care off we can re-enable this test
+ *  assumes_balancer_off
  * ]
  */
 
