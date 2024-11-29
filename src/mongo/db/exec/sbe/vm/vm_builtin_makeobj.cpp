@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+// NO OTHER HEADERS AFTER THIS LINE
+#define MONGO_SBE_VM_MAKEOBJ_H_WHITELIST
 #include "mongo/db/exec/sbe/vm/vm_makeobj.h"
 
 namespace mongo::sbe::vm {

@@ -29,6 +29,21 @@
 
 #pragma once
 
+#ifndef MONGO_SBE_VM_MAKEOBJ_H_WHITELIST
+// This file contains a usage of anonymous namespaces which are very bad to have in headers since
+// they can lead to ODR violations. Unfortunately when removed, it leads to a significant
+// performance loss (see https://jira.mongodb.org/browse/BF-35748). This regression does not go away
+// even when doing the obvious fix of merging this header and the two files that include it into a
+// single cpp file. For now we will just live with this being in a header. All files that include
+// this header must follow the following rules to avoid ODR violations:
+//  * This header may only be included in leaf cpp files, not other headers
+//  * This must be the last header included
+//  * The #define MONGO_SBE_VM_MAKEOBJ_H_WHITELIST must be after all other headers
+//
+// Using #warning rather than #error to play nicely with opening this header in  clangd.
+#warning "vm_makeobj.h is only allowed to be included in whitelisted cpp files. See above comment"
+#endif
+
 #include <limits>
 
 #include "mongo/bson/bsonelement.h"
@@ -41,6 +56,7 @@
 #include "mongo/platform/compiler.h"
 
 namespace mongo::sbe::vm {
+namespace {  // NOLINT(google-build-namespaces) See WHITELIST comment above.
 class MakeObjImpl : ByteCode::MakeObjImplBase {
 public:
     using BaseT = ByteCode::MakeObjImplBase;
@@ -359,4 +375,5 @@ private:
         traverseAndProduceObj(spec, tag, val, fieldName, bob);
     }
 };
+}  // namespace
 }  // namespace mongo::sbe::vm
