@@ -54,7 +54,7 @@ using unittest::JoinThread;
 // Any waits with a timeout or deadline that expect to be woken by another thread should wait at
 // least this long. This doesn't apply if the timeout is expected to expire, or if it is never
 // expected to wait at all.
-constexpr auto kTimeoutForRacyWait = Milliseconds(500);
+constexpr auto kTimeoutForRacyWait = Seconds(1);
 
 TEST(AtomicWaitableTests, WaitUntilValueChangedForAtomicInt) {
     BasicWaitableAtomic<int> sharedData(10);
