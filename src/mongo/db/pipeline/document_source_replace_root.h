@@ -100,8 +100,7 @@ public:
         return fieldPath && fieldPath->isROOT();
     }
 
-    Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
-                                     const SerializationOptions& options = {}) const final {
+    Document serializeTransformation(const SerializationOptions& options = {}) const final {
         return Document{{"newRoot", _newRoot->serialize(options)}};
     }
 

@@ -116,18 +116,18 @@ void DocumentSourceSingleDocumentTransformation::doDispose() {
     if (_transformationProcessor) {
         // Cache the stage options document in case this stage is serialized after disposing.
         _cachedStageOptions = _transformationProcessor->getTransformer().serializeTransformation(
-            pExpCtx->getExplain());
+            SerializationOptions{.verbosity = pExpCtx->getExplain()});
         _transformationProcessor.reset();
     }
 }
 
 Value DocumentSourceSingleDocumentTransformation::serialize(
     const SerializationOptions& opts) const {
-    return Value(Document{{getSourceName(),
-                           _transformationProcessor
-                               ? _transformationProcessor->getTransformer().serializeTransformation(
-                                     opts.verbosity, opts)
-                               : _cachedStageOptions}});
+    return Value(
+        Document{{getSourceName(),
+                  _transformationProcessor
+                      ? _transformationProcessor->getTransformer().serializeTransformation(opts)
+                      : _cachedStageOptions}});
 }
 
 projection_executor::ExclusionNode& DocumentSourceSingleDocumentTransformation::getExclusionNode() {

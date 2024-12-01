@@ -87,9 +87,7 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
 
     boost::intrusive_ptr<DocumentSource> projectionStage =
         make_intrusive<DocumentSourceInternalProjection>(
-            expCtx,
-            transformStage.getTransformer().serializeTransformation(boost::none).toBson(),
-            policies);
+            expCtx, transformStage.getTransformer().serializeTransformation().toBson(), policies);
 
     if (expCtx->getSbeCompatibility() < minRequiredCompatibility) {
         return nullptr;

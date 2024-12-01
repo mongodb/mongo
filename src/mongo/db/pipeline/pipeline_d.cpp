@@ -866,7 +866,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
     const auto projStage =
         exact_pointer_cast<DocumentSourceSingleDocumentTransformation*>(sources.front().get());
     const auto getProjectionObj = [&]() {
-        return projStage->getTransformer().serializeTransformation(boost::none).toBson();
+        return projStage->getTransformer().serializeTransformation().toBson();
     };
     const auto parseProjection = [&](const BSONObj& projObj) {
         return projection_ast::parseAndAnalyze(

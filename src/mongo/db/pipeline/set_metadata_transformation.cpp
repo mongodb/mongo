@@ -74,7 +74,7 @@ void SetMetadataTransformation::optimize() {
 }
 
 Document SetMetadataTransformation::serializeTransformation(
-    boost::optional<ExplainOptions::Verbosity> explain, const SerializationOptions& options) const {
+    const SerializationOptions& options) const {
     MutableDocument output;
 
     // TODO SERVER-96793 Implement and test correct serialization.

@@ -201,8 +201,7 @@ IndexDescriptor::SharedState::SharedState(const std::string& accessMethodName, B
         IndexPathProjection indexPathProjection =
             static_cast<IndexPathProjection>(WildcardKeyGenerator::createProjectionExecutor(
                 BSON("$**" << 1), wildcardProjection.Obj()));
-        _normalizedProjection =
-            indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
+        _normalizedProjection = indexPathProjection.exec()->serializeTransformation().toBson();
     }
 }
 

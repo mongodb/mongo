@@ -116,9 +116,8 @@ public:
      */
     void parse(const BSONObj& spec);
 
-    Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
-                                     const SerializationOptions& options = {}) const final {
-        return _root->serialize(explain, options);
+    Document serializeTransformation(const SerializationOptions& options = {}) const final {
+        return _root->serialize(options);
     }
 
     /**

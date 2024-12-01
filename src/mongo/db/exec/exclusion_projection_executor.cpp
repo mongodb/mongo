@@ -63,7 +63,7 @@ std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(StringDat
 
     // Check for a projection on subfields of 'oldName'. For example, {oldName: {a: 0, b: 0}}.
     if (auto it = _children.find(oldName); it != _children.end()) {
-        extractedExclusion.append(newName, it->second->serialize(boost::none, {}).toBson());
+        extractedExclusion.append(newName, it->second->serialize({}).toBson());
         _children.erase(it);
     }
 

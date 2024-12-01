@@ -116,8 +116,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::do
     // necessary fields.
     if (auto nextProject =
             dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get())) {
-        _projectFilter =
-            nextProject->getTransformer().serializeTransformation(boost::none).toBson();
+        _projectFilter = nextProject->getTransformer().serializeTransformation().toBson();
     }
 
     // Attempt to internalize any predicates of a $match upon the "ns" field.

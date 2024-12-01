@@ -330,16 +330,13 @@ void ProjectionNode::optimize() {
     _maxFieldsToProject = maxFieldsToProject();
 }
 
-Document ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain,
-                                   const SerializationOptions& options) const {
+Document ProjectionNode::serialize(const SerializationOptions& options) const {
     MutableDocument outputDoc;
-    serialize(explain, &outputDoc, options);
+    serialize(&outputDoc, options);
     return outputDoc.freeze();
 }
 
-void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain,
-                               MutableDocument* output,
-                               const SerializationOptions& options) const {
+void ProjectionNode::serialize(MutableDocument* output, const SerializationOptions& options) const {
     // Determine the boolean value for projected fields in the explain output.
     const bool projVal = isIncluded();
 
@@ -358,7 +355,7 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
             MutableDocument subDoc;
-            childIt->second->serialize(explain, &subDoc, options);
+            childIt->second->serialize(&subDoc, options);
             output->addField(options.serializeFieldPathFromString(field), subDoc.freezeToValue());
         } else {
             tassert(7241727,

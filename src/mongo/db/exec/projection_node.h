@@ -157,12 +157,9 @@ public:
 
     void optimize();
 
-    Document serialize(boost::optional<ExplainOptions::Verbosity> explain,
-                       const SerializationOptions& options) const;
+    Document serialize(const SerializationOptions& options) const;
 
-    void serialize(boost::optional<ExplainOptions::Verbosity> explain,
-                   MutableDocument* output,
-                   const SerializationOptions& options) const;
+    void serialize(MutableDocument* output, const SerializationOptions& options) const;
 
     /**
      * Append the variables referred to by this projection to the set 'refs', without clearing any

@@ -99,7 +99,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldSerializeToEquivalentProjection) {
 
     // Converts numbers to bools, converts dotted paths to nested documents. Note order of excluded
     // fields is subject to change.
-    auto serialization = exclusion->serializeTransformation(boost::none);
+    auto serialization = exclusion->serializeTransformation();
     ASSERT_EQ(serialization.computeSize(), 4ULL);
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(false));
@@ -116,14 +116,14 @@ TEST(ExclusionProjectionExecutionTest, ShouldSerializeToEquivalentProjection) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldSerializeWithTopLevelID) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << 0 << "b" << 0));
-    auto serialization = exclusion->serializeTransformation(boost::none);
+    auto serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(true));
 
     exclusion = makeExclusionProjectionWithDefaultPolicies(
         BSON("a" << 0 << "b" << BSON("c" << 0 << "d" << 0)));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"]["c"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"]["d"], Value(false));
@@ -131,21 +131,21 @@ TEST(ExclusionProjectionExecutionTest, ShouldSerializeWithTopLevelID) {
     ASSERT_VALUE_EQ(serialization["b"]["_id"], Value());
 
     exclusion = makeExclusionProjectionWithDefaultIdExclusion(BSON("a" << false << "b" << false));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(false));
 
     exclusion = makeExclusionProjectionWithDefaultIdExclusion(
         BSON("a" << false << "b" << false << "_id" << false));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(false));
 
     exclusion = makeExclusionProjectionWithDefaultIdExclusion(
         BSON("a" << false << "b" << false << "_id" << true));
-    serialization = exclusion->serializeTransformation(boost::none);
+    serialization = exclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["b"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(true));
@@ -593,7 +593,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnRootField) {
     ASSERT_FALSE(allExtracted);
     ASSERT_BSONOBJ_EQ(fromjson("{b: false}"), extractedProj);
     ASSERT_BSONOBJ_EQ(fromjson("{c: false, _id: true}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+                      exclusion->serializeTransformation().toBson());
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnSubfields) {
@@ -606,7 +606,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnSubfields) {
     const UnorderedFieldsBSONObjComparator kComparator;
     ASSERT_EQ(kComparator.compare(fromjson("{w: {y: false, z: false}}"), extractedProj), 0);
     ASSERT_BSONOBJ_EQ(fromjson("{c: {d: false}, _id: true}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+                      exclusion->serializeTransformation().toBson());
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldCorrectlyLeaveRemainderWithExcludedId) {
@@ -616,8 +616,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldCorrectlyLeaveRemainderWithExcluded
 
     ASSERT_FALSE(allExtracted);
     ASSERT_BSONOBJ_EQ(fromjson("{b: false}"), extractedProj);
-    ASSERT_BSONOBJ_EQ(fromjson("{_id: false}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: false}"), exclusion->serializeTransformation().toBson());
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldNotExtractWhenFieldIsNotPresent) {
@@ -628,7 +627,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotExtractWhenFieldIsNotPresent) {
     ASSERT_FALSE(allExtracted);
     ASSERT_BSONOBJ_EQ(fromjson("{}"), extractedProj);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: false}, _id: true}"),
-                      exclusion->serializeTransformation(boost::none).toBson());
+                      exclusion->serializeTransformation().toBson());
 }
 }  // namespace
 }  // namespace mongo::projection_executor

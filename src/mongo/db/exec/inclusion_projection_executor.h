@@ -247,14 +247,13 @@ public:
     /**
      * Serialize the projection.
      */
-    Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
-                                     const SerializationOptions& options = {}) const final {
+    Document serializeTransformation(const SerializationOptions& options = {}) const final {
         MutableDocument output;
 
         // The InclusionNode tree in '_root' will always have a top-level _id node if _id is to be
         // included. If the _id node is not present, then explicitly set {_id: false} to avoid
         // ambiguity in the expected behavior of the serialized projection.
-        _root->serialize(explain, &output, options);
+        _root->serialize(&output, options);
         auto idFieldName = options.serializeFieldPath("_id");
         if (output.peek()[idFieldName].missing()) {
             output.addField(idFieldName, Value{false});

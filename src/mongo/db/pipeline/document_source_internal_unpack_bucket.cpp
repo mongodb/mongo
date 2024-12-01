@@ -137,7 +137,7 @@ auto getIncludeExcludeProjectAndType(DocumentSource* src) {
              TransformerInterface::TransformerType::kInclusionProjection ||
          proj->getTransformerType() ==
              TransformerInterface::TransformerType::kExclusionProjection)) {
-        return std::pair{proj->getTransformer().serializeTransformation(boost::none).toBson(),
+        return std::pair{proj->getTransformer().serializeTransformation().toBson(),
                          proj->getTransformerType() ==
                              TransformerInterface::TransformerType::kInclusionProjection};
     }
