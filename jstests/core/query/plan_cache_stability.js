@@ -8,6 +8,10 @@
  *   # randomly across shards.
  *   assumes_balancer_off,
  *   requires_fcv_51,
+ *   # There are no guarantees about how 'planCacheShapeHash' is computed between different versions
+ *   # of binaries. Therefore, this test can fail if a stepdown occurs between the two explains,
+ *   # as it compares two different 'planCacheShapeHash' values.
+ *   multiversion_incompatible,
  *   # The test expects the plan cache key on a given node to remain stable. However, the plan
  *   # cache key is allowed to change between versions. Therefore, this test cannot run in
  *   # passthroughs that do upgrade/downgrade.

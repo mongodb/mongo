@@ -38,7 +38,7 @@ selector:
     - jstests/core/write/bulk/bulk_write_non_transaction.js
     # Sparse indexes.
     - jstests/core/query/distinct/distinct_hint.js
-    - jstests/core/query/query_hash_stability.js
+    - jstests/core/query/plan_cache_stability.js
     - jstests/core/query/sparse_index_supports_ne_null.js
     # Text indexes.
     - jstests/core/query/internal_strip_invalid_assignment.js

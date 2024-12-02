@@ -120,6 +120,7 @@ selector:
     - requires_collstats
     - operations_longer_than_stepdown_interval
     - uses_parallel_shell
+    - multiversion_incompatible
   roots:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
