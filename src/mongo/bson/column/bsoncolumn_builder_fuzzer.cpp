@@ -29,14 +29,13 @@
 
 #include <cstring>
 
-#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/column/bsoncolumn_test_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/column/simple8b_helpers.h"
+#include "mongo/util/base64.h"
 
 using namespace mongo;
 

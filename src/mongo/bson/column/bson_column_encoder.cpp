@@ -27,15 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/data_view.h"
-#include "mongo/base/error_extra_info.h"
-#include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/column/bsoncolumnbuilder.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/util/errno_util.h"
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
@@ -45,6 +36,15 @@
 #include <boost/program_options/variables_map.hpp>
 #include <fstream>
 #include <string>
+
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
+#include "mongo/bson/util/builder.h"
 
 using namespace mongo;
 using namespace std;

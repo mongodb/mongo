@@ -41,7 +41,6 @@
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
-#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 namespace bsoncolumn {
