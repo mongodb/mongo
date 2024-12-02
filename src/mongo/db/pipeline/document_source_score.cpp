@@ -35,11 +35,12 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_gen.h"
-#include "mongo/db/pipeline/document_source_set_metadata.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/set_metadata_transformation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -105,8 +106,13 @@ intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
 
     boost::intrusive_ptr<Expression> expr = buildMetadataExpression(pExpCtx, spec);
 
-    return DocumentSourceSetMetadata::create(
-        pExpCtx, std::move(expr), DocumentMetadataFields::MetaType::kScore);
+    const bool isIndependentOfAnyCollection = false;
+    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+        pExpCtx,
+        std::make_unique<SetMetadataTransformation>(
+            pExpCtx, std::move(expr), DocumentMetadataFields::MetaType::kScore),
+        kStageName,
+        isIndependentOfAnyCollection);
 }
 
 }  // namespace mongo
