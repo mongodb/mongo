@@ -85,7 +85,7 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassertStatusOK(dropCollectionIfUUIDNotMatching(
-                opCtx, ns(), request().getExpectedCollectionUUID()));
+                opCtx, ns(), request().getExpectedCollectionUUID(), true /* fromMigrate */));
         }
 
     private:

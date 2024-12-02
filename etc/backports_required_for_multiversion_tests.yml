@@ -360,6 +360,8 @@ last-continuous:
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
     - test_file: jstests/core/timeseries/timeseries_group_aggregations.js
       ticket: SERVER-93874
+    - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
+      ticket: SERVER-97044
   suites: null
 last-lts:
   all:
@@ -735,4 +737,6 @@ last-lts:
       ticket: SERVER-93874
     - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
       ticket: SERVER-97254
+    - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
+      ticket: SERVER-97044
   suites: null

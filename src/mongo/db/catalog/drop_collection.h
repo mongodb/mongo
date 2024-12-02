@@ -73,11 +73,14 @@ Status dropCollection(OperationContext* opCtx,
                       bool fromMigrate = false);
 
 /**
- * Drops the collection "collectionName" only if its uuid is not matching "expectedUUID".
+ * Drops the collection with the given namespace only if its uuid is not matching 'expectedUUID'.
+ * When 'fromMigrate' is set, the related oplog entry will be marked accordingly using the
+ * 'fromMigrate' field to reduce its visibility (e.g. in change streams).
  */
 Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
                                        const NamespaceString& ns,
-                                       const UUID& expectedUUID);
+                                       const UUID& expectedUUID,
+                                       bool fromMigrate);
 
 /**
  * Drops the collection "collectionName". When applying a 'drop' oplog entry on a secondary, the
