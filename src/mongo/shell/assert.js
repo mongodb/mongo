@@ -842,7 +842,7 @@ assert = (function() {
             }
         } else if (res.hasOwnProperty("acknowledged")) {
             // CRUD api functions return plain js objects with an acknowledged property.
-            doassert(makeFailMsg());
+            doassert(makeFailMsg(), res);
         } else {
             doassert(_buildAssertionMessage(
                          msg, "unknown type of result, cannot check error: " + tojson(res)),
@@ -978,7 +978,7 @@ assert = (function() {
 
         if (errMsg) {
             _runHangAnalyzerForSpecificFailureTypes(res);
-            doassert(_buildAssertionMessage(msg, errMsg));
+            doassert(_buildAssertionMessage(msg, errMsg), res);
         }
 
         return res;

@@ -72,15 +72,7 @@ export const $config = (function() {
             }
 
             retryOnRetryableError(() => {
-                const res = db[collName].insert(docs);
-                if (res.writeErrors) {
-                    for (let writeError of res.writeErrors) {
-                        if (writeError.code == ErrorCodes.NoProgressMade) {
-                            throw res;
-                        }
-                    }
-                }
-                TimeseriesTest.assertInsertWorked(res);
+                TimeseriesTest.assertInsertWorked(db[collName].insert(docs));
             }, 100 /* numRetries */, undefined /* sleepMs */, [ErrorCodes.NoProgressMade]);
 
             print(`Finished Inserting documents.`);
