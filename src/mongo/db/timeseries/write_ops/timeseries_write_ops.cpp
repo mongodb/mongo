@@ -36,6 +36,7 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/write_ops/write_ops_exec_util.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -68,10 +70,6 @@ struct TimeseriesSingleWriteResult {
     StatusWith<SingleWriteResult> result;
     bool canContinue = true;
 };
-
-NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
-    return nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
-}
 
 NamespaceString ns(const mongo::write_ops::InsertCommandRequest& request) {
     return request.getNamespace();
@@ -117,30 +115,6 @@ TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
     return {std::move(reply.results[0]), reply.canContinue};
 }
 
-mongo::write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
-    OperationContext* opCtx,
-    const OID& bucketId,
-    mongo::write_ops::UpdateModification::TransformFunc transformationFunc,
-    const mongo::write_ops::InsertCommandRequest& request) {
-    mongo::write_ops::UpdateCommandRequest op(makeTimeseriesBucketsNamespace(ns(request)),
-                                              {timeseries::makeTimeseriesTransformationOpEntry(
-                                                  opCtx, bucketId, std::move(transformationFunc))});
-
-    mongo::write_ops::WriteCommandRequestBase base;
-    // The schema validation configured in the bucket collection is intended for direct
-    // operations by end users and is not applicable here.
-    base.setBypassDocumentValidation(true);
-
-    base.setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
-
-    // Timeseries compression operation is not a user operation and should not use a
-    // statement id from any user op. Set to Uninitialized to bypass.
-    base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
-
-    op.setWriteCommandRequestBase(std::move(base));
-    return op;
-}
-
 /**
  * Returns the status and whether the request can continue.
  */
@@ -156,8 +130,11 @@ TimeseriesSingleWriteResult performTimeseriesInsert(
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performInserts(
             opCtx,
-            timeseries::makeTimeseriesInsertOp(
-                batch, makeTimeseriesBucketsNamespace(ns(request)), metadata, std::move(stmtIds)),
+            write_ops_utils::makeTimeseriesInsertOp(
+                batch,
+                write_ops_utils::makeTimeseriesBucketsNamespace(ns(request)),
+                metadata,
+                std::move(stmtIds)),
             OperationSource::kTimeseriesInsert),
         request);
 }
@@ -276,7 +253,7 @@ void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
         return compressed.compressedBucket;
     };
 
-    auto compressionOp = makeTimeseriesTransformationOp(
+    auto compressionOp = write_ops_utils::makeTimeseriesTransformationOp(
         opCtx, closedBucket.bucketId.oid, bucketCompressionFunc, request);
     auto result = getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(
@@ -298,9 +275,14 @@ void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
         }
     }
 }
-}  // namespace
-namespace details {
 
+std::shared_ptr<bucket_catalog::WriteBatch>& extractFromPair(
+    std::pair<std::shared_ptr<bucket_catalog::WriteBatch>, size_t>& pair) {
+    return pair.first;
+}
+}  // namespace
+
+namespace details {
 /**
  * Returns whether the request can continue.
  */
@@ -319,7 +301,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
     auto catalog = CollectionCatalog::get(opCtx);
-    auto nss = makeTimeseriesBucketsNamespace(ns(request));
+    auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(ns(request));
     auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
     assertTimeseriesBucketsCollection(bucketsColl);
     auto status = prepareCommit(bucketCatalog, batch, bucketsColl->getDefaultCollator());
@@ -354,9 +336,10 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                                 << "', but found " << output.result.getValue().getN() << ".");
     } else {
         auto op = batch->generateCompressedDiff
-            ? timeseries::makeTimeseriesCompressedDiffUpdateOp(
+            ? write_ops_utils::makeTimeseriesCompressedDiffUpdateOp(
                   opCtx, batch, nss, std::move(stmtIds))
-            : timeseries::makeTimeseriesUpdateOp(opCtx, batch, nss, metadata, std::move(stmtIds));
+            : write_ops_utils::makeTimeseriesUpdateOp(
+                  opCtx, batch, nss, metadata, std::move(stmtIds));
         auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
 
         if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
@@ -396,13 +379,175 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     abort(bucketCatalog, batch, ex.toStatus());
     throw;
 }
-}  // namespace details
 
-namespace {
-std::shared_ptr<bucket_catalog::WriteBatch>& extractFromPair(
-    std::pair<std::shared_ptr<bucket_catalog::WriteBatch>, size_t>& pair) {
-    return pair.first;
+Status performAtomicTimeseriesWrites(
+    OperationContext* opCtx,
+    const std::vector<mongo::write_ops::InsertCommandRequest>& insertOps,
+    const std::vector<mongo::write_ops::UpdateCommandRequest>& updateOps) try {
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    invariant(!opCtx->inMultiDocumentTransaction());
+    invariant(!insertOps.empty() || !updateOps.empty());
+
+    auto ns =
+        !insertOps.empty() ? insertOps.front().getNamespace() : updateOps.front().getNamespace();
+
+    DisableDocumentValidation disableDocumentValidation{opCtx};
+
+    write_ops_exec::LastOpFixer lastOpFixer(opCtx);
+    lastOpFixer.startingOp(ns);
+
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    if (!coll.exists()) {
+        assertTimeseriesBucketsCollectionNotFound(ns);
+    }
+
+    auto curOp = CurOp::get(opCtx);
+    curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                   .getDatabaseProfileLevel(ns.dbName()));
+
+    mongo::write_ops_exec::assertCanWrite_inlock(opCtx, ns);
+
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool replicateVectoredInsertsTransactionally = fcvSnapshot.isVersionInitialized() &&
+        repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabled(fcvSnapshot);
+
+    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
+    if (replicateVectoredInsertsTransactionally && insertOps.size() > 1 && updateOps.empty() &&
+        !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
+        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+    }
+    WriteUnitOfWork wuow{opCtx, oplogEntryGroupType};
+
+    std::vector<repl::OpTime> oplogSlots;
+    boost::optional<std::vector<repl::OpTime>::iterator> slot;
+    if (!replicateVectoredInsertsTransactionally || !updateOps.empty()) {
+        if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
+            oplogSlots = repl::getNextOpTimes(opCtx, insertOps.size() + updateOps.size());
+            slot = oplogSlots.begin();
+        }
+    }
+
+    auto participant = TransactionParticipant::get(opCtx);
+    // Since we are manually updating the "lastWriteOpTime" before committing, we'll also need to
+    // manually reset if the storage transaction is aborted.
+    if (slot && participant) {
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback([](OperationContext* opCtx) {
+            TransactionParticipant::get(opCtx).setLastWriteOpTime(opCtx, repl::OpTime());
+        });
+    }
+
+    std::vector<InsertStatement> inserts;
+    inserts.reserve(insertOps.size());
+
+    for (auto& op : insertOps) {
+        invariant(op.getDocuments().size() == 1);
+
+        inserts.emplace_back(op.getStmtIds() ? *op.getStmtIds()
+                                             : std::vector<StmtId>{kUninitializedStmtId},
+                             op.getDocuments().front(),
+                             slot ? *(*slot)++ : OplogSlot{});
+    }
+
+    if (!insertOps.empty()) {
+        auto status = collection_internal::insertDocuments(
+            opCtx, coll.getCollectionPtr(), inserts.begin(), inserts.end(), &curOp->debug());
+        if (!status.isOK()) {
+            return status;
+        }
+        if (slot && participant) {
+            // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is
+            // correctly chained to the previous operations.
+            participant.setLastWriteOpTime(opCtx, *(std::prev(*slot)));
+        }
+    }
+
+    for (auto& op : updateOps) {
+        invariant(op.getUpdates().size() == 1);
+        auto& update = op.getUpdates().front();
+
+        invariant(coll.getCollectionPtr()->isClustered());
+        auto recordId = record_id_helpers::keyForOID(update.getQ()["_id"].OID());
+
+        auto original = coll.getCollectionPtr()->docFor(opCtx, recordId);
+
+        CollectionUpdateArgs args{original.value()};
+        args.criteria = update.getQ();
+        if (const auto& stmtIds = op.getStmtIds()) {
+            args.stmtIds = *stmtIds;
+        }
+        args.source = OperationSource::kTimeseriesInsert;
+
+        BSONObj updated;
+        BSONObj diffFromUpdate;
+        const BSONObj* diffOnIndexes =
+            collection_internal::kUpdateAllIndexes;  // Assume all indexes are affected.
+        if (update.getU().type() == mongo::write_ops::UpdateModification::Type::kDelta) {
+            diffFromUpdate = update.getU().getDiff();
+            updated = doc_diff::applyDiff(original.value(),
+                                          diffFromUpdate,
+                                          update.getU().mustCheckExistenceForInsertOperations(),
+                                          update.getU().verifierFunction);
+            diffOnIndexes = &diffFromUpdate;
+            args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
+        } else if (update.getU().type() == mongo::write_ops::UpdateModification::Type::kTransform) {
+            const auto& transform = update.getU().getTransform();
+            auto transformed = transform(original.value());
+            tassert(7050400,
+                    "Could not apply transformation to time series bucket document",
+                    transformed.has_value());
+            updated = std::move(transformed.value());
+            args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
+        } else {
+            invariant(false, "Unexpected update type");
+        }
+
+        if (slot) {
+            args.oplogSlots = {**slot};
+            fassert(5481600,
+                    shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
+                        args.oplogSlots[0].getTimestamp()));
+        }
+
+        collection_internal::updateDocument(opCtx,
+                                            coll.getCollectionPtr(),
+                                            recordId,
+                                            original,
+                                            updated,
+                                            diffOnIndexes,
+                                            nullptr /*indexesAffected*/,
+                                            &curOp->debug(),
+                                            &args);
+        if (slot) {
+            if (participant) {
+                // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is
+                // correctly chained to the previous operations.
+                participant.setLastWriteOpTime(opCtx, **slot);
+            }
+            ++(*slot);
+        }
+    }
+
+    if (MONGO_unlikely(failAtomicTimeseriesWrites.shouldFail())) {
+        return {ErrorCodes::FailPointEnabled,
+                "Failing time-series writes due to failAtomicTimeseriesWrites fail point"};
+    }
+
+    wuow.commit();
+
+    lastOpFixer.finishedOpSuccessfully();
+
+    return Status::OK();
+} catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>&) {
+    // If we encounter a TimeseriesBucketCompressionFailure, we should throw to
+    // a higher level (write_ops_exec::performUpdates) so that we can freeze the corrupt bucket.
+    throw;
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
+}  // namespace details
 
 bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                        const mongo::write_ops::InsertCommandRequest& request,
@@ -430,7 +575,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
         std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
         auto catalog = CollectionCatalog::get(opCtx);
-        auto nss = makeTimeseriesBucketsNamespace(ns(request));
+        auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(ns(request));
         auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
         assertTimeseriesBucketsCollection(bucketsColl);
         for (auto batch : batchesToCommit) {
@@ -442,7 +587,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 return false;
             }
 
-            timeseries::makeWriteRequest(
+            write_ops_utils::makeWriteRequest(
                 opCtx, batch, metadata, stmtIds, nss, &insertOps, &updateOps);
         }
 
@@ -646,7 +791,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-    auto bucketsNs = makeTimeseriesBucketsNamespace(ns(request));
+    auto bucketsNs = write_ops_utils::makeTimeseriesBucketsNamespace(ns(request));
 
     // Explicitly hold a refrence to the CollectionCatalog, such that the corresponding
     // Collection instances remain valid, and the collator is not invalidated.
@@ -988,9 +1133,7 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
     return request.getDocuments().size();
 }
 
-}  // namespace
-
-void assertTimeseriesBucketsCollectionNotFound(const NamespaceString& ns) {
+void assertTimeseriesBucketsCollectionNotFound(const mongo::NamespaceString& ns) {
     uasserted(ErrorCodes::NamespaceNotFound,
               str::stream() << "Buckets collection not found for time-series collection "
                             << ns.getTimeseriesViewNamespace().toStringForErrorMsg());
@@ -1095,176 +1238,5 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
 
     return insertReply;
 }
-
-namespace details {
-Status performAtomicTimeseriesWrites(
-    OperationContext* opCtx,
-    const std::vector<mongo::write_ops::InsertCommandRequest>& insertOps,
-    const std::vector<mongo::write_ops::UpdateCommandRequest>& updateOps) try {
-    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    invariant(!opCtx->inMultiDocumentTransaction());
-    invariant(!insertOps.empty() || !updateOps.empty());
-
-    auto ns =
-        !insertOps.empty() ? insertOps.front().getNamespace() : updateOps.front().getNamespace();
-
-    DisableDocumentValidation disableDocumentValidation{opCtx};
-
-    write_ops_exec::LastOpFixer lastOpFixer(opCtx);
-    lastOpFixer.startingOp(ns);
-
-    const auto coll = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-    if (!coll.exists()) {
-        assertTimeseriesBucketsCollectionNotFound(ns);
-    }
-
-    auto curOp = CurOp::get(opCtx);
-    curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
-                                   .getDatabaseProfileLevel(ns.dbName()));
-
-    mongo::write_ops_exec::assertCanWrite_inlock(opCtx, ns);
-
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool replicateVectoredInsertsTransactionally = fcvSnapshot.isVersionInitialized() &&
-        repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabled(fcvSnapshot);
-
-    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
-    if (replicateVectoredInsertsTransactionally && insertOps.size() > 1 && updateOps.empty() &&
-        !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
-        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
-    }
-    WriteUnitOfWork wuow{opCtx, oplogEntryGroupType};
-
-    std::vector<repl::OpTime> oplogSlots;
-    boost::optional<std::vector<repl::OpTime>::iterator> slot;
-    if (!replicateVectoredInsertsTransactionally || !updateOps.empty()) {
-        if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
-            oplogSlots = repl::getNextOpTimes(opCtx, insertOps.size() + updateOps.size());
-            slot = oplogSlots.begin();
-        }
-    }
-
-    auto participant = TransactionParticipant::get(opCtx);
-    // Since we are manually updating the "lastWriteOpTime" before committing, we'll also need to
-    // manually reset if the storage transaction is aborted.
-    if (slot && participant) {
-        shard_role_details::getRecoveryUnit(opCtx)->onRollback([](OperationContext* opCtx) {
-            TransactionParticipant::get(opCtx).setLastWriteOpTime(opCtx, repl::OpTime());
-        });
-    }
-
-    std::vector<InsertStatement> inserts;
-    inserts.reserve(insertOps.size());
-
-    for (auto& op : insertOps) {
-        invariant(op.getDocuments().size() == 1);
-
-        inserts.emplace_back(op.getStmtIds() ? *op.getStmtIds()
-                                             : std::vector<StmtId>{kUninitializedStmtId},
-                             op.getDocuments().front(),
-                             slot ? *(*slot)++ : OplogSlot{});
-    }
-
-    if (!insertOps.empty()) {
-        auto status = collection_internal::insertDocuments(
-            opCtx, coll.getCollectionPtr(), inserts.begin(), inserts.end(), &curOp->debug());
-        if (!status.isOK()) {
-            return status;
-        }
-        if (slot && participant) {
-            // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is
-            // correctly chained to the previous operations.
-            participant.setLastWriteOpTime(opCtx, *(std::prev(*slot)));
-        }
-    }
-
-    for (auto& op : updateOps) {
-        invariant(op.getUpdates().size() == 1);
-        auto& update = op.getUpdates().front();
-
-        invariant(coll.getCollectionPtr()->isClustered());
-        auto recordId = record_id_helpers::keyForOID(update.getQ()["_id"].OID());
-
-        auto original = coll.getCollectionPtr()->docFor(opCtx, recordId);
-
-        CollectionUpdateArgs args{original.value()};
-        args.criteria = update.getQ();
-        if (const auto& stmtIds = op.getStmtIds()) {
-            args.stmtIds = *stmtIds;
-        }
-        args.source = OperationSource::kTimeseriesInsert;
-
-        BSONObj updated;
-        BSONObj diffFromUpdate;
-        const BSONObj* diffOnIndexes =
-            collection_internal::kUpdateAllIndexes;  // Assume all indexes are affected.
-        if (update.getU().type() == mongo::write_ops::UpdateModification::Type::kDelta) {
-            diffFromUpdate = update.getU().getDiff();
-            updated = doc_diff::applyDiff(original.value(),
-                                          diffFromUpdate,
-                                          update.getU().mustCheckExistenceForInsertOperations(),
-                                          update.getU().verifierFunction);
-            diffOnIndexes = &diffFromUpdate;
-            args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
-        } else if (update.getU().type() == mongo::write_ops::UpdateModification::Type::kTransform) {
-            const auto& transform = update.getU().getTransform();
-            auto transformed = transform(original.value());
-            tassert(7050400,
-                    "Could not apply transformation to time series bucket document",
-                    transformed.has_value());
-            updated = std::move(transformed.value());
-            args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
-        } else {
-            invariant(false, "Unexpected update type");
-        }
-
-        if (slot) {
-            args.oplogSlots = {**slot};
-            fassert(5481600,
-                    shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
-                        args.oplogSlots[0].getTimestamp()));
-        }
-
-        collection_internal::updateDocument(opCtx,
-                                            coll.getCollectionPtr(),
-                                            recordId,
-                                            original,
-                                            updated,
-                                            diffOnIndexes,
-                                            nullptr /*indexesAffected*/,
-                                            &curOp->debug(),
-                                            &args);
-        if (slot) {
-            if (participant) {
-                // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is
-                // correctly chained to the previous operations.
-                participant.setLastWriteOpTime(opCtx, **slot);
-            }
-            ++(*slot);
-        }
-    }
-
-    if (MONGO_unlikely(failAtomicTimeseriesWrites.shouldFail())) {
-        return {ErrorCodes::FailPointEnabled,
-                "Failing time-series writes due to failAtomicTimeseriesWrites fail point"};
-    }
-
-    wuow.commit();
-
-    lastOpFixer.finishedOpSuccessfully();
-
-    return Status::OK();
-} catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>&) {
-    // If we encounter a TimeseriesBucketCompressionFailure, we should throw to
-    // a higher level (write_ops_exec::performUpdates) so that we can freeze the corrupt bucket.
-    throw;
-} catch (const DBException& ex) {
-    return ex.toStatus();
-}
-
-}  // namespace details
 
 }  // namespace mongo::timeseries::write_ops

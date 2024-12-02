@@ -58,7 +58,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/measurement.h"
-#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
@@ -124,8 +124,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatch) {
     batch->max = fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})");
 
     // Makes the new document for write.
-    auto newDoc =
-        timeseries::makeNewDocumentForWrite(ns, batch, /*metadata=*/{}).uncompressedBucket;
+    auto newDoc = timeseries::write_ops_utils::makeNewDocumentForWrite(ns, batch, /*metadata=*/{})
+                      .uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
     const BSONObj bucketDoc = fromjson(
@@ -158,7 +158,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
     auto metadata = fromjson(R"({"meta":{"tag":1}})");
 
     // Makes the new document for write.
-    auto newDoc = timeseries::makeNewDocumentForWrite(ns, batch, metadata).uncompressedBucket;
+    auto newDoc = timeseries::write_ops_utils::makeNewDocumentForWrite(ns, batch, metadata)
+                      .uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
     const BSONObj bucketDoc = fromjson(
@@ -193,7 +194,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
     batch->max = fromjson(R"({"time":{"$date":"2022-06-06T15:34:50.000Z"},"a":3,"b":3})");
 
     // Makes the new compressed document for write.
-    auto bucketDoc = timeseries::makeNewDocumentForWrite(ns, batch, /*metadata=*/{});
+    auto bucketDoc =
+        timeseries::write_ops_utils::makeNewDocumentForWrite(ns, batch, /*metadata=*/{});
 
     // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
     // during compression. Check that compression was successful.
@@ -238,7 +240,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
     auto metadata = fromjson(R"({"meta":{"tag":1}})");
 
     // Makes the new compressed document for write.
-    auto bucketDoc = timeseries::makeNewDocumentForWrite(ns, batch, metadata);
+    auto bucketDoc = timeseries::write_ops_utils::makeNewDocumentForWrite(ns, batch, metadata);
 
     // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
     // during compression. Check that compression was successful.
@@ -279,14 +281,14 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
         fromjson(R"({"time":{"$date":"2022-06-06T15:33:30.000Z"},"a":3,"b":3})")};
 
     // Makes the new document for write.
-    auto newDoc = timeseries::makeNewDocumentForWrite(ns,
-                                                      uuid,
-                                                      oid,
-                                                      measurements,
-                                                      /*metadata=*/{},
-                                                      options,
-                                                      /*comparator=*/nullptr,
-                                                      boost::none)
+    auto newDoc = timeseries::write_ops_utils::makeNewDocumentForWrite(ns,
+                                                                       uuid,
+                                                                       oid,
+                                                                       measurements,
+                                                                       /*metadata=*/{},
+                                                                       options,
+                                                                       /*comparator=*/nullptr,
+                                                                       boost::none)
                       .uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
@@ -319,7 +321,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
 
     // Makes the new document for write.
     auto newDoc =
-        timeseries::makeNewDocumentForWrite(
+        timeseries::write_ops_utils::makeNewDocumentForWrite(
             ns, uuid, oid, measurements, metadata, options, /*comparator=*/nullptr, boost::none)
             .uncompressedBucket;
 
@@ -394,7 +396,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
                  "b":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}}}}
         })");
 
-    auto request = makeTimeseriesCompressedDiffUpdateOp(
+    auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOp(
         operationContext(), batch, ns.makeTimeseriesBucketsNamespace());
     auto& updates = request.getUpdates();
 
@@ -467,7 +469,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
                  "b":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}}}}
         })");
 
-    auto request = makeTimeseriesCompressedDiffUpdateOp(
+    auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOp(
         operationContext(), batch, ns.makeTimeseriesBucketsNamespace());
     auto& updates = request.getUpdates();
 
@@ -1133,7 +1135,7 @@ TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeField) {
     batch->timeField = kTimeseriesOptions.getTimeField();
 
     std::vector<timeseries::write_ops_utils::details::Measurement> testMeasurements =
-        details::sortMeasurementsOnTimeField(batch);
+        timeseries::write_ops_utils::sortMeasurementsOnTimeField(batch);
 
     const std::vector<BSONObj> sortedMeasurements = {
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})"),
@@ -1187,7 +1189,7 @@ TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeFieldExtendedRange) {
     batch->timeField = kTimeseriesOptions.getTimeField();
 
     std::vector<timeseries::write_ops_utils::details::Measurement> testMeasurements =
-        details::sortMeasurementsOnTimeField(batch);
+        timeseries::write_ops_utils::sortMeasurementsOnTimeField(batch);
 
     ASSERT_EQ(testMeasurements.size(), measurements.size());
 

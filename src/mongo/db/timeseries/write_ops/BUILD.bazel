@@ -9,6 +9,8 @@ exports_files(
         "timeseries_write_ops.h",
         "timeseries_write_ops_utils.cpp",
         "timeseries_write_ops_utils.h",
+        "timeseries_write_ops_utils_internal.cpp",
+        "timeseries_write_ops_utils_internal.h",
     ],
 )
 
@@ -21,6 +23,7 @@ mongo_cc_library(
         "timeseries_write_ops.h",
     ],
     deps = [
+        "timeseries_write_ops_utils_internal",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
@@ -38,6 +41,37 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/transaction",
         "//src/mongo/db/update:update_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_write_ops_utils_internal",
+    srcs = [
+        "timeseries_write_ops_utils_internal.cpp",
+        "timeseries_write_ops_utils_internal.h",
+    ],
+    hdrs = [
+        "measurement.h",
+        "//src/mongo/db/timeseries/bucket_catalog:bucket_catalog_helpers.h",
+        "//src/mongo/db/timeseries/bucket_catalog:flat_bson.h",
+        "//src/mongo/db/timeseries/bucket_catalog:write_batch.h",
+        "//src/mongo/util/tracking",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/query/write_ops:write_ops_exec_util",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:bucket_compression",
+        "//src/mongo/db/timeseries:bucket_compression_failure",
+        "//src/mongo/db/timeseries:timeseries_extended_range",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries/bucket_catalog",
     ],
 )
 

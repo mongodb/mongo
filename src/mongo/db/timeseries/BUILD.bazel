@@ -203,6 +203,7 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops:write_ops_exec_util",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils_internal",
         "//src/mongo/db/update:update_common",
     ],
 )

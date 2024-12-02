@@ -39,5 +39,4 @@ namespace mongo::timeseries::write_ops {
 mongo::write_ops::UpdateCommandRequest buildSingleUpdateOp(
     const mongo::write_ops::UpdateCommandRequest& wholeOp, size_t opIndex);
 
-
 }  // namespace mongo::timeseries::write_ops
