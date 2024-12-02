@@ -7,6 +7,7 @@ import subprocess
 
 import download_buildifier
 from simple_report import make_report, put_report, try_combine_reports
+from unittest_grouper import validate_bazel_groups
 
 mongo_dir = pathlib.Path(__file__).parents[1]
 
@@ -42,11 +43,13 @@ def find_all_failed(bin_path: str) -> list[str]:
 def lint_all(bin_path: str, generate_report: bool):
     files = find_all_failed(bin_path)
     lint(bin_path, files, generate_report)
+    validate_bazel_groups(generate_report=generate_report, fix=False)
 
 
 def fix_all(bin_path: str):
     files = find_all_failed(bin_path)
     fix(bin_path, files)
+    validate_bazel_groups(generate_report=False, fix=True)
 
 
 def lint(bin_path: str, files: list[str], generate_report: bool):
@@ -79,12 +82,14 @@ def lint(bin_path: str, files: list[str], generate_report: bool):
             report = make_report(f"{file} diff", header + diff, 1)
             try_combine_reports(report)
             put_report(report)
+
     print("Done linting files")
 
 
 def fix(bin_path: str, files: list[str]):
     for file in files:
         subprocess.run([bin_path, "--mode=fix", file], check=True)
+
     print("Done fixing files")
 
 

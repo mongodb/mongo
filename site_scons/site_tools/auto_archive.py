@@ -150,8 +150,7 @@ def collect_transitive_files(env, entry):
                     install_file = env.GetAutoInstalledFiles(bazel_libdep)
                     env.BazelAutoArchive(install_file[0], bazel_installed, stack)
                 except KeyError:
-                    if env.Verbose():
-                        print(f"BazelAutoArchive not processing non bazel target:\n{child}")
+                    pass
 
     # Setting the AIB_NO_ARCHIVE attribute to True prevents outputs from an
     # AutoInstall builder from being included into archives produced by this

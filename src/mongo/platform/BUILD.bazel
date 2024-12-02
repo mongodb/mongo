@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -61,13 +61,17 @@ mongo_cc_library(
 # in VSCode, install the [Live HTML Previewer](https://marketplace.visualstudio.com/items?itemName=hdg.live-html-previewer)
 # VSCode extension. Once installed, open the coverage/index.html file and click the “Show Preview”
 # widget that comes from the extension.
-mongo_cc_test(
-    name = "visibility_test1",
+mongo_cc_unit_test(
+    name = "visibility1_test",
     srcs = [
         "visibility_test1.cpp",
         "//src/mongo/util:exit_code.h",
     ],
-    tags = ["server-programmability"],
+    has_custom_mainline = True,
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
     deps = [
         ":visibility_test_lib1",
     ],

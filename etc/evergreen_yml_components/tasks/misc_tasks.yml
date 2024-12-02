@@ -1102,7 +1102,7 @@ tasks:
           #   bazel test $targets
           # TODO(SERVER-97069): Change to //src/... when unit tests are compatible with bazel sandboxing
           target: >-
-            //src/mongo/platform:visibility_test1
+            //src/mongo/platform:visibility1_test
           args: >-
             --test_output=all
             --config=local

@@ -56,7 +56,10 @@ mongo_cc_unit_test(
         "//src/mongo/bson:bsonelement_comparator.h",
         "//src/mongo/bson:bsonobj_comparator.h",
     ],
-    tags = ["server-programmability"],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-programmability",
+    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",

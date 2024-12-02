@@ -3392,7 +3392,10 @@ mongo_cc_binary(
         ],
         "//conditions:default": [],
     }),
-    # tags = ["compile_requires_large_memory_gcc"],
+    tags = [
+        "devcore",
+        "dist_test",
+    ],
     #+ env.WindowsResourceFile("mongod.rc"),
     deps = [
         # NOTE: Do not add new deps here unless required by the linker to
