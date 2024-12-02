@@ -57,7 +57,8 @@ function runTest(startChangeStream) {
     validateExpectedEventAndDropCollection({create: collName}, {
         operationType: "create",
         ns: ns,
-        operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}, type: "collection"},
+        operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+        nsType: "collection",
     });
 
     // With implicit create collection through insert.
@@ -66,7 +67,8 @@ function runTest(startChangeStream) {
     assertNextChangeEvent(cursor, {
         operationType: "create",
         ns: ns,
-        operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}, type: "collection"}
+        operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+        nsType: "collection",
     });
     assertNextChangeEvent(
         cursor, {operationType: "insert", fullDocument: {_id: 0}, ns: ns, documentKey: {_id: 0}});
@@ -83,8 +85,8 @@ function runTest(startChangeStream) {
                                                    capped: true,
                                                    size: expectedSize,
                                                    max: 1000,
-                                                   type: "collection",
-                                               }
+                                               },
+                                               nsType: "collection",
                                            });
 
     // With wired tiger setting.
@@ -102,8 +104,8 @@ function runTest(startChangeStream) {
                 idIndex: {v: 2, key: {_id: 1}, name: "_id_"},
                 indexOptionDefaults: {storageEngine: customWiredTigerSettings},
                 storageEngine: customWiredTigerSettings,
-                type: "collection",
-            }
+            },
+            nsType: "collection",
         });
 
     // With validator collection parameters.
@@ -115,9 +117,9 @@ function runTest(startChangeStream) {
                 idIndex: {v: 2, key: {_id: 1}, name: "_id_"},
                 validator: {a: 1},
                 validationLevel: "off",
-                validationAction: "warn",
-                type: "collection",
-            }
+                validationAction: "warn"
+            },
+            nsType: "collection",
         });
 
     // With collation.
@@ -138,9 +140,9 @@ function runTest(startChangeStream) {
         ns: ns,
         operationDescription: {
             collation: collation,
-            idIndex: {v: 2, key: {_id: 1}, name: "_id_", collation: collation},
-            type: "collection",
-        }
+            idIndex: {v: 2, key: {_id: 1}, name: "_id_", collation: collation}
+        },
+        nsType: "collection",
     });
 
     // With clustered index.
@@ -155,9 +157,9 @@ function runTest(startChangeStream) {
             ns: ns,
             operationDescription: {
                 clusteredIndex: {v: 2, key: {_id: 1}, name: "newName", unique: true},
-                expireAfterSeconds: NumberLong(10),
-                type: "collection",
-            }
+                expireAfterSeconds: NumberLong(10)
+            },
+            nsType: "collection",
         });
 
     // With idIndex field.
@@ -165,14 +167,12 @@ function runTest(startChangeStream) {
         {create: collName, idIndex: {v: 2, key: {_id: 1}, name: "ignored"}}, {
             operationType: "create",
             ns: ns,
-            operationDescription: {
-                idIndex: {v: 2, key: {_id: 1}, name: "_id_"},
-                type: "collection",
-            }
+            operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+            nsType: "collection",
         });
     validateExpectedEventAndDropCollection(
         {create: collName, idIndex: {v: 1, key: {_id: 1}, name: "new"}},
-        {operationType: "create", ns: ns, operationDescription: {type: "collection"}});
+        {operationType: "create", ns: ns, nsType: "collection"});
 
     // Verify that the time-series create command does not produce an event.
     cursor = startChangeStream();
@@ -190,10 +190,8 @@ function runTest(startChangeStream) {
         assertNextChangeEvent(cursor, {
             operationType: "create",
             ns,
-            operationDescription: {
-                idIndex: {v: 2, key: {_id: 1}, name: "_id_"},
-                type: "collection",
-            }
+            operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+            nsType: "collection",
         });
         assertDropCollection(testDB, collName);
     }

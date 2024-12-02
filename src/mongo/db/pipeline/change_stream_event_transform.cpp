@@ -33,6 +33,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
+#include <initializer_list>
 #include <utility>
 #include <vector>
 
@@ -40,7 +41,6 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/namespace_string.h"
@@ -115,7 +115,7 @@ CollectionType determineCollectionType(const Document& data, const DatabaseName&
     return CollectionType::kView;
 }
 
-Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
+Document copyDocExceptFields(const Document& source, std::initializer_list<StringData> fieldNames) {
     MutableDocument doc(source);
     for (auto fieldName : fieldNames) {
         doc.remove(fieldName);
@@ -250,8 +250,14 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     Value fullDocument;
     Value updateDescription;
     Value documentKey;
+    // Used to populate the 'operationDescription' output field and also to build the resumeToken
+    // for some events. Note that any change to the 'operationDescription' for existing events can
+    // break changestream resumability between different mongod versions and should thus be avoided!
     Value operationDescription;
     Value stateBeforeChange;
+    // Optional value containing the namespace type for changestream create events. This will be
+    // emitted as 'nsType' field.
+    Value nsType;
 
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
@@ -355,20 +361,20 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 // empty.
                 nss = NamespaceString(nss.dbName());
             } else if (auto nssField = oField.getField("create"); !nssField.missing()) {
-                auto collectionType = determineCollectionType(oField, nss.dbName());
                 operationType = DocumentSourceChangeStream::kCreateOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
+                Document opDesc = copyDocExceptFields(oField, {"create"_sd});
+                operationDescription = Value(opDesc);
 
-                tassert(8814201,
-                        "'operationDescription.type' should always resolve to 'collection' for "
-                        "collection create events",
-                        collectionType == CollectionType::kCollection);
-
-                // Include full details of the create in 'operationDescription'.
-                MutableDocument opDescBuilder(copyDocExceptFields(oField, {"create"_sd}));
-                opDescBuilder.setField(DocumentSourceChangeStream::kCollectionTypeField,
-                                       Value(toString(collectionType)));
-                operationDescription = opDescBuilder.freezeToValue();
+                if (_changeStreamSpec.getShowExpandedEvents()) {
+                    // Populate 'nsType' field with collection type (always "collection" here).
+                    auto collectionType = determineCollectionType(oField, nss.dbName());
+                    tassert(8814201,
+                            "'operationDescription.type' should always resolve to 'collection' for "
+                            "collection create events",
+                            collectionType == CollectionType::kCollection);
+                    nsType = Value(toString(collectionType));
+                }
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
@@ -563,6 +569,10 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // For a 'modify' event we add the state before modification if appropriate.
     doc.addField(DocumentSourceChangeStream::kStateBeforeChangeField, stateBeforeChange);
 
+    if (!nsType.missing()) {
+        doc.addField(DocumentSourceChangeStream::kNsTypeField, nsType);
+    }
+
     return doc.freeze();
 }
 
@@ -589,7 +599,13 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     Value tenantId = input[repl::OplogEntry::kTidFieldName];
 
     StringData operationType;
+    // Used to populate the 'operationDescription' output field and also to build the resumeToken
+    // for some events. Note that any change to the 'operationDescription' for existing events can
+    // break changestream resumability between different mongod versions and should thus be avoided!
     Value operationDescription;
+    // Optional value containing the namespace type for changestream create events. This will be
+    // emitted as 'nsType' field.
+    Value nsType;
 
     // For views, we are transforming the DML operation on the system.views
     // collection into a DDL event as follows:
@@ -603,19 +619,18 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
 
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
+            operationType = DocumentSourceChangeStream::kCreateOpType;
+            Document opDesc = copyDocExceptFields(oField, {"_id"_sd});
+            operationDescription = Value(opDesc);
+
+            // Populate 'nsType' field with either "view" or "timeseries".
             auto collectionType = determineCollectionType(oField, nss.dbName());
             tassert(8814202,
                     "'operationDescription.type' should always resolve to 'view' or 'timeseries' "
                     "for view creation event",
                     collectionType == CollectionType::kView ||
                         collectionType == CollectionType::kTimeseries);
-
-            operationType = DocumentSourceChangeStream::kCreateOpType;
-            // Include full details of the create in 'operationDescription'.
-            MutableDocument opDescBuilder(copyDocExceptFields(oField, {"_id"_sd}));
-            opDescBuilder.setField(DocumentSourceChangeStream::kCollectionTypeField,
-                                   Value(toString(collectionType)));
-            operationDescription = opDescBuilder.freezeToValue();
+            nsType = Value(toString(collectionType));
             break;
         }
         case repl::OpTypeEnum::kUpdate: {
@@ -653,6 +668,10 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
 
     doc.addField(DocumentSourceChangeStream::kNamespaceField, makeChangeStreamNsField(nss));
     doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
+
+    if (!nsType.missing()) {
+        doc.addField(DocumentSourceChangeStream::kNsTypeField, nsType);
+    }
 
     return doc.freeze();
 }

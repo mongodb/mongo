@@ -100,8 +100,8 @@ let expectedChanges = [
                 "granularity": "seconds",
                 "bucketMaxSpanSeconds": 3600
             },
-            "type": "collection",
-        }
+        },
+        "nsType": "collection",
     },
     {
         // Only seen if time series scalability improvements enabled
@@ -118,8 +118,8 @@ let expectedChanges = [
     {
         "operationType": "create",
         "ns": {"db": dbName, "coll": "system.views"},
-        "operationDescription":
-            {"idIndex": {"v": 2, "key": {"_id": 1}, "name": "_id_"}, "type": "collection"}
+        "operationDescription": {"idIndex": {"v": 2, "key": {"_id": 1}, "name": "_id_"}},
+        "nsType": "collection",
     },
     {
         "operationType": "create",
@@ -130,8 +130,8 @@ let expectedChanges = [
                 "$_internalUnpackBucket":
                     {"timeField": "ts", "metaField": "meta", "bucketMaxSpanSeconds": 3600}
             }],
-            "type": "timeseries",
-        }
+        },
+        "nsType": "timeseries",
     },
     {
         "operationType": "createIndexes",

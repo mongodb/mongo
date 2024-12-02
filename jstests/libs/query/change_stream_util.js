@@ -80,7 +80,8 @@ export function canonicalizeEventForTesting(event, expected) {
                            "lsid",
                            "collectionUUID",
                            "wallTime",
-                           "operationDescription"]) {
+                           "operationDescription",
+                           "nsType"]) {
         if (!expected.hasOwnProperty(fieldName)) {
             delete event[fieldName];
         }

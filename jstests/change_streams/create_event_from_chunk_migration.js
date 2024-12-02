@@ -65,6 +65,7 @@ function validateCreateEventsFromChunkMigration() {
         expectedChanges: {
             operationType: "create",
             ns: ns,
+            nsType: "collection",
         }
     });
 

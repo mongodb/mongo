@@ -46,6 +46,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_event_transform.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -56,7 +57,6 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -114,8 +114,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateCollectionTransform) {
         NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
     // Namespace for the command, i.e. "testDB.$cmd".
     const NamespaceString commandNss = NamespaceString::makeCommandNamespace(nss.dbName());
-    const auto opDescription =
-        Value(fromjson("{idIndex: {v: 2, key: {_id: 1}, name: '_id_'}, type: 'collection'}"));
+    const auto opDescription = Value(fromjson("{idIndex: {v: 2, key: {_id: 1}, name: '_id_'}}"));
     const auto idIndex = Value(fromjson("{v: 2, key: {_id: 1}, name: '_id_'}"));
     auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kCommand,  // op type
                                      commandNss,                  // namespace
@@ -135,7 +134,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateCollectionTransform) {
         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
         {DocumentSourceChangeStream::kNamespaceField,
          Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
-        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription},
+        {DocumentSourceChangeStream::kNsTypeField, "collection"_sd}};
 
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
 }
@@ -147,8 +147,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
         NamespaceString::createNamespaceString_forTest(boost::none, "viewDB.view.name");
     const auto viewPipeline =
         Value(fromjson("[{$match: {field: 'value'}}, {$project: {field: 1}}]"));
-    const auto opDescription =
-        Document{{"viewOn", "baseColl"_sd}, {"pipeline", viewPipeline}, {"type", "view"_sd}};
+    const auto opDescription = Document{{"viewOn", "baseColl"_sd}, {"pipeline", viewPipeline}};
     auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kInsert,  // op type
                                      systemViewNss,              // namespace
                                      BSON("_id" << viewNss.toString_forTest() << "viewOn"
@@ -168,7 +167,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
         {DocumentSourceChangeStream::kNamespaceField,
          Document{{"db", viewNss.db_forTest()}, {"coll", viewNss.coll()}}},
-        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription},
+        {DocumentSourceChangeStream::kNsTypeField, "view"_sd}};
 
     ASSERT_DOCUMENT_EQ(
         applyTransformation(oplogEntry,
@@ -185,8 +185,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateTimeseriesTransform) {
     const NamespaceString viewNss = collNss.makeTimeseriesBucketsNamespace();
     const auto viewPipeline = Value(
         fromjson("[{_internalUnpackBucket: {timeField: 'time', bucketMaxSpanSeconds: 3600}}]"));
-    const auto opDescription =
-        Document{{"viewOn", viewNss.coll()}, {"pipeline", viewPipeline}, {"type", "timeseries"_sd}};
+    const auto opDescription = Document{{"viewOn", viewNss.coll()}, {"pipeline", viewPipeline}};
     auto oplogEntry = makeOplogEntry(
         repl::OpTypeEnum::kInsert,  // op type
         NamespaceString::makeSystemDotViewsNamespace(
@@ -207,7 +206,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateTimeseriesTransform) {
         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
         {DocumentSourceChangeStream::kNamespaceField,
          Document{{"db", viewNss.db_forTest()}, {"coll", collNss.coll()}}},
-        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription},
+        {DocumentSourceChangeStream::kNsTypeField, "timeseries"_sd}};
 
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry,
                                            NamespaceString::makeCollectionlessAggregateNSS(

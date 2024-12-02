@@ -48,8 +48,11 @@ function runViewEventAndResumeTest(showSystemEvents) {
         // Creating the first view of the database also creates `system.views`.
         assert(event.clusterTime, event);
         assert(event.wallTime, event);
-        assertChangeStreamEventEq(
-            event, {operationType: "create", ns: {db: dbName, coll: "system.views"}});
+        assertChangeStreamEventEq(event, {
+            operationType: "create",
+            ns: {db: dbName, coll: "system.views"},
+            nsType: "collection",
+        });
 
         assert.soon(() => cursor.hasNext());
         event = cursor.next();
@@ -60,7 +63,8 @@ function runViewEventAndResumeTest(showSystemEvents) {
     assertChangeStreamEventEq(event, {
         operationType: "create",
         ns: {db: dbName, coll: "view"},
-        operationDescription: {viewOn: "base", pipeline: viewPipeline, type: "view"}
+        operationDescription: {viewOn: "base", pipeline: viewPipeline},
+        nsType: "view",
     });
 
     // Ensure that we can resume the change stream using a resuming token from the create view
@@ -79,7 +83,8 @@ function runViewEventAndResumeTest(showSystemEvents) {
     assertChangeStreamEventEq(createEvent, {
         operationType: "create",
         ns: {db: dbName, coll: "viewOnView"},
-        operationDescription: {viewOn: "view", pipeline: viewPipeline, type: "view"}
+        operationDescription: {viewOn: "view", pipeline: viewPipeline},
+        nsType: "view",
     });
 
     // Test 'collMod' command on views.
@@ -121,9 +126,11 @@ function runViewEventAndResumeTest(showSystemEvents) {
         assert.soon(() => cursor.hasNext());
         const createBucketsEvent = cursor.next();
         events.push(createBucketsEvent);
-        assertChangeStreamEventEq(
-            createBucketsEvent,
-            {operationType: "create", ns: {db: dbName, coll: "system.buckets.timeseries_coll"}});
+        assertChangeStreamEventEq(createBucketsEvent, {
+            operationType: "create",
+            ns: {db: dbName, coll: "system.buckets.timeseries_coll"},
+            nsType: "collection",
+        });
     }
 
     assert.soon(() => cursor.hasNext());
@@ -136,8 +143,8 @@ function runViewEventAndResumeTest(showSystemEvents) {
         operationDescription: {
             viewOn: "system.buckets.timeseries_coll",
             pipeline: [{$_internalUnpackBucket: {timeField: "time", bucketMaxSpanSeconds: 3600}}],
-            type: "timeseries",
-        }
+        },
+        nsType: "timeseries",
     });
 
     assert.commandWorked(
@@ -293,7 +300,8 @@ assert(event.collectionUUID, event);
 assertChangeStreamEventEq(event, {
     operationType: "create",
     ns: {db: dbName, coll: "view"},
-    operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}, type: "collection"}
+    operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+    nsType: "collection",
 });
 
 // Change stream on a single collection does not produce view events.

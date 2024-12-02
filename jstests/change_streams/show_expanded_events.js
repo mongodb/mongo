@@ -156,7 +156,8 @@ assertCreateCollection(testDB, renamedCollName);
 assertNextChangeEvent({
     ns: renamedNs,
     operationType: 'create',
-    operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}, type: "collection"}
+    operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+    nsType: "collection",
 
 });
 assertChangeEvent(() => assert.commandWorked(coll.renameCollection(renamedCollName, true)), {
