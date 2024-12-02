@@ -54,6 +54,7 @@ public:
     void setUp() override {
         ServiceContextWithClockSourceMockTest::setUp();
         _streamFixtures = _makeStreamFixtures();
+        _reactor = std::make_shared<GRPCReactor>();
     }
 
     void tearDown() override {
@@ -72,6 +73,7 @@ public:
 
     std::unique_ptr<EgressSession> makeEgressSession(UUID clientId) {
         return std::make_unique<EgressSession>(nullptr,
+                                               _reactor,
                                                _streamFixtures->clientCtx,
                                                _streamFixtures->clientStream,
                                                std::move(clientId),
@@ -165,6 +167,7 @@ private:
     }
 
     std::unique_ptr<MockStreamTestFixtures> _streamFixtures;
+    std::shared_ptr<GRPCReactor> _reactor;
 };
 
 TEST_F(GRPCSessionTest, NoClientId) {

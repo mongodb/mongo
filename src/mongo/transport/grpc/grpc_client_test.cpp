@@ -55,16 +55,31 @@ namespace mongo::transport::grpc {
 
 class GRPCClientTest : public ServiceContextTest {
 public:
-    virtual void setUp() override {
+    void setUp() override {
         getServiceContext()->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
+        _reactor = std::make_shared<GRPCReactor>();
+        _ioThread = stdx::thread([this] {
+            setThreadName("GRPCClientTestReactor");
+            _reactor->run();
+            _reactor->drain();
+        });
 
         sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_preferSSL);
+    }
+
+    void tearDown() override {
+        _reactor->stop();
+        _ioThread.join();
     }
 
     std::shared_ptr<GRPCClient> makeClient(
         GRPCClient::Options options = CommandServiceTestFixtures::makeClientOptions()) {
         return std::make_shared<GRPCClient>(
             nullptr /* transport layer */, makeClientMetadataDocument(), std::move(options));
+    }
+
+    const std::shared_ptr<GRPCReactor>& getReactor() {
+        return _reactor;
     }
 
     /**
@@ -139,8 +154,8 @@ public:
                 client->start(getServiceContext());
 
                 auto makeSession = [&](Milliseconds timeout) {
-                    auto session =
-                        client->connect(server.getListeningAddresses().at(0), timeout, {});
+                    auto session = client->connect(
+                        server.getListeningAddresses().at(0), getReactor(), timeout, {});
                     ASSERT_OK(session->finish());
                 };
 
@@ -165,6 +180,9 @@ public:
     }
 
 private:
+    stdx::thread _ioThread;
+    std::shared_ptr<GRPCReactor> _reactor;
+
     test::SSLGlobalParamsGuard _sslGlobalParamsGuard;
 };
 
@@ -195,8 +213,8 @@ TEST_F(GRPCClientTest, GRPCClientConnect) {
 
         for (auto& server : servers) {
             for (auto& addr : server->getListeningAddresses()) {
-                auto session =
-                    client->connect(addr, CommandServiceTestFixtures::kDefaultConnectTimeout, {});
+                auto session = client->connect(
+                    addr, getReactor(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
                 ASSERT_TRUE(session->isConnected());
 
                 OpMsg msg;
@@ -227,6 +245,7 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
         client->start(getServiceContext());
 
         auto session = client->connect(server.getListeningAddresses().at(0),
+                                       getReactor(),
                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
                                        {});
         assertEchoSucceeds(*session);
@@ -285,6 +304,7 @@ TEST_F(GRPCClientTest, GRPCClientConnectAuthToken) {
         Client::ConnectOptions options;
         options.authToken = kAuthToken;
         auto session = client->connect(server.getListeningAddresses().at(0),
+                                       getReactor(),
                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
                                        options);
         ASSERT_OK(session->finish());
@@ -302,9 +322,29 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoAuthToken) {
         auto client = makeClient();
         client->start(getServiceContext());
         auto session = client->connect(server.getListeningAddresses().at(0),
+                                       getReactor(),
                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
                                        {});
         ASSERT_OK(session->finish());
+    };
+
+    CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody);
+}
+
+TEST_F(GRPCClientTest, GRPCClientConnectAfterReactorShutdown) {
+    auto serverHandler = [&](std::shared_ptr<IngressSession>) {
+    };
+
+    auto clientThreadBody = [&](auto& server, auto&) {
+        auto client = makeClient();
+        client->start(getServiceContext());
+        getReactor()->stop();
+        ASSERT_THROWS_CODE(client->connect(server.getListeningAddresses().at(0),
+                                           getReactor(),
+                                           CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                           {}),
+                           DBException,
+                           ErrorCodes::ShutdownInProgress);
     };
 
     CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody);
@@ -326,6 +366,7 @@ TEST_F(GRPCClientTest, GRPCClientMetadata) {
         client->start(getServiceContext());
         clientId = client->id();
         auto session = client->connect(server.getListeningAddresses().at(0),
+                                       getReactor(),
                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
                                        {});
         ASSERT_OK(session->finish());
@@ -359,6 +400,7 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {
             sessions.push_back(client->connect(server.getListeningAddresses().at(0),
+                                               getReactor(),
                                                CommandServiceTestFixtures::kDefaultConnectTimeout,
                                                {}));
         }
@@ -378,6 +420,7 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
         }
 
         ASSERT_THROWS_CODE(client->connect(server.getListeningAddresses().at(0),
+                                           getReactor(),
                                            CommandServiceTestFixtures::kDefaultConnectTimeout,
                                            {}),
                            DBException,

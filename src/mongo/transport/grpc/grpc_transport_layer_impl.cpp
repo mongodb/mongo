@@ -227,7 +227,8 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerImpl::connectWithAuthToke
     boost::optional<std::string> authToken) {
     try {
         invariant(_client);
-        return _client->connect(std::move(peer), timeout, {std::move(authToken), sslMode});
+        return _client->connect(
+            std::move(peer), _egressReactor, timeout, {std::move(authToken), sslMode});
     } catch (const DBException& e) {
         return e.toStatus();
     }

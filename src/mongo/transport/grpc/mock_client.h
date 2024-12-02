@@ -64,6 +64,7 @@ public:
 
 private:
     CtxAndStream _streamFactory(const HostAndPort& remote,
+                                const std::shared_ptr<GRPCReactor>& reactor,
                                 Milliseconds timeout,
                                 const ConnectOptions& options) override {
         auto stub = _pool->createStub(remote, options.sslMode, timeout);

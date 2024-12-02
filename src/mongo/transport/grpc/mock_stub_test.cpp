@@ -49,6 +49,7 @@ class MockStubTest : public ServiceContextTest {
 public:
     void setUp() override {
         _fixtures = std::make_unique<MockStubTestFixtures>();
+        _reactor = std::make_shared<GRPCReactor>();
     }
 
     MockStub makeStub() {
@@ -59,7 +60,12 @@ public:
         return _fixtures->getServer();
     }
 
-    void runEchoTest(std::function<std::shared_ptr<ClientStream>(MockClientContext&)> makeStream) {
+    const std::shared_ptr<GRPCReactor>& getReactor() {
+        return _reactor;
+    }
+
+    void runEchoTest(
+        std::function<std::shared_ptr<MockClientStream>(MockClientContext&)> makeStream) {
         unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
             getServer().start(
                 monitor,
@@ -84,12 +90,12 @@ public:
                     ctx.addMetadataEntry(util::constants::kAuthenticationTokenKey.toString(),
                                          "my-token");
                     auto stream = makeStream(ctx);
-                    ASSERT_TRUE(stream->write(clientMessage.sharedBuffer()));
+                    ASSERT_TRUE(stream->syncWrite(getReactor(), clientMessage.sharedBuffer()));
 
-                    auto serverResponse = stream->read();
+                    auto serverResponse = stream->syncRead(getReactor());
                     ASSERT_TRUE(serverResponse);
                     ASSERT_EQ_MSG(Message{*serverResponse}, clientMessage);
-                    ASSERT_EQ(stream->finish().error_code(), ::grpc::OK);
+                    ASSERT_EQ(stream->syncFinish(getReactor()).error_code(), ::grpc::OK);
                 }));
             }
 
@@ -117,6 +123,7 @@ public:
 
 private:
     std::unique_ptr<MockStubTestFixtures> _fixtures;
+    std::shared_ptr<GRPCReactor> _reactor;
 };
 
 TEST_F(MockStubTest, ConcurrentStreamsAuth) {
@@ -152,22 +159,23 @@ TEST_F(MockStubTest, RPCReturn) {
     rpc.sendReturnStatus(kFinalStatus);
     ASSERT_FALSE(rpc.serverCtx->isCancelled())
         << "returning a status should not mark stream as cancelled";
-    ASSERT_FALSE(clientStream->write(makeUniqueMessage().sharedBuffer()));
+    ASSERT_FALSE(clientStream->syncWrite(getReactor(), makeUniqueMessage().sharedBuffer()));
 
     auto finishPf = makePromiseFuture<::grpc::Status>();
-    auto finishThread = stdx::thread(
-        [&clientStream = *clientStream, promise = std::move(finishPf.promise)]() mutable {
-            promise.setWith([&] { return clientStream.finish(); });
-        });
+    auto finishThread = stdx::thread([this,
+                                      clientStream = clientStream,
+                                      promise = std::move(finishPf.promise)]() mutable {
+        promise.setWith([this, clientStream] { return clientStream->syncFinish(getReactor()); });
+    });
     ON_BLOCK_EXIT([&finishThread] { finishThread.join(); });
     // finish() should not return until all messages have been read.
     ASSERT_FALSE(finishPf.future.isReady());
 
     // Ensure messages sent before the RPC was finished can still be read.
     for (auto i = 0; i < kMessageCount; i++) {
-        ASSERT_TRUE(clientStream->read());
+        ASSERT_TRUE(clientStream->syncRead(getReactor()));
     }
-    ASSERT_FALSE(clientStream->read());
+    ASSERT_FALSE(clientStream->syncRead(getReactor()));
 
     // Ensure that finish() returns now that all the messages have been read.
     auto status = finishPf.future.get();
@@ -185,29 +193,30 @@ TEST_F(MockStubTest, RPCCancellation) {
     MockClientContext ctx;
     auto [clientStream, rpc] = makeRPC(ctx);
 
-    ASSERT_TRUE(clientStream->write(makeUniqueMessage().sharedBuffer()));
+    ASSERT_TRUE(clientStream->syncWrite(getReactor(), makeUniqueMessage().sharedBuffer()));
 
     rpc.cancel(kCancellationStatus);
 
     ASSERT_TRUE(rpc.serverCtx->isCancelled());
-    ASSERT_FALSE(clientStream->write(makeUniqueMessage().sharedBuffer()));
-    ASSERT_FALSE(clientStream->read());
-    ASSERT_EQ(clientStream->finish().error_code(), kCancellationStatus.error_code());
+    ASSERT_FALSE(clientStream->syncWrite(getReactor(), makeUniqueMessage().sharedBuffer()));
+    ASSERT_FALSE(clientStream->syncRead(getReactor()));
+    ASSERT_EQ(clientStream->syncFinish(getReactor()).error_code(),
+              kCancellationStatus.error_code());
 }
 
 TEST_F(MockStubTest, CannotReturnStatusForCancelledRPC) {
     MockClientContext ctx;
     auto [clientStream, rpc] = makeRPC(ctx);
 
-    ASSERT_TRUE(clientStream->write(makeUniqueMessage().sharedBuffer()));
+    ASSERT_TRUE(clientStream->syncWrite(getReactor(), makeUniqueMessage().sharedBuffer()));
 
     rpc.cancel(::grpc::Status::CANCELLED);
     rpc.sendReturnStatus(::grpc::Status::OK);
 
     ASSERT_TRUE(rpc.serverCtx->isCancelled());
-    ASSERT_FALSE(clientStream->write(makeUniqueMessage().sharedBuffer()));
-    ASSERT_FALSE(clientStream->read());
-    ASSERT_EQ(clientStream->finish().error_code(), ::grpc::StatusCode::CANCELLED);
+    ASSERT_FALSE(clientStream->syncWrite(getReactor(), makeUniqueMessage().sharedBuffer()));
+    ASSERT_FALSE(clientStream->syncRead(getReactor()));
+    ASSERT_EQ(clientStream->syncFinish(getReactor()).error_code(), ::grpc::StatusCode::CANCELLED);
 }
 
 }  // namespace mongo::transport::grpc

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <charconv>
 #include <memory>
 #include <string>
 
@@ -37,24 +36,20 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/grpc/client_context.h"
 #include "mongo/transport/grpc/client_stream.h"
+#include "mongo/transport/grpc/reactor.h"
 #include "mongo/transport/grpc/server_context.h"
 #include "mongo/transport/grpc/server_stream.h"
-#include "mongo/transport/grpc/util.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/base64.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/uuid.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport::grpc {
 
@@ -88,52 +83,24 @@ namespace mongo::transport::grpc {
  */
 class GRPCSession : public Session {
 public:
-    explicit GRPCSession(TransportLayer* tl, HostAndPort remote)
-        : _tl(tl), _remote(std::move(remote)) {
-        SockAddr remoteAddr;
-        try {
-            remoteAddr = SockAddr::create(_remote.host(), _remote.port(), AF_UNSPEC);
-        } catch (const DBException& ex) {
-            // If {remote} fails to parse for any reason, allow the session to continue anyway.
-            // {_restrictionEnvironment} will end up with an AF_UNSPEC remote address
-            // and will fail closed, rejecting any AddressRestriction present for the user/role.
-            LOGV2_DEBUG(8128400,
-                        2,
-                        "Unable to parse peer name",
-                        "host"_attr = _remote.host(),
-                        "port"_attr = _remote.port(),
-                        "error"_attr = ex.toStatus());
-        }
+    explicit GRPCSession(TransportLayer* tl, HostAndPort remote);
 
-        // libgrpc does not expose local socket name for us.
-        // This means that any attempt to use a {serverAddress} authentication restriction
-        // with the GRPC protocol will fail to permit login.
-        _restrictionEnvironment = RestrictionEnvironment(std::move(remoteAddr), SockAddr());
-    }
-
-    virtual ~GRPCSession() {
-        if (_cleanupCallback)
-            (*_cleanupCallback)(*this);
-    }
+    virtual ~GRPCSession();
 
     const HostAndPort& remote() const {
         return _remote;
     }
 
-    StatusWith<Message> sourceMessage() noexcept override {
-        if (auto s = _verifyNotTerminated(); !s.isOK()) {
-            return s.withContext("Could not read from gRPC stream");
-        }
+    StatusWith<Message> sourceMessage() noexcept override;
 
-        return _readFromStream();
-    }
+    Status sinkMessage(Message m) noexcept override;
 
-    Status sinkMessage(Message m) noexcept override {
-        if (auto s = _verifyNotTerminated(); !s.isOK()) {
-            return s.withContext("Could not write to gRPC stream");
-        }
+    Future<Message> asyncSourceMessage(const BatonHandle&) noexcept final;
 
-        return _writeToStream(std::move(m));
+    Future<void> asyncSinkMessage(Message m, const BatonHandle&) noexcept final;
+
+    void cancelAsyncOperations(const BatonHandle&) final {
+        _cancelAsyncOperations();
     }
 
     /**
@@ -155,14 +122,7 @@ public:
      *
      * The provided reason MUST be a cancellation error.
      */
-    void cancel(Status reason) {
-        invariant(ErrorCodes::isCancellationError(reason));
-        // Need to update terminationStatus before cancelling so that when the RPC caller/handler is
-        // interrupted, it will be guaranteed to have access to the reason for cancellation.
-        if (_setTerminationStatus(std::move(reason))) {
-            _tryCancel();
-        }
-    }
+    void cancel(Status reason);
 
     /**
      * Returns the reason for which this session was terminated, if any. "Termination" includes
@@ -171,18 +131,7 @@ public:
      *
      * Remains unset until termination.
      */
-    boost::optional<Status> terminationStatus() const {
-        auto cancelled = _isCancelled();
-        auto status = _terminationStatus.synchronize();
-        // If the RPC was cancelled, return a status reflecting that, including in the case
-        // where the RPC was cancelled after the session was already locally ended (i.e. after
-        // the termination status was set to OK).
-        if (cancelled && (!status->has_value() || (*status)->isOK())) {
-            return Status(ErrorCodes::CallbackCanceled,
-                          "gRPC session was terminated due to the associated RPC being cancelled");
-        }
-        return *status;
-    }
+    boost::optional<Status> terminationStatus() const;
 
     TransportLayer* getTransportLayer() const final {
         return _tl;
@@ -223,23 +172,11 @@ public:
     /**
      * The following APIs are not implemented for both ingress and egress gRPC sessions.
      */
-    Future<Message> asyncSourceMessage(const BatonHandle&) noexcept final {
-        MONGO_UNIMPLEMENTED;
-    }
-
     Status waitForData() noexcept final {
         MONGO_UNIMPLEMENTED;
     }
 
     Future<void> asyncWaitForData() noexcept final {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    Future<void> asyncSinkMessage(Message, const BatonHandle&) noexcept final {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    void cancelAsyncOperations(const BatonHandle&) final {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -267,13 +204,7 @@ protected:
      * Sets the termination status if it hasn't been set already.
      * Returns whether the termination status was updated or not.
      */
-    bool _setTerminationStatus(Status status) {
-        auto ts = _terminationStatus.synchronize();
-        if (MONGO_unlikely(ts->has_value() || _isCancelled()))
-            return false;
-        ts->emplace(std::move(status));
-        return true;
-    }
+    bool _setTerminationStatus(Status status);
 
     synchronized_value<boost::optional<Status>> _terminationStatus;
 
@@ -286,6 +217,12 @@ private:
 
     virtual Status _writeToStream(Message m) = 0;
 
+    virtual Future<Message> _asyncReadFromStream() = 0;
+
+    virtual Future<void> _asyncWriteToStream(Message m) = 0;
+
+    virtual void _cancelAsyncOperations() = 0;
+
     /**
      * Perform all the pre-read/write checks on the underlying stream, returning a status that the
      * read/write should fail with if the session had already been terminated.
@@ -295,19 +232,7 @@ private:
      * expensive. If a termination status had been set locally, this method will check for
      * cancellation before returning that status, however.
      */
-    Status _verifyNotTerminated() const {
-        // Check the cached _terminationStatus directly rather than invoking terminationStatus() to
-        // avoid the overhead of checking if the RPC has been cancelled. If it has been cancelled
-        // then reading from or writing to the stream will fail anyways.
-        if (_terminationStatus->has_value()) {
-            if (auto ts = terminationStatus(); !ts->isOK()) {
-                return *ts;
-            }
-            return Status(ErrorCodes::StreamTerminated, "gRPC stream is terminated");
-        }
-
-        return Status::OK();
-    }
+    Status _verifyNotTerminated() const;
 
     TransportLayer* const _tl;
 
@@ -368,57 +293,13 @@ public:
                    ServerStream* stream,
                    boost::optional<UUID> clientId,
                    boost::optional<std::string> authToken,
-                   boost::optional<StringData> encodedClientMetadata)
-        : GRPCSession(tl, ctx->getRemote()),
-          _ctx(ctx),
-          _stream(stream),
-          _authToken(std::move(authToken)),
-          _remoteClientId(clientId),
-          _encodedClientMetadata(std::move(encodedClientMetadata)) {
-        LOGV2_DEBUG(
-            7401101, 2, "Constructed a new gRPC ingress session", "session"_attr = toBSON());
-    }
+                   boost::optional<StringData> encodedClientMetadata);
 
-    ~IngressSession() {
-        end();
-        LOGV2_DEBUG(7401402,
-                    2,
-                    "Finished cleaning up a gRPC ingress session",
-                    "session"_attr = toBSON(),
-                    "status"_attr = terminationStatus());
-    }
+    ~IngressSession();
 
-    StatusWith<Message> _readFromStream() noexcept override {
-        if (auto maybeBuffer = _stream->read()) {
-            return Message(std::move(*maybeBuffer));
-        }
+    StatusWith<Message> _readFromStream() noexcept override;
 
-        if (auto ts = terminationStatus()) {
-            return *ts;
-        } else {
-            // If the client gracefully terminated, set the RPC's final status to OK.
-            _setTerminationStatus(Status::OK());
-            return Status(ErrorCodes::StreamTerminated,
-                          "Could not read from gRPC server stream: remote done writing");
-        }
-    }
-
-    Status _writeToStream(Message message) noexcept override {
-        if (_stream->write(message.sharedBuffer())) {
-            return Status::OK();
-        }
-
-        if (auto ts = terminationStatus()) {
-            return *ts;
-        } else {
-            // If the client closed the stream before we had a chance to return our response, mark
-            // the RPC as cancelled.
-            auto status = Status(ErrorCodes::CallbackCanceled,
-                                 "Could not write to gRPC server stream: remote done reading");
-            _setTerminationStatus(status);
-            return status;
-        }
-    }
+    Status _writeToStream(Message message) noexcept override;
 
     boost::optional<UUID> getRemoteClientId() const {
         return _remoteClientId;
@@ -457,29 +338,22 @@ public:
      *
      * Throws an exception if the client provided improperly formatted metadata.
      */
-    boost::optional<const ClientMetadata&> getClientMetadata() const {
-        if (!_encodedClientMetadata) {
-            return boost::none;
-        }
+    boost::optional<const ClientMetadata&> getClientMetadata() const;
 
-        auto decoded = _decodedClientMetadata.synchronize();
+    void appendToBSON(BSONObjBuilder& bb) const override;
 
-        if (decoded->has_value()) {
-            return **decoded;
-        }
+    // IngressSession does not support asynchronous operations.
 
-        fmt::memory_buffer buffer{};
-        base64::decode(buffer, *_encodedClientMetadata);
-        BSONObj metadataDocument(buffer.data());
-        decoded->emplace(std::move(metadataDocument));
-        return **decoded;
+    Future<Message> _asyncReadFromStream() override final {
+        MONGO_UNIMPLEMENTED;
     }
 
-    void appendToBSON(BSONObjBuilder& bb) const override {
-        // No uint64_t BSON type
-        bb.append("id", static_cast<long>(id()));
-        bb.append("remoteClientId", remoteClientIdToString());
-        bb.append("remote", remote().toString());
+    Future<void> _asyncWriteToStream(Message m) override final {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    void _cancelAsyncOperations() override final {
+        MONGO_UNIMPLEMENTED;
     }
 
 private:
@@ -545,47 +419,27 @@ public:
     };
 
     EgressSession(TransportLayer* tl,
+                  const std::shared_ptr<GRPCReactor>& reactor,
                   std::shared_ptr<ClientContext> ctx,
                   std::shared_ptr<ClientStream> stream,
                   UUID clientId,
-                  std::shared_ptr<SharedState> sharedState)
-        : GRPCSession(tl, ctx->getRemote()),
-          _ctx(std::move(ctx)),
-          _stream(std::move(stream)),
-          _clientId(clientId),
-          _sharedState(std::move(sharedState)) {
-        LOGV2_DEBUG(7401401, 2, "Constructed a new gRPC egress session", "session"_attr = toBSON());
-    }
+                  std::shared_ptr<SharedState> sharedState);
 
-    ~EgressSession() {
-        end();
-        LOGV2_DEBUG(7401403,
-                    2,
-                    "Finished cleaning up a gRPC egress session",
-                    "session"_attr = toBSON(),
-                    "status"_attr = terminationStatus());
-    }
+    ~EgressSession();
 
     StatusWith<Message> _readFromStream() noexcept override {
-        if (auto maybeBuffer = _stream->read()) {
-            _updateWireVersion();
-            return Message(std::move(*maybeBuffer));
-        }
-
-        // If _stream->read() fails, then the server has no more messages to send and a final RPC
-        // status should be available. Set the termination status to that and return it here.
-        return finish();
+        return _asyncReadFromStream().getNoThrow();
     }
 
     Status _writeToStream(Message message) noexcept override {
-        if (_stream->write(message.sharedBuffer())) {
-            return Status::OK();
-        }
-
-        // If _stream->write() fails, then the RPC has been terminated and a final RPC
-        // status should be available. Set the termination status to that and return it here.
-        return finish();
+        return _asyncWriteToStream(message).getNoThrow();
     }
+
+    Future<Message> _asyncReadFromStream() override final;
+
+    Future<void> _asyncWriteToStream(Message message) override final;
+
+    void _cancelAsyncOperations() override final;
 
     /**
      * Get this session's current idea of what the cluster's maxWireVersion is.
@@ -596,35 +450,31 @@ public:
         return _sharedState->clusterMaxWireVersion.load();
     };
 
-    /**
-     * Indicates to the server side that the client will not be sending any further messages, then
-     * blocks until all messages from the server have been read and the server has returned a final
-     * status. Once a status has been received, this session's termination status is updated
-     * accordingly.
-     *
-     * Returns the termination status.
-     *
-     * This method should be used instead of end() in most cases, since it retrieves the server's
-     * return status for the RPC.
-     */
+
     Status finish() {
-        auto status = _terminationStatus.synchronize();
-        if (!status->has_value()) {
-            *status = util::convertStatus(_stream->finish());
-        }
-        return **status;
+        return asyncFinish().getNoThrow();
     }
+
+    /**
+     * Indicates to the server side that the client will not be sending any further messages,
+     * then requests notification for when all messages from the server have been read and the
+     * server has returned a final status. Once a status has been received, this session's
+     * termination status is updated accordingly.
+     *
+     * A non-OK Status indicates that either:
+     *  - The call to writesDone() or finish() was unsuccessful.
+     *  - The stream terminated with a non-OK termination status.
+     *
+     * Use finish() to gracefully close a stream that is done sending messages. This function should
+     * not be called concurrently with any other operations on the stream.
+     */
+    Future<void> asyncFinish();
 
     UUID getClientId() const {
         return _clientId;
     }
 
-    void appendToBSON(BSONObjBuilder& bb) const override {
-        // No uint64_t BSON type
-        bb.append("id", static_cast<long>(id()));
-        bb.append("clientId", _clientId.toString());
-        bb.append("remote", remote().toString());
-    }
+    void appendToBSON(BSONObjBuilder& bb) const override;
 
 private:
     void _tryCancel() override {
@@ -636,46 +486,24 @@ private:
         return false;
     }
 
-    void _updateWireVersion() {
-        // The cluster's wire version is communicated via the initial metadata, so only need to
-        // check it after reading the first message.
-        if (_checkedWireVersion.load() || _checkedWireVersion.swap(true)) {
-            return;
-        }
-
-        auto metadata = _ctx->getServerInitialMetadata();
-
-        auto log = [](auto error) {
-            LOGV2_WARNING(
-                7401602, "Failed to parse cluster's maxWireVersion", "error"_attr = error);
-        };
-
-        auto clusterWireVersionEntry = metadata.find(util::constants::kClusterMaxWireVersionKey);
-        if (MONGO_unlikely(clusterWireVersionEntry == metadata.end())) {
-            log(fmt::format("cannot find metadata field: {}",
-                            util::constants::kClusterMaxWireVersionKey));
-            return;
-        }
-
-        int wireVersion = 0;
-        if (std::from_chars(clusterWireVersionEntry->second.begin(),
-                            clusterWireVersionEntry->second.end(),
-                            wireVersion)
-                .ec != std::errc{}) {
-
-            log(fmt::format("invalid cluster maxWireVersion value: \"{}\"",
-                            clusterWireVersionEntry->second));
-            return;
-        }
-
-        // The following tries to avoid modifying the cache-line that holds the
-        // `clusterMaxWireVersion` when possible. Considering this code-path runs once for each
-        // outgoing stream, and the cluster maxWireVersion is not expected to change frequently,
-        // this avoids unnecessary cache evictions and is considered a performance optimization.
-        if (_sharedState->clusterMaxWireVersion.load() != wireVersion) {
-            _sharedState->clusterMaxWireVersion.store(wireVersion);
-        }
+    template <typename T>
+    Future<T> _withCancellation(const CancellationToken& token, Future<T> f) {
+        return future_util::withCancellation(std::move(f),
+                                             token)
+            .unsafeToInlineFuture();  // The returned Future is intended to run inline (typically on
+                                      // the reactor thread). Cancellation callbacks must not run on
+                                      // the thread calling cancelAsyncOperations-- the
+                                      // implementation of _cancelAsyncOperations ensures that the
+                                      // cancellation source is cancelled (and callbacks are
+                                      // correctly run) on the reactor thread.
     }
+
+    void _updateWireVersion();
+
+    const std::shared_ptr<GRPCReactor> _reactor;
+    // Calls to _asyncCancelSource.cancel() must always occur on the reactor thread to ensure
+    // cancellation tasks are run on the correct thread.
+    CancellationSource _asyncCancelSource;
 
     AtomicWord<bool> _checkedWireVersion;
     const std::shared_ptr<ClientContext> _ctx;
@@ -685,5 +513,3 @@ private:
 };
 
 }  // namespace mongo::transport::grpc
-
-#undef MONGO_LOGV2_DEFAULT_COMPONENT

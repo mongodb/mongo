@@ -129,7 +129,8 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connectWithAuthToke
             ErrorCodes::IllegalOperation,
             "start() must have been called with useEgress = true before attempting to connect");
     }
-    return _client->connect(std::move(peer), std::move(timeout), {std::move(authToken), sslMode});
+    return _client->connect(
+        std::move(peer), _reactor, std::move(timeout), {std::move(authToken), sslMode});
 }
 
 StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connect(

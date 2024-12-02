@@ -86,7 +86,14 @@ private:
  */
 class GRPCReactor : public Reactor, public std::enable_shared_from_this<GRPCReactor> {
 public:
+    // The following classes are friends because they must be allowed to request notification for
+    // the completion of async work via the completion queue. However, this functionality is not
+    // a part of the public Reactor API.
     friend class GRPCReactorTimer;
+    friend class StubFactoryImpl;
+    friend class EgressSession;
+    friend class MockClientStream;
+
     /**
      * The CompletionQueueEntry is the tag type we provide to gRPC functions. It contains a Promise
      * that will be fulfilled once the tag has been notified via the completion queue. All work
@@ -103,10 +110,23 @@ public:
 
     public:
         friend class GRPCReactor;
+        friend class MockClientStream;
+
         CompletionQueueEntry() = delete;
         CompletionQueueEntry(Passkey, Promise<void> promise) : _promise(std::move(promise)) {}
 
     private:
+        /**
+         * This function will fulfill the Promise associated with a tag, but does not remove it from
+         * the _cqTaskStash. This is a workaround to introducing a mock grpc::CompletionQueue that
+         * the MockClientStream interacts with, because at the MockClientStream layer we have no
+         * access to which reactor this tag is associated with and just care about filling the
+         * promise.
+         */
+        void _setPromise_forTest(Status s) {
+            _promise.setFrom(s);
+        }
+
         Promise<void> _promise;
         std::list<std::unique_ptr<CompletionQueueEntry>>::iterator _iter;
     };
@@ -137,6 +157,10 @@ public:
     void appendStats(BSONObjBuilder& bob) const override;
 
 private:
+    ::grpc::CompletionQueue* _getCompletionQueue() {
+        return &_cq;
+    }
+
     /**
      * Creates a CompletionQueueEntry and registers it in the _cqTaskStash to ensure proper lifetime
      * management of the tag. Callers that require a tag to provide to gRPC functions must create it

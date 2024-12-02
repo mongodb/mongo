@@ -40,6 +40,7 @@
 #include "mongo/transport/grpc/grpc_client_context.h"
 #include "mongo/transport/grpc/grpc_client_stream.h"
 #include "mongo/transport/grpc/grpc_session.h"
+#include "mongo/transport/grpc/reactor.h"
 #include "mongo/transport/grpc/serialization.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
@@ -77,6 +78,7 @@ public:
     };
 
     std::shared_ptr<EgressSession> connect(const HostAndPort& remote,
+                                           const std::shared_ptr<GRPCReactor>& reactor,
                                            Milliseconds timeout,
                                            ConnectOptions options);
 
@@ -99,6 +101,7 @@ private:
     enum class ClientState { kUninitialized, kStarted, kShutdown };
 
     virtual CtxAndStream _streamFactory(const HostAndPort&,
+                                        const std::shared_ptr<GRPCReactor>&,
                                         Milliseconds,
                                         const ConnectOptions&) = 0;
 
@@ -140,7 +143,10 @@ public:
     void shutdown() override;
 
 private:
-    CtxAndStream _streamFactory(const HostAndPort&, Milliseconds, const ConnectOptions&) override;
+    CtxAndStream _streamFactory(const HostAndPort&,
+                                const std::shared_ptr<GRPCReactor>&,
+                                Milliseconds,
+                                const ConnectOptions&) override;
 
     std::unique_ptr<StubFactory> _stubFactory;
 };

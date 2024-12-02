@@ -164,6 +164,11 @@ public:
         return OpMsg::parse(message).body.getOwned();
     }
 
+    std::shared_ptr<GRPCReactor> getGRPCEgressReactor(TransportLayer* tl) {
+        return std::dynamic_pointer_cast<GRPCReactor>(
+            tl->getReactor(TransportLayer::WhichReactor::kEgress));
+    }
+
     /**
      * Exercises the session manager and service entry point codepath through sending the specified
      * message from the client to the server, which responds back to the client with the same
@@ -187,6 +192,7 @@ public:
             ON_BLOCK_EXIT([&] { client->shutdown(); });
 
             auto session = client->connect(tl.getListeningAddresses().at(0),
+                                           getGRPCEgressReactor(&tl),
                                            CommandServiceTestFixtures::kDefaultConnectTimeout,
                                            {});
 
@@ -470,15 +476,29 @@ TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
         ON_BLOCK_EXIT([&] { tl->shutdown(); });
         addr = tl->getListeningAddresses().at(0);
 
-        auto session =
-            client->connect(addr, CommandServiceTestFixtures::kDefaultConnectTimeout, {});
+        auto session = client->connect(addr,
+                                       getGRPCEgressReactor(tl.get()),
+                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       {});
         ASSERT_OK(session->finish());
         session.reset();
     }
 
-    ASSERT_THROWS_CODE(
-        client->connect(addr, Milliseconds(50), {}), DBException, ErrorCodes::NetworkTimeout);
+    ASSERT_THROWS_CODE(client->connect(addr, getGRPCEgressReactor(tl.get()), Milliseconds(50), {}),
+                       DBException,
+                       ErrorCodes::NetworkTimeout);
     ASSERT_NOT_OK(tl->connect(addr, ConnectSSLMode::kGlobalSSLMode, Milliseconds(50)));
+}
+
+TEST_F(GRPCTransportLayerTest, TryCancelAfterReactorShutdown) {
+    runWithTL(
+        makeNoopRPCHandler(),
+        [&](auto& tl) {
+            auto session = makeEgressSession(tl, tl.getListeningAddresses().at(0));
+            getGRPCEgressReactor(&tl)->stop();
+            ASSERT_DOES_NOT_THROW(session->cancel(Status(ErrorCodes::CallbackCanceled, "test")));
+        },
+        CommandServiceTestFixtures::makeTLOptions());
 }
 
 TEST_F(GRPCTransportLayerTest, Unary) {

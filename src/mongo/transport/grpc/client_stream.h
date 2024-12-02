@@ -32,48 +32,77 @@
 #include <boost/optional.hpp>
 #include <grpcpp/grpcpp.h>
 
+#include "mongo/transport/grpc/reactor.h"
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo::transport::grpc {
 
 /**
- * Base class modeling a synchronous client side of a gRPC stream.
- * See: https://grpc.github.io/grpc/cpp/classgrpc_1_1_client_reader_writer.html
+ * Base class modeling an asynchronous client side of a gRPC stream.
+ * See: https://grpc.github.io/grpc/cpp/classgrpc_1_1_client_async_reader_writer.html
  *
- * ClientStream::read() is thread safe with respect to ClientStream::write(), but neither method
- * should be called concurrently with another invocation of itself on the same stream.
- *
- * ClientStream::finish() is thread safe with respect to ClientStream::read().
+ * This base class is defined instead of using the ClientAsyncReaderWriter directly in order to
+ * facilitate mocking.
  */
 class ClientStream {
 public:
     virtual ~ClientStream() = default;
 
     /**
-     * Block to read a message from the stream.
+     * Read a message of type R into msg.
      *
-     * Returns boost::none if the stream is closed, either cleanly or due to an underlying
+     * Completion will be notified by tag on the associated completion queue. This is thread-safe
+     * with respect to Write or WritesDone methods. It should not be called concurrently with other
+     * streaming APIs on the same stream. It is not meaningful to call it concurrently with another
+     * read on the same stream since reads on the same stream are delivered in order.
+     *
+     * The associated completion queue notification will have an ok=false status if the read failed
+     * due to the stream being closed, either cleanly or due to an underlying connection failure.
+     */
+    virtual void read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry* tag) = 0;
+
+    /**
+     * Request the writing of msg with an identifying tag.
+     *
+     * Only one write may be outstanding at any given time. This means that after calling Write, one
+     * must wait to receive tag from the completion queue BEFORE calling Write again. This is
+     * thread-safe with respect to read.
+     *
+     * gRPC doesn't take ownership or a reference to msg, so it is safe to to deallocate once Write
+     * returns.
+     *
+     * The associated completion queue notification will have an ok=false status if the
+     * write failed due to the stream being closed, either explicitly or due to an underlying
      * connection failure.
      */
-    virtual boost::optional<SharedBuffer> read() = 0;
+    virtual void write(ConstSharedBuffer msg, GRPCReactor::CompletionQueueEntry* tag) = 0;
 
     /**
-     * Block to write a message to the stream.
+     * Indicate that the stream is to be finished and request notification for when the call has
+     * been ended.
      *
-     * Returns true if the write was successful or false if it failed due to the stream being
-     * closed, either explicitly or due to an underlying connection failure.
+     * Should not be used concurrently with other operations.
+     *
+     * It is appropriate to call this method exactly once when both:
+     *  - the client side has no more message to send (this is declared implicitly by calling this
+     * method or explicitly through an earlier call to the writesDone method).
+     *  - there are no more messages to be received from the server (this is known from an earlier
+     * call to read that yielded a failed result, e.g. cq->Next(&read_tag, &ok) filled in 'ok' with
+     * 'false').
+     *
+     * The tag will be returned when either:
+     *  - all incoming messages have been read and the server has returned a status.
+     *  - the server has returned a non-OK status.
+     *  - the call failed for some reason and the library generated a status.
      */
-    virtual bool write(ConstSharedBuffer msg) = 0;
+    virtual void finish(::grpc::Status* status, GRPCReactor::CompletionQueueEntry* tag) = 0;
 
     /**
-     * Block waiting until all received messages have been read and the stream has been closed.
-     * This indicates to the server side that the client will not be sending any further messages.
+     * Signal the client is done with the writes (half-close the client stream).
      *
-     * Returns the final status of the RPC associated with this stream.
-     *
-     * This method should only be called once.
+     * Thread-safe with respect to read.
      */
-    virtual ::grpc::Status finish() = 0;
+    virtual void writesDone(GRPCReactor::CompletionQueueEntry* tag) = 0;
 };
 
 }  // namespace mongo::transport::grpc

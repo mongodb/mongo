@@ -50,6 +50,17 @@ public:
     static HostAndPort defaultServerAddress() {
         return HostAndPort("localhost", 1234);
     }
+
+    virtual void setUp() override {
+        _reactor = std::make_shared<GRPCReactor>();
+    }
+
+    const std::shared_ptr<GRPCReactor>& getReactor() {
+        return _reactor;
+    }
+
+private:
+    std::shared_ptr<GRPCReactor> _reactor;
 };
 
 TEST_F(MockClientTest, MockConnect) {
@@ -74,8 +85,8 @@ TEST_F(MockClientTest, MockConnect) {
         client.start(getServiceContext());
 
         for (auto& addr : addresses) {
-            auto session =
-                client.connect(addr, CommandServiceTestFixtures::kDefaultConnectTimeout, {});
+            auto session = client.connect(
+                addr, getReactor(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
             ON_BLOCK_EXIT([&] { session->end(); });
             ASSERT_TRUE(session->isConnected());
 
@@ -104,8 +115,10 @@ TEST_F(MockClientTest, MockAuthToken) {
         client.start(getServiceContext());
         Client::ConnectOptions options;
         options.authToken = kAuthToken;
-        auto session = client.connect(
-            defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, options);
+        auto session = client.connect(defaultServerAddress(),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      options);
         ASSERT_OK(session->finish());
     };
 
@@ -120,8 +133,10 @@ TEST_F(MockClientTest, MockNoAuthToken) {
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
         client.start(getServiceContext());
-        auto session = client.connect(
-            defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
+        auto session = client.connect(defaultServerAddress(),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {});
         ASSERT_OK(session->finish());
     };
 
@@ -152,8 +167,10 @@ TEST_F(MockClientTest, MockClientShutdown) {
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {
-            sessions.push_back(client.connect(
-                defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {}));
+            sessions.push_back(client.connect(defaultServerAddress(),
+                                              getReactor(),
+                                              CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                              {}));
         }
 
         Notification<void> shutdownFinished;
@@ -197,8 +214,10 @@ TEST_F(MockClientTest, MockClientMetadata) {
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
         client.start(getServiceContext());
         clientId.set(client.id());
-        auto session = client.connect(
-            defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
+        auto session = client.connect(defaultServerAddress(),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {});
         ASSERT_OK(session->finish());
     };
 
@@ -224,8 +243,10 @@ TEST_F(MockClientTest, WireVersionGossipping) {
         ASSERT_EQ(client.getClusterMaxWireVersion(), util::constants::kMinimumWireVersion);
 
         auto runTest = [&](int initialWireVersion, int updatedWireVersion) {
-            auto session = client.connect(
-                defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
+            auto session = client.connect(defaultServerAddress(),
+                                          getReactor(),
+                                          CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                          {});
             ASSERT_EQ(client.getClusterMaxWireVersion(), initialWireVersion);
             ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
             ASSERT_EQ(client.getClusterMaxWireVersion(), initialWireVersion);

@@ -41,6 +41,13 @@
 
 namespace mongo::transport::grpc {
 
+/**
+ * The MockClientStream provides mock networking functionality through a pipe. Despite mocking the
+ * ClientAsyncReaderWriter API, these functions currently block, and then fulfil the Promise
+ * associated with the CompletionQueueEntry tag once the blocking work has completed. This may be
+ * modified in the future by introducing a mock grpc::CompletionQueue, but is not strictly required
+ * for useful unit testing.
+ */
 class MockClientStream : public ClientStream {
 public:
     MockClientStream(HostAndPort remote,
@@ -49,11 +56,21 @@ public:
                      std::shared_ptr<MockCancellationState> rpcCancellationState,
                      BidirectionalPipe::End&& pipe);
 
-    boost::optional<SharedBuffer> read() override;
+    void read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry* tag) override;
 
-    bool write(ConstSharedBuffer msg) override;
+    void write(ConstSharedBuffer msg, GRPCReactor::CompletionQueueEntry* tag) override;
 
-    ::grpc::Status finish() override;
+    void finish(::grpc::Status* status, GRPCReactor::CompletionQueueEntry* tag) override;
+
+    void writesDone(GRPCReactor::CompletionQueueEntry* tag) override;
+
+
+    // The below sync APIs are provided to enable easier unit testing.
+    boost::optional<SharedBuffer> syncRead(const std::shared_ptr<GRPCReactor>& reactor);
+
+    bool syncWrite(const std::shared_ptr<GRPCReactor>& reactor, ConstSharedBuffer msg);
+
+    ::grpc::Status syncFinish(const std::shared_ptr<GRPCReactor>& reactor);
 
 private:
     friend class MockClientContext;

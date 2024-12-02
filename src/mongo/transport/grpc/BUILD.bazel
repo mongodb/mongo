@@ -35,6 +35,7 @@ mongo_cc_library(
     srcs = [
         "client.cpp",
         "client_cache.cpp",
+        "grpc_session.cpp",
         "grpc_session_manager.cpp",
         "grpc_transport_layer_impl.cpp",
         "reactor.cpp",

@@ -45,29 +45,45 @@ MockClientStream::MockClientStream(HostAndPort remote,
       _rpcCancellationState(std::move(rpcCancellationState)),
       _pipe{std::move(pipe)} {}
 
-boost::optional<SharedBuffer> MockClientStream::read() {
+void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry* tag) {
     // Even if the server side handler of this stream has set a final status for the RPC (i.e.
     // _rpcReturnStatus is ready), there may still be unread messages in the queue that the server
     // sent before setting that status, so only return early here if the RPC was cancelled.
     // Otherwise, try to read whatever messages are in the queue.
     if (_rpcCancellationState->isCancelled()) {
-        return boost::none;
+        tag->_setPromise_forTest(
+            {ErrorCodes::CallbackCanceled, "Completion queue task did not execute"});
+        return;
     }
 
-    return runWithDeadline<boost::optional<SharedBuffer>>(
+    auto res = runWithDeadline<boost::optional<SharedBuffer>>(
         _rpcCancellationState->getDeadline(), [&](Interruptible* i) { return _pipe.read(i); });
+
+    if (res.has_value()) {
+        *msg = res.get();
+        tag->_setPromise_forTest(Status::OK());
+    } else {
+        tag->_setPromise_forTest({ErrorCodes::CallbackCanceled, "Read did not go to the wire"});
+    }
 }
 
-bool MockClientStream::write(ConstSharedBuffer msg) {
+void MockClientStream::write(ConstSharedBuffer msg, GRPCReactor::CompletionQueueEntry* tag) {
     if (_rpcCancellationState->isCancelled() || _rpcReturnStatus.isReady()) {
-        return false;
+        tag->_setPromise_forTest(
+            {ErrorCodes::CallbackCanceled, "Completion queue task did not execute"});
+        return;
     }
 
-    return runWithDeadline<bool>(_rpcCancellationState->getDeadline(),
-                                 [&](Interruptible* i) { return _pipe.write(msg, i); });
+    auto res = runWithDeadline<bool>(_rpcCancellationState->getDeadline(),
+                                     [&](Interruptible* i) { return _pipe.write(msg, i); });
+    if (res) {
+        tag->_setPromise_forTest(Status::OK());
+    } else {
+        tag->_setPromise_forTest({ErrorCodes::CallbackCanceled, "Write did not go to the wire"});
+    }
 }
 
-::grpc::Status MockClientStream::finish() {
+void MockClientStream::finish(::grpc::Status* status, GRPCReactor::CompletionQueueEntry* tag) {
     _pipe.closeWriting();
 
     // We use a busy wait here because there is no easy way to wait until all the messages in the
@@ -80,10 +96,50 @@ bool MockClientStream::write(ConstSharedBuffer msg) {
 
     if (auto cancellationStatus = _rpcCancellationState->getCancellationStatus();
         cancellationStatus.has_value()) {
-        return *cancellationStatus;
+        *status = *cancellationStatus;
+        tag->_setPromise_forTest(Status::OK());
+        return;
     }
 
-    return _rpcReturnStatus.get();
+    *status = _rpcReturnStatus.get();
+    tag->_setPromise_forTest(Status::OK());
+}
+
+void MockClientStream::writesDone(GRPCReactor::CompletionQueueEntry* tag) {
+    tag->_setPromise_forTest(Status::OK());
+}
+
+boost::optional<SharedBuffer> MockClientStream::syncRead(
+    const std::shared_ptr<GRPCReactor>& reactor) {
+    auto pf = makePromiseFuture<void>();
+    std::unique_ptr<SharedBuffer> msg = std::make_unique<SharedBuffer>();
+
+    read(msg.get(), reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
+    auto res = std::move(pf.future).getNoThrow();
+    if (res.isOK()) {
+        return *msg.get();
+    } else {
+        return boost::none;
+    }
+}
+
+bool MockClientStream::syncWrite(const std::shared_ptr<GRPCReactor>& reactor,
+                                 ConstSharedBuffer msg) {
+    auto pf = makePromiseFuture<void>();
+    write(msg, reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
+
+    return std::move(pf.future).getNoThrow().isOK();
+}
+
+::grpc::Status MockClientStream::syncFinish(const std::shared_ptr<GRPCReactor>& reactor) {
+    auto pf = makePromiseFuture<void>();
+    auto finishStatus = std::make_unique<::grpc::Status>();
+
+    finish(finishStatus.get(), reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
+
+    return std::move(pf.future)
+        .then([finishStatus = std::move(finishStatus)]() { return *finishStatus; })
+        .get();
 }
 
 void MockClientStream::_cancel() {

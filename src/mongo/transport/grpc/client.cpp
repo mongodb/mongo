@@ -30,11 +30,14 @@
 #include "mongo/transport/grpc/client.h"
 
 #include <grpcpp/channel.h>
+#include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
+#include <grpcpp/grpcpp.h>
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/security/tls_certificate_provider.h>
 #include <grpcpp/security/tls_certificate_verifier.h>
 #include <grpcpp/security/tls_credentials_options.h>
+#include <grpcpp/support/async_stream.h>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
@@ -123,6 +126,7 @@ bool Client::_isShutdownComplete_inlock() {
 }
 
 std::shared_ptr<EgressSession> Client::connect(const HostAndPort& remote,
+                                               const std::shared_ptr<GRPCReactor>& reactor,
                                                Milliseconds timeout,
                                                ConnectOptions options) {
     // TODO: this implementation currently acquires _mutex twice, which will have negative
@@ -146,9 +150,9 @@ std::shared_ptr<EgressSession> Client::connect(const HostAndPort& remote,
         }
     });
 
-    auto [ctx, stream] = _streamFactory(remote, timeout, options);
-    auto session =
-        std::make_shared<EgressSession>(_tl, std::move(ctx), std::move(stream), _id, _sharedState);
+    auto [ctx, stream] = _streamFactory(remote, reactor, timeout, options);
+    auto session = std::make_shared<EgressSession>(
+        _tl, reactor, std::move(ctx), std::move(stream), _id, _sharedState);
 
     stdx::lock_guard lk(_mutex);
     if (MONGO_unlikely(_state == ClientState::kShutdown)) {
@@ -222,21 +226,43 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
                   ::grpc::internal::RpcMethod::BIDI_STREAMING,
                   channel) {}
 
-        std::shared_ptr<ClientStream> authenticatedCommandStream(GRPCClientContext* context) {
-            return _makeStream(_authenticatedCommandStreamMethod, context);
+        std::shared_ptr<ClientStream> authenticatedCommandStream(
+            GRPCClientContext* context, const std::shared_ptr<GRPCReactor>& reactor) {
+            return _makeStream(_authenticatedCommandStreamMethod, context, reactor);
         }
 
-        std::shared_ptr<ClientStream> unauthenticatedCommandStream(GRPCClientContext* context) {
-            return _makeStream(_unauthenticatedCommandStreamMethod, context);
+        std::shared_ptr<ClientStream> unauthenticatedCommandStream(
+            GRPCClientContext* context, const std::shared_ptr<GRPCReactor>& reactor) {
+            return _makeStream(_unauthenticatedCommandStreamMethod, context, reactor);
         }
 
     private:
         std::shared_ptr<ClientStream> _makeStream(::grpc::internal::RpcMethod& method,
-                                                  GRPCClientContext* context) {
-            std::unique_ptr<::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>>
-                readerWriter(
-                    ::grpc::internal::ClientReaderWriterFactory<WriteMessageType, ReadMessageType>::
-                        Create(&*_channel, method, context->getGRPCClientContext()));
+                                                  GRPCClientContext* context,
+                                                  const std::shared_ptr<GRPCReactor>& reactor) {
+            using StreamType = ::grpc::ClientAsyncReaderWriter<ConstSharedBuffer, SharedBuffer>;
+            auto pf = makePromiseFuture<void>();
+            std::unique_ptr<StreamType> readerWriter;
+
+            {
+                auto shutdownLock = reactor->_shutdownMutex.readLock();
+                uassert(ErrorCodes::ShutdownInProgress,
+                        "Cannot create a gRPC stream after reactor shutdown",
+                        !reactor->_inShutdownFlag);
+                readerWriter = std::unique_ptr<StreamType>(
+                    ::grpc::internal::
+                        ClientAsyncReaderWriterFactory<ConstSharedBuffer, SharedBuffer>::Create(
+                            &*_channel,
+                            reactor->_getCompletionQueue(),
+                            method,
+                            context->getGRPCClientContext(),
+                            true,
+                            reactor->_registerCompletionQueueEntry(std::move(pf.promise))));
+            }
+
+            // TODO SERVER-97153: Plumb this Future up the connect() chain for asyncConnect()
+            // instead of waiting on it.
+            std::move(pf.future).get();
 
             return std::make_shared<GRPCClientStream>(std::move(readerWriter));
         }
@@ -382,6 +408,7 @@ void GRPCClient::shutdown() {
 }
 
 Client::CtxAndStream GRPCClient::_streamFactory(const HostAndPort& remote,
+                                                const std::shared_ptr<GRPCReactor>& reactor,
                                                 Milliseconds connectTimeout,
                                                 const ConnectOptions& options) {
     auto stub = static_cast<StubFactoryImpl&>(*_stubFactory)
@@ -389,9 +416,9 @@ Client::CtxAndStream GRPCClient::_streamFactory(const HostAndPort& remote,
     auto ctx = std::make_shared<GRPCClientContext>();
     setMetadataOnClientContext(*ctx, options);
     if (options.authToken) {
-        return {ctx, stub->stub().authenticatedCommandStream(ctx.get())};
+        return {ctx, stub->stub().authenticatedCommandStream(ctx.get(), reactor)};
     } else {
-        return {ctx, stub->stub().unauthenticatedCommandStream(ctx.get())};
+        return {ctx, stub->stub().unauthenticatedCommandStream(ctx.get(), reactor)};
     }
 }
 

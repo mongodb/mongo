@@ -67,6 +67,7 @@ public:
         MockStubTestFixtures fixtures;
         _fixtures = fixtures.makeStreamTestFixtures(
             Base::getServiceContext()->getFastClockSource()->now() + getTimeout(), _clientMetadata);
+        _reactor = std::make_shared<GRPCReactor>();
     }
 
     virtual Milliseconds getTimeout() const {
@@ -81,7 +82,7 @@ public:
         return *_fixtures->rpc->serverCtx;
     }
 
-    ClientStream& getClientStream() {
+    MockClientStream& getClientStream() {
         return *_fixtures->clientStream;
     }
 
@@ -95,6 +96,10 @@ public:
 
     const MetadataView& getClientMetadata() const {
         return _clientMetadata;
+    }
+
+    const std::shared_ptr<GRPCReactor>& getReactor() {
+        return _reactor;
     }
 
     /**
@@ -134,6 +139,7 @@ private:
     const MetadataView _clientMetadata = {{"foo", "bar"}, {"baz", "zoo"}};
     const Message _clientFirstMessage = makeUniqueMessage();
     std::unique_ptr<MockStreamTestFixtures> _fixtures;
+    std::shared_ptr<GRPCReactor> _reactor;
 };
 
 class MockServerStreamTest : public MockServerStreamBase<ServiceContextTest> {};
@@ -150,7 +156,7 @@ class MockServerStreamTestWithMockedClockSource
 
 TEST_F(MockServerStreamTest, SendReceiveMessage) {
     auto clientFirst = makeUniqueMessage();
-    ASSERT_TRUE(getClientStream().write(clientFirst.sharedBuffer()));
+    ASSERT_TRUE(getClientStream().syncWrite(getReactor(), clientFirst.sharedBuffer()));
     auto readMsg = getServerStream().read();
     ASSERT_TRUE(readMsg);
     ASSERT_EQ_MSG(Message{*readMsg}, clientFirst);
@@ -158,7 +164,7 @@ TEST_F(MockServerStreamTest, SendReceiveMessage) {
     auto serverResponse = makeUniqueMessage();
     ASSERT_TRUE(getServerStream().write(serverResponse.sharedBuffer()));
 
-    auto clientReceivedMsg = getClientStream().read();
+    auto clientReceivedMsg = getClientStream().syncRead(getReactor());
     ASSERT_TRUE(clientReceivedMsg);
     ASSERT_EQ_MSG(Message{*clientReceivedMsg}, serverResponse);
 }
@@ -176,8 +182,8 @@ TEST_F(MockServerStreamTest, ConcurrentAccessToStream) {
         auto writeThread =
             monitor.spawn([&]() { ASSERT_TRUE(getServerStream().write(message.sharedBuffer())); });
 
-        ASSERT_TRUE(getClientStream().write(message.sharedBuffer()));
-        auto clientReceived = getClientStream().read();
+        ASSERT_TRUE(getClientStream().syncWrite(getReactor(), message.sharedBuffer()));
+        auto clientReceived = getClientStream().syncRead(getReactor());
         ASSERT_TRUE(clientReceived);
         ASSERT_EQ_MSG(Message{*clientReceived}, Message{message});
 
@@ -188,7 +194,7 @@ TEST_F(MockServerStreamTest, ConcurrentAccessToStream) {
 
 TEST_F(MockServerStreamTest, SendReceiveEmptyInitialMetadata) {
     ASSERT_TRUE(getServerStream().write(makeUniqueMessage().sharedBuffer()));
-    ASSERT_TRUE(getClientStream().read());
+    ASSERT_TRUE(getClientStream().syncRead(getReactor()));
     ASSERT_EQ(getClientContext().getServerInitialMetadata().size(), 0);
 }
 
@@ -200,7 +206,7 @@ TEST_F(MockServerStreamTest, SendReceiveInitialMetadata) {
     }
     ASSERT_TRUE(getServerStream().write(makeUniqueMessage().sharedBuffer()));
 
-    ASSERT_TRUE(getClientStream().read());
+    ASSERT_TRUE(getClientStream().syncRead(getReactor()));
     ASSERT_EQ(getClientContext().getServerInitialMetadata(), expected);
 }
 
@@ -222,8 +228,9 @@ TEST_F(MockServerStreamTestWithMockedClockSource, DeadlineIsEnforced) {
     ASSERT_TRUE(getServerContext().isCancelled());
     ASSERT_FALSE(getServerStream().read());
     ASSERT_FALSE(getServerStream().write(makeUniqueMessage().sharedBuffer()));
-    ASSERT_FALSE(getClientStream().read());
-    ASSERT_EQ(getClientStream().finish().error_code(), ::grpc::StatusCode::DEADLINE_EXCEEDED);
+    ASSERT_FALSE(getClientStream().syncRead(getReactor()));
+    ASSERT_EQ(getClientStream().syncFinish(getReactor()).error_code(),
+              ::grpc::StatusCode::DEADLINE_EXCEEDED);
 }
 
 TEST_F(MockServerStreamTest, TryCancelSubsequentServerRead) {
@@ -238,7 +245,7 @@ TEST_F(MockServerStreamTest, TryCancelSubsequentServerRead) {
 TEST_F(MockServerStreamTest, TryCancelInitialClientRead) {
     tryCancelTest([&](Notification<void>& setupDone) {
         setupDone.set();
-        ASSERT_FALSE(getClientStream().read());
+        ASSERT_FALSE(getClientStream().syncRead(getReactor()));
     });
 }
 
@@ -246,7 +253,7 @@ TEST_F(MockServerStreamTest, TryCancelWrite) {
     getServerContext().tryCancel();
     auto msg = makeUniqueMessage();
     ASSERT_FALSE(getServerStream().write(msg.sharedBuffer()));
-    ASSERT_FALSE(getClientStream().write(msg.sharedBuffer()));
+    ASSERT_FALSE(getClientStream().syncWrite(getReactor(), msg.sharedBuffer()));
 }
 
 TEST_F(MockServerStreamTest, MetadataAvailableAfterTryCancel) {
@@ -261,7 +268,7 @@ TEST_F(MockServerStreamTestShortTimeout, InitialServerReadTimesOut) {
 }
 
 TEST_F(MockServerStreamTestShortTimeout, InitialClientReadTimesOut) {
-    ASSERT_FALSE(getClientStream().read());
+    ASSERT_FALSE(getClientStream().syncRead(getReactor()));
 }
 
 TEST_F(MockServerStreamTest, ClientMetadataIsAccessible) {
@@ -269,24 +276,25 @@ TEST_F(MockServerStreamTest, ClientMetadataIsAccessible) {
 }
 
 TEST_F(MockServerStreamTest, ClientSideCancellation) {
-    ASSERT_TRUE(getClientStream().write(makeUniqueMessage().sharedBuffer()));
+    ASSERT_TRUE(getClientStream().syncWrite(getReactor(), makeUniqueMessage().sharedBuffer()));
     ASSERT_TRUE(getServerStream().read());
 
     getClientContext().tryCancel();
 
-    ASSERT_FALSE(getClientStream().read());
-    ASSERT_FALSE(getClientStream().write(makeUniqueMessage().sharedBuffer()));
+    ASSERT_FALSE(getClientStream().syncRead(getReactor()));
+    ASSERT_FALSE(getClientStream().syncWrite(getReactor(), makeUniqueMessage().sharedBuffer()));
     ASSERT_FALSE(getServerStream().read());
     ASSERT_FALSE(getServerStream().write(makeUniqueMessage().sharedBuffer()));
     ASSERT_TRUE(getServerContext().isCancelled());
 
-    ASSERT_EQ(getClientStream().finish().error_code(), ::grpc::StatusCode::CANCELLED);
+    ASSERT_EQ(getClientStream().syncFinish(getReactor()).error_code(),
+              ::grpc::StatusCode::CANCELLED);
 }
 
 TEST_F(MockServerStreamTest, CancellationInterruptsFinish) {
     auto pf = makePromiseFuture<::grpc::Status>();
-    auto finishThread =
-        stdx::thread([&] { pf.promise.setWith([&] { return getClientStream().finish(); }); });
+    auto finishThread = stdx::thread(
+        [&] { pf.promise.setWith([&] { return getClientStream().syncFinish(getReactor()); }); });
     ON_BLOCK_EXIT([&] { finishThread.join(); });
 
     // finish() won't return until server end hangs up too.
@@ -298,8 +306,8 @@ TEST_F(MockServerStreamTest, CancellationInterruptsFinish) {
 
 TEST_F(MockServerStreamTestWithMockedClockSource, DeadlineExceededInterruptsFinish) {
     auto pf = makePromiseFuture<::grpc::Status>();
-    auto finishThread =
-        stdx::thread([&] { pf.promise.setWith([&] { return getClientStream().finish(); }); });
+    auto finishThread = stdx::thread(
+        [&] { pf.promise.setWith([&] { return getClientStream().syncFinish(getReactor()); }); });
     ON_BLOCK_EXIT([&] { finishThread.join(); });
 
     // finish() won't return until server end hangs up too.

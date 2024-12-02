@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <grpcpp/support/sync_stream.h>
+#include <grpcpp/support/async_stream.h>
 
 #include "mongo/transport/grpc/client_stream.h"
 
@@ -38,28 +38,26 @@ namespace mongo::transport::grpc {
 class GRPCClientStream : public ClientStream {
 public:
     explicit GRPCClientStream(
-        std::unique_ptr<::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>> stream)
+        std::unique_ptr<::grpc::ClientAsyncReaderWriter<ConstSharedBuffer, SharedBuffer>> stream)
         : _stream{std::move(stream)} {}
 
-    boost::optional<SharedBuffer> read() override {
-        SharedBuffer msg;
-        if (_stream->Read(&msg)) {
-            return std::move(msg);
-        } else {
-            return boost::none;
-        }
+    void read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry* tag) override {
+        _stream->Read(msg, tag);
     };
 
-    bool write(ConstSharedBuffer msg) override {
-        return _stream->Write(msg);
+    void write(ConstSharedBuffer msg, GRPCReactor::CompletionQueueEntry* tag) override {
+        _stream->Write(msg, tag);
     }
 
-    ::grpc::Status finish() override {
-        _stream->WritesDone();
-        return _stream->Finish();
+    void finish(::grpc::Status* status, GRPCReactor::CompletionQueueEntry* tag) override {
+        _stream->Finish(status, tag);
+    }
+
+    void writesDone(GRPCReactor::CompletionQueueEntry* tag) override {
+        _stream->WritesDone(tag);
     }
 
 private:
-    std::unique_ptr<::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>> _stream;
+    std::unique_ptr<::grpc::ClientAsyncReaderWriter<ConstSharedBuffer, SharedBuffer>> _stream;
 };
 }  // namespace mongo::transport::grpc
