@@ -565,6 +565,10 @@ last-continuous:
     ticket: SERVER-84089
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-94207
+  - test_file: jstests/core/query/find_all_values_at_path_expression.js
+    ticket: SERVER-95670
+  - test_file: jstests/sharding/query/owning_shard_expression.js
+    ticket: SERVER-95670
   suites: null
 last-lts:
   all:
@@ -1182,4 +1186,8 @@ last-lts:
     ticket: SERVER-84089
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-94207
+  - test_file: jstests/core/query/find_all_values_at_path_expression.js
+    ticket: SERVER-95670
+  - test_file: jstests/sharding/query/owning_shard_expression.js
+    ticket: SERVER-95670
   suites: null

@@ -371,15 +371,34 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
         return Value(BSONNULL);
     }
 
-    // Retrieve the values from the incoming document.
-    NamespaceString ns(NamespaceStringUtil::parseNamespaceFromDoc(
-        getExpressionContext()->ns.tenantId(), input["ns"_sd].getStringData()));
-    const auto shardVersionObj = input["shardVersion"_sd].getDocument().toBson();
+    uassert(9567000,
+            str::stream() << opName << " supports an object as its argument",
+            input.getType() == BSONType::Object);
+
+    Value nsUnchecked = input["ns"_sd];
+    Value shardVersionUnchecked = input["shardVersion"_sd];
+    Value shardKeyValUnchecked = input["shardKeyVal"_sd];
+
+    uassert(9567001,
+            str::stream() << opName << " requires 'ns' argument to be an string",
+            nsUnchecked.getType() == BSONType::String);
+    uassert(9567002,
+            str::stream() << opName << " requires 'shardVersion' argument to be an object",
+            shardVersionUnchecked.getType() == BSONType::Object);
+    uassert(9567003,
+            str::stream() << opName << " requires 'shardKeyVal' argument to be an object",
+            shardKeyValUnchecked.getType() == BSONType::Object);
+
+    auto expCtx = getExpressionContext();
+    NamespaceString ns(NamespaceStringUtil::parseNamespaceFromDoc(expCtx->ns.tenantId(),
+                                                                  nsUnchecked.getStringData()));
+
+    const auto shardVersionObj = shardVersionUnchecked.getDocument().toBson();
     const auto shardVersion = ShardVersion::parse(BSON("" << shardVersionObj).firstElement());
-    const auto shardKeyVal = input["shardKeyVal"_sd].getDocument().toBson();
+    const auto shardKeyVal = shardKeyValUnchecked.getDocument().toBson();
 
     // Get the 'chunkManager' from the catalog cache.
-    auto opCtx = getExpressionContext()->opCtx;
+    auto opCtx = expCtx->opCtx;
     const auto catalogCache = Grid::get(opCtx)->catalogCache();
     uassert(6868602,
             "$_internalOwningShard expression only makes sense in sharded environment",
