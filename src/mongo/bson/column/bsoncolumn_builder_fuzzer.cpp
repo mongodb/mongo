@@ -125,9 +125,11 @@ BSONElement createUndefined(std::forward_list<BSONObj>& elementMemory) {
     return elementMemory.front().firstElement();
 }
 
-BSONElement createRegex(StringData options, std::forward_list<BSONObj>& elementMemory) {
+BSONElement createRegex(StringData pattern,
+                        StringData options,
+                        std::forward_list<BSONObj>& elementMemory) {
     BSONObjBuilder ob;
-    ob.appendRegex("0"_sd, options);
+    ob.appendRegex("0"_sd, pattern, options);
     elementMemory.emplace_front(ob.obj());
     return elementMemory.front().firstElement();
 }
@@ -200,27 +202,41 @@ constexpr size_t kMaxBufLength = 25;
 
 // Reusable code for generating fuzzed buf content
 bool generateBuf(const char*& ptr, const char* end, const char* buf, size_t& len) {
-    // Generate len
-    if (static_cast<size_t>(end - ptr) < sizeof(uint8_t))
+    // Generate len.
+    size_t ptrLen = static_cast<size_t>(end - ptr);
+    if (ptrLen < sizeof(uint8_t))
         return false;
     uint8_t lenRead;
     memcpy(&lenRead, ptr, sizeof(uint8_t));
-    len = lenRead % (kMaxBufLength + 1);
+    size_t maxLen = lenRead % (kMaxBufLength + 1);
     ptr += sizeof(uint8_t);
+    ptrLen = static_cast<size_t>(end - ptr);
 
-    // Pull out buf
-    if (static_cast<size_t>(end - ptr) < len)
-        return false;
+    // Pull out buf.
+    len = std::min(maxLen, ptrLen);
     memcpy((void*)buf, ptr, len);
     ptr += len;
     return true;
 };
 
 bool generateBufNoNuls(const char*& ptr, const char* end, const char* buf, size_t& len) {
-    if (!generateBuf(ptr, end, buf, len))
+    // Generate max possible len the no-null string could be.
+    size_t ptrLen = static_cast<size_t>(end - ptr);
+    if (ptrLen < sizeof(uint8_t))
         return false;
+    uint8_t lenRead;
+    memcpy(&lenRead, ptr, sizeof(uint8_t));
+    ptr += sizeof(uint8_t);
+    ptrLen = static_cast<size_t>(end - ptr);
 
-    len = strnlen(buf, len);
+    // Pull out non-null buf.
+    size_t maxLen = std::min(ptrLen, lenRead % (kMaxBufLength + 1));
+    len = strnlen(ptr, maxLen);
+    memcpy((void*)buf, ptr, len);
+
+    // If the len returned by strnlen is maxLen, then we don't detect a null byte in the buffer.
+    // Otherwise, we increment the ptr one past the null byte we detected.
+    ptr += (len == maxLen ? len : len + 1);
     return true;
 }
 
@@ -306,7 +322,7 @@ bool createFuzzedElement(const char*& ptr,
         repetition +=
             mongo::simple8b_internal::kRleMultiplier * mongo::simple8b_internal::kMaxRleCount;
 
-    // Construct a BSONElement based on type and add it to the generatedElements vector
+    // Construct a BSONElement based on type.
     size_t len;
     char buf[kMaxBufLength];
     switch (type) {
@@ -390,7 +406,15 @@ bool createFuzzedElement(const char*& ptr,
         case RegEx: {
             if (!generateBufNoNuls(ptr, end, &buf[0], len))
                 return false;
-            result = createRegex(StringData(buf, len), elementMemory);
+            auto patternStr = StringData(buf, len);
+
+            char optionsBuf[kMaxBufLength];
+            size_t optionsLen;
+            if (!generateBufNoNuls(ptr, end, &optionsBuf[0], optionsLen))
+                return false;
+            auto optionsStr = StringData(optionsBuf, optionsLen);
+
+            result = createRegex(patternStr, optionsStr, elementMemory);
             return true;
         }
         case String: {
