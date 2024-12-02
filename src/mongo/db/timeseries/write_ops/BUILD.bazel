@@ -22,6 +22,7 @@ mongo_cc_library(
     hdrs = [
         "timeseries_write_ops.h",
     ],
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "timeseries_write_ops_utils_internal",
         "//src/mongo/db:commands",

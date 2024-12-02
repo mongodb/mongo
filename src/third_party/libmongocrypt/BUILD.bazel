@@ -198,6 +198,7 @@ mongo_cc_library(
             "KMS_MESSAGE_LITTLE_ENDIAN",
         ],
     }),
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/third_party/IntelRDFPMathLib20U1:intel_decimal128",
         "//src/third_party/libbson:bson",

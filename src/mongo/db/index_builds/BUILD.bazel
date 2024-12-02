@@ -89,6 +89,7 @@ mongo_cc_library(
     hdrs = [
         "index_build_oplog_entry.h",
     ],
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         ":commit_quorum_options",
         "//src/mongo:base",
@@ -181,6 +182,7 @@ mongo_cc_library(
         "index_build_interceptor.h",
         "skipped_record_tracker.h",
     ],
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         ":two_phase_index_build_knobs_idl",
         "//src/mongo/db:server_base",

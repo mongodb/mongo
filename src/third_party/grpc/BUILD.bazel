@@ -105,6 +105,7 @@ mongo_cc_grpc_library(
     srcs = [":helloworld_proto"],
     cc_proto = ":helloworld_cc_proto",
     generate_mocks = True,
+    no_undefined_ref_DO_NOT_USE = False,
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
 )
 
@@ -344,6 +345,7 @@ mongo_cc_library(
         "dist/include/grpcpp/xds_server_builder.h",
     ],
     copts = GRPC_COPTS + ["-Isrc/third_party/grpc/dist"] + ["-Isrc/third_party/grpc/dist/include"],
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/third_party/protobuf",
     ],
@@ -2745,6 +2747,7 @@ mongo_cc_library(
         "-Isrc/third_party/grpc/dist/third_party/xxhash",
     ],
     features = GRPC_FEATURES,
+    no_undefined_ref_DO_NOT_USE = False,
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         ":address_sorting",
@@ -3141,6 +3144,7 @@ mongo_cc_grpc_library(
     srcs = [":reflection_proto"],
     cc_proto = ":reflection_cc_proto",
     generate_mocks = True,
+    no_undefined_ref_DO_NOT_USE = False,
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
 )
 
