@@ -139,12 +139,11 @@ public:
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
         std::string errmsg;
-        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses).responseOK) {
-            uasserted(ErrorCodes::OperationFailed, errmsg);
-        }
+        auto appendResult = appendRawResponses(opCtx, &errmsg, &output, shardResponses);
+        uassert(ErrorCodes::OperationFailed, errmsg, appendResult.responseOK);
 
         output.append("db", dbName.db());
-        aggregateResults(cmd.getScale(), shardResponses, output);
+        aggregateResults(cmd.getScale(), appendResult.successResponses, output);
         return true;
     }
 
