@@ -38,7 +38,8 @@ namespace mongo {
 
 /**
  * SetMetadataTransformation applies a transformation that sets metadata on the document without
- * modifying any of the document fields.
+ * modifying any of the document fields. This is the core transformation logic for the $setMetadata
+ * stage.
  */
 class SetMetadataTransformation final : public TransformerInterface {
 public:
@@ -52,6 +53,10 @@ public:
 
     bool noFieldModifications() const final {
         return true;
+    }
+
+    DocumentMetadataFields::MetaType getMetaType() {
+        return _metaType;
     }
 
     Document applyTransformation(const Document& input) const final;
@@ -73,5 +78,24 @@ private:
     const boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::intrusive_ptr<Expression> _metadataExpression;
     const DocumentMetadataFields::MetaType _metaType;
+};
+
+/**
+ * $setMetadata takes one {<$meta field> : <Expression>} pair and sets the metadata on each incoming
+ * document with the result of evaluating that expression.
+ *
+ * This is implemented as an extension of DocumentSourceSingleDocumentTransformation.
+ */
+class DocumentSourceSetMetadata final {
+public:
+    static constexpr StringData kStageName = "$setMetadata"_sd;
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    static boost::intrusive_ptr<DocumentSource> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::intrusive_ptr<Expression> metadataExpression,
+        DocumentMetadataFields::MetaType metaType);
 };
 }  // namespace mongo

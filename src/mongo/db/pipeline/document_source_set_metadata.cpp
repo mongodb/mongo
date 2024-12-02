@@ -27,11 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/set_metadata_transformation.h"
+#include "mongo/db/pipeline/document_source_set_metadata.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 
 namespace mongo {
+
+REGISTER_INTERNAL_DOCUMENT_SOURCE(setMetadata,
+                                  LiteParsedDocumentSourceInternal::parse,
+                                  DocumentSourceSetMetadata::createFromBson,
+                                  true);
 
 using MetaType = DocumentMetadataFields::MetaType;
 
@@ -39,11 +45,7 @@ SetMetadataTransformation::SetMetadataTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::intrusive_ptr<Expression> metadataExpression,
     DocumentMetadataFields::MetaType metaType)
-    : _expCtx(expCtx), _metadataExpression(std::move(metadataExpression)), _metaType(metaType) {
-    tassert(9466800,
-            "SetMetadataTransformation currently only supports MetaType::kScore.",
-            metaType == MetaType::kScore);
-}
+    : _expCtx(expCtx), _metadataExpression(std::move(metadataExpression)), _metaType(metaType) {}
 
 Document SetMetadataTransformation::applyTransformation(const Document& input) const {
     // Compute new metadata.
@@ -52,19 +54,7 @@ Document SetMetadataTransformation::applyTransformation(const Document& input) c
     // The document must be mutable to modify metadata.
     MutableDocument newDoc(input);
     auto& metadata = newDoc.metadata();
-
-    switch (_metaType) {
-        case MetaType::kScore:
-            uassert(ErrorCodes::TypeMismatch,
-                    str::stream() << "meta field 'score' requires numeric type, found "
-                                  << typeName(metaVal.getType()),
-                    metaVal.numeric());
-            metadata.setScore(metaVal.getDouble());
-            break;
-        default:
-            MONGO_UNREACHABLE_TASSERT(9466801);
-            break;
-    }
+    metadata.setMetaFieldFromValue(_metaType, metaVal);
 
     return newDoc.freeze();
 }
@@ -75,16 +65,14 @@ void SetMetadataTransformation::optimize() {
 
 Document SetMetadataTransformation::serializeTransformation(
     const SerializationOptions& options) const {
-    MutableDocument output;
-
-    // TODO SERVER-96793 Implement and test correct serialization.
-    return Document{{"score"_sd, _metadataExpression->serialize(options)}};
+    return Document{{DocumentMetadataFields::serializeMetaType(_metaType),
+                     _metadataExpression->serialize(options)}};
 }
 
 DepsTracker::State SetMetadataTransformation::addDependencies(DepsTracker* deps) const {
     expression::addDependencies(_metadataExpression.get(), deps);
 
-    // This transformation only adds metadata and does not modify fields, so later stages could need
+    // This transformation only sets metadata and does not modify fields, so later stages could need
     // access to either fields or metadata.
     return DepsTracker::State::SEE_NEXT;
 }
@@ -103,4 +91,42 @@ void SetMetadataTransformation::addVariableRefs(std::set<Variables::Id>* refs) c
     expression::addVariableRefs(_metadataExpression.get(), refs);
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceSetMetadata::createFromBson(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "The " << kStageName
+                          << " stage specification must be an object, found "
+                          << typeName(elem.type()),
+            elem.type() == BSONType::Object);
+
+    BSONObj obj = elem.embeddedObject();
+    uassert(ErrorCodes::FailedToParse,
+            str::stream()
+                << kStageName
+                << " only permits setting exactly one metadata field, but input specification has "
+                << obj.nFields() << " fields",
+            obj.nFields() == 1);
+
+    BSONElement metaSpec = obj.firstElement();
+
+    const auto metaType = DocumentMetadataFields::parseMetaType(metaSpec.fieldNameStringData());
+
+    boost::intrusive_ptr<Expression> metadataExpression =
+        Expression::parseOperand(expCtx.get(), std::move(metaSpec), expCtx->variablesParseState);
+
+    return create(expCtx, std::move(metadataExpression), metaType);
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceSetMetadata::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::intrusive_ptr<Expression> metadataExpression,
+    DocumentMetadataFields::MetaType metaType) {
+    const bool isIndependentOfAnyCollection = false;
+    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+        expCtx,
+        std::make_unique<SetMetadataTransformation>(
+            expCtx, std::move(metadataExpression), metaType),
+        kStageName,
+        isIndependentOfAnyCollection);
+}
 }  // namespace mongo

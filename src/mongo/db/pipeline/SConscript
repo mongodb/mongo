@@ -104,6 +104,7 @@ env.CppUnitTest(
         "document_source_score_fusion_test.cpp",
         "document_source_sample_test.cpp",
         "document_source_sequential_document_cache_test.cpp",
+        "document_source_set_metadata_test.cpp",
         "document_source_set_variable_from_subpipeline_test.cpp",
         "document_source_set_window_fields_test.cpp",
         "document_source_skip_test.cpp",
