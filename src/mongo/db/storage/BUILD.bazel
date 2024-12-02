@@ -19,10 +19,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:common",
-        "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/catalog:collection_options",
     ],
 )
@@ -48,23 +44,16 @@ mongo_cc_library(
         "collection_truncate_markers.cpp",
         "record_store.cpp",
         "record_store_base.cpp",
-        "//src/mongo/db/exec:headers",
-        "//src/mongo/db/s:shard_key_index_util.h",
     ],
     hdrs = [
         "collection_truncate_markers.h",
+        "damage_vector.h",
         "record_store.h",
         "record_store_base.h",
-        "//src/mongo/db/catalog:virtual_collection_options.h",
-        "//src/mongo/db/exec:batched_delete_stage_gen",
-        "//src/mongo/db/pipeline:external_data_source_option_gen",
-        "//src/mongo/db/storage:damage_vector.h",
     ],
     deps = [
         ":storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -298,12 +287,8 @@ mongo_cc_library(
     ],
     hdrs = [
         "storage_engine_metadata.h",
-        "//src/mongo/bson:bson_validate_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/query:explain_verbosity_gen",
-    ],
-    header_deps = [
-        "//src/mongo/db/repl:oplog_buffer_batched_queue",
+        "//src/mongo/base:data_type_validated.h",
+        "//src/mongo/rpc:object_check.h",
     ],
     deps = [
         "//src/mongo/bson:bson_validate",
@@ -358,7 +343,6 @@ mongo_cc_library(
         ":bson_collection_catalog_entry",
         ":record_store_base",
         ":storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/storage:feature_document_util",
@@ -537,7 +521,6 @@ mongo_cc_library(
     deps = [
         ":durable_catalog",
         ":storage_options",
-        "//src/mongo/db:multitenancy",
         "//src/mongo/db/catalog:collection_catalog",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
     ],
@@ -562,14 +545,12 @@ mongo_cc_library(
         ":storage_repair_observer",
         ":storage_util",
         "//src/mongo/db:audit",
-        "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:shard_role",
         "//src/mongo/db:vector_clock",
         "//src/mongo/db/catalog:catalog_control",
         "//src/mongo/db/catalog:catalog_helpers",
-        "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/catalog:index_catalog",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/index_builds:two_phase_index_build_knobs_idl",

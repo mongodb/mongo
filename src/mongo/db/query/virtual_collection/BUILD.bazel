@@ -19,6 +19,8 @@ mongo_cc_library(
         "external_record_store.h",
         "input_stream.h",
         "multi_bson_stream_cursor.h",
+        "//src/mongo/db/catalog:virtual_collection_options.h",
+        "//src/mongo/db/pipeline:external_data_source_option_gen",
     ],
     deps = [
         "//src/mongo/db/storage:record_store_base",
