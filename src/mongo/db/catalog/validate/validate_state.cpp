@@ -44,6 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -78,7 +79,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
     // kForegroundFullEnforceFastCount.
     if (fixErrors()) {
         invariant(!isBackground());
-        invariant(!shouldEnforceFastCount());
+        invariant(!shouldEnforceFastCount(opCtx));
     }
 
     if (adjustMultikey()) {
@@ -86,7 +87,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
     }
 }
 
-bool ValidateState::shouldEnforceFastCount() const {
+bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx) const {
     if (enforceFastCountRequested()) {
         if (_nss.isOplog() || _nss.isChangeCollection() ||
             _nss.isChangeStreamPreImagesCollection()) {
@@ -113,6 +114,18 @@ bool ValidateState::shouldEnforceFastCount() const {
             // size storer counts for the 'config.image_collection' collection. We therefore do not
             // enforce fast count on it.
             return false;
+        } else {
+            // Skip fast count checks on secondaries, as we validate at kLastApplied, and fast
+            // counts are stored in an untimestamped collection. We also skip validation on
+            // standalone instances that are from a replica set as we would be unable to determine
+            // whether the fastcount is accurate. We would expect the fastcount to match
+            // kLastApplied if the instance was a secondary, and the latest value on primary
+            const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            if ((replCoord->getSettings().isReplSet() &&
+                 replCoord->getMemberState() == repl::MemberState::RS_SECONDARY) ||
+                getReplSetMemberInStandaloneMode(opCtx->getServiceContext())) {
+                return false;
+            }
         }
 
         return true;
@@ -181,6 +194,18 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
         _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IX);
         _collectionLock.emplace(opCtx, _nss, MODE_X);
         _catalog = CollectionCatalog::get(opCtx);
+
+        // When validating secondaries we need to read at kLastApplied to ensure we don't validate
+        // in the middle of an oplog applier batch. This is because multikey index updates are not
+        // fully transactional and validation may see the metadata and collection change out of
+        // order, resulting in a validation error
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (replCoord->getSettings().isReplSet() &&
+            replCoord->getMemberState() == repl::MemberState::RS_SECONDARY) {
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kLastApplied);
+            _validateTs = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
+        }
         _collection = CollectionPtr(_catalog->lookupCollectionByNamespace(opCtx, _nss));
     }
 
