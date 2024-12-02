@@ -37,18 +37,25 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#endif  // __linux__
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/sysprofile_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
-#include "mongo/util/sysprofile.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-namespace mongo::sysprofile {
+namespace mongo {
+namespace {
+
+#ifdef __linux__
+enum class PerfMode : int { record = 0, counters };
+
 void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
     const std::string perfBinary = "/usr/bin/perf";
     const std::string perfName = perfBinary.substr(perfBinary.find_last_of('/') + 1);
@@ -116,5 +123,64 @@ bool stop(pid_t pid) {
     LOGV2(8387206, "Sending a SIGINT signal to child process.", "pid"_attr = pid);
     return kill(pid, SIGINT) == 0 && waitpid(pid, nullptr, 0) == pid;
 }
-}  // namespace mongo::sysprofile
-#endif
+#endif  // __linux__
+
+class SysProfile : public TypedCommand<SysProfile> {
+    using InvocationBase = typename TypedCommand<SysProfile>::InvocationBase;
+
+public:
+    using Request = SysProfileCommandRequest;
+    using Reply = SysProfileCommandRequest::Reply;
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    std::string help() const override {
+        return "Internal profiling command, for testing only. See "
+               "https://wiki.corp.mongodb.com/display/~zixuan.zhuang@mongodb.com/"
+               "Scripting+Profiler for prerequisite and examples.";
+    }
+
+    class Invocation : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {}
+
+        Reply typedRun(OperationContext* opCtx) {
+#ifdef __linux__
+            LOGV2(8387208, "Test-only command 'sysprofile' invoked");
+            Reply reply(1.0);
+            if (auto pid = request().getPid()) {
+                // kill profiler
+                reply.setOk(stop(*pid));
+            } else {
+                StringData filename = request().getFilename();
+                PerfMode mode = request().getMode() == ProfileModeEnum::record ? PerfMode::record
+                                                                               : PerfMode::counters;
+                reply.setPid(spawn(filename, mode));
+            }
+            return reply;
+#else
+            tasserted(8387207, "Unsupported OS for sysprofile command");
+#endif  // __linux__
+        }
+    };
+};
+
+MONGO_REGISTER_COMMAND(SysProfile).testOnly().forShard();
+}  // namespace
+}  // namespace mongo

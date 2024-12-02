@@ -54,7 +54,6 @@
 #include "mongo/db/collection_crud/capped_collection_maintenance.h"
 #include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/sysprofile_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
@@ -79,10 +78,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-
-#ifdef __linux__
-#include "mongo/util/sysprofile.h"
-#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -300,65 +295,6 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(TimeseriesCatalogBucketParamsChangedTestCmd).testOnly().forShard();
-
-class SysProfile : public TypedCommand<SysProfile> {
-    using _TypedCommandInvocationBase = typename TypedCommand<SysProfile>::InvocationBase;
-
-public:
-    using Request = SysProfileCommandRequest;
-    using Reply = SysProfileCommandRequest::Reply;
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    std::string help() const override {
-        return "Internal profiling command, for testing only. See "
-               "https://wiki.corp.mongodb.com/display/~zixuan.zhuang@mongodb.com/"
-               "Scripting+Profiler for prerequisite and examples.";
-    }
-
-    class Invocation : public _TypedCommandInvocationBase {
-    public:
-        using _TypedCommandInvocationBase::_TypedCommandInvocationBase;
-
-        bool supportsWriteConcern() const final {
-            return false;
-        }
-
-        NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
-        }
-
-        void doCheckAuthorization(OperationContext* opCtx) const final {}
-
-        Reply typedRun(OperationContext* opCtx) {
-#ifdef __linux__
-            LOGV2(8387208, "Test-only command 'sysprofile' invoked");
-            Reply reply(1.0);
-            if (auto pid = request().getPid()) {
-                // kill profiler
-                reply.setOk(sysprofile::stop(*pid));
-            } else {
-                StringData filename = request().getFilename();
-                sysprofile::PerfMode mode = request().getMode() == ProfileModeEnum::record
-                    ? sysprofile::PerfMode::record
-                    : sysprofile::PerfMode::counters;
-                reply.setPid(sysprofile::spawn(filename, mode));
-            }
-            return reply;
-#else
-            tasserted(8387207, "Unsupported OS for sysprofile command");
-#endif
-        }
-    };
-};
-
-MONGO_REGISTER_COMMAND(SysProfile).testOnly().forShard();
 }  // namespace
 
 std::string TestingDurableHistoryPin::getName() {

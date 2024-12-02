@@ -454,19 +454,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "system_perf",
-    srcs = [
-        "sysprofile.cpp",
-    ],
-    hdrs = [
-        "sysprofile.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
     name = "testing_options",
     srcs = [
         "testing_options.cpp",

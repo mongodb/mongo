@@ -1850,7 +1850,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/util/**/log_and_backoff* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/util/**/read_through_cache* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/util/**/version_constants_gen.py @10gen/devprod-build @svc-auto-approve-bot
-/src/mongo/util/**/sysprofile* @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/cmdline_utils/OWNERS.yml
 /src/mongo/util/cmdline_utils/**/* @10gen/server-security @svc-auto-approve-bot

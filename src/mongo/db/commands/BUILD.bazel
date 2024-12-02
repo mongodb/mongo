@@ -1190,6 +1190,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "test_commands",
     srcs = [
+        "sysprofile.cpp",
         "test_commands.cpp",
         "whats_my_uri_cmd.cpp",
         ":sysprofile_gen",
@@ -1199,6 +1200,7 @@ mongo_cc_library(
     ],
     deps = [
         ":test_commands_enabled",
+        "//src/mongo:base",
         "//src/mongo/db:commands",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:query_exec",
@@ -1208,7 +1210,6 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/query/write_ops:write_ops_exec",
-        "//src/mongo/util:system_perf",
     ],
 )
 

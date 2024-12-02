@@ -59,8 +59,3 @@ filters:
   - "version_constants_gen.py":
     approvers:
       - 10gen/devprod-build
-  # TODO SERVER-97502: Delete sysprofile.h and consolidate sysprofile.cpp with the 'sysprofile'
-  # command into 'src/mongo/db/commands/sysprofile.cpp'.
-  - "sysprofile*":
-    approvers:
-      - 10gen/query-execution
