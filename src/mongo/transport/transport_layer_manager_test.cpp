@@ -32,6 +32,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -67,26 +68,64 @@ public:
     private:
         bool _started = false;
     };
+
+    TransportLayerManagerImpl makeTLManager() {
+        std::vector<TransportLayerMockWithConnect*> layerPtrs;
+        std::vector<std::unique_ptr<TransportLayer>> layers;
+        for (int i = 0; i < 5; i++) {
+            auto layer = std::make_unique<TransportLayerMockWithConnect>();
+            layerPtrs.push_back(layer.get());
+            layers.push_back(std::move(layer));
+        }
+
+        return TransportLayerManagerImpl(std::move(layers), layerPtrs[0]);
+    }
+
+    std::vector<const TransportLayerMockWithConnect*> getMockTransportLayers(
+        const TransportLayerManagerImpl& mgr) {
+        std::vector<const TransportLayerMockWithConnect*> layerPtrs;
+        for (auto&& tl : mgr.getTransportLayers()) {
+            layerPtrs.push_back(dynamic_cast<const TransportLayerMockWithConnect*>(tl.get()));
+        }
+        return layerPtrs;
+    }
 };
 
 TEST_F(TransportLayerManagerTest, StartAndShutdown) {
-    std::vector<TransportLayerMockWithConnect*> layerPtrs;
-    std::vector<std::unique_ptr<TransportLayer>> layers;
-    for (int i = 0; i < 5; i++) {
-        auto layer = std::make_unique<TransportLayerMockWithConnect>();
-        layerPtrs.push_back(layer.get());
-        layers.push_back(std::move(layer));
-    }
-
-    TransportLayerManagerImpl manager(std::move(layers), layerPtrs[0]);
+    auto manager = makeTLManager();
     ASSERT_OK(manager.setup());
     ASSERT_OK(manager.start());
-    for (auto layer : layerPtrs) {
+    for (auto layer : getMockTransportLayers(manager)) {
         ASSERT_TRUE(layer->isStarted());
     }
 
     manager.shutdown();
-    for (auto layer : layerPtrs) {
+    for (auto layer : getMockTransportLayers(manager)) {
+        ASSERT_TRUE(layer->inShutdown());
+    }
+}
+
+TEST_F(TransportLayerManagerTest, ShutdownBeforeSetup) {
+    auto manager = makeTLManager();
+    manager.shutdown();
+    for (auto layer : getMockTransportLayers(manager)) {
+        ASSERT_TRUE(layer->inShutdown());
+    }
+    ASSERT_NOT_OK(manager.setup());
+    for (auto layer : getMockTransportLayers(manager)) {
+        ASSERT_TRUE(layer->inShutdown());
+    }
+}
+
+TEST_F(TransportLayerManagerTest, ShutdownAfterSetup) {
+    auto manager = makeTLManager();
+    ASSERT_OK(manager.setup());
+    manager.shutdown();
+    for (auto layer : getMockTransportLayers(manager)) {
+        ASSERT_TRUE(layer->inShutdown());
+    }
+    ASSERT_NOT_OK(manager.start());
+    for (auto layer : getMockTransportLayers(manager)) {
         ASSERT_TRUE(layer->inShutdown());
     }
 }
