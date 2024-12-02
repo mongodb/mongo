@@ -36,9 +36,9 @@ const testCases = [
                                           .getCollection(sourceCollection.getName());
 
             const docToInsert = {_id: 0, oldKey: 5, newKey: 15};
-            session.startTransaction();
-            assert.commandWorked(sessionCollection.insert(docToInsert));
-            assert.commandWorked(session.commitTransaction_forTesting());
+            withTxnAndAutoRetryOnMongos(session, () => {
+                assert.commandWorked(sessionCollection.insert(docToInsert));
+            });
             assert.eq(sourceCollection.findOne({_id: 0}), docToInsert);
         },
     },
@@ -57,12 +57,10 @@ const testCases = [
             assert.commandWorked(sessionCollectionB.insert({a: 1}));
 
             const docToInsert = {_id: 0, oldKey: 5, newKey: 15};
-            session.startTransaction();
             withTxnAndAutoRetryOnMongos(session, () => {
                 assert.commandWorked(sessionCollectionB.insert({a: 2}));
                 assert.commandWorked(sessionCollection.insert(docToInsert));
             });
-            assert.commandWorked(session.commitTransaction_forTesting());
             assert.eq(sourceCollection.findOne({_id: 0}), docToInsert);
         },
     }

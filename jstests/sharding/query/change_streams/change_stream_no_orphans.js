@@ -11,6 +11,7 @@
  *   uses_change_streams,
  * ]
  */
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -226,10 +227,11 @@ jsTest.log('Broadcasted updates (via a transaction through the router) of both o
     const session = st.s.startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
-    session.startTransaction();
-    assert.commandWorked(sessionColl.update({name: 'olivia'}, {$set: {age: 26}}, {multi: true}));
-    assert.commandWorked(sessionColl.update({name: 'james'}, {$set: {age: 56}}, {multi: true}));
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.commandWorked(
+            sessionColl.update({name: 'olivia'}, {$set: {age: 26}}, {multi: true}));
+        assert.commandWorked(sessionColl.update({name: 'james'}, {$set: {age: 56}}, {multi: true}));
+    });
     session.endSession();
 
     // The primary shard hosts orphaned (james) and owned (olivia) documents, whereas the second
@@ -254,10 +256,10 @@ jsTest.log('Broadcasted deletes (via a transaction through the router) of both o
     const session = st.s.startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
-    session.startTransaction();
-    assert.commandWorked(sessionColl.remove({name: 'olivia'}));
-    assert.commandWorked(sessionColl.remove({name: 'james'}));
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.commandWorked(sessionColl.remove({name: 'olivia'}));
+        assert.commandWorked(sessionColl.remove({name: 'james'}));
+    });
     session.endSession();
 
     // The primary shard hosts orphaned (james) and owned (olivia) documents, whereas the second
@@ -286,10 +288,10 @@ jsTest.log('Direct updates (via a transaction to a shard) of both orphaned and o
     const session = st.rs0.getPrimary().getDB(dbName).getMongo().startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
-    session.startTransaction();
-    assert.commandWorked(sessionColl.update({name: 'emma'}, {$set: {age: 21}}, {multi: true}));
-    assert.commandWorked(sessionColl.update({name: 'liam'}, {$set: {age: 61}}, {multi: true}));
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.commandWorked(sessionColl.update({name: 'emma'}, {$set: {age: 21}}, {multi: true}));
+        assert.commandWorked(sessionColl.update({name: 'liam'}, {$set: {age: 61}}, {multi: true}));
+    });
     session.endSession();
 
     // The shard hosts both orphaned (liam) and non-orphaned (emma) documents. Consequently, only
@@ -310,10 +312,10 @@ jsTest.log('Direct deletes (via a transaction to a shard) of both orphaned and o
     const session = st.rs0.getPrimary().getDB(dbName).getMongo().startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
-    session.startTransaction();
-    assert.commandWorked(sessionColl.remove({name: 'emma'}));
-    assert.commandWorked(sessionColl.remove({name: 'liam'}));
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.commandWorked(sessionColl.remove({name: 'emma'}));
+        assert.commandWorked(sessionColl.remove({name: 'liam'}));
+    });
     session.endSession();
 
     // The shard hosts both orphaned (liam) and non-orphaned (emma) documents. Consequently, only

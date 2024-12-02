@@ -6,6 +6,7 @@
  *   uses_transactions,
  * ]
  */
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     isUpdateDocumentShardKeyUsingTransactionApiEnabled
@@ -210,10 +211,10 @@ const updateDocTxn = {
     z: 4,
     replStyleUpdate: true
 };
-session.startTransaction();
-assertUpdateWorkedWithNoMatchingDoc(
-    {x: 4, y: 0, z: 0}, updateDocTxn, true /*isUpsert*/, true /*inTransaction*/);
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    assertUpdateWorkedWithNoMatchingDoc(
+        {x: 4, y: 0, z: 0}, updateDocTxn, true /*isUpsert*/, true /*inTransaction*/);
+});
 assert.eq(1, sessionDB.coll.find(updateDocTxn).itcount());
 
 // Shard key field modifications do not have to specify full shard key.
@@ -304,9 +305,10 @@ assertWouldChangeOwningShardUpdateResult(upsertRes, upsertDoc);
 const upsertDocTxn = {
     "$set": {x: 2110, y: 55, z: 4, opStyle: true}
 };
-session.startTransaction();
-assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, opStyle: true}, upsertDocTxn, true, true);
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    assertUpdateWorkedWithNoMatchingDoc(
+        {x: 4, y: 0, z: 0, opStyle: true}, upsertDocTxn, true, true);
+});
 assert.eq(1, sessionDB.coll.find(upsertDocTxn["$set"]).itcount());
 
 // Shard key field modifications do not have to specify full shard key.

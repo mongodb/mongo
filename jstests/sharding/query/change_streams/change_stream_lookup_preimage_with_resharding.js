@@ -11,6 +11,7 @@
  * ]
  */
 
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
@@ -123,11 +124,11 @@ reshardingTest.withReshardingInBackground(
                 const session = coll.getDB().getMongo().startSession();
                 const sessionDB = session.getDatabase(coll.getDB().getName());
                 const sessionColl = sessionDB.getCollection(coll.getName());
-                session.startTransaction();
-                assert.commandWorked(sessionColl.update(
-                    {_id: 2}, {$set: {annotation: "during-resharding-txn-update"}}));
-                assert.commandWorked(sessionColl.remove({_id: 3}, {justOne: true}));
-                session.commitTransaction_forTesting();
+                withTxnAndAutoRetryOnMongos(session, () => {
+                    assert.commandWorked(sessionColl.update(
+                        {_id: 2}, {$set: {annotation: "during-resharding-txn-update"}}));
+                    assert.commandWorked(sessionColl.remove({_id: 3}, {justOne: true}));
+                });
                 return true;
             },
             "Failed to execute a transaction while resharding was in progress",

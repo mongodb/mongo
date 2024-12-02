@@ -8,6 +8,9 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -45,21 +48,23 @@ const changeStreamCursorDB = db.watch();
 const changeStreamCursorCluster = mongosConn.watch();
 
 // Start a transaction, which will include both shards.
-const sesion = db.getMongo().startSession({causalConsistency: true});
-const sessionDb = sesion.getDatabase(dbName);
+const session = db.getMongo().startSession({causalConsistency: true});
+const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 
-sesion.startTransaction({readConcern: {level: "majority"}});
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction({readConcern: {level: "majority"}});
 
-// This no-op will make one of the shards a transaction participant without generating an actual
-// write. The transaction will send an empty prepared transaction to the shard, in the form of an
-// applyOps command with no operations.
-sessionColl.findAndModify({query: {shard: 1}, update: {$setOnInsert: {a: 1}}});
+    // This no-op will make one of the shards a transaction participant without generating an actual
+    // write. The transaction will send an empty prepared transaction to the shard, in the form of
+    // an applyOps command with no operations.
+    sessionColl.findAndModify({query: {shard: 1}, update: {$setOnInsert: {a: 1}}});
 
-// This write, which is not a no-op, occurs on the other shard.
-sessionColl.findAndModify({query: {shard: 2}, update: {$set: {a: 1}}});
+    // This write, which is not a no-op, occurs on the other shard.
+    sessionColl.findAndModify({query: {shard: 2}, update: {$set: {a: 1}}});
 
-assert.commandWorked(sesion.commitTransaction_forTesting());
+    assert.commandWorked(session.commitTransaction_forTesting());
+});
 
 // Each change stream should see exactly one update, resulting from the valid write on shard 2.
 [changeStreamCursorColl, changeStreamCursorDB, changeStreamCursorCluster].forEach(function(

@@ -7,6 +7,9 @@
  * ]
  */
 
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -154,13 +157,15 @@ function changeShardKeyWhenFailpointsSet(session,
     // Assert that the shard key update is not committed when there are no write errors and the
     // transaction is explicity aborted.
     if (runInTxn) {
-        session.startTransaction();
-        if (isFindAndModify) {
-            sessionDB.foo.findAndModify({query: {"x": 300}, update: {"$set": {"x": 30}}});
-        } else {
-            assert.commandWorked(sessionDB.foo.update({"x": 300}, {"$set": {"x": 30}}));
-        }
-        assert.commandWorked(session.abortTransaction_forTesting());
+        withAbortAndRetryOnTransientTxnError(session, () => {
+            session.startTransaction();
+            if (isFindAndModify) {
+                sessionDB.foo.findAndModify({query: {"x": 300}, update: {"$set": {"x": 30}}});
+            } else {
+                assert.commandWorked(sessionDB.foo.update({"x": 300}, {"$set": {"x": 30}}));
+            }
+            assert.commandWorked(session.abortTransaction_forTesting());
+        });
         assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 300}).itcount());
         assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 30}).itcount());
     }
@@ -367,9 +372,11 @@ assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
 assert(res.getWriteError().errmsg.includes(
     "There is either an orphan for this document or _id for this collection is not globally unique."));
 
-session.startTransaction();
-res = sessionDB.foo.update({"x": 505}, {"$set": {"x": 20}});
-assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    res = sessionDB.foo.update({"x": 505}, {"$set": {"x": 20}});
+    assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+});
 assert(res.errmsg.includes(
     "There is either an orphan for this document or _id for this collection is not globally unique."));
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
@@ -484,12 +491,15 @@ assertCannotUpdateInBulkOpWhenDocsMoveShards(st, kDbName, ns, session, sessionDB
 // Update two docs, updating one twice
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-session.startTransaction();
-let id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
-assert.commandWorked(sessionDB.foo.update({"x": 30}, {"$set": {"x": 600}}));
-assert.commandWorked(sessionDB.foo.update({"x": 4}, {"$set": {"x": 50}}));
-assert.commandWorked(session.commitTransaction_forTesting());
+let id;
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
+    assert.commandWorked(sessionDB.foo.update({"x": 30}, {"$set": {"x": 600}}));
+    assert.commandWorked(sessionDB.foo.update({"x": 4}, {"$set": {"x": 50}}));
+    assert.commandWorked(session.commitTransaction_forTesting());
+});
 
 assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
 assert.eq(0, sessionDB.foo.find({"x": 30}).itcount());
@@ -504,11 +514,13 @@ mongos.getDB(kDbName).foo.drop();
 // once
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-session.startTransaction();
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
-assert.commandWorked(session.commitTransaction_forTesting());
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
+    assert.commandWorked(session.commitTransaction_forTesting());
+});
 
 assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
 assert.eq(1, sessionDB.foo.find({"x": 30}).itcount());
@@ -520,12 +532,14 @@ mongos.getDB(kDbName).foo.drop();
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
 // Insert and $inc before moving doc
-session.startTransaction();
-id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
-assert.commandWorked(sessionDB.foo.insert({"x": 1, "a": 1}));
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
-sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 20}}});
-assert.commandWorked(session.commitTransaction_forTesting());
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
+    assert.commandWorked(sessionDB.foo.insert({"x": 1, "a": 1}));
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
+    sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 20}}});
+    assert.commandWorked(session.commitTransaction_forTesting());
+});
 
 assert.eq(0, sessionDB.foo.find({"x": 500}).toArray().length);
 assert.eq(1, sessionDB.foo.find({"x": 20}).toArray().length);

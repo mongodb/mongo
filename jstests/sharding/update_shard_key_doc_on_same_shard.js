@@ -7,6 +7,7 @@
  * ]
  */
 
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -789,12 +790,13 @@ assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(st, kDbName, ns, session, sessi
 let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-session.startTransaction();
-let id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 400}}));
-assert.commandWorked(sessionDB.foo.update({"x": 400}, {"x": 600, "_id": id}));
-assert.commandWorked(sessionDB.foo.update({"x": 4}, {"$set": {"x": 30}}));
-assert.commandWorked(session.commitTransaction_forTesting());
+let id;
+withTxnAndAutoRetryOnMongos(session, () => {
+    id = mongos.getDB(kDbName).foo.find({"x": 500}).toArray()[0]._id;
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 400}}));
+    assert.commandWorked(sessionDB.foo.update({"x": 400}, {"x": 600, "_id": id}));
+    assert.commandWorked(sessionDB.foo.update({"x": 4}, {"$set": {"x": 30}}));
+});
 
 assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
 assert.eq(0, sessionDB.foo.find({"x": 400}).itcount());
@@ -809,11 +811,11 @@ mongos.getDB(kDbName).foo.drop();
 // once
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-session.startTransaction();
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 400}}));
-assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 400}}));
+    assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
+});
 
 assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
 assert.eq(1, sessionDB.foo.find({"x": 400}).itcount());
@@ -825,10 +827,10 @@ mongos.getDB(kDbName).foo.drop();
 // Check that doing findAndModify to update shard key followed by $inc works correctly
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
-session.startTransaction();
-sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 600}}});
-assert.commandWorked(sessionDB.foo.update({"x": 600}, {"$inc": {"a": 1}}));
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 600}}});
+    assert.commandWorked(sessionDB.foo.update({"x": 600}, {"$inc": {"a": 1}}));
+});
 
 assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
 assert.eq(1, sessionDB.foo.find({"x": 600}).itcount());
@@ -841,10 +843,10 @@ mongos.getDB(kDbName).foo.drop();
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
 id = mongos.getDB(kDbName).foo.find({"x": 4}).toArray()[0]._id;
-session.startTransaction();
-sessionDB.foo.findAndModify({query: {"x": 4}, update: {$set: {"x": 20}}});
-assert.commandWorked(sessionDB.foo.update({"x": 20}, {$set: {"x": 1}}));
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    sessionDB.foo.findAndModify({query: {"x": 4}, update: {$set: {"x": 20}}});
+    assert.commandWorked(sessionDB.foo.update({"x": 20}, {$set: {"x": 1}}));
+});
 
 assert.eq(0, sessionDB.foo.find({"x": 4}).itcount());
 assert.eq(0, sessionDB.foo.find({"x": 20}).itcount());

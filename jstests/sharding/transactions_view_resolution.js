@@ -83,9 +83,9 @@ assert.commandWorked(viewOnShardedView.runCommand(
 //
 
 function readFromViewOnFirstParticipantStatement(session, view, viewFunc, numDocsExpected) {
-    session.startTransaction();
-    assert.eq(viewFunc(view), numDocsExpected);
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.eq(viewFunc(view), numDocsExpected);
+    });
 }
 
 // Unsharded view.
@@ -126,10 +126,10 @@ readFromViewOnFirstParticipantStatement(session, viewOnShardedView, (view) => {
 //
 
 function readFromViewOnLaterParticipantStatement(session, view, viewFunc, numDocsExpected) {
-    session.startTransaction();
-    assert.eq(view.aggregate({$match: {}}).itcount(), numDocsExpected);
-    assert.eq(viewFunc(view), numDocsExpected);
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.eq(view.aggregate({$match: {}}).itcount(), numDocsExpected);
+        assert.eq(viewFunc(view), numDocsExpected);
+    });
 }
 
 // Unsharded view.
@@ -229,12 +229,12 @@ primaryShardNotReTargeted_FirstStatement(session, viewOnShardedView, (view) => {
 
 // Assumes the primary shard for view is Shard0.
 function primaryShardNotReTargeted_LaterStatement(session, view, viewFunc, numDocsExpected) {
-    session.startTransaction();
-    // Complete a statement on the primary shard for the view.
-    assert.eq(view.aggregate({$match: {_id: -1}}).itcount(), 1);
-    // Targets the primary first, but the resolved retry only targets Shard1.
-    assert.eq(viewFunc(view), numDocsExpected);
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        // Complete a statement on the primary shard for the view.
+        assert.eq(view.aggregate({$match: {_id: -1}}).itcount(), 1);
+        // Targets the primary first, but the resolved retry only targets Shard1.
+        assert.eq(viewFunc(view), numDocsExpected);
+    });
 }
 
 // This is only possible against sharded views.

@@ -16,6 +16,9 @@
  * ]
  */
 
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const db1Name = "db1";
@@ -51,17 +54,19 @@ st.s.getDB(db2Name).getCollection(coll2Name).insert({_id: "dummy"});
 
 jsTest.log("Run a single-write-shard transaction and commit it.");
 const session = st.s.startSession();
-session.startTransaction();
-session.getDatabase(db1Name).getCollection(coll1Name).findOne({_id: "readOperationOnShard0"});
-session.getDatabase(db2Name).getCollection(coll2Name).insert({_id: "writeOperationOnShard1"});
-// Use adminCommand so we can pass writeConcern.
-assert.commandWorked(st.s.adminCommand({
-    commitTransaction: 1,
-    lsid: session.getSessionId(),
-    txnNumber: session.getTxnNumber_forTesting(),
-    autocommit: false,
-    writeConcern: {w: "majority"},
-}));
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    session.getDatabase(db1Name).getCollection(coll1Name).findOne({_id: "readOperationOnShard0"});
+    session.getDatabase(db2Name).getCollection(coll2Name).insert({_id: "writeOperationOnShard1"});
+    // Use adminCommand so we can pass writeConcern.
+    assert.commandWorked(st.s.adminCommand({
+        commitTransaction: 1,
+        lsid: session.getSessionId(),
+        txnNumber: session.getTxnNumber_forTesting(),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }));
+});
 
 jsTest.log("Induce a failover on the read shard.");
 assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: true}));

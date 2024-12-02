@@ -4,6 +4,10 @@
  *
  * @tags: [multiversion_incompatible, uses_transactions, uses_prepare_transaction]
  */
+import {
+    withAbortAndRetryOnTransientTxnError,
+    withTxnAndAutoRetryOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
@@ -92,12 +96,12 @@ let primary = st.shard0;
     jsTestLog("Inserting docs in a small transaction");
 
     let session = testDB.getMongo().startSession();
-    let sessionDB = session.getDatabase(dbName);
 
-    session.startTransaction();
-    assert.commandWorked(sessionDB.foo.insert({_id: 2, x: -2, y: 4}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 3, x: -3, y: 11}));
-    session.commitTransaction();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
+        assert.commandWorked(sessionDB.foo.insert({_id: 2, x: -2, y: 4}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 3, x: -3, y: 11}));
+    });
 
     session.endSession();
 })();
@@ -106,15 +110,15 @@ let primary = st.shard0;
     jsTestLog("Inserting docs in a large transaction");
 
     let session = testDB.getMongo().startSession();
-    let sessionDB = session.getDatabase(dbName);
 
     // maxNumberOfTransactionOperationsInSingleOplogEntry has been set to 2 to force the following
     // transaction to be broken up into two oplog entries.
-    session.startTransaction();
-    assert.commandWorked(sessionDB.foo.insert({_id: 4, x: -20, y: 4}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 5, x: -30, y: 11}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 6, x: -40, y: 11}));
-    session.commitTransaction();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
+        assert.commandWorked(sessionDB.foo.insert({_id: 4, x: -20, y: 4}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 5, x: -30, y: 11}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 6, x: -40, y: 11}));
+    });
 
     session.endSession();
 })();
@@ -125,11 +129,13 @@ let primary = st.shard0;
     let session = testDB.getMongo().startSession();
     let sessionDB = session.getDatabase(dbName);
 
-    session.startTransaction();
-    assert.commandWorked(sessionDB.foo.insert({_id: 7, x: -2, y: 4}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 8, x: -3, y: 11}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 9, x: -40, y: 11}));
-    session.abortTransaction();
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        session.startTransaction();
+        assert.commandWorked(sessionDB.foo.insert({_id: 7, x: -2, y: 4}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 8, x: -3, y: 11}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 9, x: -40, y: 11}));
+        session.abortTransaction();
+    });
 
     session.endSession();
 })();
@@ -138,15 +144,14 @@ let primary = st.shard0;
     jsTestLog("Inserting docs in a prepared transaction");
 
     let session = testDB.getMongo().startSession();
-    let sessionDB = session.getDatabase(dbName);
 
     // The TransactionCoordinator will internally use a prepared transaction if the writes target
     // multiple shards.
-    session.startTransaction();
-    assert.commandWorked(sessionDB.foo.insert({_id: 10, x: -4, y: 4}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 11, x: 10, y: 11}));
-
-    session.commitTransaction();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
+        assert.commandWorked(sessionDB.foo.insert({_id: 10, x: -4, y: 4}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 11, x: 10, y: 11}));
+    });
 
     session.endSession();
 })();
@@ -159,26 +164,28 @@ let primary = st.shard0;
 
     // The TransactionCoordinator will internally use a prepared transaction if the writes target
     // multiple shards.
-    session.startTransaction();
-    assert.commandWorked(sessionDB.foo.insert({_id: 12, x: -4, y: 10}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 13, x: 10, y: 11}));
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        session.startTransaction();
+        assert.commandWorked(sessionDB.foo.insert({_id: 12, x: -4, y: 10}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 13, x: 10, y: 11}));
 
-    // Send prepareTransaction directly to all shards to force oplog entries to be written.
-    st.rs0.getPrimary().adminCommand({
-        prepareTransaction: 1,
-        lsid: session.getSessionId(),
-        txnNumber: NumberLong(0),
-        autocommit: false,
+        // Send prepareTransaction directly to all shards to force oplog entries to be written.
+        st.rs0.getPrimary().adminCommand({
+            prepareTransaction: 1,
+            lsid: session.getSessionId(),
+            txnNumber: NumberLong(0),
+            autocommit: false,
+        });
+
+        st.rs1.getPrimary().adminCommand({
+            prepareTransaction: 1,
+            lsid: session.getSessionId(),
+            txnNumber: NumberLong(0),
+            autocommit: false,
+        });
+
+        session.abortTransaction();
     });
-
-    st.rs1.getPrimary().adminCommand({
-        prepareTransaction: 1,
-        lsid: session.getSessionId(),
-        txnNumber: NumberLong(0),
-        autocommit: false,
-    });
-
-    session.abortTransaction();
 
     session.endSession();
 })();
@@ -191,14 +198,14 @@ let primary = st.shard0;
 
     // The TransactionCoordinator will internally use a prepared transaction if the writes target
     // multiple shards.
-    session.startTransaction();
-    assert.commandWorked(sessionDB.foo.insert({_id: 14, x: -4, y: 11}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 15, x: 10, y: 4}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 16, x: -3, y: 12}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 17, x: 11, y: 3}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 18, x: 2, y: 3}));
-
-    session.commitTransaction();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
+        assert.commandWorked(sessionDB.foo.insert({_id: 14, x: -4, y: 11}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 15, x: 10, y: 4}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 16, x: -3, y: 12}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 17, x: 11, y: 3}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 18, x: 2, y: 3}));
+    });
 
     session.endSession();
 })();
@@ -211,30 +218,32 @@ let primary = st.shard0;
 
     // The TransactionCoordinator will internally use a prepared transaction if the writes target
     // multiple shards.
-    session.startTransaction();
-    assert.commandWorked(sessionDB.foo.insert({_id: 19, x: -4, y: 4}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 20, x: 10, y: 11}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 21, x: -3, y: 3}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 22, x: -2, y: 12}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 23, x: 12, y: 12}));
-    assert.commandWorked(sessionDB.foo.insert({_id: 24, x: 13, y: 12}));
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        session.startTransaction();
+        assert.commandWorked(sessionDB.foo.insert({_id: 19, x: -4, y: 4}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 20, x: 10, y: 11}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 21, x: -3, y: 3}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 22, x: -2, y: 12}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 23, x: 12, y: 12}));
+        assert.commandWorked(sessionDB.foo.insert({_id: 24, x: 13, y: 12}));
 
-    // Send prepareTransaction directly to all shards to force oplog entries to be written.
-    st.rs0.getPrimary().adminCommand({
-        prepareTransaction: 1,
-        lsid: session.getSessionId(),
-        txnNumber: NumberLong(0),
-        autocommit: false,
+        // Send prepareTransaction directly to all shards to force oplog entries to be written.
+        st.rs0.getPrimary().adminCommand({
+            prepareTransaction: 1,
+            lsid: session.getSessionId(),
+            txnNumber: NumberLong(0),
+            autocommit: false,
+        });
+
+        st.rs1.getPrimary().adminCommand({
+            prepareTransaction: 1,
+            lsid: session.getSessionId(),
+            txnNumber: NumberLong(0),
+            autocommit: false,
+        });
+
+        session.abortTransaction();
     });
-
-    st.rs1.getPrimary().adminCommand({
-        prepareTransaction: 1,
-        lsid: session.getSessionId(),
-        txnNumber: NumberLong(0),
-        autocommit: false,
-    });
-
-    session.abortTransaction();
 
     session.endSession();
 })();

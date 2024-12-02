@@ -6,6 +6,9 @@
 //   uses_change_streams,
 // ]
 
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -48,13 +51,15 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
     const session = db.getMongo().startSession();
     const sessionDb = session.getDatabase(db.getName());
     const sessionColl = sessionDb[collName];
-    session.startTransaction();
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        session.startTransaction();
 
-    // Run the given 'deleteCommand' function to perform the delete(s).
-    deleteCommand(sessionColl);
+        // Run the given 'deleteCommand' function to perform the delete(s).
+        deleteCommand(sessionColl);
 
-    // Commit the transaction so that the events become visible to the change stream.
-    assert.commandWorked(session.commitTransaction_forTesting());
+        // Commit the transaction so that the events become visible to the change stream.
+        assert.commandWorked(session.commitTransaction_forTesting());
+    });
 
     // Verify that the stream returns the expected sequence of changes.
     const changes = cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges});

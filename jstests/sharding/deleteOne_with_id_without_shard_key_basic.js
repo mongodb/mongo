@@ -5,6 +5,7 @@
  * @tags: [requires_fcv_80]
  */
 
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -31,33 +32,30 @@ const fp = configureFailPoint(st.s, 'hangAfterCompletingWriteWithoutShardKeyWith
 
 // Test that transactions do not use broadcast protocol per PM-3190.
 let session = st.s.startSession({retryWrites: false});
-session.startTransaction();
-
 let sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
+withTxnAndAutoRetryOnMongos(session, () => {
+    let deleteCmd = {
+        deletes: [
+            {q: {_id: -1}, limit: 1},
+        ]
+    };
+    assert.commandWorked(sessionColl.runCommand("delete", deleteCmd));
+});
 
-let deleteCmd = {
-    deletes: [
-        {q: {_id: -1}, limit: 1},
-    ],
-    txnNumber: NumberLong(0),
-};
-assert.commandWorked(sessionColl.runCommand("delete", deleteCmd));
-session.commitTransaction();
 session.endSession();
 
 // Test that retryable transactions do not use broadcast protocol per PM-3190.
 session = st.s.startSession({retryWrites: true});
-session.startTransaction();
+withTxnAndAutoRetryOnMongos(session, () => {
+    sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
+    let deleteCmd = {
+        deletes: [
+            {q: {_id: 0}, limit: 1},
+        ]
+    };
+    assert.commandWorked(sessionColl.runCommand("delete", deleteCmd));
+});
 
-sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
-deleteCmd = {
-    deletes: [
-        {q: {_id: 0}, limit: 1},
-    ],
-    txnNumber: NumberLong(0),
-};
-assert.commandWorked(sessionColl.runCommand("delete", deleteCmd));
-session.commitTransaction();
 session.endSession();
 
 // Test that retryable writes use broadcast protocol per PM-3190

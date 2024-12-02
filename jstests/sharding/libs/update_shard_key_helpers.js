@@ -1,4 +1,7 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 export function shardCollectionMoveChunks(
     st, kDbName, ns, shardKey, docsToInsert, splitDoc, moveChunkDoc) {
@@ -30,9 +33,11 @@ export function assertUpdateSucceeds(st, session, sessionDB, inTxn, query, updat
     let res;
     if (inTxn) {
         st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
-        session.startTransaction();
-        res = assert.commandWorked(sessionDB.foo.update(query, update, {"upsert": upsert}));
-        assert.commandWorked(session.commitTransaction_forTesting());
+        withAbortAndRetryOnTransientTxnError(session, () => {
+            session.startTransaction();
+            res = assert.commandWorked(sessionDB.foo.update(query, update, {"upsert": upsert}));
+            assert.commandWorked(session.commitTransaction_forTesting());
+        });
     } else {
         res = assert.commandWorked(sessionDB.foo.update(query, update, {"upsert": upsert}));
     }
@@ -96,10 +101,12 @@ export function runFindAndModifyCmdSuccess(st,
 
         if (inTxn) {
             st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
-            session.startTransaction();
-            res = sessionDB.foo.findAndModify(
-                {query: queries[i], update: updates[i], "upsert": upsert, "new": returnNew});
-            assert.commandWorked(session.commitTransaction_forTesting());
+            withAbortAndRetryOnTransientTxnError(session, () => {
+                session.startTransaction();
+                res = sessionDB.foo.findAndModify(
+                    {query: queries[i], update: updates[i], "upsert": upsert, "new": returnNew});
+                assert.commandWorked(session.commitTransaction_forTesting());
+            });
         } else {
             res = sessionDB.foo.findAndModify(
                 {query: queries[i], update: updates[i], "upsert": upsert, "new": returnNew});
@@ -144,12 +151,14 @@ export function runUpdateCmdFail(st,
     let res;
     if (inTxn) {
         st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
-        session.startTransaction();
-        res = sessionDB.foo.update(query, update, {multi: multiParamSet});
-        assert.writeError(res);
-        if (errorCode) {
-            assert.commandFailedWithCode(res, errorCode);
-        }
+        withAbortAndRetryOnTransientTxnError(session, () => {
+            session.startTransaction();
+            res = sessionDB.foo.update(query, update, {multi: multiParamSet});
+            assert.writeError(res);
+            if (errorCode) {
+                assert.commandFailedWithCode(res, errorCode);
+            }
+        });
         assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
     } else {
@@ -172,9 +181,11 @@ export function runUpdateCmdFail(st,
 export function runFindAndModifyCmdFail(
     st, kDbName, session, sessionDB, inTxn, query, update, upsert, pipelineUpdateResult) {
     if (inTxn) {
-        session.startTransaction();
-        assert.throws(function() {
-            sessionDB.foo.findAndModify({query: query, update: update, "upsert": upsert});
+        withAbortAndRetryOnTransientTxnError(session, () => {
+            session.startTransaction();
+            assert.throws(function() {
+                sessionDB.foo.findAndModify({query: query, update: update, "upsert": upsert});
+            });
         });
         assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);

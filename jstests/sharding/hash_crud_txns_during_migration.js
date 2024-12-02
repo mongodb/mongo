@@ -2,6 +2,7 @@
  * Test that crud operations in transactions target the right shards during migration.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {runCommandDuringTransferMods} from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
@@ -9,9 +10,9 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function runCommandInTxn(cmdFunc) {
     let session = st.s.startSession();
-    session.startTransaction();
-    cmdFunc(session);
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetryOnMongos(session, () => {
+        cmdFunc(session);
+    });
     session.endSession();
 }
 

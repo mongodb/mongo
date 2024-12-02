@@ -4,6 +4,9 @@
  *   uses_transactions,
  * ]
  */
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -47,9 +50,12 @@ let session = primary.startSession(sessionOptions);
 let sessionDb = session.getDatabase(dbName);
 let sessionColl = sessionDb.getCollection(collName);
 stopServerReplication(rst.getSecondaries());
-session.startTransaction({writeConcern: writeConcernMajority});
-assert.commandWorked(sessionColl.insert({_id: "write-with-write-concern"}));
-let res = session.commitTransaction_forTesting();
+let res;
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction({writeConcern: writeConcernMajority});
+    assert.commandWorked(sessionColl.insert({_id: "write-with-write-concern"}));
+    res = session.commitTransaction_forTesting();
+});
 checkWriteConcernTimedOut(res);
 assert(!res.hasOwnProperty("code"));
 assert(!res.hasOwnProperty("errorLabels"));

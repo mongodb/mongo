@@ -51,7 +51,6 @@ function runTest(st, readConcern, sessionOptions) {
     const otherSessionDB = st.s.startSession().getDatabase(dbName);
     assert.commandWorked(otherSessionDB.runCommand({find: collName}));
     assert.commandWorked(otherSessionDB.runCommand({insert: collName, documents: [{_id: 5}]}));
-
     // Depending on the transaction's read concern, the new document will or will not be visible
     // to the next statement.
     const numExpectedDocs = readConcern && readConcern.level === "snapshot" ? 0 : 1;

@@ -4,6 +4,9 @@
  *   uses_transactions,
  * ]
  */
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -36,9 +39,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     function assertFailsInTransaction(pipeline, errorCode) {
         const session = st.s.startSession();
         const sessionDB = session.getDatabase(testName);
-
-        session.startTransaction();
-        assert.throwsWithCode(() => sessionDB.local.aggregate(pipeline).itcount(), errorCode);
+        withAbortAndRetryOnTransientTxnError(session, () => {
+            session.startTransaction();
+            assert.throwsWithCode(() => sessionDB.local.aggregate(pipeline).itcount(), errorCode);
+        });
         session.endSession();
     }
 

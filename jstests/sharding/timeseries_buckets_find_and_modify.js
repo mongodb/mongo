@@ -25,6 +25,7 @@ import {
     sysCollNamePrefix,
     tearDownShardedCluster,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const docs = [
     doc1_a_nofields,
@@ -76,17 +77,17 @@ const testBucketMetaUpdate = function(queryField) {
     // Shard key change can be done inside a transaction.
     const session = sysColl.getDB().getMongo().startSession();
     const sessionDb = session.getDatabase(sysColl.getDB().getName());
-    session.startTransaction();
-    // According to the default split point, this does not change the owning shard.
-    const res = assert.commandWorked(sessionDb.runCommand({
-        findAndModify: sysColl.getName(),
-        query: {[queryField]: orgBucketDocs[bucketDocIdx][queryField]},
-        update: {$set: {meta: "D"}},
-        new: true,
-    }));
-    session.commitTransaction();
-    assert.eq(1, res.lastErrorObject.n, `findAndModify failed: ${tojson(res)}`);
-    assert.eq("D", res.value.meta, `Wrong meta field: ${tojson(res)}`);
+    withTxnAndAutoRetryOnMongos(session, () => {
+        // According to the default split point, this does not change the owning shard.
+        const res = assert.commandWorked(sessionDb.runCommand({
+            findAndModify: sysColl.getName(),
+            query: {[queryField]: orgBucketDocs[bucketDocIdx][queryField]},
+            update: {$set: {meta: "D"}},
+            new: true,
+        }));
+        assert.eq(1, res.lastErrorObject.n, `findAndModify failed: ${tojson(res)}`);
+        assert.eq("D", res.value.meta, `Wrong meta field: ${tojson(res)}`);
+    });
 
     const newBucketDocs = sysColl.find().toArray();
     assert.eq(orgBucketDocs.length,
@@ -104,17 +105,17 @@ const testBucketMetaUpdateToOwningShardChange = function(queryField) {
     // Shard key change can be done inside a transaction.
     const session = sysColl.getDB().getMongo().startSession();
     const sessionDb = session.getDatabase(sysColl.getDB().getName());
-    session.startTransaction();
-    // According to the default split point, this changes the owning shard.
-    const res = assert.commandWorked(sessionDb.runCommand({
-        findAndModify: sysColl.getName(),
-        query: {[queryField]: orgBucketDocs[bucketDocIdx][queryField]},
-        update: {$set: {meta: "A"}},
-        new: true,
-    }));
-    session.commitTransaction();
-    assert.eq(1, res.lastErrorObject.n, `findAndModify failed: ${tojson(res)}`);
-    assert.eq("A", res.value.meta, `Wrong meta field: ${tojson(res)}`);
+    withTxnAndAutoRetryOnMongos(session, () => {
+        // According to the default split point, this changes the owning shard.
+        const res = assert.commandWorked(sessionDb.runCommand({
+            findAndModify: sysColl.getName(),
+            query: {[queryField]: orgBucketDocs[bucketDocIdx][queryField]},
+            update: {$set: {meta: "A"}},
+            new: true,
+        }));
+        assert.eq(1, res.lastErrorObject.n, `findAndModify failed: ${tojson(res)}`);
+        assert.eq("A", res.value.meta, `Wrong meta field: ${tojson(res)}`);
+    });
     const newBucketDocs = sysColl.find().toArray();
     assert.eq(orgBucketDocs.length,
               newBucketDocs.length,

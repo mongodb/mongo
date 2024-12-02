@@ -50,9 +50,9 @@ assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUp
 
     const session = st.shard0.startSession();
     const sessionDB = session.getDatabase(dbName);
-
     // Start a transaction and target only the first shard.
     session.startTransaction({readConcern: {level: "majority"}});
+
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: -1}}));
 
     // Send another request to the first shard with the startOrContinueTransaction option and

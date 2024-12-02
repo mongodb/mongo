@@ -28,6 +28,7 @@ import {
     testDB,
     timeFieldName
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const docs = [
     doc1_a_nofields,
@@ -119,19 +120,18 @@ setUpShardedCluster();
     // TODO SERVER-67429 or SERVER-76583 Relax this restriction.
     const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(testDB.getName());
-    session.startTransaction();
+    let expectedDocs;
+    withTxnAndAutoRetryOnMongos(session, () => {
+        const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
+        assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
+        assert.eq(
+            true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
+        const updatedDoc = Object.assign(doc5_b_f104, {[metaFieldName]: "A"});
+        assert.docEq(updatedDoc, res.value, "Wrong new document");
+        expectedDocs = docs.filter(doc => doc._id !== 5);
+        expectedDocs.push(updatedDoc);
+    });
 
-    const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
-    assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
-    assert.eq(
-        true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
-    const updatedDoc = Object.assign(doc5_b_f104, {[metaFieldName]: "A"});
-    assert.docEq(updatedDoc, res.value, "Wrong new document");
-
-    session.commitTransaction();
-
-    let expectedDocs = docs.filter(doc => doc._id !== 5);
-    expectedDocs.push(updatedDoc);
     assert.sameMembers(expectedDocs, coll.find().toArray(), "Collection contents did not match");
 })();
 
@@ -158,15 +158,13 @@ setUpShardedCluster();
     // TODO SERVER-67429 or SERVER-76583 Relax this restriction.
     const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(testDB.getName());
-    session.startTransaction();
-
-    const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
-    assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
-    assert.eq(
-        true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
-    assert.docEq(doc1_a_nofields, res.value, "Wrong old document");
-
-    session.commitTransaction();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
+        assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
+        assert.eq(
+            true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
+        assert.docEq(doc1_a_nofields, res.value, "Wrong old document");
+    });
 
     const updatedDoc = Object.assign(doc1_a_nofields, {[timeFieldName]: generateTimeValue(8)});
     let expectedDocs = docs.filter(doc => doc._id !== 1);
