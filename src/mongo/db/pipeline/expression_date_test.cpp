@@ -389,7 +389,7 @@ TEST_F(DateExpressionTest, RejectsArraysWithinObjectSpecification) {
         dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
         contextDoc = Document{{"_id", 0}};
         ASSERT_THROWS_CODE(
-            dateExp->evaluate(contextDoc, &expCtx->variables), AssertionException, 40533);
+            dateExp->evaluate(contextDoc, &expCtx->variables), AssertionException, 40517);
     }
 }
 
@@ -432,7 +432,7 @@ TEST_F(DateExpressionTest, RejectsNonStringTimezone) {
         auto dateExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
         auto contextDoc = Document{{"intField", 4}};
         ASSERT_THROWS_CODE(
-            dateExp->evaluate(contextDoc, &expCtx->variables), AssertionException, 40533);
+            dateExp->evaluate(contextDoc, &expCtx->variables), AssertionException, 40517);
     }
 }
 
