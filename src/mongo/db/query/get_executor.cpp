@@ -1275,13 +1275,20 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
     }();
 
+    // If distinct multiplanning is enabled and we have a distinct property, we may not be able to
+    // commit to SBE yet.
+    auto canCommitToSbe = [&canonicalQuery]() {
+        return !canonicalQuery->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled() ||
+            !canonicalQuery->getDistinct();
+    };
+
     canonicalQuery->setSbeCompatible(useSbeEngine);
     if (!useSbeEngine) {
         // There's a special case of the projection optimization being skipped when a query has
         // any user-defined "let" variable and the query may be run with SBE. Here we make sure
         // the projection is optimized for the classic engine.
         canonicalQuery->optimizeProjection();
-    } else if (!canonicalQuery->getDistinct()) {
+    } else if (canCommitToSbe()) {
         // Commit to using SBE by removing the pushed-down aggregation stages from the original
         // pipeline and by mutating the canonical query with search specific metadata.
         finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
@@ -1292,7 +1299,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         -> std::unique_ptr<PlannerInterface> {
         // If we have a distinct, we might get a better plan using classic and DISTINCT_SCAN than
         // SBE without one.
-        if (useSbeEngine && !canonicalQuery->getDistinct()) {
+        if (useSbeEngine && canCommitToSbe()) {
             auto sbeYieldPolicy =
                 PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
 

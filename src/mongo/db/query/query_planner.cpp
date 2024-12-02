@@ -1617,7 +1617,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // If CanonicalQuery is distinct-like and we haven't generated a plan that features
     // a DISTINCT_SCAN, we should use SBE instead.
-    if (query.isSbeCompatible() && query.getDistinct()) {
+    if (isDistinctMultiplanningEnabled && query.isSbeCompatible() && query.getDistinct()) {
         const bool noDistinctScans = std::none_of(out.begin(), out.end(), [](const auto& soln) {
             return soln->hasNode(STAGE_DISTINCT_SCAN);
         });
