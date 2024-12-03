@@ -135,7 +135,6 @@ COPTS = [
         "-Wno-deprecated-declarations",
         "-Wno-deprecated-volatile",
         "-Wno-implicit-int-float-conversion",
-        "-Wno-thread-safety-analysis",
     ],
     "//conditions:default": [],
 })

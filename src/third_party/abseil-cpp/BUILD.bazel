@@ -2263,9 +2263,6 @@ mongo_cc_library(
         "dist/absl/strings/substitute.cc",
     ],
     hdrs = ABSEIL_HEADERS,
-    copts = [
-        "-Wno-array-bounds",
-    ],
     includes = ["dist"],
     skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [

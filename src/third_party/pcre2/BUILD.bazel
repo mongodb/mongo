@@ -81,7 +81,6 @@ mongo_cc_library(
         "//conditions:default": [
             "-Isrc/third_party/pcre2/build_posix",
             "-Wno-implicit-fallthrough",
-            "-Wno-dangling-pointer",
         ],
     }),
     defines = [
