@@ -860,6 +860,7 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "incompatible_aubsan",
+        "incompatible_debug_mode",
         "incompatible_tsan",
         "default",
       ]
@@ -916,6 +917,7 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "incompatible_aubsan",
+        "incompatible_debug_mode",
         "incompatible_tsan",
         "default",
       ]
