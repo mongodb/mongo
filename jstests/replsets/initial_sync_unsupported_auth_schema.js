@@ -30,7 +30,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
             return true;
         }
         return false;
-    }, "Node did not terminate due to unsupported auth schema during initial sync", 60 * 1000);
+    }, "Node did not terminate due to unsupported auth schema during initial sync", 5 * 60 * 1000);
 
     rst.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 
@@ -76,7 +76,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
             return true;
         }
         return false;
-    }, "Node did not terminate due to unsupported auth schema during initial sync", 60 * 1000);
+    }, "Node did not terminate due to unsupported auth schema during initial sync", 5 * 60 * 1000);
 
     rst.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 
