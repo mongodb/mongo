@@ -13,4 +13,48 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "simple_report",
+    srcs = ["simple_report.py"],
+    main = "simple_report.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "click",
+            group = "evergreen",
+        ),
+    ],
+)
+
+py_binary(
+    name = "mongosymb",
+    srcs = [
+        "build_system_options.py",
+        "mongosymb.py",
+    ],
+    main = "mongosymb.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "tenacity",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "resmoke",
+    srcs = ["resmoke.py"],
+    main = "resmoke.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
 exports_files(["cheetah_source_generator.py"])

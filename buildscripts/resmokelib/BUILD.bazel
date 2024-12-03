@@ -1,0 +1,65 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "resmokelib",
+    srcs = [
+        "__init__.py",
+        "cli.py",
+        "config.py",
+        "config_fuzzer_limits.py",
+        "config_fuzzer_wt_limits.py",
+        "configure_resmoke.py",
+        "errors.py",
+        "flags.py",
+        "mongo_fuzzer_configs.py",
+        "multiversionconstants.py",
+        "multiversionsetupconstants.py",
+        "parser.py",
+        "plugin.py",
+        "reportfile.py",
+        "selector.py",
+        "sighandler.py",
+        "suite_hierarchy.py",
+        "suitesconfig.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/idl",
+        "//buildscripts/resmokelib/core",
+        "//buildscripts/resmokelib/discovery",
+        "//buildscripts/resmokelib/generate_fcv_constants",
+        "//buildscripts/resmokelib/generate_fuzz_config",
+        "//buildscripts/resmokelib/hang_analyzer",
+        "//buildscripts/resmokelib/logging",
+        "//buildscripts/resmokelib/powercycle",
+        "//buildscripts/resmokelib/setup_multiversion",
+        "//buildscripts/resmokelib/testing",
+        "//buildscripts/resmokelib/undodb",
+        "//buildscripts/resmokelib/utils",
+        "//buildscripts/util",
+        dependency(
+            "psutil",
+            group = "build-metrics",
+        ),
+        dependency(
+            "mongo-tooling-metrics",
+            group = "tooling-metrics",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "opentelemetry-api",
+            group = "testing",
+        ),
+        dependency(
+            "opentelemetry-sdk",
+            group = "testing",
+        ),
+        dependency(
+            "opentelemetry-exporter-otlp-proto-common",
+            group = "testing",
+        ),
+    ],
+)

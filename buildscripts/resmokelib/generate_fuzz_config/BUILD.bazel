@@ -1,0 +1,8 @@
+py_library(
+    name = "generate_fuzz_config",
+    srcs = [
+        "__init__.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)

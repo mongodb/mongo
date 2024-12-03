@@ -1,0 +1,8 @@
+py_library(
+    name = "generate_fcv_constants",
+    srcs = [
+        "__init__.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)

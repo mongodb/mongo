@@ -1,0 +1,18 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "core",
+    srcs = [
+        "__init__.py",
+        "network.py",
+        "pipe.py",
+        "process.py",
+        "programs.py",
+        "redirect.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [dependency(
+        "packaging",
+        group = "testing",
+    )],
+)

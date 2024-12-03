@@ -81,8 +81,6 @@ load("@rules_coverity//coverity:repositories.bzl", "rules_coverity_toolchains")
 
 rules_coverity_toolchains()
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
 # Hedron's Compile Commands Extractor for Bazel
 # https://github.com/hedronvision/bazel-compile-commands-extractor
 http_archive(
@@ -150,16 +148,16 @@ http_archive(
 # Poetry rules for managing Python dependencies
 http_archive(
     name = "rules_poetry",
-    sha256 = "5db24c0eacb42ef8b25019bd000a9d2905fba71682d1dac51603bfbc0e6fa5c9",
-    strip_prefix = "rules_poetry-29b93f4f2e227834ac8d5b48cb0baef8dbeeecc7",
+    sha256 = "dbabea2a3829aa5885ba46d612b269956d0227b503147a5e1a2cfd635165fcb5",
+    strip_prefix = "rules_poetry-441f4365f7cafce345083a6325bc6712a2ce5c93",
     urls = [
         # Implements retry by relisting each url multiple times to be used as a failover.
         # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/rules_poetry/archive/29b93f4f2e227834ac8d5b48cb0baef8dbeeecc7.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/29b93f4f2e227834ac8d5b48cb0baef8dbeeecc7.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/29b93f4f2e227834ac8d5b48cb0baef8dbeeecc7.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/29b93f4f2e227834ac8d5b48cb0baef8dbeeecc7.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/29b93f4f2e227834ac8d5b48cb0baef8dbeeecc7.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
     ],
 )
 
