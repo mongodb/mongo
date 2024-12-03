@@ -210,14 +210,16 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
             // This field does not exist anymore since MongoDB 4.3 but it's possible to observe
             // it in multiversion tests. See SERVER-41696 (removed).
             ns: _10,
+            // TODO (SERVER-97749) Stop ignoring the `background` field once it's properly handled.
+            background: _11,
             ...mdIndexSpecRest
         } = mdIndexSpec;
 
         return {
             ...mdIndexSpecRest,
+            // TODO (SERVER-97749) Add the background field once it's properly handled.
             // Handle various mapping quirks of `listIndexes` vs the raw catalog. See also:
             // https://github.com/mongodb/mongo/blob/96893c43d288b84fccb4242b51c8d7c57df5887d/src/mongo/db/catalog/README.md#examples-of-differences-between-listindexes-and-listcatalog-results
-            ...(mdIndexSpec.background === 1 && {background: true}),
             ...(typeof mdIndexSpec.sparse === "number" && {sparse: mdIndexSpec.sparse !== 0}),
             ...(typeof mdIndexSpec.bits === "number" && {bits: Math.floor(mdIndexSpec.bits)}),
             // For more details on the history and handling of NaN on TTL indexes, see:
@@ -319,7 +321,15 @@ function validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, s
         listCatalog.filter(lc => lc.type === 'collection').map(mapListCatalogToListIndexesEntry)));
     const sortedListIndexes = sortCollectionIndexesInPlace(
         // Shallow-copy to avoid modifying the list given by the caller.
-        listIndexes.map(ci => ({name: ci.name, indexes: [...ci.indexes]})));
+        listIndexes.map(ci => ({
+                            name: ci.name,
+                            indexes: [...ci.indexes.map(index => {
+                                // TODO (SERVER-97749): Don't delete 'background' field once we
+                                // handle it properly
+                                delete index.background;
+                                return index;
+                            })]
+                        })));
 
     const equals = bsonUnorderedFieldArrayEquals(listIndexesFromListCatalog, sortedListIndexes);
     if (!equals) {
