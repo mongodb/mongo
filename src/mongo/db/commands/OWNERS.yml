@@ -11,7 +11,7 @@ filters:
       - 10gen/server-security
   - "create_indexes*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-index-builds
   - "fle2_*":
     approvers:
       - 10gen/server-security
@@ -30,7 +30,7 @@ filters:
       - 10gen/server-rss-sydney
   - "vote*index_build*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-index-builds
   - "rotate_certificates*":
     approvers:
       - 10gen/server-security

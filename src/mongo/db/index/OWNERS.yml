@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "index_access_method*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-index-builds
   - "key_gen_bm.cpp":
     approvers:
       - 10gen/query-execution-indexing
