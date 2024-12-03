@@ -1745,6 +1745,28 @@ def _mongo_cc_binary_and_program(
     else:
         enterprise_compatible = []
 
+    if "compile_requires_large_memory_gcc" in tags:
+        exec_properties |= select({
+            "//bazel/config:gcc_x86_64": {
+                "Pool": "large_mem_x86_64",
+            },
+            "//bazel/config:gcc_aarch64": {
+                "Pool": "large_memory_arm64",
+            },
+            "//conditions:default": {},
+        })
+
+    if "compile_requires_large_memory_sanitizer" in tags:
+        exec_properties |= select({
+            "//bazel/config:any_sanitizer_x86_64": {
+                "Pool": "large_mem_x86_64",
+            },
+            "//bazel/config:any_sanitizer_aarch64": {
+                "Pool": "large_memory_arm64",
+            },
+            "//conditions:default": {},
+        })
+
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     package_specific_copts = package_specific_copt(native.package_name())
