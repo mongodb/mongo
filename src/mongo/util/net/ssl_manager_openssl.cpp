@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/util/future.h"
 #include "mongo/util/net/ssl_manager.h"
 
 #include <boost/algorithm/string.hpp>
@@ -1102,12 +1103,9 @@ StatusWith<OCSPValidationContext> extractOcspUris(SSL_CTX* context,
                                  std::move(swIssuerCert.getValue())};
 }
 
-class OCSPCache : public ReadThroughCache<OCSPCacheKey, OCSPFetchResponse> {
+class OCSPCache : public InvalidatingLRUCache<OCSPCacheKey, OCSPFetchResponse> {
 public:
-    OCSPCache(ServiceContext* service)
-        : ReadThroughCache(_mutex, service->getService(), _threadPool, _lookup, tlsOCSPCacheSize) {
-        _threadPool.startup();
-    }
+    OCSPCache(ServiceContext* service) : InvalidatingLRUCache(tlsOCSPCacheSize) {}
 
     static void create(ServiceContext* service) {
         getOCSPCache(service).emplace(service);
@@ -1117,53 +1115,43 @@ public:
         getOCSPCache(service).reset();
     }
 
-    static OCSPCache& get(ServiceContext* service) {
+    static OCSPCache& getCache(ServiceContext* service) {
+        uassert(ErrorCodes::UnknownError, "OCSP cache not available", getOCSPCache(service));
         return *getOCSPCache(service);
     }
 
 private:
-    static LookupResult _lookup(OperationContext* opCtx,
-                                const OCSPCacheKey& key,
-                                const ValueHandle& unusedCachedValue) {
-        // If there is a CRL file, we expect the CRL file to cover the certificate status
-        // information, and therefore we don't need to make a roundtrip.
-        if (!getSSLGlobalParams().sslCRLFile.empty()) {
-            return LookupResult(boost::none);
-        }
+    static const ServiceContext::Decoration<boost::optional<OCSPCache>> getOCSPCache;
+};
 
-        auto swOCSPContext =
-            extractOcspUris(key.context, key.peerCert.get(), key.intermediateCerts.get());
-        if (!swOCSPContext.isOK()) {
-            return LookupResult(boost::none);
-        }
-
-        auto swResponse = dispatchOCSPRequests(key.context,
-                                               nullptr,
-                                               key.intermediateCerts,
-                                               std::move(swOCSPContext.getValue()),
-                                               OCSPPurpose::kClientVerify)
-                              .getNoThrow();
-        if (!swResponse.isOK() || !swResponse.getValue().cacheable()) {
-            // if the response is unknown or not cacheable, (ie. because of
-            // a missing nextUpdate field), then return none so that the
-            // response is not cached
-            return LookupResult(boost::none);
-        }
-
-        return LookupResult(std::move(swResponse.getValue()));
+boost::optional<OCSPFetchResponse> lookupOCSPForClient(const OCSPCacheKey& key) {
+    // If there is a CRL file, we expect the CRL file to cover the certificate status
+    // information, and therefore we don't need to make a roundtrip.
+    if (!getSSLGlobalParams().sslCRLFile.empty()) {
+        return boost::none;
     }
 
-    static const ServiceContext::Decoration<boost::optional<OCSPCache>> getOCSPCache;
+    auto swOCSPContext =
+        extractOcspUris(key.context, key.peerCert.get(), key.intermediateCerts.get());
+    if (!swOCSPContext.isOK()) {
+        return boost::none;
+    }
 
-    stdx::mutex _mutex;
+    auto swResponse = dispatchOCSPRequests(key.context,
+                                           nullptr,
+                                           key.intermediateCerts,
+                                           std::move(swOCSPContext.getValue()),
+                                           OCSPPurpose::kClientVerify)
+                          .getNoThrow();
+    if (!swResponse.isOK() || !swResponse.getValue().cacheable()) {
+        // if the response is unknown or not cacheable, (ie. because of
+        // a missing nextUpdate field), then return none so that the
+        // response is not cached
+        return boost::none;
+    }
 
-    ThreadPool _threadPool{[] {
-        ThreadPool::Options options;
-        options.poolName = "OCSPCache";
-        options.minThreads = 0;
-        return options;
-    }()};
-};
+    return std::move(swResponse.getValue());
+}
 
 const ServiceContext::Decoration<boost::optional<OCSPCache>> OCSPCache::getOCSPCache =
     ServiceContext::declareDecoration<boost::optional<OCSPCache>>();
@@ -2090,74 +2078,51 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
 
     OCSPCacheKey cacheKey(std::move(peerCert), context, std::move(intermediateCerts));
 
-    // Convert
-    auto convert =
-        [reactor](SharedSemiFuture<OCSPCacheVal> semifuture) mutable -> Future<OCSPCacheVal> {
+    auto& cache = OCSPCache::getCache(getGlobalServiceContext());
+    auto cacheVal = cache.get(cacheKey);
+    auto timeNow = Date_t::now();
+
+    // If a cache value exists, and the value is either
+    // revoked or not expired, we should use the cache value.
+    if (cacheVal && (!cacheVal->statusOfResponse.isOK() || cacheVal->refreshTime >= timeNow)) {
+        return Future<void>::makeReady(cacheVal->statusOfResponse);
+    }
+
+    // Otherwise, we re-fetch.
+    cache.invalidate(cacheKey);
+
+    auto lookup = [reactor, cacheKey]() -> Future<boost::optional<OCSPFetchResponse>> {
         if (!reactor) {
-            return Future<OCSPCacheVal>::makeReady(std::move(semifuture).get());
-        } else {
-            auto pf = makePromiseFuture<OCSPCacheVal>();
-            std::move(semifuture)
-                .thenRunOn(reactor)
-                .getAsync(
-                    [promise = std::move(pf.promise)](StatusWith<OCSPCacheVal> response) mutable {
-                        if (!response.isOK()) {
-                            promise.setError(response.getStatus());
-                            return;
-                        }
-                        promise.emplaceValue(std::move(response.getValue()));
-                    });
-
-            return std::move(pf.future);
+            return Future<boost::optional<OCSPFetchResponse>>::makeReady(
+                lookupOCSPForClient(cacheKey));
         }
+
+        auto pf = makePromiseFuture<boost::optional<OCSPFetchResponse>>();
+        Future<OCSPCacheKey>::makeReady(cacheKey).thenRunOn(reactor).getAsync(
+            [promise = std::move(pf.promise)](StatusWith<OCSPCacheKey> key) mutable {
+                promise.emplaceValue(lookupOCSPForClient(key.getValue()));
+            });
+        return std::move(pf.future);
     };
 
-    auto validate = [](StatusWith<OCSPCacheVal> swOcspFetchResponse)
-        -> std::pair<Status, boost::optional<Date_t>> {
-        // OCSP Status Unknown of some kind
-        if (!swOcspFetchResponse.isOK()) {
-            return {Status::OK(), boost::none};
-        }
+    return lookup().then(
+        [&cache, cacheKey](
+            StatusWith<boost::optional<OCSPFetchResponse>> swLookupResponse) -> Future<void> {
+            if (!swLookupResponse.isOK()) {
+                return swLookupResponse.getStatus();
+            }
 
-        // If lookup returns a boost::none, then it is either because the OCSP
-        // cert status is 'Unknown', or the status is 'Good', but the response
-        // containing this status cannot be cached due to a missing nextUpdate
-        // time. If the status is Unknown, we still let the client connect to
-        // the server since the server certificate is not definitively revoked
-        if (!swOcspFetchResponse.getValue()) {
-            return {Status::OK(), boost::none};
-        }
+            auto lookupResponse = std::move(swLookupResponse.getValue());
+            // If we don't have a response, we don't want to add anything
+            // to the cache.
+            if (!lookupResponse) {
+                return Status::OK();
+            }
 
-        return {swOcspFetchResponse.getValue()->statusOfResponse,
-                swOcspFetchResponse.getValue()->refreshTime};
-    };
-
-    auto& cache = OCSPCache::get(getGlobalServiceContext());
-
-    auto refetchIfInvalidAndReturn =
-        [&cache, cacheKey, convert, validate](
-            std::pair<Status, boost::optional<Date_t>> validatedResponse) mutable -> Future<void> {
-        if (!validatedResponse.first.isOK() || !validatedResponse.second) {
-            return validatedResponse.first;
-        }
-
-        auto timeNow = Date_t::now();
-
-        if (validatedResponse.second.get() < timeNow) {
-            cache.invalidateKey(cacheKey);
-            auto semifuture = cache.acquireAsync(cacheKey);
-            return convert(std::move(semifuture))
-                .onCompletion(validate)
-                .then([](std::pair<Status, boost::optional<Date_t>> validateResult) {
-                    return validateResult.first;
-                });
-        }
-
-        return validatedResponse.first;
-    };
-
-    auto semifuture = cache.acquireAsync(cacheKey);
-    return convert(std::move(semifuture)).onCompletion(validate).then(refetchIfInvalidAndReturn);
+            // Manually inject the value to the cache here.
+            auto handle = cache.insertOrAssignAndGet(cacheKey, std::move(lookupResponse.get()));
+            return handle->statusOfResponse;
+        });
 }
 
 using StoreCtxVerifiedChain = std::unique_ptr<STACK_OF(X509), X509StackDeleter>;
