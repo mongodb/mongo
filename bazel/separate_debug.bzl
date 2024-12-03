@@ -147,19 +147,26 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
 
             # For some reason Bazel isn't deduplicating the user link flags, which leads to them accumulating
             # with each layer added. Deduplicate them manually.
-            all_user_link_flags = dict()
-            for flag in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags:
-                all_user_link_flags[flag] = True
-            for input in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[1:]:
-                for flag in input.user_link_flags:
-                    if flag in all_user_link_flags:
-                        all_user_link_flags.pop(flag)
-            all_user_link_flags = [flag for flag, _ in all_user_link_flags.items()]
+            #
+            # This routine works by taking the current library's link args and searching for each of its dependency's link
+            # args present contiguously. If a matching sub list is found, it's removed from the current link line as a duplicate.
+            # This is to avoid removing positional arguments that may appear more than once.
+            #
+            # This solution may break in the case where a base dependency contains only one positional argument,
+            # but this should never happen since we will always inject at least one non positional argument globally.
+            cur_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags
+            for dep in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[1:]:
+                for i in range(len(cur_flags)):
+                    dep_flags = dep.user_link_flags
+                    if dep_flags and cur_flags:
+                        if cur_flags[i] == dep_flags[0] and cur_flags[i:i + len(dep_flags)] == dep_flags:
+                            cur_flags = cur_flags[:i] + cur_flags[i + len(dep_flags):]
+                            break
 
             linker_input = cc_common.create_linker_input(
                 owner = ctx.label,
                 libraries = depset(direct = [direct_lib]),
-                user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags,
+                user_link_flags = cur_flags,
             )
             linking_context = cc_common.create_linking_context(linker_inputs = depset(direct = [linker_input], transitive = linker_input_deps))
 
