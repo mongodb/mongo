@@ -36,16 +36,12 @@ namespace mongo {
 
 namespace {
 
-const auto getDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<RoutingInformationCache>>();
+struct RoutingInformationCacheContainer {
+    std::unique_ptr<RoutingInformationCache> routingInformationCache;
+    CatalogCache* rawPtr{};
+};
 
-const auto decorationActionRegisterer = ServiceContext::ConstructorActionRegisterer(
-    "RoutingInformationCache",
-    [](ServiceContext* serviceCtx) {
-        /* Noop; construction will be executed through the RoutingInformationCache::set() method */
-    },
-    [](ServiceContext* serviceCtx) { getDecoration(serviceCtx).reset(); });
-
+const auto getDecoration = ServiceContext::declareDecoration<RoutingInformationCacheContainer>();
 
 }  // namespace
 
@@ -56,15 +52,24 @@ RoutingInformationCache::RoutingInformationCache(ServiceContext* serviceCtx)
 
 void RoutingInformationCache::set(ServiceContext* serviceCtx) {
     auto& decoration = getDecoration(serviceCtx);
-    invariant(!decoration);
-    decoration = std::make_unique<RoutingInformationCache>(serviceCtx);
+    invariant(!decoration.routingInformationCache);
+    invariant(!decoration.rawPtr);
+    decoration.routingInformationCache = std::make_unique<RoutingInformationCache>(serviceCtx);
+    decoration.rawPtr = decoration.routingInformationCache.get();
 }
 
-RoutingInformationCache* RoutingInformationCache::get(ServiceContext* serviceCtx) {
-    return getDecoration(serviceCtx).get();
+void RoutingInformationCache::setOverride(ServiceContext* serviceCtx, CatalogCache* cacheOverride) {
+    auto& decoration = getDecoration(serviceCtx);
+    invariant(!decoration.routingInformationCache);
+    invariant(!decoration.rawPtr);
+    decoration.rawPtr = cacheOverride;
 }
 
-RoutingInformationCache* RoutingInformationCache::get(OperationContext* opCtx) {
+CatalogCache* RoutingInformationCache::get(ServiceContext* serviceCtx) {
+    return getDecoration(serviceCtx).rawPtr;
+}
+
+CatalogCache* RoutingInformationCache::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
