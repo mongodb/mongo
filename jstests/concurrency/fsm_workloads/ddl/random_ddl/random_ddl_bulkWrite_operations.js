@@ -10,7 +10,9 @@
  *   does_not_support_stepdowns,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   does_not_support_transactions,
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # Relies on internalInsertMaxBatchSize to be 64 or above, but it may be fuzzed to lower values.
+ *   does_not_support_config_fuzzer,
  *  ]
  */
 
