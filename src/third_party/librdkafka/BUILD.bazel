@@ -123,8 +123,10 @@ mongo_cc_library(
         "dist/src/lz4.c",  # This file is textually included.
     ],
     copts = [
+        "-Wno-array-bounds",
         "-Wno-unused-variable",
         "-Wno-implicit-fallthrough",
+        "-Wno-unused-but-set-variable",
         "-I$(GENDIR)/src/third_party/librdkafka/dist/FAKE",
         "-U_GNU_SOURCE",
         "-U_XOPEN_SOURCE",
@@ -132,7 +134,6 @@ mongo_cc_library(
         "//bazel/config:compiler_type_clang": ["-Wno-uninitialized"],
         "//bazel/config:compiler_type_gcc": [
             "-Wno-maybe-uninitialized",
-            "-Wno-unused-but-set-variable",
         ],
         "//conditions:default": ["//conditions:incompatible"],
     }),

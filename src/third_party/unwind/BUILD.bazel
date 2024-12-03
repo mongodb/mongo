@@ -183,6 +183,7 @@ mongo_cc_library(
     }) + select({
         "@//bazel/config:compiler_type_clang": [
             "-Wno-header-guard",
+            "-Wno-single-bit-bitfield-constant-conversion",
         ],
         "@//bazel/config:compiler_type_gcc": ["-Wno-uninitialized"],
         "//conditions:default": [],
