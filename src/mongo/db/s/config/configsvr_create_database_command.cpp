@@ -52,7 +52,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -129,6 +128,7 @@ public:
                     coordinatorDoc.setShardingDDLCoordinatorMetadata(
                         {{NamespaceString(dbName), DDLCoordinatorTypeEnum::kCreateDatabase}});
                     coordinatorDoc.setPrimaryShard(optResolvedPrimaryShard);
+                    coordinatorDoc.setUserSelectedPrimary(optResolvedPrimaryShard.is_initialized());
                     auto service = ShardingDDLCoordinatorService::getService(opCtx);
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(

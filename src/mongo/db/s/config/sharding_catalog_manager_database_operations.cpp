@@ -171,7 +171,10 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
                 auto retries = 10;
                 try {
-                    return commitCreateDatabase(opCtx, dbName, candidatePrimaryShardId);
+                    return commitCreateDatabase(opCtx,
+                                                dbName,
+                                                candidatePrimaryShardId,
+                                                optResolvedPrimaryShard.is_initialized());
                 } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
                     create_database_util::logCommitCreateDatabaseFailed(dbName, redact(ex));
                     // The proposed primaryShard was found to not exist or be draining when
@@ -187,7 +190,9 @@ DatabaseType ShardingCatalogManager::createDatabase(
                         if (retries > 0) {
                             continue;
                         } else {
-                            create_database_util::logCreateDatabaseRetryExhausted(dbName);
+                            LOGV2_WARNING(8917901,
+                                          "Exhausted retries trying to commit create database",
+                                          "dbName"_attr = dbName);
                             throw;
                         }
                     }
@@ -341,7 +346,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
 DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCtx,
                                                           const DatabaseName& dbName,
-                                                          const ShardId& primaryShard) {
+                                                          const ShardId& primaryShard,
+                                                          bool userSelectedPrimary) {
     // The database does not exist. Insert an entry for the new database into the sharding
     // catalog. Assign also a primary shard if the caller hasn't specified one.
     ShardingLogging::get(opCtx)->logChange(opCtx,
@@ -370,12 +376,10 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
 
     DatabaseType db = [&]() {
         // Hold _kShardMembershipLock until the entire commit finishes to serialize with removeShard
-        // in order to guarantee that the proposed dbPrimary shard continues to exist (and is not
-        // draining) throughout the commit.
+        // in order to guarantee that the proposed dbPrimary shard continues to exist (and the
+        // user-selected primary shard is not draining) throughout the commit.
         Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
-        // Under _kShardMembershipLock, make sure that the selected shard still exists and
-        // is not draining.
         const auto shardDocs = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -388,9 +392,10 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
                 "Selected primary shard for new database does not exist",
                 !shardDocs.docs.empty());
         const auto shardDoc = uassertStatusOK(ShardType::fromBSON(shardDocs.docs.front()));
+        // Fails only if a user selects a draining shard as its primary shard explicitly.
         uassert(ErrorCodes::ShardNotFound,
                 "Cannot select draining shard as primary for new database",
-                !shardDoc.getDraining());
+                !shardDoc.getDraining() || !userSelectedPrimary);
 
         // Pick a clusterTime that will be used as the 'timestamp' of the new database.
         const auto now = VectorClock::get(opCtx)->getTime();

@@ -462,25 +462,29 @@ public:
     //
 
     /**
-     * Checks if a database with the same name, optPrimaryShard and enableSharding state already
-     * exists, and if not, creates a new one that matches these prerequisites. If a database already
-     * exists and matches all the prerequisites returns success, otherwise throws NamespaceNotFound.
+     * Checks if a database with the same name, optResolvedPrimaryShard and enableSharding state
+     * already exists, and if not, creates a new one that matches these prerequisites. If a database
+     * already exists and matches all the prerequisites returns success, otherwise throws
+     * NamespaceNotFound.
      */
     DatabaseType createDatabase(OperationContext* opCtx,
                                 const DatabaseName& dbName,
-                                const boost::optional<ShardId>& optPrimaryShard,
+                                const boost::optional<ShardId>& optResolvedPrimaryShard,
                                 const SerializationContext& serializationContext);
 
     /*
+     * TODO (SERVER-97837): Refactor the function out of ShardingCatalogManager.
      * Commits the new database metadata for a createDatabase operation.
      *
-     * Throws ShardNotFound if the proposed 'primaryShard' is found to not exist or be draining.
-     * This check (and the actual) commit, is done under the _kShardMembershipLock to ensure
-     * synchronization with removeShard operations.
+     * Throws ShardNotFound if the proposed 'primaryShard' is found to not exist. Also throws
+     * ShardNotFound if the user-specified primary shard is draining. This check (and the actual)
+     * commit, is done under the _kShardMembershipLock to ensure synchronization with removeShard
+     * operations.
      */
     DatabaseType commitCreateDatabase(OperationContext* opCtx,
                                       const DatabaseName& dbName,
-                                      const ShardId& primaryShard);
+                                      const ShardId& primaryShard,
+                                      bool userSelectedPrimary);
 
     /**
      * Updates the metadata in config.databases collection with the new primary shard for the given

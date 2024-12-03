@@ -29,7 +29,7 @@
 #include "mongo/db/s/create_database_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/create_database_util.h"
-#include "mongo/s/routing_information_cache.h"
+#include "mongo/db/s/sharding_util.h"
 
 namespace mongo {
 
@@ -37,17 +37,24 @@ void CreateDatabaseCoordinator::_checkPreconditions() {
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
     const auto& dbName = nss().dbName();
+
+    const auto& primaryShard = _doc.getPrimaryShard();
     if (const auto& existingDatabase =
             create_database_util::checkForExistingDatabaseWithDifferentOptions(
-                opCtx, dbName, _primaryShard)) {
+                opCtx, dbName, primaryShard)) {
         _result = ConfigsvrCreateDatabaseResponse(existingDatabase->getVersion());
         // Launches an exception to directly jump to the end of the continuation chain.
         uasserted(ErrorCodes::RequestAlreadyFulfilled,
                   str::stream() << "The database" << dbName.toStringForErrorMsg()
                                 << "is already created from a past request");
     }
+    // Checks if the user-specified primary shard exists.
+    if (primaryShard) {
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShard.get()));
+    }
 }
 
+// TODO SERVER-96178: release the critical section upon error.
 ExecutorFuture<void> CreateDatabaseCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
@@ -75,6 +82,14 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                         fmt::format("Database {} is being dropped. Will automatically retry",
                                     nss().dbName().toStringForErrorMsg()),
                         create_database_util::checkIfDropPendingDB(opCtx, nss().dbName()));
+
+                // Selects the primary candidate shard if not specified by the user or selected by
+                // the coordinator already. Persists the primary shard information for later phases.
+                if (!_doc.getPrimaryShard()) {
+                    StateDoc newDoc(_doc);
+                    newDoc.setPrimaryShard(sharding_util::selectLeastLoadedNonDrainingShard(opCtx));
+                    _updateStateDocument(opCtx, std::move(newDoc));
+                }
             }))
         .then(_buildPhaseHandler(
             Phase::kCommitOnShardingCatalog,
@@ -85,17 +100,15 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                 const auto dbNameStr =
                     DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
                 if (const auto& existingDatabase = create_database_util::findDatabaseExactMatch(
-                        opCtx, dbNameStr, _primaryShard)) {
+                        opCtx, dbNameStr, _doc.getPrimaryShard())) {
                     // This means the database was created in a previous run of the same create
                     // database coordinator instance. Just forces a refresh on the primary.
                     create_database_util::refreshDbVersionOnPrimaryShard(
                         opCtx, dbNameStr, existingDatabase->getPrimary());
                     _result = ConfigsvrCreateDatabaseResponse(existingDatabase->getVersion());
                 } else {
-                    const auto candidatePrimaryShardId =
-                        create_database_util::getCandidatePrimaryShard(opCtx, _primaryShard);
                     auto createdDatabase = ShardingCatalogManager::get(opCtx)->commitCreateDatabase(
-                        opCtx, dbName, candidatePrimaryShardId);
+                        opCtx, dbName, _doc.getPrimaryShard().get(), _doc.getUserSelectedPrimary());
 
                     // Note, making the primary shard refresh its databaseVersion here is not
                     // required for correctness, since either:
@@ -123,9 +136,9 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                 return Status::OK();
             }
 
-            if (_doc.getPhase() < Phase::kCommitOnShardingCatalog) {
-                // Early exit to not trigger the clean up procedure because the commit phase hasn't
-                // started yet.
+            if (_doc.getPhase() < Phase::kEnterCriticalSectionOnPrimary) {
+                // Early exit to not trigger the clean up procedure because the coordinator has
+                // not entered to any critical section.
                 return status;
             }
 
@@ -134,28 +147,15 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
             getForwardableOpMetadata().setOn(opCtx);
             const auto& dbName = nss().dbName();
 
-            // The proposed primary shard was found to not exist or be draining when attempting to
-            // commit.
+            // We may get 'ShardNotFound' in two scenarios:
+            // 1. The coordinator tries to select a primary shard but found no shards.
+            // 2. The user-selected primary shard is draining.
+            // For both cases, we'll fail the operation.
             if (status == ErrorCodes::ShardNotFound) {
                 create_database_util::logCommitCreateDatabaseFailed(dbName, status.reason());
-                if (_primaryShard) {
-                    // If a primary shard was explicitly selected by the caller, then fail the
-                    // create operation.
-                    triggerCleanup(opCtx, status);
-                    MONGO_UNREACHABLE;
-                } else {
-                    // If no primary shard was explicitly selected by the caller, then retry to
-                    // choose a new one.
-                    if (--_availableRetries > 0) {
-                        StateDoc newDoc(_doc);
-                        newDoc.setAvailableRetries(_availableRetries);
-                        _updateStateDocument(opCtx, std::move(newDoc));
-                    } else {
-                        create_database_util::logCreateDatabaseRetryExhausted(dbName);
-                        triggerCleanup(opCtx, status);
-                        MONGO_UNREACHABLE;
-                    }
-                }
+
+                triggerCleanup(opCtx, status);
+                MONGO_UNREACHABLE;
             }
 
             return status;

@@ -54,11 +54,6 @@ void logCommitCreateDatabaseFailed(const DatabaseName& dbName, const std::string
                 "reason"_attr = reason);
 }
 
-void logCreateDatabaseRetryExhausted(const DatabaseName& dbName) {
-    LOGV2_WARNING(
-        8917901, "Exhausted retries trying to commit create database", "dbName"_attr = dbName);
-}
-
 boost::optional<DatabaseType> checkDbNameConstraints(const DatabaseName& dbName) {
     if (dbName.isConfigDB()) {
         return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());

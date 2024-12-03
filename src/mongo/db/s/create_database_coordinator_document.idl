@@ -58,12 +58,9 @@ structs:
             primaryShard:
                 type: shard_id
                 description: >-
-                    Resolved primary shard from the received parameter which may encode either a
-                    shard ID or a connection string.
+                    Resolved primary shard either from the received parameter or selected by the
+                    DDL coordinator.
                 optional: true
-            availableRetries:
-                type: int
-                description: >-
-                    Number of retries the coordinator can perform when getting 'ShardNotFound'
-                    errors.
-                default: 10
+            userSelectedPrimary:
+                type: bool
+                description: "If the primary shard was specified by the user."

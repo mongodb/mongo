@@ -242,7 +242,13 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx, Shard* con
 void waitUntilReadyToBlockNewDDLCoordinators(OperationContext* opCtx) {
     const auto wouldJoinCoordinatorsBlock = [](OperationContext* opCtx) -> bool {
         // Check that all shards will be able to join ongoing DDLs quickly.
-        const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        auto allShards = shardRegistry->getAllShardIds(opCtx);
+        if (std::find(allShards.begin(), allShards.end(), ShardId::kConfigServerId) ==
+            allShards.end()) {
+            // The config server may be a shard, so only add if it isn't already in participants.
+            allShards.emplace_back(shardRegistry->getConfigShard()->getId());
+        }
         auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
         ShardsvrJoinDDLCoordinators cmd;
@@ -297,7 +303,13 @@ void setAddOrRemoveShardInProgressClusterParam(OperationContext* opCtx, bool new
 }
 
 void joinOngoingShardingDDLCoordinatorsOnShards(OperationContext* opCtx) {
-    const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto allShards = shardRegistry->getAllShardIds(opCtx);
+    if (std::find(allShards.begin(), allShards.end(), ShardId::kConfigServerId) ==
+        allShards.end()) {
+        // The config server may be a shard, so only add if it isn't already in participants.
+        allShards.emplace_back(shardRegistry->getConfigShard()->getId());
+    }
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     ShardsvrJoinDDLCoordinators cmd;
@@ -335,7 +347,7 @@ void blockDDLCoordinatorsAndDrain(OperationContext* opCtx) {
     setAddOrRemoveShardInProgressClusterParam(opCtx, true);
 
 
-    // Wait for any ongoing DDL coorinator to finish.
+    // Wait for any ongoing DDL coordinator to finish.
     LOGV2(5687903, "Draining ongoing ShardingDDLCoordinators for topology change");
     joinOngoingShardingDDLCoordinatorsOnShards(opCtx);
     LOGV2(5687904, "Drained ongoing ShardingDDLCoordinators for topology change");

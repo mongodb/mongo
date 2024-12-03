@@ -43,9 +43,7 @@ public:
     using Phase = CreateDatabaseCoordinatorPhaseEnum;
 
     CreateDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-        : RecoverableShardingDDLCoordinator(service, "CreateDatabaseCoordinator", initialState),
-          _primaryShard(_doc.getPrimaryShard()),
-          _availableRetries(_doc.getAvailableRetries()) {}
+        : RecoverableShardingDDLCoordinator(service, "CreateDatabaseCoordinator", initialState) {}
 
     ~CreateDatabaseCoordinator() override = default;
 
@@ -71,10 +69,6 @@ private:
 
     // Check the command arguments passed and if a database can be returned right away.
     void _checkPreconditions();
-
-    const boost::optional<ShardId> _primaryShard;
-
-    int _availableRetries;
 
     // Set on successful completion of the coordinator.
     boost::optional<ConfigsvrCreateDatabaseResponse> _result;
