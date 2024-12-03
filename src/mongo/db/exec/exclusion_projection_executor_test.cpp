@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/record_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -360,6 +361,9 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
+    // Used to set 'score' metadata.
+    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
+        "featureFlagSearchHybridScoringPrerequisites", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "

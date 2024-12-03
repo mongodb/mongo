@@ -2450,6 +2450,19 @@ public:
     }
 
 private:
+    /**
+     * Asserts that if the API version is strict, that the requested metadata field is compatible
+     * with it.
+     */
+    static void _assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* expCtx,
+                                                        StringData metadataFieldName);
+    /**
+     * Asserts that 'featureFlagSearchHybridScoringPrerequisites' feature flag is enabled, if the
+     * requested metadata field requires it.
+     */
+    static void _assertMetaFieldCompatibleWithHybridScoringFF(ExpressionContext* expCtx,
+                                                              StringData metadataFieldName);
+
     DocumentMetadataFields::MetaType _metaType;
 };
 

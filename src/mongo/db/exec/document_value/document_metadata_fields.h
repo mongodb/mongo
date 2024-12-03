@@ -40,6 +40,8 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
@@ -164,6 +166,8 @@ public:
     void setTextScore(double score) {
         _setCommon(MetaType::kTextScore);
         _holder->textScore = score;
+        // The 'score' metadata field is also set, with the value of the 'textScore'.
+        setScore(score);
     }
 
     bool hasRandVal() const {
@@ -239,6 +243,8 @@ public:
     void setSearchScore(double score) {
         _setCommon(MetaType::kSearchScore);
         _holder->searchScore = score;
+        // The 'score' metadata field is also set, with the value of the 'textScore'.
+        setScore(score);
     }
 
     bool hasSearchHighlights() const {
@@ -355,6 +361,8 @@ public:
     void setVectorSearchScore(double vectorSearchScore) {
         _setCommon(MetaType::kVectorSearchScore);
         _holder->vectorSearchScore = vectorSearchScore;
+        // The 'score' metadata field is also set, with the value of the 'textScore'.
+        setScore(vectorSearchScore);
     }
 
     bool hasSearchSequenceToken() const {
@@ -381,8 +389,12 @@ public:
     }
 
     void setScore(double score) {
-        _setCommon(MetaType::kScore);
-        _holder->score = score;
+        if (feature_flags::gFeatureFlagSearchHybridScoringPrerequisites
+                .isEnabledUseLastLTSFCVWhenUninitialized(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            _setCommon(MetaType::kScore);
+            _holder->score = score;
+        }
     }
 
     void serializeForSorter(BufBuilder& buf) const;

@@ -53,6 +53,7 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/record_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -857,6 +858,9 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 }
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMetaExpressions) {
+    // Used to set 'score' metadata.
+    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
+        "featureFlagSearchHybridScoringPrerequisites", true);
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "

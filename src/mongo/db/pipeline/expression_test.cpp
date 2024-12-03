@@ -3161,6 +3161,27 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScoreAPIStrict) {
                        ErrorCodes::APIStrictError);
 }
 
+TEST(ExpressionMetaTest, ExpressionMetaScoreAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"score\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaScoreFFNotEnabled) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(false);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"score\"}");
+    // Should throw because 'featureFlagSearchHybridScoringPrerequisites' is not enabled.
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
 TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
@@ -3319,6 +3340,9 @@ TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaScore) {
+    // Used to set 'score' metadata.
+    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
+        "featureFlagSearchHybridScoringPrerequisites", true);
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{$meta: \"score\"}");
     auto expressionMeta =

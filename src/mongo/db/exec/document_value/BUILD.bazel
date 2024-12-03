@@ -24,6 +24,8 @@ mongo_cc_library(
         "document_metadata_fields.h",
         "value.h",
         "value_comparator.h",
+        "//src/mongo/db:feature_flag.h",
+        "//src/mongo/db/query:query_feature_flags_gen",
     ],
     deps = [
         "//src/mongo:base",

@@ -2857,6 +2857,35 @@ const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTyp
 
 }  // namespace
 
+void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* const expCtx,
+                                                             StringData metadataFieldName) {
+    const bool apiStrict = expCtx->getOperationContext() &&
+        APIParameters::get(expCtx->getOperationContext()).getAPIStrict().value_or(false);
+    // TODO SERVER-97104: add 'scoreDetails' here.
+    static const StringSet kUnstableFields = {
+        "searchScore", "indexKey", "textScore", "searchHighlights", "searchSequenceToken", "score"};
+    const bool usesUnstableField = kUnstableFields.contains(metadataFieldName);
+    uassert(ErrorCodes::APIStrictError,
+            "Provided apiStrict is true with an unstable parameter",
+            !apiStrict || !usesUnstableField);
+}
+
+void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFF(ExpressionContext* const expCtx,
+                                                                   StringData metadataFieldName) {
+    // TODO SERVER-97104: add 'scoreDetails' here.
+    static const StringSet kHybridScoringProtectedFields = {"score"};
+    const bool usesHybridScoringProtectedField =
+        kHybridScoringProtectedFields.contains(metadataFieldName);
+    const bool hybridScoringFFEnabled =
+        feature_flags::gFeatureFlagSearchHybridScoringPrerequisites
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    uassert(ErrorCodes::FailedToParse,
+            "'featureFlagSearchHybridScoringPrerequisites' must be enabled to use "
+            "this meta field",
+            !usesHybridScoringProtectedField || hybridScoringFFEnabled);
+}
+
 intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vpsIn) {
@@ -2865,18 +2894,9 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
     const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
 
     if (iter != kMetaNameToMetaType.end()) {
-        const auto apiStrict = expCtx->getOperationContext() &&
-            APIParameters::get(expCtx->getOperationContext()).getAPIStrict().value_or(false);
-
         auto typeName = iter->first;
-        auto usesUnstableField = (typeName == "searchScore") || (typeName == "indexKey") ||
-            (typeName == "textScore") || (typeName == "searchHighlights") ||
-            (typeName == "searchSequenceToken");
-
-        if (apiStrict && usesUnstableField) {
-            uasserted(ErrorCodes::APIStrictError,
-                      "Provided apiStrict is true with an unstable parameter");
-        }
+        _assertMetaFieldCompatibleWithStrictAPI(expCtx, typeName);
+        _assertMetaFieldCompatibleWithHybridScoringFF(expCtx, typeName);
         return new ExpressionMeta(expCtx, iter->second);
     } else {
         uasserted(17308, "Unsupported argument to $meta: " + expr.String());
