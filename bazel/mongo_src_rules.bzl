@@ -1764,6 +1764,13 @@ def _mongo_cc_binary_and_program(
         header_deps = header_deps,
     )
 
+    exec_properties |= select({
+        "//bazel/config:link_timeout_5min_enabled": {
+            "cpp_link.timeout": "300",
+        },
+        "//conditions:default": {},
+    })
+
     args = {
         "name": name + WITH_DEBUG_SUFFIX,
         "srcs": srcs + fincludes_hdr + SANITIZER_DENYLIST_HEADERS,

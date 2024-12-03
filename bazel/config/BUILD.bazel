@@ -2179,3 +2179,19 @@ config_setting(
         "//bazel/config:use_sasl_client": "True",
     },
 )
+
+# --------------------------------------
+# link_timeout_5min
+# --------------------------------------
+
+bool_flag(
+    name = "link_timeout_5min",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "link_timeout_5min_enabled",
+    flag_values = {
+        "//bazel/config:link_timeout_5min": "True",
+    },
+)
