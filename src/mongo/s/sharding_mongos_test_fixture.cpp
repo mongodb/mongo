@@ -79,13 +79,14 @@
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/config_server_catalog_cache_loader_impl.h"
+#include "mongo/s/config_server_catalog_cache_loader_mock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/sharding_initialization.h"
@@ -185,11 +186,11 @@ ShardingTestFixture::ShardingTestFixture(
 
     auto catalogCache = [&]() -> std::unique_ptr<CatalogCache> {
         if (withMockCatalogCache) {
-            return std::make_unique<CatalogCacheMock>(service,
-                                                      std::make_shared<CatalogCacheLoaderMock>());
+            return std::make_unique<CatalogCacheMock>(
+                service, std::make_shared<ConfigServerCatalogCacheLoaderMock>());
         } else {
             return std::make_unique<CatalogCache>(
-                service, std::make_shared<ConfigServerCatalogCacheLoader>());
+                service, std::make_shared<ConfigServerCatalogCacheLoaderImpl>());
         }
     }();
 

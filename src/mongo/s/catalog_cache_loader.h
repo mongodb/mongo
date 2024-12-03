@@ -105,9 +105,6 @@ public:
         std::vector<ChunkType> changedChunks;
     };
 
-    using GetChunksSinceCallbackFn =
-        std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>;
-
     /**
      * Transitions into shut down and cleans up state. Once this transitions to shut down, should
      * not be able to transition back to normal. Should be safe to be called more than once.

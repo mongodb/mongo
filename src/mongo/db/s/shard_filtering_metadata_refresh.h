@@ -55,10 +55,10 @@ public:
     FilteringMetadataCache() = default;
 
     static void init(ServiceContext* serviceCtx,
-                     std::shared_ptr<CatalogCacheLoader> loader,
+                     std::shared_ptr<ShardServerCatalogCacheLoader> loader,
                      bool isPrimary);
     static void initForTesting(ServiceContext* serviceCtx,
-                               std::shared_ptr<CatalogCacheLoader> loader);
+                               std::shared_ptr<ShardServerCatalogCacheLoader> loader);
 
     static FilteringMetadataCache* get(ServiceContext* serviceCtx);
 
@@ -203,7 +203,7 @@ private:
     // If _cache is set, it will be used only for filtering; otherwise, the Grid's CatalogCache will
     // be used.
     std::unique_ptr<CatalogCache> _cache;
-    std::shared_ptr<CatalogCacheLoader> _loader;
+    std::shared_ptr<ShardServerCatalogCacheLoader> _loader;
 };
 
 extern FailPoint hangInRefreshFilteringMetadataUntilSuccessInterruptible;

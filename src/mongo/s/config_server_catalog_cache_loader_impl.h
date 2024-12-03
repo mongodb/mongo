@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -35,16 +35,27 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
 
-class ConfigServerCatalogCacheLoader : public CatalogCacheLoader {
+class ConfigServerCatalogCacheLoaderImpl : public ConfigServerCatalogCacheLoader {
 public:
-    ~ConfigServerCatalogCacheLoader() override = default;
+    ConfigServerCatalogCacheLoaderImpl();
+    ~ConfigServerCatalogCacheLoaderImpl() override = default;
+
+    void shutDown() override;
+
+    SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
+                                                          ChunkVersion version) override;
+    SemiFuture<DatabaseType> getDatabase(const DatabaseName& dbName) override;
+
+private:
+    // Thread pool to be used to perform metadata load
+    std::shared_ptr<ThreadPool> _executor;
 };
 
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -79,7 +80,7 @@ protected:
     Status initializeGlobalShardingStateForMongodForTest(
         const ConnectionString& configConnStr,
         std::unique_ptr<CatalogCache> catalogCache,
-        std::shared_ptr<CatalogCacheLoader> catalogCacheLoader);
+        std::shared_ptr<ShardServerCatalogCacheLoader> catalogCacheLoader = nullptr);
 
     // Syntactic sugar for getting sharding components off the Grid, if they have been initialized.
 

@@ -65,9 +65,11 @@ env.BazelProgram(
 env.Library(
     target="sharding_test_fixture_common",
     source=[
-        "sharding_test_fixture_common.cpp",
+        "$BUILD_DIR/mongo/db/s/shard_server_catalog_cache_loader_mock.cpp",
         "catalog_cache_loader_mock.cpp",
         "catalog_cache_mock.cpp",
+        "config_server_catalog_cache_loader_mock.cpp",
+        "sharding_test_fixture_common.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/remote_command_targeter_mock",

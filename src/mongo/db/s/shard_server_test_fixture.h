@@ -33,12 +33,12 @@
 #include <string>
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader_mock.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/catalog_cache_mock.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -61,7 +61,7 @@ protected:
      * Sets the catalog cache loader for mocking. This must be called before the setUp function is
      * invoked.
      */
-    void setCatalogCacheLoader(std::shared_ptr<CatalogCacheLoader> loader);
+    void setCatalogCacheLoader(std::shared_ptr<ShardServerCatalogCacheLoader> loader);
 
     /**
      * Sets the catalog cache for mocking. This must be called before the setUp function is invoked.
@@ -84,7 +84,7 @@ protected:
 
     service_context_test::ShardRoleOverride _shardRole;
 
-    std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
+    std::shared_ptr<ShardServerCatalogCacheLoader> _catalogCacheLoader;
     std::unique_ptr<CatalogCache> _catalogCache;
 };
 
@@ -92,20 +92,20 @@ class ShardServerTestFixtureWithCatalogCacheMock : public ShardServerTestFixture
 protected:
     void setUp() override;
     CatalogCacheMock* getCatalogCacheMock();
-    std::shared_ptr<CatalogCacheLoaderMock> getCatalogCacheLoaderMock();
+    std::shared_ptr<ShardServerCatalogCacheLoaderMock> getCatalogCacheLoaderMock();
 
 private:
-    std::shared_ptr<CatalogCacheLoaderMock> _cacheLoaderMock;
+    std::shared_ptr<ShardServerCatalogCacheLoaderMock> _cacheLoaderMock;
 };
 
 class ShardServerTestFixtureWithCatalogCacheLoaderMock : public ShardServerTestFixture {
 protected:
     void setUp() override;
     CatalogCacheMock* getCatalogCacheMock();
-    std::shared_ptr<CatalogCacheLoaderMock> getCatalogCacheLoaderMock();
+    std::shared_ptr<ShardServerCatalogCacheLoaderMock> getCatalogCacheLoaderMock();
 
 private:
-    std::shared_ptr<CatalogCacheLoaderMock> _cacheLoaderMock;
+    std::shared_ptr<ShardServerCatalogCacheLoaderMock> _cacheLoaderMock;
 };
 
 }  // namespace mongo

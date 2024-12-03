@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
@@ -454,12 +454,12 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
 
 }  // namespace
 
-ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
-    std::unique_ptr<CatalogCacheLoader> configServerLoader)
+ShardServerCatalogCacheLoaderImpl::ShardServerCatalogCacheLoaderImpl(
+    std::unique_ptr<ConfigServerCatalogCacheLoader> configServerLoader)
     : _configServerLoader(std::move(configServerLoader)),
       _executor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
-          options.poolName = "ShardServerCatalogCacheLoader";
+          options.poolName = "ShardServerCatalogCacheLoaderImpl";
           options.minThreads = 0;
           options.maxThreads = 6;
           return options;
@@ -467,16 +467,16 @@ ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
     _executor->startup();
 }
 
-ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
+ShardServerCatalogCacheLoaderImpl::~ShardServerCatalogCacheLoaderImpl() {
     shutDown();
 }
 
-void ShardServerCatalogCacheLoader::notifyOfCollectionRefreshEndMarkerSeen(
+void ShardServerCatalogCacheLoaderImpl::notifyOfCollectionRefreshEndMarkerSeen(
     const NamespaceString& nss, const Timestamp& commitTime) {
     _namespaceNotifications.notifyChange(nss, commitTime);
 }
 
-void ShardServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
+void ShardServerCatalogCacheLoaderImpl::initializeReplicaSetRole(bool isPrimary) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     invariant(_role == ReplicaSetRole::None);
 
@@ -487,7 +487,7 @@ void ShardServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
     }
 }
 
-void ShardServerCatalogCacheLoader::onStepDown() {
+void ShardServerCatalogCacheLoaderImpl::onStepDown() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     invariant(_role != ReplicaSetRole::None);
     _contexts.interrupt(ErrorCodes::PrimarySteppedDown);
@@ -495,7 +495,7 @@ void ShardServerCatalogCacheLoader::onStepDown() {
     _role = ReplicaSetRole::Secondary;
 }
 
-void ShardServerCatalogCacheLoader::onStepUp() {
+void ShardServerCatalogCacheLoaderImpl::onStepUp() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     invariant(_role != ReplicaSetRole::None);
     _contexts.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
@@ -503,14 +503,14 @@ void ShardServerCatalogCacheLoader::onStepUp() {
     _role = ReplicaSetRole::Primary;
 }
 
-void ShardServerCatalogCacheLoader::onReplicationRollback() {
+void ShardServerCatalogCacheLoaderImpl::onReplicationRollback() {
     // No need to increment the term since this interruption is only to prevent the secondary
     // refresh thread from getting stuck or waiting on an incorrect opTime.
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _contexts.interrupt(ErrorCodes::Interrupted);
 }
 
-void ShardServerCatalogCacheLoader::shutDown() {
+void ShardServerCatalogCacheLoaderImpl::shutDown() {
     {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_inShutdown) {
@@ -534,7 +534,7 @@ void ShardServerCatalogCacheLoader::shutDown() {
     _configServerLoader->shutDown();
 }
 
-SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksSince(
+SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
     // If the collecction is never registered on the sharding catalog there is no need to refresh.
     // Further, attempting to refesh config.collections or config.chunks would trigger recursive
@@ -580,7 +580,8 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
         .semi();
 }
 
-SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(const DatabaseName& dbName) {
+SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
+    const DatabaseName& dbName) {
     tassert(9131801,
             "Unexpected request for 'admin' or 'config' database, which have fixed metadata",
             !dbName.isAdminDB() && !dbName.isConfigDB());
@@ -618,8 +619,8 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(const Databa
         .semi();
 }
 
-void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
+void ShardServerCatalogCacheLoaderImpl::waitForCollectionFlush(OperationContext* opCtx,
+                                                               const NamespaceString& nss) {
     stdx::unique_lock<stdx::mutex> lg(_mutex);
     const auto initialTerm = _term;
 
@@ -684,8 +685,8 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
     }
 }
 
-void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
-                                                         const DatabaseName& dbName) {
+void ShardServerCatalogCacheLoaderImpl::waitForDatabaseFlush(OperationContext* opCtx,
+                                                             const DatabaseName& dbName) {
 
     stdx::unique_lock<stdx::mutex> lg(_mutex);
     const auto initialTerm = _term;
@@ -752,7 +753,8 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
     }
 }
 
-StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
+StatusWith<CollectionAndChangedChunks>
+ShardServerCatalogCacheLoaderImpl::_runSecondaryGetChunksSince(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion) {
@@ -771,7 +773,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
 }
 
 StatusWith<CollectionAndChangedChunks>
-ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
+ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetChunksSince(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
@@ -881,7 +883,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 };
 
 
-StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
+StatusWith<DatabaseType> ShardServerCatalogCacheLoaderImpl::_runSecondaryGetDatabase(
     OperationContext* opCtx, const DatabaseName& dbName) {
     Timer t;
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
@@ -904,7 +906,7 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase
     return dbt;
 }
 
-StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
+StatusWith<DatabaseType> ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetDatabase(
     OperationContext* opCtx, const DatabaseName& dbName, long long termScheduled) {
     auto swDatabaseType = _configServerLoader->getDatabase(dbName).getNoThrow();
     if (swDatabaseType == ErrorCodes::NamespaceNotFound) {
@@ -934,7 +936,7 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_schedulePrimaryGetDatab
     return swDatabaseType;
 }
 
-StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoaderMetadata(
+StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_getLoaderMetadata(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
@@ -1024,7 +1026,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     }
 }
 
-std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getEnqueuedMetadata(
+std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_getEnqueuedMetadata(
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     const long long term) {
@@ -1059,7 +1061,7 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getE
     return std::make_pair(true, std::move(collAndChunks));
 }
 
-void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChunksTask(
+void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleCollAndChunksTask(
     OperationContext* opCtx, const NamespaceString& nss, CollAndChunkTask task) {
 
     // Ensure that this node is primary before using or persisting the information fetched from the
@@ -1089,7 +1091,7 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
     });
 }
 
-void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
+void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleDbTask(
     OperationContext* opCtx, const DatabaseName& dbName, DBTask task) {
 
     // Ensure that this node is primary before using or persisting the information fetched from the
@@ -1119,7 +1121,7 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
     });
 }
 
-void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString& nss) {
+void ShardServerCatalogCacheLoaderImpl::_runCollAndChunksTasks(const NamespaceString& nss) {
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     ThreadClient tc("ShardServerCatalogCacheLoader::runCollAndChunksTasks",
                     getGlobalServiceContext()->getService(ClusterRole::ShardServer),
@@ -1196,7 +1198,7 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
     });
 }
 
-void ShardServerCatalogCacheLoader::_runDbTasks(const DatabaseName& dbName) {
+void ShardServerCatalogCacheLoaderImpl::_runDbTasks(const DatabaseName& dbName) {
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     ThreadClient tc("ShardServerCatalogCacheLoader::runDbTasks",
                     getGlobalServiceContext()->getService(ClusterRole::ShardServer),
@@ -1271,7 +1273,7 @@ void ShardServerCatalogCacheLoader::_runDbTasks(const DatabaseName& dbName) {
     });
 }
 
-void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
+void ShardServerCatalogCacheLoaderImpl::_updatePersistedCollAndChunksMetadata(
     OperationContext* opCtx, const NamespaceString& nss) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
@@ -1313,8 +1315,8 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
                               "newCollectionPlacementVersion"_attr = task.maxQueryVersion);
 }
 
-void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext* opCtx,
-                                                               const DatabaseName& dbName) {
+void ShardServerCatalogCacheLoaderImpl::_updatePersistedDbMetadata(OperationContext* opCtx,
+                                                                   const DatabaseName& dbName) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     const DBTask& task = _dbTaskLists[dbName].front();
@@ -1349,7 +1351,7 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
 }
 
 NamespaceMetadataChangeNotifications::ScopedNotification
-ShardServerCatalogCacheLoader::_forcePrimaryCollectionRefreshAndWaitForReplication(
+ShardServerCatalogCacheLoaderImpl::_forcePrimaryCollectionRefreshAndWaitForReplication(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto selfShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, getSelfShardId(opCtx)));
@@ -1382,7 +1384,7 @@ ShardServerCatalogCacheLoader::_forcePrimaryCollectionRefreshAndWaitForReplicati
 }
 
 CollectionAndChangedChunks
-ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVersion(
+ShardServerCatalogCacheLoaderImpl::_getCompletePersistedMetadataForSecondarySinceVersion(
     OperationContext* opCtx,
     NamespaceMetadataChangeNotifications::ScopedNotification&& notif,
     const NamespaceString& nss,
@@ -1429,7 +1431,7 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
     }
 }
 
-ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
+ShardServerCatalogCacheLoaderImpl::CollAndChunkTask::CollAndChunkTask(
     StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
     ChunkVersion minimumQueryVersion,
     long long currentTerm)
@@ -1452,8 +1454,8 @@ ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
     }
 }
 
-ShardServerCatalogCacheLoader::DBTask::DBTask(StatusWith<DatabaseType> swDatabaseType,
-                                              long long currentTerm)
+ShardServerCatalogCacheLoaderImpl::DBTask::DBTask(StatusWith<DatabaseType> swDatabaseType,
+                                                  long long currentTerm)
     : taskNum(taskIdGenerator.fetchAndAdd(1)), termCreated(currentTerm) {
     if (swDatabaseType.isOK()) {
         dbType = std::move(swDatabaseType.getValue());
@@ -1465,13 +1467,13 @@ ShardServerCatalogCacheLoader::DBTask::DBTask(StatusWith<DatabaseType> swDatabas
     }
 }
 
-ShardServerCatalogCacheLoader::CollAndChunkTaskList::CollAndChunkTaskList()
+ShardServerCatalogCacheLoaderImpl::CollAndChunkTaskList::CollAndChunkTaskList()
     : _activeTaskCompletedCondVar(std::make_shared<stdx::condition_variable>()) {}
 
-ShardServerCatalogCacheLoader::DbTaskList::DbTaskList()
+ShardServerCatalogCacheLoaderImpl::DbTaskList::DbTaskList()
     : _activeTaskCompletedCondVar(std::make_shared<stdx::condition_variable>()) {}
 
-void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(CollAndChunkTask task) {
+void ShardServerCatalogCacheLoaderImpl::CollAndChunkTaskList::addTask(CollAndChunkTask task) {
     if (_tasks.empty()) {
         _tasks.emplace_back(std::move(task));
         return;
@@ -1512,7 +1514,7 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(CollAndChunkTa
     }
 }
 
-void ShardServerCatalogCacheLoader::DbTaskList::addTask(DBTask task) {
+void ShardServerCatalogCacheLoaderImpl::DbTaskList::addTask(DBTask task) {
     if (_tasks.empty()) {
         _tasks.emplace_back(std::move(task));
         return;
@@ -1534,32 +1536,32 @@ void ShardServerCatalogCacheLoader::DbTaskList::addTask(DBTask task) {
     }
 }
 
-void ShardServerCatalogCacheLoader::CollAndChunkTaskList::pop_front() {
+void ShardServerCatalogCacheLoaderImpl::CollAndChunkTaskList::pop_front() {
     invariant(!_tasks.empty());
     _tasks.pop_front();
     _activeTaskCompletedCondVar->notify_all();
 }
 
-void ShardServerCatalogCacheLoader::DbTaskList::pop_front() {
+void ShardServerCatalogCacheLoaderImpl::DbTaskList::pop_front() {
     invariant(!_tasks.empty());
     _tasks.pop_front();
     _activeTaskCompletedCondVar->notify_all();
 }
 
-bool ShardServerCatalogCacheLoader::CollAndChunkTaskList::hasTasksFromThisTerm(
+bool ShardServerCatalogCacheLoaderImpl::CollAndChunkTaskList::hasTasksFromThisTerm(
     long long term) const {
     invariant(!_tasks.empty());
     return _tasks.back().termCreated == term;
 }
 
-ChunkVersion ShardServerCatalogCacheLoader::CollAndChunkTaskList::getHighestVersionEnqueued()
+ChunkVersion ShardServerCatalogCacheLoaderImpl::CollAndChunkTaskList::getHighestVersionEnqueued()
     const {
     invariant(!_tasks.empty());
     return _tasks.back().maxQueryVersion;
 }
 
 CollectionAndChangedChunks
-ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
+ShardServerCatalogCacheLoaderImpl::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
     const long long term) const {
     CollectionAndChangedChunks collAndChunks;
     for (const auto& task : _tasks) {

@@ -48,7 +48,7 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_mock.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
@@ -60,7 +60,7 @@
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/config_server_catalog_cache_loader_impl.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -84,8 +84,8 @@ protected:
                 [&](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
                     const auto& configConnStr = shardIdentity.getConfigsvrConnectionString();
 
-                    auto loader = std::make_shared<ShardServerCatalogCacheLoader>(
-                        std::make_unique<ConfigServerCatalogCacheLoader>());
+                    auto loader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
+                        std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
                     auto catalogCache =
                         std::make_unique<CatalogCache>(opCtx->getServiceContext(), loader);
                     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(

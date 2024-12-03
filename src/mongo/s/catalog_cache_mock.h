@@ -39,8 +39,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/config_server_catalog_cache_loader_mock.h"
 
 namespace mongo {
 
@@ -53,7 +53,7 @@ class CatalogCacheMock final : public CatalogCache {
     CatalogCacheMock& operator=(const CatalogCacheMock&) = delete;
 
 public:
-    CatalogCacheMock(ServiceContext* context, std::shared_ptr<CatalogCacheLoaderMock> loader);
+    CatalogCacheMock(ServiceContext* context, std::shared_ptr<CatalogCacheLoader> loader);
     ~CatalogCacheMock() override = default;
 
     StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx,

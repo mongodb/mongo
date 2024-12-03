@@ -29,7 +29,7 @@
 
 #include "mongo/s/routing_information_cache.h"
 
-#include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/config_server_catalog_cache_loader_impl.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -51,7 +51,7 @@ const auto decorationActionRegisterer = ServiceContext::ConstructorActionRegiste
 
 RoutingInformationCache::RoutingInformationCache(ServiceContext* serviceCtx)
     : CatalogCache(serviceCtx,
-                   std::make_shared<ConfigServerCatalogCacheLoader>(),
+                   std::make_shared<ConfigServerCatalogCacheLoaderImpl>(),
                    "ConfigServerRoutingInfo"_sd /*kind*/) {}
 
 void RoutingInformationCache::set(ServiceContext* serviceCtx) {

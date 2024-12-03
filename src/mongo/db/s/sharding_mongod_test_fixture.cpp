@@ -56,6 +56,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_local.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/server_options.h"
@@ -76,7 +77,6 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
@@ -190,7 +190,7 @@ std::unique_ptr<BalancerConfiguration> ShardingMongoDTestFixture::makeBalancerCo
 Status ShardingMongoDTestFixture::initializeGlobalShardingStateForMongodForTest(
     const ConnectionString& configConnStr,
     std::unique_ptr<CatalogCache> catalogCache,
-    std::shared_ptr<CatalogCacheLoader> catalogCacheLoader) {
+    std::shared_ptr<ShardServerCatalogCacheLoader> catalogCacheLoader) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
     // Create and initialize each sharding component individually before moving them to the Grid

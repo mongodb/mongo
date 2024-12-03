@@ -38,14 +38,13 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 
 namespace mongo {
 
 CatalogCacheMock::CatalogCacheMock(ServiceContext* serviceContext,
-                                   std::shared_ptr<CatalogCacheLoaderMock> loader)
+                                   std::shared_ptr<CatalogCacheLoader> loader)
     : CatalogCache(serviceContext, loader) {}
 
 StatusWith<CachedDatabaseInfo> CatalogCacheMock::getDatabase(OperationContext* opCtx,
@@ -101,7 +100,7 @@ void CatalogCacheMock::advanceCollectionTimeInStore(const NamespaceString& nss,
 }
 
 std::unique_ptr<CatalogCacheMock> CatalogCacheMock::make() {
-    auto catalogCacheLoader = std::make_shared<CatalogCacheLoaderMock>();
+    auto catalogCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
     auto serviceContext = ServiceContext::make();
     return std::make_unique<CatalogCacheMock>(serviceContext.get(), catalogCacheLoader);
 }

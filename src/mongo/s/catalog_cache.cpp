@@ -88,6 +88,7 @@
 
 
 namespace mongo {
+using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockCollectionCacheLookup);
@@ -106,7 +107,7 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
     const NamespaceString& nss,
     bool isIncremental,
     const RoutingTableHistoryValueHandle& existingHistory,
-    const CatalogCacheLoader::CollectionAndChangedChunks& collectionAndChunks) {
+    const CollectionAndChangedChunks& collectionAndChunks) {
     // If a refresh doesn't find new information -> re-use the existing RoutingTableHistory
     if (isIncremental && collectionAndChunks.changedChunks.size() == 1 &&
         collectionAndChunks.changedChunks[0].getVersion() == existingHistory->optRt->getVersion()) {

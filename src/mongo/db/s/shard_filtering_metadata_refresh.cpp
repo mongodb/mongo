@@ -254,18 +254,11 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
 }  // namespace
 
 void FilteringMetadataCache::init(ServiceContext* serviceCtx,
-                                  std::shared_ptr<CatalogCacheLoader> loader,
+                                  std::shared_ptr<ShardServerCatalogCacheLoader> loader,
                                   bool isPrimary) {
     invariant(serviceCtx->getService(ClusterRole::ShardServer) != nullptr);
 
-    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(loader.get());
-    if (shardLoader) {
-        shardLoader->initializeReplicaSetRole(isPrimary);
-    }
-
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
-    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(loader.get());
-    invariant(shardLoader || readOnlyLoader);
+    loader->initializeReplicaSetRole(isPrimary);
 
     auto decoration = FilteringMetadataCache::get(serviceCtx);
     invariant(decoration->_loader == nullptr);
@@ -279,7 +272,7 @@ void FilteringMetadataCache::init(ServiceContext* serviceCtx,
 }
 
 void FilteringMetadataCache::initForTesting(ServiceContext* serviceCtx,
-                                            std::shared_ptr<CatalogCacheLoader> loader) {
+                                            std::shared_ptr<ShardServerCatalogCacheLoader> loader) {
     invariant(serviceCtx->getService(ClusterRole::ShardServer) != nullptr);
 
     auto decoration = FilteringMetadataCache::get(serviceCtx);
@@ -307,14 +300,7 @@ void FilteringMetadataCache::onStepDown() {
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
 
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
-    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
-    if (readOnlyLoader)
-        return;
-
-    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
-    invariant(shardLoader);
-    shardLoader->onStepDown();
+    _loader->onStepDown();
 }
 
 void FilteringMetadataCache::onStepUp() {
@@ -324,14 +310,7 @@ void FilteringMetadataCache::onStepUp() {
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
 
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
-    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
-    if (readOnlyLoader)
-        return;
-
-    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
-    invariant(shardLoader);
-    shardLoader->onStepUp();
+    _loader->onStepUp();
 }
 
 void FilteringMetadataCache::onReplicationRollback() {
@@ -341,14 +320,7 @@ void FilteringMetadataCache::onReplicationRollback() {
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
 
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
-    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
-    if (readOnlyLoader)
-        return;
-
-    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
-    invariant(shardLoader);
-    shardLoader->onReplicationRollback();
+    _loader->onReplicationRollback();
 }
 
 void FilteringMetadataCache::notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
@@ -359,14 +331,7 @@ void FilteringMetadataCache::notifyOfCollectionRefreshEndMarkerSeen(const Namesp
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
 
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
-    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
-    if (readOnlyLoader)
-        return;
-
-    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
-    invariant(shardLoader);
-    shardLoader->notifyOfCollectionRefreshEndMarkerSeen(nss, commitTime);
+    _loader->notifyOfCollectionRefreshEndMarkerSeen(nss, commitTime);
 }
 
 void FilteringMetadataCache::waitForCollectionFlush(OperationContext* opCtx,
@@ -377,9 +342,7 @@ void FilteringMetadataCache::waitForCollectionFlush(OperationContext* opCtx,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
 
-    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
-    invariant(shardLoader);
-    shardLoader->waitForCollectionFlush(opCtx, nss);
+    _loader->waitForCollectionFlush(opCtx, nss);
 }
 
 void FilteringMetadataCache::waitForDatabaseFlush(OperationContext* opCtx,
@@ -390,9 +353,7 @@ void FilteringMetadataCache::waitForDatabaseFlush(OperationContext* opCtx,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
 
-    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
-    invariant(shardLoader);
-    shardLoader->waitForDatabaseFlush(opCtx, dbName);
+    _loader->waitForDatabaseFlush(opCtx, dbName);
 }
 
 void FilteringMetadataCache::report(BSONObjBuilder* builder) const {

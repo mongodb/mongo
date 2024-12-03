@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/config_server_catalog_cache_loader_impl.h"
 
 #include <boost/smart_ptr.hpp>
 #include <mutex>
@@ -94,7 +94,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
 
 }  // namespace
 
-ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader()
+ConfigServerCatalogCacheLoaderImpl::ConfigServerCatalogCacheLoaderImpl()
     : _executor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
           options.poolName = "ConfigServerCatalogCacheLoader";
@@ -105,12 +105,12 @@ ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader()
     _executor->startup();
 }
 
-void ConfigServerCatalogCacheLoader::shutDown() {
+void ConfigServerCatalogCacheLoaderImpl::shutDown() {
     _executor->shutdown();
     _executor->join();
 }
 
-SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunksSince(
+SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoaderImpl::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
     // There's no need to refresh if a collection is always unsharded. Further, attempting to
     // refresh config.collections or config.chunks would trigger recursive refreshes since a config
@@ -132,7 +132,8 @@ SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunks
         .semi();
 }
 
-SemiFuture<DatabaseType> ConfigServerCatalogCacheLoader::getDatabase(const DatabaseName& dbName) {
+SemiFuture<DatabaseType> ConfigServerCatalogCacheLoaderImpl::getDatabase(
+    const DatabaseName& dbName) {
     return ExecutorFuture<void>(_executor)
         .then([dbName] {
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.

@@ -84,6 +84,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -105,12 +106,12 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/config_server_catalog_cache_loader_impl.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/router_uptime_reporter.h"
@@ -371,19 +372,19 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
 
     globalConnPool.addHook(new ShardingConnectionHook(makeShardingEgressHooksList(service)));
 
-    auto shardRoleCatalogCacheLoader = [&]() -> std::shared_ptr<CatalogCacheLoader> {
+    auto shardRoleCatalogCacheLoader = [&]() -> std::shared_ptr<ShardServerCatalogCacheLoader> {
         if (storageGlobalParams.queryableBackupMode) {
             return std::make_shared<ReadOnlyCatalogCacheLoader>();
         } else {
-            return std::make_shared<ShardServerCatalogCacheLoader>(
-                std::make_unique<ConfigServerCatalogCacheLoader>());
+            return std::make_shared<ShardServerCatalogCacheLoaderImpl>(
+                std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
         }
     }();
 
     // (Ignore FCV check): this feature flag is not FCV-gated.
     auto catalogCache = feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()
         ? std::make_unique<CatalogCache>(service,
-                                         std::make_shared<ConfigServerCatalogCacheLoader>())
+                                         std::make_shared<ConfigServerCatalogCacheLoaderImpl>())
         : std::make_unique<CatalogCache>(service, shardRoleCatalogCacheLoader);
 
     bool isStandaloneOrPrimary = [&]() {
@@ -394,6 +395,7 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
         bool isReplSet = replCoord->getSettings().isReplSet();
         return !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
     }();
+
     FilteringMetadataCache::init(
         service, std::move(shardRoleCatalogCacheLoader), isStandaloneOrPrimary);
 

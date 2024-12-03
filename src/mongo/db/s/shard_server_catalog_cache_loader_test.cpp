@@ -43,7 +43,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/shard_metadata_util.h"
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/shard_id.h"
@@ -53,7 +53,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/s/config_server_catalog_cache_loader_mock.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/unittest/assert.h"
@@ -153,7 +153,7 @@ public:
     void refreshCollectionEpochOnRemoteLoader();
     void refreshDatabaseOnRemoteLoader();
 
-    CatalogCacheLoaderMock* _remoteLoaderMock;
+    ConfigServerCatalogCacheLoaderMock* _remoteLoaderMock;
     std::unique_ptr<ShardServerCatalogCacheLoader> _shardLoader;
 
 private:
@@ -166,9 +166,9 @@ void ShardServerCatalogCacheLoaderTest::setUp() {
 
     // Create mock remote and real shard loader, retaining a pointer to the mock remote loader so
     // that unit tests can manipulate it to return certain responses.
-    auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
+    auto mockLoader = std::make_unique<ConfigServerCatalogCacheLoaderMock>();
     _remoteLoaderMock = mockLoader.get();
-    _shardLoader = std::make_unique<ShardServerCatalogCacheLoader>(std::move(mockLoader));
+    _shardLoader = std::make_unique<ShardServerCatalogCacheLoaderImpl>(std::move(mockLoader));
 
     // Set the shard loader to primary mode, and set it for testing.
     _shardLoader->initializeReplicaSetRole(true);
