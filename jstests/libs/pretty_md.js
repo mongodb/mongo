@@ -171,6 +171,7 @@ export function outputShardedFindSummaryAndResults(queryObj) {
  */
 function getUniqueResults(coll, key, filter) {
     return Array
-        .from(new Set(coll.find(filter, {[key]: 1, _id: 0}).toArray().map(o => o ? o[key] : null)))
+        .from(new Set(
+            coll.find(filter, {[key]: 1, _id: 0}).toArray().flatMap(o => o ? o[key] : null)))
         .sort();
 }

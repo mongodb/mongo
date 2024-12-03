@@ -47,20 +47,22 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
 
 /**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
- * to provide results for the distinct command.
+ * to provide results for the distinct command. If the QuerySolution is already using a
+ * DistinctNode, finalize it by pushing ShardingFilter and FetchNodes into the distinct scan. Plans
+ * involving multiple scans will not be mutated.
  *
- * When 'strictDistinctOnly' is false, any resulting QuerySolution will limit the number of
- * documents that need to be examined to compute the results of a distinct command, but it may not
- * guarantee that there are no duplicate values for the distinct field.
+ * When 'plannerParams' does not specify 'STRICT_DISTINCT_ONLY', any resulting QuerySolution will
+ * limit the number of documents that need to be examined to compute the results of a distinct
+ * command, but it may not guarantee that there are no duplicate values for the distinct field.
  *
  * If the provided solution could be mutated successfully, returns true, otherwise returns
  * false. This conversion is known as the 'distinct hack'.
  */
-bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
-                                const QueryPlannerParams& plannerParams,
-                                QuerySolution* soln,
-                                const std::string& field,
-                                bool flipDistinctScanDirection = false);
+bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
+                          const QueryPlannerParams& plannerParams,
+                          QuerySolution* soln,
+                          const std::string& field,
+                          bool flipDistinctScanDirection = false);
 
 /**
  * Attempt to create a query solution with DISTINCT_SCAN based on an index which could
@@ -75,7 +77,7 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
  * If the canonical query doesn't have a filter and a sort, the query planner won't try to build an
  * index scan, so we will try to create a DISTINCT_SCAN manually.
  *
- * Othewise, if the distinct multiplanner is disabled, we will return the first query solution that
+ * Otherwise, if the distinct multiplanner is disabled, we will return the first query solution that
  * can be transformed to an DISTINCT_SCAN from the candidates returned by the query planner.
  */
 std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& canonicalQuery,
