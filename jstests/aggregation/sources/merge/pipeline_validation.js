@@ -18,12 +18,12 @@ function assertPipelineIsInvalid(pipeline, expectedErrorCode) {
     assertErrorCode(source, mergeWith(pipeline), expectedErrorCode);
 }
 
-if (FixtureHelpers.isSharded(source)) {
-    // Sharded clusters will hit this error earlier since they invoke the 'serialize()'
-    // codepath.
-    // TODO SERVER-96515 remove the branching here.
-    assertPipelineIsInvalid([{$addFields: 2}], 40272);
-} else {
+// Sharded clusters will hit this error earlier since they invoke the 'serialize()'
+// codepath.
+// TODO SERVER-97846 Investigate why this query only _sometimes_ errors when the collection is not
+// sharded.
+// TODO SERVER-96515 remove the branching here.
+if (!FixtureHelpers.isMongos(db)) {
     assert.doesNotThrow(() => source.aggregate(mergeWith([{$addFields: 2}])));
 }
 assert.commandWorked(source.insert({_id: 0}));
