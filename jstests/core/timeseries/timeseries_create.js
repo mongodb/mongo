@@ -234,7 +234,7 @@ testTimeseriesNamespaceExists((testDB, collName) => {
                 ? BinData(7, "CQDANfZWjgEAAAA=")
                 : {"0": timestamp},
             "_id": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? BinData(7, "BwBl+ZcgR0I69Frq/GcA")
+                ? BinData(7, "BwBl+ZcYR0I69Frq/GcA")
                 : {"0": oid},
             "a": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
                 ? BinData(7, "AQAAAAAAAADwPwA=")
