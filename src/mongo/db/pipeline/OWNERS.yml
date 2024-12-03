@@ -56,7 +56,7 @@ filters:
       - 10gen/query-optimization-parsers
   - "document_source_query_stats*":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-integration-query-stats
   - "document_source_rank_fusion*":
     approvers:
       - 10gen/query-integration-search

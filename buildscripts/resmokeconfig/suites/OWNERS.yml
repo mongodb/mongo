@@ -67,7 +67,7 @@ filters:
       - 10gen/query-execution
   - "query_stats*":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-integration-query-stats
   - "query_tester_self_test.yml":
     approvers:
       - 10gen/query-optimization

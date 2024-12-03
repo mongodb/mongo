@@ -8,4 +8,4 @@ filters:
       - 10gen/query-integration-staff-leads
   - "collect_query_stats_mongod.*":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-integration-query-stats

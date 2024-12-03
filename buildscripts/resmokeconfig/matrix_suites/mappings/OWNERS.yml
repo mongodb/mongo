@@ -10,7 +10,8 @@ filters:
       - 10gen/query-execution-query-settings
   - "aggregation_mongos_query_shape_hash_stability.yml":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-query-stats
   - "aggregation_multiversion_fuzzer*":
     approvers:
       - 10gen/query-optimization
@@ -19,13 +20,15 @@ filters:
       - 10gen/query-execution-query-settings
   - "aggregation_query_shape_hash_stability.yml":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-query-stats
   - "aggregation_sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
   - "aggregation_sharded_collections_query_shape_hash_stability.yml":
     approvers:
       - 10gen/query-execution-query-settings
+      - 10gen/query-integration-query-stats
   - "bulk_write*":
     approvers:
       - 10gen/query-execution-write-exec
@@ -46,19 +49,22 @@ filters:
       - 10gen/query-execution-query-settings
   - "replica_sets_jscore_query_shape_hash_stability.yml":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-query-stats
   - "sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
   - "sharded_collections_query_shape_hash_stability.yml":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-query-stats
   - "sharding_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
   - "sharding_query_shape_hash_stability.yml":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-query-stats
   - "update_fuzzer*":
     approvers:
       - 10gen/query-execution-write-exec

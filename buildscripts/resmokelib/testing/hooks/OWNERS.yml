@@ -16,4 +16,4 @@ filters:
       - 10gen/query-execution-change-streams
   - "run_query_stats.py":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-integration-query-stats

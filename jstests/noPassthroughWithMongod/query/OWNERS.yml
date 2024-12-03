@@ -5,7 +5,7 @@ filters:
       - 10gen/query
   - "*query_stats*":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/query-integration-query-stats
   - "plan_cache*":
     approvers:
       - 10gen/query-optimization

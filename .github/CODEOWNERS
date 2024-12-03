@@ -61,23 +61,23 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/*
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_expression_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_sharded_collections_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_sharded_collections_query_shape_hash_stability.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_sharded_collections_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/bulk_write* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/bulk_write_sharded* @10gen/query-execution-router-write-exec @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/core_repeat_queries.yml @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_jscore_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_jscore_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_jscore_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_query_shape_hash_stability.yml @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/update_fuzzer* @10gen/query-execution-write-exec @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/overrides/OWNERS.yml
@@ -112,7 +112,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/fle* @10gen/query-integration-fle @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/json_schema.yml @10gen/query-execution @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/mql_model* @10gen/query-execution @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/query_stats* @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_tester_self_test.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/search* @10gen/query-integration-search-testing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_clustered_collections.yml @10gen/query-execution-router-query-exec @svc-auto-approve-bot
@@ -136,7 +136,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/queryable_server_hook.py @10gen/server-rss-sydney @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/change_streams.py @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/enable_change_stream.py @10gen/query-execution-change-streams @svc-auto-approve-bot
-/buildscripts/resmokelib/testing/hooks/**/run_query_stats.py @10gen/query-integration-observability @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/run_query_stats.py @10gen/query-integration-query-stats @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/smoke_tests/OWNERS.yml
 /buildscripts/smoke_tests/**/server_programmability.yml @10gen/server-programmability @svc-auto-approve-bot
@@ -232,7 +232,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/query/map_reduce/**/* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/query/query_stats/OWNERS.yml
-/jstests/concurrency/fsm_workloads/query/query_stats/**/* @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/query/query_stats/**/* @10gen/query-integration-query-stats @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/query/remove/OWNERS.yml
 /jstests/concurrency/fsm_workloads/query/remove/**/* @10gen/query-execution @svc-auto-approve-bot
@@ -566,7 +566,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/query/profile/**/* @10gen/query-integration-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/query/queryStats/OWNERS.yml
-/jstests/noPassthrough/query/queryStats/**/* @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/noPassthrough/query/queryStats/**/* @10gen/query-integration-query-stats @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/query/timeseries/OWNERS.yml
 /jstests/noPassthrough/query/timeseries/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
@@ -646,7 +646,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/query/OWNERS.yml
 /jstests/noPassthroughWithMongod/query/**/* @10gen/query @svc-auto-approve-bot
-/jstests/noPassthroughWithMongod/query/**/*query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/noPassthroughWithMongod/query/**/*query_stats* @10gen/query-integration-query-stats @svc-auto-approve-bot
 /jstests/noPassthroughWithMongod/query/**/plan_cache* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/query/explain/OWNERS.yml
@@ -1162,7 +1162,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_internal_unpack_bucket* @10gen/query-integration-timeseries @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_internal_convert_bucket_index_stats* @10gen/query-integration-timeseries @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_parsing_validators* @10gen/query-optimization-parsers @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/document_source_query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/document_source_query_stats* @10gen/query-integration-query-stats @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_rank_fusion* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_score* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_score_fusion* @10gen/query-integration-search @svc-auto-approve-bot
@@ -1277,7 +1277,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/client_cursor/OWNERS.yml
 /src/mongo/db/query/client_cursor/**/* @10gen/query-execution-client-cursor @svc-auto-approve-bot
 /src/mongo/db/query/client_cursor/**/exhaust_cursor_currentop_integration_test.cpp @10gen/query-integration-staff-leads @svc-auto-approve-bot
-/src/mongo/db/query/client_cursor/**/collect_query_stats_mongod.* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/query/client_cursor/**/collect_query_stats_mongod.* @10gen/query-integration-query-stats @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/collation/OWNERS.yml
 /src/mongo/db/query/collation/**/* @10gen/query-execution-collation @svc-auto-approve-bot
@@ -1305,11 +1305,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/plan_enumerator/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/query_shape/OWNERS.yml
-/src/mongo/db/query/query_shape/**/* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/query/query_shape/**/* @10gen/query-integration-query-stats @svc-auto-approve-bot
 /src/mongo/db/query/query_shape/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/query_stats/OWNERS.yml
-/src/mongo/db/query/query_stats/**/* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/query/query_stats/**/* @10gen/query-integration-query-stats @svc-auto-approve-bot
 /src/mongo/db/query/query_stats/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/query_tester/OWNERS.yml
@@ -1740,7 +1740,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/query/exec/**/cluster_cursor* @10gen/query-execution-client-cursor @svc-auto-approve-bot
 /src/mongo/s/query/exec/**/owned_remote_cursor.h @10gen/query-execution-client-cursor @svc-auto-approve-bot
 /src/mongo/s/query/exec/**/document_source_merge_cursors* @10gen/query-execution-aggregation @svc-auto-approve-bot
-/src/mongo/s/query/exec/**/collect_query_stats_mongos.* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/s/query/exec/**/collect_query_stats_mongos.* @10gen/query-integration-query-stats @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/query/planner/OWNERS.yml
 /src/mongo/s/query/planner/**/* @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
