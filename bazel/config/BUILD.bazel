@@ -2195,3 +2195,43 @@ config_setting(
         "//bazel/config:link_timeout_5min": "True",
     },
 )
+
+# --------------------------------------
+# fission
+# --------------------------------------
+
+config_setting(
+    name = "fission_enabled",
+    values = {
+        "fission": "yes",
+    },
+)
+
+config_setting(
+    name = "linux_gcc_fission",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//bazel/config:compiler_type": "gcc",
+    },
+    values = {
+        "fission": "yes",
+    },
+)
+
+selects.config_setting_group(
+    name = "linux_gcc_fission_x86_64",
+    match_all = [
+        "@platforms//cpu:x86_64",
+        ":linux_gcc_fission",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linux_gcc_fission_aarch64",
+    match_all = [
+        "@platforms//cpu:aarch64",
+        ":linux_gcc_fission",
+    ],
+)

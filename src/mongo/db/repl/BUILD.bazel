@@ -1798,6 +1798,17 @@ mongo_cc_library(
         "sync_source_resolver.h",
         "vote_requester.h",
     ],
+    # TODO(SERVER-97808)
+    # replication_coordinator_impl.cpp needs more than 3.5GB of ram for gcc+fission builds
+    exec_properties = select({
+        "//bazel/config:linux_gcc_fission_x86_64": {
+            "Pool": "large_memory_x86_64",
+        },
+        "//bazel/config:linux_gcc_fission_aarch64": {
+            "Pool": "large_memory_arm64",
+        },
+        "//conditions:default": {},
+    }),
     deps = [
         "data_replicator_external_state_initial_sync",
         "delayable_timeout_callback",

@@ -1057,6 +1057,7 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
 # These are added as both copts and linker flags.
 GDWARF_FEATURES = select({
     "//bazel/config:linux_clang": ["dwarf32"],
+    "//bazel/config:linux_gcc_fission": ["dwarf32"],  # gdb crashes with -gsplit-dwarf and -gdwarf64
     # SCons implementation originally used a compiler check to verify that
     # -gdwarf64 was supported. If this creates incompatibility issues, we may
     # need to fallback to -gdwarf32 in certain cases.
@@ -1113,10 +1114,19 @@ GCC_OR_CLANG_LINKFLAGS = select({
 })
 
 COMPRESS_DEBUG_COPTS = select({
-    # Disable debug compression in both the assembler and linker
-    # by default.
+    # Disable debug compression in assembler by default unless using debug fission.
+    # Debug compression significantly reduces .o, .dwo, and .a sizes, and with
+    # fission enabled, the linker sees so little of the dwarf that decompression
+    # isn't a problem.
+    "//bazel/config:fission_enabled": [
+        "-Wa,--compress-debug-sections",
+    ],
     "//bazel/config:linux_gcc": [
         "-Wa,--nocompress-debug-sections",
+    ],
+    # subsumes both of the two above - if both are true, we want compression
+    "//bazel/config:linux_gcc_fission": [
+        "-Wa,--compress-debug-sections",
     ],
     "//conditions:default": [],
 })

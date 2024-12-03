@@ -1,7 +1,7 @@
 # This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
 
 load("@//bazel/toolchains:mongo_cc_toolchain_config.bzl", "mongo_cc_toolchain_config")
-load("@mongo_toolchain//:mongo_toolchain_flags.bzl", "COMMON_LINK_FLAGS", "COMMON_BUILTIN_INCLUDE_DIRECTORIES", "COMMON_INCLUDE_DIRECTORIES", "COMMON_BINDIRS", "GCC_INCLUDE_DIRS", "CLANG_INCLUDE_DIRS")
+load("@mongo_toolchain//:mongo_toolchain_flags.bzl", "CLANG_INCLUDE_DIRS", "COMMON_BINDIRS", "COMMON_BUILTIN_INCLUDE_DIRECTORIES", "COMMON_INCLUDE_DIRECTORIES", "COMMON_LINK_FLAGS", "GCC_INCLUDE_DIRS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -24,13 +24,16 @@ Error:
   --//bazel/config:linker=lld is not supported on s390x
 """
 
-LINKER_LINKFLAGS = select({
-    "@//bazel/config:linker_default": [],
-    "@//bazel/config:linker_gold": ["-fuse-ld=gold"],
-    "@//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
-}, no_match_error = LINKER_ERROR_MESSAGE)
+LINKER_LINKFLAGS = select(
+    {
+        "@//bazel/config:linker_default": [],
+        "@//bazel/config:linker_gold": ["-fuse-ld=gold"],
+        "@//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
+    },
+    no_match_error = LINKER_ERROR_MESSAGE,
+)
 
-LINK_FLAGS = ["-L"+flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
+LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
 mongo_cc_toolchain_config(
     name = "cc_gcc_toolchain_config",
@@ -51,6 +54,7 @@ mongo_cc_toolchain_config(
         "nm": "v4/bin/nm",
         "ld": "v4/bin/ld",
         "as": "v4/bin/as",
+        "dwp": "v4/bin/dwp",
         "objcopy": "v4/bin/llvm-objcopy",
         "objdump": "v4/bin/objdump",
         "gcov": "v4/bin/gcov",
@@ -83,6 +87,7 @@ mongo_cc_toolchain_config(
         "nm": "v4/bin/nm",
         "ld": "v4/bin/ld",
         "as": "v4/bin/as",
+        "dwp": "v4/bin/dwp",
         "objcopy": "v4/bin/llvm-objcopy",
         "objdump": "v4/bin/objdump",
         "gcov": "v4/bin/gcov",

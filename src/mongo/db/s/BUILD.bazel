@@ -644,6 +644,17 @@ mongo_cc_library(
         "//src/mongo/db/s/config:sharding_catalog_manager.h",
         "//src/mongo/s:chunk_constraints.h",
     ],
+    # TODO(SERVER-97809)
+    # sharding_ddl_util.cpp needs more than 3.5GB of ram for gcc+fission builds
+    exec_properties = select({
+        "//bazel/config:linux_gcc_fission_x86_64": {
+            "Pool": "large_memory_x86_64",
+        },
+        "//bazel/config:linux_gcc_fission_aarch64": {
+            "Pool": "large_memory_arm64",
+        },
+        "//conditions:default": {},
+    }),
     deps = [
         ":forwardable_operation_metadata",
         ":resharding_server_parameters_idl",
