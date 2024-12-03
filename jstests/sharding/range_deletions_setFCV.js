@@ -87,6 +87,7 @@ function moveChunkAndCheckRangeDeletionTasksUponFCVUpgrade(nss, donorShard, move
         afterDeletionFailpoint.off();
     }
     beforeDeletionFailpoint.off();
+    assert.commandWorked(donorShard.rs.getPrimary().adminCommand({cleanupOrphaned: nss}));
 }
 
 function testAgainstCollectionWithRangeShardKey() {
