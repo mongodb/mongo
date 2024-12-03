@@ -6,7 +6,6 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const collPrefix = jsTestName();
 const bucketPrefix = "system.buckets." + jsTestName();
@@ -227,7 +226,7 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.extra": 10}}));
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
-assert(res.errors.length == 1, tojson(res));
+assert(res.errors.length == 2, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with string min/max values are caught.
