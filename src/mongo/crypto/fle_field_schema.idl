@@ -405,20 +405,6 @@ structs:
             optional: true
             stability: unstable
 
-    EncryptionSchemaCSFLE:
-        description: "Implements Encryption Schema for CSFLE."
-        strict: true
-        fields:
-          jsonSchema:
-            description: "Object containing json schema specification."
-            type: object_owned
-            stability: unstable
-          isRemoteSchema:
-            description: "Boolean field indicating whether the schema was fetched from the server ahead of being sent to query analysis."
-            type: bool
-            optional: false
-            stability: unstable
-
     ecocDocument:
         description: "This represents a document stored in an encrypted compaction collection."
         strict: true
