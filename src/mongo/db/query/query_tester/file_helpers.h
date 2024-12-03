@@ -51,6 +51,7 @@ static constexpr auto kFeatureExtractorDir = std::string_view{"/home/ubuntu/feat
 static constexpr auto kShellMaxLen = std::numeric_limits<size_t>::max();
 static constexpr auto kShellTimeout = Milliseconds{60 * 60 * 1000};  // 1 hour
 
+enum class DiffStyle { kLine, kWord };
 enum class ErrorLogLevel { kSimple, kVerbose, kExtractFeatures };
 enum class WriteOutOptions { kNone, kResult, kOnelineResult };
 
@@ -152,7 +153,7 @@ std::string getMongoRepoRoot();
  * Performs a text-based diff between the expected and actual result test files and returns the diff
  * output.
  */
-std::string gitDiff(const std::filesystem::path&, const std::filesystem::path&);
+std::string gitDiff(const std::filesystem::path&, const std::filesystem::path&, DiffStyle);
 
 inline bool isTerminal() {
     static const bool isTerminal = isatty(STDOUT_FILENO) != 0;
@@ -164,6 +165,7 @@ void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFil
                          size_t totalTestsRun);
 std::vector<std::string> readAndAssertNewline(std::fstream&, const std::string& context);
 std::vector<std::string> readLine(std::fstream&, std::string& lineFromFile);
+DiffStyle stringToDiffStyle(const std::string&);
 WriteOutOptions stringToWriteOutOpt(const std::string& opt);
 CollectionSpec toCollectionSpec(const std::string&);
 void verifyFileStreamGood(std::fstream&, const std::filesystem::path&, const std::string& op);

@@ -149,7 +149,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const WriteOutOptions outOpt,
                    const ModeOption mode,
                    const bool populateAndExit,
-                   const ErrorLogLevel errorLogLevel) {
+                   const ErrorLogLevel errorLogLevel,
+                   const DiffStyle diffStyle) {
     // Run the tests.
     auto versionInfo = MockVersionInfo{};
     auto conn = buildConn(uriString, &versionInfo, mode);
@@ -183,7 +184,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         const bool hasFailures = [&](const auto& testPath) {
             try {
                 currFile.runTestFile(conn.get(), mode);
-                return !currFile.writeAndValidate(mode, outOpt, errorLogLevel);
+                return !currFile.writeAndValidate(mode, outOpt, errorLogLevel, diffStyle);
             } catch (const std::exception& exception) {
                 std::cerr << std::endl
                           << testPath.string() << std::endl
@@ -254,26 +255,28 @@ void assertNextArgExists(const std::vector<std::string>& args,
 }
 
 void printHelpString() {
-    std::map<std::string, std::string> helpMap = {
-        {"-h", "Print this help string"},
-        {"--uri",
-         "Follow with the mongo URI string to connect to a running "
-         "mongo cluster. Required"},
-        {"-t",
-         "Test. This should be followed by a test name. This can appear "
-         "multiple times to run multiple tests."},
-        {"-n",
-         "Run a specific test in the test file that immediately preceded "
-         "this argument. This "
-         "should be followed by an integer"},
-        {"--load",
-         "Load all collections specified in relevant test files. If "
-         "not specified will assume data "
-         "has already been loaded."},
+    static const auto kHelpMap = std::map<std::string, std::string>{
+        // Long-options come before short-options. Sorted in lexicographical order.
+        {"--diff",
+         // Default to line-based diff here to make Evergreen integration easier.
+         "[line, word]. Use line- or word-based diff when displaying result set differences. "
+         "Defaults to line-based diff if not specified. Humans using terminals that support ANSI "
+         "color codes are recommended to use --diff word for easier-to-read output."},
         {"--drop",
          "Drop the collections before loading them. Should be "
          "specified with the load argument or "
          "no documents will exist in the test collections."},
+        {"--extractFeatures",
+         "Extracts metadata about most common features across failed queries for an enriched "
+         "debugging experience."},
+        {"--load",
+         "Load all collections specified in relevant test files. If "
+         "not specified will assume data "
+         "has already been loaded."},
+        {"--mode",
+         "[run, compare, normalize]. Specify whether to just run and record "
+         "results; expect all test files to specify results (default); or ensure that "
+         "output results are correctly normalized."},
         {"--out",
          "[result, oneline]. Write out results for each test file after running "
          "tests in run or normalize mode. Results files end in `.results` "
@@ -281,21 +284,26 @@ void printHelpString() {
          "`result` will write out multiline results, "
          "`oneline` will write out single-line results. "
          "Not available in compare mode."},
-        {"--mode",
-         "[run, compare, normalize]. Specify whether to just run and record "
-         "results; expect all test files to specify results (default); or ensure that "
-         "output results are correctly normalized."},
+        {"--populateAndExit", "Only drop and load data. No tests are run."},
+        {"--uri",
+         "Follow with the mongo URI string to connect to a running "
+         "mongo cluster. Required"},
+        // Short options second. Sorted in lexicographical order.
+        {"-h", "Print this help string"},
+        {"-n",
+         "Run a specific test in the test file that immediately preceded "
+         "this argument. This "
+         "should be followed by an integer"},
         {"-r",
          "Run a specific range of tests in the test file immediately "
          "before this argument. "
          "Should "
          "be followed by two integers in ascending order"},
-        {"-v (verbose)", "Appends a summary of failing queries to an unsuccessful test file run."},
-        {"--extractFeatures",
-         "Extracts metadata about most common features across failed queries for an enriched "
-         "debugging experience."},
-        {"--populateAndExit", "Only drop and load data. No tests are run."}};
-    for (const auto& [key, val] : helpMap) {
+        {"-t",
+         "Test. This should be followed by a test name. This can appear "
+         "multiple times to run multiple tests."},
+        {"-v (verbose)", "Appends a summary of failing queries to an unsuccessful test file run."}};
+    for (const auto& [key, val] : kHelpMap) {
         std::cout << key << ": " << val << std::endl;
     }
 }
@@ -310,15 +318,22 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto dropOpt = false;
     auto extractFeatures = false;
     auto loadOpt = false;
-    auto outOpt = WriteOutOptions::kNone;
     auto mongoURIString = boost::optional<std::string>{};
     auto mode = ModeOption::Compare;  // Default.
+    auto outOpt = WriteOutOptions::kNone;
     auto populateAndExit = false;
     auto verbose = false;
+    auto diffStyle = DiffStyle::kLine;
     for (auto argNum = size_t{1}; argNum < parsedArgs.size(); ++argNum) {
         // Same order as in the help menu.
-        if (parsedArgs[argNum] == "--drop") {
+        if (parsedArgs[argNum] == "--diff") {
+            assertNextArgExists(parsedArgs, argNum, "--diff");
+            diffStyle = stringToDiffStyle(parsedArgs[argNum + 1]);
+            ++argNum;
+        } else if (parsedArgs[argNum] == "--drop") {
             dropOpt = true;
+        } else if (parsedArgs[argNum] == "--extractFeatures") {
+            extractFeatures = true;
         } else if (parsedArgs[argNum] == "--load") {
             loadOpt = true;
         } else if (parsedArgs[argNum] == "--mode") {
@@ -373,8 +388,6 @@ int queryTesterMain(const int argc, const char** const argv) {
             expectingNumAt = argNum + 1;
         } else if (parsedArgs[argNum] == "-v") {
             verbose = true;
-        } else if (parsedArgs[argNum] == "--extractFeatures") {
-            extractFeatures = true;
         } else {
             exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
         }
@@ -432,7 +445,8 @@ int queryTesterMain(const int argc, const char** const argv) {
                               outOpt,
                               mode,
                               populateAndExit,
-                              errorLogLevel);
+                              errorLogLevel,
+                              diffStyle);
     } catch (AssertionException& ex) {
         exitWithError(1, ex.reason());
     }

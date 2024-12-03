@@ -105,12 +105,13 @@ public:
      */
     bool textBasedCompare(const std::filesystem::path&,
                           const std::filesystem::path&,
-                          ErrorLogLevel);
+                          ErrorLogLevel,
+                          DiffStyle);
 
     /**
      * If 'compare' is set, tests must have results to compare to.
      */
-    bool writeAndValidate(ModeOption, WriteOutOptions, ErrorLogLevel);
+    bool writeAndValidate(ModeOption, WriteOutOptions, ErrorLogLevel, DiffStyle);
 
     bool writeOutAndNumber(std::fstream&, WriteOutOptions);
 

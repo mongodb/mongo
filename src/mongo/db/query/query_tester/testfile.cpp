@@ -421,8 +421,10 @@ std::string QueryFile::serializeStateForDebug() const {
 
 bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
                                  const std::filesystem::path& actualPath,
-                                 const ErrorLogLevel errorLogLevel) {
-    if (const auto& diffOutput = gitDiff(expectedPath, actualPath); !diffOutput.empty()) {
+                                 const ErrorLogLevel errorLogLevel,
+                                 const DiffStyle diffStyle) {
+    if (const auto& diffOutput = gitDiff(expectedPath, actualPath, diffStyle);
+        !diffOutput.empty()) {
         // Write out the diff output.
         std::cout << diffOutput << std::endl;
 
@@ -448,7 +450,8 @@ bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
 
 bool QueryFile::writeAndValidate(const ModeOption mode,
                                  const WriteOutOptions writeOutOpts,
-                                 const ErrorLogLevel errorLogLevel) {
+                                 const ErrorLogLevel errorLogLevel,
+                                 const DiffStyle diffStyle) {
     // Set up the text-based diff environment.
     std::filesystem::create_directories(_actualPath.parent_path());
     auto actualStream = std::fstream{_actualPath, std::ios::out | std::ios::trunc};
@@ -461,7 +464,7 @@ bool QueryFile::writeAndValidate(const ModeOption mode,
     // One big comparison, all at once.
     if (mode == ModeOption::Compare ||
         (mode == ModeOption::Normalize && writeOutOpts == WriteOutOptions::kNone)) {
-        return textBasedCompare(_expectedPath, _actualPath, errorLogLevel);
+        return textBasedCompare(_expectedPath, _actualPath, errorLogLevel, diffStyle);
     } else {
         const bool includeResults = writeOutOpts == WriteOutOptions::kResult ||
             writeOutOpts == WriteOutOptions::kOnelineResult;

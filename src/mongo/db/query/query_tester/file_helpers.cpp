@@ -196,7 +196,9 @@ std::string getMongoRepoRoot() {
     return repoRoot;
 }
 
-std::string gitDiff(const std::filesystem::path& expected, const std::filesystem::path& actual) {
+std::string gitDiff(const std::filesystem::path& expected,
+                    const std::filesystem::path& actual,
+                    const DiffStyle diffStyle) {
     const auto gitDiffCmd =
         (std::stringstream{}
          << "git"
@@ -209,7 +211,8 @@ std::string gitDiff(const std::filesystem::path& expected, const std::filesystem
          // The --no-index option allows us to compare files that are not in any repository. -U0
          // removes any lines of context around the diff so that the correct test number directly
          // preceding the diff will be captured.
-         << " --no-index --word-diff=color -U0 -- " << expected << " " << actual << " 2>&1")
+         << " --no-index " << (diffStyle == DiffStyle::kWord ? "--word-diff=color" : "--color")
+         << " -U0 -- " << expected << " " << actual << " 2>&1")
             .str();
 
     // Need to ignore exit status because the implied --exit-code will return an error sttatus when
@@ -265,6 +268,17 @@ std::vector<std::string> readLine(std::fstream& fs, std::string& lineFromFile) {
         std::getline(fs, lineFromFile);
     }
     return comments;
+}
+
+DiffStyle stringToDiffStyle(const std::string& style) {
+    static const auto kStringToDiffStyleMap =
+        std::map<std::string, DiffStyle>{{"line", DiffStyle::kLine}, {"word", DiffStyle::kWord}};
+
+    if (auto it = kStringToDiffStyleMap.find(style); it != kStringToDiffStyleMap.end()) {
+        return it->second;
+    } else {
+        uasserted(9764301, str::stream{} << "Unexpected diff style " << style);
+    }
 }
 
 WriteOutOptions stringToWriteOutOpt(const std::string& opt) {
