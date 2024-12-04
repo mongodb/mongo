@@ -52,7 +52,7 @@ class ServiceContext;
  * Instantiates the TTLMonitor to periodically remove documents from TTL collections. Safe to call
  * again after shutdownTTLMonitor() has been called.
  */
-void startTTLMonitor(ServiceContext* serviceContext);
+void startTTLMonitor(ServiceContext* serviceContext, bool setupOnly = false);
 
 /**
  * Shuts down the TTLMonitor if it is running. Safe to call multiple times.
@@ -89,6 +89,11 @@ public:
 
     long long getTTLPasses_forTest();
     long long getTTLSubPasses_forTest();
+
+    /*
+     * Audit indexes when stepping up to primary and do any necessary fixes.
+     */
+    static void doStepUpFixes(OperationContext* opCtx);
 
 private:
     friend class TTLTest;

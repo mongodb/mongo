@@ -149,6 +149,13 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
          oldExpireSecsElement.type() != BSONType::NumberLong);
     if (shouldUpdateCatalog) {
         // Change the value of "expireAfterSeconds" on disk.
+        auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [ttlCache, uuid = writableColl->uuid(), indexName = idx->indexName()](
+                OperationContext*, boost::optional<Timestamp>) {
+                ttlCache->setTTLIndexExpireAfterSecondsType(
+                    uuid, indexName, TTLCollectionCache::Info::ExpireAfterSecondsType::kInt);
+            });
         writableColl->updateTTLSetting(opCtx, idx->indexName(), indexExpireAfterSeconds);
     }
 }

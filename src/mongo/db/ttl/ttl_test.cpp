@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/expression.h"
 #include <utility>
 #include <vector>
 
@@ -71,6 +72,7 @@ protected:
 
         std::unique_ptr<TTLMonitor> ttlMonitor = std::make_unique<TTLMonitor>();
         TTLMonitor::set(service, std::move(ttlMonitor));
+        startTTLMonitor(service, true);
 
         _opCtx = cc().makeOperationContext();
 
@@ -121,14 +123,19 @@ protected:
     void createIndex(const NamespaceString& nss,
                      const BSONObj& keyPattern,
                      std::string name,
-                     Seconds expireAfterSeconds) {
+                     Seconds expireAfterSeconds,
+                     bool badType = false) {
 
         AutoGetCollection collection(opCtx(), nss, MODE_X);
         ASSERT(collection);
 
-        auto spec =
-            BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << keyPattern << "name"
-                     << name << "expireAfterSeconds" << durationCount<Seconds>(expireAfterSeconds));
+        auto spec = badType ? BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
+                                       << keyPattern << "name" << name << "expireAfterSeconds"
+                                       << ((double)durationCount<Seconds>(expireAfterSeconds)))
+                            : BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
+                                       << keyPattern << "name" << name << "expireAfterSeconds"
+                                       << durationCount<Seconds>(expireAfterSeconds));
+
 
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx());
 
@@ -192,6 +199,10 @@ public:
         WriteUnitOfWork wuow(_opCtx);
         db->createCollection(_opCtx, nss, options);
         wuow.commit();
+    }
+
+    void dropIndex(const NamespaceString& nss, BSONObj keys) {
+        _client.dropIndex(nss, keys);
     }
 
 private:
@@ -259,6 +270,60 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     ASSERT_EQ(client.count(nss), 100);
     ASSERT_EQ(getTTLPasses(), initTTLPasses);
     ASSERT_EQ(getTTLSubPasses(), initTTLSubPasses);
+}
+
+TEST_F(TTLTest, TTLPassSingleCollectionBasicStepUp) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    client.createCollection(nss);
+
+    createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1), true);
+
+    // step down, fake a dropped index
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx());
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    auto&& ttlCollectionCache = TTLCollectionCache::get(opCtx()->getServiceContext());
+    auto ttlInfos = ttlCollectionCache.getTTLInfos();
+    ASSERT_EQ(ttlInfos.size(), 1);
+    ASSERT_EQ(ttlInfos.begin()->second.size(), 1);
+    ASSERT(ttlInfos.begin()->second[0].isExpireAfterSecondsNonInt());
+    TTLCollectionCache::Info newInfo("testIndexY",
+                                     TTLCollectionCache::Info::ExpireAfterSecondsType::kNonInt);
+    ttlCollectionCache.registerTTLInfo(ttlInfos.begin()->first, newInfo);
+
+    // step up and run step up fixes
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
+    ttlMonitor->doStepUpFixes(opCtx());
+
+    // check that false index is removed and other index expiration type is fixed
+    ttlInfos = ttlCollectionCache.getTTLInfos();
+    ASSERT_EQ(ttlInfos.size(), 1);
+    ASSERT_EQ(ttlInfos.begin()->second.size(), 1);
+    ASSERT(!ttlInfos.begin()->second[0].isExpireAfterSecondsNonInt());
+
+    client.insertExpiredDocs(nss, "x", 100);
+    client.insertExpiredDocs(nss, "y", 100);
+    ASSERT_EQ(client.count(nss), 200);
+
+    auto initTTLPasses = getTTLPasses();
+    auto initTTLSubPasses = getTTLSubPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // Work is done, half documents with x-index removed
+    ASSERT_EQ(client.count(nss), 100);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    ASSERT_EQ(getTTLSubPasses(), initTTLSubPasses + 1);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
