@@ -3,7 +3,4 @@ filters:
   - "*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "move_primary*":
-    approvers:
-      - 10gen/server-catalog-and-routing
       - 10gen/server-cluster-scalability
