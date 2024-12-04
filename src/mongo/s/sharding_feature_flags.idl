@@ -197,3 +197,8 @@ feature_flags:
     cpp_varname: feature_flags::gDualCatalogCache
     default: false
     shouldBeFCVGated: false
+  featureFlagUseTopologyChangeCoordinators:
+    description: "Feature flag for enabling the coordinator based topology changes."
+    cpp_varname: feature_flags::gUseTopologyChangeCoordinators
+    default: false
+    shouldBeFCVGated: true
