@@ -104,21 +104,37 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
             }
         })")};
 
-    // Set different values in the command request.
-    AggregateCommandRequest acrBypassTrue(kDefaultTestNss.nss());
-    acrBypassTrue.setPipeline(rawPipeline);
-    acrBypassTrue.setBypassDocumentValidation(true);
+
+    AggregateCommandRequest acrAllValues(kDefaultTestNss.nss());
+    acrAllValues.setPipeline(rawPipeline);
+    // Set all possible items in '_hasField'. None of these should affect the size.
+    SimpleCursorOptions cursor;
+    cursor.setBatchSize(10);
+    acrAllValues.setCursor(cursor);
+    acrAllValues.setExplain(explain::VerbosityEnum::kQueryPlanner);
+    acrAllValues.setBypassDocumentValidation(true);
+    acrAllValues.setPassthroughToShard(PassthroughToShardOptions("shard1"));
+
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
     auto namespaces = pipeline->getInvolvedCollections();
-    auto aggComponentsBypassTrue = std::make_unique<AggCmdComponents>(acrBypassTrue, namespaces);
 
+    auto aggComponentsAllValues = std::make_unique<AggCmdComponents>(acrAllValues, namespaces);
 
-    AggregateCommandRequest acrBypassFalse(kDefaultTestNss.nss());
-    acrBypassFalse.setPipeline(rawPipeline);
-    acrBypassFalse.setBypassDocumentValidation(false);
-    auto aggComponentsBypassFalse = std::make_unique<AggCmdComponents>(acrBypassFalse, namespaces);
+    // Confirm all values are set.
+    BSONObjBuilder bob;
+    aggComponentsAllValues->appendTo(
+        bob, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    ASSERT_BSONOBJ_EQ(
+        fromjson(
+            R"({ bypassDocumentValidation: true, cursor: { batchSize: 1 }, explain: "queryPlanner", $_passthroughToShard: { shard: "?" } })"),
+        bob.obj());
 
-    ASSERT_EQ(aggComponentsBypassTrue->size(), aggComponentsBypassFalse->size());
+    // Create a request that has no values set.
+    AggregateCommandRequest acrNoSetValues(kDefaultTestNss.nss());
+    acrNoSetValues.setPipeline(rawPipeline);
+    auto aggComponentsNoValues = std::make_unique<AggCmdComponents>(acrNoSetValues, namespaces);
+
+    ASSERT_EQ(aggComponentsAllValues->size(), aggComponentsNoValues->size());
 }
 
 TEST_F(AggKeyTest, DifferentAggCmdComponentSizes) {
@@ -153,7 +169,7 @@ TEST_F(AggKeyTest, DifferentAggCmdComponentSizes) {
 }
 
 // Testing item in opCtx that should impact key size.
-TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutWriteConcern) {
+TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutComment) {
     auto rawPipeline = {fromjson(R"({
             $match: {
                 foo: { $in: ["a", "b"] },
