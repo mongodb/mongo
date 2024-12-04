@@ -100,7 +100,18 @@ GLOBAL_TASK_FACTOR_OVERRIDES = {
 }
 
 
-def global_task_factor(task_name, overrides, factor):
+def get_original_task_name(task_name):
+    """
+    The task name after going through the task generator may have the form
+    /<task name>_[0-9]+-<platform>/. This function returns the original task
+    name.
+
+    For example, "sharding_0-linux-debug" -> "sharding".
+    """
+    return re.compile("_[0-9]+").split(task_name)[0]
+
+
+def global_task_factor(generated_task_name, overrides, factor):
     """
     Check for a global task override and return factor.
 
@@ -109,17 +120,19 @@ def global_task_factor(task_name, overrides, factor):
     :param factor: Default factor if there is no override.
     :return: Factor that should be used based on global overrides.
     """
+    task_name = get_original_task_name(generated_task_name)
     for task_re, task_factor in overrides.items():
-        if re.compile(task_re).match(task_name):
+        if re.compile(task_re).search(task_name):
             return task_factor
 
     return factor
 
 
-def get_task_factor(task_name, overrides, override_type, factor):
+def get_task_factor(generated_task_name, overrides, override_type, factor):
     """Check for task override and return factor."""
+    task_name = get_original_task_name(generated_task_name)
     for task_override in overrides.get(override_type, []):
-        if re.compile(task_override["task"]).match(task_name):
+        if re.compile(task_override["task"]).search(task_name):
             return task_override["factor"]
     return factor
 
@@ -152,6 +165,72 @@ def determine_jobs(task_name, variant, distro, jobs_max=0, job_factor=1.0):
     if jobs_max == 0:
         return max(1, jobs_available)
     return min(jobs_max, jobs_available)
+
+
+# TODO (SERVER-97801): Delete this function.
+def maybe_override_num_jobs_on_required(task_name, variant, jobs):
+    """
+    Currently we are under-utilizing hosts for certain tasks because
+    we're picking a Resmoke job value that's too low. This function
+    exists to increase the number of jobs used for certain tasks on
+    certain build variants in an effort to speed up patch builds.
+
+    If the task or variant isn't optimizable, this function does nothing.
+
+    :param task_name: Name of task to attempt to optimize.
+    :param variant: Name of the build variant.
+    :param jobs: The current number of jobs to be used.
+    :return: A new number of jobs to be used.
+    """
+    all_factors = {
+        "^replica_sets(_last_lts|_last_continuous)?$": 2,
+        "^sharding$": 1.5,
+        "^sharding(_last_lts|_last_continuous)$": 2,
+        "concurrency_replication": 0.5,
+        "concurrency_sharded": 0.25,
+        "concurrency.*simultaneous": 0.5,
+        "replica_sets.*passthrough": 1,
+        "sharded_collections.*with_config_transitions": 2,
+        "^sharding_.*jscore_passthrough$": 1,
+        "^sharding_.*passthrough.*with_config_transitions": 2,
+        "sharding_jscore_passthrough_with_balancer": 1,
+        "^search(_auth)?$": 0.5,
+        "fuzzer.*deterministic": 1,
+        "aggregation_secondary_reads": 0.5,
+        "^disk_wiredtiger$": 0.5,
+        "multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough": 1,
+        "multi_shard_multi_stmt_txn_": 0.5,
+        "resharding_timeseries_fuzzer": 0.5,
+        "unsplittable_collections_created_on_any_shard_jscore_passthrough": 0.5,
+    }
+
+    if (
+        variant != "enterprise-amazon-linux2-arm64-all-feature-flags"
+        and variant != "linux-64-debug-required"
+    ):
+        LOGGER.info(f"Variant '{variant}' cannot have its jobs increased. Keeping {jobs} jobs.")
+        return jobs
+    elif variant == "linux-64-debug-required":
+        all_factors |= {
+            "^noPassthrough$": 0.5,
+            "read_concern_linearizable_passthrough": 1,
+            "sharded_collections_uninitialized_fcv_jscore_passthrough": 0.5,
+            "sharding_csrs_continuous_config_stepdown": 1,
+        }
+    else:
+        all_factors |= {
+            "search_no_pinned_connections_auth": 0.5,
+        }
+
+    factor = global_task_factor(task_name, all_factors, -1)
+
+    if factor < 0:
+        LOGGER.info(f"Task '{task_name}' was not found in factor list. Keeping {jobs} jobs.")
+        return jobs
+
+    jobs = int(round(factor * CPU_COUNT))
+    LOGGER.info(f"Task '{task_name}' has factor {factor}; will use {jobs} jobs.")
+    return jobs
 
 
 def output_jobs(jobs, outfile):
@@ -212,8 +291,7 @@ def main():
 
     LOGGER.info(
         "Finding job count",
-        task=options.task,
-        variant=options.variant,
+        options=options,
         platform=PLATFORM_MACHINE,
         sys=SYS_PLATFORM,
         cpu_count=CPU_COUNT,
@@ -222,6 +300,8 @@ def main():
     jobs = determine_jobs(
         options.task, options.variant, options.distro, options.jobs_max, options.jobs_factor
     )
+    jobs = maybe_override_num_jobs_on_required(options.task, options.variant, jobs)
+
     if jobs < CPU_COUNT:
         print("Reducing number of jobs to run from {} to {}".format(CPU_COUNT, jobs))
     output_jobs(jobs, options.outfile)
