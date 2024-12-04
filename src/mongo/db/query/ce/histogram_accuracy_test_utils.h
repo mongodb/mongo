@@ -71,6 +71,9 @@ struct ErrorCalculationSummary {
     double qError90thPercentile;
     double qError95thPercentile;
     double qError99thPercentile;
+
+    // total executed queries.
+    size_t executedQueries = 0;
 };
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);

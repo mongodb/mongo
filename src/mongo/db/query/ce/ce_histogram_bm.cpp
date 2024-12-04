@@ -35,7 +35,7 @@
 
 namespace mongo::ce {
 
-enum DataType { kInt, kStringSmall, kString, kDouble };
+enum DataType { kInt, kStringSmall, kString, kDouble, kBoolean, kNull, kNan };
 
 struct HistogramEstimationBenchmarkConfiguration {
     int numberOfBuckets;
@@ -45,6 +45,7 @@ struct HistogramEstimationBenchmarkConfiguration {
     QueryType queryType;
     std::pair<size_t, size_t> dataInterval;
     sbe::value::TypeTags sbeDataType;
+    double nanProb = 0;
 
     HistogramEstimationBenchmarkConfiguration(benchmark::State& state)
         : numberOfBuckets(state.range(0)),
@@ -69,6 +70,19 @@ struct HistogramEstimationBenchmarkConfiguration {
                 sbeDataType = sbe::value::TypeTags::NumberDouble;
                 dataInterval = {0, 1000};
                 break;
+            case kBoolean:
+                sbeDataType = sbe::value::TypeTags::Boolean;
+                dataInterval = {0, 2};
+                break;
+            case kNull:
+                sbeDataType = sbe::value::TypeTags::Null;
+                dataInterval = {0, 1000};
+                break;
+            case kNan:
+                sbeDataType = sbe::value::TypeTags::NumberDouble;
+                dataInterval = {0, 1000};
+                nanProb = 1;
+                break;
         }
     }
 };
@@ -81,7 +95,6 @@ void BM_CreateHistogram(benchmark::State& state) {
 
     std::vector<stats::SBEValue> data;
     const size_t seed = 1724178214;
-    TypeCounts typeCounts;
 
     auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
     // Create one by one the values.
@@ -125,11 +138,11 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
 
     HistogramEstimationBenchmarkConfiguration configuration(state);
 
-    const TypeCombination typeCombinationData{TypeCombination{{configuration.sbeDataType, 100}}};
+    const TypeCombination typeCombinationData{
+        TypeCombination{{configuration.sbeDataType, 100, configuration.nanProb}}};
 
     std::vector<stats::SBEValue> data;
     const size_t seed = 1724178214;
-    TypeCounts typeCounts;
     const int numberOfQueries = 100;
 
     auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
@@ -168,147 +181,52 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     // Build histogram.
     auto ceHist = stats::createCEHistogram(data, configuration.numberOfBuckets);
 
-    TypeProbability typeCombinationQuery{configuration.sbeDataType, 100};
+    TypeProbability typeCombinationQuery{configuration.sbeDataType, 100, configuration.nanProb};
 
+    size_t executedQueries = 0;
     for (auto curState : state) {
-        runQueries(configuration.size,
-                   numberOfQueries,
-                   configuration.queryType,
-                   configuration.dataInterval,
-                   typeCombinationQuery,
-                   data,
-                   ceHist,
-                   true /*includeScalar*/,
-                   false /*useE2EAPI*/,
-                   seed);
+        auto summary = runQueries(configuration.size,
+                                  numberOfQueries,
+                                  configuration.queryType,
+                                  configuration.dataInterval,
+                                  typeCombinationQuery,
+                                  data,
+                                  ceHist,
+                                  true /*includeScalar*/,
+                                  false /*useE2EAPI*/,
+                                  seed);
+        executedQueries += summary.executedQueries;
     }
+    state.SetItemsProcessed(executedQueries);
+
+    // Calculate processing time per item after the loop.
+    state.counters["processing_time_per_item"] =
+        benchmark::Counter(static_cast<double>(executedQueries),
+                           benchmark::Counter::Flags::kIsRate | benchmark::Counter::Flags::kInvert);
 }
 
-
 BENCHMARK(BM_CreateHistogram)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kUniform,
-            /*dataType*/ kInt,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_CreateHistogram)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kNormal,
-            /*dataType*/ kInt,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_CreateHistogram)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kZipfian,
-            /*dataType*/ kInt,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_CreateHistogram)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kUniform,
-            /*dataType*/ kString,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_CreateHistogram)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kNormal,
-            /*dataType*/ kString,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_CreateHistogram)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kZipfian,
-            /*dataType*/ kString,
-            /*queryType*/ kPoint});
+    ->ArgNames({"buckets", "size", "distrib", "dataType", "query"})
+    ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
+                   /*size*/ {50'000, 100'000},
+                   /*dataDistribution*/ {kUniform, kNormal, kZipfian},
+                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan},
+                   /*queryType*/ {kPoint}});
 
 BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kUniform,
-            /*dataType*/ kInt,
-            /*queryType*/ kPoint});
+    ->ArgNames({"buckets", "size", "distrib", "dataType", "query"})
+    ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
+                   /*size*/ {50'000, 100'000},
+                   /*dataDistribution*/ {kUniform, kNormal, kZipfian},
+                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan},
+                   /*queryType*/ {kPoint}});
 
 BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kUniform,
-            /*dataType*/ kString,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kUniform,
-            /*dataType*/ kInt,
-            /*queryType*/ kRange});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kUniform,
-            /*dataType*/ kString,
-            /*queryType*/ kRange});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kNormal,
-            /*dataType*/ kInt,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kNormal,
-            /*dataType*/ kString,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kNormal,
-            /*dataType*/ kInt,
-            /*queryType*/ kRange});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kNormal,
-            /*dataType*/ kString,
-            /*queryType*/ kRange});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kZipfian,
-            /*dataType*/ kInt,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kZipfian,
-            /*dataType*/ kString,
-            /*queryType*/ kPoint});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kZipfian,
-            /*dataType*/ kInt,
-            /*queryType*/ kRange});
-
-BENCHMARK(BM_RunHistogramEstimations)
-    ->Args({/*numberOfBuckets*/ 10,
-            /*size*/ 50000,
-            /*dataDistribution*/ kZipfian,
-            /*dataType*/ kString,
-            /*queryType*/ kRange});
+    ->ArgNames({"buckets", "size", "distrib", "dataType", "query"})
+    ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
+                   /*size*/ {50000, 100'000},
+                   /*dataDistribution*/ {kUniform, kNormal, kZipfian},
+                   /*dataType*/ {kInt, kString, kBoolean},
+                   /*queryType*/ {kRange}});
 
 }  // namespace mongo::ce

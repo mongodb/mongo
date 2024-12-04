@@ -237,8 +237,12 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                 if ((bool)interval.first || (bool)interval.second) {
                     includeTrue = true;
                 }
-                td.push_back(std::make_unique<stats::BooleanDistribution>(
-                    mdd, type.typeProbability, ndv, includeFalse, includeTrue));
+                td.push_back(std::make_unique<stats::BooleanDistribution>(mdd,
+                                                                          type.typeProbability,
+                                                                          (int)includeFalse +
+                                                                              (int)includeTrue,
+                                                                          includeFalse,
+                                                                          includeTrue));
                 break;
             }
             case sbe::value::TypeTags::NumberInt32:
@@ -491,6 +495,9 @@ ErrorCalculationSummary runQueries(size_t size,
             relativeErrorSum += abs(errors.second.get());
             relativeErrorMax = fmax(relativeErrorMax, abs(errors.second.get()));
         }
+
+        // Increment the number of executed queries.
+        ++finalResults.executedQueries;
     }
 
     // Store results over the whole dataset to final structure.
