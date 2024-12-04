@@ -226,14 +226,20 @@ def bazel_builder_action(
                 # Check if the current directory and .cache files are on the same mount
                 # because hardlinking doesn't work between drives and when it fails
                 # it leaves behind a symlink that is hard to clean up
-                if os.stat(".").st_dev == os.stat(s, follow_symlinks=True).st_dev:
+                # We don't hardlink on windows because SCons will run link commands against
+                # the files in the bazel directory, and if its running the link command
+                # while SCons cleans up files in the output directory you get file permission errors
+                if (
+                    platform.system() != "Windows"
+                    and os.stat(".").st_dev == os.stat(s, follow_symlinks=True).st_dev
+                ):
                     if os.path.exists(str(t)):
                         os.remove(str(t))
                     os.link(s, str(t))
                     os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
                 else:
                     print(
-                        f"Copying {s} to {t} instead of hardlinking because files are on different mounts."
+                        f"Copying {s} to {t} instead of hardlinking because files are on different mounts or we are on Windows."
                     )
                     shutil.copy(s, str(t))
                     os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
