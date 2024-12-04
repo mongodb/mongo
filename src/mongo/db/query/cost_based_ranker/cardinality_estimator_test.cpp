@@ -27,160 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
-
 #include <limits>
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stats/collection_statistics_impl.h"
-#include "mongo/db/query/stats/collection_statistics_mock.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo::cost_based_ranker {
 namespace {
-
-CardinalityEstimate makeCard(double d) {
-    return CardinalityEstimate(CardinalityType(d), EstimationSource::Code);
-}
-
-SelectivityEstimate makeSel(double d) {
-    return SelectivityEstimate(SelectivityType(d), EstimationSource::Code);
-}
-
-std::unique_ptr<MatchExpression> parse(const BSONObj& bson) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto expr = MatchExpressionParser::parse(
-        bson, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_OK(expr);
-    return std::move(expr.getValue());
-}
-
-IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields) {
-    BSONObjBuilder bob;
-    for (auto& fieldName : indexFields) {
-        bob.append(fieldName, 1);
-    }
-    BSONObj kp = bob.obj();
-
-    return {kp,
-            IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
-            false,
-            {},
-            {},
-            false,
-            false,
-            CoreIndexInfo::Identifier("test_foo"),
-            nullptr,
-            {},
-            nullptr,
-            nullptr};
-}
-
-std::unique_ptr<IndexScanNode> makeIndexScan(IndexBounds bounds,
-                                             std::vector<std::string> indexFields,
-                                             std::unique_ptr<MatchExpression> filter = nullptr) {
-    auto indexScan = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(indexFields));
-    indexScan->bounds = std::move(bounds);
-    if (filter) {
-        indexScan->filter = std::move(filter);
-    }
-    return indexScan;
-}
-
-std::unique_ptr<QuerySolution> makeIndexScanFetchPlan(
-    IndexBounds bounds,
-    std::vector<std::string> indexFields,
-    std::unique_ptr<MatchExpression> indexFilter = nullptr,
-    std::unique_ptr<MatchExpression> fetchFilter = nullptr) {
-
-    auto fetch =
-        std::make_unique<FetchNode>(makeIndexScan(bounds, indexFields, std::move(indexFilter)));
-    if (fetchFilter) {
-        fetch->filter = std::move(fetchFilter);
-    }
-
-    auto solution = std::make_unique<QuerySolution>();
-    solution->setRoot(std::move(fetch));
-    return solution;
-}
-
-std::unique_ptr<QuerySolution> makeCollScanPlan(std::unique_ptr<MatchExpression> filter) {
-    auto scan = std::make_unique<CollectionScanNode>();
-    if (filter) {
-        scan->filter = std::move(filter);
-    }
-
-    auto solution = std::make_unique<QuerySolution>();
-    solution->setRoot(std::move(scan));
-    return solution;
-}
-
-OrderedIntervalList makePointInterval(double point, std::string fieldName) {
-    OrderedIntervalList oil(fieldName);
-    oil.intervals.emplace_back(IndexBoundsBuilder::makePointInterval(point));
-    return oil;
-}
-
-IndexBounds makePointIntervalBounds(double point, std::string fieldName) {
-    IndexBounds bounds;
-    bounds.fields.emplace_back(makePointInterval(point, fieldName));
-    return bounds;
-}
-
-IndexBounds makeRangeIntervalBounds(const BSONObj& range,
-                                    BoundInclusion boundInclusion,
-                                    std::string fieldName) {
-    OrderedIntervalList oilRange(fieldName);
-    oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(range, boundInclusion));
-    IndexBounds rangeBounds;
-    rangeBounds.fields.push_back(oilRange);
-    return rangeBounds;
-}
-
-CardinalityEstimate getPlanCE(const QuerySolution& plan, double collCE) {
-    EstimateMap qsnEstimates;
-    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    stats::CollectionStatisticsImpl stats(collCE, kNss);
-    CardinalityEstimator estimator{stats, qsnEstimates, QueryPlanRankerModeEnum::kHeuristicCE};
-    estimator.estimatePlan(plan);
-    return qsnEstimates.at(plan.root()).outCE;
-}
-
-CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan,
-                                       stats::CollectionStatisticsMock stats) {
-    EstimateMap qsnEstimates;
-    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    CardinalityEstimator estimator{stats, qsnEstimates, QueryPlanRankerModeEnum::kHistogramCE};
-    estimator.estimatePlan(plan);
-    return qsnEstimates.at(plan.root()).outCE;
-}
-
-stats::CollectionStatisticsMock makeCollStatsWithHistograms() {
-    stats::CollectionStatisticsMock stats(1000);
-    std::vector<ce::BucketData> data{
-        {0 /*bucketBoundary*/, 10 /*equalFreq*/, 90 /*rangeFreq*/, 5 /*ndv*/},
-        {5, 100, 100, 0},
-        {6, 700, 0, 0}};
-    stats.addHistogram(
-        "a",
-        stats::CEHistogram::make(ce::createHistogram(data),
-                                 stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, 1000}},
-                                 1000));
-    stats.addHistogram(
-        "b",
-        stats::CEHistogram::make(ce::createHistogram(data),
-                                 stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, 1000}},
-                                 1000));
-    return stats;
-}
 
 TEST(CardinalityEstimator, PointInterval) {
     std::vector<std::string> indexFields = {"a"};

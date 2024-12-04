@@ -46,10 +46,16 @@ public:
 private:
     CostEstimate costTree(const QuerySolutionNode* node);
 
-    CostEstimate costNode(const QuerySolutionNode* node,
-                          const CardinalityEstimate& ce,
-                          const std::vector<CostEstimate>& childCosts,
-                          const std::vector<CardinalityEstimate>& childCEs);
+    /**
+     * Given a QSN node, its child estimates, and its own CEs in qsnEst, compute the node's cost,
+     * and set 'qsnEst.cost' to this cost. The paramater 'qsnEst' is both input and output.
+     */
+    void computeAndSetNodeCost(const QuerySolutionNode* node,
+                               const std::vector<CostEstimate>& childCosts,
+                               const std::vector<CardinalityEstimate>& childCEs,
+                               QSNEstimate& qsnEst);
+
+    CostEstimate filterCost(const MatchExpression* filter, const CardinalityEstimate& ce) const;
 
     // Cost coefficients based on Bonsai cost calibration
     static const CostCoefficient defaultIncrement;

@@ -70,6 +70,7 @@ CardinalityEstimate CardinalityEstimator::estimate(const QuerySolutionNode* node
             break;
         case STAGE_SORT_DEFAULT:
         case STAGE_SORT_SIMPLE:
+            tassert(9768401, "Sort nodes are not expected to have filters.", !node->filter);
             ce = _inputCard;
             isConjunctionBreaker = true;
             break;

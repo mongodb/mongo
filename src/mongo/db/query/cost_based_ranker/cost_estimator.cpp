@@ -45,17 +45,18 @@ CostEstimate CostEstimator::costTree(const QuerySolutionNode* qsn) {
 
     auto foundQSNEst = _estimateMap.find(qsn);
     tassert(9695100, "All QSNs must have a CE.", foundQSNEst != _estimateMap.end());
-    QSNEstimate& qsnEst = foundQSNEst->second;
-    qsnEst.cost = costNode(qsn, qsnEst.outCE, childCosts, childCEs);
-    return qsnEst.cost;
+    QSNEstimate& qsnEstimate = foundQSNEst->second;
+    computeAndSetNodeCost(qsn, childCosts, childCEs, qsnEstimate);
+    return qsnEstimate.cost;
 }
 
-CostEstimate CostEstimator::costNode(const QuerySolutionNode* node,
-                                     const CardinalityEstimate& ce,
-                                     const std::vector<CostEstimate>& childCosts,
-                                     const std::vector<CardinalityEstimate>& childCEs) {
-    if (ce == zeroCE) {
-        return minCost;
+void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
+                                          const std::vector<CostEstimate>& childCosts,
+                                          const std::vector<CardinalityEstimate>& childCEs,
+                                          QSNEstimate& qsnEst) {
+    if (qsnEst.inCE && *qsnEst.inCE == zeroCE) {
+        qsnEst.cost = minCost;
+        return;
     }
 
     auto addEstimates = [](const auto& e1, const auto& e2) {
@@ -63,22 +64,45 @@ CostEstimate CostEstimator::costNode(const QuerySolutionNode* node,
     };
 
     CostEstimate nodeCost = zeroCost;
+    // Empty predicates may be represented as an empty AND.
+    const MatchExpression* filter = node->filter
+        ? (node->filter->matchType() == MatchExpression::AND && node->filter->numChildren() == 0)
+            ? nullptr
+            : node->filter.get()
+        : nullptr;
+
     switch (node->getType()) {
         case STAGE_COLLSCAN: {
-            nodeCost += collScanStartup * oneCE + collScanIncrement * ce;
+            const auto& inCE = *qsnEst.inCE;
+            nodeCost += collScanStartup * oneCE + collScanIncrement * inCE;
+            if (filter) {
+                nodeCost += filterCost(filter, inCE);
+            }
             break;
         }
         case STAGE_VIRTUAL_SCAN: {
-            nodeCost += virtScanStartup * oneCE + virtScanIncrement * ce;
+            const auto& inCE = *qsnEst.inCE;
+            nodeCost += virtScanStartup * oneCE + virtScanIncrement * inCE;
+            if (filter) {
+                nodeCost += filterCost(filter, inCE);
+            }
             break;
         }
         case STAGE_IXSCAN: {
-            nodeCost += indexScanStartup * oneCE + indexScanIncrement * ce;
+            const auto& inCE = *qsnEst.inCE;
+            nodeCost += indexScanStartup * oneCE + indexScanIncrement * inCE;
+            if (filter) {
+                nodeCost += filterCost(filter, inCE);
+            }
             break;
         }
         case STAGE_FETCH: {
             nodeCost = childCosts[0];
-            nodeCost += fetchStartup * oneCE + fetchIncrement * ce;
+            const auto& inCE = childCEs[0];
+            nodeCost += fetchStartup * oneCE + fetchIncrement * inCE;
+            if (filter) {
+                nodeCost += filterCost(filter, inCE);
+            }
             break;
         }
         case STAGE_AND_HASH: {
@@ -118,7 +142,8 @@ CostEstimate CostEstimator::costNode(const QuerySolutionNode* node,
         case STAGE_SORT_DEFAULT:
         case STAGE_SORT_SIMPLE: {
             auto sortNode = static_cast<const SortNode*>(node);
-            double logFactor = ce.toDouble();
+            const auto& inCE = childCEs[0];
+            double logFactor = inCE.toDouble();
             CostCoefficient incrCC = sortIncrement;
             if (sortNode->limit > 0) {
                 incrCC = sortWithLimitIncrement;
@@ -127,7 +152,7 @@ CostEstimate CostEstimator::costNode(const QuerySolutionNode* node,
 
             nodeCost = sortStartup * oneCE + childCosts[0];
             if (logFactor > 1.0) {
-                CardinalityEstimate sortSteps = ce * std::log2(logFactor);
+                CardinalityEstimate sortSteps = inCE * std::log2(logFactor);
                 nodeCost += incrCC * sortSteps;
             }
             break;
@@ -135,14 +160,25 @@ CostEstimate CostEstimator::costNode(const QuerySolutionNode* node,
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9695102);
     }
-    if (node->filter) {
-        // TODO: Take into account the cost of individual filter nodes
-        // TODO: Use the ce of the qsn output instead of its input estimate
-        nodeCost += filterStartup * oneCE + filterIncrement * ce;
+
+    qsnEst.cost = (nodeCost < minCost) ? minCost : nodeCost;
+}
+
+CostEstimate CostEstimator::filterCost(const MatchExpression* filter,
+                                       const CardinalityEstimate& ce) const {
+    if (ce == zeroCE) {
+        return zeroCost;
     }
 
-    return (nodeCost < minCost) ? minCost : nodeCost;
+    CostEstimate res = zeroCost;
+    // TODO: Take into account the cost of different types of predicates.
+    for (size_t i = 0; i < filter->numChildren(); i++) {
+        res += filterCost(filter->getChild(i), ce);
+    }
+    res += filterStartup * oneCE + filterIncrement * ce;
+    return res;
 }
+
 
 const CostCoefficient CostEstimator::defaultIncrement =
     CostCoefficient{CostCoefficientType{1000.0_ms}};

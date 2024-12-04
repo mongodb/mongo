@@ -102,17 +102,35 @@ mongo_cc_unit_test(
     name = "cost_based_ranker_test",
     srcs = [
         "cardinality_estimator_test.cpp",
+        "cost_estimator_test.cpp",
         "estimates_test.cpp",
         "heuristic_estimator_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
+        ":cbr_test_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "cbr_test_utils",
+    srcs = [
+        "cbr_test_utils.cpp",
+    ],
+    hdrs = [
+        "cbr_test_utils.h",
+    ],
+    deps = [
+        ":cardinality_estimator",
         ":estimates",
         ":heuristic_estimator",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/ce:ce_test_utils",
+        "//src/mongo/db/query/optimizer:optimizer_base",
+        "//src/mongo/db/query/stats:collection_statistics_mock",
+        "//src/mongo/db/query/stats:stats_histograms",
         "//src/mongo/db/query/stats:stats_test_utils",
+        "//src/mongo/unittest",
     ],
 )
