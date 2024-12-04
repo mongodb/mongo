@@ -82,7 +82,6 @@ stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
  * Calculate the frequency of a specific SBEValue as found in a vector of SBEValues.
  */
 size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                          sbe::value::TypeTags type,
                                           stats::SBEValue valueToCalculate,
                                           bool includeScalar);
 
@@ -97,7 +96,6 @@ size_t calculateTypeFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>
  * The range is always inclusive of the bounds.
  */
 static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBEValue>& data,
-                                                    sbe::value::TypeTags type,
                                                     stats::SBEValue valueToCalculateLow,
                                                     stats::SBEValue valueToCalculateHigh);
 

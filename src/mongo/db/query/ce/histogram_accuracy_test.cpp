@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
                          1 /*Probability of NaN Value [0,1]*/}},  // NaN
         TypeCombination{{TypeTags::Boolean, 100}},
         TypeCombination{{TypeTags::NumberInt64, 100}},
-        TypeCombination{{TypeTags::NumberDouble}},
+        TypeCombination{{TypeTags::NumberDouble, 100}},
         TypeCombination{{TypeTags::StringSmall, 100}},
         TypeCombination{{TypeTags::StringBig, 100}},
         TypeCombination{{TypeTags::Array, 100}},
