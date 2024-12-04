@@ -118,9 +118,31 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
                 continue;
             }
 
+            // Here, we first convert the operation managed by the client object into its BSON
+            // representation that will be returned to the caller. Although its still possible that
+            // this operation/client is filtered out based on the configured mode of this call,
+            // it guarantees that the properties (specifically the 'active' status in this case) of
+            // the operation will not change between checking them and including them the results.
+            // Remember that other concurrent processes are updating the state of the underlying
+            // operation while this function is executing. Even though the 'client' object is
+            // locked, it holds pointers to other objects that are being concurrently modified. Note
+            // that this specific 'copy, then check' flow here specifically for the 'active' status
+            // is not comprehensive to all possible race-conditions of this type, where the state of
+            // the operation changes between a check and then copy, as changing the current code
+            // structure to address all possibilities of this type is complex, and will require a
+            // broader initiative.
+            // TODO SERVER-97558: Examine the current op fetching logic, and look for race-condition
+            // bugs of this nature that result in incorrect results being returned.
+            //
             // Delegate to the mongoD- or mongoS-specific implementation of
             // _reportCurrentOpForClient.
-            ops.emplace_back(_reportCurrentOpForClient(expCtx, client, truncateMode));
+            BSONObj candidateOpBSON = _reportCurrentOpForClient(expCtx, client, truncateMode);
+            if (connMode == CurrentOpConnectionsMode::kExcludeIdle &&
+                !candidateOpBSON["active"].Bool()) {
+                continue;
+            }
+
+            ops.emplace_back(std::move(candidateOpBSON));
         }
     };
 
