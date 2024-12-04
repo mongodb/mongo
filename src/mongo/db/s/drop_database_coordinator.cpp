@@ -47,6 +47,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -98,6 +99,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/database_name_util.h"
@@ -171,10 +173,21 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
             .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
                 uassertStatusOK(insertPlacementEntryResponse.toStatus());
 
-                // Inserts a document {_id: <dbName>, version: {timestamp: <timestamp>}} to
-                // 'config.dropPendingDBs' collection on the config server. This blocks
-                // createDatabase coordinator from committing the creation of database with the
-                // same name to the sharding catalog.
+                const bool createDatabaseDDLCoordinatorFeatureFlagEnabled =
+                    feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+                if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
+                    BatchedCommandResponse noOpResponse;
+                    noOpResponse.setStatus(Status::OK());
+                    noOpResponse.setN(0);
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                }
+
+                // Inserts a document {_id: <dbName>, version: {timestamp: <timestamp>}}
+                // to 'config.dropPendingDBs' collection on the config server. This
+                // blocks createDatabase coordinator from committing the creation of
+                // database with the same name to the sharding catalog.
                 write_ops::InsertCommandRequest insertConfigDropPendingDBsEntry(
                     NamespaceString::kConfigDropPendingDBsNamespace,
                     {BSON(DatabaseType::kDbNameFieldName
