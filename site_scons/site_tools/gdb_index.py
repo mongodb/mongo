@@ -78,11 +78,15 @@ def _update_builder(env, builder):
                     verbose,
                 ),
                 SCons.Action.Action(
+                    "$OBJCOPY --remove-section .debug_str $TARGET",
+                    verbose,
+                ),
+                SCons.Action.Action(
                     "cat ${TARGET}.debug_str >>${TARGET}.debug_str.new",
                     verbose,
                 ),
                 SCons.Action.Action(
-                    "$OBJCOPY --add-section .debug_names=${TARGET}.debug_names --set-section-flags .debug_names=readonly --update-section .debug_str=${TARGET}.debug_str.new ${TARGET} ${TARGET}",
+                    "$OBJCOPY --add-section .debug_names=${TARGET}.debug_names --set-section-flags .debug_names=readonly --add-section .debug_str=${TARGET}.debug_str.new ${TARGET} ${TARGET}",
                     "$GDB_INDEX_ADD_SECTION_STR",
                 ),
                 SCons.Action.Action(
