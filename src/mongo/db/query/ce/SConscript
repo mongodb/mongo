@@ -43,10 +43,8 @@ env.Benchmark(
     CONSOLIDATED_TARGET="second_half_bm",
 )
 
-env.Program(
+env.BazelProgram(
     target="histogram_estimation_accuracy_analysis_program",
-    source=["histogram_accuracy_test.cpp"],
-    LIBDEPS=[
-        "ce_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

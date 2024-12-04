@@ -100,10 +100,9 @@ mongo_cc_unit_test(
     ],
 )
 
-# Despite the name, this is not a unit test:
 # it's a utility that measures the accuracy of histogram CE.
 mongo_cc_binary(
-    name = "histogram_estimation_accuracy_test",
+    name = "histogram_estimation_accuracy_analysis_program",
     srcs = [
         "histogram_accuracy_test.cpp",
     ],
