@@ -76,34 +76,12 @@ struct TestSpec {
 };
 
 void attemptToSetTransportLayerManager() {
-    // For now use a port not reserved for an MDB process. Port 0 should resolve to an unused port,
-    // but it still creates the UNIX sock file with 0 in the filename, so we still need to backoff.
-    auto params = ServerGlobalParams{.port = 0};
+    auto params = ServerGlobalParams{.port = 0, .noUnixSocket = true};
     auto tl =
         transport::TransportLayerManagerImpl::createWithConfig(&params, getGlobalServiceContext());
     auto res = tl->setup();
 
-    // Reattempt with exponential backoff.
-    if (!res.isOK()) {
-        static constexpr auto kMaxReattempts = 5;
-        static constexpr auto kWobbleRange = 50;
-        auto wobbleGenerator = PseudoRandom(
-            std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now())
-                .time_since_epoch()
-                .count());
-        for (auto reattempts = 0, sleepTime = 100; !res.isOK() && reattempts < kMaxReattempts;
-             ++reattempts, sleepTime += sleepTime) {
-            sleepTime += wobbleGenerator.nextInt64(kWobbleRange);
-            sleepmillis(sleepTime);
-            tl = transport::TransportLayerManagerImpl::createWithConfig(&params,
-                                                                        getGlobalServiceContext());
-            res = tl->setup();
-        }
-        uassert(9670415,
-                str::stream{} << "Error setting up listener after " << kMaxReattempts
-                              << " reattempts: " << res,
-                res.isOK());
-    }
+    uassert(9670415, str::stream{} << "Error setting up listener: " << res, res.isOK());
 
     getGlobalServiceContext()->setTransportLayerManager(std::move(tl));
 }
