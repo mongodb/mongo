@@ -577,17 +577,21 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(stdx::unique_lock<stdx::mute
     }
 
     lk.unlock();
-    token.onCancel().unsafeToInlineFuture().getAsync([this, cbh](Status status) {
-        if (!status.isOK()) {
-            return;
-        }
+    token.onCancel().unsafeToInlineFuture().getAsync(
+        [this, cbh, requestString = op.getDiagnosticString()](Status status) {
+            if (!status.isOK()) {
+                return;
+            }
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        ResponseStatus rs = ResponseStatus::make_forTest(
-            Status(ErrorCodes::CallbackCanceled, "Network operation canceled"), Milliseconds(0));
+            LOGV2(9786900, "Canceling network operation", "request"_attr = requestString);
 
-        _interruptWithResponse_inlock(lk, cbh, rs);
-    });
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            ResponseStatus rs = ResponseStatus::make_forTest(
+                Status(ErrorCodes::CallbackCanceled, "Network operation canceled"),
+                Milliseconds(0));
+
+            _interruptWithResponse_inlock(lk, cbh, rs);
+        });
     lk.lock();
 }
 
