@@ -125,6 +125,7 @@ COPTS = [
     "-Wno-uninitialized",
     "-Wno-unused-function",
     "-Wno-unused-variable",
+    "-std=c++17",
 ] + select({
     "//bazel/config:compiler_type_gcc": [
         "-Wno-attribute-alias",
