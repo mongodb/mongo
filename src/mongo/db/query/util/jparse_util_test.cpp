@@ -143,4 +143,23 @@ TEST(JParseUtilTest, NumberLongInSingleQuotationsFailToParse) {
     ASSERT_EQ(9180302, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "Bad character is in this snippet: \"berLong('");
 }
+
+TEST(JParseUtilTest, NumberConversionTestNumToDate) {
+    auto jsonStr = "{$match: {num: {$convert: {input: {$literal: -314159295}, to: 9}}}}";
+    BSONObj expected =
+        BSON("$match" << BSON("num"
+                              << BSON("$convert" << BSON("input" << BSON("$literal" << -314159295.0)
+                                                                 << "to" << 9.0))));
+    parseFuzzerJsonAndAssertEq(jsonStr, expected);
+}
+
+TEST(JParseUtilTest, NumberConversionTestRoundNumToDate) {
+    auto jsonStr = "{$match: {num: {$convert: {input: {$round: [0, 5]}, to: \"date\"}}}}";
+    BSONObj expected =
+        BSON("$match" << BSON(
+                 "num" << BSON("$convert"
+                               << BSON("input" << BSON("$round" << BSON_ARRAY(0.0 << 5.0)) << "to"
+                                               << "date"))));
+    parseFuzzerJsonAndAssertEq(jsonStr, expected);
+}
 }  // namespace mongo

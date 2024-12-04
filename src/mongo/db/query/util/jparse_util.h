@@ -67,6 +67,8 @@ private:
     // Similar to JParse::numberLong, additionally supporting numbers in quotations.
     Status numberLong(StringData fieldName, BSONObjBuilder&);
     Status dbRef(StringData fieldName, BSONObjBuilder&);
+    // Similar to JParse::number, but converts all unannotated numerics to doubles.
+    Status number(StringData fieldName, BSONObjBuilder&);
 
     inline bool peekToken(const char* token);
     inline bool readToken(const char* token);

@@ -168,7 +168,7 @@ Status JParseUtil::value(StringData fieldName, BSONObjBuilder& builder) {
     } else if (readToken("-Infinity")) {
         builder.append(fieldName, -std::numeric_limits<double>::infinity());
     } else {
-        Status ret = _jparse.number(fieldName, builder);
+        Status ret = number(fieldName, builder);
         if (ret != Status::OK()) {
             return ret.withContext(
                 "Attempted to parse a number array element, not recognizing any other keywords. "
@@ -627,6 +627,29 @@ Status JParseUtil::dbRef(StringData fieldName, BSONObjBuilder& builder) {
     }
 
     subBuilder.done();
+    return Status::OK();
+}
+
+Status JParseUtil::number(StringData fieldName, BSONObjBuilder& builder) {
+    char* endptrd;
+    double retd;
+
+    Status parsedStatus = NumberParser::strToAny()(_jparse._input, &retd, &endptrd);
+    if (parsedStatus == ErrorCodes::Overflow) {
+        return _jparse.parseError("Value cannot fit in double");
+    }
+    if (!parsedStatus.isOK()) {
+        return _jparse.parseError(parsedStatus.withContext("Bad characters in value").reason());
+    }
+
+    // Always cast the parsed number to a double.
+    MONGO_JPARSE_UTIL_DEBUG("Type: double");
+    builder.append(fieldName, retd);
+
+    _jparse._input = endptrd;
+    if (_jparse._input >= _jparse._input_end) {
+        return _jparse.parseError("Trailing number at end of input");
+    }
     return Status::OK();
 }
 
