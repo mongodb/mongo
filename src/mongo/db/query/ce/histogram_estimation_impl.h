@@ -36,7 +36,7 @@
 
 namespace mongo::ce {
 
-enum class EstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
+enum class ArrayExactRangeEstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
 
 /**
  * Computes an estimate for a value and estimation type. Uses linear interpolation to
@@ -74,19 +74,6 @@ EstimationResult interpolateEstimateInBucket(const stats::ScalarHistogram& h,
                                              EstimationType type,
                                              size_t bucketIndex);
 
-/**
- * Computes an estimate for range query on array data with formula:
- * Card(ArrayMin(a < valHigh)) - Card(ArrayMax(a < valLow))
- */
-EstimationResult estimateRangeQueryOnArray(const stats::ScalarHistogram& histogramAmin,
-                                           const stats::ScalarHistogram& histogramAmax,
-                                           bool lowInclusive,
-                                           sbe::value::TypeTags tagLow,
-                                           sbe::value::Value valLow,
-                                           bool highInclusive,
-                                           sbe::value::TypeTags tagHigh,
-                                           sbe::value::Value valHigh);
-
 // --------------------- CE HISTOGRAM ESTIMATION METHODS ---------------------
 
 /**
@@ -104,15 +91,17 @@ EstimationResult estimateCardinalityEq(const stats::CEHistogram& ceHist,
  * values. The other fields define the range of the estimation. This method assumes that the values
  * are in order.
  */
-EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
-                                          bool lowInclusive,
-                                          sbe::value::TypeTags tagLow,
-                                          sbe::value::Value valLow,
-                                          bool highInclusive,
-                                          sbe::value::TypeTags tagHigh,
-                                          sbe::value::Value valHigh,
-                                          bool includeScalar,
-                                          EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
+EstimationResult estimateCardinalityRange(
+    const stats::CEHistogram& ceHist,
+    bool lowInclusive,
+    sbe::value::TypeTags tagLow,
+    sbe::value::Value valLow,
+    bool highInclusive,
+    sbe::value::TypeTags tagHigh,
+    sbe::value::Value valHigh,
+    bool includeScalar,
+    ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
+    ArrayExactRangeEstimationAlgo estAlgo = ArrayExactRangeEstimationAlgo::HistogramV2);
 
 /**
  * Estimates the cardinality of a given interval using either histograms or type counts. Otherwise,
@@ -120,7 +109,8 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
  */
 CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,
                                                 const mongo::Interval& interval,
-                                                bool includeScalar = true);
+                                                bool includeScalar,
+                                                ArrayRangeEstimationAlgo arrayRangeEstimationAlgo);
 
 /**
  * Checks if a given bound can be estimated via either histograms or type counts.

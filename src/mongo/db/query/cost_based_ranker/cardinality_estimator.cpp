@@ -294,7 +294,8 @@ CardinalityEstimate CardinalityEstimator::estimate(const ComparisonMatchExpressi
                 str::stream{} << "encountered interval which is unestimatable: "
                               << interval.toString(true),
                 ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true));
-        return ce::HistogramEstimator::estimateCardinality(*histogram, _inputCard, interval, true);
+        return ce::HistogramEstimator::estimateCardinality(
+            *histogram, _inputCard, interval, true, ce::ArrayRangeEstimationAlgo::kExactArrayCE);
     }
 
     SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
@@ -378,7 +379,11 @@ CardinalityEstimate CardinalityEstimator::estimate(const OrderedIntervalList* no
                         ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true);
                     if (canEstimate) {
                         return ce::HistogramEstimator::estimateCardinality(
-                                   *histogram, _inputCard, interval, true) /
+                                   *histogram,
+                                   _inputCard,
+                                   interval,
+                                   true,
+                                   ce::ArrayRangeEstimationAlgo::kExactArrayCE) /
                             _inputCard;
                     }
                 }

@@ -220,27 +220,6 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
     return {resultCard, resultNDV};
 }
 
-EstimationResult estimateRangeQueryOnArray(const ScalarHistogram& histogramAmin,
-                                           const ScalarHistogram& histogramAmax,
-                                           bool lowInclusive,
-                                           sbe::value::TypeTags tagLow,
-                                           sbe::value::Value valLow,
-                                           bool highInclusive,
-                                           sbe::value::TypeTags tagHigh,
-                                           sbe::value::Value valHigh) {
-    const EstimationType highType =
-        highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
-    const EstimationResult highEstimate =
-        estimateCardinality(histogramAmin, tagHigh, valHigh, highType);
-
-    const EstimationType lowType =
-        lowInclusive ? EstimationType::kLess : EstimationType::kLessOrEqual;
-    const EstimationResult lowEstimate =
-        estimateCardinality(histogramAmax, tagLow, valLow, lowType);
-
-    return highEstimate - lowEstimate;
-}
-
 boost::optional<EstimationResult> estimateCardinalityEqViaTypeCounts(
     const stats::CEHistogram& ceHist, sbe::value::TypeTags tag, sbe::value::Value val) {
     EstimationResult estimation = {0.0 /*card*/, 0.0 /*ndv*/};
@@ -379,7 +358,8 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
                                           sbe::value::TypeTags tagHigh,
                                           sbe::value::Value valHigh,
                                           bool includeScalar,
-                                          EstimationAlgo estimationAlgo) {
+                                          ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
+                                          ArrayExactRangeEstimationAlgo estimationAlgo) {
     tassert(8870502,
             "The interval must be in ascending order",
             !reversedInterval(tagLow, valLow, tagHigh, valHigh));
@@ -397,70 +377,86 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
             h, lowInclusive, tagLow, valLow, highInclusive, tagHigh, valHigh);
     };
 
-    EstimationResult result = {0.0 /*card*/, 0.0 /*ndv*/};
+    EstimationResult estimation = {0.0 /*card*/, 0.0 /*ndv*/};
 
     if (ceHist.isArray()) {
 
-        if (includeScalar) {
-            // Range query on array data.
-            result += estimateRangeQueryOnArray(ceHist.getArrayMin(),
-                                                ceHist.getArrayMax(),
-                                                lowInclusive,
-                                                tagLow,
-                                                valLow,
-                                                highInclusive,
-                                                tagHigh,
-                                                valHigh);
-        } else {
-            // $elemMatch query on array data.
-            const auto arrayMinEst = estRange(ceHist.getArrayMin());
-            const auto arrayMaxEst = estRange(ceHist.getArrayMax());
-            const auto arrayUniqueEst = estRange(ceHist.getArrayUnique());
+        // Queries refering to array fields fall to these two categories:
+        // i. kExactArrayCE. For $elemMatch queries we estimate the number of arrays that contain at
+        // least one value within the interval.
+        // ii. kConjunctArrayCE. For other queries, the intervals {{$gt: a} OR {$lt: b}} intervals
+        // are traslated by IndexBoundBuilder to {-inf, a} AND {b, +inf}, thus similarly to (i) we
+        // estimate the arrays that contain at least one value within the interval.
+        switch (arrayRangeEstimationAlgo) {
+            case ArrayRangeEstimationAlgo::kExactArrayCE: {
+                const auto arrayMinEst = estRange(ceHist.getArrayMin());
+                const auto arrayMaxEst = estRange(ceHist.getArrayMax());
+                const auto arrayUniqueEst = estRange(ceHist.getArrayUnique());
 
-            const double totalArrayCount = ceHist.getArrayCount() - ceHist.getEmptyArrayCount();
+                const double totalArrayCount = ceHist.getArrayCount() - ceHist.getEmptyArrayCount();
 
-            uassert(
-                9160701, "Array histograms should contain at least one array", totalArrayCount > 0);
-            switch (estimationAlgo) {
-                case EstimationAlgo::HistogramV1: {
-                    const double arrayUniqueDensity = (arrayUniqueEst.ndv == 0.0)
-                        ? 0.0
-                        : (arrayUniqueEst.card / std::sqrt(arrayUniqueEst.ndv));
-                    result = {
-                        std::max(std::max(arrayMinEst.card, arrayMaxEst.card), arrayUniqueDensity),
-                        0.0};
-                    break;
+                uassert(9160701,
+                        "Array histograms should contain at least one array",
+                        totalArrayCount > 0);
+                switch (estimationAlgo) {
+                    case ArrayExactRangeEstimationAlgo::HistogramV1: {
+                        const double arrayUniqueDensity = (arrayUniqueEst.ndv == 0.0)
+                            ? 0.0
+                            : (arrayUniqueEst.card / std::sqrt(arrayUniqueEst.ndv));
+                        estimation = {std::max(std::max(arrayMinEst.card, arrayMaxEst.card),
+                                               arrayUniqueDensity),
+                                      0.0};
+                        break;
+                    }
+                    case ArrayExactRangeEstimationAlgo::HistogramV2: {
+                        const double avgArraySize =
+                            getTotals(ceHist.getArrayUnique()).card / totalArrayCount;
+                        const double adjustedUniqueCard = (avgArraySize == 0.0)
+                            ? 0.0
+                            : std::min(arrayUniqueEst.card / pow(avgArraySize, 0.2),
+                                       totalArrayCount);
+                        estimation = {std::max(std::max(arrayMinEst.card, arrayMaxEst.card),
+                                               adjustedUniqueCard),
+                                      0.0};
+                        break;
+                    }
+                    case ArrayExactRangeEstimationAlgo::HistogramV3: {
+                        const double adjustedUniqueCard =
+                            0.85 * std::min(arrayUniqueEst.card, totalArrayCount);
+                        estimation = {std::max(std::max(arrayMinEst.card, arrayMaxEst.card),
+                                               adjustedUniqueCard),
+                                      0.0};
+                        break;
+                    }
+                    default:
+                        MONGO_UNREACHABLE;
                 }
-                case EstimationAlgo::HistogramV2: {
-                    const double avgArraySize =
-                        getTotals(ceHist.getArrayUnique()).card / totalArrayCount;
-                    const double adjustedUniqueCard = (avgArraySize == 0.0)
-                        ? 0.0
-                        : std::min(arrayUniqueEst.card / pow(avgArraySize, 0.2), totalArrayCount);
-                    result = {
-                        std::max(std::max(arrayMinEst.card, arrayMaxEst.card), adjustedUniqueCard),
-                        0.0};
-                    break;
-                }
-                case EstimationAlgo::HistogramV3: {
-                    const double adjustedUniqueCard =
-                        0.85 * std::min(arrayUniqueEst.card, totalArrayCount);
-                    result = {
-                        std::max(std::max(arrayMinEst.card, arrayMaxEst.card), adjustedUniqueCard),
-                        0.0};
-                    break;
-                }
-                default:
-                    MONGO_UNREACHABLE;
+                break;
             }
+            case ArrayRangeEstimationAlgo::kConjunctArrayCE: {
+                const EstimationType highType =
+                    highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
+                const EstimationResult highEstimate =
+                    estimateCardinality(ceHist.getArrayMin(), tagHigh, valHigh, highType);
+
+                const EstimationType lowType =
+                    lowInclusive ? EstimationType::kLess : EstimationType::kLessOrEqual;
+                const EstimationResult lowEstimate =
+                    estimateCardinality(ceHist.getArrayMax(), tagLow, valLow, lowType);
+
+                estimation += (highEstimate - lowEstimate);
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
         }
     }
 
     if (includeScalar) {
-        result += estRange(ceHist.getScalar());
+        estimation += estRange(ceHist.getScalar());
     }
 
-    return {result};
+    return estimation;
 }
 
 bool canEstimateBound(const stats::CEHistogram& ceHist,
@@ -504,6 +500,7 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
                                                 bool endInclusive,
                                                 sbe::value::TypeTags endTag,
                                                 sbe::value::Value endVal,
+                                                ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
                                                 bool includeScalar) {
     // The following conditions should have been satisfied before reaching this point. We only
     // enable the following checks in a debug build.
@@ -549,14 +546,16 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
                                                                         endInclusive,
                                                                         endTag,
                                                                         endVal,
-                                                                        includeScalar)
+                                                                        includeScalar,
+                                                                        arrayRangeEstimationAlgo)
                                                    .card},
                                EstimationSource::Histogram};
 }
 
 CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,
                                                 const mongo::Interval& interval,
-                                                bool includeScalar) {
+                                                bool includeScalar,
+                                                ArrayRangeEstimationAlgo arrayRangeEstimationAlgo) {
     if (interval.isFullyOpen()) {
         return CardinalityEstimate{
             CardinalityType{static_cast<CardinalityType>(ceHist.getSampleSize())},
@@ -595,6 +594,7 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
                                               interval.second.second,
                                               interval.second.first.getTag(),
                                               interval.second.first.getValue(),
+                                              arrayRangeEstimationAlgo,
                                               includeScalar);
         }
         return ce;

@@ -108,6 +108,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults,
@@ -130,6 +131,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);
@@ -151,6 +153,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);
@@ -173,6 +176,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);
@@ -194,6 +198,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);
@@ -215,6 +220,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);
@@ -236,6 +242,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);
@@ -257,6 +264,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              true /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);
@@ -280,6 +288,7 @@ int main(int argc, char* argv[]) {
                                              numberOfQueries,
                                              queryType,
                                              false /*includeScalar*/,
+                                             ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
                                              seed,
                                              printResults);

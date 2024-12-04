@@ -37,7 +37,8 @@ CardinalityEstimate HistogramEstimator::estimateCardinality(
     const stats::CEHistogram& hist,
     const CardinalityEstimate collectionSize,
     const mongo::Interval& interval,
-    bool includeScalar) {
+    bool includeScalar,
+    ArrayRangeEstimationAlgo arrayEstimationAlgo) {
 
     // Empty histogram.
     if (hist.getSampleSize() <= 0) {
@@ -46,7 +47,8 @@ CardinalityEstimate HistogramEstimator::estimateCardinality(
 
     // Rescales the cardinality according to the current collection size.
     auto scaleFactor = collectionSize.toDouble() / hist.getSampleSize();
-    CardinalityEstimate card = estimateIntervalCardinality(hist, interval, includeScalar);
+    CardinalityEstimate card =
+        estimateIntervalCardinality(hist, interval, includeScalar, arrayEstimationAlgo);
     return card * scaleFactor;
 }
 

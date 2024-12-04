@@ -193,6 +193,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                   data,
                                   ceHist,
                                   true /*includeScalar*/,
+                                  ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                   false /*useE2EAPI*/,
                                   seed);
         executedQueries += summary.executedQueries;

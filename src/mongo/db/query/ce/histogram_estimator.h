@@ -45,7 +45,8 @@ public:
     static CardinalityEstimate estimateCardinality(const stats::CEHistogram& hist,
                                                    CardinalityEstimate collectionSize,
                                                    const mongo::Interval& interval,
-                                                   bool includeScalar);
+                                                   bool includeScalar,
+                                                   ArrayRangeEstimationAlgo arrayEstimationAlgo);
 
     /**
      * Checks if given interval can be estimated.

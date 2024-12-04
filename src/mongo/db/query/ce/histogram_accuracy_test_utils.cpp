@@ -392,6 +392,7 @@ ErrorCalculationSummary runQueries(size_t size,
                                    const std::vector<stats::SBEValue>& data,
                                    const std::shared_ptr<const stats::CEHistogram> ceHist,
                                    bool includeScalar,
+                                   ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
                                    bool useE2EAPI,
                                    const size_t seed) {
     double relativeErrorSum = 0, relativeErrorMax = 0;
@@ -449,7 +450,11 @@ ErrorCalculationSummary runQueries(size_t size,
                                                                EstimationSource::Histogram};
 
                     estimatedCard.card = HistogramEstimator::estimateCardinality(
-                                             *ceHist, sizeCardinality, interval, includeScalar)
+                                             *ceHist,
+                                             sizeCardinality,
+                                             interval,
+                                             includeScalar,
+                                             ArrayRangeEstimationAlgo::kExactArrayCE)
                                              .toDouble();
 
                 } else {
@@ -481,7 +486,11 @@ ErrorCalculationSummary runQueries(size_t size,
                                                                EstimationSource::Histogram};
 
                     estimatedCard.card = HistogramEstimator::estimateCardinality(
-                                             *ceHist, sizeCardinality, interval, includeScalar)
+                                             *ceHist,
+                                             sizeCardinality,
+                                             interval,
+                                             includeScalar,
+                                             ArrayRangeEstimationAlgo::kExactArrayCE)
                                              .toDouble();
                 } else {
                     // Estimate result.
@@ -492,7 +501,8 @@ ErrorCalculationSummary runQueries(size_t size,
                                                              true /*highInclusive*/,
                                                              sbeValHigh[i].getTag(),
                                                              sbeValHigh[i].getValue(),
-                                                             includeScalar);
+                                                             includeScalar,
+                                                             arrayRangeEstimationAlgo);
                 }
                 break;
             }
@@ -562,6 +572,7 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                   const int numberOfQueries,
                                   QueryType queryType,
                                   bool includeScalar,
+                                  ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
                                   bool useE2EAPI,
                                   const size_t seed,
                                   bool printResults,
@@ -608,6 +619,7 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                         data,
                                         ceHist,
                                         includeScalar,
+                                        arrayRangeEstimationAlgo,
                                         useE2EAPI,
                                         seed);
                 if (printResults) {
