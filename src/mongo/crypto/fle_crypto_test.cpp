@@ -86,11 +86,6 @@
 
 namespace mongo {
 
-template <FLETokenType tt>
-bool operator==(const FLEToken<tt>& left, const FLEToken<tt>& right) {
-    return std::make_tuple(left.type, left.data) == std::make_tuple(right.type, right.data);
-}
-
 template <typename T>
 std::string hexdump(const std::vector<T>& buf) {
     return hexdump(buf.data(), buf.size());
@@ -128,9 +123,8 @@ std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os,
     return os << hexdump(right);
 }
 
-template <FLETokenType tt>
-std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const FLEToken<tt>& right) {
-    return os << "{" << static_cast<int>(right.type) << "," << hexdump(right.data) << "}";
+std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const FLEToken& right) {
+    return os << "{" << right.name() << ": " << hexdump(right.asPrfBlock()) << "}";
 }
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
@@ -1735,7 +1729,7 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
     ConstDataRange empty(0, 0);
     auto serverToken =
         FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
-    ServerDerivedFromDataToken serverDataDerivedToken(serverToken.data);
+    ServerDerivedFromDataToken serverDataDerivedToken(serverToken.asPrfBlock());
 
     constexpr size_t cipherTextSize = 32;
     constexpr size_t typeOffset = UUID::kNumBytes;
@@ -2823,7 +2817,7 @@ TEST(CompactionHelpersTest, parseCompactionTokensTestInvalidSubType) {
 TEST(CompactionHelpersTest, parseCompactionTokensTestTooShort) {
     const auto kBadToken =
         hexblob::decode("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb3"_sd);
-    constexpr auto kInvalidPrfLength = 6373501;
+    constexpr auto kInvalidPrfLength = 9616300;
 
     BSONObjBuilder builder;
     builder.appendBinData("a.b.c", kBadToken.size(), BinDataType::BinDataGeneral, kBadToken.data());
@@ -2834,7 +2828,7 @@ TEST(CompactionHelpersTest, parseCompactionTokensTestTooShort) {
 TEST(CompactionHelpersTest, parseCompactionTokensTestTooLong) {
     const auto kBadToken =
         hexblob::decode("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb34701"_sd);
-    constexpr auto kInvalidPrfLength = 6373501;
+    constexpr auto kInvalidPrfLength = 9616300;
 
     BSONObjBuilder builder;
     builder.appendBinData("a.b.c", kBadToken.size(), BinDataType::BinDataGeneral, kBadToken.data());

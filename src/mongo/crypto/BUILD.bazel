@@ -153,6 +153,7 @@ idl_generator(
     name = "fle_tokens_gen",
     src = "fle_tokens.idl",
     hdrs = [
+        "fle_key_types.h",
         "fle_tokens.h",
     ],
     deps = [
@@ -163,7 +164,12 @@ idl_generator(
 mongo_cc_library(
     name = "fle_tokens",
     srcs = [
+        "fle_tokens.cpp",
         ":fle_tokens_gen",
+    ],
+    hdrs = [
+        "fle_key_types.h",
+        "fle_tokens.h",
     ],
     deps = [
         ":mongocryptutil",

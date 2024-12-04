@@ -230,12 +230,6 @@ boost::optional<BSONObj> mergeLetAndCVariables(const boost::optional<BSONObj>& l
     return c;
 }
 
-template <FLETokenType TokenT>
-FLEToken<TokenT> FLETokenFromCDR(ConstDataRange cdr) {
-    auto block = PrfBlockfromCDR(cdr);
-    return FLEToken<TokenT>(block);
-}
-
 std::vector<QECountInfoRequestTokenSet> toTagSets(
     const std::vector<std::vector<FLEEdgePrfBlock>>& blockSets) {
 
@@ -266,9 +260,8 @@ std::vector<QECountInfoRequestTokenSet> toTagSets(
 
 FLEEdgeCountInfo convertTokensToEdgeCount(const QECountInfoReplyTokens& token) {
 
-    auto edc = token.getEDCDerivedFromDataTokenAndContentionFactorToken().map([](auto& t) {
-        return FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(t);
-    });
+    auto edc = token.getEDCDerivedFromDataTokenAndContentionFactorToken().map(
+        [](auto& t) { return EDCDerivedFromDataTokenAndContentionFactorToken::parse(t); });
 
     auto spos = token.getSearchedPositions().map([](auto& pair) {
         EmuBinaryResult newPair;
@@ -284,10 +277,9 @@ FLEEdgeCountInfo convertTokensToEdgeCount(const QECountInfoReplyTokens& token) {
         return newPair;
     });
 
-    auto esc =
-        FLETokenFromCDR<FLETokenType::ESCTwiceDerivedTagToken>(token.getESCTwiceDerivedTagToken());
+    auto esc = ESCTwiceDerivedTagToken::parse(token.getESCTwiceDerivedTagToken());
 
-    return FLEEdgeCountInfo(token.getCount(), esc.data, spos, npos, token.getStats(), edc);
+    return FLEEdgeCountInfo(token.getCount(), esc.asPrfBlock(), spos, npos, token.getStats(), edc);
 }
 
 std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
@@ -809,7 +801,7 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
 
             for (const auto& et : edgeTokenSet) {
                 FLEEdgePrfBlock block;
-                block.esc = et.getEscDerivedToken().data;
+                block.esc = et.getEscDerivedToken().asPrfBlock();
                 tokens.push_back(block);
                 totalTokens++;
             }
@@ -817,7 +809,7 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
             tokensSets.emplace_back(tokens);
         } else {
             FLEEdgePrfBlock block;
-            block.esc = payload.payload.getEscDerivedToken().data;
+            block.esc = payload.payload.getEscDerivedToken().asPrfBlock();
             tokensSets.push_back({block});
             totalTokens++;
         }
