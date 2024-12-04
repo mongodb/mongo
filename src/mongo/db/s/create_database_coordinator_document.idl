@@ -42,6 +42,7 @@ enums:
             kUnset: "unset"
             kEnterCriticalSectionOnPrimary: "enterCriticalSectionOnPrimary"
             kCommitOnShardingCatalog: "commitOnShardingCatalog"
+            kExitCriticalSectionOnPrimary: "exitCriticalSectionOnPrimary"
 
 structs:
     CreateDatabaseCoordinatorDocument:

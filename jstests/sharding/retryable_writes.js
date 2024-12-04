@@ -35,12 +35,7 @@ function verifyServerStatusChanges(
 
 function runTests(mainConn, priConn) {
     var lsid = UUID();
-
-    if (TestData.configShard) {
-        // Creating a collection updates counters on the config server, so do that before getting
-        // the initial stats.
-        assert.commandWorked(mainConn.getDB("test").createCollection("user"));
-    }
+    assert.commandWorked(mainConn.getDB("test").createCollection("user"));
 
     ////////////////////////////////////////////////////////////////////////
     // Test insert command
@@ -328,6 +323,7 @@ function runFailpointTests(mainConn, priConn) {
     // Test the 'onPrimaryTransactionalWrite' failpoint
     var lsid = UUID();
     var testDb = mainConn.getDB('TestDB');
+    assert.commandWorked(testDb.createCollection("user"));
 
     // Test connection close (default behaviour). The connection will get closed, but the
     // inserts must succeed
