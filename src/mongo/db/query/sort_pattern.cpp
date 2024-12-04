@@ -52,13 +52,17 @@ namespace mongo {
 
 namespace {
 
-static const StringDataSet kValidMetaSorts{
-    "textScore"_sd, "randVal"_sd, "geoNearDistance"_sd, "searchScore"_sd, "vectorSearchScore"_sd};
+static const StringDataSet kValidMetaSorts{"textScore"_sd,
+                                           "randVal"_sd,
+                                           "geoNearDistance"_sd,
+                                           "searchScore"_sd,
+                                           "vectorSearchScore"_sd,
+                                           "score"_sd};
 
 bool isSupportedMetaSort(const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData name) {
-    if (name == "searchScore"_sd || name == "vectorSearchScore"_sd) {
+    if (name == "searchScore"_sd || name == "vectorSearchScore"_sd || name == "score"_sd) {
         expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(
-            "sorting by searchScore or vectorSearchScore",
+            "sorting by searchScore, vectorSearchScore, or score",
             feature_flags::gFeatureFlagSearchHybridScoringPrerequisites);
     }
     return kValidMetaSorts.contains(name);
