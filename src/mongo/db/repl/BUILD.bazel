@@ -1257,7 +1257,6 @@ mongo_cc_library(
         "oplog_applier.h",
         "oplog_applier_batcher.h",
         "oplog_batch.h",
-        "oplog_buffer.h",
     ],
     deps = [
         ":oplog_entry",
@@ -1338,7 +1337,6 @@ mongo_cc_library(
         "oplog_applier.h",
         "oplog_applier_batcher.h",
         "oplog_batch.h",
-        "oplog_buffer.h",
         "oplog_fetcher.h",
     ],
     deps = [
@@ -1431,7 +1429,6 @@ mongo_cc_library(
     srcs = [
         "replication_info.cpp",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         ":hello_auth",
         ":hello_command",

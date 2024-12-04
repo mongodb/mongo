@@ -1375,7 +1375,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats:distinct_key.h",
         "//src/mongo/db/repl:sync_source_resolver.h",
     ],
-    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "buildinfo_common",
         "core",
