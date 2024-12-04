@@ -20,7 +20,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        BAZEL_FLAGS="--remote_download_outputs=all"
+        BAZEL_FLAGS="--remote_download_outputs=all --config=no-remote-exec"
       large_distro_name: amazon2023.3-arm64-large
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
@@ -77,7 +77,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        BAZEL_FLAGS="--remote_download_outputs=all"
+        BAZEL_FLAGS="--remote_download_outputs=all --config=no-remote-exec"
       large_distro_name: rhel93-medium
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
