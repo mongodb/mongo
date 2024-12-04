@@ -164,10 +164,10 @@ buildvariants:
     tasks:
       - name: compile_test_serial_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: compile_test_parallel_unittest_stream_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

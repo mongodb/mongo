@@ -2181,18 +2181,18 @@ config_setting(
 )
 
 # --------------------------------------
-# link_timeout_5min
+# link_timeout_8min
 # --------------------------------------
 
 bool_flag(
-    name = "link_timeout_5min",
+    name = "link_timeout_8min",
     build_setting_default = False,
 )
 
 config_setting(
-    name = "link_timeout_5min_enabled",
+    name = "link_timeout_8min_enabled",
     flag_values = {
-        "//bazel/config:link_timeout_5min": "True",
+        "//bazel/config:link_timeout_8min": "True",
     },
 )
 

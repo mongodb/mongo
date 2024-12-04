@@ -37,7 +37,7 @@ buildvariants:
     tasks:
       - name: compile_test_serial_no_unittests_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: .aggfuzzer .common !.feature_flag_guarded
       - name: audit
       - name: auth_audit_gen

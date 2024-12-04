@@ -39,7 +39,7 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_windows
       - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_windows
         distros:

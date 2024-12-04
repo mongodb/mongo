@@ -295,7 +295,7 @@ buildvariants:
           - windows-2022-xxlarge
       - name: compile_integration_and_test_no_audit_parallel_stream_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
         distros:

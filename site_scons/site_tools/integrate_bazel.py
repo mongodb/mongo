@@ -454,7 +454,7 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
                 "Build failed, retrying with --jobs=4 in case linking failed due to hitting concurrency limits..."
             )
             run_bazel_command(
-                env, bazel_cmd + ["--jobs", "4", "--link_timeout_5min=False"], tries_so_far=1
+                env, bazel_cmd + ["--jobs", "4", "--link_timeout_8min=False"], tries_so_far=1
             )
             return
 
@@ -1131,7 +1131,7 @@ def generate(env: SCons.Environment.Environment) -> None:
     # Timeout linking on windows at 5 minutes to retry with a lower concurrency.
     if platform.system() == "Windows":
         bazel_internal_flags += [
-            "--link_timeout_5min=True",
+            "--link_timeout_8min=True",
         ]
 
     if not os.environ.get("USE_NATIVE_TOOLCHAIN"):

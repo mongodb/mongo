@@ -1797,7 +1797,7 @@ def _mongo_cc_binary_and_program(
     )
 
     exec_properties |= select({
-        "//bazel/config:link_timeout_5min_enabled": {
+        "//bazel/config:link_timeout_8min_enabled": {
             "cpp_link.timeout": "300",
         },
         "//conditions:default": {},

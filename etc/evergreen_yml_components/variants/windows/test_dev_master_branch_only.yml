@@ -53,7 +53,7 @@ buildvariants:
     tags: ["bazel_check"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - windows-2022-xlarge
+      - windows-2022-xxlarge
     stepback: false
     expansions:
       exe: ".exe"
@@ -74,7 +74,7 @@ buildvariants:
     display_name: "* Windows Server 2022 Enterprise Dev Compile"
     tags: ["suggested"]
     run_on:
-      - windows-2022-xlarge
+      - windows-2022-xxlarge
     expansions:
       exe: ".exe"
       ext: zip
@@ -120,7 +120,7 @@ buildvariants:
     tasks:
       - name: compile_dist_test_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
 
   - name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
     display_name: "* Enterprise Windows Server 2022 (Benchmarks)"
@@ -154,7 +154,7 @@ buildvariants:
     tasks:
       - name: compile_upload_benchmarks_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: .benchmarks !benchmarks_orphaned_first_half !benchmarks_orphaned_second_half
 
   ### Security Patch-Specific Build Variants ###

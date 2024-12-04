@@ -71,7 +71,7 @@ build --flag_alias=ssl=//bazel/config:ssl
 build --flag_alias=js_engine=//bazel/config:js_engine
 build --flag_alias=use_sasl_client=//bazel/config:use_sasl_client
 build --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
-build --flag_alias=link_timeout_5min=//bazel/config:link_timeout_5min
+build --flag_alias=link_timeout_8min=//bazel/config:link_timeout_8min
 
 build --flag_alias=dwarf_version=//bazel/config:dwarf_version
 build --flag_alias=http_client=//bazel/config:http_client

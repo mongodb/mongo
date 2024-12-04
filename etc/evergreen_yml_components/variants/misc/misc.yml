@@ -64,10 +64,10 @@ buildvariants:
     tasks:
       - name: compile_ninja_next_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: compile_ninja_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
 
   - name: macos-arm-ninja-build-profiles
     display_name: "Ninja Build Profiles: macOS ARM"
@@ -97,10 +97,10 @@ buildvariants:
     tasks:
       - name: compile_ninja_default_profile_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: compile_ninja_opt_profile_TG
         distros:
-          - windows-2022-xlarge
+          - windows-2022-xxlarge
       - name: compile_ninja_fast_profile_TG
         distros:
           - windows-2022-xxlarge
