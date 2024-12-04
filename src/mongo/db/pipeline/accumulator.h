@@ -458,6 +458,10 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
+    bool isCommutative() const final {
+        return true;
+    }
+
 private:
     /**
      * The total of all values is partitioned between those that are decimals, and those that are
@@ -479,6 +483,10 @@ public:
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;
+
+    bool isCommutative() const final {
+        return true;
+    }
 
 private:
     const bool _isSamp;
@@ -603,6 +611,10 @@ public:
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+
+    bool isCommutative() const final {
+        return true;
+    }
 
 private:
     void addValues(const std::vector<Value>& values);

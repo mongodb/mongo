@@ -238,10 +238,6 @@ public:
         return ExpressionNary::Associativity::kFull;
     }
 
-    bool isCommutative() const final {
-        return true;
-    }
-
     /**
      * Constructs an Expression representing $firstN or $lastN depending on 's'.
      */
@@ -353,6 +349,10 @@ public:
 
     ExpressionNary::Associativity getAssociativity() const final {
         return ExpressionNary::Associativity::kFull;
+    }
+
+    bool isCommutative() const final {
+        return true;
     }
 
     /**

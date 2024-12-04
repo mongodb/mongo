@@ -31,7 +31,8 @@
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
  *   # Verifying the optimization is applied through explain works in FCV 8.0 and forward.
- *   requires_fcv_80,
+ *   # $concatArrays (which is tested here) was added in 8.1.
+ *   requires_fcv_81,
  *   # setParameter is not allowed with signed security.
  *   not_allowed_with_signed_security_token,
  *   # $accumulator requires server-side scripting
@@ -573,21 +574,24 @@ const doc_t1_sD_x3_adotb0 = {
     t: ISODate("2024-01-01T23:50:00"),
     s: "D",
     x: 3,
-    a: {b: 0}
+    a: {b: 0},
+    arr: [{b: 0}]
 };
 
 const doc_t2_sA_x2_adotc1 = {
     t: ISODate("2024-01-01T23:51:00"),
     s: "A",
     x: 2,
-    a: {c: 1}
+    a: {c: 1},
+    arr: [{c: 1}]
 };
 
 const doc_t3_sD_x1_adotb1 = {
     t: ISODate("2024-01-02T00:02:00"),
     s: "D",
     x: 1,
-    a: {b: 1}
+    a: {b: 1},
+    arr: [{b: 1}]
 };
 
 (function testNotOptimizedMixedFirstAndMergeObjects() {
@@ -640,6 +644,60 @@ const doc_t3_sD_x1_adotb1 = {
         expected: [
             {_id: "A", lx: 2, a: [{c: 1}]},
             {_id: "D", lx: 3, a: [{b: 1}, {b: 0}]},
+        ],
+        verifyThis: (pipeline, explain) => verifySortNotAbsorbed(pipeline, explain)
+    });
+})();
+
+(function testNotOptimizedMixedLastAndConcatArrays() {
+    runTestCase({
+        docs: [
+            doc_t1_sD_x3_adotb0,
+            doc_t2_sA_x2_adotc1,
+            doc_t3_sD_x1_adotb1,
+        ],
+        pipeline: [
+            {$sort: {x: 1}},
+            {
+                $group: {
+                    _id: "$s",
+                    lx: {$last: "$x"},
+                    a: {$concatArrays: "$arr"},
+                }
+            },
+        ],
+        // For {s: "D"}, {$sort: {x: 1}} will return 'doc_t3_sD_x1_adotb1' first and then
+        // 'doc_t1_sD_x3_adotb0'. Hence, 'a' value will be [{b: 1}, {b: 0}].
+        expected: [
+            {_id: "A", lx: 2, a: [{c: 1}]},
+            {_id: "D", lx: 3, a: [{b: 1}, {b: 0}]},
+        ],
+        verifyThis: (pipeline, explain) => verifySortNotAbsorbed(pipeline, explain)
+    });
+})();
+
+(function testNotOptimizedMixedLastAndPercentile() {
+    runTestCase({
+        docs: [
+            doc_t1_sD_x3_adotb0,
+            doc_t2_sA_x2_adotc1,
+            doc_t3_sD_x1_adotb1,
+        ],
+        pipeline: [
+            {$sort: {x: 1}},
+            {
+                $group: {
+                    _id: "$s",
+                    lx: {$last: "$x"},
+                    a: {$percentile: {input: "$x", p: [0.95], method: 'approximate'}},
+                }
+            },
+        ],
+        // For {s: "D"}, {$sort: {x: 1}} will return 'doc_t3_sD_x1_adotb1' first and then
+        // 'doc_t1_sD_x3_adotb0'.
+        expected: [
+            {_id: "A", lx: 2, a: [2]},
+            {_id: "D", lx: 3, a: [3]},
         ],
         verifyThis: (pipeline, explain) => verifySortNotAbsorbed(pipeline, explain)
     });

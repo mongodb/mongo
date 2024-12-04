@@ -243,14 +243,10 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(
         if (accumulators[i].expr.name == AccumulatorFirst::kName ||
             accumulators[i].expr.name == AccumulatorLast::kName) {
             firstLastAccumulatorIndices.push_back(i);
-        } else if (accumulators[i].expr.name == AccumulatorFirstN::kName ||
-                   accumulators[i].expr.name == AccumulatorLastN::kName ||
-                   accumulators[i].expr.name == AccumulatorMergeObjects::kName ||
-                   accumulators[i].expr.name == AccumulatorPush::kName ||
-                   accumulators[i].expr.name == AccumulatorJs::kName) {
-            // If there's any $firstN, $lastN, $mergeObjects, $push, and/or $accumulator
-            // accumulators which depends on the order, we cannot absorb the $sort into $group
-            // because they rely on the ordered input from $sort.
+        } else if (!accumulators[i].expr.factory()->isCommutative()) {
+            // If there are any accumulators that are not commutative (i.e. which depend on the
+            // input order) we cannot absorb the $sort into $group because they rely on the ordered
+            // input from $sort.
             return false;
         }
     }
