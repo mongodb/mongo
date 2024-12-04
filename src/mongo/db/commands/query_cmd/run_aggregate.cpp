@@ -473,39 +473,63 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
 
 /**
  * Executes the aggregation pipeline, registering any cursors needed for subsequent calls to
- * getMore() if necessary. Returns the first ClientCursorPin, if any cursor was registered.
+ * getMore() if necessary.
  */
-boost::optional<ClientCursorPin> executeUntilFirstBatch(
-    const AggExState& aggExState,
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>>& execs,
-    rpc::ReplyBuilderInterface* result) {
+void executeUntilFirstBatch(const AggExState& aggExState,
+                            const AggCatalogState& aggCatalogState,
+                            boost::intrusive_ptr<ExpressionContext> expCtx,
+                            std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>>& execs,
+                            rpc::ReplyBuilderInterface* result) {
+    // If any cursor is registered, this will be the first ClientCursorPin.
+    boost::optional<ClientCursorPin> maybePinnedCursor = boost::none;
+
     if (execs.size() == 1) {
-        return executeSingleExecUntilFirstBatch(aggExState, expCtx, execs, result);
+        maybePinnedCursor = executeSingleExecUntilFirstBatch(aggExState, expCtx, execs, result);
+    } else {
+        // We disallowed external data sources in queries with multiple plan executors due to a data
+        // race (see SERVER-85453 for more details).
+        tassert(8545301,
+                "External data sources are not currently compatible with queries that use multiple "
+                "plan executors.",
+                aggExState.getExternalDataSourceScopeGuard() == nullptr);
+
+        // If there is more than one executor, that means this query will be running on multiple
+        // shards via exchange and merge. Such queries always require a cursor to be registered for
+        // each PlanExecutor.
+        std::vector<ClientCursorPin> pinnedCursors;
+        for (auto&& exec : execs) {
+            auto pinnedCursor = registerCursor(aggExState, expCtx, std::move(exec));
+            pinnedCursors.emplace_back(std::move(pinnedCursor));
+        }
+        handleMultipleCursorsForExchange(aggExState, expCtx, pinnedCursors, result);
+
+        if (pinnedCursors.size() > 0) {
+            maybePinnedCursor = std::move(pinnedCursors[0]);
+        }
     }
 
-    // We disallowed external data sources in queries with multiple plan executors due to a data
-    // race (see SERVER-85453 for more details).
-    tassert(8545301,
-            "External data sources are not currently compatible with queries that use multiple "
-            "plan executors.",
-            aggExState.getExternalDataSourceScopeGuard() == nullptr);
-
-    // If there is more than one executor, that means this query will be running on multiple
-    // shards via exchange and merge. Such queries always require a cursor to be registered for
-    // each PlanExecutor.
-    std::vector<ClientCursorPin> pinnedCursors;
-    for (auto&& exec : execs) {
-        auto pinnedCursor = registerCursor(aggExState, expCtx, std::move(exec));
-        pinnedCursors.emplace_back(std::move(pinnedCursor));
+    // For an optimized away pipeline, signal the cache that a query operation has completed.
+    // For normal pipelines this is done in DocumentSourceCursor.
+    if (aggCatalogState.lockAcquired()) {
+        auto exec =
+            maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
+        const auto& planExplainer = exec->getPlanExplainer();
+        if (const auto& coll = aggCatalogState.getCtx().getCollection()) {
+            CollectionQueryInfo::get(coll).notifyOfQuery(
+                coll, CurOp::get(aggExState.getOpCtx())->debug());
+        }
+        // For SBE pushed down pipelines, we may need to report stats saved for secondary
+        // collections separately.
+        for (const auto& [secondaryNss, coll] :
+             aggCatalogState.getCollections().getSecondaryCollections()) {
+            if (coll) {
+                PlanSummaryStats secondaryStats;
+                planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);
+                CollectionQueryInfo::get(coll).notifyOfQuery(
+                    aggExState.getOpCtx(), coll, secondaryStats);
+            }
+        }
     }
-    handleMultipleCursorsForExchange(aggExState, expCtx, pinnedCursors, result);
-
-    if (pinnedCursors.size() > 0) {
-        return std::move(pinnedCursors[0]);
-    }
-
-    return boost::none;
 }
 
 /**
@@ -666,6 +690,40 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         });
 
     return execs;
+}
+
+void executeExplain(const AggExState& aggExState,
+                    const AggCatalogState& aggCatalogState,
+                    boost::intrusive_ptr<ExpressionContext> expCtx,
+                    PlanExecutor* explainExecutor,
+                    rpc::ReplyBuilderInterface* result) {
+    auto bodyBuilder = result->getBodyBuilder();
+    if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
+        Explain::explainPipeline(pipelineExec,
+                                 true /* executePipeline */,
+                                 *(expCtx->getExplain()),
+                                 *aggExState.getDeferredCmd(),
+                                 &bodyBuilder);
+    } else {
+        invariant(explainExecutor->getOpCtx() == aggExState.getOpCtx());
+        // The explainStages() function for a non-pipeline executor may need to execute the plan
+        // to collect statistics. If the PlanExecutor uses kLockExternally policy, the
+        // appropriate collection lock must be already held. Make sure it has not been released
+        // yet.
+        invariant(aggCatalogState.lockAcquired());
+        Explain::explainStages(explainExecutor,
+                               aggCatalogState.getCollections(),
+                               *(expCtx->getExplain()),
+                               BSON("optimizedPipeline" << true),
+                               SerializationContext::stateCommandReply(
+                                   aggExState.getRequest().getSerializationContext()),
+                               *aggExState.getDeferredCmd(),
+                               &bodyBuilder);
+    }
+    collectQueryStatsMongod(
+        aggExState.getOpCtx(),
+        expCtx,
+        std::move(CurOp::get(aggExState.getOpCtx())->debug().queryStatsInfo.key));
 }
 
 /**
@@ -968,7 +1026,6 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    auto curOp = CurOp::get(aggExState.getOpCtx());
 
     {
         // If this is a collectionless aggregation, we won't create 'ctx' but will still need an
@@ -1026,65 +1083,9 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // Having released the collection lock, we can now begin to fetch results from the pipeline.
     // If both explain and cursor are specified, explain wins.
     if (expCtx->getExplain()) {
-        auto explainExecutor = execs[0].get();
-        auto bodyBuilder = result->getBodyBuilder();
-        if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
-            Explain::explainPipeline(pipelineExec,
-                                     true /* executePipeline */,
-                                     *(expCtx->getExplain()),
-                                     *aggExState.getDeferredCmd(),
-                                     &bodyBuilder);
-        } else {
-            invariant(explainExecutor->getOpCtx() == aggExState.getOpCtx());
-            // The explainStages() function for a non-pipeline executor may need to execute the plan
-            // to collect statistics. If the PlanExecutor uses kLockExternally policy, the
-            // appropriate collection lock must be already held. Make sure it has not been released
-            // yet.
-            invariant(aggCatalogState->lockAcquired());
-            Explain::explainStages(explainExecutor,
-                                   aggCatalogState->getCollections(),
-                                   *(expCtx->getExplain()),
-                                   BSON("optimizedPipeline" << true),
-                                   SerializationContext::stateCommandReply(
-                                       aggExState.getRequest().getSerializationContext()),
-                                   *aggExState.getDeferredCmd(),
-                                   &bodyBuilder);
-        }
-        collectQueryStatsMongod(
-            aggExState.getOpCtx(), expCtx, std::move(curOp->debug().queryStatsInfo.key));
+        executeExplain(aggExState, *aggCatalogState, expCtx, execs[0].get(), result);
     } else {
-        auto maybePinnedCursor = executeUntilFirstBatch(aggExState, expCtx, execs, result);
-
-        // For an optimized away pipeline, signal the cache that a query operation has completed.
-        // For normal pipelines this is done in DocumentSourceCursor.
-        if (aggCatalogState->lockAcquired()) {
-            auto exec =
-                maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
-            const auto& planExplainer = exec->getPlanExplainer();
-            if (const auto& coll = aggCatalogState->getCtx().getCollection()) {
-                CollectionQueryInfo::get(coll).notifyOfQuery(coll, curOp->debug());
-            }
-            // For SBE pushed down pipelines, we may need to report stats saved for secondary
-            // collections separately.
-            for (const auto& [secondaryNss, coll] :
-                 aggCatalogState->getCollections().getSecondaryCollections()) {
-                if (coll) {
-                    PlanSummaryStats secondaryStats;
-                    planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);
-                    CollectionQueryInfo::get(coll).notifyOfQuery(
-                        aggExState.getOpCtx(), coll, secondaryStats);
-                }
-            }
-        }
-    }
-
-    // The aggregation pipeline may change the namespace of the curop and we need to set it back to
-    // the original namespace to correctly report command stats. One example when the namespace can
-    // be changed is when the pipeline contains an $out stage, which executes an internal command to
-    // create a temp collection, changing the curop namespace to the name of this temp collection.
-    {
-        stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-        curOp->setNS(lk, aggExState.getOriginalNss());
+        executeUntilFirstBatch(aggExState, *aggCatalogState, expCtx, execs, result);
     }
 
     return Status::OK();
@@ -1106,6 +1107,16 @@ Status runAggregate(
     AggExState aggExState(
         opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources);
 
-    return _runAggregate(aggExState, result);
+    Status status = _runAggregate(aggExState, result);
+
+    // The aggregation pipeline may change the namespace of the curop and we need to set it back to
+    // the original namespace to correctly report command stats. One example when the namespace can
+    // be changed is when the pipeline contains an $out stage, which executes an internal command to
+    // create a temp collection, changing the curop namespace to the name of this temp collection.
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setNS(lk, request.getNamespace());
+    }
+    return status;
 }
 }  // namespace mongo
