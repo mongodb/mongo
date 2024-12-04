@@ -1070,7 +1070,7 @@ GDWARF_FEATURES = select({
 # These are added as both copts and linker flags. This should also be added after any debugging flags on the command
 # line to ensure debugging is disabled.
 DISABLE_DEBUGGING_SYMBOLS_FEATURE = select({
-    "//bazel/config:not_windows_debug_symbols_disabled": ["disable_debug_symbols"],
+    "//bazel/config:not_windows_debug_symbols_disabled": ["disable_debug_symbols", "-per_object_debug_info"],
     "//conditions:default": [],
 })
 
