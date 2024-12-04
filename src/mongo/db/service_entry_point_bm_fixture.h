@@ -59,7 +59,7 @@ public:
         // Minimal set up necessary for ServiceEntryPoint.
         auto service = getGlobalServiceContext();
 
-        ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
+        ReadWriteConcernDefaults::create(service->getService(), _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
 
         setupImpl(service);

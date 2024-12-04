@@ -816,7 +816,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         quickExit(ExitCode::badOptions);
     }
 
-    ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
+    ReadWriteConcernDefaults::create(serviceContext->getService(ClusterRole::RouterServer),
+                                     readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
     query_settings::QuerySettingsManager::create(serviceContext, [](OperationContext* opCtx) {
         // QuerySettingsManager modifies a cluster-wide parameter and thus a refresh of the
@@ -864,7 +865,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Update read write concern defaults",
                                                   &startupTimeElapsedBuilder);
-        ReadWriteConcernDefaults::get(serviceContext).refreshIfNecessary(opCtx);
+        ReadWriteConcernDefaults::get(opCtx).refreshIfNecessary(opCtx);
     } catch (const DBException& ex) {
         LOGV2_WARNING(22855,
                       "Error loading read and write concern defaults at startup",

@@ -80,7 +80,7 @@ private:
         setUpAndInitializeConfigDb();
 
         // Manually instantiate the ReadWriteConcernDefaults decoration on the service
-        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+        ReadWriteConcernDefaults::create(getService(), _lookupMock.getFetchDefaultsFn());
 
         // Create config.transactions collection
         auto opCtx = operationContext();

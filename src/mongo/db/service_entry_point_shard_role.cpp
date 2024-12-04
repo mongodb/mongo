@@ -1487,8 +1487,7 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
             // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
             // since this covers both isSpecified() && !isSpecified()
             if (readConcernArgs.isEmpty()) {
-                const auto rwcDefaults =
-                    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+                const auto rwcDefaults = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
                 const auto rcDefault = rwcDefaults.getDefaultReadConcern();
                 if (rcDefault) {
                     const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
@@ -1507,8 +1506,7 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
     if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
         readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
         !_isInternalClient() && readConcernArgs.isEmpty()) {
-        auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                             .getImplicitDefaultReadConcern();
+        auto rcDefault = ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern();
         applyDefaultReadConcern(rcDefault);
     }
 

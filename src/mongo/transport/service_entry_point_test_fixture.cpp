@@ -69,8 +69,6 @@ WriteConcernOptions TestCmdSupportsWriteConcern::expectedWriteConcern;
 void ServiceEntryPointTestFixture::setUp() {
     // Minimal set up necessary for ServiceEntryPoint.
     auto service = getGlobalServiceContext();
-    ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
-    _lookupMock.setLookupCallReturnValue({});
     service->setStorageEngine(std::make_unique<StorageEngineMock>());
 }
 
@@ -84,14 +82,14 @@ void ServiceEntryPointTestFixture::setDefaultReadConcern(OperationContext* opCtx
                                                          repl::ReadConcernArgs rc) {
     RWConcernDefault rwcd;
     rwcd.setDefaultReadConcern(repl::ReadConcernArgs::kAvailable);
-    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).setDefault(opCtx, std::move(rwcd));
+    ReadWriteConcernDefaults::get(opCtx->getService()).setDefault(opCtx, std::move(rwcd));
 }
 
 void ServiceEntryPointTestFixture::setDefaultWriteConcern(OperationContext* opCtx,
                                                           WriteConcernOptions wc) {
     RWConcernDefault rwcd;
     rwcd.setDefaultWriteConcern(wc);
-    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).setDefault(opCtx, std::move(rwcd));
+    ReadWriteConcernDefaults::get(opCtx->getService()).setDefault(opCtx, std::move(rwcd));
 }
 
 void ServiceEntryPointTestFixture::setDefaultWriteConcern(OperationContext* opCtx, BSONObj obj) {
@@ -558,9 +556,8 @@ void ServiceEntryPointTestFixture::runWriteConcernTestExpectClusterDefault(
     auto msg = constructMessage(cmdBSON, opCtx);
 
     // Construct default WC with provenance added.
-    auto defaultWCObj = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                            .getDefaultWriteConcern(opCtx)
-                            ->toBSON();
+    auto defaultWCObj =
+        ReadWriteConcernDefaults::get(opCtx->getService()).getDefaultWriteConcern(opCtx)->toBSON();
     auto defaultWCObjWithProv = defaultWCObj.addField(BSON("provenance"
                                                            << "customDefault")
                                                           .firstElement());

@@ -249,6 +249,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
+#include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/service_entry_point_router_role.h"
@@ -851,7 +852,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     try {
         if (serverGlobalParams.clusterRole.has(ClusterRole::None) && replSettings.isReplSet()) {
-            ReadWriteConcernDefaults::get(startupOpCtx.get()->getServiceContext())
+            ReadWriteConcernDefaults::get(startupOpCtx.get())
                 .refreshIfNecessary(startupOpCtx.get());
         }
     } catch (const DBException& ex) {
@@ -2117,7 +2118,13 @@ int mongod_main(int argc, char* argv[]) {
 
     startAllocatorThread();
 
-    ReadWriteConcernDefaults::create(service, readWriteConcernDefaultsCacheLookupMongoD);
+    auto routerService = service->getService(ClusterRole::RouterServer);
+    auto shardService = service->getService(ClusterRole::ShardServer);
+    if (routerService) {
+        ReadWriteConcernDefaults::create(routerService, readWriteConcernDefaultsCacheLookupMongoS);
+    }
+    ReadWriteConcernDefaults::create(shardService, readWriteConcernDefaultsCacheLookupMongoD);
+
     ChangeStreamOptionsManager::create(service);
 
     if (change_stream_serverless_helpers::canInitializeServices()) {

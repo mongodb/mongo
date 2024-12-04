@@ -105,7 +105,7 @@ void ClusterCommandTestFixture::setUp() {
 
     // The ReadWriteConcernDefaults decoration on the service context won't always be created,
     // so we should manually instantiate it to ensure it exists in our tests.
-    ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+    ReadWriteConcernDefaults::create(getService(), _lookupMock.getFetchDefaultsFn());
 }
 
 BSONObj ClusterCommandTestFixture::_makeCmd(BSONObj cmdObj, bool includeAfterClusterTime) {

@@ -65,15 +65,15 @@ static constexpr auto kReadConcernLevelsDisallowedAsDefault = {
     repl::ReadConcernLevel::kSnapshotReadConcern, repl::ReadConcernLevel::kLinearizableReadConcern};
 
 const auto getReadWriteConcernDefaults =
-    ServiceContext::declareDecoration<boost::optional<ReadWriteConcernDefaults>>();
+    Service::declareDecoration<boost::optional<ReadWriteConcernDefaults>>();
 
-ServiceContext::ConstructorActionRegisterer destroyReadWriteConcernDefaultsRegisterer(
+Service::ConstructorActionRegisterer destroyReadWriteConcernDefaultsRegisterer(
     "DestroyReadWriteConcernDefaults",
-    [](ServiceContext* service) {
+    [](Service* service) {
         // Intentionally empty, since construction happens through different code paths depending on
         // the binary
     },
-    [](ServiceContext* service) { getReadWriteConcernDefaults(service).reset(); });
+    [](Service* service) { getReadWriteConcernDefaults(service).reset(); });
 
 }  // namespace
 
@@ -342,19 +342,19 @@ boost::optional<ReadWriteConcernDefaults::WriteConcern> ReadWriteConcernDefaults
     return boost::none;
 }
 
-ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(ServiceContext* service) {
+ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(Service* service) {
     return *getReadWriteConcernDefaults(service);
 }
 
 ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(OperationContext* opCtx) {
-    return *getReadWriteConcernDefaults(opCtx->getServiceContext());
+    return *getReadWriteConcernDefaults(opCtx->getService());
 }
 
-void ReadWriteConcernDefaults::create(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn) {
+void ReadWriteConcernDefaults::create(Service* service, FetchDefaultsFn fetchDefaultsFn) {
     getReadWriteConcernDefaults(service).emplace(service, std::move(fetchDefaultsFn));
 }
 
-ReadWriteConcernDefaults::ReadWriteConcernDefaults(ServiceContext* service,
+ReadWriteConcernDefaults::ReadWriteConcernDefaults(Service* service,
                                                    FetchDefaultsFn fetchDefaultsFn)
     : _defaults(service, _threadPool, std::move(fetchDefaultsFn)),
       _threadPool([] {
@@ -371,12 +371,12 @@ ReadWriteConcernDefaults::ReadWriteConcernDefaults(ServiceContext* service,
 
 ReadWriteConcernDefaults::~ReadWriteConcernDefaults() = default;
 
-ReadWriteConcernDefaults::Cache::Cache(ServiceContext* service,
+ReadWriteConcernDefaults::Cache::Cache(Service* service,
                                        ThreadPoolInterface& threadPool,
                                        FetchDefaultsFn fetchDefaultsFn)
     : ReadThroughCache(
           _mutex,
-          service->getService(),
+          service,
           threadPool,
           [this](OperationContext* opCtx, Type, const ValueHandle& unusedCachedValue) {
               return LookupResult(lookup(opCtx));

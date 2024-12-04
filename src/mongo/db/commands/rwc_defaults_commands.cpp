@@ -157,7 +157,7 @@ public:
 
             hangWhileSettingDefaultRWC.pauseWhileSet();
 
-            auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
+            auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx);
             auto newDefaults = rwcDefaults.generateNewCWRWCToBeSavedOnDisk(
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
             // We don't want to check if the custom write concern exists on the config servers
@@ -219,7 +219,7 @@ public:
         auto typedRun(OperationContext* opCtx) {
             assertNotStandaloneOrShardServer(opCtx, GetDefaultRWConcern::kCommandName);
 
-            auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
+            auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx);
             const bool inMemory = request().getInMemory().value_or(false);
             if (!inMemory) {
                 // If not asking for the in-memory values, force a refresh to find the most recent

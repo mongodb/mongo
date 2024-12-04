@@ -160,7 +160,7 @@ public:
         using InvocationBase::InvocationBase;
 
         GetDefaultRWConcernResponse typedRun(OperationContext* opCtx) {
-            auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
+            auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx);
             if (request().getInMemory().value_or(false)) {
                 const auto rwcDefault = rwcDefaults.getDefault(opCtx);
                 GetDefaultRWConcernResponse response;

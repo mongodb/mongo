@@ -712,8 +712,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     if (canApplyDefaultWC) {
         auto getDefaultWC = ([&]() {
-            auto rwcDefaults =
-                ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+            auto rwcDefaults = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
             auto wcDefault = rwcDefaults.getDefaultWriteConcern();
             const auto defaultWriteConcernSource = rwcDefaults.getDefaultWriteConcernSource();
             customDefaultWriteConcernWasApplied = defaultWriteConcernSource &&
@@ -820,8 +819,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     auto shouldApplyDefaults = startTransaction || !TransactionRouter::get(opCtx);
     if (readConcernSupport.defaultReadConcernPermit.isOK() && shouldApplyDefaults) {
         if (readConcernArgs.isEmpty()) {
-            const auto rwcDefaults =
-                ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+            const auto rwcDefaults = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
             const auto rcDefault = rwcDefaults.getDefaultReadConcern();
             if (rcDefault) {
                 const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
@@ -839,8 +837,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
         readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
         readConcernArgs.isEmpty()) {
-        const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                   .getImplicitDefaultReadConcern();
+        const auto rcDefault = ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern();
         applyDefaultReadConcern(rcDefault);
     }
 

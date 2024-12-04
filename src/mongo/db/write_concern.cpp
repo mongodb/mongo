@@ -123,8 +123,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
     // (if [(#arbiters > 0) AND (#arbiters >= ½(#voting nodes) - 1)] then {w:1} else {w:majority}).
     if (canApplyDefaultWC) {
         auto getDefaultWC = ([&]() {
-            auto rwcDefaults =
-                ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+            auto rwcDefaults = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
             auto wcDefault = rwcDefaults.getDefaultWriteConcern();
             const auto defaultWriteConcernSource = rwcDefaults.getDefaultWriteConcernSource();
             customDefaultWasApplied = defaultWriteConcernSource &&

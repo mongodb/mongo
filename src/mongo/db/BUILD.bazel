@@ -3262,12 +3262,14 @@ mongo_cc_library(
         "logical_session_cache_factory_mongod.cpp",
         "mongod_main.cpp",
         "read_write_concern_defaults_cache_lookup_mongod.cpp",
+        "//src/mongo/s:read_write_concern_defaults_cache_lookup_mongos.cpp",
     ],
     hdrs = [
         "logical_session_cache_factory_mongod.h",
         "mongod_main.h",
         "read_write_concern_defaults_cache_lookup_mongod.h",
         "session_manager_mongod.h",
+        "//src/mongo/s:read_write_concern_defaults_cache_lookup_mongos.h",
     ],
     tags = ["compile_requires_large_memory_gcc"],
     deps = [

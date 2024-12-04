@@ -48,7 +48,7 @@ void QueryBenchmarkFixture::SetUp(benchmark::State& state) {
         BenchmarkWithProfiler::SetUp(state);
         _fixture.emplace(CatalogScopedGlobalServiceContextForTest::Options{}, false);
 
-        ReadWriteConcernDefaults::create(getGlobalServiceContext(),
+        ReadWriteConcernDefaults::create(getGlobalServiceContext()->getService(),
                                          _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
 

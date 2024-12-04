@@ -169,7 +169,7 @@ void ReplCoordTest::init() {
 
     // The ReadWriteConcernDefaults decoration on the service context won't always be created,
     // so we should manually instantiate it to ensure it exists in our tests.
-    ReadWriteConcernDefaults::create(service, lookupMock.getFetchDefaultsFn());
+    ReadWriteConcernDefaults::create(service->getService(), lookupMock.getFetchDefaultsFn());
 
     TopologyCoordinator::Options settings;
     auto topo = std::make_unique<TopologyCoordinator>(settings);

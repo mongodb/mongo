@@ -190,9 +190,8 @@ WriteConcernOptions _getBatchWriteConcern(
     if (providedBatchWriteConcern) {
         batchWriteConcern = providedBatchWriteConcern.value();
     } else {
-        auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                             .getDefault(opCtx)
-                             .getDefaultWriteConcern();
+        auto wcDefault =
+            ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx).getDefaultWriteConcern();
         if (wcDefault) {
             batchWriteConcern = wcDefault.value();
         }

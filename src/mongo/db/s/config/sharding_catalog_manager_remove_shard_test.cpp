@@ -101,7 +101,7 @@ protected:
             operationContext(), catalogClient(), repl::ReadConcernLevel::kLocalReadConcern));
         _clusterId = clusterIdLoader->getClusterId();
 
-        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+        ReadWriteConcernDefaults::create(getService(), _lookupMock.getFetchDefaultsFn());
 
         DBDirectClient client(operationContext());
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);

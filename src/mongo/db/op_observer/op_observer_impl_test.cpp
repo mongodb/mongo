@@ -258,7 +258,7 @@ protected:
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
         mongoDSessionCatalog->onStepUp(opCtx.get());
 
-        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+        ReadWriteConcernDefaults::create(getService(), _lookupMock.getFetchDefaultsFn());
 
         reset(opCtx.get(), nss, uuid);
         reset(opCtx.get(), nss1, uuid1);
@@ -4849,7 +4849,7 @@ TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntri
 }
 
 TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
-    auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(getService());
     auto opCtx = getClient()->makeOperationContext();
 
     // Put initial defaults in the cache.

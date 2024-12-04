@@ -133,7 +133,7 @@ void RollbackTest::setUp() {
     auto observerRegistry = checked_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
     observerRegistry->addObserver(std::make_unique<RollbackTestOpObserver>());
 
-    ReadWriteConcernDefaults::create(serviceContext, _lookupMock.getFetchDefaultsFn());
+    ReadWriteConcernDefaults::create(getService(), _lookupMock.getFetchDefaultsFn());
 }
 
 RollbackTest::ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollbackMock(

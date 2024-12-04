@@ -723,10 +723,7 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
         }
     }
 
-    // Start reporting statistics from the router port uptime if opened.
-    if (serverGlobalParams.routerPort) {
-        RouterUptimeReporter::get(service).startPeriodicThread(service);
-    }
+    RouterUptimeReporter::get(service).startPeriodicThread(service);
 
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.

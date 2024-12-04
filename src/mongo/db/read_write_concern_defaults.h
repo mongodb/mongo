@@ -72,11 +72,11 @@ public:
     // The _id of the persisted default read/write concern document.
     static constexpr StringData kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
 
-    static ReadWriteConcernDefaults& get(ServiceContext* service);
+    static ReadWriteConcernDefaults& get(Service* service);
     static ReadWriteConcernDefaults& get(OperationContext* opCtx);
-    static void create(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn);
+    static void create(Service* service, FetchDefaultsFn fetchDefaultsFn);
 
-    ReadWriteConcernDefaults(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn);
+    ReadWriteConcernDefaults(Service* service, FetchDefaultsFn fetchDefaultsFn);
     ~ReadWriteConcernDefaults();
 
     /**
@@ -201,9 +201,7 @@ private:
         Cache& operator=(const Cache&) = delete;
 
     public:
-        Cache(ServiceContext* service,
-              ThreadPoolInterface& threadPool,
-              FetchDefaultsFn fetchDefaultsFn);
+        Cache(Service* service, ThreadPoolInterface& threadPool, FetchDefaultsFn fetchDefaultsFn);
         ~Cache() override = default;
 
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx);

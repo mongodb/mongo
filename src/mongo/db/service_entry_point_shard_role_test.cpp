@@ -53,6 +53,10 @@ class ServiceEntryPointShardRoleTest : public ServiceEntryPointTestFixture {
 public:
     void setUp() override {
         ServiceEntryPointTestFixture::setUp();
+        auto shardService = getGlobalServiceContext()->getService(ClusterRole::ShardServer);
+        ReadWriteConcernDefaults::create(shardService, _lookupMock.getFetchDefaultsFn());
+        _lookupMock.setLookupCallReturnValue({});
+
         repl::ReplSettings replSettings;
         replSettings.setReplSetString("rs0/host1");
 

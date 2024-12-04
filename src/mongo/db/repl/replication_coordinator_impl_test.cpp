@@ -1139,7 +1139,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupExistingLocalCon
                                                   << "node3:12345"
                                                   << "_id" << 2))),
                        HostAndPort("node1", 12345));
-    auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(getService());
     ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
 }
 
@@ -1159,7 +1159,7 @@ TEST_F(ReplCoordTest,
                                                   << "node3:12345"
                                                   << "_id" << 2 << "arbiterOnly" << true))),
                        HostAndPort("node1", 12345));
-    auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(getService());
     ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
 }
 
@@ -1215,7 +1215,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigMajorit
 
     ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(getServiceContext()), appliedTS);
 
-    auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(getService());
     ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
 }
 
@@ -1280,7 +1280,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigNoMajor
 
     ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(getServiceContext()), appliedTS);
 
-    auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(getService());
     ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
 }
 
