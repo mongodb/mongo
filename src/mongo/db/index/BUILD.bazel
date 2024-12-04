@@ -60,7 +60,6 @@ mongo_cc_library(
         "2d_key_generator.h",
         "btree_access_method.h",
         "btree_key_generator.h",
-        "bulk_builder_common.h",
         "expression_keys_private.h",
         "fts_access_method.h",
         "hash_access_method.h",
