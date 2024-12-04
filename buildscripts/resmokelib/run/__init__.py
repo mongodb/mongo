@@ -1244,6 +1244,16 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--skipExcludedTests",
+            dest="skip_excluded_tests",
+            action="store_true",
+            help=(
+                "Allows skipping any test passed as positional arg that is excluded by suite config."
+                " Ignored when --force-excluded-tests is also set."
+            ),
+        )
+
+        parser.add_argument(
             "--skipTestsCoveredByMoreComplexSuites",
             dest="skip_tests_covered_by_more_complex_suites",
             action="store_true",
