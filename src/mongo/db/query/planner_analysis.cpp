@@ -1455,19 +1455,11 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     // Try to convert the query solution to have a DISTINCT_SCAN.
     if (isDistinctScanMultiplanningEnabled && query.getDistinct()) {
-        // Finalizing a distinct scan plan means pushing FETCH and SHARDING_FILTER stages to the
-        // distinct scan. If the plan is already using a distinct scan, a failure in
-        // finalizing it means we might be left with an invalid plan.
-        const bool mustFinalizeDistinctScan = soln->hasNode(STAGE_DISTINCT_SCAN);
-        const bool didFinalizeDistinctScan =
-            finalizeDistinctScan(query,
-                                 params,
-                                 soln.get(),
-                                 query.getDistinct()->getKey(),
-                                 query.getDistinct()->isDistinctScanDirectionFlipped());
-        tassert(9488000,
-                "Couldn't finalize a distinct scan plan",
-                !mustFinalizeDistinctScan || didFinalizeDistinctScan);
+        turnIxscanIntoDistinctScan(query,
+                                   params,
+                                   soln.get(),
+                                   query.getDistinct()->getKey(),
+                                   query.getDistinct()->isDistinctScanDirectionFlipped());
     }
 
     return soln;

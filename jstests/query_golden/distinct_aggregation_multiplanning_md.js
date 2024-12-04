@@ -71,7 +71,6 @@ outputAggregationPlanAndResults(
     coll,
     [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}],
     {hint: "a_1_b_1"});
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$a"}}]);
 
 section("Both DISTINCT_SCAN and non-DISTINCT_SCAN candidates considered");
 coll.insertMany([{a: 4, b: 2, c: 3}, {a: 4, b: 3, c: 6}, {a: 5, b: 4, c: 7, d: [1, 2, 3]}]);
@@ -150,12 +149,6 @@ section("No DISTINCT_SCAN candidates considered due to multikey index");
 coll.insertMany([{a: 4, b: 2, c: 3}, {a: 4, b: 3, c: 6}, {a: [1, 2, 3], b: 4, c: 7, d: 5}]);
 outputAggregationPlanAndResults(
     coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$a"}}]);
 subSection("No available indexes");
 outputAggregationPlanAndResults(
     coll, [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}]);
-
-// TODO SERVER-97238: Ensure we don't unwind the array here (i.e. we should fetch).
-section("$group by non-multikey field with $first/$last on a multikey field");
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$b", accum: {$first: "$a"}}}]);
-outputAggregationPlanAndResults(coll, [{$group: {_id: "$b", accum: {$last: "$a"}}}]);

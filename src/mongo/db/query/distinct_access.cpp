@@ -45,9 +45,9 @@ namespace {
  * extracted condition used by `getIndexEntriesForDistinct()` which generates all the suitable
  * indexes in case of not multiplanning.
  */
-bool isIndexSuitableForDistinct(const IndexEntry& index,
+bool isIndexSuitableForDistinct(const CanonicalQuery& canonicalQuery,
+                                const IndexEntry& index,
                                 const std::string& field,
-                                const BSONObj& filter,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly) {
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
@@ -78,7 +78,8 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
             return false;
         }
         return true;
-    } else if (index.type == IndexType::INDEX_WILDCARD && !filter.isEmpty()) {
+    } else if (index.type == IndexType::INDEX_WILDCARD &&
+               !canonicalQuery.getFindCommandRequest().getFilter().isEmpty()) {
         // Check whether the $** projection captures the field over which we are distinct-ing.
         if (index.indexPathProjection != nullptr &&
             projection_executor_utils::applyProjectionToOneField(index.indexPathProjection->exec(),
@@ -168,18 +169,11 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                           const std::string& key,
                           const OrderedPathSet& projectionFields,
                           const CollatorInterface* collator,
-                          bool flipDistinctScanDirection,
-                          bool strictDistinctOnly,
                           size_t* indexOut) {
     tassert(951520, "indexOut must be initialized", indexOut);
     size_t minIndexFields = Ordering::kMaxCompoundIndexKeys + 1;
     bool someIndexCoversProj = false;
     for (size_t i = 0; i < indices.size(); ++i) {
-        // If we're here, it means the query does not have a filter.
-        if (!isIndexSuitableForDistinct(
-                indices[i], key, {} /*filter*/, flipDistinctScanDirection, strictDistinctOnly)) {
-            continue;
-        }
         if (isAFullIndexScanPreferable(indices[i], key, collator)) {
             continue;
         }
@@ -208,22 +202,15 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
     const CanonicalDistinct& canonicalDistinct) {
     size_t distinctNodeIndex = 0;
     auto collator = canonicalQuery.getCollator();
-    const bool strictDistinctOnly =
-        plannerParams.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY;
-
     if (getDistinctNodeIndex(plannerParams.mainCollectionInfo.indexes,
                              canonicalDistinct.getKey(),
                              canonicalQuery.getProj()
                                  ? canonicalQuery.getProj()->getRequiredFields()
                                  : OrderedPathSet{},
                              collator,
-                             canonicalDistinct.isDistinctScanDirectionFlipped(),
-                             strictDistinctOnly,
                              &distinctNodeIndex)) {
-        // Hand-construct a distinct scan plan. Note that this is not a valid plan yet.
-        // 'analyzeDataAccess()' will add additional stages as needed and call
-        // 'finalizeDistinctScan()', which finalizes the plan by pushing FETCH and SHARDING_FILTER
-        // stages to the distinct scan.
+        // TODO SERVER-94880: Construct an index scan and let
+        // 'QueryPlannerAnalysis::analyzeDataAccess()' handle the conversion to distinct scan.
         auto dn = std::make_unique<DistinctNode>(
             plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
         dn->direction = 1;
@@ -283,11 +270,11 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& 
         if (multiPlanSolns.isOK()) {
             auto& solutions = multiPlanSolns.getValue();
             for (size_t i = 0; i < solutions.size(); ++i) {
-                if (finalizeDistinctScan(canonicalQuery,
-                                         plannerParams,
-                                         solutions[i].get(),
-                                         canonicalDistinct.getKey(),
-                                         flipDistinctScanDirection)) {
+                if (turnIxscanIntoDistinctScan(canonicalQuery,
+                                               plannerParams,
+                                               solutions[i].get(),
+                                               canonicalDistinct.getKey(),
+                                               flipDistinctScanDirection)) {
                     // The first suitable distinct scan is as good as any other.
                     return std::move(solutions[i]);
                 }
@@ -326,11 +313,11 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
     return !indexMultikeyInfo[keyPatternFieldIndex].empty();
 }
 
-bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
-                          const QueryPlannerParams& plannerParams,
-                          QuerySolution* soln,
-                          const std::string& field,
-                          bool flipDistinctScanDirection) {
+bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
+                                const QueryPlannerParams& plannerParams,
+                                QuerySolution* soln,
+                                const std::string& field,
+                                bool flipDistinctScanDirection) {
     auto root = soln->root();
 
     // When a plan can be converted to use DISTINCT_SCAN, we may expect to see these nodes
@@ -407,11 +394,9 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
     const bool strictDistinctOnly =
         (plannerParams.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
-    const BSONObj& filter = canonicalQuery.getFindCommandRequest().getFilter();
     // If a sort is required to maintain correct query semantics with DISTINCT_SCAN, we need to
     // ensure it is provided by the index.
     const bool hasSortRequirement = canonicalQuery.getDistinct()->getSortRequirement().has_value();
-    const bool hasSort = canonicalQuery.getSortPattern() || hasSortRequirement;
 
     // When multiplanning for distinct is enabled, this function is reached from the query planner
     // which is also called by the fallback find path when multiplanning is disabled. In the latter
@@ -420,10 +405,11 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
     // have not done this check yet, so we filter out ineligible indexes here.
     if (isShardFilteringDistinctScanEnabled) {
         if (!isIndexSuitableForDistinct(
-                indexEntry, field, filter, flipDistinctScanDirection, strictDistinctOnly)) {
+                canonicalQuery, indexEntry, field, flipDistinctScanDirection, strictDistinctOnly)) {
             return false;
         }
-        if (filter.isEmpty() && !hasSort &&
+        if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
+            !canonicalQuery.getSortPattern() && !hasSortRequirement &&
             isAFullIndexScanPreferable(indexEntry, field, queryCollator)) {
             return false;
         }
@@ -493,13 +479,9 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
         }
     }
 
-    // In practice, the only query that can be answered by a distinct scan on a multikey field
-    // is a distinct() with no filter.
-    const bool canScanMultikeyPath = !strictDistinctOnly && filter.isEmpty() && !hasSort;
-
     // We should not use a distinct scan if the field over which we are computing the distinct is
     // multikey.
-    if (indexEntry.multikey && !canScanMultikeyPath) {
+    if (indexEntry.multikey) {
         const auto& multikeyPaths = indexEntry.multikeyPaths;
         if (multikeyPaths.empty()) {
             // We don't have path-level multikey information available.
