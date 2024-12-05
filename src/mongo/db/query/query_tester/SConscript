@@ -21,7 +21,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/client/clientdriver_network",
         "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/query/jparse_util",
+        "$BUILD_DIR/mongo/db/query/util/jparse_util",
         "$BUILD_DIR/mongo/rpc/message",
         "$BUILD_DIR/mongo/shell/shell_utils",
         "$BUILD_DIR/mongo/transport/transport_layer_manager",

@@ -145,29 +145,14 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="sbe_abt_test",
-    source=[
-        "abt/sbe_abt_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "abt_unit_test_utils",
-        "query_sbe_abt",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="makeobj_spec_hash_test",
-    source=[
-        "makeobj_spec_hash_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "query_sbe_abt",
-        "query_sbe_makeobj_spec",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

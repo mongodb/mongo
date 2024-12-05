@@ -42,16 +42,6 @@ env.Benchmark(
     CONSOLIDATED_TARGET="second_half_bm",
 )
 
-env.Library(
-    target="change_stream_test_helpers",
-    source=[
-        "change_stream_test_helpers.cpp",
-    ],
-    LIBDEPS=[
-        "change_stream_pipeline",
-    ],
-)
-
 env.CppUnitTest(
     target="db_pipeline_test",
     source=[

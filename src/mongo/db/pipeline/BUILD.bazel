@@ -53,6 +53,19 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "change_stream_test_helpers",
+    srcs = [
+        "change_stream_test_helpers.cpp",
+    ],
+    hdrs = [
+        "change_stream_test_helpers.h",
+    ],
+    deps = [
+        ":change_stream_pipeline",
+    ],
+)
+
 idl_generator(
     name = "change_stream_pre_and_post_images_options_gen",
     src = "change_stream_pre_and_post_images_options.idl",

@@ -1,5 +1,5 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -240,6 +240,19 @@ mongo_cc_library(
         "//bazel/config:server_js_enabled": ["scripting"],
         "//conditions:default": ["scripting_none"],
     }),
+)
+
+mongo_cc_unit_test(
+    name = "scripting_test",
+    srcs = [
+        "bson_template_evaluator_test.cpp",
+        "deadline_monitor_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":scripting_common",
+        "//src/mongo/db/concurrency:lock_manager",
+    ],
 )
 
 # Note: These are not fully migrateable yet, but we'll leave them for future

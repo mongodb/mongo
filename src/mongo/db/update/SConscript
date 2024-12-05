@@ -4,65 +4,8 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="update_test_helpers",
-    source=[
-        "document_diff_test_helpers.cpp",
-    ],
-    LIBDEPS=[
-        "update",
-    ],
-)
-
 env.CppUnitTest(
     target="db_update_test",
-    source=[
-        "addtoset_node_test.cpp",
-        "arithmetic_node_test.cpp",
-        "bit_node_test.cpp",
-        "compare_node_test.cpp",
-        "current_date_node_test.cpp",
-        "delta_executor_test.cpp",
-        "document_diff_calculator_test.cpp",
-        "document_diff_serialization_test.cpp",
-        "document_diff_applier_test.cpp",
-        "document_diff_test.cpp",
-        "field_checker_test.cpp",
-        "modifier_table_test.cpp",
-        "object_replace_executor_test.cpp",
-        "object_transform_executor_test.cpp",
-        "path_support_test.cpp",
-        "pipeline_executor_test.cpp",
-        "pop_node_test.cpp",
-        "pull_node_test.cpp",
-        "pullall_node_test.cpp",
-        "push_node_test.cpp",
-        "pattern_cmp_test.cpp",
-        "rename_node_test.cpp",
-        "set_node_test.cpp",
-        "unset_node_test.cpp",
-        "update_array_node_test.cpp",
-        "update_driver_test.cpp",
-        "update_object_node_test.cpp",
-        "update_oplog_entry_serialization_test.cpp",
-        "update_serialization_test.cpp",
-        "v2_log_builder_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils",
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/db/query/query_planner",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/vector_clock_trivial",
-        "update",
-        "update_common",
-        "update_driver",
-        "update_test_helpers",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

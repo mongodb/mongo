@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -146,5 +146,53 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:cursor_server_params",
         "//src/mongo/s:grid",
         "//src/mongo/util:background_job",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "s_query_exec_test",
+    srcs = [
+        "async_results_merger_test.cpp",
+        "blocking_results_merger_test.cpp",
+        "cluster_client_cursor_impl_test.cpp",
+        "cluster_client_cursor_mock.cpp",
+        "cluster_client_cursor_mock.h",
+        "cluster_cursor_manager_test.cpp",
+        "cluster_exchange_test.cpp",
+        "establish_cursors_test.cpp",
+        "results_merger_test_fixture.cpp",
+        "results_merger_test_fixture.h",
+        "router_stage_limit_test.cpp",
+        "router_stage_remove_metadata_fields_test.cpp",
+        "router_stage_skip_test.cpp",
+        "sharded_agg_test_fixture.h",
+        "store_possible_cursor_test.cpp",
+        "//src/mongo/db/pipeline:expression_context_for_test.h",
+        "//src/mongo/db/session:logical_session_cache_noop.h",
+        "//src/mongo/idl:server_parameter_test_util.h",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":async_results_merger",
+        ":cluster_cursor",
+        ":cluster_cursor_manager",
+        ":router_exec_stage",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:saslauth",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        # Linking to cluster_commands is necessary for async_results_merger_test.cpp since it
+        # requires linking to the getMore command. Otherwise the test fails due to a uassert
+        # being thrown.
+        "//src/mongo/s/commands:cluster_commands",
+        "//src/mongo/s/commands:cluster_commands_common",
+        "//src/mongo/s/query/planner:cluster_aggregate",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/util:clock_source_mock",
     ],
 )

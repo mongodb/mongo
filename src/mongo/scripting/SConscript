@@ -52,12 +52,6 @@ if jsEngine:
 
 env.CppUnitTest(
     target="scripting_test",
-    source=[
-        "bson_template_evaluator_test.cpp",
-        "deadline_monitor_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "scripting_common",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

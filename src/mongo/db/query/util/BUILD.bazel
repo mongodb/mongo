@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,18 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_library(
+    name = "jparse_util",
+    srcs = [
+        "jparse_util.cpp",
+    ],
+    hdrs = [
+        "jparse_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/query/datetime:date_time_support",
+    ],
 )

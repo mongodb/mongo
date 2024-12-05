@@ -16,35 +16,8 @@ env.Benchmark(
     CONSOLIDATED_TARGET="second_half_bm",
 )
 
-indexTestEnv = env.Clone()
-indexTestEnv.InjectThirdParty(libraries=["snappy"])
-indexTestEnv.CppUnitTest(
+env.CppUnitTest(
     target="db_index_test",
-    source=[
-        "2d_key_generator_test.cpp",
-        "btree_key_generator_test.cpp",
-        "hash_key_generator_test.cpp",
-        "multikey_paths_test.cpp",
-        "s2_key_generator_test.cpp",
-        "s2_bucket_key_generator_test.cpp",
-        "sort_key_generator_test.cpp",
-        "wildcard_key_generator_test.cpp",
-        "wildcard_validation_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
-        "$BUILD_DIR/mongo/db/exec/working_set",
-        "$BUILD_DIR/mongo/db/mongohasher",
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query/sort_pattern",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/sorter/sorter_stats",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "expression_params",
-        "index_access_method",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
