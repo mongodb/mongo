@@ -50,13 +50,15 @@ struct HistogramEstimationBenchmarkConfiguration {
     sbe::value::TypeTags sbeDataType;
     double nanProb = 0;
     size_t arrayTypeLength = 0;
+    bool useE2EAPI = false;
 
     HistogramEstimationBenchmarkConfiguration(benchmark::State& state)
         : numberOfBuckets(state.range(0)),
           size(state.range(1)),
           dataDistribution(static_cast<DataDistributionEnum>(state.range(2))),
           dataType(static_cast<DataType>(state.range(3))),
-          queryType(static_cast<QueryType>(state.range(4))) {
+          queryType(static_cast<QueryType>(state.range(4))),
+          useE2EAPI(static_cast<bool>(state.range(5))) {
         switch (dataType) {
             case kInt:
                 sbeDataType = sbe::value::TypeTags::NumberInt64;
@@ -203,51 +205,52 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
         typeCombinationQuery.typeTag = sbe::value::TypeTags::NumberInt64;
     }
 
-    size_t executedQueries = 0;
+    auto queryIntervals = generateIntervals(configuration.queryType,
+                                            configuration.dataInterval,
+                                            numberOfQueries,
+                                            typeCombinationQuery,
+                                            seed);
+    tassert(9787300, "queryIntervals should have at least one interval", queryIntervals.size() > 0);
+    size_t i = 0;
     for (auto curState : state) {
-        auto summary = runQueries(configuration.size,
-                                  numberOfQueries,
-                                  configuration.queryType,
-                                  configuration.dataInterval,
-                                  typeCombinationQuery,
-                                  data,
-                                  ceHist,
-                                  true /*includeScalar*/,
-                                  ArrayRangeEstimationAlgo::kConjunctArrayCE,
-                                  false /*useE2EAPI*/,
-                                  seed);
-        executedQueries += summary.executedQueries;
+        benchmark::DoNotOptimize(runSingleQuery(configuration.queryType,
+                                                queryIntervals[i].first,
+                                                queryIntervals[i].second,
+                                                ceHist,
+                                                true /*includeScalar*/,
+                                                ArrayRangeEstimationAlgo::kConjunctArrayCE,
+                                                false /*useE2EAPI*/,
+                                                seed));
+        i = (i + 1) % queryIntervals.size();
     }
-    state.SetItemsProcessed(executedQueries);
-
-    // Calculate processing time per item after the loop.
-    state.counters["processing_time_per_item"] =
-        benchmark::Counter(static_cast<double>(executedQueries),
-                           benchmark::Counter::Flags::kIsRate | benchmark::Counter::Flags::kInvert);
+    state.SetItemsProcessed(state.iterations());
 }
 
 BENCHMARK(BM_CreateHistogram)
-    ->ArgNames({"buckets", "size", "distrib", "dataType", "query"})
+    ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50'000, 100'000},
                    /*dataDistribution*/ {kUniform, kNormal, kZipfian},
                    /*dataType*/ {kInt, kString, kBoolean, kNull, kNan, kArray},
-                   /*queryType*/ {kPoint}});
+                   /*queryType*/ {kPoint},
+                   /*useE2EAPI*/ {0}});
 
 BENCHMARK(BM_RunHistogramEstimations)
-    ->ArgNames({"buckets", "size", "distrib", "dataType", "query"})
+    ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
-                   /*size*/ {50'000, 100'000},
-                   /*dataDistribution*/ {kUniform, kNormal, kZipfian},
+                   /*size*/ {50'000},
+                   /*dataDistribution*/ {kUniform, kZipfian},
                    /*dataType*/ {kInt, kString, kBoolean, kNull, kNan, kArray},
-                   /*queryType*/ {kPoint}});
+                   /*queryType*/ {kPoint},
+                   /*useE2EAPI*/ {0, 1}});
 
 BENCHMARK(BM_RunHistogramEstimations)
-    ->ArgNames({"buckets", "size", "distrib", "dataType", "query"})
+    ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
-                   /*size*/ {50000, 100'000},
-                   /*dataDistribution*/ {kUniform, kNormal, kZipfian},
+                   /*size*/ {50'000},
+                   /*dataDistribution*/ {kUniform, kZipfian},
                    /*dataType*/ {kInt, kString, kBoolean, kArray},
-                   /*queryType*/ {kRange}});
+                   /*queryType*/ {kRange},
+                   /*useE2EAPI*/ {0, 1}});
 
 }  // namespace mongo::ce

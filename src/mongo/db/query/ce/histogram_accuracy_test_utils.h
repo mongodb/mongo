@@ -138,7 +138,55 @@ void generateDataZipfian(size_t size,
                          size_t ndv,
                          std::vector<stats::SBEValue>& data,
                          int arrayLength = 0);
+/**
+ * Generates query intervals randomly according to testing configuration.
+ *
+ * @param queryType The type of query intervals. It can be either kPoint or kRange.
+ * @param interval A pair representing the overall range [min, max] within which all generated
+ *                 query intervals' bounds will fall. Both the low and high bounds of each query
+ *                 interval will be within this specified range.
+ * @param numberOfQueries The number of query intervals to generate.
+ * @param queryTypeInfo The type probability information used for generating query interval bounds.
+ * @param seed A seed value for random number generation.
+ * @return A vector of pairs, where each pair consists of two SBEValue representing the low and high
+ *         bounds of an interval.
+ */
+std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
+    QueryType queryType,
+    const std::pair<size_t, size_t>& interval,
+    size_t numberOfQueries,
+    const TypeProbability& queryTypeInfo,
+    size_t seed);
 
+/**
+ * Executes a single query estimation based on the specified query type and parameters.
+ *
+ * @param queryType The type of query intervals. It can be either kPoint or kRange.
+ * @param sbeValLow The lower bound value for the query interval. For kPoint queries, this is the
+ *                  single value to estimate.
+ * @param sbeValHigh The upper bound value for the query interval. This is used only for kRange
+ *                   queries.
+ * @param ceHist The CEHistogram used for cardinality estimation.
+ * @param includeScalar The flag indicating whether scalar values should be included in the
+ *                      estimation.
+ * @param arrayRangeEstimationAlgo The estimation algorithms for range queries over array values.
+ * @param useE2EAPI A flag indicating whether to use the end-to-end API for estimation.
+ * @param size The data size.
+ * @return The estimated cardinality for the query interval.
+ */
+EstimationResult runSingleQuery(QueryType queryType,
+                                const stats::SBEValue& sbeValLow,
+                                const stats::SBEValue& sbeValHigh,
+                                const std::shared_ptr<const stats::CEHistogram>& ceHist,
+                                bool includeScalar,
+                                ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
+                                bool useE2EAPI,
+                                size_t size);
+
+/**
+ * Generates query intervals and executes query estimation. Calculates the overall accuracy and
+ * returns the summary in ErrorCalculationSummary.
+ */
 ErrorCalculationSummary runQueries(size_t size,
                                    size_t numberOfQueries,
                                    QueryType queryType,
