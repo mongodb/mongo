@@ -9,6 +9,8 @@
  *   requires_timeseries,
  *   # This test depends on stats read from the primary node in replica sets.
  *   assumes_read_preference_unchanged,
+ *   # This test depends on the stats tracked by UUID
+ *   assumes_stable_collection_uuid
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
