@@ -226,8 +226,7 @@ public:
      * of an index build, so it must ensure that before it finishes, it has indexed all documents in
      * a collection, requiring a call to this function upon completion.
      *
-     * When featureFlagIndexBuildsGracefulErrorHandling is enagled, the function is also called to
-     * preemptively abort index builds on step-up if the skipped records remain invalid.
+     * Index builds are also preemptively aborted on step up if the skipped records remain invalid.
      */
     Status retrySkippedRecords(
         OperationContext* opCtx,
