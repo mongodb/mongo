@@ -546,10 +546,6 @@ CardinalityEstimate operator*(const CardinalityEstimate& ce, const SelectivityEs
  * The optimizer's estimate of a single QSN in the physical plan.
  */
 struct QSNEstimate {
-    QSNEstimate()
-        : outCE(CardinalityType{0}, EstimationSource::Code),
-          cost(CostType::maxValue(), EstimationSource::Code){};
-
     // A QSN may have three estimates:
     // - the number of processed data items (docs or keys): 'inCE'
     // - the number of filtered data items by the attached filter (if any): 'filterCE'
@@ -565,8 +561,8 @@ struct QSNEstimate {
     //   result.
     boost::optional<CardinalityEstimate> inCE;
     boost::optional<CardinalityEstimate> filterCE;
-    CardinalityEstimate outCE;
-    CostEstimate cost;
+    CardinalityEstimate outCE{CardinalityType{0}, EstimationSource::Code};
+    CostEstimate cost{CostType::maxValue(), EstimationSource::Code};
 };
 
 // Predefined constants

@@ -114,6 +114,22 @@ std::unique_ptr<QuerySolution> makeCollScanPlan(std::unique_ptr<MatchExpression>
     return solution;
 }
 
+std::unique_ptr<QuerySolution> makeVirtualCollScanPlan(size_t size,
+                                                       std::unique_ptr<MatchExpression> filter) {
+    // In a virtual collection, each "document" is a BSONArray with a single element representing
+    // the document.
+    std::vector<BSONArray> docs(size, BSON_ARRAY(BSON("a" << 1)));
+    auto scan = std::make_unique<VirtualScanNode>(
+        std::move(docs), VirtualScanNode::ScanType::kCollScan, false);
+    if (filter) {
+        scan->filter = std::move(filter);
+    }
+
+    auto solution = std::make_unique<QuerySolution>();
+    solution->setRoot(std::move(scan));
+    return solution;
+}
+
 OrderedIntervalList makePointInterval(double point, std::string fieldName) {
     OrderedIntervalList oil(fieldName);
     oil.intervals.emplace_back(IndexBoundsBuilder::makePointInterval(point));

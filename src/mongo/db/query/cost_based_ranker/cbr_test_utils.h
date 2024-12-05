@@ -59,6 +59,9 @@ std::unique_ptr<QuerySolution> makeIndexScanFetchPlan(
 
 std::unique_ptr<QuerySolution> makeCollScanPlan(std::unique_ptr<MatchExpression> filter);
 
+std::unique_ptr<QuerySolution> makeVirtualCollScanPlan(size_t size,
+                                                       std::unique_ptr<MatchExpression> filter);
+
 OrderedIntervalList makePointInterval(double point, std::string fieldName);
 
 IndexBounds makePointIntervalBounds(double point, std::string fieldName);
