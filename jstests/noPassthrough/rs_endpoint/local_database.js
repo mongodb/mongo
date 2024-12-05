@@ -15,6 +15,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     getReplicaSetURL,
+    transitionToDedicatedConfigServer,
     waitForAutoBootstrap
 } from "jstests/noPassthrough/rs_endpoint/lib/util.js";
 
@@ -140,7 +141,7 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
 
     // Add the second shard back but convert the config shard to dedicated config server.
     assert.commandWorked(router.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
-    assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
+    transitionToDedicatedConfigServer(router, shard0Primary, shard1Name /* otherShardName */);
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");

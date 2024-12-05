@@ -18,11 +18,9 @@ import {
     getReplicaSetURL,
     makeCreateRoleCmdObj,
     makeCreateUserCmdObj,
+    transitionToDedicatedConfigServer,
     waitForAutoBootstrap
 } from "jstests/noPassthrough/rs_endpoint/lib/util.js";
-import {
-    moveDatabaseAndUnshardedColls
-} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     jsTest.log("Running tests for " + shard0Primary.host +
@@ -125,17 +123,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 
     // Add the second shard back but convert the config shard to dedicated config server.
     assert.commandWorked(router.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
-    moveDatabaseAndUnshardedColls(router.getDB(dbName), shard1Name);
-    assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
-
-    // Ensure the balancer is enabled so sharded data can be moved out by the transition to
-    // dedicated command.
-    assert.commandWorked(router.adminCommand({balancerStart: 1}));
-
-    assert.soon(() => {
-        let res = router.adminCommand({transitionToDedicatedConfigServer: 1});
-        return res.state == "completed";
-    });
+    transitionToDedicatedConfigServer(router, shard0Primary, shard1Name /* otherShardName */);
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");

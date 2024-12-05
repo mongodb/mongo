@@ -1,6 +1,9 @@
 import {
     withAbortAndRetryOnTransientTxnError
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 export function getReplicaSetURL(db) {
     const rsConfig = assert.commandWorked(db.adminCommand({replSetGetConfig: 1})).config;
@@ -155,4 +158,51 @@ export function makeCreateUserCmdObj(user) {
 export function makeCreateRoleCmdObj(role) {
     const cmdObj = {createRole: role.name, roles: role.roles, privileges: role.privileges};
     return cmdObj;
+}
+
+/*
+ * Transitions the embedded config server (config shard) in the cluster to dedicated config server
+ * after moving the data to 'otherShardName'.
+ */
+export function transitionToDedicatedConfigServer(router, configRSPrimary, otherShardName) {
+    const transitionRes0 =
+        assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
+
+    // Move data out of the config shard.
+    const setParameterRes = assert.commandWorked(configRSPrimary.adminCommand({
+        setParameter: 1,
+        // Set this to 0 to make the moveCollection commands below faster.
+        reshardingMinimumOperationDurationMillis: 0,
+    }));
+    const originalReshardingMinimumOperationDurationMillis = setParameterRes.was;
+    for (const dbName of transitionRes0.dbsToMove) {
+        moveDatabaseAndUnshardedColls(router.getDB(dbName), otherShardName);
+    }
+    assert.commandWorked(configRSPrimary.adminCommand({
+        setParameter: 1,
+        // Restore the original value.
+        reshardingMinimumOperationDurationMillis: originalReshardingMinimumOperationDurationMillis,
+    }));
+    // Rely on the balancer to move chunks for config.system.sessions.
+    assert.commandWorked(router.adminCommand({balancerStart: 1}));
+
+    let transitionRes1;
+    assert.soon(
+        () => {
+            transitionRes1 = router.adminCommand({transitionToDedicatedConfigServer: 1});
+            return transitionRes1.state == "completed";
+        },
+        () => {
+            let chunkDocs, dbDocs;
+            if (transitionRes1.hasOwnProperty("remaining")) {
+                if (transitionRes1.remaining.chunks > 0) {
+                    chunkDocs = router.getCollection("config.chunks").find().toArray();
+                }
+                if (transitionRes1.remaining.dbs > 0) {
+                    dbDocs = router.getCollection("config.databases").find().toArray();
+                }
+            }
+            return "Timed out waiting for the transition to dedicated config server " +
+                tojson({response: transitionRes1, chunkDocs, dbDocs});
+        });
 }

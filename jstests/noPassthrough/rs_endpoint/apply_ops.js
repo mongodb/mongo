@@ -17,6 +17,7 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     getReplicaSetURL,
     makeCreateUserCmdObj,
+    transitionToDedicatedConfigServer,
     waitForAutoBootstrap
 } from "jstests/noPassthrough/rs_endpoint/lib/util.js";
 
@@ -133,7 +134,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     assert.commandWorked(shard1Primary.adminCommand(
         {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {drop: collName}}], writeConcern}));
     assert.commandWorked(router.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
-    assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
+    transitionToDedicatedConfigServer(router, shard0Primary, shard1Name /* otherShardName */);
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");
@@ -143,8 +144,8 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
         {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {create: collName}}], writeConcern}));
     assert.commandWorked(shard1Primary.adminCommand(
         {applyOps: [{"op": "i", ns, "o": {_id: 5, x: 5}}], writeConcern}));
-    // shard1 has one document for the test collection.
-    assert.eq(shard1TestColl.find().itcount(), 1);
+    // shard1 has 5 documents for the test collection (4 of them were moved from the config shard).
+    assert.eq(shard1TestColl.find().itcount(), 5);
     assert.neq(shard1TestColl.findOne({_id: 5}), null);
 
     tearDownFunc();

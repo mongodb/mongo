@@ -18,11 +18,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     getReplicaSetURL,
+    transitionToDedicatedConfigServer,
     waitForAutoBootstrap
 } from "jstests/noPassthrough/rs_endpoint/lib/util.js";
-import {
-    moveDatabaseAndUnshardedColls
-} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 const keyFile = "jstests/libs/key1";
 
@@ -31,10 +29,14 @@ function runTests(shard0Primary, tearDownFunc) {
                " while the cluster contains one shard (config shard)");
 
     const adminUser = {userName: "admin", password: "adminPwd", roles: ["root"]};
+    // This role is needed on shard0 since 'transitionToDedicatedConfigServer' involves setting
+    // a server parameter.
+    const setParameterRoleName = "setParameterRole";
+    const setParameterPrivilege = {resource: {cluster: true}, actions: ["setParameter"]};
     const shard0User = {
         userName: "user_shard0",
         password: "user_shard0_pwd",
-        roles: ["readWriteAnyDatabase"]
+        roles: ["readWriteAnyDatabase", setParameterRoleName]
     };
     const shard1User = {
         userName: "user_shard1",
@@ -58,6 +60,8 @@ function runTests(shard0Primary, tearDownFunc) {
     assert.commandWorked(shard0AuthDB.runCommand(
         {createUser: adminUser.userName, pwd: adminUser.password, roles: adminUser.roles}));
     assert(shard0AuthDB.auth(adminUser.userName, adminUser.password));
+    shard0AuthDB.createRole(
+        {role: setParameterRoleName, privileges: [setParameterPrivilege], roles: []});
     assert.commandWorked(shard0AuthDB.runCommand(
         {createUser: shard0User.userName, pwd: shard0User.password, roles: shard0User.roles}));
     const shard0URL = getReplicaSetURL(shard0AuthDB);
@@ -108,6 +112,11 @@ function runTests(shard0Primary, tearDownFunc) {
     assert.commandWorked(shard1AuthDB.runCommand(
         {createUser: adminUser.userName, pwd: adminUser.password, roles: adminUser.roles}));
     assert(shard1AuthDB.auth(adminUser.userName, adminUser.password));
+    shard1AuthDB.createRole({
+        role: setParameterRoleName,
+        privileges: [{resource: {cluster: true}, actions: ["setParameter"]}],
+        roles: []
+    });
     assert.commandWorked(shard1AuthDB.runCommand(
         {createUser: shard1User.userName, pwd: shard1User.password, roles: shard1User.roles}));
     assert(shard1AuthDB.logout());
@@ -189,13 +198,12 @@ function runTests(shard0Primary, tearDownFunc) {
 
     // Add the second shard back but convert the config shard to dedicated config server.
     assert(mongosAuthDB.auth(adminUser.userName, adminUser.password));
+    assert(shard0AuthDB.auth(shard0User.userName, shard0User.password));
     assert.commandWorked(
         mongosAuthDB.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
-
-    moveDatabaseAndUnshardedColls(router.getDB(dbName), shard1Name);
-
-    assert.commandWorked(mongosAuthDB.adminCommand({transitionToDedicatedConfigServer: 1}));
+    transitionToDedicatedConfigServer(router, shard0AuthDB, shard1Name /* otherShardName */);
     assert(mongosAuthDB.logout());
+    assert(shard0AuthDB.logout());
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");
@@ -207,17 +215,30 @@ function runTests(shard0Primary, tearDownFunc) {
     assert(shard1AuthDB.logout());
 
     // Revoke the directShardOperations privilege from shard1User. The user should no longer be able
-    // to run commands.
+    // to run commands when a second shard is added to the cluster.
     assert(shard1AuthDB.auth(adminUser.userName, adminUser.password));
     shard1AuthDB.revokeRolesFromUser(shard1User.userName, ["directShardOperations"]);
     assert(shard1AuthDB.logout());
 
     assert(shard1AuthDB.auth(shard1User.userName, shard1User.password));
+    shard1TestColl.find().toArray();
+
+    // Add a second shard to the cluster.
+    const shard2Name = "shard2-" + extractUUIDFromObject(UUID());
+    const shard2Rst = new ReplSetTest({name: shard2Name, nodes: 2, keyFile});
+    shard2Rst.startSet({shardsvr: ""});
+    shard2Rst.initiate();
+    assert(mongosAuthDB.auth(adminUser.userName, adminUser.password));
+    assert.commandWorked(
+        mongosAuthDB.adminCommand({addShard: shard2Rst.getURL(), name: shard2Name}));
+    assert(mongosAuthDB.logout());
+
     assert.throwsWithCode(() => shard1TestColl.find().toArray(), ErrorCodes.Unauthorized);
     assert(shard1AuthDB.logout());
 
     tearDownFunc();
     shard1Rst.stopSet();
+    shard2Rst.stopSet();
     if (mongos) {
         MongoRunner.stopMongos(mongos);
     }
