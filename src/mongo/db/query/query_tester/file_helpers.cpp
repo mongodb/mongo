@@ -172,9 +172,7 @@ void displayFailingQueryFeatures(const std::filesystem::path& queryFeaturesFile)
 }
 
 std::string getBaseNameFromFilePath(const std::filesystem::path& filePath) {
-    auto fileName = filePath.filename().string();
-    auto extension = fileName.find('.');
-    return fileName.substr(0, extension);
+    return filePath.stem().string();
 }
 
 std::vector<size_t> getFailedTestNums(const std::string& diffOutput) {
