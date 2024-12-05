@@ -47,6 +47,9 @@ const collBase = db.base;
 collBase.drop();
 assert.commandWorked(collBase.insert({"_id": 100, "localField": "cakes", "weird": false}));
 
+// Make sure the shard that is going to execute the nested $lookup has up-to-date routing info.
+collBase.aggregate([{$lookup: {from: coll.getName(), pipeline: [], as: "out"}}]);
+
 // Test $searchMeta with $lookup.
 const lookupPipeline = [
     {$match: {_id: 100}},

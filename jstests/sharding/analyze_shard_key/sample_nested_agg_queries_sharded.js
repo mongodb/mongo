@@ -56,7 +56,9 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: foreignNs, find: {x: 1000}, to: st.shard2.name}));
 
 // Refresh the routing information for the foreign collection in shard0.
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+mongosDB.getCollection(localCollName).aggregate([
+    {$lookup: {from: foreignCollName, pipeline: [], as: "out"}}
+]);
 
 assert.commandWorked(
     st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}));
