@@ -2331,6 +2331,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_expressions",
     srcs = [
+        "//src/mongo/db/exec/expression:evaluate_array.cpp",
         "//src/mongo/db/exec/expression:evaluate_date.cpp",
         "//src/mongo/db/matcher:doc_validation_error.cpp",
         "//src/mongo/db/matcher:doc_validation_util.cpp",

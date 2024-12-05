@@ -2030,6 +2030,16 @@ public:
         return this->_limit ? true : false;
     }
 
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+    const Expression* getCond() const {
+        return _children[_kCond].get();
+    }
+    boost::optional<size_t> getLimit() const {
+        return _limit;
+    }
+
 private:
     // The array to iterate over.
     static constexpr size_t _kInput = 0;
@@ -2158,32 +2168,15 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    struct Arguments {
-        Arguments(Value targetOfSearch, int startIndex, int endIndex)
-            : targetOfSearch(targetOfSearch), startIndex(startIndex), endIndex(endIndex) {}
-
-        Value targetOfSearch;
-        int startIndex;
-        int endIndex;
-    };
-    /**
-     * When given 'operands' which correspond to the arguments to $indexOfArray, evaluates and
-     * validates the target value, starting index, and ending index arguments and returns their
-     * values as a Arguments struct. The starting index and ending index are optional, so as default
-     * 'startIndex' will be 0 and 'endIndex' will be the length of the input array. Throws a
-     * UserException if the values are found to be invalid in some way, e.g. if the indexes are not
-     * numbers.
-     */
-    Arguments evaluateAndValidateArguments(const Document& root,
-                                           const ExpressionVector& operands,
-                                           size_t arrayLength,
-                                           Variables* variables) const;
+    const boost::optional<ValueUnorderedMap<std::vector<int>>>& getParsedIndexMap() const {
+        return _parsedIndexMap;
+    }
 
 private:
-    class Optimized;
+    // Maps the values in the array to the positions at which they occur. We need to remember
+    // the positions so that we can verify they are in the appropriate range.
+    boost::optional<ValueUnorderedMap<std::vector<int>>> _parsedIndexMap;
 };
-
 
 class ExpressionIndexOfBytes final : public ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4> {
 public:
@@ -2921,6 +2914,10 @@ public:
         return visitor->visit(this);
     }
 
+    const boost::optional<std::pair<size_t, ValueFlatUnorderedSet>>& getCachedConstant() const {
+        return _cachedConstant;
+    }
+
 private:
     // The first element in the pair represent the position on the constant in the '_children'
     // array. The second element is the constant set.
@@ -2979,10 +2976,20 @@ public:
         return visitor->visit(this);
     }
 
-private:
-    class Optimized;
-};
+    const boost::optional<ValueFlatUnorderedSet>& getCachedRhsSet() const {
+        return _cachedRhsSet;
+    }
 
+private:
+    /**
+     * This class member handles the case where the RHS set is constant.
+     *
+     * Since it is constant we can construct the hashset once which makes the runtime performance
+     * effectively constant with respect to the size of RHS. Large, constant RHS is expected to be a
+     * major use case for $redact and this has been verified to improve performance significantly.
+     */
+    boost::optional<ValueFlatUnorderedSet> _cachedRhsSet;
+};
 
 class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
@@ -3079,6 +3086,14 @@ public:
 
     BSONObj getSortPattern() const {
         return _sortBy.sortPattern;
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const PatternValueCmp& getSortBy() const {
+        return _sortBy;
     }
 
 private:
@@ -3749,6 +3764,19 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    bool getUseLongestLength() const {
+        return _useLongestLength;
+    }
+
+    const std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>>& getInputs() const {
+        return _inputs;
+    }
+
+    const std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>>& getDefaults()
+        const {
+        return _defaults;
     }
 
 private:

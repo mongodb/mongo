@@ -793,13 +793,7 @@ const char* ExpressionAnyElementTrue::getOpName() const {
 /* ---------------------- ExpressionArray --------------------------- */
 
 Value ExpressionArray::evaluate(const Document& root, Variables* variables) const {
-    vector<Value> values;
-    values.reserve(_children.size());
-    for (auto&& expr : _children) {
-        Value elemVal = expr->evaluate(root, variables);
-        values.push_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
-    }
-    return Value(std::move(values));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 Value ExpressionArray::serialize(const SerializationOptions& options) const {
@@ -850,44 +844,8 @@ const char* ExpressionArray::getOpName() const {
 
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
-namespace {
-Value arrayElemAt(const ExpressionNary* self, Value array, Value indexArg) {
-    if (array.nullish() || indexArg.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    size_t arity = self->getOperandList().size();
-    uassert(28689,
-            str::stream() << self->getOpName() << "'s "
-                          << (arity == 1 ? "argument" : "first argument")
-                          << " must be an array, but is " << typeName(array.getType()),
-            array.isArray());
-    uassert(28690,
-            str::stream() << self->getOpName() << "'s second argument must be a numeric value,"
-                          << " but is " << typeName(indexArg.getType()),
-            indexArg.numeric());
-    uassert(28691,
-            str::stream() << self->getOpName() << "'s second argument must be representable as"
-                          << " a 32-bit integer: " << indexArg.coerceToDouble(),
-            indexArg.integral());
-
-    long long i = indexArg.coerceToLong();
-    if (i < 0 && static_cast<size_t>(std::abs(i)) > array.getArrayLength()) {
-        // Positive indices that are too large are handled automatically by Value.
-        return Value();
-    } else if (i < 0) {
-        // Index from the back of the array.
-        i = array.getArrayLength() + i;
-    }
-    const size_t index = static_cast<size_t>(i);
-    return array[index];
-}
-}  // namespace
-
 Value ExpressionArrayElemAt::evaluate(const Document& root, Variables* variables) const {
-    const Value array = _children[0]->evaluate(root, variables);
-    const Value indexArg = _children[1]->evaluate(root, variables);
-    return arrayElemAt(this, array, indexArg);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(arrayElemAt, ExpressionArrayElemAt::parse);
@@ -898,8 +856,7 @@ const char* ExpressionArrayElemAt::getOpName() const {
 /* ------------------------- ExpressionFirst -------------------------- */
 
 Value ExpressionFirst::evaluate(const Document& root, Variables* variables) const {
-    const Value array = _children[0]->evaluate(root, variables);
-    return arrayElemAt(this, array, Value(0));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(first, ExpressionFirst::parse);
@@ -911,8 +868,7 @@ const char* ExpressionFirst::getOpName() const {
 /* ------------------------- ExpressionLast -------------------------- */
 
 Value ExpressionLast::evaluate(const Document& root, Variables* variables) const {
-    const Value array = _children[0]->evaluate(root, variables);
-    return arrayElemAt(this, array, Value(-1));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(last, ExpressionLast::parse);
@@ -924,29 +880,7 @@ const char* ExpressionLast::getOpName() const {
 /* ------------------------- ExpressionObjectToArray -------------------------- */
 
 Value ExpressionObjectToArray::evaluate(const Document& root, Variables* variables) const {
-    const Value targetVal = _children[0]->evaluate(root, variables);
-
-    if (targetVal.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(40390,
-            str::stream() << "$objectToArray requires a document input, found: "
-                          << typeName(targetVal.getType()),
-            (targetVal.getType() == BSONType::Object));
-
-    vector<Value> output;
-
-    FieldIterator iter = targetVal.getDocument().fieldIterator();
-    while (iter.more()) {
-        Document::FieldPair pair = iter.next();
-        MutableDocument keyvalue;
-        keyvalue.addField("k", Value(pair.first));
-        keyvalue.addField("v", std::move(pair.second));
-        output.push_back(keyvalue.freezeToValue());
-    }
-
-    return Value(std::move(output));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(objectToArray, ExpressionObjectToArray::parse);
@@ -956,108 +890,7 @@ const char* ExpressionObjectToArray::getOpName() const {
 
 /* ------------------------- ExpressionArrayToObject -------------------------- */
 Value ExpressionArrayToObject::evaluate(const Document& root, Variables* variables) const {
-    const Value input = _children[0]->evaluate(root, variables);
-    if (input.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(40386,
-            str::stream() << "$arrayToObject requires an array input, found: "
-                          << typeName(input.getType()),
-            input.isArray());
-
-    MutableDocument output;
-    const vector<Value>& array = input.getArray();
-    if (array.empty()) {
-        return output.freezeToValue();
-    }
-
-    // There are two accepted input formats in an array: [ [key, val] ] or [ {k:key, v:val} ]. The
-    // first array element determines the format for the rest of the array. Mixing input formats is
-    // not allowed.
-    bool inputArrayFormat;
-    if (array[0].isArray()) {
-        inputArrayFormat = true;
-    } else if (array[0].getType() == BSONType::Object) {
-        inputArrayFormat = false;
-    } else {
-        uasserted(40398,
-                  str::stream() << "Unrecognised input type format for $arrayToObject: "
-                                << typeName(array[0].getType()));
-    }
-
-    for (auto&& elem : array) {
-        if (inputArrayFormat == true) {
-            uassert(
-                40396,
-                str::stream() << "$arrayToObject requires a consistent input format. Elements must"
-                                 "all be arrays or all be objects. Array was detected, now found: "
-                              << typeName(elem.getType()),
-                elem.isArray());
-
-            const vector<Value>& valArray = elem.getArray();
-
-            uassert(40397,
-                    str::stream() << "$arrayToObject requires an array of size 2 arrays,"
-                                     "found array of size: "
-                                  << valArray.size(),
-                    (valArray.size() == 2));
-
-            uassert(40395,
-                    str::stream() << "$arrayToObject requires an array of key-value pairs, where "
-                                     "the key must be of type string. Found key type: "
-                                  << typeName(valArray[0].getType()),
-                    (valArray[0].getType() == BSONType::String));
-
-            auto keyName = valArray[0].getStringData();
-
-            uassert(4940400,
-                    "Key field cannot contain an embedded null byte",
-                    keyName.find('\0') == std::string::npos);
-
-            output[keyName] = valArray[1];
-
-        } else {
-            uassert(
-                40391,
-                str::stream() << "$arrayToObject requires a consistent input format. Elements must"
-                                 "all be arrays or all be objects. Object was detected, now found: "
-                              << typeName(elem.getType()),
-                (elem.getType() == BSONType::Object));
-
-            uassert(40392,
-                    str::stream() << "$arrayToObject requires an object keys of 'k' and 'v'. "
-                                     "Found incorrect number of keys:"
-                                  << elem.getDocument().computeSize(),
-                    (elem.getDocument().computeSize() == 2));
-
-            Value key = elem.getDocument().getField("k");
-            Value value = elem.getDocument().getField("v");
-
-            uassert(40393,
-                    str::stream() << "$arrayToObject requires an object with keys 'k' and 'v'. "
-                                     "Missing either or both keys from: "
-                                  << elem.toString(),
-                    (!key.missing() && !value.missing()));
-
-            uassert(
-                40394,
-                str::stream() << "$arrayToObject requires an object with keys 'k' and 'v', where "
-                                 "the value of 'k' must be of type string. Found type: "
-                              << typeName(key.getType()),
-                (key.getType() == BSONType::String));
-
-            auto keyName = key.getStringData();
-
-            uassert(4940401,
-                    "Key field cannot contain an embedded null byte",
-                    keyName.find('\0') == std::string::npos);
-
-            output[keyName] = value;
-        }
-    }
-
-    return output.freezeToValue();
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(arrayToObject, ExpressionArrayToObject::parse);
@@ -1265,24 +1098,7 @@ const char* ExpressionConcat::getOpName() const {
 /* ------------------------- ExpressionConcatArrays ----------------------------- */
 
 Value ExpressionConcatArrays::evaluate(const Document& root, Variables* variables) const {
-    const size_t n = _children.size();
-    vector<Value> values;
-
-    for (size_t i = 0; i < n; ++i) {
-        Value val = _children[i]->evaluate(root, variables);
-        if (val.nullish()) {
-            return Value(BSONNULL);
-        }
-
-        uassert(28664,
-                str::stream() << "$concatArrays only supports arrays, not "
-                              << typeName(val.getType()),
-                val.isArray());
-
-        const auto& subValues = val.getArray();
-        values.insert(values.end(), subValues.begin(), subValues.end());
-    }
-    return Value(std::move(values));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(concatArrays, ExpressionConcatArrays::parse);
@@ -2591,7 +2407,6 @@ Value ExpressionFilter::evaluate(const Document& root, Variables* variables) con
     if (input.empty())
         return inputVal;
 
-
     // This counter ensures we don't return more array elements than our limit arg has specified.
     // For example, given the query, {$project: {b: {$filter: {input: '$a', as: 'x', cond: {$gt:
     // ['$$x', 1]}, limit: {$literal: 3}}}}} remainingLimitCounter would be 3 and we would return up
@@ -3258,92 +3073,8 @@ void uassertIfNotIntegralAndNonNegative(Value val,
 }  // namespace
 
 Value ExpressionIndexOfArray::evaluate(const Document& root, Variables* variables) const {
-    Value arrayArg = _children[0]->evaluate(root, variables);
-
-    if (arrayArg.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(40090,
-            str::stream() << "$indexOfArray requires an array as a first argument, found: "
-                          << typeName(arrayArg.getType()),
-            arrayArg.isArray());
-
-    const std::vector<Value>& array = arrayArg.getArray();
-    auto args = evaluateAndValidateArguments(root, _children, array.size(), variables);
-    for (int i = args.startIndex; i < args.endIndex; i++) {
-        if (getExpressionContext()->getValueComparator().evaluate(array[i] ==
-                                                                  args.targetOfSearch)) {
-            return Value(static_cast<int>(i));
-        }
-    }
-
-
-    return Value(-1);
+    return exec::expression::evaluate(*this, root, variables);
 }
-
-ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArguments(
-    const Document& root,
-    const ExpressionVector& operands,
-    size_t arrayLength,
-    Variables* variables) const {
-
-    int startIndex = 0;
-    if (operands.size() > 2) {
-        Value startIndexArg = operands[2]->evaluate(root, variables);
-        uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
-
-        startIndex = startIndexArg.coerceToInt();
-    }
-
-    int endIndex = arrayLength;
-    if (operands.size() > 3) {
-        Value endIndexArg = operands[3]->evaluate(root, variables);
-        uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
-        // Don't let 'endIndex' exceed the length of the array.
-
-        endIndex = std::min(static_cast<int>(arrayLength), endIndexArg.coerceToInt());
-    }
-    return {_children[1]->evaluate(root, variables), startIndex, endIndex};
-}
-
-/**
- * This class handles the case where IndexOfArray is given an ExpressionConstant
- * instead of using a vector and searching through it we can use a unordered_map
- * for O(1) lookup time.
- */
-class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
-public:
-    Optimized(ExpressionContext* const expCtx,
-              ValueUnorderedMap<vector<int>> indexMap,
-              const ExpressionVector& operands)
-        : ExpressionIndexOfArray(expCtx), _indexMap(std::move(indexMap)) {
-        _children = operands;
-    }
-
-    Value evaluate(const Document& root, Variables* variables) const override {
-        int arraySize = _children[0]->evaluate(root, variables).getArrayLength();
-        auto args = evaluateAndValidateArguments(root, _children, arraySize, variables);
-        auto indexVec = _indexMap.find(args.targetOfSearch);
-
-        if (indexVec == _indexMap.end())
-            return Value(-1);
-
-        // Search through the vector of indexes for first index in our range.
-        for (auto index : indexVec->second) {
-            if (index >= args.startIndex && index < args.endIndex) {
-                return Value(index);
-            }
-        }
-        // The value we are searching for exists but is not in our range.
-        return Value(-1);
-    }
-
-private:
-    // Maps the values in the array to the positions at which they occur. We need to remember the
-    // positions so that we can verify they are in the appropriate range.
-    const ValueUnorderedMap<vector<int>> _indexMap;
-};
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
     // This will optimize all arguments to this expression.
@@ -3352,8 +3083,7 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
         return optimized;
     }
     // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of
-    // an
-    // array.
+    // an array.
     if (auto constantArray = dynamic_cast<ExpressionConstant*>(_children[0].get())) {
         const Value valueArray = constantArray->getValue();
         if (valueArray.nullish()) {
@@ -3364,19 +3094,8 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
                               << "argument is of type: " << typeName(valueArray.getType()),
                 valueArray.isArray());
 
-        const auto& arr = valueArray.getArray();
-
-        // To handle the case of duplicate values the values need to map to a vector of indecies.
-        auto indexMap =
-            getExpressionContext()->getValueComparator().makeUnorderedValueMap<vector<int>>();
-
-        for (int i = 0; i < int(arr.size()); i++) {
-            if (indexMap.find(arr[i]) == indexMap.end()) {
-                indexMap.emplace(arr[i], vector<int>());
-            }
-            indexMap[arr[i]].push_back(i);
-        }
-        return new Optimized(getExpressionContext(), std::move(indexMap), _children);
+        _parsedIndexMap = exec::expression::arrayToIndexMap(
+            valueArray, getExpressionContext()->getValueComparator());
     }
     return this;
 }
@@ -4543,47 +4262,13 @@ Value ExpressionReplaceAll::_doEval(StringData input,
 /* ------------------------ ExpressionReverseArray ------------------------ */
 
 Value ExpressionReverseArray::evaluate(const Document& root, Variables* variables) const {
-    Value input(_children[0]->evaluate(root, variables));
-
-    if (input.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(34435,
-            str::stream() << "The argument to $reverseArray must be an array, but was of type: "
-                          << typeName(input.getType()),
-            input.isArray());
-
-    if (input.getArrayLength() < 2) {
-        return input;
-    }
-
-    std::vector<Value> array = input.getArray();
-    std::reverse(array.begin(), array.end());
-    return Value(std::move(array));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(reverseArray, ExpressionReverseArray::parse);
 const char* ExpressionReverseArray::getOpName() const {
     return "$reverseArray";
 }
-
-namespace {
-ValueSet arrayToSet(const Value& val, const ValueComparator& valueComparator) {
-    const vector<Value>& array = val.getArray();
-    ValueSet valueSet = valueComparator.makeOrderedValueSet();
-    valueSet.insert(array.begin(), array.end());
-    return valueSet;
-}
-
-ValueFlatUnorderedSet arrayToUnorderedSet(const Value& val,
-                                          const ValueComparator& valueComparator) {
-    const vector<Value>& array = val.getArray();
-    ValueFlatUnorderedSet valueSet = valueComparator.makeFlatUnorderedValueSet();
-    valueSet.insert(array.begin(), array.end());
-    return valueSet;
-}
-}  // namespace
 
 /* ------------------------ ExpressionSortArray ------------------------ */
 
@@ -4640,24 +4325,7 @@ intrusive_ptr<Expression> ExpressionSortArray::parse(ExpressionContext* const ex
 }
 
 Value ExpressionSortArray::evaluate(const Document& root, Variables* variables) const {
-    Value input(_children[_kInput]->evaluate(root, variables));
-
-    if (input.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(2942504,
-            str::stream() << "The input argument to $sortArray must be an array, but was of type: "
-                          << typeName(input.getType()),
-            input.isArray());
-
-    if (input.getArrayLength() < 2) {
-        return input;
-    }
-
-    std::vector<Value> array = input.getArray();
-    std::sort(array.begin(), array.end(), _sortBy);
-    return Value(std::move(array));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(sortArray, ExpressionSortArray::parse);
@@ -4680,34 +4348,7 @@ Value ExpressionSortArray::serialize(const SerializationOptions& options) const 
 /* ----------------------- ExpressionSetDifference ---------------------------- */
 
 Value ExpressionSetDifference::evaluate(const Document& root, Variables* variables) const {
-    const Value lhs = _children[0]->evaluate(root, variables);
-    const Value rhs = _children[1]->evaluate(root, variables);
-
-    if (lhs.nullish() || rhs.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(17048,
-            str::stream() << "both operands of $setDifference must be arrays. First "
-                          << "argument is of type: " << typeName(lhs.getType()),
-            lhs.isArray());
-    uassert(17049,
-            str::stream() << "both operands of $setDifference must be arrays. Second "
-                          << "argument is of type: " << typeName(rhs.getType()),
-            rhs.isArray());
-
-    ValueSet rhsSet = arrayToSet(rhs, getExpressionContext()->getValueComparator());
-    const vector<Value>& lhsArray = lhs.getArray();
-    vector<Value> returnVec;
-
-    for (vector<Value>::const_iterator it = lhsArray.begin(); it != lhsArray.end(); ++it) {
-        // rhsSet serves the dual role of filtering out elements that were originally present
-        // in RHS and of eleminating duplicates from LHS
-        if (rhsSet.insert(*it).second) {
-            returnVec.push_back(*it);
-        }
-    }
-    return Value(std::move(returnVec));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(setDifference, ExpressionSetDifference::parse);
@@ -4723,51 +4364,8 @@ void ExpressionSetEquals::validateArguments(const ExpressionVector& args) const 
             args.size() >= 2);
 }
 
-namespace {
-bool setEqualsHelper(const ValueFlatUnorderedSet& lhs,
-                     const ValueFlatUnorderedSet& rhs,
-                     const ValueComparator& valueComparator) {
-    if (lhs.size() != rhs.size()) {
-        return false;
-    }
-    for (const auto& entry : lhs) {
-        if (!rhs.count(entry)) {
-            return false;
-        }
-    }
-    return true;
-}
-}  // namespace
-
 Value ExpressionSetEquals::evaluate(const Document& root, Variables* variables) const {
-    const size_t n = _children.size();
-    const auto& valueComparator = getExpressionContext()->getValueComparator();
-
-    auto evaluateChild = [&](size_t index) {
-        const Value entry = _children[index]->evaluate(root, variables);
-        uassert(17044,
-                str::stream() << "All operands of $setEquals must be arrays. " << (index + 1)
-                              << "-th argument is of type: " << typeName(entry.getType()),
-                entry.isArray());
-        ValueFlatUnorderedSet entrySet = valueComparator.makeFlatUnorderedValueSet();
-        entrySet.insert(entry.getArray().begin(), entry.getArray().end());
-        return entrySet;
-    };
-
-    size_t lhsIndex = _cachedConstant ? _cachedConstant->first : 0;
-    // The $setEquals expression has at least two children, so accessing the first child without
-    // check is fine.
-    ValueFlatUnorderedSet lhs = _cachedConstant ? _cachedConstant->second : evaluateChild(0);
-
-    for (size_t i = 0; i < n; i++) {
-        if (i != lhsIndex) {
-            ValueFlatUnorderedSet rhs = evaluateChild(i);
-            if (!setEqualsHelper(lhs, rhs, valueComparator)) {
-                return Value(false);
-            }
-        }
-    }
-    return Value(true);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 /**
@@ -4807,40 +4405,7 @@ const char* ExpressionSetEquals::getOpName() const {
 /* ----------------------- ExpressionSetIntersection ---------------------------- */
 
 Value ExpressionSetIntersection::evaluate(const Document& root, Variables* variables) const {
-    const size_t n = _children.size();
-    const auto& valueComparator = getExpressionContext()->getValueComparator();
-    ValueSet currentIntersection = valueComparator.makeOrderedValueSet();
-    for (size_t i = 0; i < n; i++) {
-        const Value nextEntry = _children[i]->evaluate(root, variables);
-        if (nextEntry.nullish()) {
-            return Value(BSONNULL);
-        }
-        uassert(17047,
-                str::stream() << "All operands of $setIntersection must be arrays. One "
-                              << "argument is of type: " << typeName(nextEntry.getType()),
-                nextEntry.isArray());
-
-        if (i == 0) {
-            currentIntersection.insert(nextEntry.getArray().begin(), nextEntry.getArray().end());
-        } else if (!currentIntersection.empty()) {
-            ValueSet nextSet = arrayToSet(nextEntry, valueComparator);
-            if (currentIntersection.size() > nextSet.size()) {
-                // to iterate over whichever is the smaller set
-                nextSet.swap(currentIntersection);
-            }
-            ValueSet::iterator it = currentIntersection.begin();
-            while (it != currentIntersection.end()) {
-                if (!nextSet.count(*it)) {
-                    ValueSet::iterator del = it;
-                    ++it;
-                    currentIntersection.erase(del);
-                } else {
-                    ++it;
-                }
-            }
-        }
-    }
-    return Value(vector<Value>(currentIntersection.begin(), currentIntersection.end()));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(setIntersection, ExpressionSetIntersection::parse);
@@ -4850,69 +4415,12 @@ const char* ExpressionSetIntersection::getOpName() const {
 
 /* ----------------------- ExpressionSetIsSubset ---------------------------- */
 
-namespace {
-Value setIsSubsetHelper(const vector<Value>& lhs, const ValueFlatUnorderedSet& rhs) {
-    // do not shortcircuit when lhs.size() > rhs.size()
-    // because lhs can have redundant entries
-    for (vector<Value>::const_iterator it = lhs.begin(); it != lhs.end(); ++it) {
-        if (!rhs.count(*it)) {
-            return Value(false);
-        }
-    }
-    return Value(true);
-}
-}  // namespace
-
 Value ExpressionSetIsSubset::evaluate(const Document& root, Variables* variables) const {
-    const Value lhs = _children[0]->evaluate(root, variables);
-    const Value rhs = _children[1]->evaluate(root, variables);
-
-    uassert(17046,
-            str::stream() << "both operands of $setIsSubset must be arrays. First "
-                          << "argument is of type: " << typeName(lhs.getType()),
-            lhs.isArray());
-    uassert(17042,
-            str::stream() << "both operands of $setIsSubset must be arrays. Second "
-                          << "argument is of type: " << typeName(rhs.getType()),
-            rhs.isArray());
-
-    return setIsSubsetHelper(
-        lhs.getArray(), arrayToUnorderedSet(rhs, getExpressionContext()->getValueComparator()));
+    return exec::expression::evaluate(*this, root, variables);
 }
-
-/**
- * This class handles the case where the RHS set is constant.
- *
- * Since it is constant we can construct the hashset once which makes the runtime performance
- * effectively constant with respect to the size of RHS. Large, constant RHS is expected to be a
- * major use case for $redact and this has been verified to improve performance significantly.
- */
-class ExpressionSetIsSubset::Optimized : public ExpressionSetIsSubset {
-public:
-    Optimized(ExpressionContext* const expCtx,
-              const ValueFlatUnorderedSet& cachedRhsSet,
-              const ExpressionVector& operands)
-        : ExpressionSetIsSubset(expCtx), _cachedRhsSet(cachedRhsSet) {
-        _children = operands;
-    }
-
-    Value evaluate(const Document& root, Variables* variables) const override {
-        const Value lhs = _children[0]->evaluate(root, variables);
-
-        uassert(17310,
-                str::stream() << "both operands of $setIsSubset must be arrays. First "
-                              << "argument is of type: " << typeName(lhs.getType()),
-                lhs.isArray());
-
-        return setIsSubsetHelper(lhs.getArray(), _cachedRhsSet);
-    }
-
-private:
-    const ValueFlatUnorderedSet _cachedRhsSet;
-};
 
 intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
-    // perfore basic optimizations
+    // perform basic optimizations
     intrusive_ptr<Expression> optimized = ExpressionNary::optimize();
 
     // if ExpressionNary::optimize() created a new value, return it directly
@@ -4926,13 +4434,10 @@ intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
                               << "argument is of type: " << typeName(rhs.getType()),
                 rhs.isArray());
 
-        intrusive_ptr<Expression> optimizedWithConstant(
-            new Optimized(this->getExpressionContext(),
-                          arrayToUnorderedSet(rhs, getExpressionContext()->getValueComparator()),
-                          _children));
-        return optimizedWithConstant;
+        _cachedRhsSet = exec::expression::arrayToUnorderedSet(
+            rhs, getExpressionContext()->getValueComparator());
     }
-    return optimized;
+    return this;
 }
 
 REGISTER_STABLE_EXPRESSION(setIsSubset, ExpressionSetIsSubset::parse);
@@ -4943,21 +4448,7 @@ const char* ExpressionSetIsSubset::getOpName() const {
 /* ----------------------- ExpressionSetUnion ---------------------------- */
 
 Value ExpressionSetUnion::evaluate(const Document& root, Variables* variables) const {
-    ValueSet unionedSet = getExpressionContext()->getValueComparator().makeOrderedValueSet();
-    const size_t n = _children.size();
-    for (size_t i = 0; i < n; i++) {
-        const Value newEntries = _children[i]->evaluate(root, variables);
-        if (newEntries.nullish()) {
-            return Value(BSONNULL);
-        }
-        uassert(17043,
-                str::stream() << "All operands of $setUnion must be arrays. One argument"
-                              << " is of type: " << typeName(newEntries.getType()),
-                newEntries.isArray());
-
-        unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
-    }
-    return Value(vector<Value>(unionedSet.begin(), unionedSet.end()));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(setUnion, ExpressionSetUnion::parse);
@@ -4968,8 +4459,7 @@ const char* ExpressionSetUnion::getOpName() const {
 /* ----------------------- ExpressionIsArray ---------------------------- */
 
 Value ExpressionIsArray::evaluate(const Document& root, Variables* variables) const {
-    Value argument = _children[0]->evaluate(root, variables);
-    return Value(argument.isArray());
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(isArray, ExpressionIsArray::parse);
@@ -5001,82 +4491,7 @@ REGISTER_STABLE_EXPRESSION(_internalFindAllValuesAtPath,
 /* ----------------------- ExpressionSlice ---------------------------- */
 
 Value ExpressionSlice::evaluate(const Document& root, Variables* variables) const {
-    const size_t n = _children.size();
-
-    Value arrayVal = _children[0]->evaluate(root, variables);
-    // Could be either a start index or the length from 0.
-    Value arg2 = _children[1]->evaluate(root, variables);
-
-    if (arrayVal.nullish() || arg2.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(28724,
-            str::stream() << "First argument to $slice must be an array, but is"
-                          << " of type: " << typeName(arrayVal.getType()),
-            arrayVal.isArray());
-    uassert(28725,
-            str::stream() << "Second argument to $slice must be a numeric value,"
-                          << " but is of type: " << typeName(arg2.getType()),
-            arg2.numeric());
-    uassert(28726,
-            str::stream() << "Second argument to $slice can't be represented as"
-                          << " a 32-bit integer: " << arg2.coerceToDouble(),
-            arg2.integral());
-
-    const auto& array = arrayVal.getArray();
-    size_t start;
-    size_t end;
-
-    if (n == 2) {
-        // Only count given.
-        int count = arg2.coerceToInt();
-        start = 0;
-        end = array.size();
-        if (count >= 0) {
-            end = std::min(end, size_t(count));
-        } else {
-            // Negative count's start from the back. If a abs(count) is greater
-            // than the
-            // length of the array, return the whole array.
-            start = std::max(0, static_cast<int>(array.size()) + count);
-        }
-    } else {
-        // We have both a start index and a count.
-        int startInt = arg2.coerceToInt();
-        if (startInt < 0) {
-            // Negative values start from the back. If a abs(start) is greater
-            // than the length
-            // of the array, start from 0.
-            start = std::max(0, static_cast<int>(array.size()) + startInt);
-        } else {
-            start = std::min(array.size(), size_t(startInt));
-        }
-
-        Value countVal = _children[2]->evaluate(root, variables);
-
-        if (countVal.nullish()) {
-            return Value(BSONNULL);
-        }
-
-        uassert(28727,
-                str::stream() << "Third argument to $slice must be numeric, but "
-                              << "is of type: " << typeName(countVal.getType()),
-                countVal.numeric());
-        uassert(28728,
-                str::stream() << "Third argument to $slice can't be represented"
-                              << " as a 32-bit integer: " << countVal.coerceToDouble(),
-                countVal.integral());
-        uassert(28729,
-                str::stream() << "Third argument to $slice must be positive: "
-                              << countVal.coerceToInt(),
-                countVal.coerceToInt() > 0);
-
-        size_t count = size_t(countVal.coerceToInt());
-        end = std::min(start + count, array.size());
-    }
-
-    return Value(vector<Value>(array.begin() + start, array.begin() + end));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(slice, ExpressionSlice::parse);
@@ -5141,13 +4556,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
 /* ----------------------- ExpressionSize ---------------------------- */
 
 Value ExpressionSize::evaluate(const Document& root, Variables* variables) const {
-    Value array = _children[0]->evaluate(root, variables);
-
-    uassert(17124,
-            str::stream() << "The argument to $size must be an array, but was of type: "
-                          << typeName(array.getType()),
-            array.isArray());
-    return Value::createIntOrLong(array.getArray().size());
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(size, ExpressionSize::parse);
@@ -6029,72 +5438,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
 }
 
 Value ExpressionZip::evaluate(const Document& root, Variables* variables) const {
-    // Evaluate input values.
-    vector<vector<Value>> inputValues;
-    inputValues.reserve(_inputs.size());
-
-    size_t minArraySize = 0;
-    size_t maxArraySize = 0;
-    for (size_t i = 0; i < _inputs.size(); i++) {
-        Value evalExpr = _inputs[i].get()->evaluate(root, variables);
-        if (evalExpr.nullish()) {
-            return Value(BSONNULL);
-        }
-
-        uassert(34468,
-                str::stream() << "$zip found a non-array expression in input: "
-                              << evalExpr.toString(),
-                evalExpr.isArray());
-
-        inputValues.push_back(evalExpr.getArray());
-
-        size_t arraySize = evalExpr.getArrayLength();
-
-        if (i == 0) {
-            minArraySize = arraySize;
-            maxArraySize = arraySize;
-        } else {
-            auto arraySizes = std::minmax({minArraySize, arraySize, maxArraySize});
-            minArraySize = arraySizes.first;
-            maxArraySize = arraySizes.second;
-        }
-    }
-
-    vector<Value> evaluatedDefaults(_inputs.size(), Value(BSONNULL));
-
-    // If we need default values, evaluate each expression.
-    if (minArraySize != maxArraySize) {
-        for (size_t i = 0; i < _defaults.size(); i++) {
-            evaluatedDefaults[i] = _defaults[i].get()->evaluate(root, variables);
-        }
-    }
-
-    size_t outputLength = _useLongestLength ? maxArraySize : minArraySize;
-
-    // The final output array, e.g. [[1, 2, 3], [2, 3, 4]].
-    vector<Value> output;
-
-    // Used to construct each array in the output, e.g. [1, 2, 3].
-    vector<Value> outputChild;
-
-    output.reserve(outputLength);
-    outputChild.reserve(_inputs.size());
-
-    for (size_t row = 0; row < outputLength; row++) {
-        outputChild.clear();
-        for (size_t col = 0; col < _inputs.size(); col++) {
-            if (inputValues[col].size() > row) {
-                // Add the value from the appropriate input array.
-                outputChild.push_back(inputValues[col][row]);
-            } else {
-                // Add the corresponding default value.
-                outputChild.push_back(evaluatedDefaults[col]);
-            }
-        }
-        output.push_back(Value(outputChild));
-    }
-
-    return Value(std::move(output));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 boost::intrusive_ptr<Expression> ExpressionZip::optimize() {

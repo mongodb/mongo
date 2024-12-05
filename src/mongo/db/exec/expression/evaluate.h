@@ -85,6 +85,18 @@ boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
  */
 unsigned long long convertDateTruncBinSizeValue(const Value& value);
 
+/**
+ * Converts a 'val' value holding an array into a unordered set.
+ */
+ValueFlatUnorderedSet arrayToUnorderedSet(const Value& val, const ValueComparator& valueComparator);
+
+/**
+ * Converts a 'val' value holding an array into a unordered map, associating each unique value with
+ * the list of array positions where the value can be found in the original array.
+ */
+ValueUnorderedMap<std::vector<int>> arrayToIndexMap(const Value& val,
+                                                    const ValueComparator& valueComparator);
+
 Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionDateFromString& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionDateToParts& expr, const Document& root, Variables* variables);
@@ -108,6 +120,26 @@ Value evaluate(const ExpressionIsoWeekYear& expr, const Document& root, Variable
 Value evaluate(const ExpressionIsoDayOfWeek& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionIsoWeek& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionYear& expr, const Document& root, Variables* variables);
+
+Value evaluate(const ExpressionArray& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionArrayElemAt& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionFirst& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionLast& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionObjectToArray& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionArrayToObject& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionConcatArrays& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionIndexOfArray& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionIsArray& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionReverseArray& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSortArray& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSetDifference& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSetEquals& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSetIntersection& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSetIsSubset& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSlice& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSize& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionZip& expr, const Document& root, Variables* variables);
 
 }  // namespace exec::expression
 }  // namespace mongo

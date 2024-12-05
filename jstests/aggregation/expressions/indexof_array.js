@@ -1,5 +1,6 @@
 // In SERVER-8951, $indexOfArray was introduced. In this file, we test the correctness and error
 // cases of the expression.
+import "jstests/libs/query/sbe_assert_error_override.js";
 import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.indexofarray;
