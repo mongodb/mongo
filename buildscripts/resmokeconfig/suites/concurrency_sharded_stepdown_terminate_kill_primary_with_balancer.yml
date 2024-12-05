@@ -140,7 +140,6 @@ executor:
         enableTestCommands: 1
         enableElectionHandoff: 0
         roleGraphInvalidationIsFatal: 1
-        analyzeShardKeyMaxNumStaleVersionRetries: 2
         queryAnalysisWriterIntervalSecs: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         defaultConfigCommandTimeoutMS: 90000

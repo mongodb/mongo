@@ -154,7 +154,6 @@ executor:
         queryAnalysisWriterIntervalSecs: 5
         analyzeShardKeyNumRanges: 10
         analyzeShardKeySplitPointExpirationSecs: 10
-        analyzeShardKeyMaxNumStaleVersionRetries: 2
         ttlMonitorSleepSecs: 5
         logComponentVerbosity:
           verbosity: 0
@@ -162,7 +161,6 @@ executor:
     mongos_options:
       set_parameters:
         queryAnalysisSamplerConfigurationRefreshSecs: 1
-        analyzeShardKeyMaxNumStaleVersionRetries: 2
         logComponentVerbosity:
           verbosity: 0
           sharding: 2

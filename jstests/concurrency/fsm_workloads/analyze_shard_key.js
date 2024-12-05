@@ -5,7 +5,6 @@
  * guaranteed to be true when it is run in parallel with other workloads.
  *
  * @tags: [
- *  requires_fcv_81,
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
@@ -844,10 +843,32 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     // 'analyzeShardKeySplitPointExpirationSecs' and 'ttlMonitorSleepSecs' server parameters to make
     // the clean up occur as the workload runs, and then restore the original values during
     // teardown().
+    $config.data.maxNumStaleVersionRetries = 2;
     $config.data.splitPointExpirationSecs = 30;
     $config.data.ttlMonitorSleepSecs = 5;
+    $config.data.originalMaxNumStaleVersionRetries = {};
     $config.data.originalSplitPointExpirationSecs = {};
     $config.data.originalTTLMonitorSleepSecs = {};
+
+    $config.data.overrideMaxNumStaleVersionRetries = function overrideMaxNumStaleVersionRetries(
+        cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            const binVersion = assert
+                                   .commandWorked(db.adminCommand({
+                                       serverStatus: 1,
+                                   }))
+                                   .version;
+
+            // analyzeShardKeyMaxNumStaleVersionRetries was added in binVersion 8.1.
+            if (MongoRunner.compareBinVersions(binVersion, "8.1") >= 0) {
+                const res = assert.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    analyzeShardKeyMaxNumStaleVersionRetries: this.maxNumStaleVersionRetries,
+                }));
+                this.originalMaxNumStaleVersionRetries[db.getMongo().host] = res.was;
+            }
+        });
+    };
 
     $config.data.overrideSplitPointExpiration = function overrideSplitPointExpiration(cluster) {
         cluster.executeOnMongodNodes((db) => {
@@ -864,6 +885,26 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             const res = assert.commandWorked(
                 db.adminCommand({setParameter: 1, ttlMonitorSleepSecs: this.ttlMonitorSleepSecs}));
             this.originalTTLMonitorSleepSecs[db.getMongo().host] = res.was;
+        });
+    };
+
+    $config.data.restoreMaxNumStaleVersionRetries = function restoreMaxNumStaleVersionRetries(
+        cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            const binVersion = assert
+                                   .commandWorked(db.adminCommand({
+                                       serverStatus: 1,
+                                   }))
+                                   .version;
+
+            // analyzeShardKeyMaxNumStaleVersionRetries was added in binVersion 8.1.
+            if (MongoRunner.compareBinVersions(binVersion, "8.1") >= 0) {
+                assert.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    analyzeShardKeyMaxNumStaleVersionRetries:
+                        this.originalMaxNumStaleVersionRetries[db.getMongo().host],
+                }));
+            }
         });
     };
 
@@ -985,6 +1026,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
                                {comment: this.eligibleForSamplingComment});
         });
 
+        this.overrideMaxNumStaleVersionRetries(cluster);
         this.overrideSplitPointExpiration(cluster);
         this.overrideTTLMonitorSleepSecs(cluster);
 
@@ -1032,6 +1074,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         this.listSampledQueries(db, collName);
 
         print("Cleaning up");
+        this.restoreMaxNumStaleVersionRetries(cluster);
         this.restoreSplitPointExpiration(cluster);
         this.restoreTTLMonitorSleepSecs(cluster);
         this.removeSampledQueryAndSplitPointDocuments(db, collName, cluster);
