@@ -6,52 +6,12 @@ Import("wiredtiger")
 env = env.Clone()
 
 env.Library(
-    target="oplog_interface_mock",
-    source=[
-        "oplog_interface_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/net/network",
-        "oplog_entry",
-    ],
-)
-
-
-isSelfEnv = env.Clone()
-isSelfEnv.InjectThirdParty(libraries=["asio"])
-
-env.Library(
     target="task_executor_mock",
     source=[
         "task_executor_mock.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/unittest/task_executor_proxy",
-    ],
-)
-
-env.Library(
-    target="dbcheck_test_fixture",
-    source=[
-        "dbcheck_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/catalog/health_log",
-        "$BUILD_DIR/mongo/db/catalog/health_log_interface",
-        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
-        "$BUILD_DIR/mongo/db/commands/dbcheck_command",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "dbcheck",
-        "storage_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
     ],
 )
 

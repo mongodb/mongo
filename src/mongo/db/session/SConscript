@@ -1,16 +1,1 @@
 # -*- mode: python -*-
-Import("env")
-
-env = env.Clone()
-
-env.Library(
-    target="sessions_collection_mock",
-    source=[
-        "sessions_collection_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "logical_session_id",
-        "sessions_collection",
-    ],
-)

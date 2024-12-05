@@ -36,29 +36,6 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target="query_planner_test_fixture",
-    source=[
-        "query_planner_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "query_planner_test_lib",
-    ],
-)
-
-env.Library(
-    target="query_planner_test_lib",
-    source=[
-        "query_planner_test_lib.cpp",
-    ],
-    LIBDEPS=[
-        "collation/collator_factory_mock",
-        "query_planner",
-        "query_test_service_context",
-    ],
-)
-
 env.CppUnitTest(
     target="command_diagnostic_printer_test",
     source=[],
@@ -198,16 +175,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="express_execution_test",
-    source=["express_plan_test.cpp"],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/write_stage_common",
-        "query_planner",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

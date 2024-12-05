@@ -436,12 +436,12 @@ mongo_cc_unit_test(
         "expression_test_base.h",
         "makeobj_spec_hash_test.cpp",
         "sbe_unittest.h",
-        "//src/mongo/db/pipeline:expression_context_for_test.h",
     ],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":query_sbe_abt",
         ":query_sbe_makeobj_spec",
+        "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
@@ -452,7 +452,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe:expression_test_base.h",
         "//src/mongo/db/exec/sbe:sbe_unittest.h",
         "//src/mongo/db/exec/sbe/abt:sbe_abt_test.cpp",
-        "//src/mongo/db/pipeline:expression_context_for_test.h",
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
@@ -460,6 +459,7 @@ mongo_cc_unit_test(
         ":query_sbe_abt",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
     ],

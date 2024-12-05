@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -319,6 +319,21 @@ mongo_cc_library(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/transaction",
+    ],
+)
+
+mongo_cc_library(
+    name = "sessions_collection_mock",
+    srcs = [
+        "sessions_collection_mock.cpp",
+    ],
+    hdrs = [
+        "sessions_collection_mock.h",
+    ],
+    deps = [
+        ":logical_session_id",
+        ":sessions_collection",
+        "//src/mongo:base",
     ],
 )
 

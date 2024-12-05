@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -1591,4 +1591,109 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+mongo_cc_unit_test(
+    name = "async_command_execution_test",
+    srcs = [
+        "async_command_execution_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/commands:standalone",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "command_mirroring_test",
+    srcs = [
+        "command_mirroring_test.cpp",
+        "//src/mongo/idl:server_parameter_test_util.h",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":standalone",
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_commands_test",
+    srcs = [
+        "create_command_test.cpp",
+        "create_indexes_test.cpp",
+        "dbcheck_command_test.cpp",
+        "fle_compact_test.cpp",
+        "list_collections_filter_test.cpp",
+        "parse_log_component_settings_test.cpp",
+        "server_status_command_test.cpp",
+        "server_status_metric_test.cpp",
+        "set_cluster_parameter_invocation_test.cpp",
+        "set_profiling_filter_globally_cmd_test.cpp",
+        "//src/mongo/db/catalog:collection_mock.h",
+        "//src/mongo/db/commands:db_command_test_fixture.h",
+        "//src/mongo/db/commands/query_cmd:aggregation_execution_state_test.cpp",
+        "//src/mongo/db/commands/query_cmd:explain_test.cpp",
+        "//src/mongo/db/commands/query_cmd:external_data_source_commands_test.cpp",
+        "//src/mongo/db/commands/query_cmd:index_filter_commands_test.cpp",
+        "//src/mongo/db/commands/query_cmd:plan_cache_commands_test.cpp",
+        "//src/mongo/idl:server_parameter_test_util.h",
+    ] + select({
+        "//bazel/config:js_engine_none": [],
+        "//bazel/config:js_engine_mozjs": [
+            "//src/mongo/db/commands/query_cmd:mr_test.cpp",
+        ],
+    }),
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":cluster_server_parameter_commands_invocation",
+        ":core",
+        ":create_command",
+        ":dbcheck_command",
+        ":list_collections_filter",
+        ":mongod",
+        ":profile_common",
+        ":server_status_core",
+        ":servers",
+        ":standalone",
+        "//src/mongo/crypto:aead_encryption",
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:fle_crud",
+        "//src/mongo/db:fle_mocks",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:health_log",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/virtual_collection",
+        "//src/mongo/db/repl:dbcheck_test_fixture",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/shell:kms_idl",
+        "//src/mongo/util:version_impl",
+    ],
 )

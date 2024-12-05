@@ -1885,6 +1885,48 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "oplog_interface_mock",
+    srcs = [
+        "oplog_interface_mock.cpp",
+        "oplog_interface_mock.h",
+        "//src/mongo/db/repl:oplog_interface.h",
+        "//src/mongo/db/transaction:transaction_history_iterator.h",
+    ],
+    deps = [
+        ":oplog_entry",
+        "//src/mongo:base",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "dbcheck_test_fixture",
+    srcs = [
+        "dbcheck_test_fixture.cpp",
+    ],
+    hdrs = [
+        "dbcheck_test_fixture.h",
+        "//src/mongo/db/op_observer:operation_logger_mock.h",
+    ],
+    deps = [
+        ":dbcheck",
+        ":storage_interface",
+        "//src/mongo:base",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:health_log",
+        "//src/mongo/db/catalog:health_log_interface",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:dbcheck_command",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/unittest",
+    ],
+)
+
 # TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db/repl:optime.h to //src/mongo/db/repl:optime
 filegroup(
     name = "optime_hdrs",

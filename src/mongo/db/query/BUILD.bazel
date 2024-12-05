@@ -676,10 +676,58 @@ mongo_cc_library(
         "query_test_service_context.h",
     ],
     deps = [
+        "//src/mongo:base",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/s:grid",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_planner_test_fixture",
+    srcs = [
+        "query_planner_test_fixture.cpp",
+    ],
+    hdrs = [
+        "query_planner_test_fixture.h",
+    ],
+    deps = [
+        ":query_planner_test_lib",
+        "//src/mongo:base",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_planner_test_lib",
+    srcs = [
+        "query_planner_test_lib.cpp",
+    ],
+    hdrs = [
+        "query_planner_test_lib.h",
+    ],
+    deps = [
+        ":query_planner",
+        ":query_test_service_context",
+        "//src/mongo:base",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "express_execution_test",
+    srcs = ["express_plan_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":query_planner",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/collection_crud",
     ],
 )
 

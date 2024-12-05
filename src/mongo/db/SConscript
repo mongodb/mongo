@@ -108,16 +108,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="default_baton_test",
-    source=[
-        "default_baton_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "service_context",
-        "service_context_test_fixture",
-    ],
+    source=[],
+    LIBDEPS=[],
     PROVE_ALIASES=["server-programmability"],
 )
 
@@ -141,15 +133,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="mongod_options_test",
-    source=[
-        "mongod_options_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "concurrency/lock_manager",
-        "mongod_options",
-        "server_base",
-    ],
+    source=[],
+    LIBDEPS=[],
     PROVE_ALIASES=["server-programmability"],
 )
 
@@ -171,20 +156,6 @@ env.CppUnitTest(
         "s/sharding_catalog_manager",
         "service_context_d_test_fixture",
         "shard_role_api",
-    ],
-)
-
-env.Library(
-    target="fle_mocks",
-    source=[
-        "fle_query_interface_mock.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/fle_crypto",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
-        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
-        "fle_crud",
-        "fle_crud_mongod",
     ],
 )
 
@@ -282,97 +253,26 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target="commands_test_example",
-    source=[
-        "commands_test_example_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "commands",
-        "server_base",
-    ],
-)
-
 envWithAsio = env.Clone()
 envWithAsio.InjectThirdParty(libraries=["asio"])
 
 if wiredtiger:
     envWithAsio.CppUnitTest(
         target="db_base_test",
-        source=[
-            "error_labels_test.cpp",
-            "field_parser_test.cpp",
-            "field_ref_set_test.cpp",
-            "field_ref_test.cpp",
-            "hasher_test.cpp",
-            "namespace_string_test.cpp",
-            "operation_id_test.cpp",
-            "record_id_test.cpp",
-            "server_options_test.cpp",
-            "shard_id_test.cpp",
-            "startup_warnings_mongod_thp_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/util/fail_point",
-            "commands",
-            "error_labels",
-            "mongohasher",
-            "pipeline/aggregation_request_helper",
-            "pipeline/change_stream_pipeline",
-            "record_id_helpers",
-            "server_options_base",
-            "server_options_servers",
-            "service_context_test_fixture",
-            "startup_warnings_mongod",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
     envWithAsio.CppUnitTest(
         target="change_collection_test",
-        source=[
-            "change_collection_expired_change_remover_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/util/clock_source_mock",
-            "catalog/catalog_test_fixture",
-            "change_collection_expired_change_remover",
-            "change_stream_change_collection_manager",
-            "change_stream_serverless_helpers",
-            "change_streams_cluster_parameter",
-            "pipeline/change_stream_expired_pre_image_remover",
-            "query_exec",
-            "record_id_helpers",
-            "repl/read_concern_args",
-            "server_base",
-            "shard_role",
-            "startup_recovery",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
     envWithAsio.CppUnitTest(
         target="command_test",
-        source=[
-            "bulk_write_shard_test.cpp",
-            "commands_test.cpp",
-            "curop_test.cpp",
-            "curop_stats_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/db/prepare_conflict_tracker",
-            "$BUILD_DIR/mongo/db/service_context_d",
-            "$BUILD_DIR/mongo/transport/transport_layer_mock",
-            "auth/auth",
-            "auth/authmocks",
-            "catalog/catalog_helpers",
-            "commands",
-            "commands/query_cmd/bulk_write_command",
-            "commands/query_cmd/bulk_write_parser",
-            "commands_test_example",
-            "query/query_test_service_context",
-            "s/shard_server_test_fixture",
-            "service_context_test_fixture",
-            "shard_role_api",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
     envWithAsio.CppUnitTest(
@@ -444,23 +344,8 @@ if wiredtiger:
 
     envWithAsio.CppUnitTest(
         target="query_test",
-        source=[
-            "collection_index_usage_tracker_test.cpp",
-            "keypattern_test.cpp",
-            "multi_key_path_tracker_test.cpp",
-            "update_index_data_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/client/read_preference",
-            "$BUILD_DIR/mongo/util/clock_source_mock",
-            "collection_index_usage_tracker",
-            "index/index_access_method",
-            "query_exec",
-            "service_context",
-            "service_context_non_d",
-            "service_context_test_fixture",
-            "update_index_data",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
     envWithAsio.CppUnitTest(
@@ -480,41 +365,8 @@ if wiredtiger:
 
     envWithAsio.CppUnitTest(
         target="session_test",
-        source=[
-            "service_liaison_mock.cpp",
-            "session/internal_session_pool_test.cpp",
-            "session/internal_transactions_reap_service_test.cpp",
-            "session/kill_sessions_local_test.cpp",
-            "session/logical_session_cache_test.cpp",
-            "session/logical_session_id_test.cpp",
-            "session/session_catalog_mongod_test.cpp",
-            "session/session_catalog_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/executor/async_timer_mock",
-            "$BUILD_DIR/mongo/transport/transport_layer_mock",
-            "$BUILD_DIR/mongo/util/clock_source_mock",
-            "$BUILD_DIR/mongo/util/periodic_runner_factory",
-            "auth/auth",
-            "auth/authmocks",
-            "dbdirectclient",
-            "repl/image_collection_entry",
-            "repl/oplog",
-            "repl/repl_settings",
-            "repl/replica_set_aware_service",
-            "repl/replmocks",
-            "repl/storage_interface_impl",
-            "service_context_d",
-            "service_context_d_test_fixture",
-            "session/kill_sessions_local",
-            "session/logical_session_cache_impl",
-            "session/logical_session_id_helpers",
-            "session/session_catalog_mongod",
-            "session/sessions_collection",
-            "session/sessions_collection_mock",
-            "shared_request_handling",
-            "transaction/transaction",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
     envWithAsio.CppUnitTest(
