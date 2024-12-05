@@ -78,10 +78,10 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownField) {
                        ErrorCodes::IDLUnknownField);
 }
 
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfInputsIsNotArray) {
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfInputsIsNotObject) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            input: {pipelines: "not an array"}
+            input: {pipelines: "not an object"}
         }
     })");
 
@@ -167,17 +167,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
                 {
                     "$addFields": {
                         "agatha_score": {
-                            "$divide": [
+                            "$multiply": [
                                 {
-                                    "$const": 1
-                                },
-                                {
-                                    "$add": [
-                                        "$agatha_rank",
+                                    "$divide": [
                                         {
-                                            "$const": 60
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$agatha_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
                                         }
                                     ]
+                                },
+                                {
+                                    "$const": 1
                                 }
                             ]
                         }
@@ -347,17 +354,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                 {
                     "$addFields": {
                         "matchAuthor_score": {
-                            "$divide": [
+                            "$multiply": [
                                 {
-                                    "$const": 1
-                                },
-                                {
-                                    "$add": [
-                                        "$matchAuthor_rank",
+                                    "$divide": [
                                         {
-                                            "$const": 60
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$matchAuthor_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
                                         }
                                     ]
+                                },
+                                {
+                                    "$const": 1
                                 }
                             ]
                         }
@@ -395,17 +409,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                             {
                                 "$addFields": {
                                     "matchGenres_score": {
-                                        "$divide": [
+                                        "$multiply": [
                                             {
-                                                "$const": 1
-                                            },
-                                            {
-                                                "$add": [
-                                                    "$matchGenres_rank",
+                                                "$divide": [
                                                     {
-                                                        "$const": 60
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchGenres_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
                                                     }
                                                 ]
+                                            },
+                                            {
+                                                "$const": 1
                                             }
                                         ]
                                     }
@@ -450,17 +471,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                             {
                                 "$addFields": {
                                     "matchPlot_score": {
-                                        "$divide": [
+                                        "$multiply": [
                                             {
-                                                "$const": 1
-                                            },
-                                            {
-                                                "$add": [
-                                                    "$matchPlot_rank",
+                                                "$divide": [
                                                     {
-                                                        "$const": 60
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchPlot_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
                                                     }
                                                 ]
+                                            },
+                                            {
+                                                "$const": 1
                                             }
                                         ]
                                     }
@@ -709,17 +737,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                 {
                     "$addFields": {
                         "sample_score": {
-                            "$divide": [
+                            "$multiply": [
                                 {
-                                    "$const": 1
-                                },
-                                {
-                                    "$add": [
-                                        "$sample_rank",
+                                    "$divide": [
                                         {
-                                            "$const": 60
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$sample_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
                                         }
                                     ]
+                                },
+                                {
+                                    "$const": 1
                                 }
                             ]
                         }
@@ -769,17 +804,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                             {
                                 "$addFields": {
                                     "unionWith_score": {
-                                        "$divide": [
+                                        "$multiply": [
                                             {
-                                                "$const": 1
-                                            },
-                                            {
-                                                "$add": [
-                                                    "$unionWith_rank",
+                                                "$divide": [
                                                     {
-                                                        "$const": 60
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$unionWith_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
                                                     }
                                                 ]
+                                            },
+                                            {
+                                                "$const": 1
                                             }
                                         ]
                                     }
@@ -958,17 +1000,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                 {
                     "$addFields": {
                         "agatha_score": {
-                            "$divide": [
+                            "$multiply": [
                                 {
-                                    "$const": 1
-                                },
-                                {
-                                    "$add": [
-                                        "$agatha_rank",
+                                    "$divide": [
                                         {
-                                            "$const": 60
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$agatha_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
                                         }
                                     ]
+                                },
+                                {
+                                    "$const": 1
                                 }
                             ]
                         }
@@ -996,7 +1045,9 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                                     "distanceField": "dist.calculated",
                                     "maxDistance": 2,
                                     "query": {
-                                        "category": {$eq: "Parks"}
+                                        "category": {
+                                            "$eq": "Parks"
+                                        }
                                     },
                                     "spherical": true
                                 }
@@ -1020,17 +1071,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                             {
                                 "$addFields": {
                                     "geo_score": {
-                                        "$divide": [
+                                        "$multiply": [
                                             {
-                                                "$const": 1
-                                            },
-                                            {
-                                                "$add": [
-                                                    "$geo_rank",
+                                                "$divide": [
                                                     {
-                                                        "$const": 60
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$geo_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
                                                     }
                                                 ]
+                                            },
+                                            {
+                                                "$const": 1
                                             }
                                         ]
                                     }
@@ -1148,5 +1206,1117 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfIncludeProject) {
                        9191103);
 }
 
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfCombinationIsNotObject) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: 5
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfCombinationHasUnknownField) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                invalidField: 5
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::IDLUnknownField);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfWeightsIsNotObject) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination:  {
+                weights: "my bad"
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyWeights) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {}
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9460302);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfOnlySomeWeights) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9460302);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfMisnamedWeight) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3,
+                    matchGenre: 2
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9460302);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfExtraWeight) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3,
+                    matchGenre: 2,
+                    matchGenres: 1
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9460301);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfNonNumericWeight) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3,
+                    matchGenres: "0"
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       13118);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfNegativeWeightValue) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: -1,
+                    matchGenres: 0
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9460300);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 5,
+                    matchGenres: 3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "matchAuthor_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$matchAuthor_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 5
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "index": "search_index",
+                                    "text": {
+                                        "query": "mystery",
+                                        "path": "genres"
+                                    }
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "matchGenres_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchGenres_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchGenres_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+// Same as CheckWeightsApplied but the ordering of fields doesn't match between input.pipelines and
+// combination.weights; checks that the weights are applied to the pipeline with the same name.
+TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchGenres: 3,
+                    matchAuthor: 5
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "matchAuthor_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$matchAuthor_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 5
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "index": "search_index",
+                                    "text": {
+                                        "query": "mystery",
+                                        "path": "genres"
+                                    }
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "matchGenres_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchGenres_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchGenres_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    matchPlot: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ],
+                    matchDistance: [
+                        {
+                            $geoNear: {
+                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
+                                maxDistance: 2,
+                                query: { category: "Parks" },
+                                spherical: true
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchGenres: 3,
+                    matchDistance: 0,
+                    matchAuthor: 5,
+                    matchPlot: 0.3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "matchAuthor_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$matchAuthor_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 5
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": {
+                                        "type": {
+                                            "$const": "Point"
+                                        },
+                                        "coordinates": [
+                                            {
+                                                "$const": -73.99279
+                                            },
+                                            {
+                                                "$const": 40.719296
+                                            }
+                                        ]
+                                    },
+                                    "distanceField": "dist.calculated",
+                                    "maxDistance": 2,
+                                    "query": {
+                                        "category": {
+                                            "$eq": "Parks"
+                                        }
+                                    },
+                                    "spherical": true
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "matchDistance_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchDistance_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchDistance_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "index": "search_index",
+                                    "text": {
+                                        "query": "mystery",
+                                        "path": "genres"
+                                    }
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "matchGenres_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchGenres_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchGenres_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "matchPlot_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchPlot_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchPlot_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 0.3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchDistance_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchDistance_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchPlot_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchPlot_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchDistance_score",
+                                "$matchGenres_score",
+                                "$matchPlot_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
 }  // namespace
 }  // namespace mongo

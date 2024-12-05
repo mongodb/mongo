@@ -124,6 +124,54 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
     });
 }
 
+/**
+ * Validates the weights inputs. If weights are specified by the user, there must be exactly one
+ * weight per input pipeline.
+ */
+void rankFusionWeightsValidator(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
+    const StringMap<double>& weights) {
+    // The size of weights and pipelines should actually be equal, but if we have more pipelines
+    // than weights, we'll throw a more specific error below that specifies which pipeline is
+    // missing a weight.
+    uassert(9460301,
+            "$rankFusion input has more weights than pipelines. If combination.weights is "
+            "specified, there must be only one weight per named input pipeline.",
+            weights.size() <= pipelines.size());
+
+    for (const auto& pipelineIt : pipelines) {
+        auto pipelineName = pipelineIt.first;
+        uassert(9460302,
+                str::stream()
+                    << "$rankFusion input pipeline \"" << pipelineName
+                    << "\" is missing a weight, even though combination.weights is specified.",
+                weights.contains(pipelineName));
+    }
+}
+
+StringMap<double> extractAndValidateWeights(
+    const RankFusionSpec& spec,
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
+    StringMap<double> weights;
+
+    const auto& combinationSpec = spec.getCombination();
+    if (!combinationSpec.has_value()) {
+        return weights;
+    }
+
+    for (const auto& elem : combinationSpec->getWeights()) {
+        // elem.Number() throws a uassert if non-numeric.
+        double weight = elem.Number();
+        uassert(9460300,
+                str::stream() << "Rank fusion pipeline weight must be non-negative, but given "
+                              << weight,
+                weight >= 0);
+        weights[elem.fieldName()] = weight;
+    }
+    rankFusionWeightsValidator(pipelines, weights);
+    return weights;
+}
+
 std::vector<BSONObj> getPipeline(BSONElement inputPipeElem) {
     return parsePipelineFromBSON(inputPipeElem);
 }
@@ -147,18 +195,23 @@ BSONObj unwind(const std::string& prefix) {
     })");
 }
 
-// RRF Score = 1 divided by (rank + rank constant).
-BSONObj addScoreField(const std::string& prefix, const int& rankConstant) {
+// RRF Score = weight * (1 / (rank + rank constant)).
+BSONObj addScoreField(const std::string& prefix, const int rankConstant, const double weight) {
     std::string score = prefix + "_score";
     std::string rank = "$" + prefix + "_rank";
-    return BSON("$addFields" << BSON(
-                    score << BSON("$divide" << BSON_ARRAY(
-                                      1 << BSON("$add" << BSON_ARRAY(rank << rankConstant))))));
+
+    return BSON(
+        "$addFields" << BSON(
+            score << BSON("$multiply" << BSON_ARRAY(
+                              BSON("$divide" << BSON_ARRAY(
+                                       1 << BSON("$add" << BSON_ARRAY(rank << rankConstant))))
+                              << weight))));
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const std::string& prefixOne,
-    const int& rankConstant,
+    const int rankConstant,
+    const double weight,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto groupStage = DocumentSourceGroup::createFromBson(group().firstElement(), expCtx);
 
@@ -166,7 +219,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
         DocumentSourceUnwind::createFromBson(unwind(prefixOne).firstElement(), expCtx);
 
     auto addFields = DocumentSourceAddFields::createFromBson(
-        addScoreField(prefixOne, rankConstant).firstElement(), expCtx);
+        addScoreField(prefixOne, rankConstant, weight).firstElement(), expCtx);
     return {groupStage, unwindStage, addFields};
 }
 
@@ -219,13 +272,14 @@ BSONObj calculateFinalScore(
 
 boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     const std::string& prefix,
-    const int& rankConstant,
+    const int rankConstant,
+    const double weight,
     std::unique_ptr<Pipeline, PipelineDeleter> oneInputPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
     bsonPipeline.push_back(group());
     bsonPipeline.push_back(unwind(prefix));
-    bsonPipeline.push_back(addScoreField(prefix, rankConstant));
+    bsonPipeline.push_back(addScoreField(prefix, rankConstant, weight));
 
     auto collName = expCtx->getNamespaceString().coll();
 
@@ -267,7 +321,6 @@ std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::
 
     auto parsedSpec = RankFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
-    // TODO SERVER-94603 will need to validate that weights shares the names.
 
     // Ensure that all pipelines are valid ranked selection pipelines.
     for (const auto& elem : inputPipesObj) {
@@ -296,30 +349,35 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     for (const auto& elem : spec.getInput().getPipelines()) {
         auto pipeline = Pipeline::parse(getPipeline(elem), pExpCtx);
         rankFusionPipelineValidator(*pipeline);
+        // TODO SERVER-96154 Validate field names.
         inputPipelines[elem.fieldName()] = std::move(pipeline);
     }
 
-    auto rankConstant = 60;
-    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
-    auto takePipeline = [&outputStages](auto& pipeline) {
-        while (!pipeline->getSources().empty()) {
-            outputStages.push_back(pipeline->popFront());
-        }
-    };
+    StringMap<double> weights = extractAndValidateWeights(spec, inputPipelines);
 
+    // For now, the rankConstant is always 60.
+    static const double rankConstant = 60;
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
     for (auto it = inputPipelines.begin(); it != inputPipelines.end(); it++) {
         const auto& name = it->first;
         auto& pipeline = it->second;
+
+        // If weights weren't specified, the default weight is 1.
+        double pipelineWeight = weights.empty() ? 1 : weights.at(name);
+
         if (outputStages.empty()) {
             // First pipeline.
-            takePipeline(pipeline);
-            auto firstPipelineStages = buildFirstPipelineStages(name, rankConstant, pExpCtx);
+            while (!pipeline->getSources().empty()) {
+                outputStages.push_back(pipeline->popFront());
+            }
+            auto firstPipelineStages =
+                buildFirstPipelineStages(name, rankConstant, pipelineWeight, pExpCtx);
             for (const auto& stage : firstPipelineStages) {
                 outputStages.push_back(std::move(stage));
             }
         } else {
-            auto unionWithStage =
-                buildUnionWithPipeline(name, rankConstant, std::move(pipeline), pExpCtx);
+            auto unionWithStage = buildUnionWithPipeline(
+                name, rankConstant, pipelineWeight, std::move(pipeline), pExpCtx);
             outputStages.push_back(unionWithStage);
         }
     }

@@ -32,8 +32,16 @@ global:
 imports:
   - "mongo/db/pipeline/document_source_rank_fusion_inputs.idl"
 structs:
-  # The RankFusionSpec needs to be in a separate file because use of the
-  # validateRankFusionMinInputs callback will otherwise create a circular dependency.
+  RankFusionCombinationSpec:
+    description: Specification for the 'combination' argument to $rankFusion.
+    strict: true
+    fields:
+      weights:
+        description: Map (name -> double) of input weights. Default is 1 if unspecified.
+        type: object_owned
+        optional: false
+  # The RankFusionInputSpec needs to be in a separate file because use of the
+  # validation callback will otherwise create a circular dependency.
   RankFusionSpec:
     description: Specification for a $rankFusion stage.
     strict: true
@@ -42,3 +50,8 @@ structs:
         description: The set of sub-pipelines' results to be merged with rank fusion.
         type: RankFusionInputSpec
         optional: false
+      combination:
+        description: The set of pipeline weights to match up with the input pipelines.
+        type: RankFusionCombinationSpec
+        optional: true
+

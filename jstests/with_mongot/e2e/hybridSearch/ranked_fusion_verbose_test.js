@@ -20,8 +20,7 @@ coll.drop();
 
 assert.commandWorked(coll.insertMany(getMovieData()));
 
-// Index is blocking by default so that the query is only run after index has been made.
-createSearchIndex(coll, {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "search_movie", definition: {"mappings": {"dynamic": true}}});
 
 // Create vector search index on movie plot embeddings.
 createSearchIndex(coll, getVectorSearchIndexSpec());
@@ -35,7 +34,7 @@ function getSearchPipeline() {
     let searchPipeline = [
         {
             $search: {
-                index: "search_movie_block",
+                index: "search_movie",
                 text: {query: "ape", path: ["fullplot", "title"]},
             }
         },
@@ -109,7 +108,7 @@ function getSearchWithSetWindowFieldsPipeline() {
     let searchPipeline = [
         {
             $search: {
-                index: "search_movie_block",
+                index: "search_movie",
                 text: {query: "ape", path: ["fullplot", "title"]},
             }
         },
@@ -244,5 +243,5 @@ runTestFlipped(expectedResultIdOrder, getSearchPipeline(), getVectorSearchPipeli
 runTestFlipped(expectedResultIdOrder,
                getSearchWithSetWindowFieldsPipeline(),
                getVectorSearchWithSetWindowFieldsPipeline());
-dropSearchIndex(coll, {name: "search_movie_block"});
+dropSearchIndex(coll, {name: "search_movie"});
 dropSearchIndex(coll, {name: getVectorSearchIndexSpec().name});

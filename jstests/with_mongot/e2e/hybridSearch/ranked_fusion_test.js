@@ -1,9 +1,8 @@
 /*
  * Tests hybrid search with the rank fusion using the $rankFusion stage.
- * @tags: [ featureFlagSearchHybridScoringPrerequisites, requires_fcv_81 ]
+ * @tags: [ featureFlagSearchHybridScoringPrerequisites ]
  */
 
-import {stringifyArray} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     buildExpectedResults,
@@ -18,12 +17,11 @@ coll.drop();
 
 assert.commandWorked(coll.insertMany(getMovieData()));
 
-// Index is blocking by default so that the query is only run after index has been made.
-createSearchIndex(coll, {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "search_movie", definition: {"mappings": {"dynamic": true}}});
 
 // Create vector search index on movie plot embeddings.
 const vectorIndex = {
-    name: "vector_search_movie_block",
+    name: "vector_search_movie",
     type: "vectorSearch",
     definition: {
         "fields": [{
@@ -51,14 +49,14 @@ let testQuery = [
                             queryVector: getPlotEmbeddingById(6),
                             path: "plot_embedding",
                             numCandidates: limit * vectorSearchOverrequestFactor,
-                            index: "vector_search_movie_block",
+                            index: "vector_search_movie",
                             limit: limit,
                         }
                     }],
                     search: [
                         {
                             $search: {
-                                index: "search_movie_block",
+                                index: "search_movie",
                                 text: {query: "ape", path: ["fullplot", "title"]},
                             }
                         },
@@ -76,5 +74,5 @@ let results = coll.aggregate(testQuery).toArray();
 let expectedResultIds = [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15];
 assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds), results);
 
-dropSearchIndex(coll, {name: "search_movie_block"});
-dropSearchIndex(coll, {name: "vector_search_movie_block"});
+dropSearchIndex(coll, {name: "search_movie"});
+dropSearchIndex(coll, {name: "vector_search_movie"});
