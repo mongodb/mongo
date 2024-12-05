@@ -980,6 +980,7 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-stitch-support install-stitch-support-debug install-stitch-support-dev
+          bazel_build_tags: --bazel-build-tag=mongo_library
           task_compile_flags: >-
             --link-model=dynamic-sdk
             --ssl=off
@@ -1022,6 +1023,7 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-stitch-support-test
+          bazel_build_tags: --bazel-build-tag=mongo_library
           compiling_for_test: true
           task_compile_flags: >-
             --ssl=off
@@ -1047,6 +1049,7 @@ tasks:
       - func: "scons compile"
         vars:
           targets: archive-mongo-crypt-dev archive-mongo-crypt-debug
+          bazel_build_tags: --bazel-build-tag=mongo_library
           task_compile_flags: >-
             --dbg=on
             --opt=off
