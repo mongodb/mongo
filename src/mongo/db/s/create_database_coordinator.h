@@ -72,10 +72,14 @@ private:
     // Check the command arguments passed and if a database can be returned right away.
     void _checkPreconditions();
 
-    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    void _setupPrimaryShard(OperationContext* opCtx);
+
+    void _enterCriticalSection(OperationContext* opCtx,
+                               std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                const CancellationToken& token);
 
-    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    void _exitCriticalSection(OperationContext* opCtx,
+                              std::shared_ptr<executor::ScopedTaskExecutor> executor,
                               const CancellationToken& token);
 
     const BSONObj _critSecReason;

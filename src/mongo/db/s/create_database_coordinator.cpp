@@ -35,6 +35,39 @@
 
 namespace mongo {
 
+namespace {
+void checkIfDropPendingDB(OperationContext* opCtx, const DatabaseName& dbName) {
+    // Fails and retries if a previous dropDatabase is not complete yet.
+    uassert(ErrorCodes::DatabaseDropPending,
+            fmt::format("Database {} is being dropped. Will automatically retry",
+                        dbName.toStringForErrorMsg()),
+            create_database_util::checkIfDropPendingDB(opCtx, dbName));
+}
+
+void refreshDatabaseCache(OperationContext* opCtx,
+                          const DatabaseName& dbName,
+                          const ShardId& primaryShard) {
+    const auto dbNameStr =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+    // Note, making the primary shard refresh its databaseVersion here is not
+    // required for correctness, since either:
+    // 1) This is the first time this database is being created. The primary shard
+    //    will not have a databaseVersion already cached.
+    // 2) The database was dropped and is being re-created. Since dropping a
+    //    database also sends _flushDatabaseCacheUpdates to all shards, the primary
+    //    shard should not have a database version cached. (Note, it is possible
+    //    that dropping a database will skip sending _flushDatabaseCacheUpdates if
+    //    the config server fails over while dropping the database.)
+    // However, routers don't support retrying internally on StaleDbVersion in
+    // transactions (SERVER-39704), so if the first operation run against the
+    // database is in a transaction, it would fail with StaleDbVersion. Making the
+    // primary shard refresh here allows that first transaction to succeed. This
+    // allows our transaction passthrough suites and transaction demos to succeed
+    // without additional special logic.
+    create_database_util::refreshDbVersionOnPrimaryShard(opCtx, dbNameStr, primaryShard);
+}
+}  // namespace
+
 void CreateDatabaseCoordinator::_checkPreconditions() {
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
@@ -65,31 +98,30 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_cleanupOnAbort(
             // Exits the critical section if the shard selected by the user is found to be draining
             // when committing the database creation.
             if (_doc.getPhase() == Phase::kCommitOnShardingCatalog) {
-                _exitCriticalSection(executor, token);
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
+                _exitCriticalSection(opCtx, executor, token);
             }
         });
 }
 
-void CreateDatabaseCoordinator::_enterCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
-    // Fails and retries if a previous dropDatabase is not complete yet.
-    uassert(ErrorCodes::DatabaseDropPending,
-            fmt::format("Database {} is being dropped. Will automatically retry",
-                        nss().dbName().toStringForErrorMsg()),
-            create_database_util::checkIfDropPendingDB(opCtx, nss().dbName()));
-
-    // Selects the primary candidate shard if not specified by the user or selected by
-    // the coordinator already. Persists the primary shard information for later phases.
-    if (!_doc.getPrimaryShard()) {
-        StateDoc newDoc(_doc);
-        newDoc.setPrimaryShard(sharding_util::selectLeastLoadedNonDrainingShard(opCtx));
-        _updateStateDocument(opCtx, std::move(newDoc));
+void CreateDatabaseCoordinator::_setupPrimaryShard(OperationContext* opCtx) {
+    if (_doc.getPrimaryShard()) {
+        return;
     }
+    // Selects the primary candidate shard if not specified by the user or selected by the
+    // coordinator already. Persists the primary shard information for later phases.
+    StateDoc newDoc(_doc);
+    newDoc.setPrimaryShard(sharding_util::selectLeastLoadedNonDrainingShard(opCtx));
+    _updateStateDocument(opCtx, std::move(newDoc));
+}
 
+void CreateDatabaseCoordinator::_enterCriticalSection(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     ShardsvrParticipantBlock blockCRUDOperationsRequest(
         NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()));
     blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -105,11 +137,9 @@ void CreateDatabaseCoordinator::_enterCriticalSection(
 }
 
 void CreateDatabaseCoordinator::_exitCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(
         NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()));
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
@@ -122,27 +152,6 @@ void CreateDatabaseCoordinator::_exitCriticalSection(
         **executor, token, unblockCRUDOperationsRequest);
     sharding_ddl_util::sendAuthenticatedCommandToShards(
         opCtx, opts, {_doc.getPrimaryShard().get()});
-
-    const auto dbName = nss().dbName();
-    const auto dbNameStr =
-        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-    // Note, making the primary shard refresh its databaseVersion here is not
-    // required for correctness, since either:
-    // 1) This is the first time this database is being created. The primary shard
-    //    will not have a databaseVersion already cached.
-    // 2) The database was dropped and is being re-created. Since dropping a
-    //    database also sends _flushDatabaseCacheUpdates to all shards, the primary
-    //    shard should not have a database version cached. (Note, it is possible
-    //    that dropping a database will skip sending _flushDatabaseCacheUpdates if
-    //    the config server fails over while dropping the database.)
-    // However, routers don't support retrying internally on StaleDbVersion in
-    // transactions (SERVER-39704), so if the first operation run against the
-    // database is in a transaction, it would fail with StaleDbVersion. Making the
-    // primary shard refresh here allows that first transaction to succeed. This
-    // allows our transaction passthrough suites and transaction demos to succeed
-    // without additional special logic.
-    create_database_util::refreshDbVersionOnPrimaryShard(
-        opCtx, dbNameStr, _doc.getPrimaryShard().get());
 }
 
 ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
@@ -156,13 +165,20 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(Phase::kEnterCriticalSectionOnPrimary,
                                  [this, token, executor = executor, anchor = shared_from_this()] {
-                                     _enterCriticalSection(executor, token);
+                                     auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+                                     getForwardableOpMetadata().setOn(opCtx);
+
+                                     checkIfDropPendingDB(opCtx, nss().dbName());
+                                     _setupPrimaryShard(opCtx);
+                                     _enterCriticalSection(opCtx, executor, token);
                                  }))
         .then(_buildPhaseHandler(
             Phase::kCommitOnShardingCatalog,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
+
                 const auto& dbName = nss().dbName();
                 const auto dbNameStr =
                     DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
@@ -181,24 +197,23 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kExitCriticalSectionOnPrimary,
             [this, token, executor = executor, anchor = shared_from_this()] {
-                {
-                    // Populates the result if the coordinator was rebuilt after the commit phase.
-                    // This needs to be
-                    // done before releasing the critical section.
-                    const auto opCtxHolder = cc().makeOperationContext();
-                    auto* opCtx = opCtxHolder.get();
-                    getForwardableOpMetadata().setOn(opCtx);
-                    const auto& dbNameStr = DatabaseNameUtil::serialize(
-                        nss().dbName(), SerializationContext::stateDefault());
+                const auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
 
-                    if (!_result.is_initialized()) {
-                        const auto& createdDatabase = create_database_util::findDatabaseExactMatch(
-                            opCtx, dbNameStr, _doc.getPrimaryShard());
-                        invariant(createdDatabase.is_initialized());
-                        _result = ConfigsvrCreateDatabaseResponse(createdDatabase->getVersion());
-                    }
+                const auto& dbName = nss().dbName();
+                const auto& dbNameStr =
+                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+                // Populates the result if the coordinator was rebuilt after the commit phase.
+                // This needs to be done before releasing the critical section.
+                if (!_result.is_initialized()) {
+                    const auto& createdDatabase = create_database_util::findDatabaseExactMatch(
+                        opCtx, dbNameStr, _doc.getPrimaryShard());
+                    invariant(createdDatabase.is_initialized());
+                    _result = ConfigsvrCreateDatabaseResponse(createdDatabase->getVersion());
                 }
-                _exitCriticalSection(executor, token);
+                _exitCriticalSection(opCtx, executor, token);
+                refreshDatabaseCache(opCtx, dbName, _doc.getPrimaryShard().get());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
@@ -222,7 +237,6 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
             // For both cases, we'll fail the operation.
             if (status == ErrorCodes::ShardNotFound) {
                 create_database_util::logCommitCreateDatabaseFailed(dbName, status.reason());
-
                 triggerCleanup(opCtx, status);
                 MONGO_UNREACHABLE;
             }
