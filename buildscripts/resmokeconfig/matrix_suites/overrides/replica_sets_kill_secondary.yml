@@ -22,6 +22,10 @@
                 rollback: 2
               storage:
                 recovery: 2
+            # Non-voting replica set members will synchronously build an index upon observing an
+            # commitIndexBuild oplog entry. We lower resumableIndexBuildMajorityOpTimeTimeoutMillis so
+            # oplog application doesn't wait as long when tests have a large number of index builds.
+            resumableIndexBuildMajorityOpTimeTimeoutMillis: 10
         num_nodes: 2
         voting_secondaries: false
         replset_config_options:

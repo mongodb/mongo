@@ -29,6 +29,7 @@ executor:
           storage:
             recovery: 2
         preImagesCollectionTruncateMarkersMinBytes: 4096
+        resumableIndexBuildMajorityOpTimeTimeoutMillis: 10
       syncdelay: 5
       wiredTigerCollectionConfigString: allocation_size=1k,leaf_page_max=1k
       wiredTigerEngineConfigString: debug_mode=(table_logging=true)
