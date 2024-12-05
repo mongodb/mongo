@@ -6,11 +6,28 @@ import {
 } from "jstests/libs/check_shard_filtering_metadata_helpers.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 
 const conn = db.getMongo();
-const topology = DiscoverTopology.findConnectedNodes(conn);
+
+let topology;
+try {
+    topology = DiscoverTopology.findConnectedNodes(conn);
+} catch (e) {
+    if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
+        ErrorCodes.isNetworkTimeoutError(e.code) || isNetworkError(e) ||
+        e.code === ErrorCodes.FailedToSatisfyReadPreference ||
+        RetryableWritesUtil.isFailedToSatisfyPrimaryReadPreferenceError(e)) {
+        jsTest.log(
+            `Aborted filtering metadata check due to retriable error during topology discovery: ${
+                e}`);
+        quit();
+    } else {
+        throw e;
+    }
+}
 
 if (topology.type !== Topology.kShardedCluster) {
     throw new Error(
