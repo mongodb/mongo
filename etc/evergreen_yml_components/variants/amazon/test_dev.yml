@@ -177,6 +177,7 @@ buildvariants:
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
+      skip_symbolization: true
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2

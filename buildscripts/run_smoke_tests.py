@@ -8,10 +8,10 @@ import shlex
 import subprocess
 import sys
 from collections import defaultdict
+from typing import Optional
 
 import structlog
 import typer
-import yaml
 from structlog.stdlib import LoggerFactory
 from typing_extensions import Annotated
 
@@ -20,6 +20,8 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from buildscripts.resmokelib import parser, selector
+from buildscripts.resmokelib.utils import globstar
+from buildscripts.util.read_config import read_config_file
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
@@ -51,9 +53,14 @@ def get_suite_path(suite_arg: str) -> str:
     raise RuntimeError(f"Could not find suite {suite_arg}")
 
 
-def load_suite_config(path: str) -> dict:
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+def discover_suites(suite_names_or_paths: list[str] | None = None) -> list[str]:
+    if suite_names_or_paths is None:
+        return [
+            suite_path
+            for suite_path in globstar.iglob(os.path.join(DATA_DIRECTORY, "*.yml"))
+            if "OWNERS.yml" not in suite_path
+        ]
+    return [get_suite_path(suite) for suite in suite_names_or_paths]
 
 
 def map_suites_to_tests(config: dict) -> dict[str, list[str]]:
@@ -69,6 +76,17 @@ def map_suites_to_tests(config: dict) -> dict[str, list[str]]:
         suite_to_tests[suite].update(tests)
 
     return suite_to_tests
+
+
+def load_config_for_suites(suites: list[str]) -> dict[str, list[str]]:
+    config = defaultdict(set)
+    for suite in suites:
+        suite_config_file = get_suite_path(suite)
+        suite_config = read_config_file(suite_config_file)
+        suite_to_tests = map_suites_to_tests(suite_config)
+        for suite, tests in suite_to_tests.items():
+            config[suite].update(tests)
+    return config
 
 
 def run_resmoke_suite(
@@ -104,7 +122,10 @@ def run_resmoke_suite(
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def main(
     ctx: typer.Context,
-    suite: str,
+    suites_str: Annotated[
+        Optional[str],
+        typer.Option("--suites", help="Comma-separated list of suites to run", metavar="suites"),
+    ] = None,
     dry_run: Annotated[
         bool,
         typer.Option(
@@ -133,11 +154,10 @@ def main(
     passthrough_resmoke_args = ctx.args
     parser.set_run_options(shlex.join(passthrough_resmoke_args))
 
-    config_file = get_suite_path(suite)
-    LOGGER.debug("Found smoke test suite", path=config_file)
-    config = load_suite_config(config_file)
-    LOGGER.debug("Loaded smoke test suite")
-    suite_to_tests = map_suites_to_tests(config)
+    suite_names_or_paths = None if suites_str is None else suites_str.split(",")
+    suites = discover_suites(suite_names_or_paths)
+    LOGGER.debug("Discovered suites", suites=suites)
+    suite_to_tests = load_config_for_suites(suites)
 
     for suite, tests in suite_to_tests.items():
         if len(tests) == 0:

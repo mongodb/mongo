@@ -917,6 +917,53 @@ functions:
         files:
           - powercycle_tasks.json
 
+  "generate smoke test tasks":
+    - command: manifest.load
+    - *git_get_shallow_project
+    - *f_expansions_write
+    - *restore_git_history_and_tags
+    - *add_git_tag
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
+    - *upload_pip_requirements
+
+    - command: subprocess.exec
+      display_name: "smoke tests tasks generate"
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "buildscripts/evergreen_gen_smoke_test_tasks.py"
+          - "../expansions.yml"
+          - "--output-file=../smoke_test_tasks.json"
+
+    - command: archive.targz_pack
+      display_name: "targz_pack smoke_test_tasks_config.tgz"
+      params:
+        target: smoke_test_tasks_config.tgz
+        source_dir: "./"
+        include:
+          - "smoke_test_tasks.json"
+
+    - command: s3.put
+      display_name: "upload smoke_test_tasks_config.tgz"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: smoke_test_tasks_config.tgz
+        remote_file: ${project}/${build_variant}/${revision}/smoke_test_tasks/${task_name}-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/gzip
+        display_name: Generated Task Config - Execution ${execution}
+
+    - command: generate.tasks
+      display_name: "generate.tasks smoke_test_tasks.json"
+      params:
+        files:
+          - smoke_test_tasks.json
+
   "run powercycle sentinel":
     - command: manifest.load
     - *git_get_shallow_project

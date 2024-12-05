@@ -2,7 +2,7 @@
 # Running the full set, including both C++ unit tests and jstests can be accomplished by running
 # the following commands:
 # ninja [ninja-args] prove-server-programmability
-# python buildscripts/run_smoke_tests.py server_programmability
+# python buildscripts/run_smoke_tests.py --suites=server_programmability
 
 suites:
   core:

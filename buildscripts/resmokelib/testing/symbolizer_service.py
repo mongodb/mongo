@@ -35,6 +35,7 @@ class ResmokeSymbolizerConfig(NamedTuple):
     evg_task_id: Optional[str]
     client_id: Optional[str]
     client_secret: Optional[str]
+    skip_symbolization: bool
 
     @classmethod
     def from_resmoke_config(cls) -> ResmokeSymbolizerConfig:
@@ -47,6 +48,7 @@ class ResmokeSymbolizerConfig(NamedTuple):
             evg_task_id=_config.EVERGREEN_TASK_ID,
             client_id=_config.SYMBOLIZER_CLIENT_ID,
             client_secret=_config.SYMBOLIZER_CLIENT_SECRET,
+            skip_symbolization=_config.SKIP_SYMBOLIZATION,
         )
 
     @staticmethod
@@ -143,6 +145,10 @@ class ResmokeSymbolizer:
         :param test: resmoke test case
         :return: whether we should symbolize
         """
+        if self.config.skip_symbolization:
+            test.logger.info("Configured to skip symbolization, skipping symbolization")
+            return False
+
         if self.config.evg_task_id is None:
             test.logger.info("Not running in Evergreen, skipping symbolization")
             return False

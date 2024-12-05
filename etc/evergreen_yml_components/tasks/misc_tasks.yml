@@ -1390,6 +1390,17 @@ tasks:
           <<: *powercycle_remote_credentials
         timeout_secs: 1800 # 30 minute timeout for no output
 
+  - name: run_smoke_tests_gen
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+        "requires_large_host",
+        "incompatible_windows",
+      ]
+    commands:
+      - func: "generate smoke test tasks"
+
   - name: selinux_rhel8_enterprise
     tags: ["assigned_to_jira_team_server_security", "experimental"]
     depends_on:

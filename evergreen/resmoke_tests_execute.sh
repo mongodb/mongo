@@ -126,6 +126,10 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --patchBuild"
   fi
 
+  if [ "${skip_symbolization}" = "true" ]; then
+    extra_args="$extra_args --skipSymbolization"
+  fi
+
   path_value="$PATH:/data/multiversion"
 
   # Set the suite name to be the task name by default; unless overridden with the `suite` expansion.

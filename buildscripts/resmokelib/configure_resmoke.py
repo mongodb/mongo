@@ -632,6 +632,8 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
         "skip_tests_covered_by_more_complex_suites"
     )
 
+    _config.SKIP_SYMBOLIZATION = config.pop("skip_symbolization")
+
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:
         _config.ARCHIVE_FILE = None

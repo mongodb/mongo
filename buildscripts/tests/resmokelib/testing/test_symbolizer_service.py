@@ -16,6 +16,7 @@ def mock_resmoke_symbolizer_config():
     config_mock.evg_task_id = "evg_task_id"
     config_mock.client_id = "client_id"
     config_mock.client_secret = "client_secret"
+    config_mock.skip_symbolization = False
     config_mock.is_windows.return_value = False
     config_mock.is_macos.return_value = False
     return config_mock
