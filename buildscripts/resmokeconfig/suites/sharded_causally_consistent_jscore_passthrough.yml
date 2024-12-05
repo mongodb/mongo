@@ -67,7 +67,7 @@ selector:
     - uses_parallel_shell
     # Capped collections cannot be sharded
     - requires_capped
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

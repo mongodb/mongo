@@ -56,7 +56,7 @@ selector:
     - uses_transactions
     # Parallel shell is not causally consistent because it uses a different session.
     - uses_parallel_shell
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

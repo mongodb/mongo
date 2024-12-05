@@ -143,7 +143,7 @@ selector:
     - requires_fcv_81
     # Exclude tests that are not compatible with upgrade/downgrade.
     - cannot_run_during_upgrade_downgrade
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

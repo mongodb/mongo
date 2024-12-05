@@ -232,6 +232,7 @@ selector:
     - uses_parallel_shell
     - does_not_support_causal_consistency
     - requires_timeseries
+    - requires_2_or_more_shards
   roots:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js

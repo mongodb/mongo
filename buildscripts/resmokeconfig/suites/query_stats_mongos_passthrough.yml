@@ -49,7 +49,7 @@ selector:
     # Running $queryStats will increment these counters which can screw up some test assertions.
     - inspects_command_opcounters
     - known_query_shape_computation_problem
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

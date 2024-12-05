@@ -40,7 +40,7 @@ selector:
     - assumes_against_mongod_not_mongos
     # system.profile collection doesn't exist on mongos.
     - requires_profiling
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

@@ -68,7 +68,7 @@ selector:
     - uses_prepare_transaction
     # These tests already pass in API parameters, so we avoid overwriting them.
     - uses_api_parameters
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

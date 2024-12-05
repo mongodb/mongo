@@ -21,7 +21,7 @@ selector:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections
     # can't be created on `getCollection` call.
     - assumes_no_implicit_collection_creation_on_get_collection
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

@@ -7,6 +7,7 @@ selector:
     # Don't run tests that require the encrypted collscan mode in this suite.
     - requires_fle2_encrypted_collscan
     - fle2_no_mongos
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

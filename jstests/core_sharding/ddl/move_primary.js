@@ -1,14 +1,12 @@
 /*
  * Tests basic movePrimary behaviour.
+ *
+ * @tags: [
+ *   requires_2_or_more_shards,
+ * ]
  */
 
-import {getNumShards, getRandomShardId} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
-
-// TODO SERVER-96953 Remove the if clause and add a 'requires_2_or_more_shards' exclusion tag.
-if (getNumShards(db) < 2) {
-    jsTestLog("This test requires at least two shards.");
-    quit();
-}
+import {getRandomShardId} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
 
 const testDB = db.getSiblingDB('test_db');
 testDB.dropDatabase();

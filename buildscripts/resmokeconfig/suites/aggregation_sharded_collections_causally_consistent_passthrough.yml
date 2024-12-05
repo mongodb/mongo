@@ -51,7 +51,7 @@ selector:
     - requires_sharding
     - requires_replication
     - requires_spawning_own_processes
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

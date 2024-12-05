@@ -257,7 +257,7 @@ selector:
     - uses_parallel_shell
     - does_not_support_causal_consistency
     - requires_timeseries # Transactions not supported
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

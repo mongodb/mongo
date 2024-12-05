@@ -41,7 +41,7 @@ selector:
     # system.profile collection doesn't exist on mongos.
     - requires_profiling
     - config_shard_incompatible
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:

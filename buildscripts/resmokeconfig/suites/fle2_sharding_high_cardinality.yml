@@ -8,7 +8,7 @@ selector:
     # i.e. verify explain output
     - requires_fle2_in_always
     - fle2_no_mongos
-
+    - requires_2_or_more_shards
 executor:
   archive:
     hooks:
