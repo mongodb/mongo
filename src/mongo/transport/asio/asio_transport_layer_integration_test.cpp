@@ -117,7 +117,7 @@ public:
         auto server = connectionString.getServers().front();
 
         auto sc = getGlobalServiceContext();
-        auto tl = sc->getTransportLayerManager()->getEgressLayer();
+        auto tl = sc->getTransportLayerManager()->getDefaultEgressLayer();
         _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
         _reactorThread = stdx::thread([&] {
             _reactor->run();

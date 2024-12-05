@@ -101,14 +101,19 @@ public:
         auto* svcCtx = getServiceContext();
         auto clientCache = std::make_shared<ClientCache>();
         std::vector<std::shared_ptr<ClientTransportObserver>> observers;
-        auto sm = std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers));
+        auto sm = options.enableIngress
+            ? std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers))
+            : nullptr;
         auto tl =
             std::make_unique<GRPCTransportLayerImpl>(svcCtx, std::move(options), std::move(sm));
-        uassertStatusOK(tl->registerService(
-            std::make_unique<CommandService>(tl.get(),
-                                             std::move(serverCb),
-                                             std::make_unique<WireVersionProvider>(),
-                                             std::move(clientCache))));
+
+        if (options.enableIngress) {
+            uassertStatusOK(tl->registerService(
+                std::make_unique<CommandService>(tl.get(),
+                                                 std::move(serverCb),
+                                                 std::make_unique<WireVersionProvider>(),
+                                                 std::move(clientCache))));
+        }
         return tl;
     }
 
@@ -147,6 +152,23 @@ public:
             ON_BLOCK_EXIT([&] { tl->shutdown(); });
             ASSERT_DOES_NOT_THROW(cb(*tl));
         });
+    }
+
+    void createAndStartupTL(bool ingress, bool egress) {
+        auto options = CommandServiceTestFixtures::makeTLOptions();
+        options.enableIngress = ingress;
+        options.enableEgress = egress;
+
+        auto tl = makeTL(makeNoopRPCHandler(), std::move(options));
+
+        if (!ingress && !egress) {
+            ASSERT_NOT_OK(tl->setup());
+            ASSERT_NOT_OK(tl->start());
+        } else {
+            ASSERT_OK(tl->setup());
+            ASSERT_OK(tl->start());
+        }
+        tl->shutdown();
     }
 
     void assertConnectSucceeds(GRPCTransportLayer& tl, const HostAndPort& addr) {
@@ -210,6 +232,40 @@ public:
     MockServiceEntryPoint* serviceEntryPoint;
     test::SSLGlobalParamsGuard _sslGlobalParamsGuard;
 };
+
+TEST_F(GRPCTransportLayerTest, startupIngressAndEgress) {
+    createAndStartupTL(true, true);
+}
+
+TEST_F(GRPCTransportLayerTest, startupIngressNoEgress) {
+    createAndStartupTL(true, false);
+}
+
+TEST_F(GRPCTransportLayerTest, startupEgressNoIngress) {
+    createAndStartupTL(false, true);
+}
+
+TEST_F(GRPCTransportLayerTest, startupNeitherIngressNorEgress) {
+    createAndStartupTL(false, false);
+}
+
+TEST_F(GRPCTransportLayerTest, startupEgressWithoutTLS) {
+    sslGlobalParams.sslCAFile.clear();
+    sslGlobalParams.sslPEMKeyFile.clear();
+    createAndStartupTL(false, true);
+}
+
+TEST_F(GRPCTransportLayerTest, setupIngressWithoutTLSShouldFail) {
+    sslGlobalParams.sslCAFile.clear();
+    sslGlobalParams.sslPEMKeyFile.clear();
+
+    auto options = CommandServiceTestFixtures::makeTLOptions();
+    options.enableIngress = true;
+
+    auto tl = makeTL(makeNoopRPCHandler(), std::move(options));
+    ASSERT_EQ(ErrorCodes::InvalidOptions, tl->setup());
+}
+
 
 TEST_F(GRPCTransportLayerTest, RunCommand) {
     runCommandThroughServiceEntryPoint("x");

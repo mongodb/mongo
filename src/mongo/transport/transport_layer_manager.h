@@ -43,12 +43,13 @@
 namespace mongo::transport {
 
 class TransportLayer;
+enum class TransportProtocol;
 
 /**
  * This TransportLayerManager holds other TransportLayers, and manages all TransportLayer
  * operations that should touch every TransportLayer. For egress-only functionality, callers should
- * access the egress layer through getEgressLayer(). Mongod and Mongos can treat this like the
- * "only" TransportLayer and not be concerned with which other TransportLayer implementations it
+ * access the egress layer through getDefaultEgressLayer(). Mongod and Mongos can treat this like
+ * the "only" TransportLayer and not be concerned with which other TransportLayer implementations it
  * holds underneath.
  *
  * The manager must be provided with an immutable list of TransportLayers that it will manage at
@@ -68,21 +69,14 @@ public:
     virtual void appendStatsForServerStatus(BSONObjBuilder* bob) const = 0;
     virtual void appendStatsForFTDC(BSONObjBuilder& bob) const = 0;
 
-    virtual TransportLayer* getEgressLayer() = 0;
+    virtual TransportLayer* getDefaultEgressLayer() = 0;
     virtual const std::vector<std::unique_ptr<TransportLayer>>& getTransportLayers() const = 0;
 
     /**
-     * Returns the first transport layer of type T in the transport layers list.
+     * Returns the transport layer that matches the TransportProtocol. If none exist this function
+     * returns a nullptr.
      */
-    template <class T>
-    T* getFirstTransportLayer() const {
-        for (auto& tl : getTransportLayers()) {
-            if (auto layer = dynamic_cast<T*>(tl.get())) {
-                return layer;
-            }
-        }
-        return nullptr;
-    }
+    virtual TransportLayer* getTransportLayer(TransportProtocol protocol) const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,

@@ -59,6 +59,7 @@ public:
         Options() : Options(ServerGlobalParams()) {}
 
         bool enableEgress = false;
+        bool enableIngress = true;
         std::vector<std::string> bindIpList;
         /**
          * If set to 0, the transport layer will bind to an arbitrary unused port.
@@ -103,6 +104,10 @@ public:
 
     StringData getNameForLogging() const override {
         return "gRPC"_sd;
+    }
+
+    TransportProtocol getTransportProtocol() const override {
+        return TransportProtocol::GRPC;
     }
 
     /**

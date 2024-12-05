@@ -329,7 +329,7 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
             const auto connectExpiration = now + kConnectTimeout;
             while (now < connectExpiration) {
                 auto tl = getGlobalServiceContext()->getTransportLayerManager();
-                auto sws = tl->getEgressLayer()->connect(
+                auto sws = tl->getDefaultEgressLayer()->connect(
                     destAddr, transport::kGlobalSSLMode, connectExpiration - now);
                 auto status = sws.getStatus();
                 if (!status.isOK()) {

@@ -793,6 +793,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         auto tl = transport::TransportLayerManagerImpl::createWithConfig(
             &serverGlobalParams,
             serviceContext,
+            false /* useEgressGRPC */,
             loadBalancerPort,
             boost::none,
             std::make_unique<ClientTransportObserverMongos>());

@@ -64,6 +64,7 @@ class OperationContext;
 namespace transport {
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
+enum class TransportProtocol { MongoRPC, GRPC };
 
 class Reactor;
 using ReactorHandle = std::shared_ptr<Reactor>;
@@ -151,6 +152,11 @@ public:
     virtual BatonHandle makeBaton(OperationContext* opCtx) const {
         return {};
     }
+
+    /**
+     * Returns the TransportProtocol associated with this TransportLayer.
+     */
+    virtual TransportProtocol getTransportProtocol() const = 0;
 
     /**
      * Return the session manager, if any, associated with this TransportLayer.

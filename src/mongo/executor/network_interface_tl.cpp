@@ -269,14 +269,13 @@ void NetworkInterfaceTL::startup() {
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
 #ifdef MONGO_CONFIG_SSL
     if (_connPoolOpts.transientSSLParams) {
-        auto statusOrContext = tl->getEgressLayer()->createTransientSSLContext(
-            _connPoolOpts.transientSSLParams.value());
-        uassertStatusOK(statusOrContext.getStatus());
-        transientSSLContext = std::move(statusOrContext.getValue());
+        transientSSLContext =
+            uassertStatusOK(tl->getDefaultEgressLayer()->createTransientSSLContext(
+                _connPoolOpts.transientSSLParams.value()));
     }
 #endif
 
-    _reactor = tl->getEgressLayer()->getReactor(transport::TransportLayer::kNewReactor);
+    _reactor = tl->getDefaultEgressLayer()->getReactor(transport::TransportLayer::kNewReactor);
     auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
         _reactor, tl, std::move(_onConnectHook), _connPoolOpts, transientSSLContext);
     _pool = std::make_shared<ConnectionPool>(

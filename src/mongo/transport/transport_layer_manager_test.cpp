@@ -141,7 +141,7 @@ TEST_F(TransportLayerManagerTest, ConnectEgressLayer) {
     TransportLayerManagerImpl manager(std::move(layers), egressPtr);
     uassertStatusOK(manager.setup());
     uassertStatusOK(manager.start());
-    auto swSession = manager.getEgressLayer()->connect(
+    auto swSession = manager.getDefaultEgressLayer()->connect(
         HostAndPort("localhost:1234"), ConnectSSLMode::kDisableSSL, Milliseconds(100), boost::none);
     ASSERT_OK(swSession);
     ASSERT_TRUE(egressPtr->owns(swSession.getValue()->id()));

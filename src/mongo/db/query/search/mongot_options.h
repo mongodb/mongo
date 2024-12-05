@@ -49,6 +49,7 @@ struct MongotParams {
     bool enabled = false;
     std::string host;
     bool skipAuthToMongot = false;
+    bool useGRPC = false;
 
     AtomicWord<int> minConnections;
     AtomicWord<int> maxConnections;

@@ -103,7 +103,7 @@ Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext) {
     auto tl = context->getTransportLayerManager();
-    return tl->getEgressLayer()
+    return tl->getDefaultEgressLayer()
         ->asyncConnect(peer,
                        sslMode,
                        reactor,

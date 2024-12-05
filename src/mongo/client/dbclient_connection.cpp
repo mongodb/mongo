@@ -111,7 +111,7 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession
     Milliseconds timeout,
     const boost::optional<TransientSSLParams>& transientSSLParams) {
     auto swSession =
-        getGlobalServiceContext()->getTransportLayerManager()->getEgressLayer()->connect(
+        getGlobalServiceContext()->getTransportLayerManager()->getDefaultEgressLayer()->connect(
             host,
             transientSSLParams ? transport::kEnableSSL : getURI().getSSLMode(),
             _socketTimeout.value_or(Milliseconds(5000)),

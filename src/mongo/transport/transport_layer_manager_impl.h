@@ -55,7 +55,7 @@ class TransportLayerManagerImpl final : public TransportLayerManager {
 
 public:
     TransportLayerManagerImpl(std::vector<std::unique_ptr<TransportLayer>> tls,
-                              TransportLayer* egressLayer);
+                              TransportLayer* defaultEgressLayer);
     explicit TransportLayerManagerImpl(std::unique_ptr<TransportLayer> tl);
 
     ~TransportLayerManagerImpl() override = default;
@@ -79,14 +79,15 @@ public:
     static std::unique_ptr<TransportLayerManager> createWithConfig(
         const ServerGlobalParams* config,
         ServiceContext* ctx,
+        bool useEgressGRPC = false,
         boost::optional<int> loadBalancerPort = {},
         boost::optional<int> routerPort = {},
         std::shared_ptr<ClientTransportObserver> observer = nullptr);
 
     static std::unique_ptr<TransportLayerManager> makeDefaultEgressTransportLayer();
 
-    TransportLayer* getEgressLayer() override {
-        return _egressLayer;
+    TransportLayer* getDefaultEgressLayer() override {
+        return _defaultEgressLayer;
     }
 
 #ifdef MONGO_CONFIG_SSL
@@ -102,6 +103,15 @@ public:
         return _tls;
     }
 
+    TransportLayer* getTransportLayer(TransportProtocol protocol) const override {
+        for (auto& tl : _tls) {
+            if (tl->getTransportProtocol() == protocol) {
+                return tl.get();
+            }
+        }
+        return nullptr;
+    }
+
 private:
     /**
      * Expects the following order of state transitions, or terminates the process:
@@ -114,7 +124,7 @@ private:
     stdx::mutex _stateMutex;
 
     std::vector<std::unique_ptr<TransportLayer>> _tls;
-    TransportLayer* _egressLayer;
+    TransportLayer* _defaultEgressLayer;
 };
 
 }  // namespace mongo::transport

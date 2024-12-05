@@ -219,6 +219,10 @@ public:
         return "asio"_sd;
     }
 
+    TransportProtocol getTransportProtocol() const override {
+        return TransportProtocol::MongoRPC;
+    }
+
     int listenerPort() const {
         return _listenerPort;
     }

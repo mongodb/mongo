@@ -140,6 +140,7 @@
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
@@ -296,6 +297,10 @@
 #include "mongo/util/version.h"
 #include "mongo/watchdog/watchdog_mongod.h"
 
+#ifdef MONGO_CONFIG_GRPC
+#include "mongo/transport/grpc/grpc_feature_flag_gen.h"
+#endif
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 
@@ -335,8 +340,22 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
         return transport::TransportLayerManagerImpl::makeDefaultEgressTransportLayer();
     }
 
-    return transport::TransportLayerManagerImpl::createWithConfig(
-        &serverGlobalParams, svcCtx, std::move(loadBalancerPort), std::move(routerPort));
+    bool useEgressGRPC = false;
+#ifdef MONGO_CONFIG_GRPC
+    if (globalMongotParams.useGRPC) {
+        uassert(9715900,
+                "Egress GRPC for search is not enabled",
+                feature_flags::gEgressGrpcForSearch.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        useEgressGRPC = true;
+    }
+#endif
+
+    return transport::TransportLayerManagerImpl::createWithConfig(&serverGlobalParams,
+                                                                  svcCtx,
+                                                                  useEgressGRPC,
+                                                                  std::move(loadBalancerPort),
+                                                                  std::move(routerPort));
 }
 
 ExitCode initializeTransportLayer(ServiceContext* serviceContext, BSONObjBuilder* timerReport) {

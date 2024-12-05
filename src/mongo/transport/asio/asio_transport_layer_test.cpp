@@ -839,7 +839,7 @@ public:
     }
 
     AsioTransportLayer& tla() {
-        auto tl = getServiceContext()->getTransportLayerManager()->getEgressLayer();
+        auto tl = getServiceContext()->getTransportLayerManager()->getDefaultEgressLayer();
         return *checked_cast<AsioTransportLayer*>(tl);
     }
 };
@@ -1613,7 +1613,7 @@ class EgressSessionWithScopedReactor {
 public:
     EgressSessionWithScopedReactor(ServiceContext* sc)
         : _sc(sc),
-          _reactor(sc->getTransportLayerManager()->getEgressLayer()->getReactor(
+          _reactor(sc->getTransportLayerManager()->getDefaultEgressLayer()->getReactor(
               TransportLayer::kNewReactor)),
           _reactorThread([&] { _reactor->run(); }),
           _session(_makeEgressSession()) {}
@@ -1629,13 +1629,13 @@ public:
 
 private:
     std::shared_ptr<Session> _makeEgressSession() {
-        auto tla =
-            checked_cast<AsioTransportLayer*>(_sc->getTransportLayerManager()->getEgressLayer());
+        auto tla = checked_cast<AsioTransportLayer*>(
+            _sc->getTransportLayerManager()->getDefaultEgressLayer());
 
         HostAndPort localTarget(testHostName(), tla->listenerPort());
 
         return _sc->getTransportLayerManager()
-            ->getEgressLayer()
+            ->getDefaultEgressLayer()
             ->asyncConnect(localTarget,
                            ConnectSSLMode::kGlobalSSLMode,
                            _reactor,

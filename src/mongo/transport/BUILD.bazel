@@ -44,6 +44,7 @@ mongo_cc_library(
         ":session_manager",
         ":transport_layer",
         "//src/mongo/db:server_base",
+        "//src/mongo/rpc:client_metadata",
         "//src/third_party/asio-master:asio",
     ] + select({
         "//bazel/config:build_grpc_enabled": [

@@ -35,13 +35,17 @@
 #include <fstream>
 #endif
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/version.h"
 
 #ifdef MONGO_CONFIG_GRPC
+#include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
 #endif
 
@@ -55,17 +59,17 @@
 namespace mongo::transport {
 
 TransportLayerManagerImpl::TransportLayerManagerImpl(
-    std::vector<std::unique_ptr<TransportLayer>> tls, TransportLayer* egressLayer)
-    : _tls(std::move(tls)), _egressLayer(egressLayer) {
-    invariant(_egressLayer);
+    std::vector<std::unique_ptr<TransportLayer>> tls, TransportLayer* defaultEgressLayer)
+    : _tls(std::move(tls)), _defaultEgressLayer(defaultEgressLayer) {
+    invariant(_defaultEgressLayer);
     invariant(find_if(_tls.begin(), _tls.end(), [&](auto& tl) {
-                  return tl.get() == _egressLayer;
+                  return tl.get() == _defaultEgressLayer;
               }) != _tls.end());
 }
 
 TransportLayerManagerImpl::TransportLayerManagerImpl(std::unique_ptr<TransportLayer> tl) {
     _tls.push_back(std::move(tl));
-    _egressLayer = _tls[0].get();
+    _defaultEgressLayer = _tls[0].get();
 }
 
 // TODO Right now this and setup() leave TLs started if there's an error. In practice the server
@@ -137,6 +141,35 @@ void TransportLayerManagerImpl::appendStatsForFTDC(BSONObjBuilder& bob) const {
     }
 }
 
+bool shouldGRPCIngressBeEnabled() {
+#ifdef MONGO_CONFIG_GRPC
+    bool flag = feature_flags::gFeatureFlagGRPC.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    if (!flag) {
+        return false;
+    }
+
+#ifdef MONGO_CONFIG_SSL
+    bool hasCertificateConfigured = !sslGlobalParams.sslPEMKeyFile.empty();
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+    hasCertificateConfigured |= !sslGlobalParams.sslCertificateSelector.empty();
+#endif
+
+    if (hasCertificateConfigured) {
+        return true;
+    }
+
+    LOGV2(8076800, "Unable to start ingress gRPC transport without tlsCertificateKeyFile");
+    return false;
+#else
+    LOGV2(8076801, "Unable to start ingress gRPC transport in a build without SSL enabled");
+#endif  // MONGO_CONFIG_SSL
+
+#endif  // MONGO_CONFIG_GRPC
+    return false;
+}
+
 std::unique_ptr<TransportLayerManager>
 TransportLayerManagerImpl::makeDefaultEgressTransportLayer() {
     transport::AsioTransportLayer::Options opts(&serverGlobalParams);
@@ -150,6 +183,7 @@ TransportLayerManagerImpl::makeDefaultEgressTransportLayer() {
 std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConfig(
     const ServerGlobalParams* config,
     ServiceContext* svcCtx,
+    bool useEgressGRPC,
     boost::optional<int> loadBalancerPort,
     boost::optional<int> routerPort,
     std::shared_ptr<ClientTransportObserver> observer) {
@@ -171,17 +205,25 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     }
 
 #ifdef MONGO_CONFIG_GRPC
-#ifdef MONGO_CONFIG_SSL
-    if (!sslGlobalParams.sslPEMKeyFile.empty()) {
-        using GRPCTL = grpc::GRPCTransportLayerImpl;
+    using GRPCTL = grpc::GRPCTransportLayerImpl;
+    grpc::GRPCTransportLayer::Options opts(*config);
+    opts.enableIngress = shouldGRPCIngressBeEnabled();
+    opts.enableEgress = useEgressGRPC;
+
+    if (opts.enableIngress || opts.enableEgress) {
+        BSONObjBuilder bob;
+        auto versionString =
+            VersionInfoInterface::instance(VersionInfoInterface::NotEnabledAction::kFallback)
+                .version();
+        uassertStatusOK(ClientMetadata::serialize(
+            "MongoDB Internal Client", versionString, config->binaryName + "-GRPCClient", &bob));
+        auto metadataDoc = bob.obj();
+
+        opts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
+
         retVector.push_back(
-            GRPCTL::createWithConfig(svcCtx, GRPCTL::Options(*config), std::move(observers)));
-    } else {
-        LOGV2(8076800, "Unable to start gRPC transport without tlsCertificateKeyFile");
+            GRPCTL::createWithConfig(svcCtx, std::move(opts), std::move(observers)));
     }
-#else
-    LOGV2(8076801, "Unable to start gRPC transport in a build without SSL enabled");
-#endif
 #endif
 
     auto egress = retVector[0].get();

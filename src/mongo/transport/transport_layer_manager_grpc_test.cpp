@@ -262,7 +262,7 @@ TEST_F(AsioGRPCTransportLayerManagerTest, EgressAsio) {
             ASSERT_OK(session.sinkMessage(swMsg.getValue()));
         });
 
-        auto swSession = getTransportLayerManager().getEgressLayer()->connect(
+        auto swSession = getTransportLayerManager().getDefaultEgressLayer()->connect(
             getAsioListenAddress(),
             ConnectSSLMode::kGlobalSSLMode,
             grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
@@ -342,6 +342,30 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
 
         stdx::unique_lock lk(mutex);
         cv.wait(lk, [&]() { return serverCbComplete; });
+    });
+}
+
+TEST_F(AsioGRPCTransportLayerManagerTest, StartupUsingCreateWithConfig) {
+    runTest([&](auto& monitor) {
+        auto tlm = transport::TransportLayerManagerImpl::createWithConfig(
+            &serverGlobalParams, getServiceContext(), true);
+
+        uassertStatusOK(tlm->setup());
+        uassertStatusOK(tlm->start());
+
+        bool hasAsioTl = false;
+        bool hasGRPCTl = false;
+        for (auto& tl : tlm->getTransportLayers()) {
+            auto protocol = tl->getTransportProtocol();
+            if (protocol == TransportProtocol::MongoRPC)
+                hasAsioTl = true;
+            if (protocol == TransportProtocol::GRPC)
+                hasGRPCTl = true;
+        }
+        ASSERT_TRUE(hasAsioTl);
+        ASSERT_TRUE(hasGRPCTl);
+
+        tlm->shutdown();
     });
 }
 

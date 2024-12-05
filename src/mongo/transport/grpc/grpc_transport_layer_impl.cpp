@@ -72,18 +72,22 @@ std::unique_ptr<GRPCTransportLayerImpl> GRPCTransportLayerImpl::createWithConfig
 
     auto clientCache = std::make_shared<ClientCache>();
 
-    auto tl = std::make_unique<GRPCTransportLayerImpl>(
-        svcCtx,
-        std::move(options),
-        std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers)));
-    uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
-        tl.get(),
-        [tlPtr = tl.get()](auto session) {
-            invariant(session->getTransportLayer() == tlPtr);
-            tlPtr->getSessionManager()->startSession(std::move(session));
-        },
-        std::make_shared<grpc::WireVersionProvider>(),
-        std::move(clientCache))));
+    auto sm = options.enableIngress
+        ? std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers))
+        : nullptr;
+
+    auto tl = std::make_unique<GRPCTransportLayerImpl>(svcCtx, std::move(options), std::move(sm));
+
+    if (options.enableIngress) {
+        uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
+            tl.get(),
+            [tlPtr = tl.get()](auto session) {
+                invariant(session->getTransportLayer() == tlPtr);
+                tlPtr->getSessionManager()->startSession(std::move(session));
+            },
+            std::make_shared<grpc::WireVersionProvider>(),
+            std::move(clientCache))));
+    }
 
     return tl;
 }
@@ -164,6 +168,11 @@ Status GRPCTransportLayerImpl::setup() {
             _client = std::make_shared<GRPCClient>(
                 this, *_options.clientMetadata, std::move(clientOptions));
         }
+
+        iassert(ErrorCodes::InvalidOptions,
+                "gRPC cannot be setup with both ingress and egress disabled",
+                _client || _server);
+
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();
@@ -176,26 +185,31 @@ Status GRPCTransportLayerImpl::start() {
         iassert(TransportLayer::ShutdownStatus.code(),
                 "Cannot start GRPCTransportLayer after it has been shut down",
                 !_isShutdown);
+        iassert(ErrorCodes::NotYetInitialized,
+                "gRPC networking has not been setup yet",
+                _client || _server);
 
-        // We can't distinguish between the default list of disabled protocols and one specified by
-        // via options, so we just log that the list is being ignored when using gRPC.
-        if (!sslGlobalParams.sslDisabledProtocols.empty()) {
-            LOGV2_DEBUG(8000811,
-                        3,
-                        "Ignoring tlsDisabledProtocols for gRPC-based connections",
-                        "tlsDisabledProtocols"_attr = sslGlobalParams.sslDisabledProtocols);
-        }
-        uassert(ErrorCodes::InvalidSSLConfiguration,
-                "Specifying a CRL file is not supported when gRPC mode is enabled",
-                sslGlobalParams.sslCRLFile.empty());
-        uassert(ErrorCodes::InvalidSSLConfiguration,
-                "Certificate passwords are not supported when gRPC mode is enabled",
-                sslGlobalParams.sslPEMKeyPassword.empty());
-        uassert(ErrorCodes::InvalidSSLConfiguration,
-                "tlsFIPSMode is not supported when gRPC mode is enabled",
-                !sslGlobalParams.sslFIPSMode);
-
+        // TODO SERVER-97619: Depending on the resolution of SERVER-97619, we may need to move the
+        // log and uasserts out of this block.
         if (_server) {
+            // We can't distinguish between the default list of disabled protocols and one specified
+            // by via options, so we just log that the list is being ignored when using gRPC.
+            if (!sslGlobalParams.sslDisabledProtocols.empty()) {
+                LOGV2_DEBUG(8000811,
+                            3,
+                            "Ignoring tlsDisabledProtocols for gRPC-based connections",
+                            "tlsDisabledProtocols"_attr = sslGlobalParams.sslDisabledProtocols);
+            }
+            uassert(ErrorCodes::InvalidSSLConfiguration,
+                    "Specifying a CRL file is not supported when gRPC mode is enabled",
+                    sslGlobalParams.sslCRLFile.empty());
+            uassert(ErrorCodes::InvalidSSLConfiguration,
+                    "Certificate passwords are not supported when gRPC mode is enabled",
+                    sslGlobalParams.sslPEMKeyPassword.empty());
+            uassert(ErrorCodes::InvalidSSLConfiguration,
+                    "tlsFIPSMode is not supported when gRPC mode is enabled",
+                    !sslGlobalParams.sslFIPSMode);
+
             invariant(_sessionManager);
             _server->start();
             if (_options.useUnixDomainSockets) {

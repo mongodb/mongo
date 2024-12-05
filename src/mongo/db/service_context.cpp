@@ -302,7 +302,8 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     // `DefaultBaton` as a fallback.
     opCtx->setBaton([&]() -> BatonHandle {
         if (_transportLayerManager)
-            if (auto baton = _transportLayerManager->getEgressLayer()->makeBaton(opCtx.get()))
+            if (auto baton =
+                    _transportLayerManager->getDefaultEgressLayer()->makeBaton(opCtx.get()))
                 return baton;
         return std::make_shared<DefaultBaton>(opCtx.get());
     }());

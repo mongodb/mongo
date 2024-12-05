@@ -250,6 +250,7 @@ public:
         options.maxServerThreads = kMaxThreads;
         options.useUnixDomainSockets = false;
         options.unixDomainSocketPermissions = DEFAULT_UNIX_PERMS;
+        options.enableIngress = true;
         options.enableEgress = true;
         options.clientMetadata = makeClientMetadataDocument();
 

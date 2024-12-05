@@ -70,3 +70,10 @@ server_parameters:
           gte: 1
       default: 32767
       redact: false
+
+    useGrpcForSearch:
+        description: Configures whether or not shards should communicate with mongot using gRPC.
+        set_at: [ startup ]
+        default: false
+        cpp_varname: 'globalMongotParams.useGRPC'
+        redact: false

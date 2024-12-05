@@ -97,6 +97,10 @@ public:
         return "mock"_sd;
     }
 
+    TransportProtocol getTransportProtocol() const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     ReactorHandle getReactor(WhichReactor which) override;
 
     // Set to a factory function to use your own session type.
