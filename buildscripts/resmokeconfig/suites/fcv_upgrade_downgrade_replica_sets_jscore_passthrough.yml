@@ -53,14 +53,14 @@ selector:
     # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
     # upgrade/downgrade
     # TODO SERVER-70605: remove this block.
-    - jstests/core/timeseries/bucket_granularity.js
-    - jstests/core/timeseries/timeseries_id_range.js
-    - jstests/core/timeseries/timeseries_insert_after_update.js
-    - jstests/core/timeseries/timeseries_sparse.js
-    - jstests/core/timeseries/timeseries_min_max.js
-    - jstests/core/timeseries/timeseries_simple.js
-    - jstests/core/timeseries/timeseries_collation.js
-    - jstests/core/timeseries/bucket_timestamp_rounding.js
+    - jstests/core/timeseries/ddl/bucket_granularity.js
+    - jstests/core/timeseries/query/timeseries_id_range.js
+    - jstests/core/timeseries/write/timeseries_insert_after_update.js
+    - jstests/core/timeseries/write/timeseries_sparse.js
+    - jstests/core/timeseries/write/timeseries_min_max.js
+    - jstests/core/timeseries/write/timeseries_simple.js
+    - jstests/core/timeseries/ddl/timeseries_collation.js
+    - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js
 
     # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
@@ -109,8 +109,8 @@ selector:
     - jstests/core/bench_test1.js
 
     # Bucketing behavior changes based on the timeseriesAlwaysUseCompressedBuckets feature flag.
-    - jstests/core/timeseries/timeseries_lastpoint.js
-    - jstests/core/timeseries/timeseries_reopened_bucket_insert.js
+    - jstests/core/timeseries/query/timeseries_lastpoint.js
+    - jstests/core/timeseries/write/timeseries_reopened_bucket_insert.js
 
 executor:
   archive:

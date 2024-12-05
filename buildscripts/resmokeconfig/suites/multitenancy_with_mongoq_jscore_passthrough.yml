@@ -49,7 +49,7 @@ selector:
     - jstests/core/query/sbe/from_plan_cache_flag.js
     - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
     - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
-    - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js
     - jstests/core/**/wildcard_index_cached_plans.js
     # defaultPrompt() calls buildInfo command which is not allowed with security token.
     - jstests/core/txns/shell_prompt_in_transaction.js

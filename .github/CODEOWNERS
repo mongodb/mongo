@@ -375,6 +375,29 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/timeseries/OWNERS.yml
 /jstests/core/timeseries/**/* @10gen/server-storage-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/timeseries/ddl/OWNERS.yml
+/jstests/core/timeseries/ddl/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_index* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_index_build_failure.js @10gen/server-index-builds @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_index_spec.js @10gen/server-storage-execution @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_index_ttl_partial.js @10gen/query-integration-timeseries @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_index_use.js @10gen/query-integration-timeseries @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_user_system_buckets.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_nondefault_collation.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/timeseries/geo/OWNERS.yml
+/jstests/core/timeseries/geo/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/timeseries/libs/OWNERS.yml
+/jstests/core/timeseries/libs/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
+/jstests/core/timeseries/libs/**/timeseries.js @10gen/server-storage-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/timeseries/query/OWNERS.yml
+/jstests/core/timeseries/query/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/timeseries/write/OWNERS.yml
+/jstests/core/timeseries/write/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/txns/OWNERS.yml
 /jstests/core/txns/**/* @10gen/server-replication @svc-auto-approve-bot
 

@@ -18,8 +18,8 @@ selector:
     - jstests/core/**/explain_shell_helpers.js
     - jstests/core/txns/list_collections_not_blocked_by_txn.js
     # Assumes the collection is not clustered by default.
-    - jstests/core/timeseries/clustered_index_options.js
-    - jstests/core/timeseries/timeseries_expire_collmod.js
+    - jstests/core/timeseries/ddl/timeseries_clustered_index_options.js
+    - jstests/core/timeseries/ddl/timeseries_expire_collmod.js
     # Doesn't expect a failpoint to be enabled.
     - jstests/core/**/set_param1.js
     # Expects queries on _id to use IDHACK in explain.
@@ -35,7 +35,7 @@ selector:
     - jstests/core/**/index9.js
     # Expects the collection creation options not to change.
     - jstests/core/**/internal_rename_if_options_and_indexes_match.js
-    - jstests/core/timeseries/timeseries_user_system_buckets.js
+    - jstests/core/timeseries/ddl/timeseries_user_system_buckets.js
     # The _id index is expected to not have a 'unique' field.
     - jstests/core/**/list_indexes.js
     # Expects createIndex with 'clustered' option fails on a non-clustered collection.

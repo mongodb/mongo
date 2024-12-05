@@ -50,7 +50,7 @@ selector:
 
     # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
     - jstests/core/query/type/type_array.js
-    - jstests/core/timeseries/timeseries_internal_bounded_sort_compound_mixed_types.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound_mixed_types.js
     - jstests/core/query/json_schema/unique_items.js
 
     # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
@@ -68,7 +68,7 @@ selector:
 
     # Expects to successfully drop invalid views. As drops are no-oped, the leftover
     # invalid views fail the data consistency checker.
-    - jstests/core/timeseries/drop_timeseries.js
+    - jstests/core/timeseries/ddl/timeseries_drop.js
 
     # Fails upsert operations with duplicate key errors due to drops being no-oped.
     # The test performs these upserts in retryable writes that cause the test to timeout.

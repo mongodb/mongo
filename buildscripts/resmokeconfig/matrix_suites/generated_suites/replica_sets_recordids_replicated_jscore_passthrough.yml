@@ -45,8 +45,8 @@ selector:
     - jstests/core/fsync.js
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
-    - jstests/core/timeseries/timeseries_update_multi.js
-    - jstests/core/timeseries/*.js
+    - jstests/core/timeseries/write/timeseries_update_multi.js
+    - jstests/core/timeseries/**/*.js
     - jstests/core/txns/timeseries/*.js
     - jstests/core/administrative/validate_db_metadata_command.js
     - jstests/core/catalog/list_catalog.js

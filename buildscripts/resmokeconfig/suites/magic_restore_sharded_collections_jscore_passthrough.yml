@@ -68,7 +68,7 @@ selector:
 
     # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
     - jstests/core/query/type/type_array.js
-    - jstests/core/timeseries/timeseries_internal_bounded_sort_compound_mixed_types.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound_mixed_types.js
     - jstests/core/query/json_schema/unique_items.js
 
     # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
