@@ -908,7 +908,6 @@ tasks:
         vars:
           targets: install-integration-tests
           compiling_for_test: true
-          separate_debug: off
 
   - name: archive_jstestshell
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
