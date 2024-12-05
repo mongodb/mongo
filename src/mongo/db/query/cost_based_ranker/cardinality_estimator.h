@@ -40,6 +40,8 @@
 
 namespace mongo::cost_based_ranker {
 
+using CEResult = StatusWith<CardinalityEstimate>;
+
 template <typename T>
 concept IntersectionType = std::same_as<T, AndHashNode> || std::same_as<T, AndSortedNode>;
 
@@ -69,44 +71,46 @@ public:
     CardinalityEstimator& operator=(const CardinalityEstimator&) = delete;
     CardinalityEstimator& operator=(CardinalityEstimator&&) = delete;
 
-    void estimatePlan(const QuerySolution& plan) {
+    CEResult estimatePlan(const QuerySolution& plan) {
         // Restore initial state so that the estimator can be reused for multiple plans.
         _inputCard = _collCard;
         _conjSels.clear();
 
-        estimate(plan.root());
+        return estimate(plan.root());
     }
 
 private:
     // QuerySolutionNodes
-    CardinalityEstimate estimate(const QuerySolutionNode* node);
-    CardinalityEstimate estimate(const CollectionScanNode* node);
-    CardinalityEstimate estimate(const VirtualScanNode* node);
-    CardinalityEstimate estimate(const IndexScanNode* node);
-    CardinalityEstimate estimate(const FetchNode* node);
-    CardinalityEstimate estimate(const AndHashNode* node);
-    CardinalityEstimate estimate(const AndSortedNode* node);
-    CardinalityEstimate estimate(const OrNode* node);
-    CardinalityEstimate estimate(const MergeSortNode* node);
+    CEResult estimate(const QuerySolutionNode* node);
+    CEResult estimate(const CollectionScanNode* node);
+    CEResult estimate(const VirtualScanNode* node);
+    CEResult estimate(const IndexScanNode* node);
+    CEResult estimate(const FetchNode* node);
+    CEResult estimate(const AndHashNode* node);
+    CEResult estimate(const AndSortedNode* node);
+    CEResult estimate(const OrNode* node);
+    CEResult estimate(const MergeSortNode* node);
 
     // MatchExpressions
-    CardinalityEstimate estimate(const MatchExpression* node, bool isFilterRoot);
-    CardinalityEstimate estimate(const ComparisonMatchExpression* node);
-    CardinalityEstimate estimate(const LeafMatchExpression* node);
-    CardinalityEstimate estimate(const AndMatchExpression* node);
-    CardinalityEstimate estimate(const OrMatchExpression* node);
+    CEResult estimate(const MatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const ComparisonMatchExpression* node);
+    CEResult estimate(const LeafMatchExpression* node);
+    CEResult estimate(const AndMatchExpression* node);
+    CEResult estimate(const OrMatchExpression* node);
     // Intervals
-    CardinalityEstimate estimate(const IndexBounds* node);
-    CardinalityEstimate estimate(const OrderedIntervalList* node);
+    CEResult estimate(const IndexBounds* node);
+    CEResult estimate(const OrderedIntervalList* node);
 
     // Internal helper functions
-    CardinalityEstimate scanCard(const QuerySolutionNode* node, const CardinalityEstimate& card);
+    CEResult histogramCE(const ComparisonMatchExpression* node);
+
+    CEResult scanCard(const QuerySolutionNode* node, const CardinalityEstimate& card);
 
     template <IntersectionType T>
-    CardinalityEstimate indexIntersectionCard(const T* node);
+    CEResult indexIntersectionCard(const T* node);
 
     template <UnionType T>
-    CardinalityEstimate indexUnionCard(const T* node);
+    CEResult indexUnionCard(const T* node);
 
     CardinalityEstimate conjCard(size_t offset, CardinalityEstimate inputCard) {
         std::span selsToEstimate(std::span(_conjSels.begin() + offset, _conjSels.end()));

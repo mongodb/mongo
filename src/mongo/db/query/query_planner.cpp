@@ -1643,29 +1643,48 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
 
     // TODO SERVER-97529: This is a temporary stub implementation of CBR which arbitrarily picks
     // the last of the enumerated plans.
-
+    auto cbrMode = query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
     EstimateMap estimates;
     CardinalityEstimator cardEstimator(
-        *params.mainCollectionInfo.collStats,
-        samplingEstimator,
-        estimates,
-        query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode());
+        *params.mainCollectionInfo.collStats, samplingEstimator, estimates, cbrMode);
     CostEstimator costEstimator(estimates);
 
-    for (auto&& soln : statusWithMultiPlanSolns.getValue()) {
-        cardEstimator.estimatePlan(*soln);
-        costEstimator.estimatePlan(*soln);
-    }
-
+    std::vector<std::unique_ptr<QuerySolution>> allSoln =
+        std::move(statusWithMultiPlanSolns.getValue());
+    // This set of plans contains the optimal plan. If 'acceptedSoln' contains a single
+    // plan, then that is the optimal (winning) plan chosen by the planner. Otherwise, if there is
+    // more than one plan, those plans are sent to the multi-planner to choose the winning plan.
     std::vector<std::unique_ptr<QuerySolution>> acceptedSoln;
+    // The set of plans that definitely do not contain the optimal plan. This set is used for
+    // explain to show all rejected plans.
     std::vector<std::unique_ptr<QuerySolution>> rejectedSoln;
 
-    for (auto it = statusWithMultiPlanSolns.getValue().begin();
-         it != std::prev(statusWithMultiPlanSolns.getValue().end());
-         ++it) {
-        rejectedSoln.push_back(std::move(*it));
+    for (auto&& soln : allSoln) {
+        auto ceRes = cardEstimator.estimatePlan(*soln);
+        if (!ceRes.isOK()) {
+            // This plan's cardinality cannot be estimated.
+            if (cbrMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+                // In automatic CE mode fallback to multi-planning for inestimable plans.
+                acceptedSoln.push_back(std::move(soln));
+            } else {
+                // All other CE modes are considered "strict", that is, when a CE method couldn't
+                // be applied, this is considered a user error.
+                return ceRes.getStatus();
+            }
+        } else {
+            costEstimator.estimatePlan(*soln);
+        }
     }
-    acceptedSoln.push_back(std::move(statusWithMultiPlanSolns.getValue().back()));
+    // TODO SERVER-97529: Pick the best plan from the ones that could be estimated
+    for (auto it = allSoln.begin(); it != std::prev(allSoln.end()); ++it) {
+        if (*it) {
+            // Skip nullptr solutions that were moved in the previous loop.
+            rejectedSoln.push_back(std::move(*it));
+        }
+    }
+    if (!allSoln.empty() && allSoln.back()) {
+        acceptedSoln.push_back(std::move(allSoln.back()));
+    }
     return QueryPlanner::CostBasedRankerResult{.solutions = std::move(acceptedSoln),
                                                .rejectedPlans = std::move(rejectedSoln),
                                                .estimates = std::move(estimates)};

@@ -55,66 +55,69 @@ CardinalityEstimator::CardinalityEstimator(const stats::CollectionStatistics& co
     }
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const QuerySolutionNode* node) {
+CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
     StageType nodeType = node->getType();
-    CardinalityEstimate ce{zeroCE};
+    CEResult ceRes{zeroCE};
     bool isConjunctionBreaker = false;
 
     switch (nodeType) {
         case STAGE_COLLSCAN:
-            ce = estimate(static_cast<const CollectionScanNode*>(node));
+            ceRes = estimate(static_cast<const CollectionScanNode*>(node));
             break;
         case STAGE_VIRTUAL_SCAN:
-            ce = estimate(static_cast<const VirtualScanNode*>(node));
+            ceRes = estimate(static_cast<const VirtualScanNode*>(node));
             break;
         case STAGE_IXSCAN:
-            ce = estimate(static_cast<const IndexScanNode*>(node));
+            ceRes = estimate(static_cast<const IndexScanNode*>(node));
             break;
         case STAGE_FETCH:
-            ce = estimate(static_cast<const FetchNode*>(node));
+            ceRes = estimate(static_cast<const FetchNode*>(node));
             break;
         case STAGE_AND_HASH:
-            ce = indexIntersectionCard(static_cast<const AndHashNode*>(node));
+            ceRes = indexIntersectionCard(static_cast<const AndHashNode*>(node));
             break;
         case STAGE_AND_SORTED:
-            ce = indexIntersectionCard(static_cast<const AndSortedNode*>(node));
+            ceRes = indexIntersectionCard(static_cast<const AndSortedNode*>(node));
             break;
         case STAGE_OR:
-            ce = indexUnionCard(static_cast<const OrNode*>(node));
+            ceRes = indexUnionCard(static_cast<const OrNode*>(node));
             isConjunctionBreaker = true;
             break;
         case STAGE_SORT_MERGE:
-            ce = indexUnionCard(static_cast<const MergeSortNode*>(node));
+            ceRes = indexUnionCard(static_cast<const MergeSortNode*>(node));
             isConjunctionBreaker = true;
             break;
         case STAGE_SORT_DEFAULT:
         case STAGE_SORT_SIMPLE:
             tassert(9768401, "Sort nodes are not expected to have filters.", !node->filter);
-            ce = _inputCard;
+            ceRes = _inputCard;
             isConjunctionBreaker = true;
             break;
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9586709);
     }
 
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
     if (isConjunctionBreaker) {
         tassert(9586705,
                 "All indirect conjuncts should have been taken into account.",
                 _conjSels.empty());
-        _inputCard = ce;
+        _inputCard = ceRes.getValue();
     }
 
-    return ce;
+    return ceRes;
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const MatchExpression* node, bool isFilterRoot) {
+CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool isFilterRoot) {
     if (isFilterRoot && _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
         // Sample the entire filter
         return _samplingEstimator->estimateCardinality(node);
     }
 
-    MatchExpression::MatchType nodeType = node->matchType();
-    CardinalityEstimate ce{zeroCE};
+    const MatchExpression::MatchType nodeType = node->matchType();
+    CEResult ceRes{zeroCE};
 
     switch (nodeType) {
         case MatchExpression::EQ:
@@ -122,22 +125,25 @@ CardinalityEstimate CardinalityEstimator::estimate(const MatchExpression* node, 
         case MatchExpression::LTE:
         case MatchExpression::GT:
         case MatchExpression::GTE:
-            ce = estimate(static_cast<const ComparisonMatchExpression*>(node));
+            ceRes = estimate(static_cast<const ComparisonMatchExpression*>(node));
             break;
         case MatchExpression::AND:
-            ce = estimate(static_cast<const AndMatchExpression*>(node));
+            ceRes = estimate(static_cast<const AndMatchExpression*>(node));
             break;
         case MatchExpression::OR:
-            ce = estimate(static_cast<const OrMatchExpression*>(node));
+            ceRes = estimate(static_cast<const OrMatchExpression*>(node));
             break;
         default:
             if (node->numChildren() == 0) {
-                ce = estimate(static_cast<const LeafMatchExpression*>(node));
+                ceRes = estimate(static_cast<const LeafMatchExpression*>(node));
             } else {
                 MONGO_UNIMPLEMENTED_TASSERT(9586708);
             }
     }
 
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
     if (isFilterRoot && (node->numChildren() == 0 || nodeType == MatchExpression::OR)) {
         // Leaf nodes and ORs that are the root of a QSN's filter are atomic from conjunction
         // estimation's perspective, therefore conjunction estimation will not add such nodes
@@ -148,32 +154,36 @@ CardinalityEstimate CardinalityEstimator::estimate(const MatchExpression* node, 
         // Both conjuncts are added here when each QSN estimates its filter node.
         // All conjuncts' selectivities are combined when computing the total cardinality of the
         // FetchNode.
-        SelectivityEstimate sel = ce / _inputCard;
+        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
         _conjSels.emplace_back(sel);
     }
 
-    return ce;
+    return ceRes;
 }
 
 /*
  * QuerySolutionNodes
  */
-CardinalityEstimate CardinalityEstimator::estimate(const CollectionScanNode* node) {
+CEResult CardinalityEstimator::estimate(const CollectionScanNode* node) {
     return scanCard(node, _inputCard);
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const VirtualScanNode* node) {
+CEResult CardinalityEstimator::estimate(const VirtualScanNode* node) {
     CardinalityEstimate virtualCollCard{CardinalityType{(double)node->docs.size()},
                                         EstimationSource::Code};
     return scanCard(node, virtualCollCard);
 }
 
-CardinalityEstimate CardinalityEstimator::scanCard(const QuerySolutionNode* node,
-                                                   const CardinalityEstimate& card) {
+CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
+                                        const CardinalityEstimate& card) {
     QSNEstimate est;
     est.inCE = card;
     if (const MatchExpression* filter = node->filter.get()) {
-        est.filterCE = estimate(filter, true);
+        auto ceRes = estimate(filter, true);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
+        est.filterCE = ceRes.getValue();
         est.outCE = *est.filterCE;
     } else {
         est.outCE = card;
@@ -184,17 +194,25 @@ CardinalityEstimate CardinalityEstimator::scanCard(const QuerySolutionNode* node
     return outCE;
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const IndexScanNode* node) {
+CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     QSNEstimate est;
     // Ignore selectivities pushed by other operators up to this point
     size_t selOffset = _conjSels.size();
 
     // Estimate the number of keys in the scan's interval.
-    est.inCE = estimate(&node->bounds);
+    auto ceRes1 = estimate(&node->bounds);
+    if (!ceRes1.isOK()) {
+        return ceRes1;
+    }
+    est.inCE = ceRes1.getValue();
 
     if (const MatchExpression* filter = node->filter.get()) {
         // Notice that filterCE is estimated independent of interval CE.
-        est.filterCE = estimate(filter, true);
+        auto ceRes2 = estimate(filter, true);
+        if (!ceRes2.isOK()) {
+            return ceRes2;
+        }
+        est.filterCE = ceRes2.getValue();
     }
 
     // Estimate the cardinality of the combined index scan and filter conditions.
@@ -207,17 +225,24 @@ CardinalityEstimate CardinalityEstimator::estimate(const IndexScanNode* node) {
     return outCE;
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const FetchNode* node) {
+CEResult CardinalityEstimator::estimate(const FetchNode* node) {
     QSNEstimate est;
 
     tassert(
         9586704, "There cannot be other sub-plans parallel to a FetchNode", _conjSels.size() == 0);
 
     // Child's result CE is the input CE of this node, so there is no entry for it for this node.
-    estimate(node->children[0].get());
+    auto ceRes1 = estimate(node->children[0].get());
+    if (!ceRes1.isOK()) {
+        return ceRes1;
+    }
 
     if (const MatchExpression* filter = node->filter.get()) {
-        est.filterCE = estimate(filter, true);
+        auto ceRes2 = estimate(filter, true);
+        if (!ceRes2.isOK()) {
+            return ceRes2;
+        }
+        est.filterCE = ceRes2.getValue();
     }
 
     // Combine the selectivity of this node's filter with its child selectivities.
@@ -229,15 +254,19 @@ CardinalityEstimate CardinalityEstimator::estimate(const FetchNode* node) {
 }
 
 template <IntersectionType T>
-CardinalityEstimate CardinalityEstimator::indexIntersectionCard(const T* node) {
+CEResult CardinalityEstimator::indexIntersectionCard(const T* node) {
+    tassert(9586703, "Index intersection nodes are not expected to have filters.", !node->filter);
+
     QSNEstimate est;
     // Ignore selectivities pushed by other operators up to this point.
     size_t selOffset = _conjSels.size();
 
     for (auto&& child : node->children) {
-        estimate(child.get());
+        auto ceRes = estimate(child.get());
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
     }
-    tassert(9586703, "Index intersection nodes are not expected to have filters.", !node->filter);
 
     // Combine the selectivities of all child nodes.
     est.outCE = conjCard(selOffset, _inputCard);
@@ -248,7 +277,9 @@ CardinalityEstimate CardinalityEstimator::indexIntersectionCard(const T* node) {
 }
 
 template <UnionType T>
-CardinalityEstimate CardinalityEstimator::indexUnionCard(const T* node) {
+CEResult CardinalityEstimator::indexUnionCard(const T* node) {
+    tassert(9586701, "Index union nodes are not expected to have filters.", !node->filter);
+
     QSNEstimate est;
 
     std::vector<SelectivityEstimate> disjSels;
@@ -256,12 +287,13 @@ CardinalityEstimate CardinalityEstimator::indexUnionCard(const T* node) {
     // We do not support intersections of unions
     tassert(9586702, "Currently index union is a top-level node.", selOffset == 0);
     for (auto&& child : node->children) {
-        auto ce = estimate(child.get());
+        auto ceRes = estimate(child.get());
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
         trimSels(selOffset);
-        disjSels.emplace_back(ce / _inputCard);
+        disjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
-
-    tassert(9586701, "Index union nodes are not expected to have filters.", !node->filter);
 
     // Combine the selectivities of all child nodes.
     est.outCE = disjCard(_inputCard, disjSels);
@@ -271,67 +303,110 @@ CardinalityEstimate CardinalityEstimator::indexUnionCard(const T* node) {
     return outCE;
 }
 
+StatusWith<OrderedIntervalList> expressionToOIL(const ComparisonMatchExpression* node) {
+    OrderedIntervalList oil;
+    // Generate a fake catalog index object representing a single non-multikey field. We don't
+    // care whether the field is actually multikey or not because both cases will generate the
+    // same bounds for a ComparisonMatchExpression.
+    static IndexEntry fakeIndex(BSONObj::kEmptyObject /* keyPattern */,
+                                INDEX_BTREE,
+                                IndexDescriptor::IndexVersion::kV2,
+                                false /* multikey */,
+                                {} /* multikeyPaths */,
+                                {} /* multikeyPathSet */,
+                                false /* sparse */,
+                                false /* unique */,
+                                CoreIndexInfo::Identifier("idx"),
+                                nullptr /* filterExpression */,
+                                BSONObj::kEmptyObject /* infoObj */,
+                                nullptr /* collatorInterface */,
+                                nullptr /* wildcardProjection */);
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        node, node->getData(), fakeIndex, &oil, &tightness, nullptr /* ietBuilder */);
+
+    // We expect a simple comparison MatchExpression to generate exact bounds.
+    if (!(tightness == IndexBoundsBuilder::EXACT ||
+          tightness == IndexBoundsBuilder::EXACT_MAYBE_COVERED)) {
+        return Status(
+            ErrorCodes::HistogramCEFailure,
+            str::stream{}
+                << "encountered unimplemented case where index bounds tightness are non-exact: "
+                << oil.toString(true));
+    }
+    if (oil.intervals.size() > 1) {
+        return Status(
+            ErrorCodes::HistogramCEFailure,
+            str::stream{}
+                << "encountered unimplemented case where index bounds have multiple intervals: "
+                << oil.toString(false));
+    }
+
+    return StatusWith(std::move(oil));
+}
+
+CEResult CardinalityEstimator::histogramCE(const ComparisonMatchExpression* node) {
+    auto histogram = _collStats.getHistogram(std::string(node->path()));
+
+    if (!histogram) {
+        return CEResult(ErrorCodes::HistogramCEFailure,
+                        str::stream{} << "no histogram found for path: " << node->path());
+    }
+
+    auto oilResult = expressionToOIL(node);
+
+    if (!oilResult.isOK()) {
+        return CEResult(ErrorCodes::HistogramCEFailure, oilResult.getStatus().reason());
+    }
+
+    if (oilResult.getValue().intervals.size() == 0) {
+        return zeroCE;
+    }
+
+    const auto& interval = oilResult.getValue().intervals.front();
+
+    if (!ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true)) {
+        return CEResult(ErrorCodes::HistogramCEFailure,
+                        str::stream{} << "encountered interval which is unestimatable: "
+                                      << interval.toString(true));
+    }
+
+    return ce::HistogramEstimator::estimateCardinality(
+        *histogram, _inputCard, interval, true, ce::ArrayRangeEstimationAlgo::kExactArrayCE);
+}
+
 /*
  * MatchExpressions
  */
-CardinalityEstimate CardinalityEstimator::estimate(const ComparisonMatchExpression* node) {
+CEResult CardinalityEstimator::estimate(const ComparisonMatchExpression* node) {
+    bool fallbackToHeuristicCE = false;
+    bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE;
+
     // We can use a histogram to estimate this MatchExpression by constructing the corresponding
     // interval and estimating that.
-    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE) {
-        auto histogram = _collStats.getHistogram(std::string(node->path()));
-        tassert(
-            9708801, str::stream{} << "no histogram found for path: " << node->path(), histogram);
-
-        // Generate a fake catalog index object representing a single non-multikey field. We don't
-        // care whether the field is actually multikey or not because both cases will generate the
-        // same bounds for a ComparisonMatchExpression.
-        static IndexEntry fakeIndex(BSONObj::kEmptyObject /* keyPattern */,
-                                    INDEX_BTREE,
-                                    IndexDescriptor::IndexVersion::kV2,
-                                    false /* multikey */,
-                                    {} /* multikeyPaths */,
-                                    {} /* multikeyPathSet */,
-                                    false /* sparse */,
-                                    false /* unique */,
-                                    CoreIndexInfo::Identifier("idx"),
-                                    nullptr /* filterExpression */,
-                                    BSONObj::kEmptyObject /* infoObj */,
-                                    nullptr /* collatorInterface */,
-                                    nullptr /* wildcardProjection */);
-        OrderedIntervalList oil;
-        IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(
-            node, node->getData(), fakeIndex, &oil, &tightness, nullptr /* ietBuilder */);
-        // We expect a simple comparison MatchExpression to generate exact bounds.
-        tassert(9708802,
-                str::stream{} << "encountered unimplemented case where index bounds are non-exact: "
-                              << oil.toString(true),
-                tightness == IndexBoundsBuilder::EXACT ||
-                    tightness == IndexBoundsBuilder::EXACT_MAYBE_COVERED);
-        tassert(9708803,
-                str::stream{}
-                    << "encountered unimplemented case where index bounds have multiple intervals: "
-                    << oil.toString(false),
-                oil.intervals.size() == 1);
-        const auto& interval = oil.intervals.front();
-        tassert(9708804,
-                str::stream{} << "encountered interval which is unestimatable: "
-                              << interval.toString(true),
-                ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true));
-        return ce::HistogramEstimator::estimateCardinality(
-            *histogram, _inputCard, interval, true, ce::ArrayRangeEstimationAlgo::kExactArrayCE);
+    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
+        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        auto ceRes = histogramCE(node);
+        if (ceRes.isOK() || strict) {
+            return ceRes;
+        }
+        fallbackToHeuristicCE = true;
     }
 
-    SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
+    if (_rankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE) {
+        const SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
+        return sel * _inputCard;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(9751900);
+}
+
+CEResult CardinalityEstimator::estimate(const LeafMatchExpression* node) {
+    const SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
     return sel * _inputCard;
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const LeafMatchExpression* node) {
-    SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
-    return sel * _inputCard;
-}
-
-CardinalityEstimate CardinalityEstimator::estimate(const AndMatchExpression* node) {
+CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     // Find with an empty query "coll.find({})" generates a AndMatchExpression without children.
     if (node->numChildren() == 0) {
         return _inputCard;
@@ -341,10 +416,13 @@ CardinalityEstimate CardinalityEstimator::estimate(const AndMatchExpression* nod
     size_t selOffset = _conjSels.size();
 
     for (size_t i = 0; i < node->numChildren(); i++) {
-        auto ce = estimate(node->getChild(i), false);
+        auto ceRes = estimate(node->getChild(i), false);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
         // Add the child selectivity to the conjunction selectivity stack so that it can be
         // combined with selectivities of conjuncts or leaf nodes from parent QSNs.
-        SelectivityEstimate sel = ce / _inputCard;
+        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
         _conjSels.emplace_back(sel);
     }
 
@@ -353,14 +431,17 @@ CardinalityEstimate CardinalityEstimator::estimate(const AndMatchExpression* nod
     return conjCard(selOffset, _inputCard);
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const OrMatchExpression* node) {
+CEResult CardinalityEstimator::estimate(const OrMatchExpression* node) {
     tassert(9586706, "OrMatchExpression must have children.", node->numChildren() > 0);
     std::vector<SelectivityEstimate> disjSels;
     size_t selOffset = _conjSels.size();
     for (size_t i = 0; i < node->numChildren(); i++) {
-        auto ce = estimate(node->getChild(i), false);
+        auto ceRes = estimate(node->getChild(i), false);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
         trimSels(selOffset);
-        disjSels.emplace_back(ce / _inputCard);
+        disjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
     return disjCard(_inputCard, disjSels);
 }
@@ -368,11 +449,12 @@ CardinalityEstimate CardinalityEstimator::estimate(const OrMatchExpression* node
 /*
  * Intervals
  */
-CardinalityEstimate CardinalityEstimator::estimate(const IndexBounds* node) {
+CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     if (node->isSimpleRange) {
         MONGO_UNIMPLEMENTED_TASSERT(9586707);  // TODO: SERVER-96816
     }
     if (node->isUnbounded()) {
+        _conjSels.emplace_back(oneSel);
         return _inputCard;
     }
 
@@ -381,41 +463,63 @@ CardinalityEstimate CardinalityEstimator::estimate(const IndexBounds* node) {
     for (const auto& field : node->fields) {
         const OrderedIntervalList* oil = &field;
         // Notice that OILs are considered leaves from CE perspective.
-        auto ce = estimate(oil);
-        SelectivityEstimate sel = ce / _inputCard;
+        auto ceRes = estimate(oil);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
+        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
         _conjSels.emplace_back(sel);
     }
 
     return conjCard(selOffset, _inputCard);
 }
 
-CardinalityEstimate CardinalityEstimator::estimate(const OrderedIntervalList* node) {
+CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node) {
+    auto localRankerMode = _rankerMode;
+    const bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE;
+    const stats::CEHistogram* histogram = nullptr;
+
+    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
+        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        histogram = _collStats.getHistogram(node->name);
+        if (!histogram) {
+            if (strict) {
+                return CEResult(ErrorCodes::HistogramCEFailure,
+                                str::stream{} << "no histogram found for path: " << node->name);
+            }
+            localRankerMode = QueryPlanRankerModeEnum::kHeuristicCE;
+        }
+    }
+
     // The intervals in an OIL are disjunct by definition, therefore the total cardinality is
     // the sum of cardinalities of the intervals. Therefore interval selectivities are summed.
     CardinalityEstimate resultCard = minCE;
     for (const auto& interval : node->intervals) {
-        SelectivityEstimate sel = [&] {
-            if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-                _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-                auto histogram = _collStats.getHistogram(node->name);
-                if (histogram) {
-                    bool canEstimate =
-                        ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true);
-                    if (canEstimate) {
-                        return ce::HistogramEstimator::estimateCardinality(
-                                   *histogram,
-                                   _inputCard,
-                                   interval,
-                                   true,
-                                   ce::ArrayRangeEstimationAlgo::kExactArrayCE) /
-                            _inputCard;
-                    }
+        bool fallbackToHeuristicCE = false;
+        if (localRankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
+            localRankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+            if (ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true)) {
+                resultCard += ce::HistogramEstimator::estimateCardinality(
+                    *histogram,
+                    _inputCard,
+                    interval,
+                    true,
+                    ce::ArrayRangeEstimationAlgo::kExactArrayCE);
+            } else {
+                if (strict) {
+                    return CEResult(ErrorCodes::HistogramCEFailure,
+                                    str::stream{} << "encountered interval which is unestimatable: "
+                                                  << interval.toString(true));
                 }
+                fallbackToHeuristicCE = true;
             }
-            return estimateInterval(interval, _inputCard);
-        }();
-        resultCard += sel * _inputCard;
+        }
+        if (localRankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE) {
+            SelectivityEstimate sel = estimateInterval(interval, _inputCard);
+            resultCard += sel * _inputCard;
+        }
     }
+
     resultCard = std::min(resultCard, _inputCard);
     return resultCard;
 }

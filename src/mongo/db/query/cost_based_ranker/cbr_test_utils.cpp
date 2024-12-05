@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"
 
@@ -137,42 +136,42 @@ IndexBounds makeRangeIntervalBounds(const BSONObj& range,
     return rangeBounds;
 }
 
-CardinalityEstimate getPlanCE(const QuerySolution& plan, double collCE) {
+CEResult getPlanCE(const QuerySolution& plan,
+                   stats::CollectionStatisticsMock& stats,
+                   QueryPlanRankerModeEnum ceMode) {
     EstimateMap qsnEstimates;
-    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    stats::CollectionStatisticsImpl stats(collCE, kNss);
-    CardinalityEstimator estimator{
-        stats, nullptr, qsnEstimates, QueryPlanRankerModeEnum::kHeuristicCE};
-    estimator.estimatePlan(plan);
-    return qsnEstimates.at(plan.root()).outCE;
+    CardinalityEstimator estimator{stats, nullptr, qsnEstimates, ceMode};
+    return estimator.estimatePlan(plan);
+}
+
+CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCard) {
+    auto stats = makeCollStatsWithHistograms({}, collCard);
+    const auto ceRes = getPlanCE(plan, stats, QueryPlanRankerModeEnum::kHeuristicCE);
+    ASSERT(ceRes.isOK());
+    return ceRes.getValue();
 }
 
 CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan,
-                                       stats::CollectionStatisticsMock stats) {
-    EstimateMap qsnEstimates;
-    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    CardinalityEstimator estimator{
-        stats, nullptr, qsnEstimates, QueryPlanRankerModeEnum::kHistogramCE};
-    estimator.estimatePlan(plan);
-    return qsnEstimates.at(plan.root()).outCE;
+                                       stats::CollectionStatisticsMock& stats) {
+    const auto ceRes = getPlanCE(plan, stats, QueryPlanRankerModeEnum::kHistogramCE);
+    ASSERT(ceRes.isOK());
+    return ceRes.getValue();
 }
 
-stats::CollectionStatisticsMock makeCollStatsWithHistograms() {
-    stats::CollectionStatisticsMock stats(1000);
+stats::CollectionStatisticsMock makeCollStatsWithHistograms(
+    const std::vector<std::string>& histFields, double collCard) {
+    stats::CollectionStatisticsMock stats(collCard);
     std::vector<ce::BucketData> data{
         {0 /*bucketBoundary*/, 10 /*equalFreq*/, 90 /*rangeFreq*/, 5 /*ndv*/},
         {5, 100, 100, 0},
         {6, 700, 0, 0}};
-    stats.addHistogram(
-        "a",
-        stats::CEHistogram::make(ce::createHistogram(data),
-                                 stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, 1000}},
-                                 1000));
-    stats.addHistogram(
-        "b",
-        stats::CEHistogram::make(ce::createHistogram(data),
-                                 stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, 1000}},
-                                 1000));
+    for (const auto& field : histFields) {
+        stats.addHistogram(field,
+                           stats::CEHistogram::make(
+                               ce::createHistogram(data),
+                               stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, collCard}},
+                               collCard));
+    }
     return stats;
 }
 
