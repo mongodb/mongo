@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/query-execution
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads

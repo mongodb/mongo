@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/query-execution-classic-engine
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads

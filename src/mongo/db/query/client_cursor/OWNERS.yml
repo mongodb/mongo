@@ -3,6 +3,10 @@ filters:
   - "*":
     approvers:
       - 10gen/query-execution-client-cursor
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-integration-staff-leads
   - "exhaust_cursor_currentop_integration_test.cpp":
     approvers:
       - 10gen/query-integration-staff-leads

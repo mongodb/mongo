@@ -3,6 +3,10 @@ filters:
   - "*":
     approvers:
       - 10gen/query-execution-router-query-exec
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-integration-staff-leads
   - "*client_cursor*":
     approvers:
       - 10gen/query-execution-client-cursor

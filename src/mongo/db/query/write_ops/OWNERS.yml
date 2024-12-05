@@ -5,6 +5,10 @@ filters:
   - "*":
     approvers:
       - 10gen/query-optimization-parsers
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
   - "write_ops_exec*":
     approvers:
       - 10gen/query-execution-write-exec

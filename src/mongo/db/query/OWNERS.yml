@@ -6,6 +6,11 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
   - "analyze*":
     approvers:
       - 10gen/query-optimization

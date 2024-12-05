@@ -6,6 +6,11 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
   # The IDL files in this directory are generally related to DocumentSource parsing, so they are
   # owned by QO by default.
   - "*.idl":
