@@ -51,28 +51,6 @@ const testCases = [
         tasks: [{nsToMove: "testDbWithSystemJS.system.js"}]
     },
     {
-        // TODO SERVER-93149 remove test case once timeseries will be moveable again
-        name: "timeseries",
-        setup: (st) => {
-            const dbName = "testDbWithTimeseries";
-            assert.commandWorked(
-                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-            assert.commandWorked(st.s.getDB(dbName).runCommand(
-                {create: "testColl", timeseries: {timeField: "x", metaField: "y"}}));
-        },
-        tasks: [
-            {nsToMove: "testDbWithTimeseries.system.views"},
-            {
-                nsToMove: "testDbWithTimeseries.testColl",
-                shouldSkip: (conn) => FeatureFlagUtil.isEnabled(conn, "ReshardingForTimeseries")
-            },
-            {
-                nsToMove: "testDbWithTimeseries.system.buckets.testColl",
-                shouldSkip: (conn) => FeatureFlagUtil.isEnabled(conn, "ReshardingForTimeseries")
-            }
-        ],
-    },
-    {
         name: "views",
         setup: (st) => {
             const dbName = "testDbWithView";

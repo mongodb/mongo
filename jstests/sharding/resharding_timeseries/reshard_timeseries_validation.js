@@ -1,6 +1,5 @@
 // Basic validation tests for resharding timeseries collections.
 // @tags: [
-//   featureFlagReshardingForTimeseries,
 //   requires_fcv_80,
 // ]
 //
