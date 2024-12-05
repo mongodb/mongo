@@ -50,7 +50,11 @@ WT_CCFLAGS = [
     "@platforms//cpu:s390x": ["-Isrc/third_party/wiredtiger/src/checksum/zseries"],
     "//conditions:default": [],
 }) + select({
-    "@platforms//os:linux": ["-Wno-uninitialized"],
+    "@platforms//os:linux": [
+        "-Wno-uninitialized",
+        "-Wno-array-bounds",
+        "-Wno-format-overflow",
+    ],
     "//conditions:default": [],
 })
 
