@@ -1,6 +1,5 @@
 // Basic tests for resharding for timeseries collection.
 // @tags: [
-//   featureFlagReshardingForTimeseries,
 //   requires_fcv_80,
 // ]
 //
