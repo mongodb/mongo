@@ -166,9 +166,10 @@ public:
 
     // The name of the field where the operation description of the non-CRUD operations will be
     // located. This is complementary to the 'documentKey' for CRUD operations.
-    // Note that the operationDescription of an event will be part of the event's resumeToken. Thus
-    // the operationDescription for an existing event should never be changed, because otherwise the
-    // changestream resumability between different versions of MongoDB may be jeopardized.
+    // Note that the operation description of an event will be part of the event's resume token.
+    // Thus the operation description for an existing event should never be changed, because
+    // otherwise the changestream resumability between different versions of MongoDB may be
+    // jeopardized.
     static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
 
     // The name of the field where the pre-image document will be found, if requested and available.
@@ -238,9 +239,6 @@ public:
 
     // The target namespace of a rename operation.
     static constexpr StringData kRenameTargetNssField = "to"_sd;
-
-    // The collection type created by a create operation.
-    static constexpr StringData kCollectionTypeField = "type"_sd;
 
     // Wall time of the corresponding oplog entry.
     static constexpr StringData kWallTimeField = "wallTime"_sd;
