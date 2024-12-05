@@ -155,7 +155,7 @@ checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsi
 // appropriate test variables.
 st.configRS.stepUp(configSecondaryConn);
 st.configRS.waitForState(configSecondaryConn, ReplSetTest.State.PRIMARY);
-st.configRS.waitForState(configPrimaryConn, ReplSetTest.State.SECONDARY);
+st.configRS.awaitSecondaryNodes(null, [configPrimaryConn]);
 st.configRS.awaitNodesAgreeOnPrimary();
 
 configSecondaryConn = configPrimaryConn;

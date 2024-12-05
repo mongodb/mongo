@@ -99,8 +99,7 @@ rsA.getSecondaries().forEach(
 
 print("9: wait for recovery");
 
-rsA.getSecondaries().forEach(
-    secondary => rsA.waitForState(secondary, ReplSetTest.State.SECONDARY, 5 * 60 * 1000));
+rsA.awaitSecondaryNodes(5 * 60 * 1000);
 
 print("10: check our regular and secondaryOk query");
 

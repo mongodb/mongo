@@ -18,7 +18,7 @@ assert.commandWorked(conn.getDB('admin').foo.insert({a: 1}, {writeConcern: {w: N
 // Make sure there is no primary
 rs.stop(0);
 rs.stop(1);
-rs.waitForState(nodes[2], ReplSetTest.State.SECONDARY);
+rs.awaitSecondaryNodes(null, [nodes[2]]);
 
 // Make sure you can still authenticate a replset connection with no primary
 var conn2 = new Mongo(rs.getURL());

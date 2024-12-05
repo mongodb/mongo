@@ -153,6 +153,6 @@ assert.soonNoExcept(() => !tooStale(replTest.nodes[2]), "Waiting for Node 2 to e
 assert.soon(() => myState(replTest.nodes[2]) === ReplSetTest.State.SECONDARY,
             "Waiting for Node 2 to transition to SECONDARY");
 // This waits for the state as indicated by the primary node.
-replTest.waitForState(replTest.nodes[2], ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [replTest.nodes[2]]);
 
 replTest.stopSet();

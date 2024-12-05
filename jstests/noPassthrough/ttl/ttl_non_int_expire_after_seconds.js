@@ -104,7 +104,7 @@ function createIndexWithoutExpireAfterSecondsValidation(coll, indexName, expireA
 
     const newNode = rst.add({rsConfig: {votes: 0, priority: 0}});
     rst.reInitiate();
-    rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [newNode]);
     rst.awaitReplication();
     let newNodeTestDB = newNode.getDB(dbName);
     let newNodeColl = newNodeTestDB.getCollection(collName);

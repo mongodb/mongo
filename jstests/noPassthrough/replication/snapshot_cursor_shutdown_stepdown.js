@@ -70,7 +70,7 @@ function testStepdown(stepdownFunc) {
 
     // It should be possible to step down the primary without hanging.
     stepdownFunc(rst);
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
 
     // Kill the cursor.
     assert.commandWorked(sessionDB.runCommand({killCursors: collName, cursors: [cursorId]}));

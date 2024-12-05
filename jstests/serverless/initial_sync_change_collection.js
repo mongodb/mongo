@@ -73,7 +73,7 @@ assert.commandWorked(secondary.getDB("test").adminCommand(
     {configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
 
 // Wait for the initial sync to complete.
-replSetTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replSetTest.awaitSecondaryNodes(null, [secondary]);
 
 // Create a connection to the secondary node for the tenant.
 const tenantSecondaryNode = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(

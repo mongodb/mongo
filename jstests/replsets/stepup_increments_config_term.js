@@ -22,7 +22,7 @@ jsTestLog("Trying to step down primary.");
 assert.commandWorked(primary.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
 
 jsTestLog("Waiting for PRIMARY(" + primary.host + ") to step down & become SECONDARY.");
-replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [primary]);
 
 // Wait until the config has propagated to the secondary and the primary has learned of it, so that
 // the config replication check is satisfied.

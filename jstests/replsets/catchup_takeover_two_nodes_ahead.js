@@ -66,7 +66,7 @@ verifyServerStatusElectionReasonCounterChange(
     initialPrimaryStatus.electionMetrics, newPrimaryStatus.electionMetrics, "catchUpTakeover", 1);
 
 // Wait until the old primary steps down.
-replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.timeoutMS);
+replSet.awaitSecondaryNodes(replSet.timeoutMS, [nodes[2]]);
 
 // Check that the 'numCatchUpsFailedWithNewTerm' field has been incremented in serverStatus, and
 // that none of the other reasons for catchup concluding has been incremented.

@@ -81,7 +81,7 @@ assert.soon(() => isConfigCommitted(node1));
 node0.reconnect([node1, node2, node3]);
 // The newly connected node will receive a heartbeat with a higher term, and
 // step down from being primary. The reconfig command issued to this node, C1, will fail.
-rst.waitForState(node0, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [node0]);
 rst.awaitNodesAgreeOnPrimary(rst.timeoutMS, [node0, node1, node3], node1);
 rst.waitForConfigReplication(node1);
 assert.eq(C2, rst.getReplSetConfigFromNode());

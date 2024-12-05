@@ -20,7 +20,7 @@ jsTestLog("Adding node 1");
 const newNode = rst.add({});
 
 rst.reInitiate();
-rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [newNode]);
 rst.awaitReplication();
 rst.awaitSecondaryNodes();
 

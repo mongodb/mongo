@@ -138,7 +138,7 @@ assertStepDownSucceeds(primary);
 
 // Make sure that original primary has transitioned to SECONDARY state
 jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
-replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [primary]);
 
 // Disable all fail points for clean shutdown
 restartReplSetReplication(replTest);

@@ -42,7 +42,7 @@ function runTest(host, rst, waitForPrimary) {
     var primary = rst.getPrimary();
     var secondary = rst.getSecondary();
     assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 60, force: true}));
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
     if (waitForPrimary) {
         rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
     }

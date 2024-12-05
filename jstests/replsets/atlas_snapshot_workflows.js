@@ -67,7 +67,7 @@ function testAddWithSnapshot(secondariesDown) {
     const useForce = secondariesDown > 1;
     if (useForce) {
         // Wait for the set to become unhealthy.
-        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [primary]);
     }
     // Atlas always adds nodes with 0 votes and priority
     const newNode =
@@ -82,7 +82,7 @@ function testAddWithSnapshot(secondariesDown) {
         {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: useForce}));
 
     jsTestLog("Waiting for node to sync.");
-    rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [newNode]);
 
     jsTestLog("Reconfiguring added node to have votes");
     config = rst.getReplSetConfigFromNode(primary.nodeId);
@@ -126,7 +126,7 @@ function testReplaceWithSnapshot(node, secondariesDown) {
     disconnectSecondaries(secondariesDown);
     if (useForce) {
         // Wait for the set to become unhealthy.
-        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [primary]);
     }
     jsTestLog("Stopping node for replacement of data");
     rst.stop(node, undefined, undefined, {forRestart: true});

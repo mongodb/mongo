@@ -104,6 +104,6 @@ jsTestLog("Re-adding initial sync node a final time");
 config.members[1].host = origHost;
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: 1}));
-rst.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [initialSyncNode]);
 
 rst.stopSet();

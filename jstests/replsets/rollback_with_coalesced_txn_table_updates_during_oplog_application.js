@@ -152,7 +152,7 @@ function runTest(crashAfterRollbackTruncation) {
             "noReplSet": false,
             setParameter: 'failpoint.stopReplProducer=' + tojson({mode: 'alwaysOn'})
         });
-        rst.waitForState(secondary1, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [secondary1]);
         secondary1.setSecondaryOk();
         // On startup, we expect to see the update persisted in the 'config.transactions' table.
         let restoredDoc =
@@ -162,7 +162,7 @@ function runTest(crashAfterRollbackTruncation) {
     } else {
         // Lift the failpoint to let rollback complete and wait for state to change to SECONDARY.
         hangAfterTruncate.off();
-        rst.waitForState(secondary1, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [secondary1]);
     }
 
     // Reconnect to secondary1 after it completes its rollback and step it up to be the new primary.

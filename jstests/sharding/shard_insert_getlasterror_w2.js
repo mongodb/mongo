@@ -87,7 +87,7 @@ var primary = replSet1.getPrimary();
 var [secondary1, secondary2] = replSet1.getSecondaries();
 replSet1.stop(secondary1);
 replSet1.stop(secondary2);
-replSet1.waitForState(primary, ReplSetTest.State.SECONDARY);
+replSet1.awaitSecondaryNodes(null, [primary]);
 
 testDB.getMongo().adminCommand({setParameter: 1, logLevel: 1});
 testDB.getMongo().setSecondaryOk();

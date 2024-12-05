@@ -50,7 +50,7 @@ const initialSyncNode = replTest.add(
     {setParameter: {logComponentVerbosity: tojsononeline({replication: 5, storage: 5})}});
 
 replTest.reInitiate();
-replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [initialSyncNode]);
 replTest.awaitReplication();
 
 validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);

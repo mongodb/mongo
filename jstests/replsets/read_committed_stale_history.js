@@ -115,7 +115,7 @@ try {
 if (res) {
     assert.commandWorked(res);
 }
-rst.waitForState(nodes[0], ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [nodes[0]]);
 reconnect(nodes[0]);
 
 // At this point the former primary will attempt to go into rollback, but the

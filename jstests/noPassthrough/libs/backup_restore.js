@@ -304,8 +304,7 @@ export const BackupRestoreTest = function(options) {
         }
 
         // Wait up to 5 minutes until restarted node is in state secondary.
-        rst.getSecondaries().forEach(secondary =>
-                                         rst.waitForState(secondary, ReplSetTest.State.SECONDARY));
+        rst.awaitSecondaryNodes();
 
         jsTestLog('Stopping CRUD and FSM clients');
 
@@ -382,7 +381,7 @@ export const BackupRestoreTest = function(options) {
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
         jsTestLog('CRUD and FSM clients stopped. Waiting for hidden node ' + hiddenHost +
                   ' to become SECONDARY');
-        rst.waitForState(hiddenNode, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [hiddenNode]);
 
         // Wait for secondaries to finish catching up before shutting down.
         jsTestLog(

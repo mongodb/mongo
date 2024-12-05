@@ -53,7 +53,7 @@ jsTest.log("Node B steps up in term 2 and performs a write, which is not replica
 // E:
 stopServerReplication([nodeA, nodeC, nodeD]);
 assert.commandWorked(nodeB.adminCommand({replSetStepUp: 1}));
-rst.waitForState(nodeA, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [nodeA]);
 assert.eq(nodeB, rst.getPrimary());
 assert.commandWorked(nodeB.getDB(dbName)[collName].insert({term: 2}));
 rst.waitForConfigReplication(nodeB, [nodeA, nodeB, nodeC, nodeD]);

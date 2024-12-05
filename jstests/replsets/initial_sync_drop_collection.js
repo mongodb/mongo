@@ -92,7 +92,7 @@ function finishTest({failPoint, expectedLog, createNew}) {
     }
 
     jsTestLog("Waiting for initial sync to complete.");
-    replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+    replTest.awaitSecondaryNodes(null, [secondary]);
 
     let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(0, res.initialSyncStatus.failedInitialSyncAttempts);
@@ -162,7 +162,7 @@ runDropTest({
 // secondary will be finished with initial sync when the drop happens.
 var secondary2 = replTest.add({rsConfig: {priority: 0}});
 replTest.reInitiate();
-replTest.waitForState(secondary2, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary2]);
 
 jsTestLog("[5] Testing committed drop between getMore calls.");
 runDropTest({

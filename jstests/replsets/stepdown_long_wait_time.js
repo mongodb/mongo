@@ -68,7 +68,7 @@ jsTestLog('Enable replication on the SECONDARY ' + secondary.host);
 restartServerReplication(secondary);
 
 jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
-replSet.waitForState(primary, ReplSetTest.State.SECONDARY);
+replSet.awaitSecondaryNodes(null, [primary]);
 var exitCode = stepDowner();
 
 jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");

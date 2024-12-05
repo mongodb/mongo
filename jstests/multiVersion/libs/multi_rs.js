@@ -93,11 +93,9 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
     authNode(primary);
 
     let oldPrimary = this.stepdown(primary);
-    this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY, undefined, authNode);
+    this.awaitSecondaryNodes(null, [oldPrimary]);
 
-    // waitForState() runs the logout command via asCluster() on either the current primary or the
-    // first node in the replica set so we re-authenticate on all connections before calling
-    // awaitNodesAgreeOnPrimary().
+    // we need to re-authenticate on all connections before calling awaitNodesAgreeOnPrimary().
     for (const node of this.nodes) {
         const connStatus =
             assert.commandWorked(node.adminCommand({connectionStatus: 1, showPrivileges: true}));

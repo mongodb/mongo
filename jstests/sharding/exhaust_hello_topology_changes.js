@@ -49,7 +49,7 @@ awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: true});
 jsTestLog("Stepping up a new primary node.");
 st.rs0.stepUp(electableRsSecondary);
 assert.eq(electableRsSecondary, st.rs0.getPrimary());
-st.rs0.waitForState(rsPrimary, ReplSetTest.State.SECONDARY);
+st.rs0.awaitSecondaryNodes(null, [rsPrimary]);
 awaitRSClientHosts(
     mongos, {host: electableRsSecondary.name}, {ok: true, ismaster: true}, st.rs0, timeoutMS);
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: false}, st.rs0, timeoutMS);
@@ -91,7 +91,7 @@ st.rs0.getReplSetConfig().members.forEach(node => {
 });
 
 jsTestLog("Wait for the electable secondary to reach the SECONDARY after initial sync.");
-st.rs0.waitForState(electableRsSecondary, ReplSetTest.State.SECONDARY);
+st.rs0.awaitSecondaryNodes(null, [electableRsSecondary]);
 
 // Terminate the primary and wait for the secondary to step up, trigger a topology change
 jsTestLog("Terminating the primary.");

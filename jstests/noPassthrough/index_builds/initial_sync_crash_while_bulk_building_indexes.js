@@ -73,6 +73,6 @@ secondary = rst.restart(
     SIGKILL);
 
 // Wait for initial sync to finish.
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 
 rst.stopSet();

@@ -35,7 +35,7 @@ const awaitStepUp = startParallelShell(() => {
 // Wait for secondary to hit the failpoint. Even though the election on secondary has not finished,
 // the primary should step down due to seeing a higher term.
 voteRequestCompleteFailPoint.wait();
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 
 jsTestLog("Make the secondary hang after entering quiesce mode.");
 let quiesceModeFailPoint = configureFailPoint(secondary, "hangDuringQuiesceMode");

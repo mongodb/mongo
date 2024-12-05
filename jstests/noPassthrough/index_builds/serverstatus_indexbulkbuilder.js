@@ -144,7 +144,7 @@ assert.eq(indexBulkBuilderSection.memUsage, 0, tojson(indexBulkBuilderSection));
     const newNode =
         replSet.add({setParameter: {maxIndexBuildMemoryUsageMegabytes: maxMemUsageMegabytes}});
     replSet.reInitiate();
-    replSet.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    replSet.awaitSecondaryNodes(null, [newNode]);
     replSet.awaitReplication();
     let newNodeTestDB = newNode.getDB(testDB.getName());
     let newNodeColl = newNodeTestDB.getCollection(coll.getName());

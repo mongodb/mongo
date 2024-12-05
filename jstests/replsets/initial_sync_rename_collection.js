@@ -98,7 +98,7 @@ function finishTest({failPoint, expectedLog, createNew, renameAcrossDBs}) {
     }
 
     jsTestLog("Waiting for initial sync to complete.");
-    replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+    replTest.awaitSecondaryNodes(null, [secondary]);
 
     let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(0, res.initialSyncStatus.failedInitialSyncAttempts);

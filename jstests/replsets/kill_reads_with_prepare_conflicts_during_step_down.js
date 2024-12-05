@@ -77,7 +77,7 @@ assert.commandWorked(
 
 readBlockedOnPrepareConflictThread();
 
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 
 // Validate that the read operation got killed during step down.
 let replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;

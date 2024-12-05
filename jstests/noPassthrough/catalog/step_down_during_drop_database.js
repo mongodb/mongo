@@ -42,7 +42,7 @@ checkLog.contains(primary,
                       "enabled. Blocking until fail point is disabled");
 
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 60, force: true}));
-replSet.waitForState(primary, ReplSetTest.State.SECONDARY);
+replSet.awaitSecondaryNodes(null, [primary]);
 
 assert.commandWorked(primary.adminCommand({configureFailPoint: failpoint, mode: "off"}));
 awaitShell();

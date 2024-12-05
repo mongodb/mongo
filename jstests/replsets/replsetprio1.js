@@ -22,7 +22,7 @@ replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, nodes, nodes[2]);
 
 // wait for 1 to not appear to be primary (we are about to make it primary and need a clean slate
 // here)
-replTest.waitForState(nodes[1], ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [nodes[1]]);
 
 // Wait for election oplog entry to be replicated, to ensure 0 will vote for 1 after stopping 2.
 replTest.awaitReplication();

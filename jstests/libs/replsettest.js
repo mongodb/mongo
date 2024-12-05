@@ -107,7 +107,7 @@ export class ReplSetTest {
      * Wait for a rs indicator to go to a particular state or states.
      *
      * @private
-     * @param node is a single node or list of nodes, by id or conn
+     * @param node is a single node, by id or conn
      * @param states is a single state or list of states
      * @param ind is the indicator specified
      * @param timeout how long to wait for the state to be reached
@@ -502,7 +502,7 @@ export class ReplSetTest {
             assert.soonNoExcept(() => {
                 awaitingSecondaries = [];
                 // Reload who the current secondaries are
-                this.getPrimary(timeout);
+                _callHello(this);
 
                 var secondariesToCheck = secondaries || this._secondaries;
                 var len = secondariesToCheck.length;
@@ -3047,16 +3047,20 @@ export class ReplSetTest {
     /**
      * Wait for a state indicator to go to a particular state or states.
      *
-     * Note that this waits for the state as indicated by the primary node.  If you want to wait for
-     * a node to actually reach SECONDARY state, as reported by itself, use awaitSecondaryNodes
-     * instead.
+     * Note that this waits for the state as indicated by the primary node, if there is one. If not,
+     * it will use the first live node.
      *
-     * @param node is a single node or list of nodes, by id or conn
+     * Cannot be used to wait for a secondary state alone. To wait for a secondary state, use the
+     * function 'awaitSecondaryNodes' instead.
+     *
+     * @param node is a single node, by id or conn
      * @param state is a single state or list of states
      * @param timeout how long to wait for the state to be reached
      * @param reconnectNode indicates that we should reconnect to a node that stepped down
      */
     waitForState(node, state, timeout, reconnectNode) {
+        assert(state != ReplSetTest.State.SECONDARY,
+               "To wait for a secondary state, use the function 'awaitSecondaryNodes' instead.");
         this._waitForIndicator(node, "state", state, timeout, reconnectNode);
     }
 

@@ -57,7 +57,7 @@ const stepDownThread = startParallelShell(() => {
     assert.commandWorked(db.adminCommand({"replSetStepDown": 60, force: true}));
 }, s0primary.port);
 
-st.rs0.waitForState(s0primary, ReplSetTest.State.SECONDARY);
+st.rs0.awaitSecondaryNodes(null, [s0primary]);
 
 fp.off();
 

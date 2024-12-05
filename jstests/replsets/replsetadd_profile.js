@@ -21,7 +21,7 @@ primaryCollection.save({a: 1});
 var newNode = replTest.add();
 replTest.reInitiate();
 
-replTest.waitForState(replTest.nodes[1], ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [replTest.nodes[1]]);
 // Allow documents to propagate to new replica set member.
 replTest.awaitReplication();
 

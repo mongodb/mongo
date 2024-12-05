@@ -92,7 +92,7 @@ assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
 
 // Wait for the secondary to complete initial sync.
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Initial sync completed");
 

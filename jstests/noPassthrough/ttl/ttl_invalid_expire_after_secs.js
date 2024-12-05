@@ -73,7 +73,7 @@ function test(expireAfterSecondsVal) {
     // sync.
     const newNode = rst.add({rsConfig: {votes: 0, priority: 0}});
     rst.reInitiate();
-    rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [newNode]);
     rst.awaitReplication();
     let newNodeTestDB = newNode.getDB(db.getName());
     let newNodeColl = newNodeTestDB.getCollection(coll.getName());

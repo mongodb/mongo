@@ -55,7 +55,7 @@ export var testPrepareFailoverDueToReconfig = function(name, reconfigOnPrimary) 
     // Run the reconfig command on whichever node the caller targeted.
     const reconfigTarget = reconfigOnPrimary ? primary : secondary;
     assert.commandWorked(reconfigTarget.adminCommand({replSetReconfig: config, force: true}));
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
 
     // Wait for the old secondary to become the new primary.
     const newPrimary = rst.getPrimary();

@@ -49,7 +49,7 @@ jsTestLog("Stepping down");
 assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 30}));
 
 jsTestLog("Waiting for former PRIMARY to become SECONDARY");
-replSet.waitForState(primary, ReplSetTest.State.SECONDARY, 30000);
+replSet.awaitSecondaryNodes(30000, [primary]);
 
 const newPrimary = replSet.getPrimary();
 assert.neq(primary, newPrimary, "SECONDARY did not become PRIMARY");

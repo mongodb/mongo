@@ -87,7 +87,7 @@ configureFailPoint(primaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch", {} 
 
 // Wait until the primary transitioned to SECONDARY state.
 joinStepDownThread();
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 
 // We don't want to check if we have reached "waitAfterCommandFinishesExecution" fail point
 // because we already know that the primary has stepped down successfully. This implies that

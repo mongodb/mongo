@@ -130,7 +130,7 @@ jsTestLog("Resuming batch application on the secondary");
 dropFailPoint.off();
 
 jsTestLog("Waiting for initial sync to complete");
-rst.waitForState(initSyncNode, ReplSetTest.State.SECONDARY);  // will time out on error
+rst.awaitSecondaryNodes(null, [initSyncNode]);  // will time out on error
 
 rst.awaitReplication();
 rst.stopSet();

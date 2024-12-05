@@ -98,7 +98,7 @@ rst.stepUp(secondary);
 waitForSecondaryReadBlockedOnPrepareConflictThread();
 
 rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 
 primary = rst.getPrimary();
 

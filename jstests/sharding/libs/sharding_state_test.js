@@ -28,7 +28,7 @@ export var ShardingStateTest = (function() {
         const newNode = replSet.add(addParams);
 
         replSet.reInitiate();
-        replSet.waitForState(newNode, ReplSetTest.State.SECONDARY);
+        replSet.awaitSecondaryNodes(null, [newNode]);
         replSet.waitForAllNewlyAddedRemovals();
 
         return newNode;

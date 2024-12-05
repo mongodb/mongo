@@ -212,7 +212,7 @@ for (const [collectionName, collectionOptions] of [
 
         // Wait until the initial sync process is complete and the new node becomes a fully
         // functioning secondary.
-        replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+        replTest.awaitSecondaryNodes(null, [initialSyncNode]);
 
         // Verify that pre-images were not written during the logical initial sync.
         let preImageDocuments = getPreImages(initialSyncNode);

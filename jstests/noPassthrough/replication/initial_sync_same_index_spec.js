@@ -84,6 +84,6 @@ assert.commandWorked(
     secondary.adminCommand({configureFailPoint: "hangBeforeClonerStage", mode: 'off'}));
 
 jsTestLog("Waiting for initial sync to complete successfully.");
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 
 replTest.stopSet();

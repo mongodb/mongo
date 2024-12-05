@@ -47,7 +47,7 @@ assert.eq(1, getExtendedRangeCount(primary));
 assert.eq(1, getExtendedRangeCount(secondary));
 
 rst.restart(primary, {skipValidation: true});
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 
 assert.eq(1, primaryDB.standard.count());
 assert.eq(1, primaryDB.extended.count());

@@ -251,7 +251,7 @@ const failureModes = {
             let primary = st.rs0.getPrimary();
             assert.commandWorked(
                 primary.adminCommand({replSetStepDown: 60 /* stepDownSecs */, force: true}));
-            st.rs0.waitForState(primary, ReplSetTest.State.SECONDARY);
+            st.rs0.awaitSecondaryNodes(null, [primary]);
             assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
             st.rs0.awaitNodesAgreeOnPrimary();
         },

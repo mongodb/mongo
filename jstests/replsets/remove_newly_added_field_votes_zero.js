@@ -58,7 +58,7 @@ assertVoteCount(primary, {
 jsTestLog("Waiting for initial sync to complete");
 assert.commandWorked(
     secondary0.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(secondary0, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary0]);
 
 jsTestLog("Checking that 'newlyAdded' field is still not set");
 assert(!isMemberNewlyAdded(primary, 1));
@@ -125,7 +125,7 @@ assertVoteCount(primary, {
 jsTestLog("Waiting for second initial sync to complete");
 assert.commandWorked(
     secondary1.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(secondary1, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary1]);
 
 jsTestLog("Checking that 'newlyAdded' field was removed");
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2);

@@ -132,7 +132,7 @@ jsTest.log("allowing heartbeat stepdown " + secondary.host);
 blockHeartbeatStepdownFailPoint.off();
 
 jsTestLog("Checking that node successfully stepped down");
-replSet.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replSet.awaitSecondaryNodes(null, [secondary]);
 assert(!secondary.adminCommand('hello').isWritablePrimary);
 
 // Now ensure that the node can successfully become primary again.

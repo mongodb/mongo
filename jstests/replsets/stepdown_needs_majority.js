@@ -94,7 +94,7 @@ jsTestLog("Trying to step down primary with 3 nodes out of 5 caught up.");
 assertStepDownSucceeds(primary);
 
 jsTestLog("Waiting for PRIMARY(" + primary.host + ") to step down & become SECONDARY.");
-replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [primary]);
 
 //
 // Disable failpoints and stop replica set

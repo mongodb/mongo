@@ -87,7 +87,7 @@ assertVoteCount(primary, {
 jsTestName("Allowing one of the secondaries to complete initial sync (_id 1, index 2)");
 assert.commandWorked(
     newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(newNodeTwo, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [newNodeTwo]);
 
 jsTestName("Waiting for its 'newlyAdded' to be removed");
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2 /* memberIndex */);
@@ -113,7 +113,7 @@ assert(configOnDisk.members[1]["newlyAdded"], configOnDisk);
 jsTestName("Letting the other secondary node finish initial sync (_id 2, index 1)");
 assert.commandWorked(
     newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(newNodeOne, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [newNodeOne]);
 
 jsTestName("Waiting for the second 'newlyAdded' field to be removed.");
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 1 /* memberIndex */);

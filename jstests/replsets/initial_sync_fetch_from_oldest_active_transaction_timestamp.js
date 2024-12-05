@@ -137,7 +137,7 @@ assert.commandWorked(secondary.adminCommand(
 jsTestLog("Initial sync resumed");
 
 // Wait for the secondary to complete initial sync.
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 replTest.awaitReplication();
 
 jsTestLog("Initial sync completed");

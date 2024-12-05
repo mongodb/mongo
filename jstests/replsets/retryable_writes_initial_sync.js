@@ -78,7 +78,7 @@ jsTestLog({
 jsTestLog("Resuming initial sync.");
 assert.commandWorked(
     node1.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: 'off'}));
-rst.waitForState(node1, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [node1]);
 
 let initialSyncedNode = rst.getSecondary();
 rst.stepUp(initialSyncedNode);

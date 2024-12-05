@@ -61,7 +61,7 @@ function checkClusterParameterInitialSync(rst, newNodeOptions) {
     // with all data fully replicated to it.
     const newNode = rst.add(newNodeOptions);
     rst.reInitiate();
-    rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [newNode]);
     rst.awaitReplication();
 
     // Check that the new node has the latest cluster parameter values.

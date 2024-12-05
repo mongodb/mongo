@@ -79,7 +79,7 @@ assert.commandWorked(
 waitForUserReconfig();
 
 jsTestLog("Waiting for 'newlyAdded' field to be removed");
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 1);
 assertVoteCount(primary, {
     votingMembersCount: 2,

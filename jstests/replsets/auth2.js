@@ -22,7 +22,7 @@ var testInvalidAuthStates = function(replSetTest) {
 
     jsTestLog("shut down 2, 0 becomes a secondary.");
     replSetTest.stop(2);
-    replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.SECONDARY);
+    replSetTest.awaitSecondaryNodes(null, [replSetTest.nodes[0]]);
 };
 
 var name = "rs_auth2";

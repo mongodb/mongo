@@ -38,9 +38,7 @@ function stepDownPrimary(rst) {
 
     // We wait for the primary to transition to the SECONDARY state to ensure we're waiting
     // until after the parallel shell has started the replSetStepDown command.
-    const reconnectNode = false;
-    rst.waitForState(directConn, ReplSetTest.State.SECONDARY, null, reconnectNode);
-
+    rst.awaitSecondaryNodes(null, [directConn]);
     return awaitShell;
 }
 

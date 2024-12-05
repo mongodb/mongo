@@ -68,6 +68,6 @@ assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "tim
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
 
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 
 rst.stopSet();

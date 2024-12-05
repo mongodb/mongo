@@ -32,7 +32,7 @@ rst.awaitReplication();
 jsTestLog("Stepping down with no command in progress.  Should not disconnect.");
 // If the 'primary' connection is broken on stepdown, this command will fail.
 assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 // If the 'primaryDataConn' connection was broken during stepdown, this command will fail.
 assert.commandWorked(primaryDb.adminCommand({ping: 1}));
 // Allow the primary to be re-elected, and wait for it.
@@ -60,7 +60,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
     const waitForShell = startParallelShell(writeCommand, primary.port);
     waitForCurOpByFailPointNoNS(primaryAdmin, failpoint);
     assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
     assert.commandWorked(primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "off"}));
     try {
         waitForShell();

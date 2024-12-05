@@ -72,7 +72,7 @@ jsTestLog("Disconnecting old primary");
 node0.disconnect(node1);
 node0.disconnect(node2);
 assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: 10 * 60, force: true}));
-rst.waitForState(rst.nodes[0], ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [rst.nodes[0]]);
 
 jsTestLog("Electing new primary");
 
@@ -107,7 +107,7 @@ assert.soonNoExcept(function() {
     return rbid > lastRBID;
 }, "rbid did not update", ReplSetTest.kDefaultTimeoutMS);
 
-rst.waitForState(rst.nodes[0], ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [rst.nodes[0]]);
 
 jsTestLog("Done with test");
 rst.stopSet();

@@ -55,7 +55,7 @@ jsTest.log("Step up Node B in term 2. Commit a new write.");
 // Ensure Node B is caught up, so that it can become primary.
 rst.awaitReplication(undefined, undefined, [nodeB]);
 assert.commandWorked(nodeB.adminCommand({replSetStepUp: 1}));
-rst.waitForState(nodeA, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [nodeA]);
 assert.eq(nodeB, rst.getPrimary());
 assert.commandWorked(
     nodeB.getDB(dbName)[collName].insert({_id: "term 2"}, {writeConcern: {w: "majority"}}));

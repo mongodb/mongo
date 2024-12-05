@@ -65,5 +65,5 @@ assert.commandWorked(secondary.getDB("test").adminCommand(
 
 jsTestLog("Waiting for initial sync to complete.");
 // Wait for initial sync to complete.
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 rst.stopSet();

@@ -77,11 +77,11 @@ function finishTest(
     configureFailPoint(primaryAdmin, failPoint, {}, "off");
 
     jsTestLog("Waiting for initial sync to complete.");
-    rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [secondary]);
 
     // Wait until the primary transitioned to SECONDARY state.
     joinStepDownThread();
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
 
     jsTestLog("Validating initial sync data.");
     let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));

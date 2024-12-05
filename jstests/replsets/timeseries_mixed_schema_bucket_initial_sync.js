@@ -54,7 +54,7 @@ assert.commandWorked(bucketsColl.insert(bucket));
 
 const secondary = replTest.add();
 replTest.reInitiate();
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 replTest.awaitReplication();
 
 const primaryColl = primary.getDB(db.getName())[bucketsColl.getName()];

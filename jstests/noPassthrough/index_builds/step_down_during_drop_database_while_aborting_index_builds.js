@@ -50,7 +50,7 @@ awaitIndexBuild();
 checkLog.containsJson(primary, 4612300);
 
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 60, force: true}));
-replSet.waitForState(primary, ReplSetTest.State.SECONDARY);
+replSet.awaitSecondaryNodes(null, [primary]);
 
 assert.commandWorked(primary.adminCommand({configureFailPoint: failpoint, mode: "off"}));
 

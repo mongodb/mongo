@@ -81,7 +81,7 @@ assert.commandWorked(secondTermPrimary.adminCommand({replSetReconfig: newConfig}
 rollbackTest.getTestFixture().waitForConfigReplication(secondTermPrimary);
 
 // Verify the removed node is added back and primary sees its state as SECONDARY.
-rollbackTest.getTestFixture().waitForState(rollbackNode, ReplSetTest.State.SECONDARY);
+rollbackTest.getTestFixture().awaitSecondaryNodes(null, [rollbackNode]);
 
 // Transition back to steady state.
 rollbackTest.transitionToSteadyStateOperations();

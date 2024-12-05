@@ -156,7 +156,7 @@ assertFindBothTenantsPrefixedDb(
 jsTest.log("Restart the secondary and enable multitenancySupport.");
 secondary =
     rst.restart(secondary, {startClean: false, setParameter: {'multitenancySupport': true}});
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 secondary.setSecondaryOk();
 assert(secondary.getDB("admin").auth('admin', 'pwd'));
 

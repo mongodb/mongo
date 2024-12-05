@@ -38,7 +38,7 @@ const secondary = rst.add({
     }
 });
 rst.reInitiate();
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Checking that the primary has initiated the removal of 'newlyAdded'");
 hangBeforeNewlyAddedRemovalFP.wait();

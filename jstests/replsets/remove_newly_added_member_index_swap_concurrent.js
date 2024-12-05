@@ -80,7 +80,7 @@ jsTestLog("Allowing primary to initiate the 'newlyAdded' field removal for the f
 let hangDuringAutomaticReconfigFP = configureFailPoint(primaryDb, "hangDuringAutomaticReconfig");
 assert.commandWorked(
     newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(newNodeOne, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [newNodeOne]);
 
 hangDuringAutomaticReconfigFP.wait();
 
@@ -123,7 +123,7 @@ assert(configOnDisk.members[1]["newlyAdded"], configOnDisk);
 jsTestLog("Letting the other secondary node finish initial sync");
 assert.commandWorked(
     newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(newNodeTwo, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [newNodeTwo]);
 
 jsTestLog("Waiting for the second 'newlyAdded' field to be removed (_id 2, index 1)");
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 1 /* memberIndex */);

@@ -98,7 +98,7 @@ Object.keys(initialMechStats).forEach(function(mech) {
 
     const newNode = rst.add({});
     rst.reInitiate();
-    rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [newNode]);
     rst.awaitReplication();
 
     rst.stop(newNode);

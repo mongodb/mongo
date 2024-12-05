@@ -71,7 +71,7 @@ for (var i = 0; i < numElections; i++) {
     rst.stepUp(secondary);
 
     // Make sure a new primary has been established.
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
     rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
 
     // Reset election timeout for the old primary.
@@ -107,7 +107,7 @@ setLastVoteDoc(node0, term, rst.nodes[0]);
 
 jsTestLog("Restarting node 0 in replica set mode");
 node0 = rst.restart(0);  // Restart in replSet mode again.
-rst.waitForState(node0, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [node0]);
 
 assert.soonNoExcept(function() {
     assertCurrentTerm(node0, term);

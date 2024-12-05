@@ -62,7 +62,7 @@ assert.commandWorked(initialSyncNode.adminCommand(
 
 // Wait until the initial sync process is complete and the new node becomes a fully
 // functioning secondary.
-replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [initialSyncNode]);
 
 // Verify that pre-images were not written during the logical initial sync. At this point the
 // pre-image collections in the nodes of the replica set are out of sync.

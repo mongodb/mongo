@@ -47,7 +47,7 @@ function runStepDown() {
     assert.commandWorked(primaryAdmin.runCommand({"replSetStepDown": 30 * 60, "force": true}));
 
     // Wait until the primary transitioned to SECONDARY state.
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
 
     jsTestLog("Validating data.");
     assert.docEq([{_id: 'readOp'}], primaryColl.find().toArray());

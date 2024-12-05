@@ -62,7 +62,7 @@ assert.commandWorked(primary.adminCommand({
 
 // Step down the primary.
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 10}));
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 
 // Resume the abort.
 assert.commandWorked(

@@ -57,7 +57,7 @@ replSet.awaitReplication();
 jsTestLog("Taking secondary out of maintenance mode so it will transition back to SECONDARY");
 
 assert.commandWorked(secondary.adminCommand({replSetMaintenance: 0}));
-replSet.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replSet.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Stepping up the secondary");
 

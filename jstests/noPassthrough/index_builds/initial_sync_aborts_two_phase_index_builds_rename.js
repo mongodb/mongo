@@ -60,7 +60,7 @@ const createIdx = IndexBuildTest.startIndexBuild(primary, "test.anotherColl", {a
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
 
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 createIdx();
 
 rst.stopSet();

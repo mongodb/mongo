@@ -43,7 +43,7 @@ replTest.awaitReplication();
 jsTestLog("Testing that changestream survives stepdown between find and getmore");
 // Step down.
 assert.commandWorked(primaryDb.adminCommand({replSetStepDown: 60, force: true}));
-replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [primary]);
 
 // Receive the first change event.  This tests stepdown between find and getmore.
 res = assert.commandWorked(
@@ -68,7 +68,7 @@ assert.eq(changes[0]["operationType"], "insert");
 jsTestLog("Testing that changestream survives stepdown between two getmores");
 // Step down again.
 assert.commandWorked(primaryDb.adminCommand({replSetStepDown: 60, force: true}));
-replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [primary]);
 
 // Get the next one.  This tests that changestreams survives a step down between getmores.
 res = assert.commandWorked(

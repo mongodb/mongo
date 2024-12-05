@@ -104,7 +104,7 @@ jsTestLog("Failing first initial sync attempt");
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "failInitialSyncBeforeApplyingBatch", mode: "off"}));
 
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Initial sync completed");
 

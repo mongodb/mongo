@@ -106,7 +106,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         });
 
         replTest.reInitiate();
-        replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+        replTest.awaitSecondaryNodes(null, [initialSyncNode]);
         replTest.awaitReplication();
 
         validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
@@ -157,7 +157,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         jsTestLog("Resume initial sync.");
         assert.commandWorked(
             initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "off"}));
-        replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+        replTest.awaitSecondaryNodes(null, [initialSyncNode]);
         replTest.awaitReplication();
 
         validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
@@ -208,7 +208,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         jsTestLog("Resume initial sync.");
         assert.commandWorked(
             initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "off"}));
-        replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+        replTest.awaitSecondaryNodes(null, [initialSyncNode]);
         replTest.awaitReplication();
 
         validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
@@ -237,7 +237,7 @@ export function testPreservingRecordIdsDuringInitialSync(
             }
         });
         replTest.reInitiate();
-        replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+        replTest.awaitSecondaryNodes(null, [initialSyncNode]);
         replTest.awaitReplication();
 
         validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);

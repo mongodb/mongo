@@ -97,7 +97,7 @@ replTest.stop(secondary1);
 
 print("8. Eventually the new node should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
-replTest.waitForState(secondary2, ReplSetTest.State.SECONDARY, 60 * 1000);
+replTest.awaitSecondaryNodes(60 * 1000, [secondary2]);
 
 print("9. Bring the secondary back up");
 replTest.start(secondary1, {}, true);

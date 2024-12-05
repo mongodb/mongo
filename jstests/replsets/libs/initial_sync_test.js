@@ -54,7 +54,7 @@ export function InitialSyncTest(
     const primary = replSet.getPrimary();
     let secondary = replSet.getSecondary();
 
-    replSet.waitForState(secondary, ReplSetTest.State.SECONDARY);
+    replSet.awaitSecondaryNodes(null, [secondary]);
 
     /**
      * Return an instance of ReplSetTest initialized with a standard two-node replica set running

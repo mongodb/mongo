@@ -85,7 +85,7 @@ assert.commandWorked(
 
 assert.commandWorked(
     rollbackNode.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
-rst.waitForState(rollbackNode, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [rollbackNode]);
 
 restartServerReplication(syncSource);
 

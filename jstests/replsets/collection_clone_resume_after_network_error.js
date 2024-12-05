@@ -193,6 +193,6 @@ assert.commandWorked(
     secondaryDb.adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
 
 jsTestLog("Waiting for initial sync to complete.");
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 
 rst.stopSet();

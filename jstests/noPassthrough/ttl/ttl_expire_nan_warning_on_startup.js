@@ -40,7 +40,7 @@ assert.commandWorked(secondary.adminCommand({fsync: 1}));
 
 // Restart the secondary and check for the startup warning in the logs.
 secondary = rst.restart(secondary);
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 
 // Wait for "Found an existing TTL index with NaN 'expireAfterSeconds' in the catalog" log message.
 checkLog.containsJson(secondary, 6852200, {
