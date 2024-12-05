@@ -6,6 +6,8 @@
  *    requires_fcv_80,
  *    # $_internalListCollections only supports local read concern
  *    assumes_read_concern_unchanged,
+ *    # There is no need to support multitenancy, as it has been canceled and was never in
+ *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
  *    does_not_support_causal_consistency,
  *    does_not_support_transactions,
