@@ -24,9 +24,9 @@ coll.drop();
 // Insert such data that some queries will do well with an {a: 1} index while
 // others with a {b: 1} index.
 assert.commandWorked(
-    coll.insertMany(Array.from({length: 100}, (_, i) => ({a: 1, b: i, c: i % 7}))));
+    coll.insertMany(Array.from({length: 1000}, (_, i) => ({a: 1, b: i, c: i % 7}))));
 assert.commandWorked(
-    coll.insertMany(Array.from({length: 100}, (_, i) => ({a: i, b: 1, c: i % 3}))));
+    coll.insertMany(Array.from({length: 1000}, (_, i) => ({a: i, b: 1, c: i % 3}))));
 
 coll.createIndexes([{a: 1}, {b: 1}, {c: 1, b: 1, a: 1}, {a: 1, b: 1}, {c: 1, a: 1}]);
 

@@ -36,6 +36,25 @@
 
 namespace mongo::cost_based_ranker {
 
+CardinalityEstimator::CardinalityEstimator(const stats::CollectionStatistics& collStats,
+                                           const ce::SamplingEstimator* samplingEstimator,
+                                           EstimateMap& qsnEstimates,
+                                           QueryPlanRankerModeEnum rankerMode)
+    : _collCard{CardinalityEstimate{CardinalityType{collStats.getCardinality()},
+                                    EstimationSource::Metadata}},
+      _inputCard{_collCard},
+      _collStats(collStats),
+      _samplingEstimator(samplingEstimator),
+      _qsnEstimates{qsnEstimates},
+      _rankerMode(rankerMode) {
+    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
+        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        tassert(9746501,
+                "samplingEstimator cannot be null when ranker mode is samplingCE or automaticCE",
+                _samplingEstimator != nullptr);
+    }
+}
+
 CardinalityEstimate CardinalityEstimator::estimate(const QuerySolutionNode* node) {
     StageType nodeType = node->getType();
     CardinalityEstimate ce{zeroCE};
@@ -89,6 +108,11 @@ CardinalityEstimate CardinalityEstimator::estimate(const QuerySolutionNode* node
 }
 
 CardinalityEstimate CardinalityEstimator::estimate(const MatchExpression* node, bool isFilterRoot) {
+    if (isFilterRoot && _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        // Sample the entire filter
+        return _samplingEstimator->estimateCardinality(node);
+    }
+
     MatchExpression::MatchType nodeType = node->matchType();
     CardinalityEstimate ce{zeroCE};
 

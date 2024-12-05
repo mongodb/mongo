@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/get_executor.h"
 
+#include "mongo/db/query/ce/sampling_estimator.h"
+#include "mongo/db/query/ce/sampling_estimator_impl.h"
 #include <absl/container/flat_hash_set.h>
 #include <absl/container/node_hash_map.h>
 #include <boost/container/flat_set.hpp>
@@ -505,9 +507,26 @@ public:
 
         std::vector<std::unique_ptr<QuerySolution>> solutions;
         QueryPlanner::CostBasedRankerResult cbrResult;
-        if (_cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
-            QueryPlanRankerModeEnum::kMultiPlanning) {
-            auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(*_cq, *_plannerParams);
+        auto rankerMode = _cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
+        if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning) {
+            using namespace cost_based_ranker;
+            std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
+            if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
+                rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+                samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
+                    _cq->getOpCtx(),
+                    getCollections(),
+                    ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
+                    CardinalityEstimate{
+                        CardinalityType{
+                            _plannerParams->mainCollectionInfo.collStats->getCardinality()},
+                        EstimationSource::Metadata},
+                    SamplingConfidenceIntervalEnum::k95,
+                    samplingMarginOfError.load());
+            }
+
+            auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
+                *_cq, *_plannerParams, samplingEstimator.get());
             if (!statusWithCBRSolns.isOK()) {
                 return statusWithCBRSolns.getStatus();
             }

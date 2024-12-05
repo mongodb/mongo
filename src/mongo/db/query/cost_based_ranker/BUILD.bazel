@@ -23,6 +23,7 @@ mongo_cc_library(
         "heuristic_estimator",
         "//src/mongo/db/query:index_bounds_builder",
         "//src/mongo/db/query/ce:histogram_estimator",
+        "//src/mongo/db/query/ce:sampling_estimator_interface",
         "//src/mongo/db/query/stats:collection_statistics_interface",
     ],
 )

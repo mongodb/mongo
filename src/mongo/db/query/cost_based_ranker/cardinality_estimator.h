@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/ce/sampling_estimator.h"
 #include "mongo/db/query/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
@@ -58,14 +59,9 @@ concept UnionType = std::same_as<T, OrNode> || std::same_as<T, MergeSortNode>;
 class CardinalityEstimator {
 public:
     CardinalityEstimator(const stats::CollectionStatistics& collStats,
+                         const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
-                         QueryPlanRankerModeEnum rankerMode)
-        : _collCard{CardinalityEstimate{CardinalityType{collStats.getCardinality()},
-                                        EstimationSource::Metadata}},
-          _inputCard{_collCard},
-          _collStats(collStats),
-          _qsnEstimates{qsnEstimates},
-          _rankerMode(rankerMode) {}
+                         QueryPlanRankerModeEnum rankerMode);
 
     // Delete the copy and move constructors and assignment operator
     CardinalityEstimator(const CardinalityEstimator&) = delete;
@@ -148,6 +144,11 @@ private:
 
     // Collection statistics contains cached histograms.
     const stats::CollectionStatistics& _collStats;
+
+    // Sampling estimator used to estimate cardinality using a cache of documents randomly sampled
+    // from the collection. We don't own this pointer and it may be null in the case that a sampling
+    // method which never uses sampling is requested.
+    const ce::SamplingEstimator* _samplingEstimator;
 
     // A map from QSN to QSNEstimate that stores the final CE result for each QSN node.
     // Not owned by this class - it is passed by the user of this class, and is filled in with

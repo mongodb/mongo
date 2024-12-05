@@ -1631,7 +1631,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 }  // QueryPlanner::plan
 
 StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedRanking(
-    const CanonicalQuery& query, const QueryPlannerParams& params) {
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    const ce::SamplingEstimator* samplingEstimator) {
     using namespace cost_based_ranker;
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(query, params);
@@ -1645,6 +1647,7 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     EstimateMap estimates;
     CardinalityEstimator cardEstimator(
         *params.mainCollectionInfo.collStats,
+        samplingEstimator,
         estimates,
         query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode());
     CostEstimator costEstimator(estimates);
@@ -1974,7 +1977,8 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
         const CanonicalQuery& cq, const CollectionPtr& coll)> getSolutionCachedData,
     const CollectionPtr& collection,
     const CanonicalQuery& query,
-    const QueryPlannerParams& params) {
+    const QueryPlannerParams& params,
+    const ce::SamplingEstimator* samplingEstimator) {
     invariant(query.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
     invariant(query.getPrimaryMatchExpression()->numChildren(),
               "Cannot plan subqueries for an $or with no children");
@@ -2028,8 +2032,8 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
 
             if (query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
                 QueryPlanRankerModeEnum::kMultiPlanning) {
-                auto statusWithCBRSolns =
-                    QueryPlanner::planWithCostBasedRanking(*branchResult->canonicalQuery, params);
+                auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
+                    *branchResult->canonicalQuery, params, samplingEstimator);
                 if (!statusWithCBRSolns.isOK()) {
                     str::stream ss;
                     ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString()

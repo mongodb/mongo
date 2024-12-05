@@ -141,7 +141,8 @@ CardinalityEstimate getPlanCE(const QuerySolution& plan, double collCE) {
     EstimateMap qsnEstimates;
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
     stats::CollectionStatisticsImpl stats(collCE, kNss);
-    CardinalityEstimator estimator{stats, qsnEstimates, QueryPlanRankerModeEnum::kHeuristicCE};
+    CardinalityEstimator estimator{
+        stats, nullptr, qsnEstimates, QueryPlanRankerModeEnum::kHeuristicCE};
     estimator.estimatePlan(plan);
     return qsnEstimates.at(plan.root()).outCE;
 }
@@ -150,7 +151,8 @@ CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan,
                                        stats::CollectionStatisticsMock stats) {
     EstimateMap qsnEstimates;
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    CardinalityEstimator estimator{stats, qsnEstimates, QueryPlanRankerModeEnum::kHistogramCE};
+    CardinalityEstimator estimator{
+        stats, nullptr, qsnEstimates, QueryPlanRankerModeEnum::kHistogramCE};
     estimator.estimatePlan(plan);
     return qsnEstimates.at(plan.root()).outCE;
 }
