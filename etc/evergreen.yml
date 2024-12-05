@@ -120,6 +120,8 @@ github_pr_aliases:
   - variant: "^(amazon-linux2-arm64-static-compile|linux-x86-dynamic-compile-required)$"
     variant_tags: []
     task_tags: ["clang_tidy"]
+  - variant: "^(AL2023-arm64-coverage|rhel-93-64-bit-coverage)$"
+    task: ".*"
 
 patch_aliases:
   - alias: required
