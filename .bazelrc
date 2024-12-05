@@ -10,6 +10,9 @@ build --enable_platform_specific_config=true
 # Don't use legacy toolchain resolution.
 build --incompatible_enable_cc_toolchain_resolution
 
+# allow multiple execution infos to be set
+build --incompatible_modify_execution_info_additive
+
 # This makes builds more hermetic by preventing environment variables from leaking into the execution of rules
 build --incompatible_strict_action_env=true
 

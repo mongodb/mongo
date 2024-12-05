@@ -1150,10 +1150,24 @@ def generate(env: SCons.Environment.Environment) -> None:
         ]
 
     if not os.environ.get("USE_NATIVE_TOOLCHAIN"):
-        bazel_internal_flags += [
-            f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}",
-            f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}",
-        ]
+        if (
+            not is_local_execution(env)
+            and normalized_os == "linux"
+            and os.environ.get("evergreen_remote_exec") == "off"
+        ):
+            cache_silo = "_cache_silo"
+            bazel_internal_flags += [
+                f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}{cache_silo}",
+                f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}{cache_silo}",
+                "--spawn_strategy=local",
+                "--jobs=auto",
+                "--remote_executor=",
+            ]
+        else:
+            bazel_internal_flags += [
+                f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}",
+                f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}",
+            ]
 
     if "MONGO_ENTERPRISE_VERSION" in env:
         enterprise_features = env.GetOption("enterprise_features")

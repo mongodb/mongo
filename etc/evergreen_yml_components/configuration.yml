@@ -36,6 +36,10 @@ parameters:
     value: "--bazel-build-tag=dist_test --bazel-build-tag=mongo_library" # Every 4 hours starting at 0000 UTC
     description: "Default build tags"
 
+  - key: evergreen_remote_exec
+    value: "off"
+    description: "disable remote exec in CI"
+
   ## Cron parameters.
   - key: project_required_suggested_cron
     value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
