@@ -68,10 +68,9 @@ function testImplicitCreateCollection(
     assertShardingMetadataForUnshardedCollectionDoesNotExist(db, collUuid);
 }
 
+let dbNum = 0;
 function makeDatabaseNameForTest() {
-    // Truncate the uuid string to avoid exceeding the database name length limit when there is a
-    // tenant id prefix.
-    return "testDb-" + extractUUIDFromObject(UUID()).substring(0, 5);
+    return "testDb-" + dbNum++;
 }
 
 function runTest(shard0Primary, execCtxType, expectShardingMetadata) {
