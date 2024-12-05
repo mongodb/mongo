@@ -2205,6 +2205,7 @@ tasks:
         "release_critical",
         "misc_js",
         "non_win_dbg",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
