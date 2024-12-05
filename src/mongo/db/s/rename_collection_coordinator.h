@@ -92,9 +92,6 @@ private:
 
     std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
 
-    // TODO (SERVER-80704): Get rid of this method once v8.0 branches out
-    void _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
-
     boost::optional<RenameCollectionResponse> _response;
     const RenameCollectionRequest _request;
 };

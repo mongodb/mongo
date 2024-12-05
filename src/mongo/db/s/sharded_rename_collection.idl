@@ -113,16 +113,6 @@ structs:
             phase:
                 type: RenameCollectionCoordinatorPhase
                 default: kUnset
-            targetIsSharded:
-                # TODO (SERVER-80704): Remove targetIsSharded field once v8.0 branches out
-                description: "Deprecated. Indicates whether the target collection (to override) is sharded or not."
-                type: bool
-                default: false
-            optShardedCollInfo:
-                # TODO (SERVER-80704): Remove optShardedCollInfo field once v8.0 branches out
-                description: "Deprecated. CollectionType of the collection currently being renamed (if is tracked by the config server)."
-                type: CollectionType
-                optional: true
             optTrackedCollInfo:
                 description: "CollectionType of the collection currently being renamed (if is tracked by the config server)."
                 type: CollectionType
