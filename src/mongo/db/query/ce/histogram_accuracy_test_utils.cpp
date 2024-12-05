@@ -230,6 +230,23 @@ void printResult(const DataDistributionEnum dataDistribution,
 }
 
 
+/**
+ * Populates TypeDistrVector 'td' based on the input configuration.
+ *
+ * This function iterates over a given type combination and populates the provided 'td' with various
+ * statistical distributions according to the specified types and their probabilities.
+ *
+ * This function supports data types: nothing, null, boolean, integer, string, and array. Note that
+ * currently, arrays are only generated with integer elements.
+ *
+ * @param td The TypeDistrVector that will be populated.
+ * @param interval A pair representing the inclusive minimum and maximum bounds for the data.
+ * @param typeCombination The types and their associated probabilities presenting the distribution.
+ * @param ndv The number of distinct values to generate.
+ * @param seedArray A random number seed for generating array. Used only by TypeTags::Array.
+ * @param mdd The distribution descriptor.
+ * @param arrayLength The maximum length for array distributions, defaulting to 0.
+ */
 void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                                                    const std::pair<size_t, size_t>& interval,
                                                    const TypeCombination& typeCombination,

@@ -35,7 +35,7 @@
 
 namespace mongo::ce {
 
-enum DataType { kInt, kStringSmall, kString, kDouble, kBoolean, kNull, kNan };
+enum DataType { kInt, kStringSmall, kString, kDouble, kBoolean, kNull, kNan, kArray };
 
 struct HistogramEstimationBenchmarkConfiguration {
     int numberOfBuckets;
@@ -43,9 +43,13 @@ struct HistogramEstimationBenchmarkConfiguration {
     DataDistributionEnum dataDistribution;
     DataType dataType;
     QueryType queryType;
+
+    // Inclusive minimum and maximum bounds for randomly generated data, ensuring each data falls
+    // within these limits.
     std::pair<size_t, size_t> dataInterval;
     sbe::value::TypeTags sbeDataType;
     double nanProb = 0;
+    size_t arrayTypeLength = 0;
 
     HistogramEstimationBenchmarkConfiguration(benchmark::State& state)
         : numberOfBuckets(state.range(0)),
@@ -83,6 +87,11 @@ struct HistogramEstimationBenchmarkConfiguration {
                 dataInterval = {0, 1000};
                 nanProb = 1;
                 break;
+            case kArray:
+                sbeDataType = sbe::value::TypeTags::Array;
+                dataInterval = {0, 1000};
+                arrayTypeLength = 10;
+                break;
         }
     }
 };
@@ -106,7 +115,8 @@ void BM_CreateHistogram(benchmark::State& state) {
                                 typeCombinationData,
                                 seed,
                                 ndv,
-                                data);
+                                data,
+                                configuration.arrayTypeLength);
             break;
         case kNormal:
             // For ndv we set half the number of values in the provided data interval.
@@ -115,7 +125,8 @@ void BM_CreateHistogram(benchmark::State& state) {
                                typeCombinationData,
                                seed,
                                ndv,
-                               data);
+                               data,
+                               configuration.arrayTypeLength);
             break;
         case kZipfian:
             // For ndv we set half the number of values in the provided data interval.
@@ -124,7 +135,8 @@ void BM_CreateHistogram(benchmark::State& state) {
                                 typeCombinationData,
                                 seed,
                                 ndv,
-                                data);
+                                data,
+                                configuration.arrayTypeLength);
             break;
     }
 
@@ -156,7 +168,8 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                 typeCombinationData,
                                 seed,
                                 ndv,
-                                data);
+                                data,
+                                configuration.arrayTypeLength);
             break;
         case kNormal:
             // For ndv we set half the number of values in the provided data interval.
@@ -165,7 +178,8 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                typeCombinationData,
                                seed,
                                ndv,
-                               data);
+                               data,
+                               configuration.arrayTypeLength);
             break;
         case kZipfian:
             // For ndv we set half the number of values in the provided data interval.
@@ -174,7 +188,8 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                 typeCombinationData,
                                 seed,
                                 ndv,
-                                data);
+                                data,
+                                configuration.arrayTypeLength);
             break;
     }
 
@@ -182,6 +197,11 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     auto ceHist = stats::createCEHistogram(data, configuration.numberOfBuckets);
 
     TypeProbability typeCombinationQuery{configuration.sbeDataType, 100, configuration.nanProb};
+    if (configuration.dataType == kArray) {
+        // The array data generation currently only supports integer elements as implemented in
+        // populateTypeDistrVectorAccordingToInputConfig.
+        typeCombinationQuery.typeTag = sbe::value::TypeTags::NumberInt64;
+    }
 
     size_t executedQueries = 0;
     for (auto curState : state) {
@@ -211,7 +231,7 @@ BENCHMARK(BM_CreateHistogram)
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50'000, 100'000},
                    /*dataDistribution*/ {kUniform, kNormal, kZipfian},
-                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan},
+                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan, kArray},
                    /*queryType*/ {kPoint}});
 
 BENCHMARK(BM_RunHistogramEstimations)
@@ -219,7 +239,7 @@ BENCHMARK(BM_RunHistogramEstimations)
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50'000, 100'000},
                    /*dataDistribution*/ {kUniform, kNormal, kZipfian},
-                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan},
+                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan, kArray},
                    /*queryType*/ {kPoint}});
 
 BENCHMARK(BM_RunHistogramEstimations)
@@ -227,7 +247,7 @@ BENCHMARK(BM_RunHistogramEstimations)
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50000, 100'000},
                    /*dataDistribution*/ {kUniform, kNormal, kZipfian},
-                   /*dataType*/ {kInt, kString, kBoolean},
+                   /*dataType*/ {kInt, kString, kBoolean, kArray},
                    /*queryType*/ {kRange}});
 
 }  // namespace mongo::ce
