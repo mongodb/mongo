@@ -46,11 +46,6 @@ assert.commandWorked(mongosDB.getCollection(localCollName).insert([{a: 0}]));
 // Set up the foreign collection.
 assert.commandWorked(mongosDB.createCollection(foreignCollName));
 
-// Make sure that the shard executing $lookup operations has up-to-date routing information.
-mongosDB.getCollection(localCollName).aggregate([
-    {$lookup: {from: foreignCollName, pipeline: [], as: "out"}}
-]);
-
 assert.commandWorked(
     st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}));
 const foreignCollUUid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);

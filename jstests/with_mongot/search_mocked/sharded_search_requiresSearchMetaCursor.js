@@ -288,7 +288,7 @@ runRequiresSearchMetaCursorTest({
 });
 
 // Before running the following pipeline, make sure shard0 has up-to-date routing information.
-unshardedColl.aggregate([{$lookup: {from: shardedColl.getName(), pipeline: [], as: "out"}}]);
+assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: shardedCollNS}));
 
 // Run tests on the unsharded collection, with a $lookup and $unionWith that have a subpipeline on
 // the sharded collection.

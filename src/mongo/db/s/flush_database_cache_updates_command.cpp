@@ -213,6 +213,14 @@ public:
                 LOGV2_DEBUG(21981, 1, "Forcing remote routing table refresh", "db"_attr = dbName);
                 uassertStatusOK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
                     opCtx, dbName, boost::none));
+
+                // TODO (SERVER-97511): Remove the refresh of the routing information.
+                // (Ignore FCV check): this feature flag is not FCV-gated.
+                if (feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+                    const auto catalogCache = Grid::get(opCtx)->catalogCache();
+                    catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
+                    (void)catalogCache->getDatabase(opCtx, dbName);
+                }
             }
 
             // A config server could receive this command even if not in config shard mode if the CS

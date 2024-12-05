@@ -10,7 +10,6 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const verifyMidpointTransactionMetrics = function(initialTxnMetrics, expectedParticipants) {
     const expectedMongosTargetedShards =
@@ -187,31 +186,12 @@ const testAddingParticipants = function(expectedParticipants,
     assert.commandWorked(st.s.getDB(dbName).bar.remove({}));
 };
 
-const refreshRoutingTable = (shards, collName) => {
-    const lookup = [{$lookup: {from: collName, pipeline: [], as: "out"}}];
-    const shardMap = {
-        [shard0.shardName]: localNsShard0,
-        [shard1.shardName]: localNsShard1,
-        [shard2.shardName]: localNsShard2
-    };
-
-    shards.forEach(shard => {
-        const ns = shardMap[shard.shardName];
-        if (ns) {
-            st.s.getCollection(ns).aggregate(lookup);
-        }
-    });
-};
-
 let st = new ShardingTest({shards: 3});
 
 const dbName = "test";
 const localColl = "foo";
 const foreignColl = "bar";
 const localNs = dbName + "." + localColl;
-const localNsShard0 = dbName + ".foo_shard0";
-const localNsShard1 = dbName + ".foo_shard1";
-const localNsShard2 = dbName + ".foo_shard2";
 const foreignNs = dbName + "." + foreignColl;
 
 let shard0 = st.shard0;
@@ -233,30 +213,17 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: shard2.shardName}));
 
-// Create one sharded collection with once chunk placed in each shard.
-CreateShardedCollectionUtil.shardCollectionWithChunks(
-    st.s.getCollection(localNsShard0),
-    {_id: 1},
-    [{min: {_id: MinKey}, max: {_id: MaxKey}, shard: st.shard0.shardName}]);
-CreateShardedCollectionUtil.shardCollectionWithChunks(
-    st.s.getCollection(localNsShard1),
-    {_id: 1},
-    [{min: {_id: MinKey}, max: {_id: MaxKey}, shard: st.shard1.shardName}]);
-CreateShardedCollectionUtil.shardCollectionWithChunks(
-    st.s.getCollection(localNsShard2),
-    {_id: 1},
-    [{min: {_id: MinKey}, max: {_id: MaxKey}, shard: st.shard2.shardName}]);
-st.s.getCollection(localNsShard0).insert([{_id: 1}]);
-st.s.getCollection(localNsShard1).insert([{_id: 1}]);
-st.s.getCollection(localNsShard2).insert([{_id: 1}]);
-
 // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
 // from the shards starting, aborting, and restarting the transaction due to needing to
 // refresh after the transaction has started.
-refreshRoutingTable([shard0, shard1, shard2], localColl);
+[shard0, shard1, shard2].forEach(shard => {
+    assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
+});
 st.refreshCatalogCacheForNs(st.s, localNs);
 
-refreshRoutingTable([shard0, shard1, shard2], foreignColl);
+[shard0, shard1, shard2].forEach(shard => {
+    assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+});
 st.refreshCatalogCacheForNs(st.s, foreignNs);
 
 print("Testing that an existing participant can add one additional participant which was not " +
@@ -306,8 +273,9 @@ testAddingParticipants(expectedParticipants,
 print("Testing that an existing participant can add itself as an additional participant");
 assert.commandWorked(
     st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard0.shardName}));
-refreshRoutingTable([shard0, shard1, shard2], foreignColl);
-
+[shard0, shard1, shard2].forEach(shard => {
+    assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+});
 st.refreshCatalogCacheForNs(st.s, foreignNs);
 
 fooDocsToInsert = [{_id: -5}];        // will live on shard0
@@ -347,7 +315,9 @@ assert.commandWorked(
 assert.commandWorked(
     st.s.adminCommand({moveChunk: foreignNs, find: {x: -10}, to: shard1.shardName}));
 
-refreshRoutingTable([shard0, shard1, shard2], foreignColl);
+[shard0, shard1, shard2].forEach(shard => {
+    assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+});
 st.refreshCatalogCacheForNs(st.s, foreignNs);
 
 // Run an agg request such that:
@@ -483,7 +453,8 @@ assert.commandWorked(st.s.getDB(dbName).createView("foreignView", foreignColl, [
 
 // Refresh shard0 to prevent it from getting a StaleConfig error before the expected view resolution
 // error
-refreshRoutingTable([shard0], "foreignView");
+assert.commandWorked(
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: dbName + ".foreignView"}));
 
 // Run $lookup against the view. Force the merging shard to be a non-primary shard so that the
 // primary shard will not be a participant in the transaction at all. The expected behavior for this
