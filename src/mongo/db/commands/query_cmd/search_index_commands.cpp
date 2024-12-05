@@ -26,12 +26,14 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include <tuple>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/search_index_commands_gen.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/search/search_index_command_testing_helper.h"
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/idl/idl_parser.h"
@@ -43,7 +45,8 @@ namespace mongo {
 
 namespace {
 template <typename CommandType>
-BSONObj retrieveSearchIndexManagerResponse(OperationContext* opCtx, CommandType& cmd) {
+std::tuple<const UUID, const NamespaceString, boost::optional<StringData>>
+retrieveCollectionUUIDAndResolveView(OperationContext* opCtx, CommandType& cmd) {
     const auto& currentOperationNss = cmd.getNamespace();
     auto role = opCtx->getService()->role();
     // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
@@ -65,18 +68,27 @@ BSONObj retrieveSearchIndexManagerResponse(OperationContext* opCtx, CommandType&
             sourceCollectionNss = *resolvedNss;
             viewNss.emplace(currentOperationNss.coll());
         }
-        // Run the search index command against the remote search index management server.
-        return getSearchIndexManagerResponse(
-            opCtx, sourceCollectionNss, collUUID, cmd.toBSON(), viewNss);
+        return std::make_tuple(collUUID, sourceCollectionNss, viewNss);
     } else if (role.hasExclusively(ClusterRole::RouterServer)) {
         auto collectionUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(
             opCtx, currentOperationNss);
         // Run the search index command against the remote search index management server.
-        return getSearchIndexManagerResponse(
-            opCtx, currentOperationNss, collectionUUID, cmd.toBSON());
+        return std::make_tuple(collectionUUID, currentOperationNss, boost::none);
     }
     MONGO_UNREACHABLE;
 }
+
+template <typename CommandType>
+BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, CommandType& cmd) {
+    const auto [collUUID, resolvedNss, viewName] = retrieveCollectionUUIDAndResolveView(opCtx, cmd);
+
+    search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(
+        opCtx, resolvedNss, cmd.toBSON(), viewName);
+
+    // Run the search index command against the remote search index management server.
+    return getSearchIndexManagerResponse(opCtx, resolvedNss, collUUID, cmd.toBSON(), viewName);
+}
+
 }  // namespace
 namespace {
 
@@ -132,7 +144,10 @@ public:
             generic_argument_util::prepareRequestForSearchIndexManagerPassthrough(cmd);
 
             IDLParserContext ctx("CreateSearchIndexesReply Parser");
-            BSONObj manageSearchIndexResponse = retrieveSearchIndexManagerResponse(opCtx, cmd);
+
+            BSONObj manageSearchIndexResponse =
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
+
             return CreateSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 
@@ -204,7 +219,10 @@ public:
                     !(cmd.getName() && cmd.getId()));
 
             IDLParserContext ctx("DropSearchIndexReply Parser");
-            BSONObj manageSearchIndexResponse = retrieveSearchIndexManagerResponse(opCtx, cmd);
+
+            BSONObj manageSearchIndexResponse =
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
+
             return DropSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 
@@ -283,7 +301,8 @@ public:
                     cmd.getName() || cmd.getId());
 
             IDLParserContext ctx("UpdateSearchIndexReply Parser");
-            BSONObj manageSearchIndexResponse = retrieveSearchIndexManagerResponse(opCtx, cmd);
+            BSONObj manageSearchIndexResponse =
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
             return UpdateSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 

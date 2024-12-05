@@ -103,6 +103,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "shardsvr_run_search_index_command_gen",
+    src = "shardsvr_run_search_index_command.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "sessions_commands_gen",
     src = "sessions_commands.idl",
     deps = [
@@ -1080,12 +1089,14 @@ mongo_cc_library(
         "refresh_sessions_command.cpp",
         "rename_collection_common.cpp",
         "server_status_command.cpp",
+        "shardsvr_run_search_index_command.cpp",
         "start_session_command.cpp",
         ":fle2_cleanup_gen",
         ":fle2_compact_gen",
         ":generic_gen",
         ":parameters_gen",
         ":sessions_commands_gen",
+        ":shardsvr_run_search_index_command_gen",
     ],
     hdrs = [
         "fle2_compact.h",
@@ -1109,12 +1120,14 @@ mongo_cc_library(
         "//src/mongo/db/commands/query_cmd:update_metrics",
         "//src/mongo/db/commands/query_cmd:write_commands_common",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
+        "//src/mongo/db/query/search:search_index_options",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/db/session:kill_sessions",
         "//src/mongo/db/session:logical_session_cache",
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/transaction:transaction_api",
+        "//src/mongo/executor:async_multicaster",
         "//src/mongo/logv2:logv2_options",
         "//src/mongo/rpc:message",
         "//src/mongo/util/net:http_client",

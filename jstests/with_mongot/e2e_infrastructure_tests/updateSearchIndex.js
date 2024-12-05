@@ -22,7 +22,10 @@ assert.commandWorked(coll.insertMany([
     },
 ]));
 
-let indexDef = {mappings: {dynamic: true}, storedSource: {exclude: ["facts.state_motto"]}};
+let indexDef = {
+    mappings: {dynamic: true, fields: {}},
+    storedSource: {exclude: ["facts.state_motto"]}
+};
 createSearchIndex(coll, {name: "updateSearchIndexTest", definition: indexDef});
 
 // This query returns all documents in the collection but it is kind of silly as a search query.
