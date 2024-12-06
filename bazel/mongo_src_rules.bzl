@@ -658,6 +658,23 @@ DWARF_VERSION_FEATURES = select({
     "//conditions:default": [],
 })
 
+# Set the debug level for copts and linker
+DEBUG_LEVEL_FEATURES = select({
+    "//bazel/config:gcc_or_clang_dbg_level_0": [
+        "g0",
+    ],
+    "//bazel/config:gcc_or_clang_dbg_level_1": [
+        "g1",
+    ],
+    "//bazel/config:gcc_or_clang_dbg_level_2": [
+        "g2",
+    ],
+    "//bazel/config:gcc_or_clang_dbg_level_3": [
+        "g3",
+    ],
+    "//conditions:default": [],
+})
+
 # SERVER-9761: Ensure early detection of missing symbols in dependent libraries
 # at program startup. For non-release dynamic builds we disable this behavior in
 # the interest of improved mongod startup times. Xcode15 removed bind_at_load
@@ -1348,7 +1365,7 @@ MONGO_GLOBAL_LINKFLAGS = (
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
 
-MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + OVERLOADED_VIRTUAL_FEATURES + DISABLE_DEBUGGING_SYMBOLS_FEATURE
+MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + DEBUG_LEVEL_FEATURES + OVERLOADED_VIRTUAL_FEATURES + DISABLE_DEBUGGING_SYMBOLS_FEATURE
 
 MONGO_COPTS_THIRD_PARTY = UBSAN_OPTS_THIRD_PARTY
 
@@ -1504,6 +1521,9 @@ def mongo_cc_library(
         })
     else:
         enterprise_compatible = []
+
+    if "third_party" in native.package_name():
+        tags = tags + ["third_party"]
 
     if "compile_requires_large_memory_gcc" in tags:
         exec_properties |= select({
