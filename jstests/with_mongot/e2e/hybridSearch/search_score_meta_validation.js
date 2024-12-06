@@ -5,16 +5,16 @@
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
-    getPlotEmbeddingById,
-    getVectorSearchIndexSpec,
-    makeVectorQuery
-} from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
+    getMoviePlotEmbeddingById,
+    getMovieVectorSearchIndexSpec,
+    makeMovieVectorQuery
+} from "jstests/with_mongot/e2e/lib/data/movies.js";
 
 const coll = db.search_score_meta_validation;
 coll.drop();
 
 assert.commandWorked(coll.insertMany(getMovieData()));
-createSearchIndex(coll, getVectorSearchIndexSpec());
+createSearchIndex(coll, getMovieVectorSearchIndexSpec());
 
 function testInvalidDereference(metaType) {
     // TODO SERVER-93521 Should not be able to use 'searchScore' without a $search pipeline. These
@@ -35,12 +35,12 @@ testInvalidDereference("vectorSearchScore");
 //     {
 //         $unionWith: {
 //             coll: coll.getName(),
-//             pipeline: [makeVectorQuery({
-//                 queryVector: getPlotEmbeddingById(8),
+//             pipeline: [makeMovieVectorQuery({
+//                 queryVector: getMoviePlotEmbeddingById(8),
 //                 limit: 10,
 //             })]
 //         }
 //     },
 //     {$sort: {score: {$meta: "vectorSearchScore"}}}
 // ]));
-dropSearchIndex(coll, {name: getVectorSearchIndexSpec().name});
+dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});

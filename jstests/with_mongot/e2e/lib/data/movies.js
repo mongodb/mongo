@@ -1,8 +1,3 @@
-/**
- * Helper methods to return expected results for hybrid scoring testing with reciprocal rank fusion
- * in verbose syntax.
- */
-
 // Plot embeddings for 17 movies where array index corresponds to the _id of the movie, or null if
 // the entry has no plot embedding.
 const plotEmbeddings = [
@@ -5127,21 +5122,21 @@ export function getMovieDataWithTie() {
     return data;
 }
 
-export function makeVectorQuery({queryVector, limit}) {
+export function makeMovieVectorQuery({queryVector, limit}) {
     return {
         $vectorSearch: {
             queryVector: queryVector,
             path: "plot_embedding",
             exact: true,
-            index: "vector_search_movie_block",
+            index: getMovieVectorSearchIndexSpec().name,
             limit: limit,
         }
     };
 }
 
-export function getVectorSearchIndexSpec() {
+export function getMovieVectorSearchIndexSpec() {
     return {
-        name: "vector_search_movie_block",
+        name: "vector_search_movie",
         type: "vectorSearch",
         definition: {
             "fields": [{
@@ -5154,31 +5149,14 @@ export function getVectorSearchIndexSpec() {
     };
 }
 
-/**
- * @param id of a movie document.
- * @returns The corresponding document with all fields in order.
- */
-export function getDocumentById(id) {
-    let data = getMovieData();
-    return data[id];
+export function getMovieSearchIndexSpec() {
+    return {name: "search_movie", definition: {"mappings": {"dynamic": true}}};
 }
 
 /**
  * @param id of a movie document.
  * @returns The corresponding plot embedding.
  */
-export function getPlotEmbeddingById(id) {
+export function getMoviePlotEmbeddingById(id) {
     return plotEmbeddings[id];
-}
-
-/**
- * @param idArray is an array of _ids to build an array of documents.
- * @returns An array of documents.
- */
-export function buildExpectedResults(idArray) {
-    let results = [];
-    for (var id in idArray) {
-        results.push(getDocumentById(idArray[id]));
-    }
-    return results;
 }

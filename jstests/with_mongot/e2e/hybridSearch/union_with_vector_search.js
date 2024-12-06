@@ -7,8 +7,10 @@ import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
-    getPlotEmbeddingById
-} from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
+    getMoviePlotEmbeddingById,
+    getMovieSearchIndexSpec,
+    getMovieVectorSearchIndexSpec
+} from "jstests/with_mongot/e2e/lib/data/movies.js";
 import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
 
 const moviesCollName = jsTestName() + "_movies";
@@ -18,23 +20,10 @@ moviesColl.drop();
 assert.commandWorked(moviesColl.insertMany(getMovieData()));
 
 // Index is blocking by default so that the query is only run after index has been made.
-createSearchIndex(moviesColl,
-                  {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(moviesColl, getMovieSearchIndexSpec());
 
 // Create vector search index on movie plot embeddings.
-const vectorIndex = {
-    name: "vector_search_movie_block",
-    type: "vectorSearch",
-    definition: {
-        "fields": [{
-            "type": "vector",
-            "numDimensions": 1536,
-            "path": "plot_embedding",
-            "similarity": "euclidean"
-        }]
-    }
-};
-createSearchIndex(moviesColl, vectorIndex);
+createSearchIndex(moviesColl, getMovieVectorSearchIndexSpec());
 
 // Creating a basic collection to $unionWith with the vector search collection.
 const basicCollName = jsTestName() + "_basic";
@@ -54,10 +43,10 @@ function getVSQuery(nReturned) {
     let query = [
         {
             $vectorSearch: {
-                queryVector: getPlotEmbeddingById(6),  // embedding for 'Tarzan the Ape Man'
+                queryVector: getMoviePlotEmbeddingById(6),  // embedding for 'Tarzan the Ape Man'
                 path: "plot_embedding",
                 numCandidates: nReturned * vectorSearchOverrequestFactor,
-                index: "vector_search_movie_block",
+                index: getMovieVectorSearchIndexSpec().name,
                 limit: nReturned,
             }
         },
@@ -156,8 +145,7 @@ const moviesCollBName = jsTestName() + "_movies_B";
 const moviesCollB = db.getCollection(moviesCollBName);
 moviesCollB.drop();
 assert.commandWorked(moviesCollB.insertMany(getMovieData()));
-createSearchIndex(moviesCollB,
-                  {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(moviesCollB, getMovieSearchIndexSpec());
 
 // $vectorSearch on moviesColl $unionWith $vectorSearch on moviesCollB.
 var vsUnionWithVsCollB = getVSPipeline(2).concat([{
@@ -517,6 +505,6 @@ var unionWithMatchVS = [{
 assert.commandFailedWithCode(
     db.runCommand({aggregate: basicCollName, pipeline: unionWithMatchVS, cursor: {}}), 40602);
 
-dropSearchIndex(moviesColl, {name: "search_movie_block"});
-dropSearchIndex(moviesColl, {name: "vector_search_movie_block"});
-dropSearchIndex(moviesCollB, {name: "search_movie_block"});
+dropSearchIndex(moviesColl, {name: getMovieSearchIndexSpec().name});
+dropSearchIndex(moviesColl, {name: getMovieVectorSearchIndexSpec().name});
+dropSearchIndex(moviesCollB, {name: getMovieSearchIndexSpec().name});

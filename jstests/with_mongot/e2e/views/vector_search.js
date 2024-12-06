@@ -2,13 +2,12 @@
  * This test ensures we support running $vectorSearch on views
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 import {
-    buildExpectedResults,
     getMovieData,
-    getPlotEmbeddingById
-} from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
-import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
+    getMoviePlotEmbeddingById,
+    getMovieVectorSearchIndexSpec
+} from "jstests/with_mongot/e2e/lib/data/movies.js";
+import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const collName = "search_views";
 const coll = db.getCollection(collName);
@@ -22,24 +21,12 @@ assert.commandWorked(db.createView(viewName, 'search_views', viewPipeline));
 let addFieldsView = db[viewName];
 
 // Create vector search index on movie plot embeddings.
-const vectorIndex = {
-    name: "vector_search_movie_block",
-    type: "vectorSearch",
-    definition: {
-        "fields": [{
-            "type": "vector",
-            "numDimensions": 1536,
-            "path": "plot_embedding",
-            "similarity": "euclidean"
-        }]
-    }
-};
-createSearchIndex(addFieldsView, vectorIndex);
+createSearchIndex(addFieldsView, getMovieVectorSearchIndexSpec());
 
 // Query for similar documents.
 let pipeline = [{
     "$vectorSearch": {
-        "queryVector": getPlotEmbeddingById(6),
+        "queryVector": getMoviePlotEmbeddingById(6),
         "path": "plot_embedding",
         "numCandidates": 100,
         "limit": 5,
@@ -51,4 +38,4 @@ const explainResults = addFieldsView.explain().aggregate(pipeline)["stages"];
 // the vectorSearch related stages (eg $_internalSearchMongotRemote, $_internalSearchIdLookup,
 // $vectorSearch)
 assertViewAppliedCorrectly(explainResults, pipeline, viewPipeline);
-dropSearchIndex(addFieldsView, {name: "vector_search_movie_block"});
+dropSearchIndex(addFieldsView, {name: getMovieVectorSearchIndexSpec().name});

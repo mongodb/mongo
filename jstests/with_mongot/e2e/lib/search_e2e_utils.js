@@ -2,6 +2,8 @@
  * Contains common test utilities for e2e search tests involving mongot.
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
+import {getMovieData} from "jstests/with_mongot/e2e/lib/data/movies.js";
+import {getRentalData} from "jstests/with_mongot/e2e/lib/data/rentals.js";
 
 /**
  * This function is used in place of direct assertions between expected and actual document array
@@ -249,4 +251,30 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
 export function waitUntilDocIsVisibleByQuery({docId, coll, queryPipeline}) {
     assert.soon(() =>
                     coll.aggregate(queryPipeline.concat([{$match: {_id: docId}}])).itcount() === 1);
+}
+
+export const datasets = {
+    MOVIES: 1,
+    RENTALS: 2,
+};
+
+/**
+ * @param idArray is an array of _ids used to build an array of documents.
+ * @param dataset is an element of the 'datasets' enum used to determine which dataset the results
+ *     belong to.
+ *
+ * @returns An array of documents from a dataset.
+ */
+export function buildExpectedResults(idArray, dataset) {
+    let results = [];
+    let data = [];
+    if (dataset === datasets.MOVIES) {
+        data = getMovieData();
+    } else if (dataset === datasets.RENTALS) {
+        data = getRentalData();
+    }
+    for (const id of idArray) {
+        results.push(data[id]);
+    }
+    return results;
 }

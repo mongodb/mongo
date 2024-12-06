@@ -7,12 +7,16 @@
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
-    buildExpectedResults,
     getMovieData,
-    getPlotEmbeddingById,
-    getVectorSearchIndexSpec
-} from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
-import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
+    getMoviePlotEmbeddingById,
+    getMovieSearchIndexSpec,
+    getMovieVectorSearchIndexSpec
+} from "jstests/with_mongot/e2e/lib/data/movies.js";
+import {
+    assertDocArrExpectedFuzzy,
+    buildExpectedResults,
+    datasets,
+} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
 
 const collName = "search_rank_fusion";
 const coll = db.getCollection(collName);
@@ -20,10 +24,11 @@ coll.drop();
 
 assert.commandWorked(coll.insertMany(getMovieData()));
 
-createSearchIndex(coll, {name: "search_movie", definition: {"mappings": {"dynamic": true}}});
+// Index is blocking by default so that the query is only run after index has been made.
+createSearchIndex(coll, getMovieSearchIndexSpec());
 
 // Create vector search index on movie plot embeddings.
-createSearchIndex(coll, getVectorSearchIndexSpec());
+createSearchIndex(coll, getMovieVectorSearchIndexSpec());
 
 const limit = 20;
 // Multiplication factor of limit for numCandidates in $vectorSearch.
@@ -34,7 +39,7 @@ function getSearchPipeline() {
     let searchPipeline = [
         {
             $search: {
-                index: "search_movie",
+                index: getMovieSearchIndexSpec().name,
                 text: {query: "ape", path: ["fullplot", "title"]},
             }
         },
@@ -65,10 +70,10 @@ function getVectorSearchPipeline() {
     let vectorSearchPipeline = [
         {
             $vectorSearch: {
-                queryVector: getPlotEmbeddingById(6),  //'Tarzan the Ape Man': _id = 6
+                queryVector: getMoviePlotEmbeddingById(6),  //'Tarzan the Ape Man': _id = 6
                 path: "plot_embedding",
                 numCandidates: limit * vectorSearchOverrequestFactor,
-                index: "vector_search_movie_block",
+                index: getMovieVectorSearchIndexSpec().name,
                 limit: limit,
             }
         },
@@ -108,7 +113,7 @@ function getSearchWithSetWindowFieldsPipeline() {
     let searchPipeline = [
         {
             $search: {
-                index: "search_movie",
+                index: getMovieSearchIndexSpec().name,
                 text: {query: "ape", path: ["fullplot", "title"]},
             }
         },
@@ -132,10 +137,10 @@ function getVectorSearchWithSetWindowFieldsPipeline() {
     let vectorSearchPipeline = [
         {
             $vectorSearch: {
-                queryVector: getPlotEmbeddingById(6),  //'Tarzan the Ape Man': _id = 6
+                queryVector: getMoviePlotEmbeddingById(6),  //'Tarzan the Ape Man': _id = 6
                 path: "plot_embedding",
                 numCandidates: limit * vectorSearchOverrequestFactor,
-                index: "vector_search_movie_block",
+                index: getMovieVectorSearchIndexSpec().name,
                 limit: limit,
             }
         },
@@ -210,7 +215,7 @@ function runTest(expectedResultIds, searchPipeline, vectorSearchPipeline) {
         vectorSearchPipeline.concat(unionWithSearch).concat(hybridSearchProcessingPipeline);
     let results = coll.aggregate(hybridSearchQuery).toArray();
 
-    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds), results);
+    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), results);
 }
 
 // Perform a hybrid search with $search on fullplot and title for the keyword "ape"
@@ -227,7 +232,7 @@ function runTestFlipped(expectedResultIds, searchPipeline, vectorSearchPipeline)
         searchPipeline.concat(unionWithVectorSearch).concat(hybridSearchProcessingPipeline);
     let results = coll.aggregate(hybridSearchQuery).toArray();
 
-    assert.eq(results, buildExpectedResults(expectedResultIds));
+    assert.eq(results, buildExpectedResults(expectedResultIds, datasets.MOVIES));
 }
 
 const expectedResultIdOrder = [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15];
@@ -243,5 +248,5 @@ runTestFlipped(expectedResultIdOrder, getSearchPipeline(), getVectorSearchPipeli
 runTestFlipped(expectedResultIdOrder,
                getSearchWithSetWindowFieldsPipeline(),
                getVectorSearchWithSetWindowFieldsPipeline());
-dropSearchIndex(coll, {name: "search_movie"});
-dropSearchIndex(coll, {name: getVectorSearchIndexSpec().name});
+dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
+dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});

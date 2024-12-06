@@ -6,8 +6,9 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
-    getPlotEmbeddingById
-} from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
+    getMoviePlotEmbeddingById,
+    getMovieVectorSearchIndexSpec
+} from "jstests/with_mongot/e2e/lib/data/movies.js";
 
 // Load Collection
 const coll = db.sort_by_vector_search_score;
@@ -16,19 +17,7 @@ const allSeedData = getMovieData();
 assert.commandWorked(coll.insertMany(allSeedData));
 
 // Create vector search index on movie plot embeddings.
-const vectorIndex = {
-    name: "vector_search_movie_block",
-    type: "vectorSearch",
-    definition: {
-        "fields": [{
-            "type": "vector",
-            "numDimensions": 1536,
-            "path": "plot_embedding",
-            "similarity": "euclidean"
-        }]
-    }
-};
-createSearchIndex(coll, vectorIndex);
+createSearchIndex(coll, getMovieVectorSearchIndexSpec());
 
 // Call explain and assert "queryVector" embeddings values not included.
 function testExplainVerbosity(verbosity) {
@@ -40,10 +29,10 @@ function testExplainVerbosity(verbosity) {
     let query = [
         {
             $vectorSearch: {
-                queryVector: getPlotEmbeddingById(6),  // embedding for 'Tarzan the Ape Man'
+                queryVector: getMoviePlotEmbeddingById(6),  // embedding for 'Tarzan the Ape Man'
                 path: "plot_embedding",
                 numCandidates: limit * vectorSearchOverrequestFactor,
-                index: "vector_search_movie_block",
+                index: getMovieVectorSearchIndexSpec().name,
                 limit: limit,
             }
         },
@@ -71,4 +60,4 @@ function testExplainVerbosity(verbosity) {
 }
 
 testExplainVerbosity("queryPlanner");  // Currently the only option.
-dropSearchIndex(coll, {name: "vector_search_movie_block"});
+dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});

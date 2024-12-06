@@ -8,11 +8,16 @@
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
-    buildExpectedResults,
     getMovieData,
-    getPlotEmbeddingById
-} from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
-import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
+    getMoviePlotEmbeddingById,
+    getMovieSearchIndexSpec,
+    getMovieVectorSearchIndexSpec
+} from "jstests/with_mongot/e2e/lib/data/movies.js";
+import {
+    assertDocArrExpectedFuzzy,
+    buildExpectedResults,
+    datasets,
+} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
 
 const collName = "search_score_fusion";
 const coll = db.getCollection(collName);
@@ -21,22 +26,10 @@ coll.drop();
 assert.commandWorked(coll.insertMany(getMovieData()));
 
 // Index is blocking by default so that the query is only run after index has been made.
-createSearchIndex(coll, {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, getMovieSearchIndexSpec());
 
 // Create vector search index on movie plot embeddings.
-const vectorIndex = {
-    name: "vector_search_movie_block",
-    type: "vectorSearch",
-    definition: {
-        "fields": [{
-            "type": "vector",
-            "numDimensions": 1536,
-            "path": "plot_embedding",
-            "similarity": "euclidean"
-        }]
-    }
-};
-createSearchIndex(coll, vectorIndex);
+createSearchIndex(coll, getMovieVectorSearchIndexSpec());
 
 function runQueryTest(query, expectedResults) {
     let results = coll.aggregate(query).toArray();
@@ -51,11 +44,11 @@ const vectorSearchOverrequestFactor = 10;
 let vectorSearchPipeline = [
     {
         $vectorSearch: {
-            queryVector: getPlotEmbeddingById(
+            queryVector: getMoviePlotEmbeddingById(
                 6),  // get the embedding for 'Tarzan the Ape Man', which has _id = 6
             path: "plot_embedding",
             numCandidates: limit * vectorSearchOverrequestFactor,
-            index: "vector_search_movie_block",
+            index: getMovieVectorSearchIndexSpec().name,
             limit: 2 * limit
         }
     },
@@ -64,7 +57,12 @@ let vectorSearchPipeline = [
 
 let fullTextSearchPipeline = [
     // This search term 'ape' is related to the vector search for 'Tarzan the Ape Man'.
-    {$search: {index: "search_movie_block", text: {query: "ape", path: ["fullplot", "title"]}}},
+    {
+        $search: {
+            index: getMovieSearchIndexSpec().name,
+            text: {query: "ape", path: ["fullplot", "title"]}
+        }
+    },
     {$limit: 2 * limit},
     {$addFields: {fts_score: {$meta: "searchScore"}}}
 ];
@@ -146,7 +144,8 @@ runQueryTest(
             },
         ])
         .concat(mixVsFtsResultsPipeline),
-    buildExpectedResults(/*expectedResultIds*/[6, 1, 2, 3, 4, 5, 8, 9, 10, 12, 13, 14, 11, 7, 15]));
+    buildExpectedResults(
+        /*expectedResultIds*/[6, 1, 2, 3, 4, 5, 8, 9, 10, 12, 13, 14, 11, 7, 15], datasets.MOVIES));
 
 // Test 2: MinMaxScalar score normalization
 runQueryTest(
@@ -203,7 +202,8 @@ runQueryTest(
             }
         ])
         .concat(mixVsFtsResultsPipeline),
-    buildExpectedResults(/*expectedResultIds*/[6, 1, 4, 2, 8, 9, 10, 3, 12, 13, 5, 14, 11, 7, 15]));
+    buildExpectedResults(
+        /*expectedResultIds*/[6, 1, 4, 2, 8, 9, 10, 3, 12, 13, 5, 14, 11, 7, 15], datasets.MOVIES));
 
-dropSearchIndex(coll, {name: "search_movie_block"});
-dropSearchIndex(coll, {name: "vector_search_movie_block"});
+dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
+dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
