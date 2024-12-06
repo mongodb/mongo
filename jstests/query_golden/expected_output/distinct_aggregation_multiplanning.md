@@ -1830,6 +1830,67 @@ Execution Engine: classic
 }
 ```
 
+### Pipeline
+```json
+[ { "$group" : { "_id" : "$a" } } ]
+```
+### Results
+```json
+{  "_id" : 4 }
+{  "_id" : 5 }
+```
+### Summarized explain
+Execution Engine: classic
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a"
+				}
+			}
+		}
+	]
+}
+```
+
 ## 2. Both DISTINCT_SCAN and non-DISTINCT_SCAN candidates considered
 ### DISTINCT_SCAN selected
 ### Pipeline
@@ -3334,6 +3395,36 @@ Execution Engine: sbe
 }
 ```
 
+### Pipeline
+```json
+[ { "$group" : { "_id" : "$a" } } ]
+```
+### Results
+```json
+{  "_id" : 4 }
+{  "_id" : 5 }
+{  "_id" : [ 1, 2, 3 ] }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "GROUP"
+		},
+		{
+			"direction" : "forward",
+			"filter" : {
+				
+			},
+			"stage" : "COLLSCAN"
+		}
+	]
+}
+```
+
 ### No available indexes
 ### Pipeline
 ```json
@@ -3375,6 +3466,152 @@ Execution Engine: sbe
 				
 			},
 			"stage" : "COLLSCAN"
+		}
+	]
+}
+```
+
+## 6. $group by non-multikey field with $first/$last on a multikey field
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$b",
+			"accum" : {
+				"$first" : "$a"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 2,  "accum" : 4 }
+{  "_id" : 3,  "accum" : 4 }
+{  "_id" : 4,  "accum" : 1 }
+```
+### Summarized explain
+Execution Engine: classic
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "b_1_a_1",
+						"isFetching" : false,
+						"isMultiKey" : true,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [
+								"a"
+							],
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$b",
+					"accum" : "$a"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$b",
+			"accum" : {
+				"$last" : "$a"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 2,  "accum" : 4 }
+{  "_id" : 3,  "accum" : 4 }
+{  "_id" : 4,  "accum" : [ 1, 2, 3 ] }
+```
+### Summarized explain
+Execution Engine: classic
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"direction" : "backward",
+						"indexBounds" : {
+							"b" : [
+								"[MaxKey, MinKey]"
+							]
+						},
+						"indexName" : "b_1",
+						"isFetching" : true,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$b",
+					"accum" : "$a"
+				}
+			}
 		}
 	]
 }
