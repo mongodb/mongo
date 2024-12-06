@@ -834,7 +834,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/bson/**/* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/bson/column/OWNERS.yml
-/src/mongo/bson/column/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/bson/column/**/* @10gen/server-bsoncolumn @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/bson/mutable/OWNERS.yml
 /src/mongo/bson/mutable/**/* @10gen/query-execution @svc-auto-approve-bot
