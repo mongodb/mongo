@@ -535,7 +535,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
     // any policy other than "specific shard only".
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    const auto pipelineBuilder = [&]() {
+    auto pipeline = [&]() -> std::unique_ptr<Pipeline, PipelineDeleter> {
         auto pipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                involvedNamespaces,
@@ -593,11 +593,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             searchStage->setDocsNeededBounds(bounds);
         }
         return pipeline;
-    };
+    }();
 
     auto targeter = cluster_aggregation_planner::AggregationTargeter::make(
         opCtx,
-        pipelineBuilder,
+        std::move(pipeline),
         cri,
         pipelineDataSource,
         request.getPassthroughToShard().has_value());
@@ -609,61 +609,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         !request.getCollectionUUID() ||
             targeter.policy !=
                 cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kMongosRequired);
-
-    if (!expCtx) {
-        // When the AggregationTargeter chooses a "specific shard only" policy, it does not call
-        // the 'pipelineBuilder' function, so we've yet to construct an expression context or
-        // register query stats. Because this is a passthrough, we only need a bare minimum
-        // expression context on mongos.
-        tassert(7972400,
-                "Expected to have a 'kSpecificShardOnly' targetting policy",
-                targeter.policy ==
-                    cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly);
-
-        std::unique_ptr<CollatorInterface> collation = nullptr;
-        if (auto collationObj = request.getCollation()) {
-            // This will be null if attempting to build an interface for the simple collator.
-            collation = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                            ->makeFromBSON(*collationObj));
-        }
-
-        expCtx = ExpressionContextBuilder{}
-                     .opCtx(opCtx)
-                     .collator(std::move(collation))
-                     .ns(namespaces.executionNss)
-                     .letParameters(request.getLet())
-                     .build();
-        expCtx->addResolvedNamespaces(involvedNamespaces);
-
-        // We might need 'inRouter' temporarily set to true for query stats parsing, but we don't
-        // want to modify the value of 'expCtx' for future code execution so we will set it back to
-        // its original value.
-        ON_BLOCK_EXIT([&expCtx, originalInRouterVal = expCtx->getInRouter()]() {
-            expCtx->setInRouter(originalInRouterVal);
-        });
-
-        // In order to parse a change stream request for query stats, 'inRouter' needs
-        // to be set to true.
-        if (hasChangeStream) {
-            expCtx->setInRouter(true);
-        }
-
-        // Skip query stats recording for queryable encryption queries.
-        if (!shouldDoFLERewrite) {
-            // We want to hold off parsing the pipeline until it's clear we must. Because of that,
-            // we wait to parse the pipeline until this callback is invoked within
-            // query_stats::registerRequest.
-            query_stats::registerRequest(
-                opCtx,
-                namespaces.executionNss,
-                [&]() {
-                    auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-                    return std::make_unique<query_stats::AggKey>(
-                        request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
-                },
-                hasChangeStream);
-        }
-    }
 
     if (request.getExplain()) {
         explain_common::generateServerInfo(result);
@@ -735,6 +680,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     kSpecificShardOnly: {
                     // Mark expCtx as tailable and await data so CCC behaves accordingly.
                     expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+                    expCtx->setInRouter(false);
 
                     uassert(6273801,
                             "per shard cursor pipeline must contain $changeStream",
@@ -788,11 +734,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                    namespaces.executionNss,
                                    cri ? boost::make_optional(cri->cm) : boost::none,
                                    involvedNamespaces);
-        // Add 'command' object to explain output.
         if (expCtx->getExplain()) {
             explain_common::generateQueryShapeHash(expCtx->getOperationContext(), result);
-            explain_common::appendIfRoom(
-                serializeForPassthrough(expCtx, request).toBson(), "command", result);
+            // Add 'command' object to explain output. If this command was done as passthrough, it
+            // will already be there.
+            if (targeter.policy !=
+                cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly) {
+                explain_common::appendIfRoom(
+                    serializeForPassthrough(expCtx, request).toBson(), "command", result);
+            }
             collectQueryStatsMongos(opCtx,
                                     std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
         }

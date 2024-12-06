@@ -760,28 +760,27 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
         opCtx, std::make_unique<RouterStagePipeline>(std::move(pipeline)), std::move(cursorParams));
 }
 
-AggregationTargeter AggregationTargeter::make(
-    OperationContext* opCtx,
-    const std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
-    boost::optional<CollectionRoutingInfo> cri,
-    PipelineDataSource pipelineDataSource,
-    bool perShardCursor) {
-    if (perShardCursor) {
-        return {TargetingPolicy::kSpecificShardOnly, nullptr /* pipeline */, cri};
-    }
-
+AggregationTargeter AggregationTargeter::make(OperationContext* opCtx,
+                                              std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                              boost::optional<CollectionRoutingInfo> cri,
+                                              PipelineDataSource pipelineDataSource,
+                                              bool perShardCursor) {
+    // TODO SERVER-97620 get this info from pipeline instead of passing in a separate field for it.
     tassert(7972401,
             "Aggregation did not have a routing table and does not feature either a $changeStream "
             "or a $documents stage",
             cri || pipelineDataSource == PipelineDataSource::kChangeStream ||
                 pipelineDataSource == PipelineDataSource::kQueue);
-    auto pipeline = buildPipelineFn();
+
     auto policy = pipeline->requiredToRunOnRouter() ? TargetingPolicy::kMongosRequired
                                                     : TargetingPolicy::kAnyShard;
     if (!cri && pipelineDataSource == PipelineDataSource::kQueue) {
         // If we don't have a routing table and there is a $documents stage, we must run on
         // mongos.
         policy = TargetingPolicy::kMongosRequired;
+    }
+    if (perShardCursor) {
+        policy = TargetingPolicy::kSpecificShardOnly;
     }
     return AggregationTargeter{policy, std::move(pipeline), cri};
 }

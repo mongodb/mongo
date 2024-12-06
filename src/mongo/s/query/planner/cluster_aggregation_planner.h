@@ -99,12 +99,11 @@ struct AggregationTargeter {
      * Populates and returns targeting info for an aggregation pipeline on the given namespace
      * 'executionNss'.
      */
-    static AggregationTargeter make(
-        OperationContext* opCtx,
-        std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
-        boost::optional<CollectionRoutingInfo> cri,
-        sharded_agg_helpers::PipelineDataSource pipelineDataSource,
-        bool perShardCursor);
+    static AggregationTargeter make(OperationContext* opCtx,
+                                    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                    boost::optional<CollectionRoutingInfo> cri,
+                                    sharded_agg_helpers::PipelineDataSource pipelineDataSource,
+                                    bool perShardCursor);
 
     enum TargetingPolicy {
         kMongosRequired,

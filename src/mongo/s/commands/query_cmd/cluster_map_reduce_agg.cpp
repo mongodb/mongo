@@ -226,9 +226,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cri.cm, verbosity);
 
-    const auto pipelineBuilder = [&]() {
-        return map_reduce_common::translateFromMR(parsedMr, expCtx);
-    };
+    auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
 
     auto namespaces =
         ClusterAggregate::Namespaces{parsedMr.getNamespace(), parsedMr.getNamespace()};
@@ -242,7 +240,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     auto targeter =
         cluster_aggregation_planner::AggregationTargeter::make(opCtx,
-                                                               pipelineBuilder,
+                                                               std::move(pipeline),
                                                                cri,
                                                                PipelineDataSource::kNormal,
                                                                false);  // perShardCursor
