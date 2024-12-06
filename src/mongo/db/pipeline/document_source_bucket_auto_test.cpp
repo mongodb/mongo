@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
@@ -1057,6 +1058,65 @@ TEST_F(BucketAutoTests, QueryShapeReParseSerializedStage) {
     ASSERT_BSONOBJ_EQ(serializedDocSource, newSerializedDocSource);
 }
 
+TEST_F(BucketAutoTests, BucketAutoWithPushRespectsMemoryLimit) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 1,
+                output: {
+                    array: { $push: '$arr' }
+                }
+            }})");
+
+    // Each array in the 100 documents below takes up roughly 110 bytes. The infrastructure that
+    // processes each new element in the accumulator takes up roughly another 100 bytes. So we
+    // should require roughly 100 * 110 + 100 bytes for this operation to succeed, but lets round up
+    // to the nearest 500.
+    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxPushBytes", 11500);
+    std::deque<Document> docs;
+    for (size_t i = 0; i < 100; i++) {
+        docs.push_back(
+            Document(fromjson(str::stream() << "{_id : " << i << ", arr : ['string 0']}")));
+    }
+    auto results = getResults(spec, docs);
+    // Assert on the result size (1 bucket expected) to confirm we didn't run out of memory.
+    ASSERT_EQUALS(results.size(), 1UL);
+
+    // Decrease the memory limit and run again, asserting that we hit an error.
+    RAIIServerParameterControllerForTest queryKnobController2("internalQueryMaxPushBytes", 9600);
+    ASSERT_THROWS_CODE(getResults(spec, docs), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST_F(BucketAutoTests, BucketAutoWithConcatArraysRespectsMemoryLimit) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 1,
+                output: {
+                    array: { $concatArrays: '$arr' }
+                }
+            }})");
+
+    // Each array in the 100 documents below takes up roughly 110 bytes. The infrastructure that
+    // processes each new element in the accumulator takes up roughly another 100 bytes. So we
+    // should require roughly 100 * 110 + 100 bytes for this operation to succeed, but lets round up
+    // to the nearest 500.
+    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxConcatArraysBytes",
+                                                             11500);
+    std::deque<Document> docs;
+    for (size_t i = 0; i < 100; i++) {
+        docs.push_back(
+            Document(fromjson(str::stream() << "{_id : " << i << ", arr : ['string 0']}")));
+    }
+    auto results = getResults(spec, docs);
+    // Assert on the result size (1 bucket expected) to confirm we didn't run out of memory.
+    ASSERT_EQUALS(results.size(), 1UL);
+
+    // Decrease the memory limit and run again, asserting that we hit an error.
+    RAIIServerParameterControllerForTest queryKnobController2("internalQueryMaxConcatArraysBytes",
+                                                              9600);
+    ASSERT_THROWS_CODE(getResults(spec, docs), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
 
 }  // namespace
 }  // namespace mongo

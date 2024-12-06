@@ -550,24 +550,21 @@ void AccumulatorPushConcatArraysCommonForBucketAuto::processInternal(const Value
 
 void AccumulatorPushConcatArraysCommonForBucketAuto::addToMap(long long inputPosition,
                                                               Value input) {
-    const auto inputSize = input.getApproximateSize();
-    const auto memUsage = sizeof(long long) + inputSize + sizeof(KeyOutPair);
+    const auto memUsage = sizeof(long long) + input.getApproximateSize() + sizeof(KeyOutPair);
 
     tassert(9059700,
             str::stream() << "Received a duplicate input position: " << inputPosition,
             !_inputPositionToValueMap.contains(inputPosition));
 
-    _memUsageTracker.add(inputSize);
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << getOpName()
-                          << "used too much memory and cannot spill to disk. Memory limit: "
-                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-            _memUsageTracker.withinMemoryLimit());
-
     _inputPositionToValueMap.insert(
         std::pair{inputPosition,
                   SimpleMemoryUsageTokenWith<Value>{
                       SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, std::move(input)}});
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << getOpName()
+                          << " used too much memory and cannot spill to disk. Memory limit: "
+                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+            _memUsageTracker.withinMemoryLimit());
 }
 
 void AccumulatorConcatArraysForBucketAuto::addToMap(long long inputPosition, Value input) {
