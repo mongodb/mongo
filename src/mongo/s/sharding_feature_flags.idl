@@ -175,8 +175,7 @@ feature_flags:
   featureFlagCreateDatabaseDDLCoordinator:
     description: "Feature flag for enabling the sharding DDL coordinator for database creation."
     cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
-    default: true
-    version: 8.1
+    default: false
     shouldBeFCVGated: true
   # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
   featureFlagConfigDebugDumpSupported:
