@@ -1,10 +1,6 @@
 /**
  * Verify renaming to/from a collection with encrypted fields is disallowed depending on the users
  * privileges
- *
- * @tags: [
- * requires_fcv_61,
- * ]
  */
 load("jstests/fle2/libs/encrypted_client_util.js");
 

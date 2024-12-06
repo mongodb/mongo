@@ -1,0 +1,8 @@
+test_kind: py_test
+
+selector:
+  roots:
+  - buildscripts/tests/resmoke_validation/**/test_*.py
+
+
+executor: {}

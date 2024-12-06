@@ -215,6 +215,7 @@ buildvariants:
   - name: .auth
   - name: buildscripts_test
   - name: resmoke_end2end_tests
+  - name: resmoke_validation_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
@@ -387,6 +388,7 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: validate_commit_message
   - name: check_feature_flag_tags
+  - name: resmoke_validation_tests
 
 # Temporary variant to stress a component and gather more data.
 - <<: *enterprise-rhel-8-64-bit-dynamic-required-template

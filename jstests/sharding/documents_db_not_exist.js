@@ -1,6 +1,6 @@
 /**
  * Tests that $documents stage continues even when the database does not exist
- * @tags: [requires_fcv_62, multiversion_incompatible]
+ * @tags: [multiversion_incompatible]
  *
  */
 

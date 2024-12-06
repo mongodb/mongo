@@ -2,7 +2,6 @@
  * Test that change streams returns reshardCollection events.
  *
  *  @tags: [
- *    requires_fcv_61,
  *    requires_sharding,
  *    uses_change_streams,
  *    change_stream_does_not_expect_txns,

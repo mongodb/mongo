@@ -4,7 +4,6 @@
  * empty.
  *
  * @tags: [
- *   requires_fcv_80,
  *   assumes_against_mongod_not_mongos,  # not yet supported until 7.2 with SERVER-65534
  * ]
  */

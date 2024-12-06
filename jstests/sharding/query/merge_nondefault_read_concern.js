@@ -1,7 +1,6 @@
 /**
  * Tests that $merge doesn't fail when a non-default readConcern is
  * set on the session.
- * @tags: [requires_fcv_71]
  */
 (function() {
 "use strict";
