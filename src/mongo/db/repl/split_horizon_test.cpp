@@ -110,7 +110,7 @@ TEST(SplitHorizonTesting, determineHorizon) {
         const auto& input = test.input;
 
         const std::string witness =
-            SplitHorizon(input.forwardMapping).determineHorizon(input.horizonParameters).toString();
+            SplitHorizon(input.forwardMapping).determineHorizon(input.horizonParameters);
         ASSERT_EQUALS(witness, expected);
     }
 

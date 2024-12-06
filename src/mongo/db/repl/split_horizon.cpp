@@ -181,7 +181,8 @@ auto SplitHorizon::getParameters(const Client* const client) -> Parameters {
     return getSplitHorizonParameters(*client);
 }
 
-StringData SplitHorizon::determineHorizon(const SplitHorizon::Parameters& horizonParameters) const {
+std::string SplitHorizon::determineHorizon(
+    const SplitHorizon::Parameters& horizonParameters) const {
     if (horizonParameters.sniName) {
         const auto sniName = *horizonParameters.sniName;
         const auto found = _reverseHostMapping.find(sniName);
@@ -189,7 +190,7 @@ StringData SplitHorizon::determineHorizon(const SplitHorizon::Parameters& horizo
             return found->second;
         }
     }
-    return kDefaultHorizon;
+    return kDefaultHorizon.toString();
 }
 
 void SplitHorizon::toBSON(BSONObjBuilder& configBuilder) const {
