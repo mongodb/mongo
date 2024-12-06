@@ -41,7 +41,7 @@ const st = new ShardingTest({
     shards: 3,
     mongos: 2,
     other: {
-        rsOptions: kShardOptionsForDisabledStaleShardVersionRetries,
+        shardOptions: kShardOptionsForDisabledStaleShardVersionRetries,
         configOptions: configOptions,
         enableBalancer: false
     }

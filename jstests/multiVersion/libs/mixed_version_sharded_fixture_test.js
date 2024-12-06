@@ -18,6 +18,7 @@ export function testPerformUpgradeDowngradeSharded({
         config: 1,
         other: {
             mongosOptions: {binVersion: "last-lts"},
+            shardOptions: {binVersion: "last-lts"},
             configOptions: {binVersion: "last-lts"},
             rsOptions: {binVersion: "last-lts"}
         },

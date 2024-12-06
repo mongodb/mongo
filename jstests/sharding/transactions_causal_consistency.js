@@ -25,7 +25,7 @@ const st = new ShardingTest({
     shards: 2,
     mongos: 2,
     other: {
-        rsOptions: kShardOptionsForDisabledStaleShardVersionRetries,
+        shardOptions: kShardOptionsForDisabledStaleShardVersionRetries,
     }
 });
 

@@ -1356,8 +1356,6 @@ export class ShardingTest {
                     rsDefaults.shardsvr = '';
                 }
 
-                assert(!otherParams.hasOwnProperty('shardOptions'),
-                       "The 'shardOptions' field has been deprecated (use 'rsOptions' instead)");
                 if (otherParams.rs || otherParams["rs" + i] || otherParams.rsOptions) {
                     if (otherParams.rs) {
                         rsDefaults = Object.merge(rsDefaults, otherParams.rs);
