@@ -1205,6 +1205,10 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getExpression() const {
+        return _children[_kExpression].get();
+    }
+
 private:
     ExpressionCoerceToBool(ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
 
@@ -4605,43 +4609,12 @@ public:
         return true;
     }
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        auto result = this->getIdentity();
-        for (auto&& child : this->_children) {
-            Value val = child->evaluate(root, variables);
-            if (val.nullish()) {
-                return Value(BSONNULL);
-            }
-            auto valNum = uassertStatusOK(safeNumFromValue(val));
-            result = doOperation(result, valNum);
-        }
-        return Value(result);
-    }
-
 private:
-    StatusWith<SafeNum> safeNumFromValue(const Value& val) const {
-        switch (val.getType()) {
-            case NumberInt:
-                return val.getInt();
-            case NumberLong:
-                return (int64_t)val.getLong();
-            default:
-                return Status(ErrorCodes::TypeMismatch,
-                              str::stream()
-                                  << this->getOpName() << " only supports int and long operands.");
-        }
-    }
-
-    virtual SafeNum doOperation(const SafeNum& a, const SafeNum& b) const = 0;
     virtual SafeNum getIdentity() const = 0;
 };
 
 class ExpressionBitAnd final : public ExpressionBitwise<ExpressionBitAnd> {
 public:
-    SafeNum doOperation(const SafeNum& a, const SafeNum& b) const final {
-        return a.bitAnd(b);
-    }
-
     SafeNum getIdentity() const final {
         return -1;  // In two's complement, this is all 1's.
     }
@@ -4649,6 +4622,8 @@ public:
     const char* getOpName() const final {
         return "$bitAnd";
     };
+
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     explicit ExpressionBitAnd(ExpressionContext* const expCtx)
         : ExpressionBitwise<ExpressionBitAnd>(expCtx) {
@@ -4671,10 +4646,6 @@ public:
 
 class ExpressionBitOr final : public ExpressionBitwise<ExpressionBitOr> {
 public:
-    SafeNum doOperation(const SafeNum& a, const SafeNum& b) const final {
-        return a.bitOr(b);
-    }
-
     SafeNum getIdentity() const final {
         return 0;
     }
@@ -4682,6 +4653,8 @@ public:
     const char* getOpName() const final {
         return "$bitOr";
     };
+
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     explicit ExpressionBitOr(ExpressionContext* const expCtx)
         : ExpressionBitwise<ExpressionBitOr>(expCtx) {
@@ -4703,10 +4676,6 @@ public:
 
 class ExpressionBitXor final : public ExpressionBitwise<ExpressionBitXor> {
 public:
-    SafeNum doOperation(const SafeNum& a, const SafeNum& b) const final {
-        return a.bitXor(b);
-    }
-
     SafeNum getIdentity() const final {
         return 0;
     }
@@ -4714,6 +4683,8 @@ public:
     const char* getOpName() const final {
         return "$bitXor";
     };
+
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     explicit ExpressionBitXor(ExpressionContext* const expCtx)
         : ExpressionBitwise<ExpressionBitXor>(expCtx) {

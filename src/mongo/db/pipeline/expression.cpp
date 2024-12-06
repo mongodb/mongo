@@ -662,18 +662,7 @@ const char* ExpressionAdd::getOpName() const {
 /* ------------------------- ExpressionAllElementsTrue -------------------------- */
 
 Value ExpressionAllElementsTrue::evaluate(const Document& root, Variables* variables) const {
-    const Value arr = _children[0]->evaluate(root, variables);
-    uassert(17040,
-            str::stream() << getOpName() << "'s argument must be an array, but is "
-                          << typeName(arr.getType()),
-            arr.isArray());
-    const vector<Value>& array = arr.getArray();
-    for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
-        if (!it->coerceToBool()) {
-            return Value(false);
-        }
-    }
-    return Value(true);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(allElementsTrue, ExpressionAllElementsTrue::parse);
@@ -740,14 +729,7 @@ intrusive_ptr<Expression> ExpressionAnd::optimize() {
 }
 
 Value ExpressionAnd::evaluate(const Document& root, Variables* variables) const {
-    const size_t n = _children.size();
-    for (size_t i = 0; i < n; ++i) {
-        Value pValue(_children[i]->evaluate(root, variables));
-        if (!pValue.coerceToBool())
-            return Value(false);
-    }
-
-    return Value(true);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(and, ExpressionAnd::parse);
@@ -758,18 +740,7 @@ const char* ExpressionAnd::getOpName() const {
 /* ------------------------- ExpressionAnyElementTrue -------------------------- */
 
 Value ExpressionAnyElementTrue::evaluate(const Document& root, Variables* variables) const {
-    const Value arr = _children[0]->evaluate(root, variables);
-    uassert(17041,
-            str::stream() << getOpName() << "'s argument must be an array, but is "
-                          << typeName(arr.getType()),
-            arr.isArray());
-    const vector<Value>& array = arr.getArray();
-    for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
-        if (it->coerceToBool()) {
-            return Value(true);
-        }
-    }
-    return Value(false);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(anyElementTrue, ExpressionAnyElementTrue::parse);
@@ -952,11 +923,7 @@ intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
 }
 
 Value ExpressionCoerceToBool::evaluate(const Document& root, Variables* variables) const {
-    Value pResult(_children[_kExpression]->evaluate(root, variables));
-    bool b = pResult.coerceToBool();
-    if (b)
-        return Value(true);
-    return Value(false);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 Value ExpressionCoerceToBool::serialize(const SerializationOptions& options) const {
@@ -1010,50 +977,27 @@ boost::intrusive_ptr<ExpressionCompare> ExpressionCompare::create(
 }
 
 namespace {
-// Lookup table for truth value returns
-struct CmpLookup {
-    const bool truthValue[3];                // truth value for -1, 0, 1
-    const ExpressionCompare::CmpOp reverse;  // reverse(b,a) returns the same as op(a,b)
-    const char name[5];                      // string name with trailing '\0'
+// Lookup table for returning opName
+struct CmpOpName {
+    const char name[5];  // string name with trailing '\0'
 };
-static const CmpLookup cmpLookup[7] = {
-    /*             -1      0      1      reverse                  name   */
-    /* EQ  */ {{false, true, false}, ExpressionCompare::EQ, "$eq"},
-    /* NE  */ {{true, false, true}, ExpressionCompare::NE, "$ne"},
-    /* GT  */ {{false, false, true}, ExpressionCompare::LT, "$gt"},
-    /* GTE */ {{false, true, true}, ExpressionCompare::LTE, "$gte"},
-    /* LT  */ {{true, false, false}, ExpressionCompare::GT, "$lt"},
-    /* LTE */ {{true, true, false}, ExpressionCompare::GTE, "$lte"},
-
-    // CMP is special. Only name is used.
-    /* CMP */ {{false, false, false}, ExpressionCompare::CMP, "$cmp"},
+static const CmpOpName cmpOpNames[7] = {
+    /* EQ  */ {"$eq"},
+    /* NE  */ {"$ne"},
+    /* GT  */ {"$gt"},
+    /* GTE */ {"$gte"},
+    /* LT  */ {"$lt"},
+    /* LTE */ {"$lte"},
+    /* CMP */ {"$cmp"},
 };
 }  // namespace
 
 Value ExpressionCompare::evaluate(const Document& root, Variables* variables) const {
-    Value pLeft(_children[0]->evaluate(root, variables));
-    Value pRight(_children[1]->evaluate(root, variables));
-
-    int cmp = getExpressionContext()->getValueComparator().compare(pLeft, pRight);
-
-    // Make cmp one of 1, 0, or -1.
-    if (cmp == 0) {
-        // leave as 0
-    } else if (cmp < 0) {
-        cmp = -1;
-    } else if (cmp > 0) {
-        cmp = 1;
-    }
-
-    if (cmpOp == CMP)
-        return Value(cmp);
-
-    bool returnValue = cmpLookup[cmpOp].truthValue[cmp + 1];
-    return Value(returnValue);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 const char* ExpressionCompare::getOpName() const {
-    return cmpLookup[cmpOp].name;
+    return cmpOpNames[cmpOp].name;
 }
 
 /* ------------------------- ExpressionConcat ----------------------------- */
@@ -1081,9 +1025,7 @@ const char* ExpressionConcatArrays::getOpName() const {
 /* ----------------------- ExpressionCond ------------------------------ */
 
 Value ExpressionCond::evaluate(const Document& root, Variables* variables) const {
-    Value pCond(_children[0]->evaluate(root, variables));
-    int idx = pCond.coerceToBool() ? 1 : 2;
-    return _children[idx]->evaluate(root, variables);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 boost::intrusive_ptr<Expression> ExpressionCond::optimize() {
@@ -2943,13 +2885,7 @@ void ExpressionIfNull::validateArguments(const ExpressionVector& args) const {
 }
 
 Value ExpressionIfNull::evaluate(const Document& root, Variables* variables) const {
-    const size_t n = _children.size();
-    for (size_t i = 0; i < n; ++i) {
-        Value pValue(_children[i]->evaluate(root, variables));
-        if (!pValue.nullish() || i == n - 1)
-            return pValue;
-    }
-    return Value();
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 boost::intrusive_ptr<Expression> ExpressionIfNull::optimize() {
@@ -3004,19 +2940,7 @@ REGISTER_STABLE_EXPRESSION(ifNull, ExpressionIfNull::parse);
 /* ----------------------- ExpressionIn ---------------------------- */
 
 Value ExpressionIn::evaluate(const Document& root, Variables* variables) const {
-    Value argument(_children[0]->evaluate(root, variables));
-    Value arrayOfValues(_children[1]->evaluate(root, variables));
-
-    uassert(40081,
-            str::stream() << "$in requires an array as a second argument, found: "
-                          << typeName(arrayOfValues.getType()),
-            arrayOfValues.isArray());
-    for (auto&& value : arrayOfValues.getArray()) {
-        if (getExpressionContext()->getValueComparator().evaluate(argument == value)) {
-            return Value(true);
-        }
-    }
-    return Value(false);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(in, ExpressionIn::parse);
@@ -3453,10 +3377,7 @@ Value ExpressionNary::serialize(const SerializationOptions& options) const {
 /* ------------------------- ExpressionNot ----------------------------- */
 
 Value ExpressionNot::evaluate(const Document& root, Variables* variables) const {
-    Value pOp(_children[0]->evaluate(root, variables));
-
-    bool b = pOp.coerceToBool();
-    return Value(!b);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(not, ExpressionNot::parse);
@@ -3467,14 +3388,7 @@ const char* ExpressionNot::getOpName() const {
 /* -------------------------- ExpressionOr ----------------------------- */
 
 Value ExpressionOr::evaluate(const Document& root, Variables* variables) const {
-    const size_t n = _children.size();
-    for (size_t i = 0; i < n; ++i) {
-        Value pValue(_children[i]->evaluate(root, variables));
-        if (pValue.coerceToBool())
-            return Value(true);
-    }
-
-    return Value(false);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 intrusive_ptr<Expression> ExpressionOr::optimize() {
@@ -4515,20 +4429,7 @@ monotonic::State ExpressionSubtract::getMonotonicState(const FieldPath& sortedFi
 REGISTER_STABLE_EXPRESSION(switch, ExpressionSwitch::parse);
 
 Value ExpressionSwitch::evaluate(const Document& root, Variables* variables) const {
-    for (int i = 0; i < numBranches(); ++i) {
-        auto [caseExpr, thenExpr] = getBranch(i);
-        Value caseResult = caseExpr->evaluate(root, variables);
-
-        if (caseResult.coerceToBool()) {
-            return thenExpr->evaluate(root, variables);
-        }
-    }
-
-    uassert(40066,
-            "$switch could not find a matching branch for an input, and no default was specified.",
-            defaultExpr());
-
-    return defaultExpr()->evaluate(root, variables);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* const expCtx,
@@ -7214,6 +7115,18 @@ const char* ExpressionBitNot::getOpName() const {
 REGISTER_STABLE_EXPRESSION(bitAnd, ExpressionBitAnd::parse);
 REGISTER_STABLE_EXPRESSION(bitOr, ExpressionBitOr::parse);
 REGISTER_STABLE_EXPRESSION(bitXor, ExpressionBitXor::parse);
+
+Value ExpressionBitAnd::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionBitOr::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionBitXor::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())
