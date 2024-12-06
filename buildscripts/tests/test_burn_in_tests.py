@@ -495,4 +495,4 @@ class TestYamlBurnInExecutor(unittest.TestCase):
         yaml_raw = stdout.getvalue()
         results = yaml.safe_load(yaml_raw)
         self.assertEqual(n_tasks, len(results["discovered_tasks"]))
-        self.assertEqual(n_tests, len(results["discovered_tasks"][0]["test_list"]))
+        self.assertEqual(n_tests, len(results["discovered_tasks"][0]["suites"][0]["test_list"]))

@@ -256,14 +256,14 @@ class TaskToBurnInInfo(NamedTuple):
         :param tests_by_suite: Dict of suites.
         :return: Dictionary of information needed to run task.
         """
-        suites_to_burn_in = []
-        for suite_name, resmoke_args in task.combined_suite_to_resmoke_args_map.items():
-            suites_to_burn_in.append(
-                SuiteToBurnInInfo(
-                    name=suite_name,
-                    resmoke_args=resmoke_args,
-                    tests=tests_by_suite[suite_name],
-                ))
+        suites_to_burn_in = [
+            SuiteToBurnInInfo(
+                name=suite_name,
+                resmoke_args=resmoke_args,
+                tests=tests_by_suite[suite_name],
+            ) for suite_name, resmoke_args in task.combined_suite_to_resmoke_args_map.items()
+            if len(tests_by_suite[suite_name]) > 0
+        ]
         return cls(
             display_task_name=_get_task_name(task),
             suites=suites_to_burn_in,
@@ -550,16 +550,28 @@ class LocalBurnInExecutor(BurnInExecutor):
         run_tests(tests_by_task, resmoke_cmd)
 
 
+class DiscoveredSuite(BaseModel):
+    """
+    Model for a discovered suite to run.
+
+    * suite_name: Name of discovered suite.
+    * test_list: List of tests to run under discovered suite.
+    """
+
+    suite_name: str
+    test_list: List[str]
+
+
 class DiscoveredTask(BaseModel):
     """
     Model for a discovered task to run.
 
     * task_name: Name of discovered task.
-    * test_list: List of tests to run under discovered task.
+    * suites: List of suites to run under discovered task.
     """
 
     task_name: str
-    test_list: List[str]
+    suites: List[DiscoveredSuite]
 
 
 class DiscoveredTaskList(BaseModel):
@@ -578,8 +590,13 @@ class YamlBurnInExecutor(BurnInExecutor):
         :param tests_by_task: Dictionary of tasks to run with tests to run in each.
         """
         discovered_tasks = DiscoveredTaskList(discovered_tasks=[
-            DiscoveredTask(task_name=task_name, test_list=task_info.collect_suite_tests())
-            for task_name, task_info in tests_by_task.items()
+            DiscoveredTask(
+                task_name=task_name,
+                suites=[
+                    DiscoveredSuite(suite_name=suite.name, test_list=suite.tests)
+                    for suite in task_info.suites
+                ],
+            ) for task_name, task_info in tests_by_task.items()
         ])
         print(yaml.safe_dump(discovered_tasks.dict()))
 
