@@ -138,26 +138,16 @@ expectedChanges.push({
     ns: {db: db.getName(), coll: coll.getName()},
 });
 
-// If we are running in a sharded passthrough, then this may have been a multi-shard transaction.
-// Change streams will interleave the txn events from across the shards in (clusterTime, txnOpIndex)
-// order, and so may not reflect the ordering of writes in the test. We thus verify that exactly the
-// expected set of events are observed, but we relax the ordering requirements.
-function assertNextChangesEqual({cursor, expectedChanges, expectInvalidate}) {
-    const assertEqualFunc = FixtureHelpers.isMongos(db) ? cst.assertNextChangesEqualUnordered
-                                                        : cst.assertNextChangesEqual;
-    return assertEqualFunc(
-        {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: expectInvalidate});
-}
-
 //
 // Test behavior of single-collection change streams with apply ops.
 //
 
 // Verify that the stream returns the expected sequence of changes.
-assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness(
+    {cursor: changeStream, expectedChanges: expectedChanges});
 
 // Single collection change stream should also be invalidated by the drop.
-assertNextChangesEqual({
+cst.assertNextChangesEqualWithDeploymentAwareness({
     cursor: changeStream,
     expectedChanges: [{operationType: "invalidate"}],
     expectInvalidate: true
@@ -188,7 +178,8 @@ changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {startAtOperationTime: testStartTime}}, {$project: {"lsid.uid": 0}}],
     collection: 1
 });
-assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness(
+    {cursor: changeStream, expectedChanges: expectedChanges});
 
 //
 // Test behavior of whole-cluster change streams with apply ops.
@@ -214,6 +205,7 @@ changeStream = cst.startWatchingChanges({
     ],
     collection: 1
 });
-assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness(
+    {cursor: changeStream, expectedChanges: expectedChanges});
 
 cst.cleanUp();

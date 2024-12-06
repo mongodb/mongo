@@ -135,18 +135,8 @@ let expectedChanges = [
         ],
         collection: 1
     });
-    // If we are running in a sharded passthrough, then this may have been a multi-shard txn. Change
-    // streams will interleave the txn events from across the shards in (clusterTime, txnOpIndex)
-    // order, and so may not reflect the ordering of writes in the test. The ordering of events is
-    // important for later tests, so if we are running on mongoS we verify that exactly the expected
-    // set of events are observed, and then we adopt the order in which they were returned.
-    if (FixtureHelpers.isMongos(db)) {
-        expectedChanges = wholeClusterCST.assertNextChangesEqualUnordered(
-            {cursor: wholeClusterCursor, expectedChanges: expectedChanges});
-    } else {
-        expectedChanges = wholeClusterCST.assertNextChangesEqual(
-            {cursor: wholeClusterCursor, expectedChanges: expectedChanges});
-    }
+    expectedChanges = wholeClusterCST.assertNextChangesEqualWithDeploymentAwareness(
+        {cursor: wholeClusterCursor, expectedChanges: expectedChanges});
 })();
 
 // Helper function to find the first non-transaction event and the first two transaction events in

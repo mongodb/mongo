@@ -2,6 +2,7 @@
  * A class with helper functions which operate on change streams. The class maintains a list of
  * opened cursors and kills them on cleanup.
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 
 /**
@@ -297,7 +298,7 @@ export function ChangeStreamTest(_db, options) {
     }
 
     /**
-     * Returns the next document from a cursor or returns null if there wasn't one.
+     * Returns the next consumed document from a cursor or returns null if there wasn't one.
      * This does not issue any getMores, instead relying off the batch inside 'cursor'.
      */
     function getNextDocFromCursor(cursor) {
@@ -307,6 +308,11 @@ export function ChangeStreamTest(_db, options) {
         }
         assert.eq(
             nextBatch.length, 1, "Batch length wasn't 0 or 1: " + tojsonMaybeTruncate(cursor));
+
+        // Reset the nextBatch, as the document is consumed.
+        delete cursor.firstBatch;
+        cursor.nextBatch = [];
+
         return nextBatch[0];
     }
 
@@ -460,6 +466,19 @@ export function ChangeStreamTest(_db, options) {
             skipFirstBatch: skipFirstBatch,
             ignoreOrder: true
         });
+    };
+
+    /**
+     * Iterates through the change stream and asserts that the next changes are the expected ones.
+     *
+     * The method enforces a strict order of events for replica set deployments. In sharded
+     * clusters, due to the possibility of interleaved events across shards, the order is not
+     * strictly enforced, allowing for flexibility in the sequence of events.
+     */
+    self.assertNextChangesEqualWithDeploymentAwareness = function(...args) {
+        const assertEqualFunc = FixtureHelpers.isMongos(db) ? self.assertNextChangesEqualUnordered
+                                                            : self.assertNextChangesEqual;
+        return assertEqualFunc(...args);
     };
 
     /**

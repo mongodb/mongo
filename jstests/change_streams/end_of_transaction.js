@@ -142,21 +142,10 @@ const expectedChangesDb = [
     dropEvent(coll.getName()),
 ];
 
-// If we are running in a sharded passthrough, then this may have been a multi-shard transaction.
-// Change streams will interleave the txn events from across the shards in (clusterTime, txnOpIndex)
-// order, and so may not reflect the ordering of writes in the test. We thus verify that exactly the
-// expected set of events are observed, but we relax the ordering requirements.
-function assertNextChangesEqual({cursor, expectedChanges, expectInvalidate}) {
-    const assertEqualFunc = FixtureHelpers.isMongos(db) ? cst.assertNextChangesEqualUnordered
-                                                        : cst.assertNextChangesEqual;
-    return assertEqualFunc(
-        {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: expectInvalidate});
-}
-
-const collChanges = assertNextChangesEqual(
+const collChanges = cst.assertNextChangesEqualWithDeploymentAwareness(
     {cursor: collChangeStream, expectedChanges: expectedChangesColl, expectInvalidate: true});
 assertEndOfTransaction(collChanges);
-const dbChanges = assertNextChangesEqual(
+const dbChanges = cst.assertNextChangesEqualWithDeploymentAwareness(
     {cursor: dbChangeStream, expectedChanges: expectedChangesDb, expectInvalidate: false});
 assertEndOfTransaction(dbChanges);
 

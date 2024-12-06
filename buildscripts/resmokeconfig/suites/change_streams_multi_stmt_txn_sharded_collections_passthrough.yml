@@ -6,6 +6,10 @@ selector:
   exclude_files:
     # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
     - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+    # Stage not supported inside of a multi-document transaction: $indexStats.
+    - jstests/change_streams/projection_fakes_internal_event.js
+    # TODO: SERVER-98064 Investigate split_large_event.js failures in change_streams_multi_stmt_txn_sharded_collections_passthrough
+    - jstests/change_streams/split_large_event.js
   exclude_with_any_tags:
     # These tests would fail with "Cowardly refusing to override write concern of command: ..."
     - assumes_write_concern_unchanged
@@ -39,6 +43,7 @@ executor:
         await import("jstests/libs/override_methods/txn_passthrough_cmd_massage.js");
         await import("jstests/libs/override_methods/network_error_and_txn_override.js");
         await import("jstests/libs/override_methods/implicit_filter_eot_changestreams.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
   hooks:
     # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
     # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
