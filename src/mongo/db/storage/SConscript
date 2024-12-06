@@ -488,6 +488,7 @@ env.Library(
 env.CppUnitTest(
     target='db_storage_test',
     source=[
+        'backup_block_test.cpp',
         'flow_control_test.cpp',
         'historical_ident_tracker_test.cpp',
         'index_entry_comparison_test.cpp',
@@ -523,6 +524,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        'backup_block',
         'flow_control',
         'flow_control_parameters',
         'historical_ident_tracker',

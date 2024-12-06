@@ -60,6 +60,26 @@ class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 class WiredTigerEngineRuntimeConfigParameter;
 
+/**
+ * With the absolute path to an ident and the parent dbpath, return the ident.
+ *
+ * Note that the ident can have 4 different forms depending on the combination
+ * of server parameters present (directoryperdb / wiredTigerDirectoryForIndexes).
+ * With any one of these server parameters enabled, a directory could be included
+ * in the returned ident.
+ * See the unit test WiredTigerKVEngineTest::ExtractIdentFromPath for example usage.
+ *
+ * Note (2) idents use unix-style separators (always, see
+ * durable_catalog.cpp:generateUniqueIdent) but ident paths are platform-dependant.
+ * This method returns the unix-style "/" separators always.
+ */
+std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
+                                 const boost::filesystem::path& identAbsolutePath);
+
+
+Status validateExtraDiagnostics(const std::vector<std::string>& value,
+                                const boost::optional<TenantId>& tenantId);
+
 struct WiredTigerFileVersion {
     // MongoDB 4.4+ will not open on datafiles left behind by 4.2.5 and earlier. MongoDB 4.4
     // shutting down in FCV 4.2 will leave data files that 4.2.6+ will understand
