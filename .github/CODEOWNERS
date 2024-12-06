@@ -1611,6 +1611,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/timeseries/OWNERS.yml
 /src/mongo/db/timeseries/**/* @10gen/server-storage-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/timeseries/bucket_catalog/OWNERS.yml
+/src/mongo/db/timeseries/bucket_catalog/**/* @10gen/server-timeseries-bucket-catalog @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/transaction/OWNERS.yml
 /src/mongo/db/transaction/**/* @10gen/server-replication @svc-auto-approve-bot
 
