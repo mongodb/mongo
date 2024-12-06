@@ -436,7 +436,7 @@ mongo_cc_library(
         "write_unit_of_work.cpp",
     ],
     hdrs = [
-        "write_unit_of_work.cpp",
+        "write_unit_of_work.h",
     ],
     header_deps = [
         "//src/mongo/db/commands:server_status_core",

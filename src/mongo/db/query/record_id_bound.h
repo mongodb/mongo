@@ -38,7 +38,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/storage/key_string/key_string.h"
 
 namespace mongo {
 

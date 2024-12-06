@@ -654,6 +654,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 
@@ -690,6 +691,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 

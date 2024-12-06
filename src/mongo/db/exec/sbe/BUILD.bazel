@@ -217,7 +217,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_stats.h",
         "//src/mongo/db/storage:temporary_record_store.h",
         "//src/mongo/db/storage:write_unit_of_work.h",
-        "//src/mongo/db/storage/key_string:key_string.h",
         "//src/mongo/idl:command_generic_argument.h",
         "//src/mongo/idl:idl_parser.h",
         "//src/mongo/platform:atomic_proxy.h",

@@ -67,6 +67,7 @@ mongo_cc_library(
         "//src/mongo/db/admission:ticketholder_manager",
         "//src/mongo/db/concurrency:flow_control_ticketholder",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/stats:counter_ops",
+        "//src/mongo/db/storage/key_string",
         "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
@@ -165,7 +166,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_stats.h",
         "//src/mongo/db/storage:temporary_record_store.h",
         "//src/mongo/db/storage:write_unit_of_work_hdrs",
-        "//src/mongo/db/storage/key_string:key_string_hdrs",
         "//src/mongo/idl:command_generic_argument_hdrs",
         "//src/mongo/idl:idl_parser_hdrs",
         "//src/mongo/platform:atomic_proxy.h",

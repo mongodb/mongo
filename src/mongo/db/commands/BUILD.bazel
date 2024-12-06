@@ -811,6 +811,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:profile_settings",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 
