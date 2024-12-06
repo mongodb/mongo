@@ -190,6 +190,17 @@ void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request)
             // let's run createCollection again without selecting a random dataShard.
         }
     }
+    // Note that this check must run separately to manage the case a request already comes with
+    // dataShard selected (as for $out or specific tests) and the checkpoint is enabled. In that
+    // case, we leave the dataShard selected instead of randomize it, but we will track the
+    // collection.
+    if (MONGO_unlikely(createUnshardedCollectionRandomizeDataShard.shouldFail()) &&
+        request.getDataShard()) {
+        // To set dataShard we need to pass from the coordinator and track the collection. Only the
+        // createUnsplittableCollection command can do that. Convert the create request to the test
+        // command request by enabling the flag below when the failpoint is active.
+        request.setIsFromCreateUnsplittableCollectionTestCommand(true);
+    }
 
     request.setReadConcern(repl::ReadConcernArgs::get(opCtx));
 

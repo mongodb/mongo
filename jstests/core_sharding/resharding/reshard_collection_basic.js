@@ -116,9 +116,7 @@ assert.commandFailedWithCode(db.adminCommand({
 // TODO SERVER-87189 remove this test case since a user-created unsharded collection is now always
 // tracked. A temporary db.system.resharding.collection must now exist as unsplittable as well
 // to support moveCollection.
-const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
-if (!isTrackUnshardedUponCreationEnabled) {
+if (!TestData.implicitlyTrackUnshardedCollectionOnCreation) {
     jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
     assert.commandFailedWithCode(
         db.getSiblingDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),

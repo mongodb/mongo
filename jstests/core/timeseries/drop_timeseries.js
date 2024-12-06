@@ -140,8 +140,7 @@ jsTest.log("Case 4: view on buckets, buckets doesn't exist, drop by the buckets 
 jsTest.log("Case 5: view on another collection, buckets exists, drop by the main NS");
 // The create collection coordinator disallows the creation of the buckets collection or the view
 // (depending on the creation order), so this case doesn't work for tracked collections.
-if (!FeatureFlagUtil.isPresentAndEnabled(
-        db, "TrackUnshardedCollectionsUponCreation", undefined, true)) {
+if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && !TestData.runningWithBalancer) {
     let coll = getNewColl(db);
     let bucketsColl = getBucketsColl(db, coll);
 
@@ -158,7 +157,7 @@ if (!FeatureFlagUtil.isPresentAndEnabled(
 } else {
     // Still get collection to advance counter.
     getNewColl(db);
-    jsTest.log("Skipping due to TrackUnshardedCollectionsUponCreation");
+    jsTest.log("Skipping due to implicitly tracking collections upon creation");
 }
 
 jsTest.log("Case 6: view on another collection, buckets exists, drop by the buckets NS");
@@ -212,8 +211,7 @@ jsTest.log("Case 8: view on another collection, buckets doesn't exist, drop by t
 
 jsTest.log("Case 9: normal collection, buckets exists, drop by the main NS");
 // TODO SERVER-95267: execute unconditionally.
-if (!FeatureFlagUtil.isPresentAndEnabled(
-        db, "TrackUnshardedCollectionsUponCreation", undefined, true)) {
+if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && !TestData.runningWithBalancer) {
     let coll = getNewColl(db);
     let bucketsColl = getBucketsColl(db, coll);
 
@@ -230,13 +228,12 @@ if (!FeatureFlagUtil.isPresentAndEnabled(
 } else {
     // Still get collection to advance counter.
     getNewColl(db);
-    jsTest.log("Skipping due to TrackUnshardedCollectionsUponCreation");
+    jsTest.log("Skipping due to implicitly tracking collections upon creation");
 }
 
 jsTest.log("Case 10: normal collection, buckets exists, drop by the buckets NS");
 // TODO SERVER-95267: execute unconditionally.
-if (!FeatureFlagUtil.isPresentAndEnabled(
-        db, "TrackUnshardedCollectionsUponCreation", undefined, true)) {
+if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && !TestData.runningWithBalancer) {
     let coll = getNewColl(db);
     let bucketsColl = getBucketsColl(db, coll);
 
@@ -253,7 +250,7 @@ if (!FeatureFlagUtil.isPresentAndEnabled(
 } else {
     // Still get collection to advance counter.
     getNewColl(db);
-    jsTest.log("Skipping due to TrackUnshardedCollectionsUponCreation");
+    jsTest.log("Skipping due to implicitly tracking collections upon creation");
 }
 
 jsTest.log("Case 11: normal collection, buckets doesn't exist, drop by the buckets NS");
@@ -274,8 +271,7 @@ jsTest.log("Case 11: normal collection, buckets doesn't exist, drop by the bucke
 
 jsTest.log("Case 12: timeseries without view, drop by the main NS");
 // TODO SERVER-95267: execute unconditionally.
-if (!FeatureFlagUtil.isPresentAndEnabled(
-        db, "TrackUnshardedCollectionsUponCreation", undefined, true)) {
+if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && !TestData.runningWithBalancer) {
     let coll = getNewColl(db);
     let bucketsColl = getBucketsColl(db, coll);
 
@@ -291,7 +287,7 @@ if (!FeatureFlagUtil.isPresentAndEnabled(
 } else {
     // Still get collection to advance counter.
     getNewColl(db);
-    jsTest.log("Skipping due to TrackUnshardedCollectionsUponCreation");
+    jsTest.log("Skipping due to  implicitly tracking collections upon creation");
 }
 
 jsTest.log("Case 13: timeseries without view, drop by the buckets NS");

@@ -5,7 +5,7 @@
  * - The donor shard still has user data for that database (i.e. untracked unsharded
  *   collections that are movable by moveCollection).
  *
- * @tags: [requires_fcv_80, featureFlagTrackUnshardedCollectionsUponCreation]
+ * @tags: [requires_fcv_81]
  */
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -18,13 +18,19 @@ function getCollectionUuid(db, collName) {
     return listCollectionRes.cursor.firstBatch[0].info.uuid;
 }
 
-function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation}) {
-    jsTest.log("Running tests for user collections " +
-               tojson({featureFlagTrackUnshardedCollectionsUponCreation}));
+function createCollection(st, dbName, collName, track) {
+    if (track) {
+        st.s.getDB(dbName).runCommand({createUnsplittableCollection: collName});
+    } else {
+        st.s.getDB(dbName).runCommand({create: collName});
+    }
+}
+
+function testUserCollections({trackUnshardedCollections}) {
+    jsTest.log("Running tests for user collections " + tojson({trackUnshardedCollections}));
     const st = new ShardingTest({
         shards: 3,
         configShard: true,
-        rs: {setParameter: {featureFlagTrackUnshardedCollectionsUponCreation}},
     });
     const shard0Primary = st.rs0.getPrimary();
     const shard1Primary = st.rs1.getPrimary();
@@ -45,11 +51,13 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
 
     // Make dbName0 have one collection n1, which is an unsharded collection.
     const ns0 = dbName0 + "." + collName0;
+    createCollection(st, dbName0, collName0, trackUnshardedCollections);
     assert.commandWorked(st.s.getCollection(ns0).insert([{x: 1}]));
 
     // Make dbName1 have two collections ns1 and ns2, where ns1 is an unsharded collection and ns2
     // is a sharded collection with [MinKey, 0] on shard0 and [0, MaxKey] on shard1.
     const ns1 = dbName1 + "." + collName0;
+    createCollection(st, dbName1, collName0, trackUnshardedCollections);
     assert.commandWorked(st.s.getCollection(ns1).insert({x: 1}));
     const ns2 = dbName1 + "." + collName1;
     assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: 1}}));
@@ -72,7 +80,7 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
     // collection ns1 is untracked since movePrimary doesn't move tracked unsharded collections.
     const movePrimaryRes1 =
         st.s.adminCommand({movePrimary: dbName1, to: st.shard1.shardName, comment});
-    if (featureFlagTrackUnshardedCollectionsUponCreation) {
+    if (trackUnshardedCollections) {
         assert.commandWorked(movePrimaryRes1);
     } else {
         assert.commandFailedWithCode(movePrimaryRes1, 9046501);
@@ -109,7 +117,7 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
     // Move the remaining data on shard0 to shard1.
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: ns2, find: {x: -1}, to: st.shard1.shardName, _waitForDelete: true}));
-    if (featureFlagTrackUnshardedCollectionsUponCreation) {
+    if (trackUnshardedCollections) {
         // movePrimary doesn't move tracked unsharded collections so n0 and n1 still need to moved
         // manually to shard1.
         assert.commandWorked(
@@ -143,6 +151,7 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
 
     // Make dbName2 have one collection n3, which is an unsharded collection.
     const ns3 = dbName2 + "." + collName0;
+    createCollection(st, dbName2, collName0, trackUnshardedCollections);
     assert.commandWorked(st.s.getCollection(ns3).insert([{x: 1}]));
 
     const movePrimaryFp1 =
@@ -152,7 +161,7 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
     // should fail if the unsharded collection ns3 is untracked since movePrimary doesn't move
     // tracked unsharded collections.
     const movePrimaryRes2 = st.s.adminCommand({movePrimary: dbName2, to: st.shard2.shardName});
-    if (featureFlagTrackUnshardedCollectionsUponCreation) {
+    if (trackUnshardedCollections) {
         assert.commandWorked(movePrimaryRes2);
     } else {
         assert.commandFailedWithCode(movePrimaryRes2, 9046501);
@@ -164,22 +173,13 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
 }
 
 function testInternalCollections({featureFlagReshardingForTimeseries}) {
-    // Disable this feature flag since movePrimary doesn't move tracked unsharded collections.
-    const featureFlagTrackUnshardedCollectionsUponCreation = false;
-    jsTest.log("Running tests for internal collections " + tojson({
-                   featureFlagTrackUnshardedCollectionsUponCreation,
-                   featureFlagReshardingForTimeseries
-               }));
+    jsTest.log("Running tests for internal collections " +
+               tojson({featureFlagReshardingForTimeseries}));
 
     const st = new ShardingTest({
         shards: 2,
         configShard: true,
-        rs: {
-            setParameter: {
-                featureFlagTrackUnshardedCollectionsUponCreation,
-                featureFlagReshardingForTimeseries
-            }
-        },
+        rs: {setParameter: {featureFlagReshardingForTimeseries}},
     });
     const shard0Primary = st.rs0.getPrimary();
 
@@ -301,7 +301,7 @@ function testInternalCollections({featureFlagReshardingForTimeseries}) {
     // Make shard0 the primary shard for dbName4.
     assert.commandWorked(
         st.s.adminCommand({enableSharding: dbName4, primaryShard: st.shard0.shardName}));
-    assert.commandWorked(testDB4.createCollection("system.resharding.foo"));
+    assert.commandWorked(testDB4.runCommand({create: "system.resharding.foo"}));
     // moveCollection does not have a way to tell that this is not a real resharding temporary
     // collection. However, movePrimary should not be allowed to move it.
     assert.commandFailedWithCode(
@@ -317,7 +317,7 @@ function testInternalCollections({featureFlagReshardingForTimeseries}) {
     st.stop();
 }
 
-testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation: false});
-testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation: true});
+testUserCollections({trackUnshardedCollections: false});
+testUserCollections({trackUnshardedCollections: true});
 testInternalCollections({featureFlagReshardingForTimeseries: false});
 testInternalCollections({featureFlagReshardingForTimeseries: true});

@@ -52,7 +52,6 @@ const runTest = function({
 
         // Run as a retryable write to modify the shard key value.
         const session = coll.getDB().getMongo().startSession({retryWrites: true});
-        const sessionDb = session.getDatabase(coll.getDB().getName());
         updateCommand["lsid"] = session.getSessionId();
         updateCommand["txnNumber"] = NumberLong(1);
         if (expectedWriteErrorCode) {

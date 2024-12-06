@@ -28,6 +28,7 @@ selector:
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_profiling
+    - assumes_no_track_upon_creation
 
 executor:
   archive:
@@ -35,6 +36,11 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          implicitlyTrackUnshardedCollectionOnCreation: true
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
