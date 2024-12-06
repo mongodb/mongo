@@ -588,7 +588,7 @@ TEST_F(DocumentSourceMatchTest, RepeatedJoinWithShouldNotNestAnds) {
 
 DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
                    ShouldFailToDescendExpressionOnPathThatIsNotACommonPrefix,
-                   "Invariant failure.*expression::isPathPrefixOf") {
+                   "Tripwire assertion.*Expected 'a' to be a prefix of 'b.c', but it is not.") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a.b" << 1 << "b.c" << 1);
     const auto matchExpression =
@@ -596,9 +596,10 @@ DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
-DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
-                   ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithObject,
-                   R"#(Invariant failure.*node->matchType\(\))#") {
+DEATH_TEST_REGEX_F(
+    DocumentSourceMatchTest,
+    ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithObject,
+    "Tripwire assertion.*The given match expression has a node that represents a partial path.") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("a.b" << 1)));
     const auto matchExpression =
@@ -606,13 +607,12 @@ DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
-// Due to the order of traversal of the MatchExpression tree, this test may actually trigger the
-// invariant failure that the path being descended is not a prefix of the path of the
-// MatchExpression node corresponding to the '$gt' expression, which will report an empty path.
-DEATH_TEST_F(DocumentSourceMatchTest,
-             ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithValue,
-             "Invariant failure") {
+DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
+                   ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithValue,
+                   "Tripwire assertion.") {
     const auto expCtx = getExpCtx();
+    // We will either hit the assertion that $elemMatch is not allowed to be descended on or the
+    // assertion that the path of the '$gt' expression (empty path) is not prefixed by 'a'
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("$gt" << 0)));
     const auto matchExpression =
         unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
