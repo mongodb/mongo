@@ -75,38 +75,40 @@ public:
 
     /**
      * Invoked when the config server primary enters the 'PRIMARY' state and is invoked while the
-     * caller is holding the global X lock. Kicks off the main balancer thread and returns
-     * immediately. Auto-balancing (if enabled) should commence shortly, and manual migrations will
-     * be processed and run.
+     * caller is holding the global X lock. Kicks off the main balancer thread (which will in turn
+     * instantiate a secondary worker and the CommandsScheduler) and returns immediately.
+     * Auto-balancing (if enabled) should commence shortly, and manual migrations will be processed
+     * and run.
      *
-     * Must only be called if the balancer is in the stopped state (i.e., just constructed or
-     * waitForBalancerToStop has been called before). Any code in this call must not try to acquire
-     * any locks or to wait on operations, which acquire locks.
+     * Must only be called if the balancer thread set is in the Terminated state (i.e., just
+     * constructed or joinTermination() has been called before).
+     * Any code in this call must not try to acquire any locks or to wait on operations, which
+     * acquire locks.
      */
-    void initiateBalancer(OperationContext* opCtx);
+    void initiate(OperationContext* opCtx);
 
     /**
      * Invoked when this node which is currently serving as a 'PRIMARY' steps down and is invoked
-     * while the global X lock is held. Requests the main balancer thread to stop and returns
-     * immediately without waiting for it to terminate. Once the balancer has stopped, manual
-     * migrations will be rejected.
+     * while the global X lock is held. Requests to the hierarchy of balancer threads to leave and
+     * returns immediately without waiting for them to terminate. (Once the termination is complete,
+     * manual migrations will be rejected).
      *
      * This method might be called multiple times in succession, which is what happens as a result
      * of incomplete transition to primary so it is resilient to that.
      *
-     * The waitForBalancerToStop method must be called afterwards in order to wait for the main
+     * The joinTermination() method must be called afterwards in order to wait for the main
      * balancer thread to terminate and to allow initiateBalancer to be called again.
      */
-    void interruptBalancer();
+    void requestTermination();
 
     /**
      * Invoked when a node on its way to becoming a primary finishes draining and is about to
-     * acquire the global X lock in order to allow writes. Waits for the balancer thread to
-     * terminate and primes the balancer so that initiateBalancer can be called.
+     * acquire the global X lock in order to allow writes. Waits for the hierarchy of balancer
+     * threads to terminate and primes the balancer so that initiateBalancer can be called.
      *
      * This must not be called while holding any locks!
      */
-    void waitForBalancerToStop();
+    void joinTermination();
 
     /**
      * Potentially blocking method, which will return immediately if the balancer is not running a
@@ -187,12 +189,20 @@ private:
     static constexpr int kMaxOutstandingStreamingOperations = 50;
 
     /**
-     * Possible runtime states of the balancer. The comments indicate the allowed next state.
+     * Possible runtime states of the set of threads instantiated by the balancer.
+     * The diagram below depicts the allowed transitions.
+     * Terminated --> Running --> Terminating
+     *    ^            /          /
+     *    |           /          /
+     *     \---------------------
      */
-    enum State {
-        kStopped,   // kRunning
-        kRunning,   // kStopping | kStopped
-        kStopping,  // kStopped
+    enum class ThreadSetState {
+        // There is no worker thread instantiated by the balancer
+        Terminated,
+        // The balancer is initiliasing its worker threads (or they are all already active)
+        Running,
+        // A request to terminate all the balancer worker threads is ongoing
+        Terminating,
     };
 
     /**
@@ -200,7 +210,7 @@ private:
      */
     void onStartup(OperationContext* opCtx) final {}
     void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
-    void onShutdown() final {}
+    void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;
@@ -217,9 +227,9 @@ private:
     void _consumeActionStreamLoop();
 
     /**
-     * Checks whether the balancer main thread has been requested to stop.
+     * Checks whether the balancer is going through a termination sequence of its threads.
      */
-    bool _stopRequested();
+    bool _terminationRequested();
 
     /**
      * Signals the beginning and end of a balancing round.
@@ -277,8 +287,9 @@ private:
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
 
-    // Indicates the current state of the balancer
-    State _state{kStopped};
+    // Indicates the current state of the worker threads instantiated by the balancer
+    // (_thread, _actionStreamConsumerThread and _commandScheduler)
+    ThreadSetState _threadSetState{ThreadSetState::Terminated};
 
     // The main balancer threads
     stdx::thread _thread;
