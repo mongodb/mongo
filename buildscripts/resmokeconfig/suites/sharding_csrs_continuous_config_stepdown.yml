@@ -269,6 +269,9 @@ selector:
     # We'll consider re-enabling this test under SPM-3835.
     - jstests/sharding/causal_consistency_shell_support.js
 
+    # Expects the user collections to never change shard and expects unsharded collections to stay
+    # untracked from the cluster catalog.
+    - jstests/sharding/list_cluster_catalog.js
     # The following tests are excluded because they use changestreams, but do not handle
     # resumable changestream errors right now.
     # TODO (SERVER-97414): we could make these tests use the ChangeStreamTest fixture and

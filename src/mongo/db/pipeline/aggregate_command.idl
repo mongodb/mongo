@@ -199,7 +199,15 @@ commands:
                 - privilege: # $listSearchIndexes
                     agg_stage: listSearchIndexes
                     resource_pattern: database
-                    action_type: listSearchIndexes
+                    action_type: listSearchIndexes 
+                - privilege: # $listClusterCatalog
+                    agg_stage: listClusterCatalog
+                    resource_pattern: cluster
+                    action_type: listClusterCatalog
+                - privilege: # $listClusterCatalog
+                    agg_stage: listClusterCatalog
+                    resource_pattern: database
+                    action_type: listCollections
         # Note that the 'CursorInitialReply' is not the only response that an aggregate command
         # could return. With 'explain' or 'exchange', the response would not include the fields in
         # 'CursorInitialReply'. But using 'explain' or 'exchange' is unstable, but otherwise the

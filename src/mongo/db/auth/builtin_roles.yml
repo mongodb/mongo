@@ -253,6 +253,7 @@ roles:
           - getParameter
           - getShardMap
           - hostInfo
+          - listClusterCatalog
           - listDatabases
           - listSampledQueries
           - listSessions # clusterManager gets this also

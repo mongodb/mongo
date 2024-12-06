@@ -51,6 +51,7 @@ selector:
     - jstests/core/administrative/validate_db_metadata_command.js
     - jstests/core/catalog/list_catalog.js
     - jstests/core/catalog/agg_internal_list_collections_stage.js
+    - jstests/core/catalog/agg_list_cluster_catalog.js
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
     - jstests/core/ddl/convert_to_capped.js
     - jstests/core/rename_system_buckets_collections.js

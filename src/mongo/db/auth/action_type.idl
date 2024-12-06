@@ -45,6 +45,7 @@ enums:
         values:
            addShard :  "addShard"
            advanceClusterTime :  "advanceClusterTime"
+           listClusterCatalog : "listClusterCatalog"
            allCollectionStats: "allCollectionStats"
            analyze :  "analyze"
            analyzeShardKey : "analyzeShardKey"

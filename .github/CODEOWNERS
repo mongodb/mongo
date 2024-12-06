@@ -1248,6 +1248,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_coll_stats* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_internal_all_collection_stats* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_internal_list_collections* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/document_source_list_cluster_catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*list_catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*sharded_data_distribution* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 

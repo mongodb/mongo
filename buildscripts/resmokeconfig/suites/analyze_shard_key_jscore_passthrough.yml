@@ -76,6 +76,7 @@ selector:
     - jstests/core/**/bucket_unpacking_with_sort_extended_range.js
     # View tests aren't expected to work when collections are implicitly sharded.
     - jstests/core/txns/view_reads_in_transaction.js
+    - jstests/core/catalog/agg_list_cluster_catalog.js
 
     # The following test expects collections that have not been explicitly created to not exist so the
     # implicit shard accessed collection logic causes it to fail.

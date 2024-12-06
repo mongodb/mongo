@@ -185,9 +185,9 @@ feature_flags:
     version: 8.1
     shouldBeFCVGated: true
   # TODO (SERVER-94367): remove once 9.0 becomes last LTS.
-  featureFlagAggregateClusterCatalogAggStage:
-    description: "Feature flag for enabling the aggregation stage $aggregateClusterCatalog"
-    cpp_varname: feature_flags::gAggregateClusterCatalogAggStage
+  featureFlagListClusterCatalogAggStage:
+    description: "Feature flag for enabling the aggregation stage $listClusterCatalog"
+    cpp_varname: feature_flags::gListClusterCatalogAggStage
     default: false
     shouldBeFCVGated: true
   # TODO (SERVER-97261): remove once 9.0 becomes last LTS.

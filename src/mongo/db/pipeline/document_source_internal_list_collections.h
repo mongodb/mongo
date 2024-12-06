@@ -99,7 +99,7 @@ public:
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
             // TODO (SERVER-97061): Update this once we support snapshot read concern on
-            // $aggregateClusterCatalog.
+            // $listClusterCatalog.
             return onlyReadConcernLocalSupported(kStageNameInternal, level, isImplicitDefault);
         }
 

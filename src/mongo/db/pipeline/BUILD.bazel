@@ -120,6 +120,7 @@ mongo_cc_library(
         "document_source_internal_all_collection_stats_gen",
         "document_source_internal_apply_oplog_update_gen",
         "document_source_internal_projection_gen",
+        "document_source_list_cluster_catalog_gen",
         "document_source_list_mql_entities_gen",
         "document_source_list_sampled_queries_gen",
         "document_source_list_sessions_gen",
@@ -438,6 +439,7 @@ mongo_cc_library(
         "accumulator_internal_construct_stats.cpp",
         "document_source.cpp",
         "document_source_add_fields.cpp",
+        "document_source_list_cluster_catalog.cpp",
         "document_source_bucket.cpp",
         "document_source_bucket_auto.cpp",
         "document_source_coll_stats.cpp",
@@ -544,6 +546,7 @@ mongo_cc_library(
         "document_source.h",
         "document_source_mock.h",
         "document_source_add_fields.h",
+        "document_source_list_cluster_catalog.h",
         "document_source_bucket.h",
         "document_source_bucket_auto.h",
         "document_source_coll_stats.h",
@@ -747,6 +750,14 @@ mongo_cc_library(
         ":aggregation_request_helper",
         "//src/mongo/db/query:common_query_enums_and_helpers",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "document_source_list_cluster_catalog_gen",
+    src = "document_source_list_cluster_catalog.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
     ],
 )
 
