@@ -55,20 +55,6 @@ env.Benchmark(
 )
 
 env.Library(
-    target="oplog_entry_test_helpers",
-    source=[
-        "oplog_entry_test_helpers.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/session/logical_session_id",
-        "oplog_entry",
-        "optime",
-    ],
-)
-
-env.Library(
     target="idempotency_test_util",
     source=[
         "idempotency_document_structure.cpp",

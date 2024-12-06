@@ -7,56 +7,6 @@ Import("wiredtiger")
 
 env = env.Clone()
 
-env.Library(
-    target="testframework",
-    source=[
-        "framework_options_init.cpp",
-        "framework_options.cpp",
-        "framework_options_gen.cpp",
-        "framework.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_impl",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/storage/flow_control_parameters",
-        "$BUILD_DIR/mongo/db/storage/storage_control",
-        "$BUILD_DIR/mongo/scripting/scripting_common",
-        "$BUILD_DIR/mongo/unittest/unittest",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
-        "$BUILD_DIR/mongo/util/periodic_runner_factory",
-    ],
-)
-
-env.Library(
-    target="mocklib",
-    source=[
-        "mock/mock_conn_registry.cpp",
-        "mock/mock_dbclient_connection.cpp",
-        "mock/mock_remote_db_server.cpp",
-        "mock/mock_replica_set.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/client/dbclient_mockcursor",
-        "$BUILD_DIR/mongo/client/replica_set_monitor_test_helper",
-        "$BUILD_DIR/mongo/db/repl/replica_set_messages",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/exec/projection_executor",
-        "$BUILD_DIR/mongo/db/query/projection_ast",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query_expressions",
-    ],
-)
-
 env.Program(
     target="dbtest",
     source=[

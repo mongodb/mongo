@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -12,4 +12,76 @@ exports_files(
 idl_generator(
     name = "framework_options_gen",
     src = "framework_options.idl",
+)
+
+mongo_cc_library(
+    name = "testframework",
+    srcs = [
+        "framework.cpp",
+        "framework_options.cpp",
+        "framework_options_gen",
+        "framework_options_init.cpp",
+    ],
+    hdrs = [
+        "framework.h",
+        "framework_options.h",
+        "//src/mongo/dbtests:dbtests.h",
+    ],
+    deps = [
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_d",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/storage:flow_control_parameters",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/scripting:scripting_common",
+        "//src/mongo/unittest",
+        "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util/options_parser:options_parser_init",
+    ],
+)
+
+mongo_cc_library(
+    name = "mocklib",
+    srcs = [
+        "//src/mongo/dbtests/mock:mock_conn_registry.cpp",
+        "//src/mongo/dbtests/mock:mock_dbclient_connection.cpp",
+        "//src/mongo/dbtests/mock:mock_remote_db_server.cpp",
+        "//src/mongo/dbtests/mock:mock_replica_set.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/dbtests/mock:mock_conn_registry.h",
+        "//src/mongo/dbtests/mock:mock_dbclient_connection.h",
+        "//src/mongo/dbtests/mock:mock_remote_db_server.h",
+        "//src/mongo/dbtests/mock:mock_replica_set.h",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:dbclient_mockcursor",
+        "//src/mongo/client:replica_set_monitor_test_helper",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/exec:projection_executor",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:projection_ast",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/repl:replica_set_messages",
+    ],
+)
+
+# TODO(SERVER-96941): Remove shim once it's possible to use select in binary deps
+mongo_cc_library(
+    name = "deps_shim",
+    deps = select({
+        "//bazel/config:enterprise_feature_ldap_and_wiredtiger_enabled": [
+            "//src/mongo/db/modules/enterprise/src/inmemory:storage_inmemory",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:use_wiredtiger_enabled": ["//src/mongo/db/storage/wiredtiger:storage_wiredtiger"],
+        "//conditions:default": [],
+    }),
 )

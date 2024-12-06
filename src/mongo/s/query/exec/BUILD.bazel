@@ -168,7 +168,6 @@ mongo_cc_unit_test(
         "sharded_agg_test_fixture.h",
         "store_possible_cursor_test.cpp",
         "//src/mongo/db/session:logical_session_cache_noop.h",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_first_group"],
     deps = [
@@ -186,6 +185,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:shared_request_handling",
         "//src/mongo/db:vector_clock",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
         # Linking to cluster_commands is necessary for async_results_merger_test.cpp since it
         # requires linking to the getMore command. Otherwise the test fails due to a uassert
         # being thrown.

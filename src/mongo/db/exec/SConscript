@@ -17,59 +17,8 @@ env.SConscript(
 
 env.CppUnitTest(
     target="db_exec_test",
-    source=[
-        "distinct_scan_test.cpp",
-        "document_value/document_comparator_test.cpp",
-        "document_value/document_metadata_fields_test.cpp",
-        "document_value/document_value_test.cpp",
-        "document_value/document_value_test_util_self_test.cpp",
-        "document_value/value_comparator_test.cpp",
-        "add_fields_projection_executor_test.cpp",
-        "exclusion_projection_executor_test.cpp",
-        "find_projection_executor_test.cpp",
-        "inclusion_projection_executor_test.cpp",
-        "orphan_chunk_skipper_test.cpp",
-        "projection_executor_builder_test.cpp",
-        "projection_executor_redaction_test.cpp",
-        "projection_executor_test.cpp",
-        "projection_executor_utils_test.cpp",
-        "projection_executor_wildcard_access_test.cpp",
-        "queued_data_stage_test.cpp",
-        "sort_test.cpp",
-        "working_set_test.cpp",
-        "bucket_unpacker_test.cpp",
-        "spool_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/column/column",
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_compression",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "document_value/document_value",
-        "document_value/document_value_test_util",
-        "projection_executor",
-        "query_shard_server_test_fixture",
-        "working_set",
-    ],
-)
-
-env.Library(
-    target="query_shard_server_test_fixture",
-    source=[
-        "query_shard_server_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/s/shard_server_test_fixture",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

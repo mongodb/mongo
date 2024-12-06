@@ -2125,6 +2125,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "enterprise_feature_ldap_and_wiredtiger_enabled",
+    match_all = [
+        "//bazel/config:enterprise_feature_ldap_enabled",
+        "//bazel/config:use_wiredtiger_enabled",
+    ],
+)
+
+selects.config_setting_group(
     name = "enterprise_feature_audit_or_encryptdb_enabled",
     match_any = [
         ":enterprise_feature_audit_enabled",

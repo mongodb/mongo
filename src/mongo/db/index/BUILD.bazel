@@ -130,7 +130,6 @@ mongo_cc_unit_test(
         "sort_key_generator_test.cpp",
         "wildcard_key_generator_test.cpp",
         "wildcard_validation_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
@@ -149,6 +148,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:storage_options",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/third_party/snappy",
     ],
 )

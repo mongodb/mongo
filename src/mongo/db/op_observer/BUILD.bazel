@@ -333,7 +333,6 @@ mongo_cc_unit_test(
         "op_observer_impl_test.cpp",
         "op_observer_registry_test.cpp",
         "user_write_block_mode_op_observer_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
@@ -368,5 +367,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )

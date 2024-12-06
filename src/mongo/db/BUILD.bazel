@@ -3596,7 +3596,6 @@ mongo_cc_unit_test(
         "change_stream_pre_images_tenant_truncate_markers_test.cpp",
         "change_stream_pre_images_truncate_manager_test.cpp",
         "change_stream_pre_images_truncate_markers_per_nsUUID_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
@@ -3615,6 +3614,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )
 
@@ -3622,7 +3622,6 @@ mongo_cc_unit_test(
     name = "mongod_options_test",
     srcs = [
         "mongod_options_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = [
         "mongo_unittest_third_group",
@@ -3632,6 +3631,7 @@ mongo_cc_unit_test(
         ":mongod_options",
         ":server_base",
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util/options_parser",
     ],
 )
@@ -3650,7 +3650,6 @@ mongo_cc_unit_test(
         "server_options_test.cpp",
         "shard_id_test.cpp",
         "startup_warnings_mongod_thp_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_third_group"],
     target_compatible_with = select({
@@ -3669,6 +3668,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:change_stream_pipeline",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:fail_point",
         "//src/third_party/asio-master:asio",
     ],
@@ -3678,7 +3678,6 @@ mongo_cc_unit_test(
     name = "change_collection_test",
     srcs = [
         "change_collection_expired_change_remover_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_third_group"],
     target_compatible_with = select({
@@ -3699,6 +3698,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:clock_source_mock",
         "//src/third_party/asio-master:asio",
     ],
@@ -3751,7 +3751,6 @@ mongo_cc_unit_test(
         "commands_test.cpp",
         "curop_stats_test.cpp",
         "curop_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_third_group"],
     target_compatible_with = select({
@@ -3774,6 +3773,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/s:shard_server_test_fixture",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/transport:transport_layer_mock",
         "//src/third_party/asio-master:asio",
     ],
@@ -3843,6 +3843,121 @@ mongo_cc_unit_test(
         "//src/mongo:base",
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "operation_test",
+    srcs = [
+        "cancelable_operation_context_test.cpp",
+        "client_context_test.cpp",
+        "client_strand_test.cpp",
+        "dbdirectclient_test.cpp",
+        "dbmessage_test.cpp",
+        "mirroring_sampler_test.cpp",
+        "operation_context_test.cpp",
+        "operation_cpu_timer_test.cpp",
+        "operation_time_tracker_test.cpp",
+        "persistent_task_store_test.cpp",
+        "resource_yielder_test.cpp",
+        "service_context_test.cpp",
+        "thread_client_test.cpp",
+        "wire_version_test.cpp",
+        "//src/mongo/unittest:join_thread.h",
+        "//src/mongo/util:executor_test_util.h",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":commands",
+        ":dbdirectclient",
+        ":mirror_maestro",
+        ":operation_time_tracker",
+        ":rw_concern_d",
+        ":service_context",
+        ":service_context_d_test_fixture",
+        ":service_context_test_fixture",
+        ":shard_role",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/third_party/asio-master:asio",
+    ],
+)
+
+mongo_cc_library(
+    name = "op_msg_fuzzer_fixture",
+    srcs = [
+        "op_msg_fuzzer_fixture.cpp",
+    ],
+    hdrs = [
+        "op_msg_fuzzer_fixture.h",
+        "session_manager_mongod.h",
+    ],
+    deps = [
+        ":server_base",
+        ":service_context_d",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/rpc",
+        "//src/mongo/s:startup_initialization",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/unittest",
+        "//src/mongo/util:periodic_runner_factory",
+    ],
+)
+
+# These unit tests rely on the config_server_test_fixture, which
+# globally alters the state of the system to be in config server
+# mode. The other tests are not compatible with that setting.
+mongo_cc_unit_test(
+    name = "db_unittest_with_config_server_test_fixture_test",
+    srcs = [
+        "key_generator_update_test.cpp",
+        "keys_collection_cache_test.cpp",
+        "keys_collection_manager_sharding_test.cpp",
+        "logical_time_validator_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":keys_collection_client_direct",
+        ":vector_clock",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/s:config_server_test_fixture",
+    ],
+)
+
+# TODO(SERVER-45266) This could be part of db_unittest_test but it needs to mutate
+# storageGlobalParams.
+mongo_cc_unit_test(
+    name = "op_msg_fuzzer_fixture_test",
+    srcs = [
+        "op_msg_fuzzer_fixture_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":op_msg_fuzzer_fixture",
+        ":server_base",
+        "//src/mongo/rpc",
     ],
 )
 

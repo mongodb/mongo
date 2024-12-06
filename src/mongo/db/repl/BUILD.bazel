@@ -1938,3 +1938,20 @@ filegroup(
     name = "read_concern_idl_hdrs",
     srcs = [":read_concern_idl.h"],
 )
+
+mongo_cc_library(
+    name = "oplog_entry_test_helpers",
+    srcs = [
+        "oplog_entry_test_helpers.cpp",
+    ],
+    hdrs = [
+        "oplog_entry_test_helpers.h",
+    ],
+    deps = [
+        "oplog_entry",
+        "optime",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/session:logical_session_id",
+    ],
+)

@@ -1615,7 +1615,6 @@ mongo_cc_unit_test(
     name = "command_mirroring_test",
     srcs = [
         "command_mirroring_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
@@ -1625,6 +1624,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
     ],
 )
@@ -1649,7 +1649,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/commands/query_cmd:external_data_source_commands_test.cpp",
         "//src/mongo/db/commands/query_cmd:index_filter_commands_test.cpp",
         "//src/mongo/db/commands/query_cmd:plan_cache_commands_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ] + select({
         "//bazel/config:js_engine_none": [],
         "//bazel/config:js_engine_mozjs": [
@@ -1693,6 +1692,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/idl:idl_parser",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/shell:kms_idl",
         "//src/mongo/util:version_impl",
     ],

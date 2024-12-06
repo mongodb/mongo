@@ -209,50 +209,6 @@ env.BazelProgram(
     ],
 )
 
-env.Library(
-    target="op_msg_fuzzer_fixture",
-    source=[
-        "op_msg_fuzzer_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/transport/transport_layer_mock",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/rpc/rpc",
-        "$BUILD_DIR/mongo/s/startup_initialization",
-        "$BUILD_DIR/mongo/transport/session_manager",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "$BUILD_DIR/mongo/util/periodic_runner_factory",
-        "auth/auth",
-        "auth/authmocks",
-        "catalog/catalog_impl",
-        "catalog/database_holder",
-        "op_observer/op_observer",
-        "repl/replmocks",
-        "s/sharding_runtime_d",
-        "server_base",
-        "service_context_d",
-        "stats/top",
-        "storage/storage_control",
-        "storage/storage_options",
-        "storage/wiredtiger/storage_wiredtiger",
-    ],
-)
-
-# TODO(SERVER-45266) This could be part of db_unittest_test but it needs to mutate
-# storageGlobalParams.
-env.CppUnitTest(
-    target="op_msg_fuzzer_fixture_test",
-    source=[
-        "op_msg_fuzzer_fixture_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/rpc/rpc",
-        "op_msg_fuzzer_fixture",
-        "server_base",
-    ],
-)
-
 envWithAsio = env.Clone()
 envWithAsio.InjectThirdParty(libraries=["asio"])
 
@@ -307,38 +263,8 @@ if wiredtiger:
 
     envWithAsio.CppUnitTest(
         target="operation_test",
-        source=[
-            "cancelable_operation_context_test.cpp",
-            "client_context_test.cpp",
-            "client_strand_test.cpp",
-            "dbdirectclient_test.cpp",
-            "dbmessage_test.cpp",
-            "mirroring_sampler_test.cpp",
-            "operation_context_test.cpp",
-            "operation_cpu_timer_test.cpp",
-            "operation_time_tracker_test.cpp",
-            "persistent_task_store_test.cpp",
-            "resource_yielder_test.cpp",
-            "thread_client_test.cpp",
-            "wire_version_test.cpp",
-            "service_context_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/transport/transport_layer_mock",
-            "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-            "catalog/catalog_test_fixture",
-            "commands",
-            "dbdirectclient",
-            "mirror_maestro",
-            "operation_time_tracker",
-            "repl/replmocks",
-            "rw_concern_d",
-            "service_context",
-            "service_context_d_test_fixture",
-            "service_context_test_fixture",
-            "shard_role",
-            "stats/counters",
-        ],
+        source=[],
+        LIBDEPS=[],
         PROVE_ALIASES=["server-programmability"],
     )
 
@@ -401,23 +327,10 @@ env.CppUnitTest(
     LIBDEPS=[],
 )
 
-# These unit tests rely on the config_server_test_fixture, which
-# globally alters the state of the system to be in config server
-# mode. The other tests are not compatible with that setting.
 envWithAsio.CppUnitTest(
     target="db_unittest_with_config_server_test_fixture_test",
-    source=[
-        "key_generator_update_test.cpp",
-        "keys_collection_cache_test.cpp",
-        "keys_collection_manager_sharding_test.cpp",
-        "logical_time_validator_test.cpp",
-    ],
-    LIBDEPS=[
-        "auth/authmocks",
-        "keys_collection_client_direct",
-        "s/config_server_test_fixture",
-        "vector_clock",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 asioEnv.CppIntegrationTest(

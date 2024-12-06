@@ -401,6 +401,31 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "sbe_plan_stage_test",
+    srcs = [
+        "sbe_plan_stage_test.cpp",
+    ],
+    hdrs = [
+        "sbe_plan_stage_test.h",
+    ],
+    deps = [
+        ":query_sbe",
+        ":query_sbe_stages",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:task_executor_cursor",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/unittest",
+    ],
+)
+
 # Lightweight test utils.
 mongo_cc_library(
     name = "abt_unit_test_utils",

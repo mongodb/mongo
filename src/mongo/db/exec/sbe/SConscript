@@ -2,30 +2,6 @@
 
 Import("env")
 
-env.Library(
-    target="sbe_plan_stage_test",
-    source=[
-        "sbe_plan_stage_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/executor/network_interface_mock",
-        "$BUILD_DIR/mongo/executor/task_executor_cursor",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "query_sbe",
-        "query_sbe_stages",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-    ],
-)
-
 env.CppUnitTest(
     target="db_sbe_test",
     source=[
@@ -130,8 +106,10 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/timeseries/bucket_compression",
+        "$BUILD_DIR/mongo/unittest/unittest",
         "$BUILD_DIR/mongo/util/pcre_wrapper",
         "sbe_plan_stage_test",
     ],
