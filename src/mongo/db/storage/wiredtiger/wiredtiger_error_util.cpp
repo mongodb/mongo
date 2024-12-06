@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+namespace {
 /**
  * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
  * exceed a certain threshold on the proportion of total cache which is used by transaction.
@@ -65,6 +66,16 @@ bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
         txnDirtyBytes.getValue(), cacheDirtyBytes.getValue(), threshold);
 }
 
+str::stream generateContextStrStream(StringData prefix, StringData reason, int retCode) {
+    str::stream contextStrStream;
+    if (!prefix.empty())
+        contextStrStream << prefix << " ";
+    contextStrStream << retCode << ": " << reason;
+
+    return contextStrStream;
+};
+}  // namespace
+
 bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, double threshold) {
     double txnBytesDirtyOverCacheBytesDirty = static_cast<double>(txnDirtyBytes) / cacheDirtyBytes;
 
@@ -79,15 +90,6 @@ bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, d
     return txnBytesDirtyOverCacheBytesDirty > threshold;
 }
 
-str::stream generateContextStrStream(StringData prefix, StringData reason, int retCode) {
-    str::stream contextStrStream;
-    if (!prefix.empty())
-        contextStrStream << prefix << " ";
-    contextStrStream << retCode << ": " << reason;
-
-    return contextStrStream;
-};
-
 bool rollbackReasonWasCachePressure(const char* reason) {
     return reason &&
         (strncmp(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION,
@@ -98,25 +100,39 @@ bool rollbackReasonWasCachePressure(const char* reason) {
                  sizeof(WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW)) == 0);
 }
 
+void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
+                                              bool temporarilyUnavailableEnabled,
+                                              bool cacheIsInsufficientForTransaction,
+                                              const char* reason,
+                                              StringData prefix,
+                                              int retCode) {
+    if (txnTooLargeEnabled && cacheIsInsufficientForTransaction) {
+        throwTransactionTooLargeForCache(
+            generateContextStrStream(prefix, WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE, retCode)
+            << " (" << reason << ")");
+    }
+
+    if (temporarilyUnavailableEnabled) {
+        throwTemporarilyUnavailableException(generateContextStrStream(prefix, reason, retCode));
+    }
+}
+
 void throwAppropriateException(bool txnTooLargeEnabled,
                                bool temporarilyUnavailableEnabled,
-                               bool cacheIsInsufficientForTransaction,
+                               WT_SESSION* session,
+                               double cacheThreshold,
                                const char* reason,
                                StringData prefix,
                                int retCode) {
-
     if ((txnTooLargeEnabled || temporarilyUnavailableEnabled) &&
         rollbackReasonWasCachePressure(reason)) {
-        if (txnTooLargeEnabled && cacheIsInsufficientForTransaction) {
-            throwTransactionTooLargeForCache(
-                generateContextStrStream(
-                    prefix, WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE, retCode)
-                << " (" << reason << ")");
-        }
-
-        if (temporarilyUnavailableEnabled) {
-            throwTemporarilyUnavailableException(generateContextStrStream(prefix, reason, retCode));
-        }
+        throwCachePressureExceptionIfAppropriate(
+            txnTooLargeEnabled,
+            temporarilyUnavailableEnabled,
+            cacheIsInsufficientForTransaction(session, cacheThreshold),
+            reason,
+            prefix,
+            retCode);
     }
 
     throwWriteConflictException(prefix);
@@ -134,7 +150,8 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
 
         throwAppropriateException(txnTooLargeEnabled,
                                   temporarilyUnavailableEnabled,
-                                  cacheIsInsufficientForTransaction(session, cacheThreshold),
+                                  session,
+                                  cacheThreshold,
                                   reason,
                                   prefix,
                                   retCode);

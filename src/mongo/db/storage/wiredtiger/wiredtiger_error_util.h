@@ -46,9 +46,16 @@
 namespace mongo {
 bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, double threshold);
 bool rollbackReasonWasCachePressure(const char* reason);
+void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
+                                              bool temporarilyUnavailableEnabled,
+                                              bool cacheIsInsufficientForTransaction,
+                                              const char* reason,
+                                              StringData prefix,
+                                              int retCode);
 void throwAppropriateException(bool txnTooLargeEnabled,
                                bool temporarilyUnavailableEnabled,
-                               bool cacheIsInsufficientForTransaction,
+                               WT_SESSION* session,
+                               double cacheThreshold,
                                const char* reason,
                                StringData prefix,
                                int retCode);

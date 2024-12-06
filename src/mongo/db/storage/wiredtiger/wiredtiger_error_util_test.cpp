@@ -38,34 +38,41 @@ public:
     struct TestCase {
         bool txnTooLarge;
         bool tempUnavailable;
-        bool cacheSufficiency;
+        bool cacheInsufficient;
         const char* reason;
     };
 
-    void throwsExpectedException(TestCase testCase, ErrorCodes::Error err) {
-        try {
-            throwAppropriateException(testCase.txnTooLarge,
-                                      testCase.tempUnavailable,
-                                      testCase.cacheSufficiency,
-                                      testCase.reason,
-                                      prefix,
-                                      retCode);
-        } catch (DBException& ex) {
-            ASSERT_EQ(ex.code(), err)
-                << "expected " << ErrorCodes::errorString(err)
-                << " error for txnTooLargeEnabled: " << testCase.txnTooLarge
-                << ", temporarilyUnavailableEnabled: " << testCase.tempUnavailable
-                << ", cacheIsInsufficientForTransaction: " << testCase.cacheSufficiency
-                << ", and rollback reason: " << testCase.reason;
-        }
+    void throwsWriteConflictException(TestCase testCase, ErrorCodes::Error err) {
+        ASSERT_THROWS_CODE(throwAppropriateException(testCase.txnTooLarge,
+                                                     testCase.tempUnavailable,
+                                                     session,
+                                                     cacheThreshold,
+                                                     testCase.reason,
+                                                     prefix,
+                                                     retCode),
+                           StorageUnavailableException,
+                           err)
+            << "Expected " << ErrorCodes::errorString(err)
+            << " error for txnTooLargeEnabled: " << testCase.txnTooLarge
+            << ", temporarilyUnavailableEnabled: " << testCase.tempUnavailable
+            << ", and rollback reason: " << testCase.reason;
     }
 
-    bool txnTooLargeEnabled{true};
-    bool temporarilyUnavailableEnabled{true};
-    bool disabled{false};
-
-    bool insufficient{true};
-    bool sufficient{false};
+    void throwsCachePressureException(TestCase testCase, ErrorCodes::Error err) {
+        ASSERT_THROWS_CODE(throwCachePressureExceptionIfAppropriate(testCase.txnTooLarge,
+                                                                    testCase.tempUnavailable,
+                                                                    testCase.cacheInsufficient,
+                                                                    testCase.reason,
+                                                                    prefix,
+                                                                    retCode),
+                           StorageUnavailableException,
+                           err)
+            << "Expected " << ErrorCodes::errorString(err)
+            << " error for txnTooLargeEnabled: " << testCase.txnTooLarge
+            << ", temporarilyUnavailableEnabled: " << testCase.tempUnavailable
+            << ", cacheIsInsufficientForTransaction: " << testCase.cacheInsufficient
+            << ", and rollback reason: " << testCase.reason;
+    }
 
     const char* reasonEviction = WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION;
     const char* reasonOverflow = WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW;
@@ -73,6 +80,8 @@ public:
 
     StringData prefix = "";
     int retCode = 0;
+    double cacheThreshold = 0;
+    WT_SESSION* session = nullptr;
 };
 
 TEST_F(WiredTigerUtilHelperTest, transactionExceededCacheThreshold) {
@@ -96,14 +105,26 @@ TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
     // cache is insufficient for transaction, and reason for rollback was cache pressure. Also
     // throws TransactionTooLargeForCacheException even if temporarilyUnavailableEnabled is enabled.
     std::vector<TestCase> transactionTooLargeTestCases = {
-        {txnTooLargeEnabled, disabled, insufficient, reasonEviction},
-        {txnTooLargeEnabled, disabled, insufficient, reasonOverflow},
-        {txnTooLargeEnabled, temporarilyUnavailableEnabled, insufficient, reasonEviction},
-        {txnTooLargeEnabled, temporarilyUnavailableEnabled, insufficient, reasonOverflow},
+        {.txnTooLarge = true,
+         .tempUnavailable = false,
+         .cacheInsufficient = true,
+         .reason = reasonEviction},
+        {.txnTooLarge = true,
+         .tempUnavailable = false,
+         .cacheInsufficient = true,
+         .reason = reasonOverflow},
+        {.txnTooLarge = true,
+         .tempUnavailable = true,
+         .cacheInsufficient = true,
+         .reason = reasonEviction},
+        {.txnTooLarge = true,
+         .tempUnavailable = true,
+         .cacheInsufficient = true,
+         .reason = reasonOverflow},
     };
 
     for (auto testCase : transactionTooLargeTestCases) {
-        throwsExpectedException(testCase, ErrorCodes::TransactionTooLargeForCache);
+        throwsCachePressureException(testCase, ErrorCodes::TransactionTooLargeForCache);
     }
 }
 
@@ -112,47 +133,103 @@ TEST_F(WiredTigerUtilHelperTest, throwTemporarilyUnavailableException) {
         // If both or one of txnTooLargeEnabled and cacheIsInsufficientForTransaction are false,
         // throws TemporarilyUnavailableException if it is enabled and rollback reason was cache
         // pressure.
-        {disabled, temporarilyUnavailableEnabled, sufficient, reasonEviction},
-        {disabled, temporarilyUnavailableEnabled, sufficient, reasonOverflow},
-        {disabled, temporarilyUnavailableEnabled, insufficient, reasonEviction},
-        {disabled, temporarilyUnavailableEnabled, insufficient, reasonOverflow},
-        {txnTooLargeEnabled, temporarilyUnavailableEnabled, sufficient, reasonEviction},
-        {txnTooLargeEnabled, temporarilyUnavailableEnabled, sufficient, reasonOverflow},
+        {.txnTooLarge = false,
+         .tempUnavailable = true,
+         .cacheInsufficient = false,
+         .reason = reasonEviction},
+        {.txnTooLarge = false,
+         .tempUnavailable = true,
+         .cacheInsufficient = false,
+         .reason = reasonOverflow},
+        {.txnTooLarge = false,
+         .tempUnavailable = true,
+         .cacheInsufficient = true,
+         .reason = reasonEviction},
+        {.txnTooLarge = false,
+         .tempUnavailable = true,
+         .cacheInsufficient = true,
+         .reason = reasonOverflow},
+        {.txnTooLarge = true,
+         .tempUnavailable = true,
+         .cacheInsufficient = false,
+         .reason = reasonEviction},
+        {.txnTooLarge = true,
+         .tempUnavailable = true,
+         .cacheInsufficient = false,
+         .reason = reasonOverflow},
     };
 
     for (auto testCase : temporarilyUnavailableTestCases) {
-        throwsExpectedException(testCase, ErrorCodes::TemporarilyUnavailable);
+        throwsCachePressureException(testCase, ErrorCodes::TemporarilyUnavailable);
     }
 }
 
-TEST_F(WiredTigerUtilHelperTest, throwAppropriateException) {
+TEST_F(WiredTigerUtilHelperTest, throwWriteConflictException) {
     std::vector<TestCase> writeConflictExceptionTestCases = {
         // Throws WCE if reason for rollback was not cache pressure.
-        {txnTooLargeEnabled, disabled, insufficient, noReason},
-        {txnTooLargeEnabled, disabled, sufficient, noReason},
-        {txnTooLargeEnabled, temporarilyUnavailableEnabled, insufficient, noReason},
-        {txnTooLargeEnabled, temporarilyUnavailableEnabled, sufficient, noReason},
-        {disabled, temporarilyUnavailableEnabled, insufficient, noReason},
-        {disabled, temporarilyUnavailableEnabled, sufficient, noReason},
-        {disabled, disabled, insufficient, noReason},
-        {disabled, disabled, sufficient, noReason},
+        {.txnTooLarge = true,
+         .tempUnavailable = false,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = noReason},
+        {.txnTooLarge = true,
+         .tempUnavailable = true,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = noReason},
+        {.txnTooLarge = false,
+         .tempUnavailable = true,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = noReason},
+        {.txnTooLarge = false,
+         .tempUnavailable = false,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = noReason},
 
-        // Throws WCE if cache is sufficient for transaction no matter the reason for rollback if
-        // temporarilyUnavailable is disabled.
-        {txnTooLargeEnabled, disabled, sufficient, reasonEviction},
-        {txnTooLargeEnabled, disabled, sufficient, reasonOverflow},
-
-        // Throws WCE whether cache is sufficient or insufficient for transaction no matter the
-        // reason for rollback if both TransactionTooLargeForCache and temporarilyUnavailable are
-        // disabled.
-        {disabled, disabled, sufficient, reasonEviction},
-        {disabled, disabled, sufficient, reasonOverflow},
-        {disabled, disabled, insufficient, reasonOverflow},
-        {disabled, disabled, insufficient, reasonEviction},
+        // Throws WCE for transaction no matter the reason for rollback if both
+        // TransactionTooLargeForCache and temporarilyUnavailable are disabled.
+        {.txnTooLarge = false,
+         .tempUnavailable = false,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = reasonEviction},
+        {.txnTooLarge = false,
+         .tempUnavailable = false,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = reasonOverflow},
+        {.txnTooLarge = false,
+         .tempUnavailable = false,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = reasonOverflow},
+        {.txnTooLarge = false,
+         .tempUnavailable = false,
+         .cacheInsufficient = false /*ignored*/,
+         .reason = reasonEviction},
     };
 
     for (auto testCase : writeConflictExceptionTestCases) {
-        throwsExpectedException(testCase, ErrorCodes::WriteConflict);
+        throwsWriteConflictException(testCase, ErrorCodes::WriteConflict);
+    }
+}
+
+TEST_F(WiredTigerUtilHelperTest, doesNotThrowCachePressureException) {
+    std::vector<TestCase> notCachePressureExceptionTestCases = {
+        // Does not throw cache pressure exception if cache is sufficient for transaction no matter
+        // the reason for rollback if temporarilyUnavailable is disabled.
+        {.txnTooLarge = true,
+         .tempUnavailable = false,
+         .cacheInsufficient = false,
+         .reason = reasonEviction},
+        {.txnTooLarge = true,
+         .tempUnavailable = false,
+         .cacheInsufficient = false,
+         .reason = reasonOverflow},
+    };
+
+    for (auto testCase : notCachePressureExceptionTestCases) {
+        ASSERT_DOES_NOT_THROW(throwCachePressureExceptionIfAppropriate(testCase.txnTooLarge,
+                                                                       testCase.tempUnavailable,
+                                                                       testCase.cacheInsufficient,
+                                                                       testCase.reason,
+                                                                       prefix,
+                                                                       retCode));
     }
 }
 }  // namespace
