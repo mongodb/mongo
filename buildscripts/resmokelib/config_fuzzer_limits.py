@@ -357,6 +357,10 @@ config_fuzzer_params = {
             "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
             "fuzz_at": ["startup"],
         },
+        "failpoint.enableSignalTesting": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
         "enableDetailedConnectionHealthMetricLogLines": {
             "choices": [True, False],
             "period": 5,
@@ -414,6 +418,10 @@ config_fuzzer_params = {
             "choices": [True, False],
             "period": 10,
             "fuzz_at": ["startup", "runtime"],
+        },
+        "failpoint.enableSignalTesting": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
         },
     },
 }

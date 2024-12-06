@@ -17,9 +17,8 @@ class FuzzRuntimeStress(interface.Hook):
 
     IS_BACKGROUND = True
 
-    def __init__(self, hook_logger, fixture, option="off"):
+    def __init__(self, hook_logger, fixture):
         """Initialize the FuzzRuntimeStress."""
-        self._option = option
         interface.Hook.__init__(self, hook_logger, fixture, FuzzRuntimeStress.DESCRIPTION)
         self._stress_thread = None
 
@@ -28,7 +27,6 @@ class FuzzRuntimeStress(interface.Hook):
         self._stress_thread = _FuzzStressThread(
             self.logger,
             lifecycle_interface.FlagBasedThreadLifecycle(),
-            self._option,
         )
         self.logger.info("Starting the runtime stress fuzzing thread.")
         self._stress_thread.start()
@@ -61,14 +59,12 @@ class _FuzzStressThread(threading.Thread):
         self,
         logger,
         lifecycle,
-        option,
     ):
         """Initialize _FuzzStressThread."""
         threading.Thread.__init__(self, name="FuzzStressThread")
         self.daemon = True
         self.logger = logger
         self.__lifecycle = lifecycle
-        self._option = option
 
         self._interval_secs = _FuzzStressThread.INTERVAL_BETWEEN_FUZZ
         self._last_exec = 0
@@ -97,10 +93,9 @@ class _FuzzStressThread(threading.Thread):
             proc.start()
 
     def stress(self):
-        """Create processes to simulate stress depending on the option."""
-        self.logger.exception(f"Stress fuzzing thread creating {self._option} stress")
-        if self._option == "cpu":
-            self.fuzz_cpu_stress()
+        """Create processes to simulate stress."""
+        self.logger.exception("Stress fuzzing thread creating cpu stress")
+        self.fuzz_cpu_stress()
 
     def clear_stress(self):
         """Clear all processes spawned by this thread."""

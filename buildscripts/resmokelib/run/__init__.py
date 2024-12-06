@@ -838,7 +838,13 @@ class TestRunner(Subcommand):
                 }
             )
             return False
+
         executor_config = suite.get_executor_config()
+        if config.FUZZ_RUNTIME_STRESS in ("cpu", "all"):
+            executor_config.setdefault("hooks", []).append({"class": "FuzzRuntimeStress"})
+        if config.FUZZ_RUNTIME_STRESS in ("signals", "all"):
+            executor_config.setdefault("hooks", []).append({"class": "PeriodicStackTrace"})
+
         try:
             executor = testing.executor.TestSuiteExecutor(
                 self._exec_logger, suite, archive_instance=self._archive, **executor_config
@@ -1858,9 +1864,11 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--fuzzRuntimeStress",
             dest="fuzz_runtime_stress",
-            choices=["off", "cpu"],
+            choices=["off", "cpu", "signals", "all"],
             default="off",
-            help="Starts a hook that produces stress, the amount of which periodically changes.",
+            help="Starts a hook or hooks that produces stress. Use 'cpu' to start a hook that "
+            "produces stress on the CPU, the amount of which periodically changes. Use 'signals' "
+            "to start a hook which periodically forces servers to handle signals.",
         )
 
         mongodb_server_options.add_argument(
