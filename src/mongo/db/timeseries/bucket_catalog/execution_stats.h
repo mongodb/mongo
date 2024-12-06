@@ -76,14 +76,6 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketQueriesFailed;
     AtomicWord<long long> numBucketReopeningsFailed;
     AtomicWord<long long> numDuplicateBucketsReopened;
-
-    // TODO SERVER-70605: Remove the metrics below.
-    AtomicWord<long long> numBytesUncompressed;
-    AtomicWord<long long> numBytesCompressed;
-    AtomicWord<long long> numSubObjCompressionRestart;
-    AtomicWord<long long> numCompressedBuckets;
-    AtomicWord<long long> numUncompressedBuckets;
-    AtomicWord<long long> numFailedDecompressBuckets;
 };
 
 class ExecutionStatsController {
@@ -124,12 +116,6 @@ public:
     void incNumBucketQueriesFailed(long long increment = 1);
     void incNumBucketReopeningsFailed(long long increment = 1);
     void incNumDuplicateBucketsReopened(long long increment = 1);
-    void incNumBytesUncompressed(long long increment = 1);
-    void incNumBytesCompressed(long long increment = 1);
-    void incNumSubObjCompressionRestart(long long increment = 1);
-    void incNumCompressedBuckets(long long increment = 1);
-    void incNumUncompressedBuckets(long long increment = 1);
-    void incNumFailedDecompressBuckets(long long increment = 1);
 
 private:
     tracking::shared_ptr<ExecutionStats> _collectionStats;

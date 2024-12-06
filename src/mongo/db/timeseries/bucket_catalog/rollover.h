@@ -53,10 +53,6 @@ enum class RolloverReason {
     kCachePressure,  // System is under cache pressure, and adding this measurement would make
                      // the bucket larger than the dynamic size limit
     kSize,  // Adding this measurement would make the bucket larger than the normal size limit
-    kIncompatible,  // The measurement is incompatible with the bucket state. A few bucket members
-                    // are set differently based on whether the always used compressed feature flag
-                    // is enabled or disabled.
-                    // TODO SERVER-70605: remove this rollover reason.
 };
 
 }  // namespace mongo::timeseries::bucket_catalog

@@ -259,21 +259,6 @@ void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
         write_ops_exec::performUpdates(
             opCtx, compressionOp, OperationSource::kTimeseriesBucketCompression),
         request);
-
-    // TODO(SERVER-70605): Remove deprecated metrics.
-    closedBucket.stats.incNumBytesUncompressed(compressionStats.uncompressedSize);
-    if (result.result.isOK() && compressionStats.compressedSize > 0) {
-        closedBucket.stats.incNumBytesCompressed(compressionStats.compressedSize);
-        closedBucket.stats.incNumSubObjCompressionRestart(compressionStats.numInterleavedRestarts);
-        closedBucket.stats.incNumCompressedBuckets();
-    } else {
-        closedBucket.stats.incNumBytesCompressed(compressionStats.uncompressedSize);
-        closedBucket.stats.incNumUncompressedBuckets();
-
-        if (compressionStats.decompressionFailed) {
-            closedBucket.stats.incNumFailedDecompressBuckets();
-        }
-    }
 }
 
 std::shared_ptr<bucket_catalog::WriteBatch>& extractFromPair(
