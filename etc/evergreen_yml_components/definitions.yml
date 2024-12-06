@@ -1332,6 +1332,8 @@ functions:
       type: test
       params:
         binary: bash
+        include_expansions_in_env:
+          - evergreen_remote_exec
         args:
           - "src/evergreen/scons_compile.sh"
     - command: expansions.update

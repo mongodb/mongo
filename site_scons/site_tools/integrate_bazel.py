@@ -1145,6 +1145,9 @@ def generate(env: SCons.Environment.Environment) -> None:
         "--dynamic_mode=off",
     ]
 
+    if os.environ.get("evergreen_remote_exec") == "off":
+        bazel_internal_flags += ["--jobs=auto"]
+
     # Timeout linking on windows at 5 minutes to retry with a lower concurrency.
     if platform.system() == "Windows":
         bazel_internal_flags += [
