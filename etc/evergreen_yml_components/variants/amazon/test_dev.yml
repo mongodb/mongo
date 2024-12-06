@@ -272,6 +272,7 @@ buildvariants:
   - name: amazon2-x86-compile
     display_name: "* Compile Amazon Linux 2 x86 for sys-perf"
     tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2-x86-compile
@@ -306,6 +307,7 @@ buildvariants:
   - name: amazon2023-arm64-compile
     display_name: "* Compile Amazon Linux 2023 arm64 for sys-perf"
     tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2023-arm64-compile
@@ -323,6 +325,7 @@ buildvariants:
   - name: amazon2-arm64-compile-pgo
     display_name: "* Compile Amazon Linux 2 arm64 PGO for sys-perf"
     tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     expansions:
       platform: linux
       project_dir: dsi
@@ -346,8 +349,8 @@ buildvariants:
 
   - name: amazon2-arm64-mongocrypt-shlib-compile
     display_name: "* Compile mongo_crypt_v1.so Amazon Linux 2 arm64 for sys-perf"
-    cron: "0 0 * * 4" # 00:00 on Thursday
     tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2-arm64-compile
@@ -374,6 +377,7 @@ buildvariants:
   - name: amazon2-x86-streams-compile
     display_name: "* Compile Streams Amazon Linux 2 x86 for sys-perf"
     tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2-x86-streams-compile
