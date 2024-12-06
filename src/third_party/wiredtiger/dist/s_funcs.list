@@ -3,6 +3,7 @@ WT_CRC32_ENTRY
 WT_CURDUMP_PASS
 __bit_ffs
 __bit_nclr
+__live_restore_debug_dump_extent_list
 __ovfl_discard_dump
 __ovfl_reuse_dump
 __wt_bloom_drop

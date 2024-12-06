@@ -2455,23 +2455,23 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
         0 :
         __wt_atomic_loadv64(&txn_global->current) - checkpoint_pinned);
 
-    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_max, conn->ckpt_scrub_max);
-    if (conn->ckpt_scrub_min != UINT64_MAX)
-        WT_STATP_CONN_SET(session, stats, checkpoint_scrub_min, conn->ckpt_scrub_min);
-    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_recent, conn->ckpt_scrub_recent);
-    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_total, conn->ckpt_scrub_total);
+    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_max, conn->ckpt.scrub_max);
+    if (conn->ckpt.scrub_min != UINT64_MAX)
+        WT_STATP_CONN_SET(session, stats, checkpoint_scrub_min, conn->ckpt.scrub_min);
+    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_recent, conn->ckpt.scrub_recent);
+    WT_STATP_CONN_SET(session, stats, checkpoint_scrub_total, conn->ckpt.scrub_total);
 
-    WT_STATP_CONN_SET(session, stats, checkpoint_prep_max, conn->ckpt_prep_max);
-    if (conn->ckpt_prep_min != UINT64_MAX)
-        WT_STATP_CONN_SET(session, stats, checkpoint_prep_min, conn->ckpt_prep_min);
-    WT_STATP_CONN_SET(session, stats, checkpoint_prep_recent, conn->ckpt_prep_recent);
-    WT_STATP_CONN_SET(session, stats, checkpoint_prep_total, conn->ckpt_prep_total);
+    WT_STATP_CONN_SET(session, stats, checkpoint_prep_max, conn->ckpt.prep_max);
+    if (conn->ckpt.prep_min != UINT64_MAX)
+        WT_STATP_CONN_SET(session, stats, checkpoint_prep_min, conn->ckpt.prep_min);
+    WT_STATP_CONN_SET(session, stats, checkpoint_prep_recent, conn->ckpt.prep_recent);
+    WT_STATP_CONN_SET(session, stats, checkpoint_prep_total, conn->ckpt.prep_total);
 
-    WT_STATP_CONN_SET(session, stats, checkpoint_time_max, conn->ckpt_time_max);
-    if (conn->ckpt_time_min != UINT64_MAX)
-        WT_STATP_CONN_SET(session, stats, checkpoint_time_min, conn->ckpt_time_min);
-    WT_STATP_CONN_SET(session, stats, checkpoint_time_recent, conn->ckpt_time_recent);
-    WT_STATP_CONN_SET(session, stats, checkpoint_time_total, conn->ckpt_time_total);
+    WT_STATP_CONN_SET(session, stats, checkpoint_time_max, conn->ckpt.time_max);
+    if (conn->ckpt.time_min != UINT64_MAX)
+        WT_STATP_CONN_SET(session, stats, checkpoint_time_min, conn->ckpt.time_min);
+    WT_STATP_CONN_SET(session, stats, checkpoint_time_recent, conn->ckpt.time_recent);
+    WT_STATP_CONN_SET(session, stats, checkpoint_time_total, conn->ckpt.time_total);
 }
 
 /*

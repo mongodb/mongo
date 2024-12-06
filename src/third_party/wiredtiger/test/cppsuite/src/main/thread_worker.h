@@ -62,7 +62,7 @@ public:
     void finish();
 
     /* If the value's size is less than the given size, padding of '0' is added to the value. */
-    std::string pad_string(const std::string &value, uint64_t size);
+    static std::string pad_string(const std::string &value, uint64_t size);
 
     /*
      * Generic update function, takes a collection_id, key and value.

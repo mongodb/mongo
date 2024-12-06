@@ -1009,12 +1009,9 @@ __posix_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session)
  *     Initialize a POSIX configuration.
  */
 int
-__wt_os_posix(WT_SESSION_IMPL *session)
+__wt_os_posix(WT_SESSION_IMPL *session, WT_FILE_SYSTEM **fsp)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_FILE_SYSTEM *file_system;
-
-    conn = S2C(session);
 
     WT_RET(__wt_calloc_one(session, &file_system));
 
@@ -1029,8 +1026,8 @@ __wt_os_posix(WT_SESSION_IMPL *session)
     file_system->fs_size = __posix_fs_size;
     file_system->terminate = __posix_terminate;
 
-    /* Switch it into place. */
-    conn->file_system = file_system;
+    /* Return the file system. */
+    *fsp = file_system;
 
     return (0);
 }

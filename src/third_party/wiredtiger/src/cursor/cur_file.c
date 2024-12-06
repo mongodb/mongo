@@ -27,40 +27,39 @@
  * specific checkpoint and we got that checkpoint's write generation from the global checkpoint
  * metadata, not from per-tree information.
  */
-#define WT_WITH_CHECKPOINT(session, cbt, op)                                                \
-    do {                                                                                    \
-        WT_TXN *__saved_txn;                                                                \
-        uint64_t __saved_write_gen = (session)->checkpoint_write_gen;                       \
-        bool no_reconcile_set;                                                              \
-                                                                                            \
-        no_reconcile_set = F_ISSET((session), WT_SESSION_NO_RECONCILE);                     \
-        if ((cbt)->checkpoint_txn != NULL) {                                                \
-            __saved_txn = (session)->txn;                                                   \
-            if (F_ISSET(__saved_txn, WT_TXN_IS_CHECKPOINT)) {                               \
-                WT_ASSERT(                                                                  \
-                  session, (cbt)->checkpoint_write_gen == (session)->checkpoint_write_gen); \
-                __saved_txn = NULL;                                                         \
-            } else {                                                                        \
-                (session)->txn = (cbt)->checkpoint_txn;                                     \
-                /* Reconciliation is disabled when reading a checkpoint. */                 \
-                F_SET((session), WT_SESSION_NO_RECONCILE);                                  \
-                if ((cbt)->checkpoint_hs_dhandle != NULL) {                                 \
-                    WT_ASSERT(session, (session)->hs_checkpoint == NULL);                   \
-                    (session)->hs_checkpoint = (cbt)->checkpoint_hs_dhandle->checkpoint;    \
-                }                                                                           \
-                __saved_write_gen = (session)->checkpoint_write_gen;                        \
-                (session)->checkpoint_write_gen = (cbt)->checkpoint_write_gen;              \
-            }                                                                               \
-        } else                                                                              \
-            __saved_txn = NULL;                                                             \
-        op;                                                                                 \
-        if (__saved_txn != NULL) {                                                          \
-            (session)->txn = __saved_txn;                                                   \
-            if (!no_reconcile_set)                                                          \
-                F_CLR((session), WT_SESSION_NO_RECONCILE);                                  \
-            (session)->hs_checkpoint = NULL;                                                \
-            (session)->checkpoint_write_gen = __saved_write_gen;                            \
-        }                                                                                   \
+#define WT_WITH_CHECKPOINT(session, cbt, op)                                                  \
+    do {                                                                                      \
+        WT_TXN *__saved_txn;                                                                  \
+        uint64_t __saved_write_gen = (session)->ckpt.write_gen;                               \
+        bool no_reconcile_set;                                                                \
+                                                                                              \
+        no_reconcile_set = F_ISSET((session), WT_SESSION_NO_RECONCILE);                       \
+        if ((cbt)->checkpoint_txn != NULL) {                                                  \
+            __saved_txn = (session)->txn;                                                     \
+            if (F_ISSET(__saved_txn, WT_TXN_IS_CHECKPOINT)) {                                 \
+                WT_ASSERT(session, (cbt)->checkpoint_write_gen == (session)->ckpt.write_gen); \
+                __saved_txn = NULL;                                                           \
+            } else {                                                                          \
+                (session)->txn = (cbt)->checkpoint_txn;                                       \
+                /* Reconciliation is disabled when reading a checkpoint. */                   \
+                F_SET((session), WT_SESSION_NO_RECONCILE);                                    \
+                if ((cbt)->checkpoint_hs_dhandle != NULL) {                                   \
+                    WT_ASSERT(session, (session)->hs_checkpoint == NULL);                     \
+                    (session)->hs_checkpoint = (cbt)->checkpoint_hs_dhandle->checkpoint;      \
+                }                                                                             \
+                __saved_write_gen = (session)->ckpt.write_gen;                                \
+                (session)->ckpt.write_gen = (cbt)->checkpoint_write_gen;                      \
+            }                                                                                 \
+        } else                                                                                \
+            __saved_txn = NULL;                                                               \
+        op;                                                                                   \
+        if (__saved_txn != NULL) {                                                            \
+            (session)->txn = __saved_txn;                                                     \
+            if (!no_reconcile_set)                                                            \
+                F_CLR((session), WT_SESSION_NO_RECONCILE);                                    \
+            (session)->hs_checkpoint = NULL;                                                  \
+            (session)->ckpt.write_gen = __saved_write_gen;                                    \
+        }                                                                                     \
     } while (0)
 
 /*

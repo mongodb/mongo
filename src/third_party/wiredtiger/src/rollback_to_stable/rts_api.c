@@ -257,6 +257,7 @@ static void
 __rollback_to_stable_finalize(WT_ROLLBACK_TO_STABLE *rts)
 {
     rts->dryrun = false;
+    rts->threads_num = 0;
 }
 
 /*
@@ -315,11 +316,8 @@ __rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckpt)
       dryrun ? " dryrun" : "", time_diff_ms);
     WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 0);
 
-    __rollback_to_stable_finalize(S2C(session)->rts);
-
     /* Reset the RTS configuration to default. */
-    S2C(session)->rts->dryrun = false;
-    S2C(session)->rts->threads_num = 0;
+    __rollback_to_stable_finalize(S2C(session)->rts);
 
     WT_TRET(__wt_session_close_internal(session));
 

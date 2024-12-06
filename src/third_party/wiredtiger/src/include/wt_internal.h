@@ -135,6 +135,10 @@ struct __wt_chunkcache_pinned_list;
 typedef struct __wt_chunkcache_pinned_list WT_CHUNKCACHE_PINNED_LIST;
 struct __wt_ckpt;
 typedef struct __wt_ckpt WT_CKPT;
+struct __wt_ckpt_connection;
+typedef struct __wt_ckpt_connection WT_CKPT_CONNECTION;
+struct __wt_ckpt_session;
+typedef struct __wt_ckpt_session WT_CKPT_SESSION;
 struct __wt_ckpt_snapshot;
 typedef struct __wt_ckpt_snapshot WT_CKPT_SNAPSHOT;
 struct __wt_col;
@@ -265,6 +269,14 @@ struct __wt_json;
 typedef struct __wt_json WT_JSON;
 struct __wt_keyed_encryptor;
 typedef struct __wt_keyed_encryptor WT_KEYED_ENCRYPTOR;
+struct __wt_live_restore_file_handle;
+typedef struct __wt_live_restore_file_handle WT_LIVE_RESTORE_FILE_HANDLE;
+struct __wt_live_restore_fs;
+typedef struct __wt_live_restore_fs WT_LIVE_RESTORE_FS;
+struct __wt_live_restore_fs_layer;
+typedef struct __wt_live_restore_fs_layer WT_LIVE_RESTORE_FS_LAYER;
+struct __wt_live_restore_hole_list;
+typedef struct __wt_live_restore_hole_list WT_LIVE_RESTORE_HOLE_LIST;
 struct __wt_log;
 typedef struct __wt_log WT_LOG;
 struct __wt_log_desc;
@@ -523,6 +535,7 @@ typedef uint64_t wt_timestamp_t;
 #include "generation.h"
 #include "hazard.h"
 #include "json.h"
+#include "../live_restore/live_restore.h"
 #include "../log/log.h"
 #include "lsm.h"
 #include "meta.h" /* required by block.h */

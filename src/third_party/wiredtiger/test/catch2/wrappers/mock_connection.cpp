@@ -90,7 +90,7 @@ mock_connection::setup_block_manager(WT_SESSION_IMPL *session)
 #if defined(_MSC_VER)
     WT_RET(__wt_os_win(session));
 #else
-    WT_RET(__wt_os_posix(session));
+    WT_RET(__wt_os_posix(session, &_connection_impl->file_system));
 #endif
     return 0;
 }

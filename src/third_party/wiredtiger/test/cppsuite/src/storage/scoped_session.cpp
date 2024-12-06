@@ -52,6 +52,13 @@ scoped_session::scoped_session(scoped_session &&other)
     std::swap(_session, other._session);
 }
 
+void
+scoped_session::close_session()
+{
+    testutil_check(_session->close(_session, nullptr));
+    _session = nullptr;
+}
+
 /*
  * Implement move assignment by move constructing a temporary and swapping its internals with the
  * current session. This means that the currently held WT_SESSION will get destroyed as the

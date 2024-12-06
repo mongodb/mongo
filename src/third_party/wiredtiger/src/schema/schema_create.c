@@ -64,7 +64,7 @@ __check_imported_ts(
 
 err:
     if (ckptbase != NULL)
-        __wt_meta_ckptlist_free(session, &ckptbase);
+        __wt_ckptlist_free(session, &ckptbase);
     return (ret);
 }
 

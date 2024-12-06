@@ -137,7 +137,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
 err:
     F_CLR(session, WT_SESSION_IMPORT_REPAIR);
 
-    __wt_meta_ckptlist_free(session, &ckptbase);
+    __wt_ckptlist_free(session, &ckptbase);
 
     __wt_free(session, checkpoint_list);
     if (ret != 0)

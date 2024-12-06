@@ -88,6 +88,7 @@ Crummey
 CustomersPhone
 Cygwin
 DESC
+DEST
 DHANDLE
 DNE
 DONTNEED
@@ -508,6 +509,7 @@ bInheritHandle
 backoff
 bal
 basecfg
+basename
 bb
 bba
 bbb

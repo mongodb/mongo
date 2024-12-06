@@ -93,11 +93,11 @@ __wt_metadata_get_ckptlist(WT_SESSION *session, const char *name, WT_CKPT **ckpt
 
 /*
  * __wt_metadata_free_ckptlist --
- *     Public entry point to __wt_meta_ckptlist_free (for wt list).
+ *     Public entry point to __wt_ckptlist_free (for wt list).
  */
 void
 __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase)
   WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-    __wt_meta_ckptlist_free((WT_SESSION_IMPL *)session, &ckptbase);
+    __wt_ckptlist_free((WT_SESSION_IMPL *)session, &ckptbase);
 }

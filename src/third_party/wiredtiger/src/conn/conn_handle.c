@@ -86,9 +86,9 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     WT_RET(__wt_spin_init(session, &conn->block_lock, "block manager"));
     TAILQ_INIT(&conn->blockqh); /* Block manager list */
 
-    conn->ckpt_prep_min = UINT64_MAX;
-    conn->ckpt_time_min = UINT64_MAX;
-    conn->ckpt_scrub_min = UINT64_MAX;
+    conn->ckpt.prep_min = UINT64_MAX;
+    conn->ckpt.time_min = UINT64_MAX;
+    conn->ckpt.scrub_min = UINT64_MAX;
 
 err:
     return (ret);

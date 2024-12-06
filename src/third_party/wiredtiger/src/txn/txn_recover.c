@@ -667,7 +667,7 @@ __recovery_set_ckpt_base_write_gen(WT_RECOVERY *r)
         WT_CLEAR(cval);
         WT_ERR(__wt_config_getones(session, sys_config, WT_SYSTEM_BASE_WRITE_GEN, &cval));
         if (cval.len != 0)
-            S2C(session)->last_ckpt_base_write_gen = (uint64_t)cval.val;
+            S2C(session)->ckpt.last_base_write_gen = (uint64_t)cval.val;
     }
 
 err:

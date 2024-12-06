@@ -319,7 +319,7 @@ struct __wt_name_flag {
     do {                                                                                       \
         WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_WRITE)); \
         (conn)->hot_backup_timestamp = (conn)->txn_global.last_ckpt_timestamp;                 \
-        __wt_atomic_store64(&(conn)->hot_backup_start, (conn)->ckpt_most_recent);              \
+        __wt_atomic_store64(&(conn)->hot_backup_start, (conn)->ckpt.most_recent);              \
         (conn)->hot_backup_list = NULL;                                                        \
     } while (0)
 
@@ -510,51 +510,7 @@ struct __wt_connection_impl {
     char **hot_backup_list;        /* Hot backup file list */
     uint32_t *partial_backup_remove_ids; /* Remove btree id list for partial backup */
 
-    WT_SESSION_IMPL *ckpt_session;       /* Checkpoint thread session */
-    wt_thread_t ckpt_tid;                /* Checkpoint thread */
-    bool ckpt_tid_set;                   /* Checkpoint thread set */
-    WT_CONDVAR *ckpt_cond;               /* Checkpoint wait mutex */
-    wt_shared uint64_t ckpt_most_recent; /* Clock value of most recent checkpoint */
-#define WT_CKPT_LOGSIZE(conn) (__wt_atomic_loadi64(&(conn)->ckpt_logsize) != 0)
-    wt_shared wt_off_t ckpt_logsize; /* Checkpoint log size period */
-    bool ckpt_signalled;             /* Checkpoint signalled */
-
-    uint64_t ckpt_apply;           /* Checkpoint handles applied */
-    uint64_t ckpt_apply_time;      /* Checkpoint applied handles gather time */
-    uint64_t ckpt_drop;            /* Checkpoint handles drop */
-    uint64_t ckpt_drop_time;       /* Checkpoint handles drop time */
-    uint64_t ckpt_lock;            /* Checkpoint handles lock */
-    uint64_t ckpt_lock_time;       /* Checkpoint handles lock time */
-    uint64_t ckpt_meta_check;      /* Checkpoint handles metadata check */
-    uint64_t ckpt_meta_check_time; /* Checkpoint handles metadata check time */
-    uint64_t ckpt_skip;            /* Checkpoint handles skipped */
-    uint64_t ckpt_skip_time;       /* Checkpoint skipped handles gather time */
-    uint64_t ckpt_usecs;           /* Checkpoint timer */
-
-    uint64_t ckpt_scrub_max; /* Checkpoint scrub time min/max */
-    uint64_t ckpt_scrub_min;
-    uint64_t ckpt_scrub_recent; /* Checkpoint scrub time recent/total */
-    uint64_t ckpt_scrub_total;
-
-    uint64_t ckpt_prep_max; /* Checkpoint prepare time min/max */
-    uint64_t ckpt_prep_min;
-    uint64_t ckpt_prep_recent; /* Checkpoint prepare time recent/total */
-    uint64_t ckpt_prep_total;
-    uint64_t ckpt_time_max; /* Checkpoint time min/max */
-    uint64_t ckpt_time_min;
-    uint64_t ckpt_time_recent; /* Checkpoint time recent/total */
-    uint64_t ckpt_time_total;
-
-    /* Checkpoint stats and verbosity timers */
-    struct timespec ckpt_prep_end;
-    struct timespec ckpt_prep_start;
-    struct timespec ckpt_timer_start;
-    struct timespec ckpt_timer_scrub_end;
-
-    /* Checkpoint progress message data */
-    uint64_t ckpt_progress_msg_count;
-    uint64_t ckpt_write_bytes;
-    uint64_t ckpt_write_pages;
+    WT_CKPT_CONNECTION ckpt;
 
     /* Record the important timestamps of each stage in recovery. */
     struct __wt_recovery_timeline {
@@ -576,9 +532,6 @@ struct __wt_connection_impl {
 
     /* Connection's base write generation. */
     uint64_t base_write_gen;
-
-    /* Last checkpoint connection's base write generation */
-    uint64_t last_ckpt_base_write_gen;
 
     uint32_t stat_flags; /* Options declared in flags.py */
 
@@ -851,20 +804,21 @@ struct __wt_connection_impl {
 #define WT_CONN_INCR_BACKUP 0x00004000u
 #define WT_CONN_IN_MEMORY 0x00008000u
 #define WT_CONN_LEAK_MEMORY 0x00010000u
-#define WT_CONN_LSM_MERGE 0x00020000u
-#define WT_CONN_MINIMAL 0x00040000u
-#define WT_CONN_OPTRACK 0x00080000u
-#define WT_CONN_PANIC 0x00100000u
-#define WT_CONN_PREFETCH_RUN 0x00200000u
-#define WT_CONN_READONLY 0x00400000u
-#define WT_CONN_READY 0x00800000u
-#define WT_CONN_RECONFIGURING 0x01000000u
-#define WT_CONN_RECOVERING 0x02000000u
-#define WT_CONN_RECOVERY_COMPLETE 0x04000000u
-#define WT_CONN_RTS_THREAD_RUN 0x08000000u
-#define WT_CONN_SALVAGE 0x10000000u
-#define WT_CONN_TIERED_FIRST_FLUSH 0x20000000u
-#define WT_CONN_WAS_BACKUP 0x40000000u
+#define WT_CONN_LIVE_RESTORE 0x00020000u
+#define WT_CONN_LSM_MERGE 0x00040000u
+#define WT_CONN_MINIMAL 0x00080000u
+#define WT_CONN_OPTRACK 0x00100000u
+#define WT_CONN_PANIC 0x00200000u
+#define WT_CONN_PREFETCH_RUN 0x00400000u
+#define WT_CONN_READONLY 0x00800000u
+#define WT_CONN_READY 0x01000000u
+#define WT_CONN_RECONFIGURING 0x02000000u
+#define WT_CONN_RECOVERING 0x04000000u
+#define WT_CONN_RECOVERY_COMPLETE 0x08000000u
+#define WT_CONN_RTS_THREAD_RUN 0x10000000u
+#define WT_CONN_SALVAGE 0x20000000u
+#define WT_CONN_TIERED_FIRST_FLUSH 0x40000000u
+#define WT_CONN_WAS_BACKUP 0x80000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 };

@@ -218,7 +218,7 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
         WT_ERR(__wt_meta_ckptlist_set(session, dhandle, ckptbase, NULL));
 
 err:
-    __wt_meta_ckptlist_free(session, &ckptbase);
+    __wt_ckptlist_free(session, &ckptbase);
     __wt_free(session, config);
     return (ret);
 }

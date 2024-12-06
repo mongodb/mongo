@@ -26,23 +26,23 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
     conn = S2C(session);
 
     WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
-    conn->ckpt_usecs = (uint64_t)cval.val * WT_MILLION;
+    conn->ckpt.usecs = (uint64_t)cval.val * WT_MILLION;
 
     WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
     ckpt_logsize = (wt_off_t)cval.val;
-    __wt_atomic_storei64(&conn->ckpt_logsize, ckpt_logsize);
+    __wt_atomic_storei64(&conn->ckpt.logsize, ckpt_logsize);
 
     /*
      * The checkpoint configuration requires a wait time and/or a log size, if neither is set, we're
      * not running at all. Checkpoints based on log size also require logging be enabled.
      */
-    if (conn->ckpt_usecs != 0 || (ckpt_logsize != 0 && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))) {
+    if (conn->ckpt.usecs != 0 || (ckpt_logsize != 0 && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))) {
         /*
          * If checkpointing based on log data, use a minimum of the log file size. The logging
          * subsystem has already been initialized.
          */
         if (ckpt_logsize != 0 && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
-            __wt_atomic_storei64(&conn->ckpt_logsize, WT_MAX(ckpt_logsize, conn->log_mgr.file_max));
+            __wt_atomic_storei64(&conn->ckpt.logsize, WT_MAX(ckpt_logsize, conn->log_mgr.file_max));
         /* Checkpoints are incompatible with in-memory configuration */
         WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
         if (cval.val != 0)
@@ -89,7 +89,7 @@ __ckpt_server(void *arg)
          * Wait... NOTE: If the user only configured logsize, then usecs will be 0 and this wait
          * won't return until signalled.
          */
-        __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs, __ckpt_server_run_chk);
+        __wt_cond_wait(session, conn->ckpt.cond, conn->ckpt.usecs, __ckpt_server_run_chk);
 
         /* Check if we're quitting or being reconfigured. */
         if (!__ckpt_server_run_chk(session))
@@ -102,16 +102,16 @@ __ckpt_server(void *arg)
          * Reset the log file size counters if the checkpoint wasn't skipped.
          */
         if (checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT) &&
-          __wt_atomic_loadi64(&conn->ckpt_logsize)) {
+          __wt_atomic_loadi64(&conn->ckpt.logsize)) {
             __wt_log_written_reset(session);
-            conn->ckpt_signalled = false;
+            conn->ckpt.signalled = false;
 
             /*
              * In case we crossed the log limit during the checkpoint and the condition variable was
              * already signalled, do a tiny wait to clear it so we don't do another checkpoint
              * immediately.
              */
-            __wt_cond_wait(session, conn->ckpt_cond, 1, NULL);
+            __wt_cond_wait(session, conn->ckpt.cond, 1, NULL);
         }
     }
 
@@ -133,7 +133,7 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
     uint32_t session_flags;
 
     /* Nothing to do if the server is already running. */
-    if (conn->ckpt_session != NULL)
+    if (conn->ckpt.session != NULL)
         return (0);
 
     FLD_SET(conn->server_flags, WT_CONN_SERVER_CHECKPOINT);
@@ -146,16 +146,16 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
      */
     session_flags = WT_SESSION_CAN_WAIT;
     WT_RET(__wt_open_internal_session(
-      conn, "checkpoint-server", true, session_flags, 0, &conn->ckpt_session));
-    session = conn->ckpt_session;
+      conn, "checkpoint-server", true, session_flags, 0, &conn->ckpt.session));
+    session = conn->ckpt.session;
 
-    WT_RET(__wt_cond_alloc(session, "checkpoint server", &conn->ckpt_cond));
+    WT_RET(__wt_cond_alloc(session, "checkpoint server", &conn->ckpt.cond));
 
     /*
      * Start the thread.
      */
-    WT_RET(__wt_thread_create(session, &conn->ckpt_tid, __ckpt_server, session));
-    conn->ckpt_tid_set = true;
+    WT_RET(__wt_thread_create(session, &conn->ckpt.tid, __ckpt_server, session));
+    conn->ckpt.tid_set = true;
 
     return (0);
 }
@@ -181,7 +181,7 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
      * have to worry about races where a running server is reading configuration information that
      * we're updating, and it's not expected that reconfiguration will happen a lot.
      */
-    if (conn->ckpt_session != NULL)
+    if (conn->ckpt.session != NULL)
         WT_RET(__wt_checkpoint_server_destroy(session));
 
     WT_RET(__ckpt_server_config(session, cfg, &start));
@@ -204,24 +204,24 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     FLD_CLR(conn->server_flags, WT_CONN_SERVER_CHECKPOINT);
-    if (conn->ckpt_tid_set) {
-        __wt_cond_signal(session, conn->ckpt_cond);
-        WT_TRET(__wt_thread_join(session, &conn->ckpt_tid));
-        conn->ckpt_tid_set = false;
+    if (conn->ckpt.tid_set) {
+        __wt_cond_signal(session, conn->ckpt.cond);
+        WT_TRET(__wt_thread_join(session, &conn->ckpt.tid));
+        conn->ckpt.tid_set = false;
     }
-    __wt_cond_destroy(session, &conn->ckpt_cond);
+    __wt_cond_destroy(session, &conn->ckpt.cond);
 
     /* Close the server thread's session. */
-    if (conn->ckpt_session != NULL)
-        WT_TRET(__wt_session_close_internal(conn->ckpt_session));
+    if (conn->ckpt.session != NULL)
+        WT_TRET(__wt_session_close_internal(conn->ckpt.session));
 
     /*
      * Ensure checkpoint settings are cleared - so that reconfigure doesn't get confused.
      */
-    conn->ckpt_session = NULL;
-    conn->ckpt_tid_set = false;
-    conn->ckpt_cond = NULL;
-    conn->ckpt_usecs = 0;
+    conn->ckpt.session = NULL;
+    conn->ckpt.tid_set = false;
+    conn->ckpt.cond = NULL;
+    conn->ckpt.usecs = 0;
 
     return (ret);
 }
@@ -237,8 +237,8 @@ __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize)
 
     conn = S2C(session);
     WT_ASSERT(session, WT_CKPT_LOGSIZE(conn));
-    if (logsize >= __wt_atomic_loadi64(&conn->ckpt_logsize) && !conn->ckpt_signalled) {
-        __wt_cond_signal(session, conn->ckpt_cond);
-        conn->ckpt_signalled = true;
+    if (logsize >= __wt_atomic_loadi64(&conn->ckpt.logsize) && !conn->ckpt.signalled) {
+        __wt_cond_signal(session, conn->ckpt.cond);
+        conn->ckpt.signalled = true;
     }
 }

@@ -72,6 +72,7 @@ public:
     WT_SESSION *get();
 
     scoped_cursor open_scoped_cursor(const std::string &uri, const std::string &cfg = "");
+    void close_session();
 
 private:
     WT_SESSION *_session = nullptr;

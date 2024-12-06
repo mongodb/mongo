@@ -59,6 +59,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     truncate = 0.005;
 
     checkpoint = 0.02;
+    checkpoint_crash = 0.002;
     crash = 0.002;
     evict = 0.1;
     restart = 0.002;
@@ -505,6 +506,14 @@ kv_workload_generator::run()
                 *p << operation::checkpoint();
                 _sequences.push_back(p);
             }
+            probability_case(_spec.checkpoint_crash)
+            {
+                kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
+                  _sequences.size(), kv_workload_sequence_type::checkpoint_crash);
+                uint64_t random_number = _random.next_uint64(1000);
+                *p << operation::checkpoint_crash(random_number);
+                _sequences.push_back(p);
+            }
             probability_case(_spec.crash)
             {
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
@@ -625,6 +634,7 @@ kv_workload_generator::run()
                     ckpt_oldest = k_timestamp_none;
             }
             if (s->sequence->type() == kv_workload_sequence_type::crash ||
+              s->sequence->type() == kv_workload_sequence_type::checkpoint_crash ||
               s->sequence->type() == kv_workload_sequence_type::restart) {
                 oldest = ckpt_oldest;
                 stable = ckpt_stable;
@@ -667,6 +677,7 @@ kv_workload_generator::run()
 
         /* If the operation resulted in a database crash or restart, stop all started sequences. */
         if (std::holds_alternative<operation::crash>(op) ||
+          std::holds_alternative<operation::checkpoint_crash>(op) ||
           std::holds_alternative<operation::restart>(op)) {
             t.complete_all();
             continue;

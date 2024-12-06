@@ -57,6 +57,7 @@ public:
 
     void close();
     void create(const std::string &config, const std::string &home);
+    void reopen(const std::string &config, const std::string &home);
     scoped_session create_session();
 
     WT_CONNECTION *get_connection();

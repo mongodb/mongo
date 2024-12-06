@@ -301,6 +301,51 @@ operator<<(std::ostream &out, const checkpoint &op)
 }
 
 /*
+ * checkpoint_crash --
+ *     A representation of this workload operation.
+ */
+struct checkpoint_crash : public without_txn_id, public without_table_id {
+    uint64_t crash_step;
+
+    /*
+     * checkpoint_crash::checkpoint_crash --
+     *     Create the operation.
+     */
+    inline checkpoint_crash(const uint64_t crash_step) : crash_step(crash_step) {}
+
+    /*
+     * checkpoint_crash::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const checkpoint_crash &other) const noexcept
+    {
+        return crash_step == other.crash_step;
+    }
+
+    /*
+     * checkpoint_crash::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const checkpoint_crash &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const checkpoint_crash &op)
+{
+    out << "checkpoint_crash(" << op.crash_step << ")";
+    return out;
+}
+
+/*
  * commit_transaction --
  *     A representation of this workload operation.
  */
@@ -1069,10 +1114,10 @@ operator<<(std::ostream &out, const wt_config &op)
  * any --
  *     Any workload operation.
  */
-using any = std::variant<begin_transaction, breakpoint, checkpoint, commit_transaction, crash,
-  create_table, evict, insert, nop, prepare_transaction, remove, restart, rollback_to_stable,
-  rollback_transaction, set_commit_timestamp, set_oldest_timestamp, set_stable_timestamp, truncate,
-  wt_config>;
+using any = std::variant<begin_transaction, breakpoint, checkpoint, checkpoint_crash,
+  commit_transaction, crash, create_table, evict, insert, nop, prepare_transaction, remove, restart,
+  rollback_to_stable, rollback_transaction, set_commit_timestamp, set_oldest_timestamp,
+  set_stable_timestamp, truncate, wt_config>;
 
 /*
  * operator<< --

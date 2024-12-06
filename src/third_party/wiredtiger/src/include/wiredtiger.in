@@ -1895,6 +1895,10 @@ struct __wt_session {
      * for internal testing purposes., a set of related configuration options defined as follows.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;checkpoint_cleanup, if true\, checkpoint cleanup thread is
      * triggered to perform the checkpoint cleanup., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;checkpoint_crash_point, non-negative number between 0 and
+     * 1000 will trigger a controlled crash during the checkpoint process.  Lower values will
+     * trigger crashes in the initial phase of checkpoint\, while higher values will result in
+     * crashes in the final phase of the checkpoint process., an integer; default \c -1.}
      * @config{
      * ),,}
      * @config{drop, specify a list of checkpoints to drop.  The list may additionally contain one
@@ -3189,6 +3193,18 @@ struct __wt_connection {
  * given as a list\, where each option specifies an event handler category e.g.  'error' represents
  * the messages from the WT_EVENT_HANDLER::handle_error method., a list\, with values chosen from
  * the following options: \c "error"\, \c "message"; default \c [].}
+ * @config{live_restore = (, Live restore configuration options.  These options control the behavior
+ * of WiredTiger when live restoring from a backup., a set of related configuration options defined
+ * as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether live restore is enabled or not., a
+ * boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to the backup
+ * that will be restored from., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * threads_max, maximum number of threads WiredTiger will start to migrate data from the backup to
+ * the running WiredTiger database.  Each worker thread uses a session handle from the configured
+ * session_max., an integer between \c 1 and \c 12; default \c 8.}
+ * @config{ ),,}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from the configured
  * session_max., a set of related configuration options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log records.  Permitted

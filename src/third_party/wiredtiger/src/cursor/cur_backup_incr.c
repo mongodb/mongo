@@ -44,7 +44,7 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
     ret = __wt_meta_checkpoint(session, btree->dhandle->name, 0, &ckpt);
     if (ret == 0 && ckpt.addr.size == 0)
         F_SET(cb, WT_CURBACKUP_CKPT_FAKE);
-    __wt_meta_checkpoint_free(session, &ckpt);
+    __wt_checkpoint_free(session, &ckpt);
 
     WT_ASSERT(session, cb->cfg_current != NULL);
     WT_ERR(__wt_config_getones(session, cb->cfg_current, "block_compressor", &v));

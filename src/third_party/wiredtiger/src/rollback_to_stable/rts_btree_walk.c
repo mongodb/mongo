@@ -350,7 +350,7 @@ __wti_rts_btree_walk_btree_apply(
      * to confirm that the btree is modified in the previous restart cycle.
      */
     if (WT_CHECK_RECOVERY_FLAG_TXNID(session, rollback_txnid) &&
-      (write_gen >= S2C(session)->last_ckpt_base_write_gen)) {
+      (write_gen >= S2C(session)->ckpt.last_base_write_gen)) {
         has_txn_updates_gt_than_ckpt_snap = true;
         /* Increment the inconsistent checkpoint stats counter. */
         WT_STAT_CONN_DSRC_INCR(session, txn_rts_inconsistent_ckpt);
