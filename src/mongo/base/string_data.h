@@ -110,13 +110,7 @@ public:
      * the first 'len' characters starting at 'c'. The range of
      * characters in the half-open interval `[c, c + len)` must be valid.
      */
-    constexpr StringData(const char* c, size_type len) : StringData(std::string_view{c, len}) {
-        if constexpr (kDebugBuild) {
-            if (MONGO_unlikely(!data() && (size() != 0))) {
-                invariant(0, "StringData(nullptr,len) requires len==0");
-            }
-        }
-    }
+    constexpr StringData(const char* c, size_type len) : StringData(_checkedView(c, len)) {}
 
 #if MONGO_STRING_DATA_CXX20
     /**
@@ -354,6 +348,14 @@ public:
 
 private:
     explicit constexpr StringData(std::string_view sv) : _sv{sv} {}
+
+    static constexpr std::string_view _checkedView(const char* c, size_type len) {
+        if constexpr (kDebugBuild) {
+            if (MONGO_unlikely(!c && (len != 0)))
+                invariant(0, "StringData(nullptr,len) requires len==0");
+        }
+        return std::string_view{c, len};
+    }
 
     std::string_view _sv;
 };
