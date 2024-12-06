@@ -199,7 +199,6 @@ let viewsCommandTests = {
     _shardsvrReshardCollection: {skip: isAnInternalCommand},
     _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
     _shardsvrSetAllowMigrations: {skip: isAnInternalCommand},
-    _shardsvrRunSearchIndexCommand: {skip: isAnInternalCommand},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},
     _shardsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
     _shardsvrUntrackUnsplittableCollection: {skip: isAnInternalCommand},

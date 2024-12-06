@@ -30,10 +30,7 @@ assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', [
 ]));
 let addFieldsView = testDb[viewName];
 
-let indexDef = {
-    mappings: {dynamic: true, fields: {}},
-    storedSource: {exclude: ["facts.state_motto"]}
-};
+let indexDef = {mappings: {dynamic: true}, storedSource: {exclude: ["facts.state_motto"]}};
 createSearchIndex(addFieldsView, {name: "addFieldsIndex", definition: indexDef});
 
 // Update the search index to exclude state_flower, instead of state_motto, from storage.
