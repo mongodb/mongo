@@ -56,7 +56,7 @@ struct IndexFeatures {
     bool id = false;
     bool internal = false;
     bool partial = false;
-    bool regular = false;
+    bool prepareUnique = false;
     bool sparse = false;
     bool ttl = false;
     bool unique = false;

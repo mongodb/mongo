@@ -44,6 +44,7 @@ static const std::string kHashed = "hashed";
 static const std::string kId = "id";
 static const std::string kNormal = "normal";
 static const std::string kPartial = "partial";
+static const std::string kPrepareUnique = "prepareUnique";
 static const std::string kSingle = "single";
 static const std::string kSparse = "sparse";
 static const std::string kText = "text";
@@ -62,6 +63,7 @@ std::map<std::string, IndexFeatureStats> makeFeatureMap() {
     map[kId];
     map[kNormal];
     map[kPartial];
+    map[kPrepareUnique];
     map[kSingle];
     map[kSparse];
     map[kText];
@@ -92,6 +94,7 @@ IndexFeatures IndexFeatures::make(const IndexDescriptor* desc, bool internal) {
     features.id = desc->isIdIndex();
     features.internal = internal;
     features.partial = desc->isPartial();
+    features.prepareUnique = desc->prepareUnique();
     features.sparse = desc->isSparse();
     features.ttl = desc->infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName);
     features.type = indexType;
@@ -173,6 +176,9 @@ void GlobalIndexUsageTracker::_updateStatsForEachFeature(const IndexFeatures& fe
     }
     if (features.partial) {
         update(&_indexFeatureToStats.at(kPartial));
+    }
+    if (features.prepareUnique) {
+        update(&_indexFeatureToStats.at(kPrepareUnique));
     }
     if (features.sparse) {
         update(&_indexFeatureToStats.at(kSparse));

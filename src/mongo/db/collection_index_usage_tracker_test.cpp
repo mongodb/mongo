@@ -237,12 +237,14 @@ TEST_F(CollectionIndexUsageTrackerTest, GlobalFeatureUsageBasic) {
     ASSERT_EQ(1, getGlobalIndexUsage()->getCount());
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
 
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
@@ -255,12 +257,14 @@ TEST_F(CollectionIndexUsageTrackerTest, GlobalFeatureUsageBasic) {
     ASSERT_EQ(2, getGlobalIndexUsage()->getCount());
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
 
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
@@ -271,12 +275,14 @@ TEST_F(CollectionIndexUsageTrackerTest, GlobalFeatureUsageBasic) {
     ASSERT_EQ(2, getGlobalIndexUsage()->getCount());
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
 
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
@@ -285,12 +291,14 @@ TEST_F(CollectionIndexUsageTrackerTest, GlobalFeatureUsageBasic) {
     ASSERT_EQ(2, getGlobalIndexUsage()->getCount());
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
 
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
@@ -299,12 +307,14 @@ TEST_F(CollectionIndexUsageTrackerTest, GlobalFeatureUsageBasic) {
     ASSERT_EQ(1, getGlobalIndexUsage()->getCount());
     ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
 
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
@@ -313,15 +323,62 @@ TEST_F(CollectionIndexUsageTrackerTest, GlobalFeatureUsageBasic) {
     ASSERT_EQ(0, getGlobalIndexUsage()->getCount());
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
 
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
     ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
+}
+
+// Unregister and re-register an index with prepareUnique
+TEST_F(CollectionIndexUsageTrackerTest, RegisterPrepareUnique) {
+    auto spec = BSON("key" << BSON("foo" << 1) << "v" << 2);
+    auto desc = IndexDescriptor("", spec);
+    getTracker()->registerIndex("foo", spec, IndexFeatures::make(&desc, false /* internal */));
+    getTracker()->recordIndexAccess("foo");
+
+    ASSERT_EQ(1, getGlobalIndexUsage()->getCount());
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "id"));
+    ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
+    ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "single"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
+
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
+    ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
+    ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
+
+    // Unregister an re-register with different options.
+    getTracker()->unregisterIndex("foo");
+    auto spec2 = BSON("key" << BSON("foo" << 1) << "prepareUnique" << true << "v" << 2);
+    auto desc2 = IndexDescriptor("", spec2);
+    getTracker()->registerIndex("foo", spec2, IndexFeatures::make(&desc2, false /* internal */));
+    getTracker()->recordIndexAccess("foo");
+
+    ASSERT_EQ(1, getGlobalIndexUsage()->getCount());
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "id"));
+    ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "prepareUnique"));
+    ASSERT_EQ(1, getFeatureUseCount(getGlobalIndexUsage(), "single"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "sparse"));
+    ASSERT_EQ(0, getFeatureUseCount(getGlobalIndexUsage(), "unique"));
+
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "id"));
+    ASSERT_EQ(2, getFeatureAccessCount(getGlobalIndexUsage(), "normal"));
+    ASSERT_EQ(1, getFeatureAccessCount(getGlobalIndexUsage(), "prepareUnique"));
+    ASSERT_EQ(2, getFeatureAccessCount(getGlobalIndexUsage(), "single"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "sparse"));
+    ASSERT_EQ(0, getFeatureAccessCount(getGlobalIndexUsage(), "unique"));
 }
 
 }  // namespace
