@@ -212,29 +212,37 @@ let presetReshardedChunks =
  */
 
 jsTest.log('Fail if sharding is disabled.');
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}}),
-                             ErrorCodes.NamespaceNotFound);
+assert.commandFailedWithCode(
+    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
+    ErrorCodes.NamespaceNotFound);
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
 jsTest.log("Fail if collection is unsharded.");
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}}),
-                             ErrorCodes.NamespaceNotSharded);
+assert.commandFailedWithCode(
+    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
+    ErrorCodes.NamespaceNotSharded);
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
 jsTest.log("Fail if missing required key.");
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns}), 40414);
+assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, numInitialChunks: 1}),
+                             40414);
 
 jsTest.log("Fail if unique is specified and is true.");
 assert.commandFailedWithCode(
-    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, unique: true}),
+    mongos.adminCommand(
+        {reshardCollection: ns, key: {newKey: 1}, unique: true, numInitialChunks: 1}),
     ErrorCodes.BadValue);
 
 jsTest.log("Fail if collation is specified and is not {locale: 'simple'}.");
-assert.commandFailedWithCode(
-    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, collation: {locale: 'en_US'}}),
-    ErrorCodes.BadValue);
+assert.commandFailedWithCode(mongos.adminCommand({
+    reshardCollection: ns,
+    key: {newKey: 1},
+    collation: {locale: 'en_US'},
+    numInitialChunks: 1
+}),
+                             ErrorCodes.BadValue);
 
 jsTest.log("Fail if both numInitialChunks and _presetReshardedChunks are provided.");
 assert.commandFailedWithCode(mongos.adminCommand({
@@ -263,6 +271,7 @@ jsTest.log("Fail if zone provided is invalid for storage.");
 assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: ns,
     key: {"_id": "hashed"},
+    numInitialChunks: 1,
     zones: [{min: {"_id": {"$minKey": 1}}, max: {"_id": {"$maxKey": 1}}, zone: "Namezone"}]
 }),
                              ErrorCodes.BadValue);
@@ -301,13 +310,16 @@ assert.commandFailedWithCode(mongos.getDB('test').system.resharding.mycoll.inser
 mongos.getDB(kDbName)[collName].drop();
 
 jsTest.log("Succeed when correct locale is provided.");
-assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}, collation: {locale: 'simple'}}, 1);
+assertReshardCollOk(
+    {reshardCollection: ns, key: {newKey: 1}, collation: {locale: 'simple'}, numInitialChunks: 1},
+    1);
 
 jsTest.log("Succeed base case.");
-assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}}, 1);
+assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}, 1);
 
 jsTest.log("Succeed if unique is specified and is false.");
-assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}, unique: false}, 1);
+assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}, unique: false, numInitialChunks: 1},
+                    1);
 
 jsTest.log(
     "Succeed if _presetReshardedChunks is provided and test commands are enabled (default).");
@@ -344,6 +356,7 @@ assertReshardCollOk({
     key: {newKey: 1},
     unique: false,
     collation: {locale: 'simple'},
+    numInitialChunks: 1,
     zones: [{zone: newZoneName, min: {newKey: 5}, max: {newKey: 10}}]
 },
                     3);
@@ -353,8 +366,8 @@ assertReshardCollOk({
     reshardCollection: ns,
     key: {newKey: 1},
     unique: false,
-    numInitialChunks: 1,
     collation: {locale: 'simple'},
+    numInitialChunks: 1,
     zones: [{zone: newZoneName, min: {newKey: MinKey}, max: {newKey: MaxKey}}]
 },
                     1);
@@ -380,6 +393,7 @@ assertReshardCollOk({
     key: {oldKey: 1, newKey: 1},
     unique: false,
     collation: {locale: 'simple'},
+    numInitialChunks: 1,
     zones: [{zone: existingZoneName, min: {oldKey: 0}, max: {oldKey: 5}}]
 },
                     3);

@@ -34,7 +34,8 @@ var $config = extendWorkload($config, function($config, $super) {
             let reshardCollectionCmd = {
                 reshardCollection: namespace,
                 key: {a: 1},
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
+                numInitialChunks: 1,
             };
             testCommand(db, namespace, "reshardCollection", reshardCollectionCmd, this);
 
@@ -56,7 +57,8 @@ var $config = extendWorkload($config, function($config, $super) {
             reshardCollectionCmd = {
                 reshardCollection: namespace,
                 key: {_id: 1},
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
+                numInitialChunks: 1,
             };
             testCommand(db, namespace, "reshardCollection", reshardCollectionCmd, this);
         }
