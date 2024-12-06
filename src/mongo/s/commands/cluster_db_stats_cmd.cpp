@@ -131,11 +131,12 @@ public:
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
-        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses).responseOK) {
+        auto appendResult = appendRawResponses(opCtx, &errmsg, &output, shardResponses);
+        if (!appendResult.responseOK) {
             return false;
         }
 
-        aggregateResults(scale, shardResponses, output);
+        aggregateResults(scale, appendResult.successResponses, output);
         return true;
     }
 
