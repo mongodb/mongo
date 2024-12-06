@@ -157,10 +157,10 @@ void ValidateState::yieldCursors(OperationContext* opCtx) {
 }
 
 Status ValidateState::initializeCollection(OperationContext* opCtx) {
+    _validateTs = opCtx->getServiceContext()->getStorageEngine()->getLastStableRecoveryTimestamp();
+
+    // Background validation reads data from the last stable checkpoint.
     if (isBackground()) {
-        // Background validation reads data from the last stable checkpoint.
-        _validateTs =
-            opCtx->getServiceContext()->getStorageEngine()->getLastStableRecoveryTimestamp();
         if (!_validateTs) {
             return Status(
                 ErrorCodes::NamespaceNotFound,
