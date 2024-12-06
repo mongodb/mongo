@@ -57,14 +57,15 @@ selector:
     - jstests/core/views/views_creation.js
     - jstests/core/views/views_drop.js
     - jstests/core/**/query/disallow_system_views_user_writes.js
-    - jstests/core/timeseries/bucket_granularity.js
+    - jstests/core/timeseries/ddl/bucket_granularity.js
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
     - jstests/core_sharding/resharding/*.js
 
     # These tests expect listCollections to return system.bucket.* collections, which are filtered
     # out by mongos when authentication is enabled.
     # Refer to filter in cluster_list_collections_cmd.cpp
-    - jstests/core/timeseries/timeseries_*.js
+    - jstests/core/timeseries/ddl/*.js
+    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
     # This test uses `benchRun` which spawns connections which do not inherit the causal session.
     - jstests/core/**/benchrun_pipeline_updates.js
 

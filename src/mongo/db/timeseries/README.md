@@ -347,8 +347,8 @@ equivalently the value of its `control.min.<time field>`, will be taken from the
 inserted to the bucket and rounded down based on the `bucketRoundingSeconds`. This rounding will
 generally be accomplished by basic modulus arithmetic operating on the number of seconds since the
 epoch i.e. for an input timestamp `t` and a rounding value `r`, the rounded timestamp will be
-taken as `t - (t % r)`. See [jstests/core/timeseries/bucket_timestamp_rounding.js](https://github.com/mongodb/mongo/blob/master/jstests/core/timeseries/bucket_timestamp_rounding.js) for edge
-cases on rounding and bucket timespans.
+taken as `t - (t % r)`. See [jstests/core/timeseries/ddl/bucket_timestamp_rounding.js](https://github.com/mongodb/mongo/blob/master/jstests/core/timeseries/ddl/bucket_timestamp_rounding.js)
+for edge cases on rounding and bucket timespans.
 
 A user may choose to set `bucketMaxSpanSeconds` and `bucketRoundingSeconds` directly when creating a
 new collection in order to use "fixed bucketing". In this case we require that these two values are

@@ -75,7 +75,7 @@ selector:
     - jstests/core/**/list_indexes_non_existent_ns.js
     - jstests/core/**/mr_preserve_indexes.js
     - jstests/core/**/benchrun_pipeline_updates.js
-    - jstests/core/timeseries/timeseries_delete_hint.js
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
     - jstests/core/query/comment_field.js

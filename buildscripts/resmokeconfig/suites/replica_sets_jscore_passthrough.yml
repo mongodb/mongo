@@ -40,7 +40,7 @@ selector:
 
     # TODO SERVER-94428: Reenable this test.
     # This test is currently incompatible with dbcheck.
-    - jstests/core/timeseries/timeseries_update_multi.js
+    - jstests/core/timeseries/write/timeseries_update_multi.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

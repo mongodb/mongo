@@ -1,6 +1,6 @@
 /**
  * Tests running the update command on a time-series collection when the feature flag for arbitrary
- * time-series updates is not enabled. Split off from jstests/core/timeseries_update, see
+ * time-series updates is not enabled. Split off from jstests/core/write/timeseries_update.js, see
  * SERVER-78202 for more context.
  * @tags: [
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant

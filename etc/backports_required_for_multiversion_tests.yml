@@ -99,19 +99,19 @@ last-continuous:
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js
       ticket: SERVER-88949
-    - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    - test_file: jstests/core/timeseries/query/timeseries_groupby_reorder.js
       ticket: SERVER-87961
-    - test_file: jstests/core/timeseries/timeseries_lastpoint.js
+    - test_file: jstests/core/timeseries/query/timeseries_lastpoint.js
       ticket: SERVER-87961
     - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
       ticket: SERVER-84623
-    - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
+    - test_file: jstests/core/timeseries/geo/timeseries_geonear_lookup.js
       ticket: SERVER-81454
     - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
       ticket: SERVER-89618
     - test_file: jstests/replsets/initial_sync_survives_restart.js
       ticket: SERVER-88447
-    - test_file: jstests/core/timeseries/timeseries_computed_field.js
+    - test_file: jstests/core/timeseries/query/timeseries_computed_field.js
       ticket: SERVER-88072
     - test_file: jstests/auth/commands_builtin_roles_replset.js
       ticket: SERVER-92411
@@ -139,9 +139,9 @@ last-continuous:
       ticket: SERVER-89664
     - test_file: jstests/sharding/non_transaction_snapshot_reads_retry.js
       ticket: SERVER-89664
-    - test_file: jstests/core/timeseries/timeseries_collation.js
+    - test_file: jstests/core/timeseries/ddl/timeseries_collation.js
       ticket: SERVER_89698
-    - test_file: jstests/core/timeseries/timeseries_index_partial.js
+    - test_file: jstests/core/timeseries/ddl/timeseries_index_partial.js
       ticket: SERVER_89698
     - test_file: jstests/core/index/express_write.js
       ticket: SERVER-83760
@@ -177,11 +177,11 @@ last-continuous:
       ticket: SERVER-89806
     - test_file: jstests/aggregation/match_swapping_renamed_fields.js
       ticket: SERVER-90869
-    - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
+    - test_file: jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
       ticket: SERVER-90818
     - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
       ticket: SERVER-90157
-    - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
+    - test_file: jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
       ticket: SERVER-90833
     - test_file: jstests/core/query/find/finda.js
       ticket: SERVER-87285
@@ -209,11 +209,11 @@ last-continuous:
       ticket: SERVER-91339
     - test_file: jstests/change_streams/split_large_event.js
       ticket: SERVER-91406
-    - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
+    - test_file: jstests/core/timeseries/query/timeseries_shadowing_meta_project_pushdown.js
       ticket: SERVER-90995
     - test_file: jstests/sharding/fail_kill_sessions.js
       ticket: SERVER-89630
-    - test_file: jstests/core/timeseries/timeseries_cursor_batches.js
+    - test_file: jstests/core/timeseries/query/timeseries_cursor_batches.js
       ticket: SERVER-91512
     - test_file: jstests/core/index/index_bounds_pipe.js
       ticket: SERVER-91616
@@ -279,9 +279,9 @@ last-continuous:
       ticket: SERVER-84359
     - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
       ticket: SERVER-92930
-    - test_file: jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
+    - test_file: jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
       ticket: SERVER-93099
-    - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
+    - test_file: jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
       ticket: SERVER-93099
     - test_file: jstests/core/index/index_creation_on_different_collations.js
       ticket: SERVER-93112
@@ -317,7 +317,7 @@ last-continuous:
       ticket: SERVER-93153
     - test_file: jstests/concurrency/fsm_workloads/query/update/upsert_unique_index_collation.js
       ticket: SERVER-94156
-    - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
+    - test_file: jstests/core/timeseries/query/timeseries_filter_extended_range.js
       ticket: SERVER-94207
     - test_file: jstests/sharding/explain_find_transformed_query.js
       ticket: SERVER-82471
@@ -325,7 +325,7 @@ last-continuous:
       ticket: SERVER-93154
     - test_file: jstests/sharding/timeseries_query_extended_range.js
       ticket: SERVER-73641
-    - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
+    - test_file: jstests/core/timeseries/write/timeseries_update_delete_extended_range.js
       ticket: SERVER-95075
     - test_file: jstests/sharding/direct_shard_connection_write_after_restart.js
       ticket: SERVER-95244
@@ -337,7 +337,7 @@ last-continuous:
       ticket: SERVER-92530
     - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
       ticket: SERVER-94259
-    - test_file: jstests/core/timeseries/drop_timeseries.js
+    - test_file: jstests/core/timeseries/ddl/timeseries_drop.js
       ticket: SERVER-94829
     - test_file: jstests/core/connection_status.js
       ticket: SERVER-95952
@@ -358,7 +358,7 @@ last-continuous:
     - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
       ticket: SERVER-97254
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
-    - test_file: jstests/core/timeseries/timeseries_group_aggregations.js
+    - test_file: jstests/core/timeseries/query/timeseries_group_aggregations.js
       ticket: SERVER-93874
     - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
       ticket: SERVER-97044
@@ -443,19 +443,19 @@ last-lts:
       ticket: SERVER-89395
     - test_file: jstests/core/query/explain/explain_skip.js
       ticket: SERVER-88949
-    - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    - test_file: jstests/core/timeseries/query/timeseries_groupby_reorder.js
       ticket: SERVER-87961
-    - test_file: jstests/core/timeseries/timeseries_lastpoint.js
+    - test_file: jstests/core/timeseries/query/timeseries_lastpoint.js
       ticket: SERVER-87961
     - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
       ticket: SERVER-84623
-    - test_file: jstests/core/timeseries/timeseries_geonear_lookup.js
+    - test_file: jstests/core/timeseries/geo/timeseries_geonear_lookup.js
       ticket: SERVER-81454
     - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
       ticket: SERVER-89618
     - test_file: jstests/replsets/initial_sync_survives_restart.js
       ticket: SERVER-88447
-    - test_file: jstests/core/timeseries/timeseries_computed_field.js
+    - test_file: jstests/core/timeseries/query/timeseries_computed_field.js
       ticket: SERVER-88072
     - test_file: jstests/auth/commands_builtin_roles_replset.js
       ticket: SERVER-92411
@@ -483,9 +483,9 @@ last-lts:
       ticket: SERVER-89664
     - test_file: jstests/sharding/non_transaction_snapshot_reads_retry.js
       ticket: SERVER-89664
-    - test_file: jstests/core/timeseries/timeseries_collation.js
+    - test_file: jstests/core/timeseries/ddl/timeseries_collation.js
       ticket: SERVER_89698
-    - test_file: jstests/core/timeseries/timeseries_index_partial.js
+    - test_file: jstests/core/timeseries/ddl/timeseries_index_partial.js
       ticket: SERVER_89698
     - test_file: jstests/core/index/express_write.js
       ticket: SERVER-83760
@@ -521,11 +521,11 @@ last-lts:
       ticket: SERVER-89806
     - test_file: jstests/aggregation/match_swapping_renamed_fields.js
       ticket: SERVER-90869
-    - test_file: jstests/core/timeseries/timeseries_ixscan_clusteredidxscan_union.js
+    - test_file: jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
       ticket: SERVER-90818
     - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
       ticket: SERVER-90157
-    - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
+    - test_file: jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
       ticket: SERVER-90833
     - test_file: jstests/core/query/find/finda.js
       ticket: SERVER-87285
@@ -577,11 +577,11 @@ last-lts:
       ticket: SERVER-91075
     - test_file: jstests/change_streams/split_large_event.js
       ticket: SERVER-91406
-    - test_file: jstests/core/timeseries/timeseries_shadowing_meta_project_pushdown.js
+    - test_file: jstests/core/timeseries/query/timeseries_shadowing_meta_project_pushdown.js
       ticket: SERVER-90995
     - test_file: jstests/sharding/fail_kill_sessions.js
       ticket: SERVER-89630
-    - test_file: jstests/core/timeseries/timeseries_cursor_batches.js
+    - test_file: jstests/core/timeseries/query/timeseries_cursor_batches.js
       ticket: SERVER-91512
     - test_file: jstests/sharding/migration_coordinator_abort_failover.js
       ticket: SERVER-91331
@@ -653,9 +653,9 @@ last-lts:
       ticket: SERVER-84359
     - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
       ticket: SERVER-92930
-    - test_file: jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
+    - test_file: jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
       ticket: SERVER-93099
-    - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
+    - test_file: jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
       ticket: SERVER-93099
     - test_file: jstests/core/index/index_creation_on_different_collations.js
       ticket: SERVER-93112
@@ -693,7 +693,7 @@ last-lts:
       ticket: SERVER-93153
     - test_file: jstests/concurrency/fsm_workloads/query/update/upsert_unique_index_collation.js
       ticket: SERVER-94156
-    - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
+    - test_file: jstests/core/timeseries/query/timeseries_filter_extended_range.js
       ticket: SERVER-94207
     - test_file: jstests/sharding/explain_find_transformed_query.js
       ticket: SERVER-82471
@@ -701,7 +701,7 @@ last-lts:
       ticket: SERVER-93154
     - test_file: jstests/sharding/timeseries_query_extended_range.js
       ticket: SERVER-73641
-    - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
+    - test_file: jstests/core/timeseries/write/timeseries_update_delete_extended_range.js
       ticket: SERVER-95075
     - test_file: jstests/sharding/direct_shard_connection_write_after_restart.js
       ticket: SERVER-95244
@@ -713,7 +713,7 @@ last-lts:
       ticket: SERVER-92530
     - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
       ticket: SERVER-94259
-    - test_file: jstests/core/timeseries/drop_timeseries.js
+    - test_file: jstests/core/timeseries/ddl/timeseries_drop.js
       ticket: SERVER-94829
     - test_file: jstests/core/connection_status.js
       ticket: SERVER-95952
@@ -765,7 +765,7 @@ last-lts:
       ticket: SERVER-93149
     - test_file: jstests/core_sharding/resharding/reshard_collection_timeseries.js
       ticket: SERVER-93149
-    - test_file: jstests/core/timeseries/timeseries_group_aggregations.js
+    - test_file: jstests/core/timeseries/query/timeseries_group_aggregations.js
       ticket: SERVER-93874
     - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
       ticket: SERVER-97254

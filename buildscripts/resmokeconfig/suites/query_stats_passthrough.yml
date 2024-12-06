@@ -18,7 +18,7 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
-    - jstests/core/timeseries/timeseries_union_with.js
+    - jstests/core/timeseries/query/timeseries_union_with.js
   exclude_with_any_tags:
     # Running $queryStats will increment these counters which can screw up some test assertions.
     - inspects_command_opcounters

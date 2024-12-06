@@ -102,7 +102,7 @@ selector:
     - jstests/core/**/shell_connection_strings.js
     - jstests/core/**/geo_s2ordering.js
     - jstests/core/mixed_version_replica_set.js
-    - jstests/core/timeseries/timeseries_delete_hint.js
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
     - jstests/core/query/comment_field.js

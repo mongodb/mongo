@@ -70,7 +70,7 @@ selector:
     - jstests/core/**/bench_test1.js
     - jstests/core/index/index_partial_write_ops.js
     - jstests/core/index/index_stats.js
-    - jstests/core/timeseries/timeseries_predicates.js
+    - jstests/core/timeseries/query/timeseries_predicates.js
     - jstests/core/index/geo/geo_update_btree.js
     - jstests/core/**/*[aA]uth*.js
   exclude_with_any_tags:

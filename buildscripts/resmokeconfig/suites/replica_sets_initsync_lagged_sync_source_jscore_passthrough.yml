@@ -16,7 +16,7 @@ selector:
     - jstests/core/query/plan_cache/plan_cache_sbe.js
     - jstests/core/query/plan_cache/query_solution_hash.js
     - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
-    - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js
     # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
     # against their test collections.
     - jstests/core/**/operation_latency_histogram.js

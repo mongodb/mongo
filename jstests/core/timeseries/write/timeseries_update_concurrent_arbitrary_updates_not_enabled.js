@@ -1,7 +1,7 @@
 /**
  * Tests running the update command on a time-series collection with concurrent modifications to the
  * collection when the feature flag for time-series arbitary updates is not enabled. Split off from
- * jstests//core/timeseries/timeseries_update_concurrent.js, see SERVER-78202 for more context.
+ * jstests/core/timeseries/write/timeseries_update_concurrent.js, see SERVER-78202 for more context.
  * @tags: [
  *   # Fail points in this test do not exist on mongos.
  *   assumes_against_mongod_not_mongos,
