@@ -1691,7 +1691,7 @@ functions:
     params:
       provider: ec2
       distro: ${distro_id}
-      timeout_teardown_secs: 604800 # 7 days
+      timeout_teardown_secs: 86400 # 24 hours
       security_group_ids:
       - sg-097bff6dd0d1d31d0
 
@@ -6619,14 +6619,14 @@ tasks:
       task_names: >-
         powercycle_smoke_skip_compile
       num_tasks: 20
-      exec_timeout_secs: 604800 # 7 days
-      timeout_secs: 604800 # 7 days
+      exec_timeout_secs: 86400 # 24 hours
+      timeout_secs: 86400 # 24 hours
       set_up_retry_count: 1800
       run_powercycle_args: --sshAccessRetryCount=1800
 
 - name: powercycle_sentinel
   tags: []
-  exec_timeout_secs: 604800 # 7 days
+  exec_timeout_secs: 86400 # 24 hours
   commands:
   - func: "run powercycle sentinel"
     vars:
