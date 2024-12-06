@@ -228,7 +228,7 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
         const auto queryShape = key->universalComponents()._queryShape->toBson(
             pExpCtx->opCtx, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
         LOGV2_DEBUG(7349403,
-                    3,
+                    2,
                     "Error encountered when applying hmac to query shape, will not publish "
                     "queryStats for this entry.",
                     "status"_attr = ex.toStatus(),

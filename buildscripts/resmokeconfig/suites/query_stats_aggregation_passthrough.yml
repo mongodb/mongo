@@ -11,6 +11,9 @@ description: |
 selector:
   roots:
   - jstests/aggregation/**/*.js
+  exclude_files:
+  # TODO SERVER-92403 Re-enable this test.
+  - jstests/aggregation/sources/setWindowFields/n_accumulators.js
   exclude_with_any_tags:
   # Running $queryStats will increment these counters which can screw up some test assertions.
   - inspects_command_opcounters

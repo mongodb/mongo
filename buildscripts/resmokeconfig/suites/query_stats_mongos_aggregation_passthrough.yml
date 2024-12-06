@@ -22,6 +22,84 @@ selector:
   # $unionWith explain output does not check whether the collection is sharded in a sharded
   # cluster.
   - jstests/aggregation/sources/unionWith/unionWith_explain.js
+  # TODO SERVER-92403 Re-enable this test.
+  - jstests/aggregation/sources/setWindowFields/n_accumulators.js
+  # SERVER-94231 These tests are excluded because query stats changes the error code that
+  # certain queries return. Specifically, queries that a) end in error and b) pass through
+  # mongos end up erroring in the query stats makeKey() callback. Query stats propagates the
+  # error with a different code, which makes the test fail. This behavior only exists pre-8.0,
+  # so we don't care to address this more robustly.
+  - jstests/aggregation/bugs/server6290.js
+  - jstests/aggregation/sources/graphLookup/error.js
+  - jstests/aggregation/sources/graphLookup/filter.js
+  - jstests/aggregation/expressions/date_from_parts.js
+  - jstests/aggregation/expressions/trim.js
+  - jstests/aggregation/variables/remove_system_variable.js
+  - jstests/aggregation/accumulators/first_n_last_n.js
+  - jstests/aggregation/expressions/expression_function.js
+  - jstests/aggregation/sources/setWindowFields/parse.js
+  - jstests/aggregation/expressions/day_of_expressions.js
+  - jstests/aggregation/sources/multiple_unpack_bucket_error.js
+  - jstests/aggregation/expressions/let.js
+  - jstests/aggregation/sources/setWindowFields/first.js
+  - jstests/aggregation/expressions/reduce.js
+  - jstests/aggregation/bugs/server533.js
+  - jstests/aggregation/sources/setWindowFields/linear_fill.js
+  - jstests/aggregation/bugs/server6177.js
+  - jstests/aggregation/expressions/date_to_string.js
+  - jstests/aggregation/dbref.js
+  - jstests/aggregation/sources/setWindowFields/rank.js
+  - jstests/aggregation/expressions/date_to_parts.js
+  - jstests/aggregation/expressions/round_trunc.js
+  - jstests/aggregation/bugs/server6335.js
+  - jstests/aggregation/sources/match/skip_with_limit.js
+  - jstests/aggregation/bugs/server6074.js
+  - jstests/aggregation/bugs/server6190.js
+  - jstests/aggregation/bugs/server6198.js
+  - jstests/aggregation/bugs/server11118.js
+  - jstests/aggregation/expressions/filter.js
+  - jstests/aggregation/sources/setWindowFields/exp_moving_avg.js
+  - jstests/aggregation/bugs/upperlower.js
+  - jstests/aggregation/sources/setWindowFields/last.js
+  - jstests/aggregation/sources/densify/parse.js
+  - jstests/aggregation/variables/search_meta.js
+  - jstests/aggregation/sources/densify/decimal.js
+  - jstests/aggregation/ifnull.js
+  - jstests/aggregation/expressions/regex.js
+  - jstests/aggregation/sources/shred_documents.js
+  - jstests/aggregation/expressions/date_add_subtract.js
+  - jstests/aggregation/expressions/in.js
+  - jstests/aggregation/bugs/match.js
+  - jstests/aggregation/expressions/split.js
+  - jstests/aggregation/accumulators/top_bottom_top_n_bottom_n.js
+  - jstests/aggregation/bugs/cond.js
+  - jstests/aggregation/bugs/server4589.js
+  - jstests/aggregation/sources/setWindowFields/time.js
+  - jstests/aggregation/sources/fill/fill_parse.js
+  - jstests/aggregation/expressions/sortArray.js
+  - jstests/aggregation/bugs/server20169.js
+  - jstests/aggregation/max_subpipeline_depth.js
+  - jstests/aggregation/expressions/date_trunc.js
+  - jstests/aggregation/bugs/server20163.js
+  - jstests/aggregation/sources/setWindowFields/locf.js
+  - jstests/aggregation/accumulators/min_n_max_n.js
+  - jstests/aggregation/sources/setWindowFields/comprehensive_parse.js
+  - jstests/aggregation/sources/unionWith/unionWith_allows_stages.js
+  - jstests/aggregation/expressions/expression_get_field.js
+  - jstests/aggregation/expressions/expression_set_field.js
+  - jstests/aggregation/sources/lookup/lookup_subpipeline.js
+  - jstests/aggregation/bugs/server11675.js
+  - jstests/aggregation/accumulators/internal_js_reduce.js
+  - jstests/aggregation/sources/collStats/count.js
+  - jstests/aggregation/sources/setWindowFields/shift.js
+  - jstests/aggregation/expressions/map.js
+  - jstests/aggregation/sources/setWindowFields/derivative.js
+  - jstests/aggregation/bugs/server6530.js
+  - jstests/aggregation/expressions/switch_errors.js
+  - jstests/aggregation/expressions/date_from_string.js
+  - jstests/aggregation/sources/setWindowFields/integral.js
+  - jstests/aggregation/bugs/server6238.js
+  - jstests/aggregation/expressions/expression_cond.js
   exclude_with_any_tags:
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding

@@ -15,6 +15,10 @@ selector:
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests.
   - jstests/core/txns/**/*.js
   - jstests/core/timeseries/timeseries_union_with.js
+  # TODO SERVER-94818 Re-enable this test in query stats passthroughs.
+  # Query stats changes the error code expected by this test due to how it propagates parsing
+  # errors in test environments.
+  - jstests/core/json_schema/misc_validation.js
   exclude_with_any_tags:
   # Running $queryStats will increment these counters which can screw up some test assertions.
   - inspects_command_opcounters
