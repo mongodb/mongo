@@ -75,7 +75,7 @@ selector:
     - jstests/core/**/index_multikey.js
     - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
-    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/timeseries/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
     - jstests/core/query/comment_field.js

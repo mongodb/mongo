@@ -52,7 +52,7 @@ selector:
     - jstests/core/query/find_with_resume_after_param.js
     - jstests/core/query/resume_query_from_non_existent_record.js
     - jstests/core/query/resume_query.js
-    - jstests/core/timeseries/query/timeseries_resume_after.js
+    - jstests/core/timeseries/timeseries_resume_after.js
     # This test creates collections directly using applyOps commands. So those collections are not
     # tracked by sharding and therefore not discoverable by listCollections commands that go through
     # the router. TODO (SERVER-84342): listCollections command doesn't return collections created
@@ -71,8 +71,8 @@ selector:
     - jstests/core/write/update/update_metrics.js
     # TODO (SERVER-86777): Investigate why timeseries_delete_with_meta_concurrent.js and
     # timeseries_update_concurrent.js can't run on sharded cluster with replica set endpoint.
-    - jstests/core/timeseries/write/timeseries_delete_with_meta_concurrent.js
-    - jstests/core/timeseries/write/timeseries_update_concurrent.js
+    - jstests/core/timeseries/timeseries_delete_with_meta_concurrent.js
+    - jstests/core/timeseries/timeseries_update_concurrent.js
     # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
     # the destination database.
     - jstests/core/txns/transactions_block_ddl.js
@@ -99,11 +99,11 @@ selector:
     # as hash won't be present when running via replica set endpoint.
     - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
     # Some TS rewrites cannot be done on mongos.
-    - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
+    - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js
 
     # TODO SERVER-94428: Reenable this test.
     # This test is currently incompatible with dbcheck.
-    - jstests/core/timeseries/write/timeseries_update_multi.js
+    - jstests/core/timeseries/timeseries_update_multi.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

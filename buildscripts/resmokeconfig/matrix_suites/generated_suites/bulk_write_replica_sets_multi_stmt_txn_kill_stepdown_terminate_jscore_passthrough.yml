@@ -218,7 +218,7 @@ selector:
     - jstests/core/**/query/SERVER-23626.js
     - jstests/core/**/find_and_modify_server7660.js
     - jstests/core/**/upsert_shell.js
-    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/timeseries/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
     - jstests/core/query/comment_field.js

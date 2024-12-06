@@ -4,21 +4,21 @@
       # TODO SERVER-96408: Distinct explain fails with 'database not found' on sharded clusters
       - jstests/core/query/distinct/distinct_semantics.js
       # SERVER-95208 Fix timeseries query failing in explain, but passing when running.
-      - jstests/core/timeseries/query/timeseries_union_with.js
+      - jstests/core/timeseries/timeseries_union_with.js
       # TODO SERVER-95456: Make CLUSTERED_IXSCANs obey query settings allowed indexes.
       - jstests/core/index/express_id_eq.js
-      - jstests/core/timeseries/ddl/bucket_granularity.js
-      - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
-      - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
-      - jstests/core/timeseries/query/timeseries_filter_extended_range.js
-      - jstests/core/timeseries/write/timeseries_findAndModify_deletes_hints.js
-      - jstests/core/timeseries/write/timeseries_findAndModify_updates_hints.js
-      - jstests/core/timeseries/ddl/timeseries_index_partial.js
-      - jstests/core/timeseries/ddl/timeseries_index_use.js
-      - jstests/core/timeseries/query/timeseries_match_pushdown.js
-      - jstests/core/timeseries/write/timeseries_min_max.js
-      - jstests/core/timeseries/query/timeseries_partial_index_opt.js
-      - jstests/core/timeseries/write/timeseries_update_hint.js
+      - jstests/core/timeseries/bucket_granularity.js
+      - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
+      - jstests/core/timeseries/timeseries_homogeneous_top_bottom.js
+      - jstests/core/timeseries/timeseries_filter_extended_range.js
+      - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
+      - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
+      - jstests/core/timeseries/timeseries_index_partial.js
+      - jstests/core/timeseries/timeseries_index_use.js
+      - jstests/core/timeseries/timeseries_match_pushdown.js
+      - jstests/core/timeseries/timeseries_min_max.js
+      - jstests/core/timeseries/timeseries_partial_index_opt.js
+      - jstests/core/timeseries/timeseries_update_hint.js
       # Tests which already use query settings or index filters, which could be overridden by this suite.
       - jstests/core/index/express.js
       - jstests/core/index/index_filter_commands.js
@@ -31,7 +31,7 @@
       - jstests/core/query/top/top.js
       - jstests/core/views/views_stats.js
       - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js # failpoint 'timesEntered'
-      - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+      - jstests/core/timeseries/timeseries_sparse_index.js
       # Tests which assert on the output of 'getLog' command. The additional emitted commands might lead to
       # log truncation, hence failing the tests.
       - jstests/core/administrative/getlog2.js
@@ -43,10 +43,10 @@
       # is a design decision due to mongos lacking collation information.
       - jstests/core/clustered/clustered_collection_collation.js
       # This test uses an IDHACK-like query, for which it is not allowed to set query settings.
-      - jstests/core/timeseries/write/timeseries_delete_multi.js
-      - jstests/core/timeseries/write/timeseries_simple.js
-      - jstests/core/timeseries/write/timeseries_update.js
-      - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+      - jstests/core/timeseries/timeseries_delete_multi.js
+      - jstests/core/timeseries/timeseries_simple.js
+      - jstests/core/timeseries/timeseries_update.js
+      - jstests/core/timeseries/timeseries_update_arbitrary_updates_not_enabled.js
       - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
       # Query settings application is skipped for queries targeting collections containing encryption information.
       - jstests/core/query/queryable_encryption/**/*.js
@@ -117,7 +117,7 @@
       - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
       # This test runs many aggregations, and the PQS passthroughs slow down queries just enough to
       # hit the timeout more easily.
-      - jstests/core/timeseries/query/timeseries_group_aggregations.js
+      - jstests/core/timeseries/timeseries_group_aggregations.js
     exclude_with_any_tags:
       - uses_parallel_shell # interferes with plan cache check
 
@@ -135,10 +135,10 @@
       - jstests/core/query/index_deduplication.js
       - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
       - jstests/core/query/return_key.js
-      - jstests/core/timeseries/ddl/timeseries_index_collation.js
-      - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
-      - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
-      - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
+      - jstests/core/timeseries/timeseries_index_collation.js
+      - jstests/core/timeseries/timeseries_internal_bounded_sort_compound.js
+      - jstests/core/timeseries/timeseries_metric_index_compound.js
+      - jstests/core/timeseries/timeseries_special_indexes_metadata.js
       # Query settings have a higher precedence over index filters.
       - jstests/core/index/index_filter_catalog_independent.js
       - jstests/core/index/index_filter_collation.js

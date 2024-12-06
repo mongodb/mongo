@@ -45,7 +45,7 @@ selector:
     - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
     # This test runs many aggregations, and the override slows them down enough to hit the timeout
     # more easily.
-    - jstests/core/timeseries/query/timeseries_group_aggregations.js
+    - jstests/core/timeseries/timeseries_group_aggregations.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

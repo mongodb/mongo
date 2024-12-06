@@ -80,20 +80,20 @@ selector:
     - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
     - jstests/core/query/distinct/distinct_semantics.js
-    - jstests/core/timeseries/query/timeseries_union_with.js
+    - jstests/core/timeseries/timeseries_union_with.js
     - jstests/core/index/express_id_eq.js
-    - jstests/core/timeseries/ddl/bucket_granularity.js
-    - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
-    - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
-    - jstests/core/timeseries/query/timeseries_filter_extended_range.js
-    - jstests/core/timeseries/write/timeseries_findAndModify_deletes_hints.js
-    - jstests/core/timeseries/write/timeseries_findAndModify_updates_hints.js
-    - jstests/core/timeseries/ddl/timeseries_index_partial.js
-    - jstests/core/timeseries/ddl/timeseries_index_use.js
-    - jstests/core/timeseries/query/timeseries_match_pushdown.js
-    - jstests/core/timeseries/write/timeseries_min_max.js
-    - jstests/core/timeseries/query/timeseries_partial_index_opt.js
-    - jstests/core/timeseries/write/timeseries_update_hint.js
+    - jstests/core/timeseries/bucket_granularity.js
+    - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
+    - jstests/core/timeseries/timeseries_homogeneous_top_bottom.js
+    - jstests/core/timeseries/timeseries_filter_extended_range.js
+    - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
+    - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
+    - jstests/core/timeseries/timeseries_index_partial.js
+    - jstests/core/timeseries/timeseries_index_use.js
+    - jstests/core/timeseries/timeseries_match_pushdown.js
+    - jstests/core/timeseries/timeseries_min_max.js
+    - jstests/core/timeseries/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/timeseries_update_hint.js
     - jstests/core/index/express.js
     - jstests/core/index/index_filter_commands.js
     - jstests/core/query/query_settings/**/*.js
@@ -103,15 +103,15 @@ selector:
     - jstests/core/query/top/top.js
     - jstests/core/views/views_stats.js
     - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
-    - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+    - jstests/core/timeseries/timeseries_sparse_index.js
     - jstests/core/administrative/getlog2.js
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
     - jstests/core/commands_with_uuid.js
     - jstests/core/clustered/clustered_collection_collation.js
-    - jstests/core/timeseries/write/timeseries_delete_multi.js
-    - jstests/core/timeseries/write/timeseries_simple.js
-    - jstests/core/timeseries/write/timeseries_update.js
-    - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+    - jstests/core/timeseries/timeseries_delete_multi.js
+    - jstests/core/timeseries/timeseries_simple.js
+    - jstests/core/timeseries/timeseries_update.js
+    - jstests/core/timeseries/timeseries_update_arbitrary_updates_not_enabled.js
     - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js

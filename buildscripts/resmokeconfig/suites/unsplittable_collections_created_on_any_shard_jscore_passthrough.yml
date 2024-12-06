@@ -48,7 +48,7 @@ selector:
 
     # TODO: SERVER-85382 re-enable this test with tracked collection once create collection coordinator
     # support all timeseries/bucket namespace cases.
-    - jstests/core/timeseries/ddl/timeseries_user_system_buckets.js
+    - jstests/core/timeseries/timeseries_user_system_buckets.js
 
     # TODO SERVER-89286 re-enable this test
     - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js

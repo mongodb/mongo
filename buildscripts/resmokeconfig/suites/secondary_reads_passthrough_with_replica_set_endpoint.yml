@@ -47,7 +47,7 @@ selector:
     - jstests/core/query/find_with_resume_after_param.js
     - jstests/core/query/resume_query_from_non_existent_record.js
     - jstests/core/query/resume_query.js
-    - jstests/core/timeseries/query/timeseries_resume_after.js
+    - jstests/core/timeseries/timeseries_resume_after.js
     # This test creates collections directly using applyOps commands. So those collections are not
     # tracked by sharding and therefore not discoverable by listCollections commands that go through
     # the router. TODO (SERVER-84342): listCollections command doesn't return collections created
@@ -100,7 +100,7 @@ selector:
     # per-ClusterRole. This suite changes which role's metrics are updated.
     - jstests/core/query/query_settings/query_settings_reject_application.js
     # Some TS rewrites cannot be done on mongos.
-    - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
+    - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

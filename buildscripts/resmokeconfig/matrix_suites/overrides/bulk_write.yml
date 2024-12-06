@@ -10,7 +10,7 @@
   value:
     exclude_files:
       # The following timeseries tests use failpoints that bulkWrite doesn't support.
-      - jstests/core/timeseries/write/timeseries_delete_hint.js
+      - jstests/core/timeseries/timeseries_delete_hint.js
       # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
       # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
       # server parameter.

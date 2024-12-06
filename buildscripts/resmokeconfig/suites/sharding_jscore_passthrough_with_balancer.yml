@@ -47,7 +47,7 @@ selector:
     # moveCollection and the many deleteMany commands in this test block each other and can easily cause the test to time out.
     # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
     # TODO SERVER-91655: re-enable this test in this suite or potentially in a noPassthrough suite.
-    - jstests/core/timeseries/query/timeseries_predicates.js
+    - jstests/core/timeseries/timeseries_predicates.js
     # moveCollection and the many multi updates in this test block each other and can easily cause the test to time out.
     # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
     # TODO SERVER-91722: re-enable this test in this suite or potentially in a noPassthrough suite.

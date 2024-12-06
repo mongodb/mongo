@@ -66,7 +66,7 @@ selector:
     # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
     - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
     # TODO SERVER-86443 Enable test once featureFlagTrackUnshardedCollectionsUponCreation is enabled
-    - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+    - jstests/core/timeseries/timeseries_update_arbitrary_updates_not_enabled.js
 
     # The resharding core tests expect the sharding topology to remain constant.
     - jstests/core_sharding/resharding/**/*.js
