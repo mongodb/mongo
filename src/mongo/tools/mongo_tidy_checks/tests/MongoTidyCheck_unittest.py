@@ -73,6 +73,7 @@ class MongoTidyTests(unittest.TestCase):
                 sys.executable,
                 "buildscripts/clang_tidy.py",
                 "--disable-reporting",
+                "--clang-tidy-test",
                 f"--check-module={self.TIDY_MODULE}",
                 f'--output-dir={os.path.join(os.path.dirname(self.compile_db), self._testMethodName + "_out")}',
                 f"--compile-commands={self.compile_db}",

@@ -71,14 +71,10 @@ if env.GetOption("ninja") == "disabled":
         test_objs += test_env.Object(test)
 
     # Building a program binary may not be necessary but it does validate the code and tie it together.
-    test_prog = mongo_tidy_test_env.Program(
+    test_prog = mongo_tidy_test_env.BazelProgram(
         target="MongoTidyCheck_test",
-        source=["MongoTidyCheckTestMain.cpp"] + test_objs,
-        LIBDEPS_NO_INHERIT=[
-            "$BUILD_DIR/third_party/unwind/unwind",
-            "$BUILD_DIR/third_party/tcmalloc/tcmalloc",
-            "$BUILD_DIR/third_party/gperftools/tcmalloc_minimal",
-        ],
+        source=[],
+        LIBDEPS_NO_INHERIT=[],
     )
 
     # Here we setup the test execution. The test will pythons built in unittest framework

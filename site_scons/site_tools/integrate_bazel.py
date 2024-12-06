@@ -501,7 +501,9 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
     elif SCons.Script.BUILD_TARGETS == ["compiledb"]:
         extra_args += ["--build_tag_filters=scons_link_lists,compiledb,gen_source"]
         bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//:compiledb", "//src/..."]
-
+    elif SCons.Script.BUILD_TARGETS == ["compiledb", "+mongo-tidy-tests"]:
+        extra_args += ["--build_tag_filters=scons_link_lists,compiledb,gen_source,mongo-tidy-tests"]
+        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//:compiledb", "//src/..."]
     else:
         build_tags = env.GetOption("bazel-build-tag")
         if not build_tags:

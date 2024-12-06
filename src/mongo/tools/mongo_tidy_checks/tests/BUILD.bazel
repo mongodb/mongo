@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,63 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_binary(
+    name = "MongoTidyCheck_test",
+    srcs = ["MongoTidyCheckTestMain.cpp"] + [
+        # This list represents the test source files, which should contain a single issue which will be flagged
+        # by a clang tidy check. The issue should be isolated in as minimal way as possible.
+        "test_MongoHeaderBracketCheck.cpp",
+        "test_MongoHeaderBracketCheck.h",
+        "test_MongoVolatileCheck.cpp",
+        "test_MongoUninterruptibleLockGuardCheck.cpp",
+        "test_MongoUninterruptibleLockGuardCheckForOpCtxMember.cpp",
+        "test_MongoCctypeCheck.cpp",
+        "test_MongoCctypeCheck.h",
+        "test_MongoConfigHeaderCheck.cpp",
+        "test_MongoCxx20BannedIncludesCheck.cpp",
+        "test_MongoCxx20StdChronoCheck.cpp",
+        "test_MongoStdOptionalCheck.cpp",
+        "test_MongoTraceCheck.cpp",
+        "test_MongoStdAtomicCheck.cpp",
+        "test_MongoAssertCheck.cpp",
+        "test_MongoFCVConstantCheck.cpp",
+        "test_MongoUnstructuredLogCheck.cpp",
+        "test_MongoCollectionShardingRuntimeCheck.cpp",
+        "test_MongoMacroDefinitionLeaksCheck.cpp",
+        "test_MongoMacroDefinitionLeaksCheck.h",
+        "test_MongoRandCheck.cpp",
+        "test_MongoRWMutexCheck.cpp",
+        "test_MongoPolyFillCheck.cpp",
+        "test_MongoNoUniqueAddressCheck.cpp",
+        "test_MongoStringDataConstRefCheck1.cpp",
+        "test_MongoStringDataConstRefCheck2.cpp",
+        "test_MongoStringDataConstRefCheck3.cpp",
+        "test_MongoInvariantStatusIsOKCheck.cpp",
+    ],
+    # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
+    # to see.
+    copts = [
+        "-Wno-unused-but-set-parameter",
+        "-Wno-unused-variable",
+        "-Wno-return-type",
+        "-Wno-volatile",
+        "-Wno-deprecated-volatile",
+    ],
+    includes = ["."],
+    skip_global_deps = [
+        "allocator",
+        "libunwind",
+    ],
+    tags = [
+        "mongo-tidy-tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/third_party/s2",
+    ],
 )
