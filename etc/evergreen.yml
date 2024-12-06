@@ -102,15 +102,9 @@ commit_queue_aliases:
     task: "^(bazel_.*|run_.*|compile_.*|lint_.*|jsCore|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
     variant_tags: []
     task_tags: []
-    parameters:
-      - key: "evergreen_remote_exec"
-        value: "on"
   - variant: "^(amazon-linux2-arm64-static-compile|linux-x86-dynamic-compile-required)$"
     variant_tags: []
     task_tags: ["clang_tidy"]
-    parameters:
-      - key: "evergreen_remote_exec"
-        value: "on"
 
 github_pr_aliases:
   - variant: "commit-queue"
@@ -127,9 +121,6 @@ patch_aliases:
   - alias: required
     variant_tags: ["required"]
     task: ".*"
-    parameters:
-      - key: "evergreen_remote_exec"
-        value: "on"
   - alias: query
     variant: "^(.*query-patch-only|amazon-linux2-arm64-static-compile)$"
     task: ".*"
