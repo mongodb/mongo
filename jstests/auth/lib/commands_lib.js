@@ -7449,6 +7449,39 @@ export const authCommandsLib = {
             privileges: [{resource: {cluster: true}, actions: ["internal"]}]
           },
         ]
+      },
+      {
+        testname: "aggregate_$listClusterCatalog",
+        command: {aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}},
+        testcases: [
+            {
+                runOnDb: adminDbName,
+                roles: roles_monitoring,
+                privileges: [
+                    {resource: {cluster: true}, actions: ["listClusterCatalog"]},
+                ],
+            },
+            {
+                runOnDb: firstDbName,
+                roles: {
+                    read: 1,
+                    readAnyDatabase: 1,
+                    readWrite: 1,
+                    readWriteAnyDatabase: 1,
+                    dbAdmin: 1,
+                    dbAdminAnyDatabase: 1,
+                    dbOwner: 1,
+                    backup: 1,
+                    restore: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges: [
+                  {resource: {db: firstDbName, collection: ""}, actions: ["listCollections"]}
+                ]
+            },
+            {runOnDb: firstDbName, privileges: [], expectAuthzFailure: true},
+        ]
       }
     ],
 
