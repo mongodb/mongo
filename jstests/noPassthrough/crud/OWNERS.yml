@@ -3,3 +3,6 @@ filters:
   - "*capped_deletes*":
     approvers:
       - 10gen/server-storage-execution
+  - "replset_writes_during_restarts_keep_fast_count_correct.js":
+    approvers:
+      - 10gen/server-storage-execution
