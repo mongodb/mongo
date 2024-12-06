@@ -2028,10 +2028,12 @@ public:
     const Expression* getInput() const {
         return _children[_kInput].get();
     }
+
     const Expression* getCond() const {
         return _children[_kCond].get();
     }
-    boost::optional<size_t> getLimit() const {
+
+    const boost::optional<size_t>& getLimit() const {
         return _limit;
     }
 
@@ -2404,6 +2406,18 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getEach() const {
+        return _children[_kEach].get();
+    }
+
+    Variables::Id getVarId() const {
+        return _varId;
+    }
+
 private:
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kEach = 1;
@@ -2753,6 +2767,26 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getInitial() const {
+        return _children[_kInitial].get();
+    }
+
+    const Expression* getIn() const {
+        return _children[_kIn].get();
+    }
+
+    Variables::Id getThisVar() const {
+        return _thisVar;
+    }
+
+    Variables::Id getValueVar() const {
+        return _valueVar;
     }
 
 private:

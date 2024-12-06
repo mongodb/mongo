@@ -62,7 +62,6 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/expression/evaluate.h"
@@ -87,15 +86,12 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/text.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 using Parser = Expression::Parser;
@@ -105,8 +101,6 @@ using std::move;
 using std::pair;
 using std::string;
 using std::vector;
-
-MONGO_FAIL_POINT_DEFINE(mapReduceFilterPauseBeforeLoop);
 
 Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
                                             Value val,
@@ -128,33 +122,6 @@ Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
 
     return opts.serializeLiteral(val);
 }
-
-namespace {
-
-void mapReduceFilterWaitBeforeLoop(OperationContext* opCtx) {
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &mapReduceFilterPauseBeforeLoop, opCtx, "mapReduceFilterPauseBeforeLoop", []() {
-            LOGV2(9006800, "waiting due to 'mapReduceFilterPauseBeforeLoop' failpoint");
-        });
-}
-
-std::function<void()> getExpressionInterruptChecker(OperationContext* opCtx) {
-    if (opCtx) {
-        ElapsedTracker et(opCtx->getServiceContext()->getFastClockSource(),
-                          internalQueryExpressionInterruptIterations.load(),
-                          Milliseconds{internalQueryExpressionInterruptPeriodMS.load()});
-        return [=]() mutable {
-            if (MONGO_unlikely(et.intervalHasElapsed())) {
-                opCtx->checkForInterrupt();
-            }
-        };
-    } else {
-        return []() {
-        };
-    }
-}
-
-}  // namespace
 
 /* --------------------------- Expression ------------------------------ */
 
@@ -2305,68 +2272,7 @@ Value ExpressionFilter::serialize(const SerializationOptions& options) const {
 }
 
 Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
-    // We are guaranteed at parse time that this isn't using our _varId.
-    Value inputVal = _children[_kInput]->evaluate(root, variables);
-
-    if (inputVal.nullish())
-        return Value(BSONNULL);
-
-    uassert(28651,
-            str::stream() << "input to $filter must be an array not "
-                          << typeName(inputVal.getType()),
-            inputVal.isArray());
-
-    const vector<Value>& input = inputVal.getArray();
-
-    if (input.empty())
-        return inputVal;
-
-    // This counter ensures we don't return more array elements than our limit arg has specified.
-    // For example, given the query, {$project: {b: {$filter: {input: '$a', as: 'x', cond: {$gt:
-    // ['$$x', 1]}, limit: {$literal: 3}}}}} remainingLimitCounter would be 3 and we would return up
-    // to the first 3 elements matching our condition, per doc.
-    auto approximateOutputSize = input.size();
-    boost::optional<int> remainingLimitCounter;
-    if (_limit) {
-        auto limitValue = (_children[*_limit])->evaluate(root, variables);
-        // If the $filter query contains limit: null, we interpret the query as being "limit-less"
-        // and therefore return all matching elements per doc.
-        if (!limitValue.nullish()) {
-            uassert(
-                327391,
-                str::stream() << "$filter: limit must be represented as a 32-bit integral value: "
-                              << limitValue.toString(),
-                limitValue.integral());
-            int coercedLimitValue = limitValue.coerceToInt();
-            uassert(327392,
-                    str::stream() << "$filter: limit must be greater than 0: "
-                                  << limitValue.toString(),
-                    coercedLimitValue > 0);
-            remainingLimitCounter = coercedLimitValue;
-            approximateOutputSize =
-                std::min(approximateOutputSize, static_cast<size_t>(coercedLimitValue));
-        }
-    }
-
-    auto checkForInterrupt =
-        getExpressionInterruptChecker(getExpressionContext()->getOperationContext());
-    mapReduceFilterWaitBeforeLoop(getExpressionContext()->getOperationContext());
-
-    vector<Value> output;
-    output.reserve(approximateOutputSize);
-    for (const auto& elem : input) {
-        checkForInterrupt();
-        variables->setValue(_varId, elem);
-
-        if (_children[_kCond]->evaluate(root, variables).coerceToBool()) {
-            output.push_back(elem);
-            if (remainingLimitCounter && --*remainingLimitCounter == 0) {
-                return Value(std::move(output));
-            }
-        }
-    }
-
-    return Value(std::move(output));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 /* ------------------------- ExpressionFloor -------------------------- */
@@ -2480,45 +2386,7 @@ Value ExpressionMap::serialize(const SerializationOptions& options) const {
 }
 
 Value ExpressionMap::evaluate(const Document& root, Variables* variables) const {
-    // guaranteed at parse time that this isn't using our _varId
-    Value inputVal = _children[_kInput]->evaluate(root, variables);
-    if (inputVal.nullish())
-        return Value(BSONNULL);
-
-    uassert(16883,
-            str::stream() << "input to $map must be an array not " << typeName(inputVal.getType()),
-            inputVal.isArray());
-
-    const vector<Value>& input = inputVal.getArray();
-
-    if (input.empty())
-        return inputVal;
-
-    auto checkForInterrupt =
-        getExpressionInterruptChecker(getExpressionContext()->getOperationContext());
-    mapReduceFilterWaitBeforeLoop(getExpressionContext()->getOperationContext());
-
-    size_t memUsed = 0;
-    vector<Value> output;
-    output.reserve(input.size());
-    const size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
-    for (size_t i = 0; i < input.size(); i++) {
-        checkForInterrupt();
-        variables->setValue(_varId, input[i]);
-
-        Value toInsert = _children[_kEach]->evaluate(root, variables);
-        if (toInsert.missing())
-            toInsert = Value(BSONNULL);  // can't insert missing values into array
-
-        output.push_back(toInsert);
-        memUsed += toInsert.getApproximateSize();
-        if (MONGO_unlikely(memUsed > memLimit)) {
-            uasserted(ErrorCodes::ExceededMemoryLimit,
-                      "$map would use too much memory and cannot spill");
-        }
-    }
-
-    return Value(std::move(output));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 /* ------------------------- ExpressionMeta ----------------------------- */
@@ -3787,38 +3655,7 @@ intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCt
 }
 
 Value ExpressionReduce::evaluate(const Document& root, Variables* variables) const {
-    Value inputVal = _children[_kInput]->evaluate(root, variables);
-
-    if (inputVal.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(40080,
-            str::stream() << "$reduce requires that 'input' be an array, found: "
-                          << inputVal.toString(),
-            inputVal.isArray());
-
-    auto checkForInterrupt =
-        getExpressionInterruptChecker(getExpressionContext()->getOperationContext());
-    mapReduceFilterWaitBeforeLoop(getExpressionContext()->getOperationContext());
-
-    size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
-    Value accumulatedValue = _children[_kInitial]->evaluate(root, variables);
-
-    for (auto&& elem : inputVal.getArray()) {
-        checkForInterrupt();
-
-        variables->setValue(_thisVar, elem);
-        variables->setValue(_valueVar, accumulatedValue);
-
-        accumulatedValue = _children[_kIn]->evaluate(root, variables);
-        if (MONGO_unlikely(accumulatedValue.getApproximateSize() > memLimit)) {
-            uasserted(ErrorCodes::ExceededMemoryLimit,
-                      "$reduce would use too much memory and cannot spill");
-        }
-    }
-
-    return accumulatedValue;
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 intrusive_ptr<Expression> ExpressionReduce::optimize() {

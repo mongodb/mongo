@@ -141,6 +141,10 @@ Value evaluate(const ExpressionSlice& expr, const Document& root, Variables* var
 Value evaluate(const ExpressionSize& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionZip& expr, const Document& root, Variables* variables);
 
+Value evaluate(const ExpressionMap& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionFilter& expr, const Document& root, Variables* variables);
+
 Value evaluate(const ExpressionConcat& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionReplaceOne& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionReplaceAll& expr, const Document& root, Variables* variables);
