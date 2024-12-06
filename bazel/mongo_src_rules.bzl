@@ -1229,6 +1229,14 @@ COVERAGE_FLAGS = select({
     "//conditions:default": [],
 })
 
+# Passed to both the compiler and linker
+PGO_PROFILE_FLAGS = select({
+    "//bazel/config:pgo_profile_enabled": [
+        "-fprofile-instr-generate",
+    ],
+    "//conditions:default": [],
+})
+
 MACOS_SSL_LINKFLAGS = select({
     "//bazel/config:ssl_enabled_macos": [
         "-framework CoreFoundation",
@@ -1305,7 +1313,8 @@ MONGO_GLOBAL_COPTS = (
     SYMBOL_ORDER_COPTS +
     GCC_WARNINGS_COPTS +
     SASL_WINDOWS_COPTS +
-    COVERAGE_FLAGS
+    COVERAGE_FLAGS +
+    PGO_PROFILE_FLAGS
 )
 
 MONGO_GLOBAL_LINKFLAGS = (
@@ -1333,7 +1342,8 @@ MONGO_GLOBAL_LINKFLAGS = (
     COVERAGE_FLAGS +
     GLOBAL_WINDOWS_LIBRAY_LINKFLAGS +
     SASL_WINDOWS_LINKFLAGS +
-    MACOS_SSL_LINKFLAGS
+    MACOS_SSL_LINKFLAGS +
+    PGO_PROFILE_FLAGS
 )
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
