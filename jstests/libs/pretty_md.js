@@ -28,6 +28,11 @@ export function codeOneLine(msg) {
     printGolden("`" + tojsononeline(msg) + "`");
 }
 
+export function note(msg) {
+    printGolden("> [!NOTE]");
+    printGolden("> " + msg);
+}
+
 export function code(msg, fmt = "json") {
     printGolden("```" + fmt);
     printGolden(msg);
@@ -46,7 +51,7 @@ export function linebreak() {
 export function outputAggregationPlanAndResults(
     coll, pipeline, options = {}, shouldSortResults = true) {
     const results = coll.aggregate(pipeline, options).toArray();
-    const explain = coll.explain("allPlansExecution").aggregate(pipeline, options);
+    const explain = coll.explain().aggregate(pipeline, options);
     const flatPlan = formatExplainRoot(explain);
 
     subSection("Pipeline");
@@ -75,8 +80,11 @@ export function outputAggregationPlanAndResults(
  * explain to markdown.
  */
 export function outputDistinctPlanAndResults(coll, key, filter = {}, options = {}) {
-    const results = coll.distinct(key, filter, options);
-    const explain = coll.explain("allPlansExecution").distinct(key, filter, options);
+    // The 'coll.distinct()' shell helper doesn't support some options like 'readConcern', even
+    // though the command does support them.
+    const cmdArgs = {distinct: coll.getName(), key, query: filter, ...options};
+    const results = assert.commandWorked(coll.getDB().runCommand(cmdArgs)).values;
+    const explain = assert.commandWorked(coll.getDB().runCommand({explain: cmdArgs}));
     const flatPlan = formatExplainRoot(explain);
 
     subSection(`Distinct on "${key}", with filter: ${tojson(filter)}${
