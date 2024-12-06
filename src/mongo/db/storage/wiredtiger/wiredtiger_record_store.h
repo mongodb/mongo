@@ -183,9 +183,6 @@ public:
     virtual bool compactSupported() const {
         return !_isEphemeral;
     }
-    virtual bool supportsOnlineCompaction() const {
-        return true;
-    }
 
     virtual Timestamp getPinnedOplog() const final;
 

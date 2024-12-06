@@ -1778,6 +1778,8 @@ Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isWriteLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+    const std::string uri(getURI());
+
     if (!cache->isEphemeral()) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
         opCtx->recoveryUnit()->abandonSnapshot();
@@ -1788,7 +1790,7 @@ Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
 
         if (ret == EBUSY) {
             return Status(ErrorCodes::Interrupted,
-                          str::stream() << "Compaction interrupted on " << getURI().c_str()
+                          str::stream() << "Compaction interrupted on " << uri
                                         << " due to cache eviction pressure");
         }
         invariantWTOK(ret, s);

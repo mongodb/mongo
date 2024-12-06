@@ -47,64 +47,18 @@ namespace mongo {
 
 using logv2::LogComponent;
 
-namespace {
-
-CollectionPtr getCollectionForCompact(OperationContext* opCtx,
-                                      const NamespaceString& collectionNss) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_IX));
-
-    auto collectionCatalog = CollectionCatalog::get(opCtx);
-    CollectionPtr collection = collectionCatalog->lookupCollectionByNamespace(opCtx, collectionNss);
-
-    if (!collection) {
-        std::shared_ptr<const ViewDefinition> view =
-            collectionCatalog->lookupView(opCtx, collectionNss);
-        uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
-        uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
-    }
-
-    return collection;
-}
-
-}  // namespace
-
-StatusWith<int64_t> compactCollection(OperationContext* opCtx,
-                                      const NamespaceString& collectionNss) {
-    AutoGetDb autoDb(opCtx, collectionNss.db(), MODE_IX);
-    Database* database = autoDb.getDb();
-    uassert(ErrorCodes::NamespaceNotFound, "database does not exist", database);
-
-    // The collection lock will be upgraded to an exclusive lock if the record store does not
-    // support online compaction.
-    boost::optional<Lock::CollectionLock> collLk;
-    collLk.emplace(opCtx, collectionNss, MODE_IX);
-
-    CollectionPtr collection = getCollectionForCompact(opCtx, collectionNss);
+StatusWith<int64_t> compactCollection(OperationContext* opCtx, const CollectionPtr& collection) {
     DisableDocumentValidation validationDisabler(opCtx);
 
+    auto collectionNss = collection->ns();
     auto recordStore = collection->getRecordStore();
-
-    OldClientContext ctx(opCtx, collectionNss.ns());
 
     if (!recordStore->compactSupported())
         return Status(ErrorCodes::CommandNotSupported,
                       str::stream() << "cannot compact collection with record store: "
                                     << recordStore->name());
 
-    if (!recordStore->supportsOnlineCompaction()) {
-        // Storage engines that disallow online compaction should compact under an exclusive lock.
-        collLk.emplace(opCtx, collectionNss, MODE_X);
-
-        // Ensure the collection was not dropped during the re-lock.
-        collection = getCollectionForCompact(opCtx, collectionNss);
-        recordStore = collection->getRecordStore();
-    }
-
-    LOGV2_OPTIONS(20284,
-                  {LogComponent::kCommand},
-                  "compact {namespace} begin",
-                  "Compact begin",
-                  "namespace"_attr = collectionNss);
+    LOGV2_OPTIONS(20284, {LogComponent::kCommand}, "Compact begin", logAttrs(collectionNss));
 
     auto oldTotalSize = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
     auto indexCatalog = collection->getIndexCatalog();
