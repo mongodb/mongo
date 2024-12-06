@@ -3712,6 +3712,7 @@ tasks:
       num_files: 5
       num_tasks: 5
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      jstestfuzz_vars: --numPipelines=3000
       npm_command: agg-fuzzer
       run_no_feature_flag_tests: "true"
 
@@ -3743,7 +3744,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode optimization
+      jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-expr-fuzzer
@@ -3758,7 +3759,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode optimization
+      jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-fuzzer
@@ -3773,7 +3774,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode wildcard
+      jstestfuzz_vars: --diffTestingMode wildcard --numPipelines=3000
       npm_command: agg-fuzzer
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -3788,7 +3789,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode timeseries
+      jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=750
       npm_command: agg-fuzzer
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -3803,7 +3804,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode optimization
+      jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
       npm_command: change-stream-fuzzer
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
