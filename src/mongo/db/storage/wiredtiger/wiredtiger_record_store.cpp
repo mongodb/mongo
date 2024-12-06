@@ -1329,7 +1329,7 @@ void WiredTigerRecordStore::_changeNumRecordsAndDataSize(RecoveryUnit& ru,
 
     ru.onRollback([updateAndStoreSizeInfo, numRecordDiff, dataSizeDiff](auto _) {
         LOGV2_DEBUG(7105300,
-                    2,
+                    3,
                     "WiredTigerRecordStore: rolling back change to numRecords and dataSize",
                     "numRecordDiff"_attr = -numRecordDiff,
                     "dataSizeDiff"_attr = -dataSizeDiff);
