@@ -141,5 +141,21 @@ Value evaluate(const ExpressionSlice& expr, const Document& root, Variables* var
 Value evaluate(const ExpressionSize& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionZip& expr, const Document& root, Variables* variables);
 
+Value evaluate(const ExpressionConcat& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionReplaceOne& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionReplaceAll& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionStrcasecmp& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSubstrBytes& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSubstrCP& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionStrLenBytes& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionBinarySize& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionStrLenCP& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionToLower& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionToUpper& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables* variables);
+
 }  // namespace exec::expression
 }  // namespace mongo
