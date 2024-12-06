@@ -1,5 +1,4 @@
 Import("env")
-Import("mongo_tidy_module")
 Import("base_toolchain_bin")
 Import("use_libunwind")
 
@@ -84,7 +83,7 @@ if env.GetOption("ninja") == "disabled":
         source=[
             "MongoTidyCheck_unittest.py",
             str(base_toolchain_bin / "clang-tidy"),
-            mongo_tidy_module.abspath,
+            "#$BAZEL_OUT_DIR/src/mongo/tools/mongo_tidy_checks/libmongo_tidy_checks.so",
         ]
         + compilation_dbs,
         action=SCons.Action.Action(

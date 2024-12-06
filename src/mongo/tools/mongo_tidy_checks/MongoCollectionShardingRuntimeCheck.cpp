@@ -30,6 +30,7 @@
 #include "MongoCollectionShardingRuntimeCheck.h"
 
 #include <clang-tidy/utils/OptionsUtils.h>
+#include <filesystem>
 
 namespace mongo::tidy {
 
@@ -43,6 +44,16 @@ MongoCollectionShardingRuntimeCheck::MongoCollectionShardingRuntimeCheck(
           Options.get("exceptionDirs", "src/mongo/db/s"))),
       exceptionFiles(clang::tidy::utils::options::parseStringList(
           Options.get("exceptionFiles", "src/mongo/db/exec/query_shard_server_test_fixture.cpp"))) {
+    // Accept relative paths
+    int origLength = static_cast<int>(exceptionDirs.size());
+    for (int i = 0; i < origLength; i++) {
+        exceptionDirs.push_back(std::filesystem::current_path() / exceptionDirs[i]);
+    }
+
+    origLength = static_cast<int>(exceptionFiles.size());
+    for (int i = 0; i < origLength; i++) {
+        exceptionFiles.push_back(std::filesystem::current_path() / exceptionFiles[i]);
+    }
 }
 
 void MongoCollectionShardingRuntimeCheck::registerMatchers(MatchFinder* Finder) {

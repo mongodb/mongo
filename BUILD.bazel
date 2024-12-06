@@ -34,7 +34,7 @@ genrule(
     # We also use it to append a line to opt-in to warnings as errors.
     cmd = """
     cp $(location .clang-tidy.in) $@ && \
-    sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g ; $$aWarningsAsErrors: "*"' $@
+    sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g ; s|@MONGO_BRACKET_BUILD_DIR@|$(RULEDIR)/src/mongo|g ; $$aWarningsAsErrors: "*"' $@
     """,
     visibility = ["//visibility:public"],
 )

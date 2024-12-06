@@ -139,7 +139,13 @@ MongoHeaderBracketCheck::MongoHeaderBracketCheck(llvm::StringRef Name,
                                                  clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context),
       mongoSourceDirs(clang::tidy::utils::options::parseStringList(
-          Options.get("mongoSourceDirs", "src/mongo"))) {}
+          Options.get("mongoSourceDirs", "src/mongo"))) {
+    // Accept relative paths
+    int origLength = static_cast<int>(mongoSourceDirs.size());
+    for (int i = 0; i < origLength; i++) {
+        mongoSourceDirs.push_back(std::filesystem::current_path() / mongoSourceDirs[i]);
+    }
+}
 
 void MongoHeaderBracketCheck::storeOptions(clang::tidy::ClangTidyOptions::OptionMap& Opts) {
     Options.store(
