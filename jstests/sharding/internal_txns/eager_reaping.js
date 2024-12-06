@@ -9,7 +9,6 @@
  *    embedded_router_incompatible,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -18,6 +17,10 @@ const st = new ShardingTest({shards: 1, config: 1});
 const kDbName = "testDb";
 const kCollName = "testColl";
 const mongosTestColl = st.s.getCollection(kDbName + "." + kCollName);
+// Reap all internal sessions to make sure the actual test case starts without anything added
+// implicitly from setting up the test collection.
+assert.commandWorked(
+    st.rs0.getPrimary().adminCommand({setParameter: 1, internalSessionsReapThreshold: 1}));
 assert.commandWorked(mongosTestColl.insert({x: 1}));  // Set up the collection.
 
 function assertNumEntries(conn,
@@ -69,12 +72,6 @@ function assertNumEntriesSoon(
 }
 
 function runTest(conn, shardConn) {
-    // TODO SERVER-85296 remove this early return once the test will take into account the extra
-    // session opened by the implicit creation of the collection at the beginning of the test
-    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (isTrackUnshardedUponCreationEnabled)
-        return;
     // Lower the threshold to speed up the test and verify it's respected.
     const reapThreshold = 100;
     assert.commandWorked(
