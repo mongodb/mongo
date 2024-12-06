@@ -144,6 +144,16 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
     }
 
     if (BSONElement prepareUniqueElement = _infoObj[kPrepareUniqueFieldName]) {
+        // If FCV is initialized, check if prepareUnique is supported.
+        // Otherwise, we are in startup recovery and reading the option from disk, and can skip
+        // the check because this option could only be gnerated by 6.0+, and we already prevent
+        // FCV downgrades from 6.0 if any indexes contain prepareUnique.
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Index does not support the 'prepareUnique' field",
+                    feature_flags::gCollModIndexUnique.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+        }
         _prepareUnique = prepareUniqueElement.trueValue();
     }
 
