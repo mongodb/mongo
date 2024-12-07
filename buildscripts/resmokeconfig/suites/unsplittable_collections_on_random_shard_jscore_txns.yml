@@ -31,6 +31,7 @@ selector:
     - requires_capped
     # Prepare is not a command on mongos.
     - uses_prepare_transaction
+    - creates_unspittable_collections_on_specific_shards
 
 executor:
   archive:

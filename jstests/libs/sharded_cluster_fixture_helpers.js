@@ -8,32 +8,43 @@ function _getRandomElem(list) {
     return list[Math.floor(Math.random() * list.length)];
 }
 
-function _getShards(conn) {
+function _getShardDescriptors(conn) {
     return assert.commandWorked(conn.adminCommand({listShards: 1})).shards;
 }
 
-export function getNumShards(conn) {
-    return _getShards(conn).length;
+export function getShardNames(conn) {
+    return _getShardDescriptors(conn).map(shard => shard._id);
 }
 
-export function getRandomShardId(conn, exclude = undefined) {
-    let shards = _getShards(conn);
+export function getNumShards(conn) {
+    return _getShardDescriptors(conn).length;
+}
 
-    if (exclude !== undefined) {
-        // Normalize the exclusion parameter to a list.
-        // This is to support callers that only pass a single shardId (type string) as second
-        // argument
-        let exclusionList = [].concat(exclude);
-
-        let filteredShards = shards.filter(shard => !exclusionList.includes(shard['_id']));
-
-        assert.gte(filteredShards.length,
-                   1,
-                   `Can't find a shard not in ${tojsononeline(exclusionList)}. All shards ${
-                       tojsononeline(shards)}`);
-
-        shards = filteredShards;
+export function getRandomShardName(conn, exclude = []) {
+    // Normalize the exclusion parameter to a list, in case a single shardId is passed as a string.
+    if (!Array.isArray(exclude)) {
+        exclude = [exclude];
     }
 
-    return _getRandomElem(shards)['_id'];
+    let shards = getShardNames(conn);
+    let filteredShards = shards.filter(shard => !exclude.includes(shard));
+
+    assert.gte(
+        filteredShards.length,
+        1,
+        `Can't find a shard not in ${tojsononeline(exclude)}. All shards ${tojsononeline(shards)}`);
+
+    return _getRandomElem(filteredShards);
+}
+
+// Drops and recreates dbName and assigns optPrimaryShard to it (if specified).
+export function setupTestDatabase(conn, dbName, optPrimaryShard = null) {
+    const newDb = conn.getSiblingDB(dbName);
+    assert.commandWorked(newDb.dropDatabase());
+    const createCmd = optPrimaryShard !== null
+        ? {enablesharding: dbName, primaryShard: optPrimaryShard}
+        : {enablesharding: dbName};
+
+    assert.commandWorked(conn.adminCommand(createCmd));
+    return newDb;
 }

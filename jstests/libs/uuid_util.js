@@ -4,8 +4,9 @@
  * Reads the collection entry for 'nss' from config.collections, asserts that such an entry exists,
  * and returns its 'uuid' field, which may be undefined.
  */
-export function getUUIDFromConfigCollections(mongosConn, nss) {
-    let collEntry = mongosConn.getDB("config").collections.findOne({_id: nss});
+export function getUUIDFromConfigCollections(conn, nss) {
+    const configDB = conn.getSiblingDB ? conn.getSiblingDB('config') : conn.getDB('config');
+    let collEntry = configDB.collections.findOne({_id: nss});
     assert.neq(undefined, collEntry);
     return collEntry.uuid;
 }

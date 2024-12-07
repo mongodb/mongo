@@ -67,6 +67,7 @@ selector:
     - requires_profiling
     # system.js stored functions only work for collections that live on the db-primary shard (SERVER-83269)
     - requires_system_dot_js_stored_functions
+    - creates_unspittable_collections_on_specific_shards
 
 executor:
   archive:

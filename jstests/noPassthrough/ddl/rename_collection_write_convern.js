@@ -1,3 +1,6 @@
+// Verify that the renameCollection command can still be served in presence of a killed replica set
+// node.
+
 // The following checks involve talking to a shard node, which in this test is shutdown.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;

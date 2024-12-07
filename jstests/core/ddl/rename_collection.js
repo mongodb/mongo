@@ -8,6 +8,8 @@
  * ]
  */
 
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+
 const collNamePrefix = "rename_coll_test_";
 let collCounter = 0;
 
@@ -21,8 +23,8 @@ function getNewColl() {
     return coll;
 }
 
-jsTest.log("Rename collection with documents");
 {
+    jsTest.log("Rename collection with documents");
     const src = getNewColl();
     const dstName = getNewCollName();
 
@@ -38,16 +40,16 @@ jsTest.log("Rename collection with documents");
     dst.drop();
 }
 
-jsTest.log("Rename non-existing collection");
 {
+    jsTest.log("Rename non-existing collection");
     const src = getNewColl();
     const dst = getNewColl();
 
     assert.commandFailed(src.renameCollection(dst.getName()));
 }
 
-jsTest.log("Rename collection with indexes");
 {
+    jsTest.log("Rename collection with indexes");
     const src = getNewColl();
     const dstName = getNewCollName();
     const existingDst = getNewColl();
@@ -72,8 +74,8 @@ jsTest.log("Rename collection with indexes");
     dst.drop();
 }
 
-jsTest.log("Rename collection with existing target");
 {
+    jsTest.log("Rename collection with existing target");
     const src = getNewColl();
     const dst = getNewColl();
 
@@ -94,4 +96,48 @@ jsTest.log("Rename collection with existing target");
     assert.eq(1, dst.countDocuments({}));
 
     dst.drop();
+}
+
+{
+    jsTest.log('Testing renameCollection with toNss == fromNss');
+    const sameColl = getNewColl();
+    assert.commandWorked(sameColl.insert({a: 1}));
+
+    assert.commandFailedWithCode(
+        sameColl.renameCollection(sameColl.getName(), true /* dropTarget */),
+        [ErrorCodes.IllegalOperation]);
+
+    assert.eq(1, sameColl.countDocuments({}), "Rename a collection to itself must not lose data");
+
+    sameColl.drop();
+}
+
+// Rename non-existing source collection to a target collection/view (dropTarget=false) must
+// fail with NamespaceNotFound. Make sure the check on the source is done before any check on
+// the target for consistency with replicaset.
+{
+    jsTest.log('Testing renameCollection on non-existing source namespaces');
+    const dbName = db.getName();
+
+    // Rename non-existing source to non-existing target
+    assert.commandFailedWithCode(
+        db.adminCommand({renameCollection: dbName + ".nonExistingsource", to: dbName + ".target"}),
+        ErrorCodes.NamespaceNotFound);
+
+    // Rename non-existing source to existing collection
+    const toColl = getNewColl();
+    const toCollName = toColl.getFullName();
+    toColl.insert({a: 0});
+
+    assert.commandFailedWithCode(
+        db.adminCommand({renameCollection: dbName + ".nonExistingsource", to: toCollName}),
+        ErrorCodes.NamespaceNotFound);
+
+    // Rename non-existing source to existing view
+    const toViewName = dbName + ".target_view";
+    assert.commandWorked(db.createView(toViewName, toCollName, []));
+
+    assert.commandFailedWithCode(
+        db.adminCommand({renameCollection: dbName + ".nonExistingsource", to: toViewName}),
+        ErrorCodes.NamespaceNotFound);
 }

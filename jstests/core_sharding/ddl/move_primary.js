@@ -6,7 +6,7 @@
  * ]
  */
 
-import {getRandomShardId} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
 
 const testDB = db.getSiblingDB('test_db');
 testDB.dropDatabase();
@@ -32,7 +32,7 @@ let initPrimaryShard = testDB.getDatabasePrimaryShardId();
 doInserts(N);
 assert.eq(N, coll.countDocuments({}));
 
-let otherShard = getRandomShardId(db, /* exclude = */ initPrimaryShard);
+let otherShard = getRandomShardName(db, /* exclude = */ initPrimaryShard);
 
 jsTestLog("Move primary to another shard and check content.");
 assert.commandWorked(testDB.adminCommand({movePrimary: testDB.getName(), to: otherShard}));

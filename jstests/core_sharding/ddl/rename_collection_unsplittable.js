@@ -1,12 +1,19 @@
 /*
  * Test the rename command against unsplittable collections.
  * @tags: [
+ *   # Requires stable collection placement
  *   assumes_balancer_off,
- *   requires_fcv_80
+ *   creates_unspittable_collections_on_specific_shards,
+ *   # TODO SERVER-97716 Review this exclusion tag
+ *   multiversion_incompatible,
+ *   requires_2_or_more_shards,
  * ]
  */
 
-import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    getRandomShardName,
+    setupTestDatabase
+} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
 
 function checkRenameSucceeded(configDb, nssFrom, nssTo, expectedUuid, shard) {
     const collEntryFrom = configDb.collections.findOne({_id: nssFrom});
@@ -87,27 +94,24 @@ function testRenameUnsplittableCollection(configDb,
     checkRenameSucceeded(configDb, dbFrom + "." + collNameFrom, nssTo, resUuid, shardName);
 }
 
-// Test setup
-const st = new ShardingTest({shards: 2});
-const mongos = st.s;
-const db = mongos.getDB(jsTestName());
-const configDb = mongos.getDB("config");
-const primaryShard = st.shard0.shardName;
-const nonPrimaryShard = st.shard1.shardName;
-const anotherDb = mongos.getDB("dbTo");
+// Setup two databases sharing the same primary shard.
+const dbName = 'testDb';
+const anotherDbName = 'anotherTestDb';
+const primaryShard = getRandomShardName(db);
+const nonPrimaryShard = getRandomShardName(db, [primaryShard]);
+const testDB = setupTestDatabase(db, dbName, primaryShard);
+const anotherTestDB = setupTestDatabase(db, anotherDbName, primaryShard);
 
-// Ensure the db primary is shard0. This will be expected later on.
-st.s.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard});
-st.s.adminCommand({enableSharding: anotherDb.getName(), primaryShard: primaryShard});
+const configDb = db.getSiblingDB("config");
 
 // 1. Rename collection  test:located on the primary shard
 testRenameUnsplittableCollection(configDb, db, "collFrom1", db, "collTo1", primaryShard);
 
 // 2. Rename collection  test:located on the primary shard when target exists
 testRenameUnsplittableCollection(configDb,
-                                 db,
+                                 testDB,
                                  "collFrom2",
-                                 db,
+                                 testDB,
                                  "collTo2",
                                  primaryShard,
                                  true /*collToShouldExist*/,
@@ -118,9 +122,9 @@ testRenameUnsplittableCollection(configDb, db, "collFrom3", db, "collTo3", nonPr
 
 // 4. Rename collection  test:not located on the primary shard when target exists
 testRenameUnsplittableCollection(configDb,
-                                 db,
+                                 testDB,
                                  "collFrom4",
-                                 db,
+                                 testDB,
                                  "collTo4",
                                  nonPrimaryShard,
                                  true /*collToShouldExist*/,
@@ -128,25 +132,27 @@ testRenameUnsplittableCollection(configDb,
 
 // 5. Rename collection  test:when target exists on another shard
 testRenameUnsplittableCollection(configDb,
-                                 db,
+                                 testDB,
                                  "collFrom5",
-                                 db,
+                                 testDB,
                                  "collTo5",
                                  nonPrimaryShard,
                                  true /*collToShouldExist*/,
                                  primaryShard);
 
 // 6. Rename collection  test:located on the primary shard across DBs
-testRenameUnsplittableCollection(configDb, db, "collFrom6", anotherDb, "collTo6", primaryShard);
+testRenameUnsplittableCollection(
+    configDb, testDB, "collFrom6", anotherTestDB, "collTo6", primaryShard);
 
 // 7. Rename collection  test:not located on the primary shard across DBs
-testRenameUnsplittableCollection(configDb, db, "collFrom7", anotherDb, "collTo7", nonPrimaryShard);
+testRenameUnsplittableCollection(
+    configDb, testDB, "collFrom7", anotherTestDB, "collTo7", nonPrimaryShard);
 
 // 8. Rename collection  test:located on the primary shard across DBs when target exists
 testRenameUnsplittableCollection(configDb,
-                                 db,
+                                 testDB,
                                  "collFrom8",
-                                 anotherDb,
+                                 anotherTestDB,
                                  "collTo8",
                                  primaryShard,
                                  true /*collToShouldExist*/,
@@ -154,9 +160,9 @@ testRenameUnsplittableCollection(configDb,
 
 // 9. Rename collection  test:not located on the primary shard across DBs when target exists
 testRenameUnsplittableCollection(configDb,
-                                 db,
+                                 testDB,
                                  "collFrom9",
-                                 anotherDb,
+                                 anotherTestDB,
                                  "collTo9",
                                  nonPrimaryShard,
                                  true /*collToShouldExist*/,
@@ -164,11 +170,10 @@ testRenameUnsplittableCollection(configDb,
 
 // 10. Rename collection  test:not located on the primary shard across DBs when target exists
 testRenameUnsplittableCollection(configDb,
-                                 db,
+                                 testDB,
                                  "collFrom10",
-                                 anotherDb,
+                                 anotherTestDB,
                                  "collTo10",
                                  primaryShard,
                                  true /*collToShouldExist*/,
                                  nonPrimaryShard);
-st.stop();
