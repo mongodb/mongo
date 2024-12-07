@@ -2530,6 +2530,20 @@ functions:
       content_type: text/plain
       display_name: Bazel Header List
 
+  "save bazel jvm dump":
+    command: s3.put
+    display_name: "attach bazel jvm dump"
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/jvm.out.tar.gz
+      remote_file: ${project}/${build_variant}/${revision}/jvm.out.${task_id}-${execution}.tar.gz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: Bazel JVM dump
+
   "tar UndoDB recordings": &tar_undodb_recordings
     command: archive.targz_pack
     params:

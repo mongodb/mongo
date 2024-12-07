@@ -9,12 +9,15 @@ import platform
 import queue
 import shlex
 import shutil
+import signal
 import socket
 import stat
 import subprocess
 import sys
+import tarfile
 import threading
 import time
+import traceback
 import urllib.request
 from io import StringIO
 from typing import Any, Dict, List, Set, Tuple
@@ -29,6 +32,8 @@ from retry.api import retry_call
 from SCons.Script import ARGUMENTS
 
 from buildscripts.install_bazel import install_bazel
+from buildscripts.util.read_config import read_config_file
+from evergreen.api import RetryingEvergreenApi
 
 # Disable retries locally
 _LOCAL_MAX_RETRY_ATTEMPTS = 1
@@ -120,6 +125,17 @@ class Globals:
     bazel_executable = None
 
     max_retry_attempts: int = _LOCAL_MAX_RETRY_ATTEMPTS
+
+    bazel_remote_timeout: int = -1
+
+    timeout_event = threading.Event()
+
+    # Timeout when stuck scheduling without making progress for more than 15 minutes
+    # Ex string:
+    # [21,537 / 21,603] [Sched] Compiling src/mongo/db/s/migration_chunk_cloner_source.cpp; 1424s
+    last_sched_target_progress = ""
+    sched_time_start = 0
+    sched_timeout_sec = 60 * 15
 
     @staticmethod
     def bazel_output(scons_node):
@@ -356,28 +372,99 @@ def write_bazel_build_output(line: str) -> None:
         Globals.bazel_thread_terminal_output.write(line)
 
 
+def bazel_server_timeout_dumper(jvm_out, proc_pid, project_root):
+    p = psutil.Process(proc_pid)
+
+    Globals.timeout_event.wait()
+    if p.is_running():
+        os.kill(int(proc_pid), signal.SIGTERM)
+        p.wait()
+
+        if os.path.exists(".bazel_real"):
+            with tarfile.open(os.path.join(project_root, "jvm.out.tar.gz"), "w:gz") as tar:
+                tar.add(jvm_out)
+
+        try:
+            expansions = read_config_file(os.path.join(project_root, "../expansions.yml"))
+            task_id = expansions.get("task_id", None)
+            error_msg = (
+                "Bazel timed out waiting for remote action (from BF-35762).\n"
+                f"See task: <https://spruce.mongodb.com/task/{task_id}|here>."
+            )
+
+            evg_api = RetryingEvergreenApi.get_api(
+                config_file=os.path.join(project_root, ".evergreen.yml")
+            )
+            evg_api.send_slack_message(
+                target="#devprod-build-triager",
+                msg=error_msg,
+            )
+        except Exception:  # pylint: disable=broad-except
+            traceback.print_exc()
+
+
+def bazel_build_subproc_func(**kwargs):
+    project_root = os.path.abspath(".")
+    output_base = subprocess.run(
+        [Globals.bazel_executable, "info", "output_base"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=kwargs["env"],
+    ).stdout.strip()
+    if os.path.exists(".bazel_real"):
+        with open(".bazel_real") as f:
+            kwargs["args"][0] = f.read().strip()
+    jvm_out = os.path.join(output_base, "server/jvm.out")
+
+    bazel_proc = subprocess.Popen(**kwargs)
+
+    t = threading.Thread(
+        target=bazel_server_timeout_dumper,
+        args=(jvm_out, bazel_proc.pid, project_root),
+    )
+
+    # the bazel calls are wrapped in retries so we can rely on them to restart the attempt.
+    t.daemon = True
+    t.start()
+
+    return bazel_proc
+
+
+def check_timeout_condition(line):
+    if "[Sched]" in line:
+        target_progress = line.split("[Sched]")[0].strip()
+        if len(target_progress) > 0:
+            if Globals.last_sched_target_progress == target_progress:
+                if time.time() - Globals.sched_time_start > Globals.sched_timeout_sec:
+                    Globals.last_sched_target_progress = ""
+                    write_bazel_build_output("Stuck scheduling for too long, terminating")
+                    Globals.timeout_event.set()
+                    return True
+            else:
+                Globals.sched_time_start = time.time()
+            Globals.last_sched_target_progress = target_progress
+
+
 def perform_tty_bazel_build(bazel_cmd: str) -> None:
     # Importing pty will throw on certain platforms, the calling code must catch this exception
     # and fallback to perform_non_tty_bazel_build.
     import pty
 
     parent_fd, child_fd = pty.openpty()  # provide tty
-    bazel_proc = subprocess.Popen(
-        bazel_cmd,
+    bazel_proc = bazel_build_subproc_func(
+        args=bazel_cmd,
         stdin=child_fd,
         stdout=child_fd,
         stderr=subprocess.STDOUT,
         env={**os.environ.copy(), **Globals.bazel_env_variables},
     )
 
+    buffer = ""
     os.close(child_fd)
-
-    # Timeout when stuck scheduling without making progress for more than 10 minutes
-    # Ex string:
-    # [21,537 / 21,603] [Sched] Compiling src/mongo/db/s/migration_chunk_cloner_source.cpp; 1424s
-    last_sched_target_progress = ""
-    sched_time_start = 0
-    sched_timeout_sec = 60 * 10
+    Globals.timeout_event.clear()
+    Globals.last_sched_target_progress = ""
+    Globals.sched_time_start = time.time()
     try:
         # This loop will terminate with an EOF or EOI when the process ends.
         while True:
@@ -391,24 +478,16 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
                 if not data:  # EOF
                     break
 
-            line = data.decode()
-            write_bazel_build_output(line)
-            if "[Sched]" in line:
-                target_progress = line.split("[Sched]")[0].strip()
-                if len(target_progress) > 0:
-                    if last_sched_target_progress == target_progress:
-                        if time.time() - sched_time_start > sched_timeout_sec:
-                            write_bazel_build_output("Stuck scheduling for too long, terminating")
-                            bazel_proc.kill()
-                            bazel_proc.wait()
-                            raise subprocess.CalledProcessError(-1, bazel_cmd, "", "")
-                    else:
-                        sched_time_start = time.time()
-                    last_sched_target_progress = target_progress
+            write_bazel_build_output(data.decode())
+            buffer += data.decode()
+            if "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                if check_timeout_condition(line):
+                    raise subprocess.CalledProcessError(-1, bazel_cmd, "", "")
     finally:
         os.close(parent_fd)
         if bazel_proc.poll() is None:
-            bazel_proc.kill()
+            bazel_proc.terminate()
         bazel_proc.wait()
 
     Globals.bazel_build_exitcode = bazel_proc.returncode
@@ -418,23 +497,30 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
 
 
 def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
-    bazel_proc = subprocess.Popen(
-        bazel_cmd,
+    bazel_proc = bazel_build_subproc_func(
+        args=bazel_cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         env={**os.environ.copy(), **Globals.bazel_env_variables},
         text=True,
     )
+    Globals.timeout_event.clear()
+    Globals.last_sched_target_progress = ""
+    Globals.sched_time_start = time.time()
+
     # This loop will terminate when the process ends.
     while True:
         line = bazel_proc.stdout.readline()
         if not line:
             break
         write_bazel_build_output(line)
+        if check_timeout_condition(line):
+            raise subprocess.CalledProcessError(-1, bazel_cmd, "", "")
 
     stdout, stderr = bazel_proc.communicate()
 
     Globals.bazel_build_exitcode = bazel_proc.returncode
+
     if bazel_proc.returncode != 0:
         raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, stderr)
 
@@ -473,6 +559,7 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
             return
 
         print("ERROR: Bazel build failed:")
+        Globals.timeout_event.set()
 
         if Globals.bazel_thread_terminal_output is not None:
             Globals.bazel_thread_terminal_output.seek(0)
@@ -482,6 +569,7 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
 
         raise ex
     Globals.bazel_build_success = True
+    Globals.timeout_event.set()
 
 
 def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bool) -> None:
@@ -525,7 +613,6 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
         return
 
     print("Starting bazel build thread...")
-
     run_bazel_command(env, bazel_cmd)
 
 
