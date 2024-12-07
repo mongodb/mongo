@@ -677,9 +677,9 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_uuid_mismatch_info",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:local_oplog_info",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/catalog:snapshot_helper",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:capped_snapshots",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:snapshot_helper",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],

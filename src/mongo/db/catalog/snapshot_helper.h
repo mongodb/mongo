@@ -46,13 +46,5 @@ namespace SnapshotHelper {
  * Returns true if the state is such that we should read at last applied, false otherwise.
  */
 bool changeReadSourceIfNeeded(OperationContext* opCtx, boost::optional<const NamespaceString&> nss);
-
-/**
- * Returns true if 'collectionMin' is not compatible with 'readTimestamp'. They are incompatible
- * when the read timestamp is older than the latest in-memory collection state: the storage engine
- * view would not match the in-memory collection state.
- */
-bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
-                                       boost::optional<Timestamp> readTimestamp);
 }  // namespace SnapshotHelper
 }  // namespace mongo

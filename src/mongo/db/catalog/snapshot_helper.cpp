@@ -32,13 +32,13 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/catalog/snapshot_helper.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -223,24 +223,6 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
     // Return if we need to read at last applied to the caller in case further checks need to be
     // performed.
     return readAtLastApplied;
-}
-
-bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
-                                       boost::optional<Timestamp> readTimestamp) {
-    if (!collectionMin) {
-        return false;
-    }
-
-    // If we do not have a point in time to conflict with collectionMin, return.
-    if (!readTimestamp || readTimestamp->isNull()) {
-        return false;
-    }
-
-    // If the last change to the collection was before or at the read timestamp, then the storage
-    // snapshot will match the collection in-memory state. Return true only if there would be an
-    // inconsistency: a collection with a newer min timestamp would not match an older storage
-    // snapshot.
-    return *collectionMin > readTimestamp;
 }
 }  // namespace SnapshotHelper
 }  // namespace mongo

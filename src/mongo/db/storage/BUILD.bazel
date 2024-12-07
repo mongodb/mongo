@@ -148,23 +148,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "snapshot_helper",
-    srcs = [
-        "snapshot_helper.cpp",
-    ],
-    hdrs = [
-        "snapshot_helper.h",
-    ],
-    deps = [
-        ":recovery_unit_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/concurrency:lock_manager",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:repl_coordinator_interface",
-    ],
-)
-
 idl_generator(
     name = "flow_control_parameters_gen",
     src = "flow_control_parameters.idl",

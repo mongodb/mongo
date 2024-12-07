@@ -966,6 +966,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_signature_test.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/list_indexes* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/catalog/**/snapshot_helper* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/storage_engine_collection_options_flags_parser* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/uncommitted_catalog_updates* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/uncommitted_multikey* @10gen/server-catalog-and-routing @svc-auto-approve-bot

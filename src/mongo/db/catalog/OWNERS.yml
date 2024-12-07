@@ -96,6 +96,9 @@ filters:
   - "list_indexes*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "snapshot_helper*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "storage_engine_collection_options_flags_parser*":
     approvers:
       - 10gen/server-catalog-and-routing

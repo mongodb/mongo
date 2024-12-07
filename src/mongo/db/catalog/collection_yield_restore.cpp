@@ -33,10 +33,10 @@
 
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/snapshot_helper.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/direct_connection_util.h"
 #include "mongo/db/storage/capped_snapshots.h"
-#include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util_core.h"
 

@@ -602,6 +602,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "snapshot_helper",
+    srcs = [
+        "snapshot_helper.cpp",
+    ],
+    hdrs = [
+        "snapshot_helper.h",
+    ],
+    deps = [
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+    ],
+)
+
+mongo_cc_library(
     name = "catalog_test_fixture",
     srcs = [
         "catalog_test_fixture.cpp",
