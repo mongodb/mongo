@@ -504,45 +504,13 @@ def _impl(ctx):
         ],
     )
 
-    dbg_level_0_feature = feature(
-        name = "g0",
-        enabled = False,
-        flag_sets = [
-            flag_set(
-                actions = all_non_assembly_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-g0",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    dbg_level_1_feature = feature(
-        name = "g1",
-        enabled = False,
-        flag_sets = [
-            flag_set(
-                actions = all_non_assembly_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-g1",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    dbg_level_2_feature = feature(
-        name = "g2",
+    enable_debug_info_feature = feature(
+        name = "enable_debug_info",
         enabled = True,
         flag_sets = [
             flag_set(
+                # This needs to only be set in the cpp compile actions to avoid generating debug info when
+                # building assembly files since the assembler doesn't support gdwarf64.
                 actions = all_non_assembly_compile_actions,
                 flag_groups = [
                     flag_group(
@@ -553,24 +521,7 @@ def _impl(ctx):
                 ],
                 with_features = [
                     with_feature_set(
-                        not_features = ["g0", "g1", "g3", "disable_debug_symbols"],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    dbg_level_3_feature = feature(
-        name = "g3",
-        enabled = False,
-        flag_sets = [
-            flag_set(
-                actions = all_non_assembly_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-g3",
-                        ],
+                        not_features = ["disable_debug_symbols"],
                     ),
                 ],
             ),
@@ -786,16 +737,11 @@ def _impl(ctx):
         includes_feature,
         dependency_file_feature,
         verbose_feature,
+        enable_debug_info_feature,
         dwarf4_feature,
         dwarf5_feature,
         dwarf32_feature,
         dwarf64_feature,
-        # Debug level should be passed after dwarf
-        # as many dwarf flags will just set g2
-        dbg_level_0_feature,
-        dbg_level_1_feature,
-        dbg_level_2_feature,
-        dbg_level_3_feature,
         disable_debug_symbols_feature,
         no_warn_non_virtual_destructor_feature,
         no_deprecated_enum_enum_conversion_feature,

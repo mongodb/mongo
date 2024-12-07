@@ -8,7 +8,6 @@ load(
     "build_grpc",
     "compiler_type",
     "dbg",
-    "dbg_level",
     "debug_symbols",
     "detect_odr_violations",
     "developer_dir",
@@ -404,75 +403,6 @@ config_setting(
     flag_values = {
         "//bazel/config:dbg": "False",
     },
-)
-
-# ==========
-# dbg_level
-# ==========
-
-dbg_level(
-    name = "dbg_level",
-    build_setting_default = "2",
-)
-
-config_setting(
-    name = "dbg_level_0",
-    flag_values = {
-        "//bazel/config:dbg_level": "0",
-    },
-)
-
-config_setting(
-    name = "dbg_level_1",
-    flag_values = {
-        "//bazel/config:dbg_level": "1",
-    },
-)
-
-config_setting(
-    name = "dbg_level_2",
-    flag_values = {
-        "//bazel/config:dbg_level": "2",
-    },
-)
-
-config_setting(
-    name = "dbg_level_3",
-    flag_values = {
-        "//bazel/config:dbg_level": "3",
-    },
-)
-
-selects.config_setting_group(
-    name = "gcc_or_clang_dbg_level_0",
-    match_all = [
-        ":gcc_or_clang",
-        ":dbg_level_0",
-    ],
-)
-
-selects.config_setting_group(
-    name = "gcc_or_clang_dbg_level_1",
-    match_all = [
-        ":gcc_or_clang",
-        ":dbg_level_1",
-    ],
-)
-
-selects.config_setting_group(
-    name = "gcc_or_clang_dbg_level_2",
-    match_all = [
-        ":gcc_or_clang",
-        ":dbg_level_2",
-    ],
-)
-
-selects.config_setting_group(
-    name = "gcc_or_clang_dbg_level_3",
-    match_all = [
-        ":gcc_or_clang",
-        ":dbg_level_3",
-    ],
 )
 
 # =========
