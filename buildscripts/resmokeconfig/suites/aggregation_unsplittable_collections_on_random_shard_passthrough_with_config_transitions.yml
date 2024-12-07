@@ -100,11 +100,11 @@ selector:
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_profiling
+
     # The following tags are excluded specifically for this suite.
     - config_shard_incompatible
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
-    - assumes_no_track_upon_creation
 
 executor:
   archive:
@@ -118,7 +118,6 @@ executor:
         TestData:
           runningWithBalancer: true
           shardsAddedRemoved: true
-          implicitlyTrackUnshardedCollectionOnCreation: true
       eval:
         await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
@@ -143,15 +142,11 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        failpoint.createUnshardedCollectionRandomizeDataShard:
-          mode: alwaysOn
     mongod_options:
       set_parameters:
         enableTestCommands: 1
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
-        failpoint.createUnshardedCollectionRandomizeDataShard:
-          mode: alwaysOn
         # Manually set the random migration fail point so we can set a threshold for skipping
         # moveCollection to prevent "starving" random chunk migrations.
         failpoint.balancerShouldReturnRandomMigrations:

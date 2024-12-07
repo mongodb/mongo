@@ -9,11 +9,18 @@
  *   requires_timeseries,
  *   references_foreign_collection,
  *   requires_getmore,
- *   # TODO (SERVER-82066): Re-enable after handling direct connections correctly.
- *   assumes_no_track_upon_creation,
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+// TODO (SERVER-82066): Re-enable after handling direct connections correctly.
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+if (isMultiversion ||
+    FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
+    jsTest.log("Skipping test since featureFlagTrackUnshardedCollectionsUponCreation is enabled");
+    quit();
+}
 
 const testDB = TimeseriesAggTests.getTestDb();
 assert.commandWorked(testDB.dropDatabase());

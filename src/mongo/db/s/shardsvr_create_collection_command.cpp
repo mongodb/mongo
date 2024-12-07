@@ -230,7 +230,7 @@ public:
                 // In case of "unsplittable" collections, create the collection locally if either
                 // the feature flags are disabled or the request is for a collection type that is
                 // not tracked yet or must always be local
-                if (isUnsplittable) {
+                if (isUnsplittable && !isFromCreateUnsplittableCommand) {
                     if (isAlwaysUntracked(opCtx, ns(), request())) {
                         uassert(ErrorCodes::IllegalOperation,
                                 fmt::format("Tracking of collection '{}' is not supported.",
@@ -248,8 +248,7 @@ public:
                             (*optFixedFcvRegion)->acquireFCVSnapshot()) &&
                         request().getRegisterExistingCollectionInGlobalCatalog();
 
-                    if (!isTrackUnshardedUponCreationEnabled && !mustTrackOnMoveCollection &&
-                        !isFromCreateUnsplittableCommand) {
+                    if (!isTrackUnshardedUponCreationEnabled && !mustTrackOnMoveCollection) {
                         return _createUntrackedCollection(opCtx);
                     }
                 }

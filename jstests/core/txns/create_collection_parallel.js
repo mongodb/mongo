@@ -83,10 +83,12 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
-    // Prevent this test case in case of implicit tracking of collections. The DDL lock taken by the
-    // transaction won't be release until commit. This will cause the creation outside of a
-    // transaction (which will attempt to take the ddl lock as well) to wait indefinitely.
-    if (!TestData.implicitlyTrackUnshardedCollectionOnCreation) {
+    // TODO SERVER-77915 Remove isTrackUnshardedUponCreationDisabled. Once track unsharded is
+    // enabled, creation within a transaction will always serialize with any other collection
+    // creation by taking the DDLLock
+    const isTrackUnshardedUponCreationDisabled = !FeatureFlagUtil.isPresentAndEnabled(
+        db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
+    if (isTrackUnshardedUponCreationDisabled) {
         jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
 
         withRetryOnTransientTxnError(

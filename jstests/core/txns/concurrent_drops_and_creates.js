@@ -8,13 +8,17 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   uses_snapshot_read_concern,
  *   uses_transactions,
- *   assumes_no_track_upon_creation,
  * ]
  */
 import {
     withAbortAndRetryOnTransientTxnError
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+// TODO SERVER-86104: adapt the test for tracked collections
+if (FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
+    quit();
+}
 
 const dbName1 = "test1";
 const dbName2 = "test2";

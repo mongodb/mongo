@@ -2,7 +2,7 @@
  * Tests that the failpoint createUnshardedCollectionRandomizeDataShard works as expected.
  *
  * @tags: [
- *   requires_fcv_81,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  * ]
  */
 

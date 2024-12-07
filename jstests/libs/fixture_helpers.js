@@ -101,7 +101,7 @@ export var FixtureHelpers = (function() {
                     {$group: {_id: '$chunks.shard'}}
                 ])
                 .toArray();
-            return res.map((x) => x._id).flat();
+            return res.map((x) => x._id);
         } else {
             const dbMetadata =
                 db.getSiblingDB('config').databases.findOne({_id: coll.getDB().getName()});

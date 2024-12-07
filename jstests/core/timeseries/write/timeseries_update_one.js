@@ -20,14 +20,6 @@ import {
     timeFieldName
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
-// The test, which works under the featureFlagTimeseriesUpdatesSupport requires the collection to be
-// tracked when retriable writes are enabled.
-if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOptions &&
-    TestData.sessionOptions.retryWrites) {
-    jsTest.log(
-        "When featureFlagTimeseriesUpdatesSupport is enabled, we expect the collections to be tracked in order to enable retryable writes. Skipping test.");
-    quit();
-}
 /**
  * Tests op-style updates.
  */
