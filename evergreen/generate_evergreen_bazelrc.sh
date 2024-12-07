@@ -23,9 +23,11 @@ if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
   abs_path=$(cygpath -w "$TMPDIR" | tr '\\' '/')
   echo "startup --output_user_root=Z:/bazel_tmp" > .bazelrc.evergreen
   echo "BAZELISK_HOME=${abs_path}/bazelisk_home" >> .bazeliskrc
+  echo "build --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> .bazelrc.gitinfo
 else
   echo "startup --output_user_root=${TMPDIR}/bazel-output-root" > .bazelrc.evergreen
   echo "BAZELISK_HOME=${TMPDIR}/bazelisk_home" >> .bazeliskrc
+  echo "build --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> .bazelrc.gitinfo
 fi
 
 uri="https://spruce.mongodb.com/task/${task_id:?}?execution=${execution:?}"
