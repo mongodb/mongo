@@ -62,11 +62,15 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
             f"    buildscripts/poetry_sync.sh -p '{executable}'\n"
         )
 
+    # Remove ANSI escape codes from the output
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    clean_output = ansi_escape.sub('', poetry_dry_run_proc.stdout)
+
     # String match should look like the following
     # Package operations: 2 installs, 3 updates, 0 removals, 165 skipped
     match = re.search(
         r"Package operations: (\d+) \w+, (\d+) \w+, (\d+) \w+, (\d+) \w+",
-        poetry_dry_run_proc.stdout,
+        clean_output,
     )
     verbose("Requirements list:")
     verbose(poetry_dry_run_proc.stdout)
