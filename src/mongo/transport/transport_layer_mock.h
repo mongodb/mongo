@@ -124,6 +124,14 @@ public:
         return _sessionManager;
     }
 
+    bool isIngress() const override {
+        return false;
+    }
+
+    bool isEgress() const override {
+        return false;
+    }
+
 private:
     friend class MockSession;
 

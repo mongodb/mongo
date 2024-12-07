@@ -416,6 +416,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
     AsyncDBClient::connect(_peer,
                            _sslMode,
                            _serviceContext,
+                           _tl,
                            _reactor,
                            timeout,
                            connMetricsAnchor,

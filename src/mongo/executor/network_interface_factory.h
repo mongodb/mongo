@@ -36,6 +36,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/transport/transport_layer.h"
 
 namespace mongo {
 namespace executor {
@@ -52,7 +53,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::string instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-    ConnectionPool::Options options = ConnectionPool::Options());
+    ConnectionPool::Options options = ConnectionPool::Options(),
+    transport::TransportProtocol protocol = transport::TransportProtocol::MongoRPC);
 
 }  // namespace executor
 }  // namespace mongo

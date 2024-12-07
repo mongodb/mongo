@@ -98,6 +98,14 @@ public:
         return _reactor;
     }
 
+    bool isIngress() const override {
+        return false;
+    }
+
+    bool isEgress() const override {
+        return false;
+    }
+
 private:
     enum class StartupState { kNotStarted, kSetup, kStarted, kShutDown };
 

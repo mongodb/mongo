@@ -83,6 +83,7 @@ public:
         const HostAndPort& peer,
         transport::ConnectSSLMode sslMode,
         ServiceContext* context,
+        transport::TransportLayer* tl,
         transport::ReactorHandle reactor,
         Milliseconds timeout,
         std::shared_ptr<ConnectionMetrics> connectionMetrics,

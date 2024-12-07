@@ -113,6 +113,14 @@ public:
         return _sessionManager;
     }
 
+    bool isIngress() const override {
+        return _options.enableIngress;
+    }
+
+    bool isEgress() const override {
+        return _options.enableEgress;
+    }
+
 private:
     mutable stdx::mutex _mutex;
     bool _isShutdown = false;

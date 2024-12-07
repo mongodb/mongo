@@ -76,7 +76,7 @@ public:
         ConnectionPool::Options connPoolOptions;
         connPoolOptions.minConnections = 0;
         auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-            _reactor, sc->getTransportLayerManager(), nullptr, connPoolOptions, nullptr);
+            _reactor, tl, nullptr, connPoolOptions, nullptr);
         _pool = std::make_shared<ConnectionPool>(
             std::move(typeFactory), "ExhaustResponseReader", connPoolOptions);
     }

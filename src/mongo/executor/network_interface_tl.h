@@ -86,6 +86,7 @@ namespace executor {
 class NetworkInterfaceTL : public NetworkInterface {
 public:
     NetworkInterfaceTL(std::string instanceName,
+                       transport::TransportProtocol protocol,
                        ConnectionPool::Options connPoolOpts,
                        std::unique_ptr<NetworkConnectionHook> onConnectHook,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
@@ -310,6 +311,7 @@ private:
 
     std::string _instanceName;
     transport::ReactorHandle _reactor;
+    transport::TransportProtocol _protocol;
 
     const ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;

@@ -239,6 +239,14 @@ public:
         return _sessionManager;
     }
 
+    bool isIngress() const override {
+        return _listenerOptions.isIngress();
+    }
+
+    bool isEgress() const override {
+        return _listenerOptions.isEgress();
+    }
+
     /**
      * Returns the router listening port, if set. This is set and used to separate router from
      * shard-server traffic when a server acts as both a router and a shard-server.

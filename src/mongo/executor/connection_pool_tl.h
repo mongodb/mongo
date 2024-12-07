@@ -64,7 +64,7 @@ public:
     class Type;
 
     TLTypeFactory(transport::ReactorHandle reactor,
-                  transport::TransportLayerManager* tl,
+                  transport::TransportLayer* tl,
                   std::unique_ptr<NetworkConnectionHook> onConnectHook,
                   const ConnectionPool::Options& connPoolOptions,
                   std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext)
@@ -84,6 +84,10 @@ public:
         return _executor;
     }
 
+    transport::TransportLayer* getTransportLayer() const {
+        return _tl;
+    }
+
     Date_t now() override;
 
     void shutdown() override;
@@ -95,7 +99,7 @@ private:
     auto reactor();
 
     std::shared_ptr<OutOfLineExecutor> _executor;  // This is always a transport::Reactor
-    transport::TransportLayerManager* _tl;
+    transport::TransportLayer* _tl;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     // Options originated from instance of NetworkInterfaceTL.
     const ConnectionPool::Options _connPoolOptions;
@@ -167,6 +171,7 @@ public:
           TLTypeFactory::Type(factory),
           _reactor(reactor),
           _serviceContext(serviceContext),
+          _tl(factory->getTransportLayer()),
           _timer(factory->makeTimer()),
           _skipAuth(skipAuth),
           _peer(std::move(peer)),
@@ -203,6 +208,7 @@ private:
 private:
     transport::ReactorHandle _reactor;
     ServiceContext* const _serviceContext;
+    transport::TransportLayer* _tl;
     std::shared_ptr<ConnectionPool::TimerInterface> _timer;
     const bool _skipAuth;
 
