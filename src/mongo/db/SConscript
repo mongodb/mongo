@@ -233,32 +233,8 @@ if wiredtiger:
 
     envWithAsio.CppUnitTest(
         target="fle_test",
-        source=[
-            "fle_crud_test.cpp",
-            "query/fle/encrypted_predicate_test_fixtures.cpp",
-            "query/fle/equality_predicate_test.cpp",
-            "query/fle/implicit_validator_test.cpp",
-            "query/fle/query_rewriter_test.cpp",
-            "query/fle/range_predicate_test.cpp",
-            "query/fle/range_validator_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/crypto/aead_encryption",
-            "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-            "$BUILD_DIR/mongo/crypto/fle_crypto",
-            "$BUILD_DIR/mongo/shell/kms_idl",
-            "catalog/collection_options",
-            "fle_crud",
-            "fle_mocks",
-            "query/query_test_service_context",
-            "query/write_ops/write_ops",
-            "query_expressions",
-            "repl/repl_coordinator_interface",
-            "repl/replmocks",
-            "repl/storage_interface_impl",
-            "service_context_d_test_fixture",
-            "service_context_test_fixture",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
     envWithAsio.CppUnitTest(
