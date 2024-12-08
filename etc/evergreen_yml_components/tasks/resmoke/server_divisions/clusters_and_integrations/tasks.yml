@@ -131,7 +131,6 @@ variables:
       - func: "save mongo coredumps"
       - func: "generate hang analyzer tasks"
       - func: "save failed unittests"
-      - func: "save UndoDB recordings"
       - func: "save unstripped dbtest"
       - func: "save hang analyzer debugger files"
       - func: "save disk statistics"

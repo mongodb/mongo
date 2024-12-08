@@ -34,7 +34,6 @@ py_library(
         "//buildscripts/resmokelib/powercycle",
         "//buildscripts/resmokelib/setup_multiversion",
         "//buildscripts/resmokelib/testing",
-        "//buildscripts/resmokelib/undodb",
         "//buildscripts/resmokelib/utils",
         "//buildscripts/util",
         dependency(

@@ -77,47 +77,12 @@ class TestRunner(Subcommand):
             # bother waiting for all log output to be flushed to logkeeper.
             return
 
-        if logging.buildlogger.is_log_output_incomplete():
-            # If we already failed to write log output to logkeeper, then we don't bother waiting
-            # for any remaining log output to be flushed as it'll likely fail too. Exiting without
-            # joining the flush thread here also means that resmoke.py won't hang due a logger from
-            # a fixture or a background hook not being closed.
-            self._exit_on_incomplete_logging()
-
         flush_success = logging.flush.stop_thread()
         if not flush_success:
             self._resmoke_logger.error(
                 "Failed to flush all logs within a reasonable amount of time, "
                 "treating logs as incomplete"
             )
-
-        if not flush_success or logging.buildlogger.is_log_output_incomplete():
-            self._exit_on_incomplete_logging()
-
-    def _exit_on_incomplete_logging(self):
-        if self._exit_code == 0:
-            # We don't anticipate users to look at passing Evergreen tasks very often that even if
-            # the log output is incomplete, we'd still rather not show anything in the Evergreen UI
-            # or cause a JIRA ticket to be created.
-            self._resmoke_logger.info(
-                "We failed to flush all log output to logkeeper but all tests passed, so"
-                " ignoring."
-            )
-        else:
-            exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
-            self._resmoke_logger.info(
-                "Exiting with code %d rather than requested code %d because we failed to flush all"
-                " log output to logkeeper.",
-                exit_code,
-                self._exit_code,
-            )
-            self._exit_code = exit_code
-
-        # Force exit the process without cleaning up or calling the finally block
-        # to avoid threads making system calls from blocking process termination.
-        # This must be the last line of code that is run.
-        # pylint: disable=protected-access
-        os._exit(self._exit_code)
 
     def execute(self):
         """Execute the 'run' subcommand."""
@@ -1365,14 +1330,6 @@ class RunPlugin(PluginInterface):
             const="tests",
             dest="dry_run",
             help="Outputs the tests that would be run.",
-        )
-
-        parser.add_argument(
-            "--recordWith",
-            dest="undo_recorder_path",
-            metavar="PATH",
-            help="Record execution of mongo, mongod and mongos processes;"
-            "specify the path to UndoDB's 'live-record' binary",
         )
 
         # TODO: add support for --dryRun=commands

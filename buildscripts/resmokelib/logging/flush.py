@@ -1,6 +1,6 @@
 """Manage a thread responsible for periodically calling flush() on logging.Handler instances.
 
-These instances are used to send logs to buildlogger.
+These instances are used to send logs to ??? TODO: SERVER-97556
 """
 
 import logging

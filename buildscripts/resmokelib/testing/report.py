@@ -22,7 +22,7 @@ class TestReport(unittest.TestResult):
 
     def __init__(self, job_logger, suite_options, job_num=None):
         """
-        Initialize the TestReport with the buildlogger configuration.
+        Initialize the TestReport with the logger configuration.
 
         :param job_logger: The higher-level logger that will be used to print metadata about the test.
         :param suite_options: Options for the suite being executed.
@@ -133,7 +133,7 @@ class TestReport(unittest.TestResult):
                 self.num_dynamic += 1
 
         # Set up the test-specific logger.
-        (test_logger, url_endpoint) = logging.loggers.new_test_logger(
+        test_logger = logging.loggers.new_test_logger(
             test.short_name(),
             test.basename(),
             command,
@@ -154,7 +154,6 @@ class TestReport(unittest.TestResult):
             "rendering_type": "resmoke",
             "version": 0,
         }
-        test_info.url_endpoint = url_endpoint
         if self.logging_prefix is not None:
             test_logger.info(self.logging_prefix)
         # Set job_num in test.
@@ -330,10 +329,6 @@ class TestReport(unittest.TestResult):
                 if test_info.display_test_name is not None:
                     result["display_test_name"] = test_info.display_test_name
 
-                if test_info.url_endpoint is not None:
-                    result["url"] = test_info.url_endpoint
-                    result["url_raw"] = test_info.url_endpoint + "?raw=1"
-
                 results.append(result)
 
             return {
@@ -361,7 +356,6 @@ class TestReport(unittest.TestResult):
             test_info.display_test_name = result.get("display_test_name")
             test_info.group_id = result.get("group_id")
             test_info.log_info = result.get("log_info")
-            test_info.url_endpoint = result.get("url")
             test_info.status = result["status"]
             test_info.evergreen_status = test_info.status
             test_info.return_code = result["exit_code"]
@@ -425,7 +419,6 @@ class TestInfo(object):
         self.evergreen_status = None
         self.return_code = None
         self.log_info = None
-        self.url_endpoint = None
         self.exception_extractors = []
         self.error = None
 

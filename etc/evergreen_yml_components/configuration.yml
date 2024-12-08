@@ -107,7 +107,6 @@ post:
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
-  - func: "save UndoDB recordings"
   - func: "save libfuzzertest corpora"
   - func: "remove files"
     vars:

@@ -385,8 +385,6 @@ def mongo_shell_program(
     test_data["setParametersMongos"] = mongos_set_parameters
     test_data["setParametersMongocryptd"] = mongocryptd_set_parameters
 
-    test_data["undoRecorderPath"] = config.UNDO_RECORDER_PATH
-
     if "configShard" not in test_data and config.CONFIG_SHARD is not None:
         test_data["configShard"] = True
 

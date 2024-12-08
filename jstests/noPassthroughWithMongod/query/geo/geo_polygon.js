@@ -16,9 +16,7 @@ for (let x = -180; x < 180; x += .5) {
 assert.commandWorked(bulk.execute());
 
 var numTests = 31;
-// Reduce the amount of repetitions on live-record buildvariant
-var start = (TestData.undoRecorderPath ? 20 : 0);
-for (var n = start; n < numTests; n++) {
+for (var n = 0; n < numTests; n++) {
     t.dropIndexes();
     t.createIndex({loc: "2d"}, {bits: 2 + n});
 

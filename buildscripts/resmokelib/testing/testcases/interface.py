@@ -3,7 +3,6 @@
 This is used to perform the actual test case.
 """
 
-import glob
 import os
 import os.path
 import timeit
@@ -136,24 +135,7 @@ class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TE
         }
 
 
-class UndoDBUtilsMixin:
-    """Utility functions for interacting with UndoDB."""
-
-    def __init__(self, logger: logging.Logger, *args, **kwargs):  # pylint: disable=unused-argument
-        """Initialize the mixin to resember a TestCase."""
-        self.logger = logger
-
-    def _cull_recordings(self, program_executable):
-        """Move recordings if test fails so it doesn't get deleted."""
-        # Only store my recordings. Concurrent processes may generate their own recordings that we
-        # should ignore. There's a problem with duplicate program names under different directories
-        # But that should be rare and there's no harm in having more recordings stored.
-        for recording in glob.glob(program_executable + "*.undo"):
-            self.logger.info("Keeping recording %s", recording)
-            os.rename(recording, recording + ".tokeep")
-
-
-class ProcessTestCase(TestCase, UndoDBUtilsMixin):
+class ProcessTestCase(TestCase):
     """Base class for TestCases that executes an external process."""
 
     def run_test(self):

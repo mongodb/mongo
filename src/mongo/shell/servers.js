@@ -1200,10 +1200,6 @@ var stopMongoProgram = function(conn, signal, opts, waitpid) {
               returnCode);
     }
 
-    if (conn.undoLiveRecordPid) {
-        _stopUndoLiveRecord(conn.undoLiveRecordPid);
-    }
-
     return returnCode;
 };
 
@@ -1555,16 +1551,14 @@ function appendSetParameterArgs(argArray) {
  *
  * @param {int} [pid] the process id of the node to connect to.
  * @param {int} [port] the port of the node to connect to.
- * @param {int} [undoLiveRecordPid=null] the process id of the `live-record` process.
  * @returns a new Mongo connection object, or null if the process gracefully terminated.
  */
-MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {}) {
+MongoRunner.awaitConnection = function({pid, port} = {}) {
     var conn = null;
     assert.soon(function() {
         try {
             conn = new Mongo("127.0.0.1:" + port);
             conn.pid = pid;
-            conn.undoLiveRecordPid = undoLiveRecordPid;
             return true;
         } catch (e) {
             var res = checkProgram(pid);
@@ -1572,9 +1566,6 @@ MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {
                 print("mongo program was not running at " + port +
                       ", process ended with exit code: " + res.exitCode);
                 serverExitCodeMap[port] = res.exitCode;
-                if (undoLiveRecordPid) {
-                    _stopUndoLiveRecord(undoLiveRecordPid);
-                }
                 if (res.exitCode !== MongoRunner.EXIT_CLEAN) {
                     throw new MongoRunner.StopError(res.exitCode);
                 }
@@ -1584,21 +1575,6 @@ MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {
         return false;
     }, "unable to connect to mongo program on port " + port, 600 * 1000);
     return conn;
-};
-
-var _runUndoLiveRecord = function(pid) {
-    var argArray = [jsTestOptions().undoRecorderPath, "-p", pid];
-    return _startMongoProgram.apply(null, argArray);
-};
-
-var _stopUndoLiveRecord = function(undoLiveRecordPid) {
-    print("Saving the UndoDB recording; it may take a few minutes...");
-    var undoReturnCode = waitProgram(undoLiveRecordPid);
-    if (undoReturnCode !== 0) {
-        throw new Error(
-            "Undo live-record failed to terminate correctly. This is likely a bug in Undo. " +
-            "Please record any logs and send them to the #server-testing Slack channel");
-    }
 };
 
 /**
@@ -1634,22 +1610,16 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
         pid = _startMongoProgram({args: argArray, env: env});
     }
 
-    let undoLiveRecordPid = null;
-    if (jsTestOptions().undoRecorderPath) {
-        undoLiveRecordPid = _runUndoLiveRecord(pid);
-    }
-
     delete serverExitCodeMap[port];
     if (!waitForConnect) {
         print("Skip waiting to connect to node with pid=" + pid + ", port=" + port);
         return {
             pid: pid,
             port: port,
-            undoLiveRecordPid: undoLiveRecordPid,
         };
     }
 
-    return MongoRunner.awaitConnection({pid, port, undoLiveRecordPid});
+    return MongoRunner.awaitConnection({pid, port});
 };
 
 /**

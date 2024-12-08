@@ -7,10 +7,8 @@ import datetime
 import glob
 import os
 import os.path
-import platform
 import random
 import shlex
-import shutil
 import subprocess
 import sys
 import textwrap
@@ -138,25 +136,6 @@ def _validate_config(parser):
                     "Must specify binary versions as 'old' or 'new' in format"
                     " 'version1-version2'"
                 )
-
-    if _config.UNDO_RECORDER_PATH is not None:
-        if not sys.platform.startswith("linux") or platform.machine() not in [
-            "i386",
-            "i686",
-            "x86_64",
-        ]:
-            parser.error("--recordWith is only supported on x86 and x86_64 Linux distributions")
-            return
-
-        resolved_path = shutil.which(_config.UNDO_RECORDER_PATH)
-        if resolved_path is None:
-            parser.error(
-                f"Cannot find the UndoDB live-record binary '{_config.UNDO_RECORDER_PATH}'. Check that it exists and is executable"
-            )
-            return
-
-        if not os.access(resolved_path, os.X_OK):
-            parser.error(f"Found '{resolved_path}', but it is not an executable file")
 
     if not _config.TLS_MODE or _config.TLS_MODE == "disabled":
         if _config.SHELL_TLS_ENABLED:
@@ -353,7 +332,6 @@ be invoked as either:
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.BASE_PORT = int(config.pop("base_port"))
     _config.BACKUP_ON_RESTART_DIR = config.pop("backup_on_restart_dir")
-    _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
     _config.DRY_RUN = config.pop("dry_run")
 
@@ -680,8 +658,6 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
             evg_task_doc = utils.load_yaml_file(evg_task_doc_file)
             if task_name in evg_task_doc:
                 _config.EVERGREEN_TASK_DOC = evg_task_doc[task_name]
-
-    _config.UNDO_RECORDER_PATH = config.pop("undo_recorder_path")
 
     _config.EXCLUDE_TAGS_FILE_PATH = config.pop("exclude_tags_file_path")
 

@@ -151,7 +151,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     $resmoke_env_options \
     ${resmoke_wrapper} \
     $python buildscripts/resmoke.py run \
-    ${record_with} \
     ${resmoke_args} \
     $extra_args \
     ${test_flags} \
@@ -176,16 +175,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     --cedarReportFile=cedar_report.json
   resmoke_exit_code=$?
   set -o errexit
-
-  if [[ -n "${record_with}" ]]; then
-    recording_size=$( (du -ch ./*.undo ./*.undo.tokeep || true) | grep total)
-    echo "UndoDB produced recordings that were $recording_size (uncompressed) on disk"
-    # Unittests recordings are renamed so there's never a need to store any .undo files.
-    if [[ $resmoke_exit_code = 0 || "${task_name}" == "run_unittests_with_recording" ]]; then
-      echo "Removing UndoDB recordings of successful tests."
-      rm *.undo || true
-    fi
-  fi
 
   # 74 is exit code for IOError on POSIX systems, which is raised when the machine is
   # shutting down.

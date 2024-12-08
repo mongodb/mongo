@@ -58,7 +58,6 @@ DEFAULTS = {
     "archive_limit_tests": 10,
     "base_port": 20000,
     "backup_on_restart_dir": None,
-    "buildlogger_url": "https://logkeeper2.build.10gen.cc",
     "embedded_router": None,
     "config_shard": None,
     "continue_on_failure": False,
@@ -169,8 +168,6 @@ DEFAULTS = {
     "config_dir": "buildscripts/resmokeconfig",
     # Directory with jstests
     "jstests_dir": "jstests",
-    # UndoDB options
-    "undo_recorder_path": None,
     # Generate multiversion exclude tags options
     "exclude_tags_file_path": "generated_resmoke_config/multiversion_exclude_tags.yml",
     # Limit the number of tests to execute
@@ -325,9 +322,6 @@ BACKUP_ON_RESTART_DIR = None
 # The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
 # mongo shell.
 BASE_PORT = None
-
-# The root url of the buildlogger server.
-BUILDLOGGER_URL = None
 
 # Root directory for where resmoke.py puts directories containing data files of mongod's it starts,
 # as well as those started by individual tests.
@@ -647,9 +641,6 @@ BENCHMARK_FILTER = None
 BENCHMARK_LIST_TESTS = None
 BENCHMARK_MIN_TIME = None
 BENCHMARK_REPETITIONS = None
-
-# UndoDB options
-UNDO_RECORDER_PATH = None
 
 # # Generate multiversion exclude tags options
 EXCLUDE_TAGS_FILE_PATH = None

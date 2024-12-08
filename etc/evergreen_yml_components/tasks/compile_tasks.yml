@@ -52,7 +52,6 @@ variables:
       - func: "save mongo coredumps"
       - func: "generate hang analyzer tasks"
       - func: "save failed unittests"
-      - func: "save UndoDB recordings"
       - func: "save unstripped dbtest"
       - func: "save bazel headers"
       - func: "save bazel jvm dump"

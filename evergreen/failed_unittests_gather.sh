@@ -7,7 +7,6 @@ set -eou pipefail
 
 # Only run on unit test tasks so we don't target mongod binaries from cores.
 if [ "${task_name}" != "run_unittests" ] && [ "${task_name}" != "run_dbtest" ] \
-  && [ "${task_name}" != "run_unittests_with_recording" ] \
   && [[ ${task_name} != integration_tests* ]] \
   && [[ "${task_name}" != compile_and_run_unittests_* ]]; then
   echo "Not gathering failed unittests binaries as this is not a unittest task: ${task_name}"
@@ -78,18 +77,8 @@ while read -r core_file; do
   done
 done <<< "${core_files}"
 
-# For recorded tests, use the text file to copy them over instead of relying on core dumps.
-has_recorded_failures=""
-if [[ -f "failed_recorded_tests.txt" ]]; then
-  while read -r line; do
-    cp "$line" .
-  done < "failed_recorded_tests.txt"
-
-  has_recorded_failures="true"
-fi
-
 # Copy debug symbols for dynamic builds
 lib_dir=build/install/lib
-if [ -d "$lib_dir" ] && [[ -n "$core_files" || -n "$has_recorded_failures" ]]; then
+if [ -d "$lib_dir" ] && [ -n "$core_files" ]; then
   cp -r "$lib_dir" dist-unittests
 fi

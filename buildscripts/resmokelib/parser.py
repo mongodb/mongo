@@ -12,13 +12,11 @@ from buildscripts.resmokelib.hang_analyzer.core_analyzer import CoreAnalyzerPlug
 from buildscripts.resmokelib.multiversion import MultiversionPlugin
 from buildscripts.resmokelib.powercycle import PowercyclePlugin
 from buildscripts.resmokelib.run import RunPlugin
-from buildscripts.resmokelib.undodb import UndoDbPlugin
 
 _PLUGINS = [
     RunPlugin(),
     CoreAnalyzerPlugin(),
     HangAnalyzerPlugin(),
-    UndoDbPlugin(),
     PowercyclePlugin(),
     GenerateFCVConstantsPlugin(),
     DiscoveryPlugin(),

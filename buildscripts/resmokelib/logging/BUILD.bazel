@@ -2,7 +2,6 @@ py_library(
     name = "logging",
     srcs = [
         "__init__.py",
-        "buildlogger.py",
         "flush.py",
         "formatters.py",
         "handlers.py",

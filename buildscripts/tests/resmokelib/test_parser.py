@@ -273,17 +273,18 @@ class TestLocalCommandLine(unittest.TestCase):
 
         self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
-    def test_removes_log_option(self):
-        cmdline = to_local_args(
-            [
-                "run",
-                "--suites=my_suite",
-                "--log=buildlogger",
-                "--storageEngine=my_storage_engine",
-            ]
-        )
 
-        self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
+def test_removes_log_option(self):
+    cmdline = to_local_args(
+        [
+            "run",
+            "--suites=my_suite",
+            "--log=evg",
+            "--storageEngine=my_storage_engine",
+        ]
+    )
+
+    self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_report_file_options(self):
         cmdline = to_local_args(

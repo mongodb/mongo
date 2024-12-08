@@ -516,7 +516,6 @@ jsTestOptions = function() {
             inEvergreen: TestData.inEvergreen || false,
             defaultReadPreference: TestData.defaultReadPreference,
 
-            undoRecorderPath: TestData.undoRecorderPath,
             backupOnRestartDir: TestData.backupOnRestartDir || false,
 
             evergreenTaskId: TestData.evergreenTaskId || null,

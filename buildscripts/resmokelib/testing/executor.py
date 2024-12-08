@@ -69,7 +69,6 @@ class TestSuiteExecutor(object):
         self._suite = suite
         self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
 
-        # Must be done after getting buildlogger configuration.
         self._jobs = self._create_jobs(suite.get_num_jobs_to_start())
 
     def _create_jobs(self, num_jobs: int) -> List[_job.Job]:
