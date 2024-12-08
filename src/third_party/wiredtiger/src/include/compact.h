@@ -11,5 +11,6 @@ struct __wt_compact_state {
     uint32_t file_count; /* Number of files seen */
     uint64_t max_time;   /* Configured timeout */
 
-    struct timespec begin; /* Starting time */
+    struct timespec begin;         /* Starting time */
+    struct timespec last_progress; /* Last time a progress message was logged. */
 };

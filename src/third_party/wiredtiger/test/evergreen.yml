@@ -128,7 +128,7 @@ functions:
         set -o verbose
 
         MACOS_PYTHON_FLAGS=
-        if [ "${build_variant|}" = "macos-1014" ]; then
+        if [ "${build_variant|}" = "macos-11" ]; then
           # For mac builds, we want explicitly tell cmake which python to use, as
           # well as the matching library directory and header files. The find_libpython
           # module gives us the library.
@@ -4246,10 +4246,10 @@ buildvariants:
     - name: ".unit_test"
     - name: fops
 
-- name: macos-1014
-  display_name: "OS X 10.14"
+- name: macos-11
+  display_name: "OS X 11"
   run_on:
-  - macos-1014
+  - macos-11
   batchtime: 120 # 2 hours
   expansions:
     posix_configure_flags:
@@ -4260,7 +4260,7 @@ buildvariants:
       -DENABLE_ZLIB=1
       -DENABLE_STRICT=1 
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
-    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
+    python_binary: '/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11'
     smp_command: -j $(sysctl -n hw.logicalcpu)
     cmake_generator: "Unix Makefiles"
     make_command: make

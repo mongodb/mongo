@@ -300,7 +300,7 @@ __wt_compact(WT_SESSION_IMPL *session)
     WT_BM *bm;
     WT_DECL_RET;
     WT_REF *ref;
-    u_int i, msg_count;
+    u_int i;
     bool skip;
 
     uint64_t stats_pages_rewritten; /* Pages rewritten */
@@ -338,7 +338,7 @@ __wt_compact(WT_SESSION_IMPL *session)
          * we're making the problem worse.
          */
         if (++i > 100) {
-            bm->compact_progress(bm, session, &msg_count);
+            bm->compact_progress(bm, session);
             WT_ERR(__wt_session_compact_check_timeout(session));
 
             if (__wt_cache_stuck(session))
