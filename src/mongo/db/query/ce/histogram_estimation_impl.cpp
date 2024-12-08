@@ -233,8 +233,12 @@ boost::optional<EstimationResult> estimateCardinalityEqViaTypeCounts(
     } else if (tag == sbe::value::TypeTags::Array && stats::isEmptyArray(tag, val)) {
         estimation.card = ceHist.getEmptyArrayCount();
         return estimation;
-    } else if ((tag == sbe::value::TypeTags::Null) || (tag == sbe::value::TypeTags::Nothing) ||
-               (tag == sbe::value::TypeTags::MinKey) || (tag == sbe::value::TypeTags::MaxKey) ||
+    } else if (tag == sbe::value::TypeTags::Null) {
+        // An interval [null, null] should match both values from null and nothing.
+        estimation.card = ceHist.getTypeCount(tag);
+        estimation.card += ceHist.getTypeCount(sbe::value::TypeTags::Nothing);
+        return estimation;
+    } else if ((tag == sbe::value::TypeTags::MinKey) || (tag == sbe::value::TypeTags::MaxKey) ||
                (tag == sbe::value::TypeTags::bsonUndefined)) {
         // These types have a single possible value. We can estimate the cardinality from the type
         // counts.
@@ -301,6 +305,11 @@ boost::optional<EstimationResult> estimateCardinalityRangeViaTypeCounts(
                 case sbe::value::TypeTags::StringBig:
                     toAdd.push_back(sbe::value::TypeTags::StringSmall);
                     toAdd.push_back(sbe::value::TypeTags::StringBig);
+                    break;
+                case sbe::value::TypeTags::Null:
+                    // An interval [null, null] should match both values from null and nothing.
+                    toAdd.push_back(sbe::value::TypeTags::Null);
+                    toAdd.push_back(sbe::value::TypeTags::Nothing);
                     break;
                 default:
                     toAdd.push_back(tagLow);

@@ -61,3 +61,28 @@ try {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
 }
+
+try {
+    // Test if both nulls and missings are counted in the histogram estimate.
+    assert(coll.drop());
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.insertMany([
+        {a: null, b: 0},
+        {a: null, b: 1},
+        {a: null, b: 2},
+        {a: null, b: 3},
+        {b: 4},
+        {b: 5},
+        {b: 6}
+    ]));
+    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    const explain = coll.find({a: null}).explain();
+    [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach(plan => {
+        assert.eq(plan.estimatesMetadata.ceSource, "Histogram", plan);
+        assert.close(plan.cardinalityEstimate, 7);
+    });
+} finally {
+    // Ensure that query knob doesn't leak into other testcases in the suite.
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+}
