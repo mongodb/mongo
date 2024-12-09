@@ -16,7 +16,8 @@ suites:
     - jstests/noPassthrough/version.js
     - jstests/noPassthrough/exit_logging.js
     - jstests/noPassthrough/tassert_failpoint.js
-    - jstests/noPassthrough/pin_code_segments_on_startup.js
+    # The test below can fail depending on the host's configured ulimits, so it's not included.
+    # - jstests/noPassthrough/pin_code_segments_on_startup.js
     - jstests/noPassthrough/utf8_paths.js
     - jstests/noPassthrough/bson/*.js
     - jstests/noPassthrough/interruption/*.js
