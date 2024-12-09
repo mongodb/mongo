@@ -3138,10 +3138,14 @@ private:
     FieldPath getFieldPath() const {
         auto inputConstExpression = dynamic_cast<ExpressionConstant*>(_children[0].get());
         uassert(5511201,
-                "Expected const expression as argument to _internalUnwindAllAlongPath",
+                "Expected const expression as argument to _internalFindAllValuesAtPath",
                 inputConstExpression);
         auto constVal = inputConstExpression->getValue();
-        // getString asserts if type != string, which is the correct behavior for what we want.
+
+        uassert(9567004,
+                str::stream() << getOpName() << " requires argument to be a string",
+                constVal.getType() == BSONType::String);
+
         return FieldPath(constVal.getString());
     }
 };
