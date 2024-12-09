@@ -25,49 +25,8 @@ if shouldBuildGRPC(env):
 if wiredtiger:
     env.CppUnitTest(
         target="client_test",
-        source=[
-            "async_remote_command_targeter_adapter_test.cpp",
-            "authenticate_test.cpp",
-            "connection_string_test.cpp",
-            "dbclient_cursor_test.cpp",
-            "fetcher_test.cpp",
-            "index_spec_test.cpp",
-            "mongo_uri_test.cpp",
-            "read_preference_test.cpp",
-            "remote_command_retry_scheduler_test.cpp",
-            "replica_set_monitor_server_parameters_test.cpp",
-            "server_discovery_monitor_expedited_test.cpp",
-            "server_discovery_monitor_test.cpp",
-            "server_ping_monitor_test.cpp",
-            "streamable_replica_set_monitor_error_handler_test.cpp",
-            "streamable_replica_set_monitor_discovery_time_processor_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/client/sdam/sdam",
-            "$BUILD_DIR/mongo/client/sdam/sdam_test_util",
-            "$BUILD_DIR/mongo/db/auth/authmocks",
-            "$BUILD_DIR/mongo/db/server_base",
-            "$BUILD_DIR/mongo/db/service_context_test_fixture",
-            "$BUILD_DIR/mongo/dbtests/mocklib",
-            "$BUILD_DIR/mongo/executor/network_interface_mock",
-            "$BUILD_DIR/mongo/executor/task_executor_test_fixture",
-            "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-            "$BUILD_DIR/mongo/rpc/command_status",
-            "$BUILD_DIR/mongo/transport/transport_layer_common",
-            "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-            "$BUILD_DIR/mongo/unittest/task_executor_proxy",
-            "$BUILD_DIR/mongo/util/md5",
-            "$BUILD_DIR/mongo/util/net/network",
-            "authentication",
-            "clientdriver_minimal",
-            "clientdriver_network",
-            "connection_string",
-            "fetcher",
-            "read_preference",
-            "remote_command_retry_scheduler",
-            "remote_command_targeter_mock",
-            "replica_set_monitor_protocol_test_util",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
 env.CppIntegrationTest(
@@ -89,50 +48,27 @@ env.CppIntegrationTest(
 
 env.CppUnitTest(
     target="client_rs_test",
-    source=[
-        "dbclient_rs_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "clientdriver_network",
-        "replica_set_monitor_test_helper",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
+
 if shouldBuildGRPC(env):
     clientDriverEnv.CppUnitTest(
         target="dbclient_grpc_stream_test",
-        source=[
-            "dbclient_grpc_stream_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/db/service_context_non_d",
-            "$BUILD_DIR/mongo/db/service_context_test_fixture",
-            "$BUILD_DIR/mongo/transport/grpc/grpc_transport_mock",
-            "$BUILD_DIR/mongo/util/version_impl",
-            "clientdriver_network",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
 env.CppUnitTest(
     target="scoped_db_connection_pool_test",
-    source=["scoped_db_connection_test.cpp"],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/dbtests/mocklib",
-        "clientdriver_network",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="dbclient_connection_test",
-    source=[
-        "dbclient_connection_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/version_impl",
-        "clientdriver_network",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 # The following two tests cannot be combined because the second one
