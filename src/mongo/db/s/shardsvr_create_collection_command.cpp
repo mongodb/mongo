@@ -141,7 +141,7 @@ void runCreateCommandDirectClient(OperationContext* opCtx,
     APIParameters::get(opCtx).setInfo(c);
     // Forward the api check rules enforced by the client
     localClient.runCommand(ns.dbName(), c.toBSON(), createRes);
-    auto createStatus = getStatusFromCommandResult(createRes);
+    auto createStatus = getStatusFromWriteCommandReply(createRes);
     uassertStatusOK(createStatus);
 }
 
