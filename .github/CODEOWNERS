@@ -840,7 +840,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthroughWithMongod/ttl/**/* @10gen/server-ttl @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/validate/OWNERS.yml
-/jstests/noPassthroughWithMongod/validate/**/* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
+/jstests/noPassthroughWithMongod/validate/**/* @10gen/server-validate @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/write/OWNERS.yml
 /jstests/noPassthroughWithMongod/write/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
@@ -1097,13 +1097,13 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/catalog/OWNERS.yml
 /src/mongo/db/catalog/**/collection_compact* @10gen/server-rss-sydney @svc-auto-approve-bot
-/src/mongo/db/catalog/**/collection_validation* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/db/catalog/**/collection_validation* @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/db/catalog/**/health_log* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/import* @10gen/server-catalog-and-routing @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/catalog/**/index_key_validate* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/db/catalog/**/index_key_validate* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_spec_validate* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_repair* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/catalog/**/throttle_cursor* @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/db/catalog/**/throttle_cursor* @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/db/catalog/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/database* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/drop* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1138,7 +1138,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/catalog/**/external_data_source_scope_guard* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/catalog/validate/OWNERS.yml
-/src/mongo/db/catalog/validate/**/* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/db/catalog/validate/**/* @10gen/server-validate @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/collection_crud/OWNERS.yml
 /src/mongo/db/collection_crud/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -1152,7 +1152,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/fsync* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/commands/**/user_management_commands* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/search_* @10gen/query-integration-search @svc-auto-approve-bot
-/src/mongo/db/commands/**/validate.cpp @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/db/commands/**/validate.cpp @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/db/commands/**/vote*index_build* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/commands/**/rotate_certificates* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1818,7 +1818,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/insert_test.cpp @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/jsobjtests.cpp @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/storage_debug_util* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/dbtests/**/validate_tests.cpp @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/dbtests/**/validate_tests.cpp @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/dbtests/**/*plan_executor* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/query_stage* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/querytests.cpp @10gen/query-execution @svc-auto-approve-bot

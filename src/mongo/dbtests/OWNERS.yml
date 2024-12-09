@@ -18,8 +18,7 @@ filters:
       - 10gen/server-rss-sydney
   - "validate_tests.cpp":
     approvers:
-      - 10gen/server-storage-execution
-      - 10gen/server-rss-sydney
+      - 10gen/server-validate
   - "*plan_executor*":
     approvers:
       - 10gen/query-execution

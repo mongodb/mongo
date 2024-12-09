@@ -5,8 +5,7 @@ filters:
       - 10gen/server-rss-sydney
   - "collection_validation*":
     approvers:
-      - 10gen/server-storage-execution
-      - 10gen/server-rss-sydney
+      - 10gen/server-validate
   - "health_log*":
     approvers:
       - 10gen/server-storage-execution
@@ -19,7 +18,6 @@ filters:
   - "index_key_validate*":
     approvers:
       - 10gen/server-storage-execution
-      - 10gen/server-rss-sydney
   - "index_spec_validate*":
     approvers:
       - 10gen/server-storage-execution
@@ -29,7 +27,7 @@ filters:
       - 10gen/server-rss-sydney
   - "throttle_cursor*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-validate
   - "create*":
     approvers:
       - 10gen/server-catalog-and-routing
