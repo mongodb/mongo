@@ -439,10 +439,13 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             const auto* child = node->getChild(0);
             const MatchExpression::MatchType childtype = child->matchType();
 
-            // Can't index negations of MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE.
+            // Can't index negations of MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE; and, as
+            // above, we can't use a btree-indexed field for geo expressions (or their negations).
             if (MatchExpression::REGEX == childtype || MatchExpression::MOD == childtype ||
                 MatchExpression::TYPE_OPERATOR == childtype ||
-                MatchExpression::ELEM_MATCH_VALUE == childtype) {
+                MatchExpression::ELEM_MATCH_VALUE == childtype ||
+                MatchExpression::GEO == childtype || MatchExpression::GEO_NEAR == childtype ||
+                MatchExpression::INTERNAL_BUCKET_GEO_WITHIN == childtype) {
                 return false;
             }
 
