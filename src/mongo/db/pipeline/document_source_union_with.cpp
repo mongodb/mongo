@@ -51,20 +51,20 @@ REGISTER_DOCUMENT_SOURCE(unionWith,
                          AllowedWithApiStrict::kAlways);
 
 namespace {
+void validatorCallback(const Pipeline& pipeline) {
+    const auto& sources = pipeline.getSources();
+    std::for_each(sources.begin(), sources.end(), [](auto& src) {
+        uassert(31441,
+                str::stream() << src->getSourceName()
+                              << " is not allowed within a $unionWith's sub-pipeline",
+                src->constraints().isAllowedInUnionPipeline());
+    });
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     ExpressionContext::ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline) {
-
-    auto validatorCallback = [](const Pipeline& pipeline) {
-        const auto& sources = pipeline.getSources();
-        std::for_each(sources.begin(), sources.end(), [](auto& src) {
-            uassert(31441,
-                    str::stream() << src->getSourceName()
-                                  << " is not allowed within a $unionWith's sub-pipeline",
-                    src->constraints().isAllowedInUnionPipeline());
-        });
-    };
 
     MakePipelineOptions opts;
     opts.attachCursorSource = false;
@@ -359,7 +359,9 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             std::move(_pushedDownStages.begin(),
                       _pushedDownStages.end(),
                       std::back_inserter(recoveredPipeline));
-            pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
+            pipeCopy =
+                Pipeline::parse(recoveredPipeline, _pipeline->getContext(), validatorCallback)
+                    .release();
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
@@ -392,7 +394,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         auto serializedPipeline = [&]() -> std::vector<BSONObj> {
             if (opts.transformIdentifiers ||
                 opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-                return Pipeline::parse(_userPipeline, _pipeline->getContext())
+                return Pipeline::parse(_userPipeline, _pipeline->getContext(), validatorCallback)
                     ->serializeToBson(opts);
             }
             return _pipeline->serializeToBson(opts);
