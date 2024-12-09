@@ -35,9 +35,10 @@
 
 namespace mongo::query_tester {
 // Returns the array element containing result documents.
-BSONObj getResultsFromCommandResponse(const BSONObj& cmdResponse) {
+BSONObj getResultsFromCommandResponse(const BSONObj& cmdResponse, size_t testNum) {
     uassert(9670416,
-            str::stream{} << "Expected OK command result but got " << cmdResponse,
+            str::stream{} << "Failed to execute test number " << testNum
+                          << ". Expected OK command result but got " << cmdResponse,
             cmdResponse.getField("ok").trueValue());
     // Assume format is correct and cursor is an object containing 'firstBatch' or 'nextBatch'.
     auto&& cursorObj = cmdResponse.getField("cursor").Obj();

@@ -55,7 +55,7 @@ BSONObj toBSONObj(const std::vector<BSONObj>& objs) {
 }  // namespace
 
 std::vector<BSONObj> Test::getAllResults(DBClientConnection* const conn, const BSONObj& result) {
-    const auto actualResult = getResultsFromCommandResponse(result);
+    const auto actualResult = getResultsFromCommandResponse(result, _testNum);
     const auto id = result.getField("cursor").embeddedObject()["id"].Long();
 
     auto actualObjs = std::vector<BSONObj>{};

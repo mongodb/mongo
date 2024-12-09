@@ -33,7 +33,7 @@
 
 namespace mongo::query_tester {
 // Returns the array element containing result documents.
-BSONObj getResultsFromCommandResponse(const BSONObj& cmdResponse);
+BSONObj getResultsFromCommandResponse(const BSONObj& cmdResponse, size_t);
 
 BSONObj runCommand(DBClientConnection* conn, const std::string& db, const BSONObj& commandToRun);
 }  // namespace mongo::query_tester
