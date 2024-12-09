@@ -1192,6 +1192,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             distro_or_os = distro_id
 
     bazel_internal_flags = [
+        "--config=dbg",
         f"--compiler_type={env.ToolchainName()}",
         f'--opt={env.GetOption("opt")}',
         f'--dbg={env.GetOption("dbg") == "on"}',

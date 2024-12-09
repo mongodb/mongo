@@ -33,8 +33,8 @@ BAZEL_BINARY=bazel
 
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
-echo "bazel coverage --verbose_failures $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
+echo "bazel coverage --verbose_failures --config=dbg $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
 
-eval $BAZEL_BINARY coverage --verbose_failures $LOCAL_ARG ${args} ${target}
+eval $BAZEL_BINARY coverage --verbose_failures --config=dbg $LOCAL_ARG ${args} ${target}
 
 exit $RET
