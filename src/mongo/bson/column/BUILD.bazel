@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -48,5 +48,39 @@ mongo_cc_library(
     deps = [
         ":column",
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "bsoncolumn_test_util",
+    srcs = [
+        "bsoncolumn_test_util.cpp",
+    ],
+    hdrs = [
+        "bsoncolumn_expressions.h",
+        "bsoncolumn_expressions_internal.h",
+        "bsoncolumn_test_util.h",
+    ],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "bsoncolumn_test",
+    srcs = [
+        "bson_column_compressed_data.inl",
+        "bsoncolumn_blockbased_test.cpp",
+        "bsoncolumn_test.cpp",
+        "simple8b_test.cpp",
+        "simple8b_type_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":bson_column_fuzzer_impl",
+        ":bsoncolumn_test_util",
+        "//src/mongo/util:safe_num",
     ],
 )

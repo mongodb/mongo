@@ -31,12 +31,8 @@ ksdecode = env.Program(
 
 env.CppUnitTest(
     target="key_string_test",
-    source=[
-        "key_string_test.cpp",
-    ],
-    LIBDEPS=[
-        "key_string",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppLibfuzzerTest(

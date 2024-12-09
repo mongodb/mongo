@@ -6,24 +6,8 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_bucket_catalog_test",
-    source=[
-        "bucket_catalog_helpers_test.cpp",
-        "bucket_catalog_test.cpp",
-        "bucket_state_registry_test.cpp",
-        "minmax_test.cpp",
-        "measurement_map_test.cpp",
-        "schema_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_compression",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_metadata",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
-        "bucket_catalog",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -57,5 +57,40 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_bucket_catalog_test",
+    srcs = [
+        "bucket_catalog_helpers_test.cpp",
+        "bucket_catalog_test.cpp",
+        "bucket_state_registry_test.cpp",
+        "measurement_map_test.cpp",
+        "minmax_test.cpp",
+        "schema_test.cpp",
+        "//src/mongo/idl:server_parameter_test_util.h",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":bucket_catalog",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/timeseries:bucket_compression",
+        "//src/mongo/db/timeseries:timeseries_metadata",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "timeseries_sizing_test",
+    srcs = [
+        "timeseries_sizing_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":bucket_catalog",
     ],
 )

@@ -4002,6 +4002,18 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "prepare_conflict_tracker_test",
+    srcs = [
+        "prepare_conflict_tracker_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":prepare_conflict_tracker",
+        "//src/mongo/util:tick_source_mock",
+    ],
+)
+
 # TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:baton.h to //src/mongo/db:service_context
 filegroup(
     name = "baton_hdrs",

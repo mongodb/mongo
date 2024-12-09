@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -54,4 +54,26 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+mongo_cc_unit_test(
+    name = "db_sorter_test",
+    srcs = [
+        "sorter_checksum_calculator_test.cpp",
+        "sorter_stats_test.cpp",
+        "sorter_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":sorter_base",
+        ":sorter_stats",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:storage_options",
+        "//src/third_party/snappy",
+    ],
 )

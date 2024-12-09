@@ -28,33 +28,10 @@ env.Benchmark(
     CONSOLIDATED_TARGET="bsoncolumn_bm",
 )
 
-env.Library(
-    target="bsoncolumn_test_util",
-    source=[
-        "bsoncolumn_test_util.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/sbe_values",
-        "column",
-    ],
-)
-
 env.CppUnitTest(
     target="bsoncolumn_test",
-    source=[
-        "bsoncolumn_blockbased_test.cpp",
-        "bsoncolumn_test.cpp",
-        "simple8b_test.cpp",
-        "simple8b_type_util_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/safe_num",
-        "bson_column_fuzzer_impl",
-        "bsoncolumn_test_util",
-        "column",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

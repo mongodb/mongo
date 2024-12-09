@@ -115,13 +115,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="prepare_conflict_tracker_test",
-    source=[
-        "prepare_conflict_tracker_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "prepare_conflict_tracker",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

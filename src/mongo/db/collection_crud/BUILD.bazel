@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -64,5 +64,23 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:recovery_unit_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_capped_test",
+    srcs = [
+        "capped_collection_test.cpp",
+        "capped_utils_test.cpp",
+        "capped_visibility_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/catalog:catalog_control",
+        "//src/mongo/db/collection_crud:capped_visibility",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
     ],
 )

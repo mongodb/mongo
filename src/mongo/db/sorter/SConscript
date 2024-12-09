@@ -1,30 +1,11 @@
 Import("env")
-Import("wiredtiger")
 
 env = env.Clone()
 
-sorterEnv = env.Clone()
-sorterEnv.InjectThirdParty(libraries=["snappy"])
-
-sorterEnv.CppUnitTest(
+env.CppUnitTest(
     target="db_sorter_test",
-    source=[
-        "sorter_test.cpp",
-        "sorter_stats_test.cpp",
-        "sorter_checksum_calculator_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
-        "$BUILD_DIR/mongo/db/query/query_knobs",
-        "$BUILD_DIR/mongo/db/query/spill_util",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/storage/encryption_hooks",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/third_party/snappy/snappy",
-        "sorter_base",
-        "sorter_stats",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
@@ -36,7 +17,3 @@ env.Benchmark(
         "sorter_base",
     ],
 )
-
-sorterBaseEnv = env.Clone()
-if wiredtiger:
-    sorterBaseEnv.InjectThirdParty(libraries=["wiredtiger"])
