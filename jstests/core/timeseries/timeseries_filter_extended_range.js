@@ -1,6 +1,6 @@
 /**
- * Test that find/match type queries work properly on dates ouside the 32 bit epoch range,
- *  [1970-01-01 00:00:00 UTC - 2038-01-29 03:13:07 UTC].
+ * Test that find and match type queries work properly on dates outside the 32 bit epoch range,
+ *  [1970-01-01 00:00:00 UTC - 2038-01-19 03:14:07 UTC].
  *
  * @tags: [
  *   # Refusing to run a test that issues an aggregation command with explain because it may
@@ -12,174 +12,301 @@
  *   does_not_support_transactions,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   requires_fcv_60
  * ]
  */
 
 (function() {
 "use strict";
+
 const timeFieldName = "time";
+const standardDocs = [
+    {[timeFieldName]: ISODate("1975-12-01")},
+    {[timeFieldName]: ISODate("1980-01-13")},
+    {[timeFieldName]: ISODate("2018-07-14")},
+    {[timeFieldName]: ISODate("2030-09-30")},
+];
+const beforeEpochDocs = [
+    {[timeFieldName]: ISODate("1969-12-31T23:00:59.001Z")},
+    {[timeFieldName]: ISODate("1969-12-31T23:59:59.001Z")} /* one millisecond before the epoch */,
+];
+const afterEpochDocs = [
+    // This date is one millisecond after the maximum (the largest 32 bit integer) number of seconds
+    // since the epoch.
+    {[timeFieldName]: ISODate("2038-01-19T03:14:07.001Z")},
+    {[timeFieldName]: ISODate("2050-01-20T03:14:00.003Z")}
+];
+const allExtendedRangeDocs = beforeEpochDocs.concat(afterEpochDocs);
 
 /*
- * Creates a collection, populates it, runs the `query` and ensures that the result set
- * is equal to `results`.
- *
- * If overflow is set we create a document with dates above the 32 bit range (year 2040)
- * If underflow is set, we create a document with dates below the 32 bit range (year 1965)
+ * Creates a collection, populates it using the `standardDocs` and any dates passed in by
+ * `extendedRangeDocs`, runs the `query` and ensures that the result set is equal to `results`.
  */
-function runTest(underflow, overflow, query, results) {
-    // Setup our DB & our collections.
+function runTest({query, results, extendedRangeDocs}) {
+    // Setup the collection and insert the dates in `standardDocs` and `extendedRangeDocs`.
     const tsColl = db.getCollection(jsTestName());
     tsColl.drop();
-
     assert.commandWorked(
         db.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
-
-    const dates = [
-        // If underflow, we want to insert a date that would fall below the epoch
-        // i.e. 1970-01-01 00:00:00 UTC. Otherwise we use a date within the epoch.
-        {[timeFieldName]: underflow ? new Date("1965-01-01") : new Date("1971-01-01")},
-        {[timeFieldName]: new Date("1975-01-01")},
-        {[timeFieldName]: new Date("1980-01-01")},
-        {[timeFieldName]: new Date("1995-01-01")},
-        // If overflow, we want to insert a date that would use more than 32 bit milliseconds after
-        // the epoch. This overflow will occur 2038-01-29 03:13:07 UTC. Otherwise we go slightly
-        // before the end of the 32 bit epoch.
-        {[timeFieldName]: overflow ? new Date("2040-01-01") : new Date("2030-01-01")}
-    ];
-    assert.commandWorked(tsColl.insert(dates));
-
-    // Make sure the expected results are in the correct order for comparison below.
-    function cmpTimeFields(a, b) {
-        return (b[timeFieldName].getTime() - a[timeFieldName].getTime());
-    }
-    results.sort(cmpTimeFields);
+    assert.commandWorked(tsColl.insert(standardDocs.concat(extendedRangeDocs)));
 
     const pipeline = [{$match: query}, {$project: {_id: 0, [timeFieldName]: 1}}];
-
     const plan = tsColl.explain().aggregate(pipeline);
 
-    // Verify agg pipeline. We don't want to go through a plan that encourages a sort order to
-    // avoid BUS and index selection, so we sort after gathering the results.
+    // Verify the results.
     const aggActuals = tsColl.aggregate(pipeline).toArray();
-    aggActuals.sort(cmpTimeFields);
-    assert.docEq(results, aggActuals, JSON.stringify(plan, null, 4));
+    assert.sameMembers(results, aggActuals, JSON.stringify(plan, null, 4));
 
-    // Verify the equivalent find command. We again don't want to go through a plan that
-    // encourages a sort order to avoid BUS and index selection, so we sort after gathering the
-    // results.
+    // Verify the equivalent find command.
     let findActuals = tsColl.find(query, {_id: 0, [timeFieldName]: 1}).toArray();
-    findActuals.sort(cmpTimeFields);
-    assert.docEq(findActuals, results);
+    assert.sameMembers(results, findActuals, JSON.stringify(plan, null, 4));
 }
 
-runTest(false,
-        false,
-        {[timeFieldName]: {$eq: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1980-01-01")}]);
-runTest(false,
-        true,
-        {[timeFieldName]: {$eq: new Date("2040-01-01")}},
-        [{[timeFieldName]: new Date("2040-01-01")}]);
-runTest(true,
-        false,
-        {[timeFieldName]: {$eq: new Date("1965-01-01")}},
-        [{[timeFieldName]: new Date("1965-01-01")}]);
-
-runTest(false,
-        false,
-        {[timeFieldName]: {$lt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1971-01-01")}, {[timeFieldName]: new Date("1975-01-01")}]);
-runTest(false,
-        true,
-        {[timeFieldName]: {$lt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1971-01-01")}, {[timeFieldName]: new Date("1975-01-01")}]);
-runTest(true,
-        false,
-        {[timeFieldName]: {$lt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1975-01-01")}]);
-runTest(true,
-        true,
-        {[timeFieldName]: {$lt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1965-01-01")}, {[timeFieldName]: new Date("1975-01-01")}]);
-
-runTest(false,
-        false,
-        {[timeFieldName]: {$gt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1995-01-01")}, {[timeFieldName]: new Date("2030-01-01")}]);
-runTest(false,
-        true,
-        {[timeFieldName]: {$gt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1995-01-01")}, {[timeFieldName]: new Date("2040-01-01")}]);
-runTest(true,
-        false,
-        {[timeFieldName]: {$gt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1995-01-01")}, {[timeFieldName]: new Date("2030-01-01")}]);
-runTest(true,
-        true,
-        {[timeFieldName]: {$gt: new Date("1980-01-01")}},
-        [{[timeFieldName]: new Date("1995-01-01")}, {[timeFieldName]: new Date("2040-01-01")}]);
-
-runTest(false, false, {[timeFieldName]: {$lte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1971-01-01")},
-    {[timeFieldName]: new Date("1975-01-01")},
-    {[timeFieldName]: new Date("1980-01-01")}
-]);
-runTest(false, true, {[timeFieldName]: {$lte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1971-01-01")},
-    {[timeFieldName]: new Date("1975-01-01")},
-    {[timeFieldName]: new Date("1980-01-01")}
-]);
-runTest(true, false, {[timeFieldName]: {$lte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1965-01-01")},
-    {[timeFieldName]: new Date("1975-01-01")},
-    {[timeFieldName]: new Date("1980-01-01")}
-]);
-runTest(true, true, {[timeFieldName]: {$lte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1965-01-01")},
-    {[timeFieldName]: new Date("1975-01-01")},
-    {[timeFieldName]: new Date("1980-01-01")}
-]);
-
-runTest(false, false, {[timeFieldName]: {$gte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1980-01-01")},
-    {[timeFieldName]: new Date("1995-01-01")},
-    {[timeFieldName]: new Date("2030-01-01")}
-]);
-runTest(false, true, {[timeFieldName]: {$gte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1980-01-01")},
-    {[timeFieldName]: new Date("1995-01-01")},
-    {[timeFieldName]: new Date("2040-01-01")}
-]);
-runTest(true, false, {[timeFieldName]: {$gte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1980-01-01")},
-    {[timeFieldName]: new Date("1995-01-01")},
-    {[timeFieldName]: new Date("2030-01-01")}
-]);
-runTest(true, true, {[timeFieldName]: {$gte: new Date("1980-01-01")}}, [
-    {[timeFieldName]: new Date("1980-01-01")},
-    {[timeFieldName]: new Date("1995-01-01")},
-    {[timeFieldName]: new Date("2040-01-01")}
-]);
-
-// Verify ranges that straddle the lower and upper epoch boundaries work properly.
+// Verify when there are no extended range dates in the collection, we handle querying by extended
+// range dates. The code for this is shared by multiple operators, so we don't have to test each
+// operator separately.
+runTest({
+    query: {[timeFieldName]: {$lte: beforeEpochDocs[1].time}},
+    results: [],
+    extendedRangeDocs: []
+});
+runTest({
+    query: {[timeFieldName]: {$lte: afterEpochDocs[0].time}},
+    results: standardDocs,
+    extendedRangeDocs: []
+});
+runTest({
+    query: {[timeFieldName]: {$gt: beforeEpochDocs[1].time}},
+    results: standardDocs,
+    extendedRangeDocs: []
+});
 runTest(
-    true, false, {[timeFieldName]: {$gt: new Date("1920-01-01"), $lt: new Date("1980-01-01")}}, [
-        {[timeFieldName]: new Date("1965-01-01")},
-        {[timeFieldName]: new Date("1975-01-01")},
-    ]);
-runTest(
-    false, true, {[timeFieldName]: {$gt: new Date("1980-01-01"), $lt: new Date("2050-01-01")}}, [
-        {[timeFieldName]: new Date("1995-01-01")},
-        {[timeFieldName]: new Date("2040-01-01")},
-    ]);
-runTest(
-    false, false, {[timeFieldName]: {$gt: new Date("1920-01-01"), $lt: new Date("1980-01-01")}}, [
-        {[timeFieldName]: new Date("1971-01-01")},
-        {[timeFieldName]: new Date("1975-01-01")},
-    ]);
-runTest(
-    false, false, {[timeFieldName]: {$gt: new Date("1980-01-01"), $lt: new Date("2050-01-01")}}, [
-        {[timeFieldName]: new Date("1995-01-01")},
-        {[timeFieldName]: new Date("2030-01-01")},
-    ]);
+    {query: {[timeFieldName]: {$gt: afterEpochDocs[0].time}}, results: [], extendedRangeDocs: []});
+runTest({query: {[timeFieldName]: afterEpochDocs[0].time}, results: [], extendedRangeDocs: []});
+
+/*
+ * Verify $eq queries for dates inside, below and above the epoch ranges.
+ */
+// Test in the epoch range when there are measurements before and after the epoch.
+runTest({
+    query: {[timeFieldName]: {$eq: standardDocs[1].time}},
+    results: [standardDocs[1]],
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+// Test when there is one date above the epoch range. The date is one millisecond after the maximum
+// (the largest 32 bit integer) number of seconds since the epoch.
+runTest({
+    query: {[timeFieldName]: {$eq: afterEpochDocs[0].time}},
+    results: [afterEpochDocs[0]],
+    extendedRangeDocs: [afterEpochDocs[0]]
+});
+
+// Test when there are multiple dates after the epoch range.
+runTest({
+    query: {[timeFieldName]: {$eq: afterEpochDocs[0].time}},
+    results: [afterEpochDocs[0]],
+    extendedRangeDocs: afterEpochDocs
+});
+
+// Test when there is one date before the epoch. The date is one millisecond before the epoch.
+runTest({
+    query: {[timeFieldName]: {$eq: beforeEpochDocs[1].time}},
+    results: [beforeEpochDocs[1]],
+    extendedRangeDocs: [beforeEpochDocs[1]]
+});
+
+// Test when there are multiple dates before the epoch.
+runTest({
+    query: {[timeFieldName]: {$eq: beforeEpochDocs[0].time}},
+    results: [beforeEpochDocs[0]],
+    extendedRangeDocs: beforeEpochDocs
+});
+
+/*
+ * $lt queries.
+ */
+// Test with dates below the epoch that match the predicate.
+runTest({
+    query: {[timeFieldName]: {$lt: beforeEpochDocs[1].time}},
+    results: [beforeEpochDocs[0]],
+    extendedRangeDocs: beforeEpochDocs
+});
+
+// Test with dates above the epoch that do not match the predicate.
+runTest({
+    query: {[timeFieldName]: {$lt: standardDocs[2].time}},
+    results: [standardDocs[0], standardDocs[1]],
+    extendedRangeDocs: afterEpochDocs
+});
+
+// Test with dates both above and below the epoch. Only the before dates will match the predicate.
+runTest({
+    query: {[timeFieldName]: {$lt: standardDocs[1].time}},
+    results: [standardDocs[0], beforeEpochDocs[0], beforeEpochDocs[1]],
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+// Test with dates both above and below the epoch. Both before and after dates match the predicate.
+runTest({
+    query: {[timeFieldName]: {$lt: afterEpochDocs[1].time}},
+    results: standardDocs.concat(beforeEpochDocs, [afterEpochDocs[0]]),
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+/*
+ * $gt queries.
+ */
+// Test with dates below the epoch that do not match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gt: beforeEpochDocs[1].time}},
+    results: standardDocs,
+    extendedRangeDocs: beforeEpochDocs
+});
+
+// Test with dates above the epoch that do not match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gt: afterEpochDocs[1].time}},
+    results: [],
+    extendedRangeDocs: afterEpochDocs
+});
+
+// Test with dates both above and below the epoch. Only the after dates will match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gt: standardDocs[2].time}},
+    results: [standardDocs[3], afterEpochDocs[0], afterEpochDocs[1]],
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+// Test with dates both above and below the epoch. Both before and after dates match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gt: beforeEpochDocs[0].time}},
+    results: standardDocs.concat([beforeEpochDocs[1]], afterEpochDocs),
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+/*
+ * $lte queries.
+ */
+
+// Test with dates below the epoch that do match the predicate.
+runTest({
+    query: {[timeFieldName]: {$lte: standardDocs[0].time}},
+    results: beforeEpochDocs.concat([standardDocs[0]]),
+    extendedRangeDocs: beforeEpochDocs
+});
+
+// Test with dates above the epoch that do match the predicate.
+runTest({
+    query: {[timeFieldName]: {$lte: standardDocs[2].time}},
+    results: [standardDocs[0], standardDocs[1], standardDocs[2]],
+    extendedRangeDocs: afterEpochDocs
+});
+
+// Test with dates both above and below the epoch. Only the before dates will match the predicate.
+runTest({
+    query: {[timeFieldName]: {$lte: standardDocs[2].time}},
+    results: beforeEpochDocs.concat(standardDocs.slice(0, -1)),
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+// Test with dates both above and below the epoch. Both before and after dates will match the
+// predicate.
+runTest({
+    query: {[timeFieldName]: {$lte: afterEpochDocs[0].time}},
+    results: standardDocs.concat(beforeEpochDocs, [afterEpochDocs[0]]),
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+/*
+ * $gte queries.
+ */
+// Test with dates below the epoch that do not match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gte: standardDocs[1].time}},
+    results: standardDocs.slice(1),
+    extendedRangeDocs: beforeEpochDocs
+});
+
+// Test with dates above the epoch that do match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gte: standardDocs[2].time}},
+    results: afterEpochDocs.concat(standardDocs.slice(2)),
+    extendedRangeDocs: afterEpochDocs
+});
+
+// Test with dates both above and below the epoch. Only the after dates will match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gte: standardDocs[1].time}},
+    results: afterEpochDocs.concat(standardDocs.slice(1)),
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+// Test with dates both above and below the epoch. Both before and after dates will match the
+// predicate.
+runTest({
+    query: {[timeFieldName]: {$gte: beforeEpochDocs[1].time}},
+    results: afterEpochDocs.concat(standardDocs, [beforeEpochDocs[1]]),
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+/*
+ * Compound predicates ($and, $or).
+ */
+
+// Test with dates below the epoch that do match the predicate.
+runTest({
+    query: {[timeFieldName]: {$gt: ISODate("1920-01-01"), $lt: ISODate("1980-01-01")}},
+    results: beforeEpochDocs.concat([standardDocs[0]]),
+    extendedRangeDocs: beforeEpochDocs
+});
+
+// Test with dates below the epoch that do not match the predicate.
+runTest({
+    query:
+        {[timeFieldName]: {$gt: ISODate("1970-01-01T00:00:00.001Z"), $lt: ISODate("1980-01-01")}},
+    results: [standardDocs[0]],
+    extendedRangeDocs: beforeEpochDocs
+});
+
+// Test with dates above the epoch that do match the predicate.
+runTest({
+    query: {
+        [timeFieldName]:
+            {$gt: ISODate("2030-09-29T23:59:59.001Z"), $lt: ISODate("2050-01-20T03:14:00.001Z")}
+    },
+    results: [standardDocs[3], afterEpochDocs[0]],
+    extendedRangeDocs: afterEpochDocs
+});
+
+// Test with dates above the epoch that do not match the predicate.
+runTest({
+    query: {
+        [timeFieldName]:
+            {$gt: ISODate("2030-09-29T23:59:59.001Z"), $lt: ISODate("2038-01-19T03:14:00.000Z")}
+    },
+    results: [standardDocs[3]],
+    extendedRangeDocs: afterEpochDocs
+});
+
+// Test with dates both above and below the epoch. Both before and after dates will match the
+// predicate.
+runTest({
+    query: {
+        $or: [
+            {[timeFieldName]: {$lt: ISODate("1975-12-01T23:59:00.001Z")}},
+            {[timeFieldName]: {$gt: ISODate("2038-01-19T03:14:07.002Z")}}
+        ]
+    },
+    results: beforeEpochDocs.concat([standardDocs[0], afterEpochDocs[1]]),
+    extendedRangeDocs: allExtendedRangeDocs
+});
+
+// Test with dates both above and below the epoch. Neither before nor after dates will match the
+// predicate.
+runTest({
+    query: {[timeFieldName]: {$in: [standardDocs[1].time, standardDocs[3].time]}},
+    results: [standardDocs[1], standardDocs[3]],
+    extendedRangeDocs: allExtendedRangeDocs
+});
 })();
