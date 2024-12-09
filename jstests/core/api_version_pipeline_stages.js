@@ -27,7 +27,6 @@ const unstablePipelines = [
     [{$planCacheStats: {}}],
     [{$unionWith: {coll: "coll2", pipeline: [{$collStats: {latencyStats: {}}}]}}],
     [{$lookup: {from: "coll2", pipeline: [{$indexStats: {}}]}}],
-    [{$lookup: {from: "coll2", _internalCollation: {locale: "simple"}}}],
     [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],
 ];
 

@@ -71,11 +71,9 @@ public:
 
         LiteParsed(std::string parseTimeName,
                    NamespaceString foreignNss,
-                   boost::optional<LiteParsedPipeline> pipeline,
-                   bool hasInternalCollation)
+                   boost::optional<LiteParsedPipeline> pipeline)
             : LiteParsedDocumentSourceNestedPipelines(
-                  std::move(parseTimeName), std::move(foreignNss), std::move(pipeline)),
-              _hasInternalCollation(hasInternalCollation) {}
+                  std::move(parseTimeName), std::move(foreignNss), std::move(pipeline)) {}
 
         /**
          * Lookup from a sharded collection may not be allowed.
@@ -91,16 +89,6 @@ public:
             return (involvedNss.find(nss) == involvedNss.end());
         }
 
-        void assertPermittedInAPIVersion(const APIParameters& apiParameters) const final {
-            if (apiParameters.getAPIVersion() && *apiParameters.getAPIVersion() == "1" &&
-                apiParameters.getAPIStrict().value_or(false)) {
-                uassert(
-                    ErrorCodes::APIStrictError,
-                    "The _internalCollation argument to $lookup is not supported in API Version 1",
-                    !_hasInternalCollation);
-            }
-        }
-
         void getForeignExecutionNamespaces(
             stdx::unordered_set<NamespaceString>& nssSet) const final {
             // We do not recurse on, nor insert '_foreignNss' in the event that this $lookup has
@@ -112,10 +100,7 @@ public:
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const override final;
-
-    private:
-        bool _hasInternalCollation = false;
+                                           bool bypassDocumentValidation) const final;
     };
 
     /**
@@ -276,7 +261,6 @@ private:
      */
     DocumentSourceLookUp(NamespaceString fromNs,
                          std::string as,
-                         boost::optional<std::unique_ptr<CollatorInterface>> fromCollator,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
     /**
      * Constructor used for a $lookup stage specified using the {from: ..., localField: ...,
@@ -286,7 +270,6 @@ private:
                          std::string as,
                          std::string localField,
                          std::string foreignField,
-                         boost::optional<std::unique_ptr<CollatorInterface>> fromCollator,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -298,7 +281,6 @@ private:
                          std::string as,
                          std::vector<BSONObj> pipeline,
                          BSONObj letVariables,
-                         boost::optional<std::unique_ptr<CollatorInterface>> fromCollator,
                          boost::optional<std::pair<std::string, std::string>> localForeignFields,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -400,12 +382,6 @@ private:
     // The ExpressionContext used when performing aggregation pipelines against the '_resolvedNs'
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
-
-    // When a `_internalCollation` has been specified on a $lookup stage, we will set that collation
-    // on `_fromExpCtx`. An explicit simple collation however is represented in the same way as the
-    // default binary collation. We need to differentiate between the two to avoid serializing the
-    // collation when not set explicitly.
-    bool _hasExplicitCollation = false;
 
     // Can this $lookup be pushed down into SBE?
     bool _sbeCompatible = false;

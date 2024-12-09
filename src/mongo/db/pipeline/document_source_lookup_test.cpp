@@ -609,54 +609,6 @@ TEST_F(DocumentSourceLookUpTest, LookupWithLetReParseSerializedStageWithFromDBAn
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
-
-// Tests that $lookup with 'collation' can be round tripped.
-TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithCollation) {
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "coll");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-
-    auto originalBSON = BSON(
-        "$lookup" << BSON("from"
-                          << "coll"
-                          << "let"
-                          << BSON("local_x"
-                                  << "$x")
-                          << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                          << "as"
-                          << "_internalCollation"
-                          << BSON("locale"
-                                  << "en_US"
-                                  << "caseLevel" << false << "caseFirst"
-                                  << "off"
-                                  << "strength" << 1 << "numericOrdering" << false << "alternate"
-                                  << "non-ignorable"
-                                  << "maxVariable"
-                                  << "punct"
-                                  << "normalization" << false << "backwards" << false << "version"
-                                  << "57.1")));
-    auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
-
-    //
-    // Serialize the $lookup stage and confirm contents.
-    //
-    vector<Value> serialization;
-    static const UnorderedFieldsBSONObjComparator kComparator;
-    lookupStage->serializeToArray(serialization);
-    auto serializedBSON = serialization[0].getDocument().toBson();
-    std::cout << "serializedBSON: " << serializedBSON << std::endl;
-    ASSERT_EQ(kComparator.compare(serializedBSON, originalBSON), 0);
-
-    auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBSON.firstElement(), expCtx);
-
-    vector<Value> newSerialization;
-    roundTripped->serializeToArray(newSerialization);
-
-    ASSERT_EQ(newSerialization.size(), 1UL);
-    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
-}
-
 // Tests that $lookup with '$documents' can be round tripped.
 TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithDocumentsPipelineStage) {
     auto expCtx = getExpCtx();
