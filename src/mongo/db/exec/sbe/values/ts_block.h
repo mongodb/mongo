@@ -50,9 +50,6 @@ class TsBlock;
  * Get/Traverse/Id primitives. When given a TS bucket, it evaluates each path on the block of
  * "documents" in the TS bucket, producing a block of cells for each path.
  *
- * TODO PM-3402/after PM-3402: Swap out the naive implementation here with one that uses the new
- * decoding API.
- *
  * TODO: For now only top-level fields are supported.
  */
 class TsBucketPathExtractor {
@@ -102,13 +99,6 @@ private:
     // A vector is needed in case multiple fields with the same prefix (e.g. a.b and a.c) are
     // requested.
     StringDataMap<std::vector<size_t>> _topLevelFieldToIdxes;
-
-    // True if the feature flag for block based decoding is enabled.
-    bool _blockBasedDecompressionEnabled;
-
-    // True if the feature flag is enabled for block based decoding of paths to scalar fields in
-    // objects.
-    bool _blockBasedScalarInObjectDecompressionEnabled;
 };
 
 /**
@@ -130,7 +120,6 @@ public:
             Value blockVal,
             int bucketVersion,
             bool isTimefield = false,
-            bool blockBasedDecompressEnabled = false,
             std::pair<TypeTags, Value> controlMin = {TypeTags::Nothing, Value{0u}},
             std::pair<TypeTags, Value> controlMax = {TypeTags::Nothing, Value{0u}});
 
@@ -265,9 +254,6 @@ private:
 
     // true if all values in the block are non-nothing. Currently only true for timeField
     bool _isTimeField;
-
-    // True if the feature flag for block based decoding is enabled.
-    bool _blockBasedDecompressionEnabled;
 
     // Store the min and max found in the control field of a bucket
     std::pair<TypeTags, Value> _controlMin;

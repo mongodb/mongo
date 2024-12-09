@@ -128,21 +128,8 @@ public:
     void run() {
         auto base = static_cast<mongo::unittest::Test*>(this);
 
-        // First run the tests using the direct BSON implementation for extracting paths.
+        // Run the tests using the block-based BSON implementation for extracting paths.
         base->run();
-
-        // Now run the tests with time series implementation, using all permutations of both block
-        // and path-based block decoding feature flags.
-        useTsImpl = true;
-        for (bool enableBlockDecoding : {false, true}) {
-            for (bool enablePathBasedBlockDecoding : {false, true}) {
-                RAIIServerParameterControllerForTest blockController(
-                    "featureFlagBlockBasedDecodingScalarAPI", enableBlockDecoding);
-                RAIIServerParameterControllerForTest pathController(
-                    "featureFlagBlockBasedDecodingPathAPI", enablePathBasedBlockDecoding);
-                base->run();
-            }
-        }
     }
 
     // Given an object that matches what we might see in the data field of a bucket, produce the

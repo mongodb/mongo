@@ -104,7 +104,6 @@ std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, Str
                                             // isTimefield: this check is only safe for the tests
                                             // here where the time field is called 'time'.
                                             fieldName == "time",
-                                            true, /* blockBasedDecompressionEnabled */
                                             min,
                                             max);
 }

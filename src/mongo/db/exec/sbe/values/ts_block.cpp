@@ -214,13 +214,7 @@ boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(
 
 TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest> pathReqs,
                                              StringData timeField)
-    : _pathReqs(std::move(pathReqs)),
-      _timeField(timeField),
-      // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-      _blockBasedDecompressionEnabled(
-          feature_flags::gBlockBasedDecodingScalarAPI.isEnabledAndIgnoreFCVUnsafe()),
-      _blockBasedScalarInObjectDecompressionEnabled(
-          feature_flags::gBlockBasedDecodingPathAPI.isEnabledAndIgnoreFCVUnsafe()) {
+    : _pathReqs(std::move(pathReqs)), _timeField(timeField) {
 
     size_t idx = 0;
     for (auto& req : _pathReqs) {
@@ -346,7 +340,6 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
                                                       columnVal,
                                                       bucketVersion,
                                                       isTimeField,
-                                                      _blockBasedDecompressionEnabled,
                                                       controlMin,
                                                       controlMax));
         auto tsBlock = outBlocks.back().get();
@@ -432,8 +425,7 @@ bool TsBucketPathExtractor::tryPathBasedDecompression(
     const std::vector<size_t>& nonTopLevelIdxesForCurrentField,
     std::vector<std::unique_ptr<CellBlock>>& outCells) const {
 
-    if (!_blockBasedScalarInObjectDecompressionEnabled ||
-        tsBlock.getBlockTag() != TypeTags::bsonBinData) {
+    if (tsBlock.getBlockTag() != TypeTags::bsonBinData) {
         return false;
     }
 
@@ -496,7 +488,6 @@ TsBlock::TsBlock(size_t ncells,
                  Value blockVal,
                  int bucketVersion,
                  bool isTimeField,
-                 bool blockBasedDecompressionEnabled,
                  std::pair<TypeTags, Value> controlMin,
                  std::pair<TypeTags, Value> controlMax)
     : _blockOwned(owned),
@@ -505,7 +496,6 @@ TsBlock::TsBlock(size_t ncells,
       _count(ncells),
       _bucketVersion(bucketVersion),
       _isTimeField(isTimeField),
-      _blockBasedDecompressionEnabled(blockBasedDecompressionEnabled),
       _controlMin(copyValue(controlMin.first, controlMin.second)),
       _controlMax(copyValue(controlMax.first, controlMax.second)) {
     invariant(_blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);
@@ -560,9 +550,9 @@ void TsBlock::deblockFromBsonObj() {
 void TsBlock::deblockFromBsonColumn() {
     const auto binData = getBinData();
 
-    // If we can guarantee there are no arrays nor objects in this column, and the feature flag is
-    // enabled, use the faster block-based decoding API.
-    if (_blockBasedDecompressionEnabled && hasNoObjsOrArrays()) {
+    // If we can guarantee there are no arrays nor objects in this column,
+    // use the faster block-based decoding API.
+    if (hasNoObjsOrArrays()) {
         using SBEMaterializer = sbe::bsoncolumn::SBEColumnMaterializer;
         mongo::bsoncolumn::BSONColumnBlockBased col(binData);
 
@@ -613,8 +603,7 @@ std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
                                          cpyTag,
                                          cpyVal,
                                          _bucketVersion,
-                                         _isTimeField,
-                                         _blockBasedDecompressionEnabled);
+                                         _isTimeField);
     guard.reset();
 
     // TODO: This might not be necessary now that TsBlock doesn't really use _deblockedStorage
