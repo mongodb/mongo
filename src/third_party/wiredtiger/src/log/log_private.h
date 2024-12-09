@@ -20,6 +20,8 @@
 #define WT_LSN_MSG(lsn, msg) \
     __wt_msg(session, "%s LSN: [%" PRIu32 "][%" PRIu32 "]", (msg), (lsn)->l.file, (lsn)->l.offset)
 
+#define WT_MAX_LSN_STRING 32
+
 /*
  * Both of the macros below need to change if the content of __wt_lsn ever changes. The value is the
  * following: txnid, record type, operation type, file id, operation key, operation value

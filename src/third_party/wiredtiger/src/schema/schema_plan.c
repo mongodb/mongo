@@ -56,7 +56,7 @@ cgcols:
             if (cg == 0 && table->ncolgroups > 0 && col == table->nkey_columns - 1)
                 goto cgcols;
         }
-        WT_RET_TEST(ret != WT_NOTFOUND, ret);
+        WT_RET_NOTFOUND_OK(ret);
 
         colgroup = NULL;
     }
@@ -98,13 +98,13 @@ __wti_schema_colcheck(WT_SESSION_IMPL *session, const char *key_format, const ch
     WT_RET(__pack_init(session, &pack, value_format));
     for (vcols = 0; (ret = __pack_next(&pack, &pv)) == 0; vcols++)
         ;
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     /* Walk through the named columns. */
     __wt_config_subinit(session, &conf, colconf);
     for (ncols = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; ncols++)
         ;
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     if (ncols != 0 && ncols != kcols + vcols)
         WT_RET_MSG(session, EINVAL,
@@ -153,7 +153,7 @@ __wti_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
          */
         WT_ASSERT(session, coltype == WT_PROJ_VALUE);
     }
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     return (0);
 }
@@ -231,7 +231,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns,
 
         WT_RET_NOTFOUND_OK(ret);
     }
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     /* Special case empty plans. */
     if (i == 0 && plan->size == 0)

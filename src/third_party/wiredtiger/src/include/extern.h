@@ -710,7 +710,7 @@ extern int __wt_meta_ckptlist_get_from_config(WT_SESSION_IMPL *session, bool upd
   WT_CKPT **ckptbasep, size_t *allocatedp, const char *config)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_ckptlist_set(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
-  WT_CKPT *ckptbase, WT_ITEM *ckptlsn_str) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  WT_CKPT *ckptbase, const char *ckptlsn_str) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM *buf)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_ckptlist_update_config(WT_SESSION_IMPL *session, WT_CKPT *ckptbase,

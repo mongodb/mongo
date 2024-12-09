@@ -662,7 +662,6 @@ static int
 __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *next_lsnp,
   void *cookie, int firstrecord)
 {
-    WT_DECL_ITEM(lsn_str);
     WT_DECL_RET;
     WT_LOG_RECORD *logrec;
     WT_TXN_PRINTLOG_ARGS *args;
@@ -670,6 +669,7 @@ __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *
     uint32_t fileid, lsnfile, lsnoffset, rectype;
     int32_t start;
     const uint8_t *end, *p;
+    char lsn_str[WT_MAX_LSN_STRING];
     const char *msg;
     bool compressed;
 
@@ -698,9 +698,8 @@ __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *
     if (!firstrecord)
         WT_RET(__wt_fprintf(session, args->fs, ",\n"));
 
-    WT_ERR(__wt_scr_alloc(session, 0, &lsn_str));
-    WT_ERR(__wt_lsn_string(session, lsnp, lsn_str));
-    WT_ERR(__wt_fprintf(session, args->fs, "  { \"lsn\" : [%s],\n", (char *)lsn_str->mem));
+    WT_ERR(__wt_lsn_string(lsnp, sizeof(lsn_str), lsn_str));
+    WT_ERR(__wt_fprintf(session, args->fs, "  { \"lsn\" : [%s],\n", lsn_str));
     WT_ERR(__wt_fprintf(
       session, args->fs, "    \"hdr_flags\" : \"%s\",\n", compressed ? "compressed" : ""));
     WT_ERR(__wt_fprintf(session, args->fs, "    \"rec_len\" : %" PRIu32 ",\n", logrec->len));
@@ -748,7 +747,6 @@ __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *
     WT_ERR(__wt_fprintf(session, args->fs, "  }"));
 
 err:
-    __wt_scr_free(session, &lsn_str);
     return (ret);
 }
 

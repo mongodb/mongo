@@ -64,13 +64,14 @@ __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)
 
 /*
  * __wt_lsn_string --
- *     Return a printable string representation of an lsn.
+ *     Return a printable string representation of an lsn into a fixed array.
  */
 static WT_INLINE int
-__wt_lsn_string(WT_SESSION_IMPL *session, WT_LSN *lsn, WT_ITEM *buf)
+__wt_lsn_string(WT_LSN *lsn, size_t len, char *buf)
 {
+    WT_ASSERT(NULL, len >= WT_MAX_LSN_STRING);
     return (
-      __wt_buf_fmt(session, buf, "%" PRIu32 ",%" PRIu32, __wt_lsn_file(lsn), __wt_lsn_offset(lsn)));
+      __wt_snprintf(buf, len, "%" PRIu32 ",%" PRIu32, __wt_lsn_file(lsn), __wt_lsn_offset(lsn)));
 }
 
 /*
