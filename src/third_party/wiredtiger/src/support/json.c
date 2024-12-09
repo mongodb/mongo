@@ -60,8 +60,8 @@ static int __json_pack_size(
 
 /*
  * __json_unpack_char --
- *     Unpack a single character into JSON escaped format. Can be called with NULL buf for sizing,
- *     and won't overwrite the buffer end in any case.
+ *     Unpack a single character into JSON escaped format. This can be called with NULL buf for
+ *     sizing, and won't overwrite the buffer end in any case.
  */
 static size_t
 __json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
@@ -116,7 +116,8 @@ __json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
 
 /*
  * __json_unpack_put --
- *     Calculate the size of a packed byte string as formatted for JSON.
+ *     Unpack a packed byte string as formatted for JSON into a string buffer. This can be called
+ *     with NULL buf to calculate the required size of the buffer.
  */
 static int
 __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bufsz,
@@ -170,8 +171,16 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bu
                 }
                 s += n;
             }
-        if (bufsz > 0)
+        if (bufsz > 0) {
+            /*
+             * bufsz is calculated in advance, and decremented when each character is added to the
+             * buffer, therefore we should only expect the remaining buffer to have closing quotes
+             * and a NULL terminator.
+             */
+            WT_ASSERT(session, bufsz == 2);
             *buf++ = '"';
+            *buf++ = '\0';
+        }
         *retsizep += s;
         return (0);
     case 'U':
@@ -193,8 +202,11 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bu
             }
             s += n;
         }
-        if (bufsz > 0)
+        if (bufsz > 0) {
+            WT_ASSERT(session, bufsz == 2);
             *buf++ = '"';
+            *buf++ = '\0';
+        }
         *retsizep += s;
         return (0);
     case 'b':
@@ -362,8 +374,8 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 
 /*
  * __wt_json_unpack_str --
- *     Unpack a string into JSON escaped format. Can be called with NULL buf for sizing and won't
- *     overwrite the buffer end in any case.
+ *     Unpack a string into JSON escaped format. This can be called with NULL buf for sizing and
+ *     won't overwrite the buffer end in any case.
  */
 size_t
 __wt_json_unpack_str(u_char *dest, size_t dest_len, const u_char *src, size_t src_len)

@@ -1263,6 +1263,7 @@ ss
 ssize
 statlog
 stb
+stdbool
 stderr
 stdin
 stdout

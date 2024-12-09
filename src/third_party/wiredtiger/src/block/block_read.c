@@ -223,6 +223,12 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
         __wt_block_header_byteswap_copy(blk, &swap);
         check_size = F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP;
         if (swap.checksum == checksum) {
+            /*
+             * Set block header checksum to 0 to allow the checksum to be computed, as its
+             * calculation includes the block header. Not clearing it would result in the checksum
+             * being miscalculated. blk->checksum remains cleared, as it will not be revisited
+             * during a B-tree traversal.
+             */
             blk->checksum = 0;
             if (__wt_checksum_match(buf->mem, check_size, checksum)) {
                 /*
