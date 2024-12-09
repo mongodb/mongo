@@ -801,6 +801,40 @@ private:
     bool _isForCappedCollection = false;
 };
 
+/**
+ * Oplog entry document parser. This parser can parse only the key fields. It parses fields on
+ * demand. This parser should be used only in cases when to be parsed oplog entry data structure
+ * version may not match the one that is used by the current server version (this can happen with
+ * past or future versions of oplog entries), otherwise 'OplogEntry::parse()' is supposed to be
+ * used.
+ */
+class OplogEntryParserNonStrict {
+public:
+    /**
+     * Constructs the parser with to be parsed oplog entry document 'oplogEntry'.
+     */
+    OplogEntryParserNonStrict(const BSONObj& oplogEntry);
+
+    /**
+     * Parses and returns "opTime" field.
+     */
+    repl::OpTime getOpTime() const;
+
+    /**
+     * Parses and returns the type of operation field.
+     */
+    repl::OpTypeEnum getOpType() const;
+
+    /**
+     * Parses and returns the "operation applied" field.
+     */
+    BSONObj getObject() const;
+
+private:
+    // Oplog entry as BSON object to be parsed.
+    const BSONObj _oplogEntryObject;
+};
+
 std::ostream& operator<<(std::ostream& s, const DurableOplogEntry& o);
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o);
 
