@@ -351,6 +351,18 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
             if (!isCollectionless) {
                 listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
             }
+
+            listCollectionsCmd.setReadConcern(std::invoke([opCtx] {
+                const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+                tassert(9746001,
+                        str::stream() << "listCollections only allows 'local' read concern. Trying "
+                                         "to call it with '"
+                                      << repl::readConcernLevels::toString(readConcern.getLevel())
+                                      << "' read concern level.",
+                        readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
+                return readConcern;
+            }));
+
             generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
 
             const auto shard = uassertStatusOK(
