@@ -339,6 +339,12 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
     //
     // This loop attempts to set 'closestIndex', to select a viable candidate.
     for (int attempts = 0; attempts < 2; ++attempts) {
+        if (attempts == 1) {
+            LOGV2_INFO(
+                8423402,
+                "Failed to select a sync source on the first attempt. Starting second attempt");
+        }
+
         for (size_t candidateIndex = 0; candidateIndex < _memberData.size(); candidateIndex++) {
             if (!_isEligibleSyncSource(candidateIndex,
                                        now,
@@ -359,18 +365,21 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
             const auto syncSourceCandidate = _rsConfig.getMemberAt(candidateIndex).getHostAndPort();
             const auto closestNode = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
 
+            LOGV2_INFO(8423401,
+                       "Sync source candidate is eligible",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
+
             // Do not update 'closestIndex' if the candidate is not the closest node we've seen.
             auto syncSourceCandidatePing = _getPing(syncSourceCandidate);
             auto closestPing = _getPing(closestNode);
             if (syncSourceCandidatePing > closestPing) {
-                LOGV2_DEBUG(3873114,
-                            2,
-                            "Cannot select sync source with higher latency than the best "
-                            "candidate",
-                            "syncSourceCandidate"_attr = syncSourceCandidate,
-                            "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
-                            "closestNode"_attr = closestNode,
-                            "closestPing"_attr = closestPing);
+                LOGV2_INFO(3873114,
+                           "Cannot select sync source with higher latency than the best "
+                           "candidate",
+                           "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
+                           "closestNode"_attr = closestNode,
+                           "closestPing"_attr = closestPing);
                 continue;
             }
             closestIndex = candidateIndex;
@@ -435,18 +444,16 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
 
     // Candidate must be up to be considered.
     if (!memberData.up()) {
-        LOGV2_DEBUG(3873106,
-                    2,
-                    "Cannot select sync source because it is not up",
-                    "syncSourceCandidate"_attr = syncSourceCandidate);
+        LOGV2_INFO(3873106,
+                   "Cannot select sync source because it is not up",
+                   "syncSourceCandidate"_attr = syncSourceCandidate);
         return false;
     }
     // Candidate must be PRIMARY or SECONDARY state to be considered.
     if (!memberData.getState().readable()) {
-        LOGV2_DEBUG(3873107,
-                    2,
-                    "Cannot select sync source because it is not readable",
-                    "syncSourceCandidate"_attr = syncSourceCandidate);
+        LOGV2_INFO(3873107,
+                   "Cannot select sync source because it is not readable",
+                   "syncSourceCandidate"_attr = syncSourceCandidate);
         return false;
     }
 
@@ -454,11 +461,10 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     if (readPreference == ReadPreference::SecondaryOnly ||
         (readPreference == ReadPreference::SecondaryPreferred && firstAttempt)) {
         if (memberData.getState().primary()) {
-            LOGV2_DEBUG(3873101,
-                        2,
-                        "Cannot select sync source because it is a primary and we are "
-                        "looking for a secondary",
-                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            LOGV2_INFO(3873101,
+                       "Cannot select sync source because it is a primary and we are "
+                       "looking for a secondary",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
             return false;
         }
     }
@@ -467,73 +473,66 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     if (firstAttempt) {
         // Candidate must be a voter if we are a voter.
         if (_selfConfig().isVoter() && !memberConfig.isVoter()) {
-            LOGV2_DEBUG(3873108,
-                        2,
-                        "Cannot select sync source because we are a voter and it is not",
-                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            LOGV2_INFO(3873108,
+                       "Cannot select sync source because we are a voter and it is not",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
             return false;
         }
         // Candidates must not be hidden.
         if (memberConfig.isHidden()) {
-            LOGV2_DEBUG(3873109,
-                        2,
-                        "Cannot select sync source because it is hidden",
-                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            LOGV2_INFO(3873109,
+                       "Cannot select sync source because it is hidden",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
             return false;
         }
         // Candidates cannot be excessively behind, if we are checking for staleness.
         if (shouldCheckStaleness) {
             const auto oldestSyncOpTime = _getOldestSyncOpTime();
             if (memberData.getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
-                LOGV2_DEBUG(3873110,
-                            2,
-                            "Cannot select sync source because it is too far behind",
-                            "syncSourceCandidate"_attr = syncSourceCandidate,
-                            "syncSourceCandidateOpTime"_attr =
-                                memberData.getHeartbeatAppliedOpTime(),
-                            "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
+                LOGV2_INFO(3873110,
+                           "Cannot select sync source because it is too far behind",
+                           "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "syncSourceCandidateOpTime"_attr =
+                               memberData.getHeartbeatAppliedOpTime(),
+                           "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
                 return false;
             }
         }
         // Candidate must not have a configured delay larger than ours.
         if (_selfConfig().getSecondaryDelay() < memberConfig.getSecondaryDelay()) {
-            LOGV2_DEBUG(3873111,
-                        2,
-                        "Cannot select sync source with larger secondaryDelaySecs than ours",
-                        "syncSourceCandidate"_attr = syncSourceCandidate,
-                        "syncSourceCandidateSecondaryDelaySecs"_attr =
-                            memberConfig.getSecondaryDelay(),
-                        "secondaryDelaySecs"_attr = _selfConfig().getSecondaryDelay());
+            LOGV2_INFO(3873111,
+                       "Cannot select sync source with larger secondaryDelaySecs than ours",
+                       "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "syncSourceCandidateSecondaryDelaySecs"_attr =
+                           memberConfig.getSecondaryDelay(),
+                       "secondaryDelaySecs"_attr = _selfConfig().getSecondaryDelay());
             return false;
         }
     }
     // Candidate must build indexes if we build indexes, to be considered.
     if (_selfConfig().shouldBuildIndexes()) {
         if (!memberConfig.shouldBuildIndexes()) {
-            LOGV2_DEBUG(3873112,
-                        2,
-                        "Cannot select sync source which does not build indexes when we do",
-                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            LOGV2_INFO(3873112,
+                       "Cannot select sync source which does not build indexes when we do",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
             return false;
         }
     }
     // Only select a candidate that is ahead of me, if we are checking for staleness.
     if (shouldCheckStaleness && memberData.getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
-        LOGV2_DEBUG(3873113,
-                    1,
-                    "Cannot select sync source which is not ahead of me",
-                    "syncSourceCandidate"_attr = syncSourceCandidate,
-                    "syncSourceCandidateLastAppliedOpTime"_attr =
-                        memberData.getHeartbeatAppliedOpTime().toBSON(),
-                    "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
+        LOGV2_INFO(3873113,
+                   "Cannot select sync source which is not ahead of me",
+                   "syncSourceCandidate"_attr = syncSourceCandidate,
+                   "syncSourceCandidateLastAppliedOpTime"_attr =
+                       memberData.getHeartbeatAppliedOpTime().toBSON(),
+                   "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
         return false;
     }
     // Candidate cannot be denylisted.
     if (_memberIsDenylisted(memberConfig, now)) {
-        LOGV2_DEBUG(3873115,
-                    1,
-                    "Cannot select sync source which is denylisted",
-                    "syncSourceCandidate"_attr = syncSourceCandidate);
+        LOGV2_INFO(3873115,
+                   "Cannot select sync source which is denylisted",
+                   "syncSourceCandidate"_attr = syncSourceCandidate);
         return false;
     }
     // This candidate has passed all tests.
