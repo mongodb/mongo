@@ -292,5 +292,20 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenUnyielding) {
     future.default_timed_get();
 }
 
+TEST_F(ResultsMergerTestFixture, CanAccessAsyncResultsMergerParams) {
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto params = makeARMParamsFromExistingCursors(std::move(cursors));
+    BlockingResultsMerger blockingMerger(
+        operationContext(), std::move(params), executor(), nullptr);
+
+    ASSERT_EQ(kTestNss, blockingMerger.asyncResultsMergerParams().getNss());
+    ASSERT_EQ(1, blockingMerger.asyncResultsMergerParams().getRemotes().size());
+
+    // Kill merger because otherwise it will run into an assertion in its dtor.
+    blockingMerger.kill(operationContext());
+}
+
 }  // namespace
 }  // namespace mongo

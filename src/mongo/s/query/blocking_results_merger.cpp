@@ -46,6 +46,10 @@ BlockingResultsMerger::BlockingResultsMerger(OperationContext* opCtx,
       _arm(opCtx, std::move(executor), std::move(armParams)),
       _resourceYielder(std::move(resourceYielder)) {}
 
+const AsyncResultsMergerParams& BlockingResultsMerger::asyncResultsMergerParams() const {
+    return _arm.params();
+}
+
 StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(
     OperationContext* opCtx, const std::function<StatusWith<stdx::cv_status>()>& waitFn) noexcept {
 
