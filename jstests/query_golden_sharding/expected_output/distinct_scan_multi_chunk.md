@@ -4190,6 +4190,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -4284,6 +4285,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -4307,25 +4309,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$top" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"shardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -4465,6 +4454,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -4559,6 +4549,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -4582,25 +4573,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$top" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"shardKey" : -1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -4740,6 +4718,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -4834,6 +4813,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -4857,25 +4837,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$bottom" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"shardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5015,6 +4982,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5109,6 +5077,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5132,25 +5101,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$bottom" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"shardKey" : -1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5258,6 +5214,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -5319,6 +5276,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -5343,26 +5301,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$top" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1,
-							"shardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -5470,6 +5414,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5531,6 +5476,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5555,26 +5501,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$bottom" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1,
-							"shardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5683,6 +5615,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -5744,6 +5677,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -5768,26 +5702,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$top" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1,
-							"shardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -5895,6 +5815,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5956,6 +5877,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -5980,26 +5902,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$bottom" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1,
-							"shardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -6087,6 +5995,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -6127,6 +6036,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -6150,25 +6060,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$top" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -6254,6 +6151,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -6294,6 +6192,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -6317,25 +6216,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$bottom" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -6422,6 +6308,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -6462,6 +6349,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -6485,25 +6373,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$top" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$top" : {
@@ -6589,6 +6464,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -6629,6 +6505,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -6652,25 +6529,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$bottom" : {
-						"output" : "$$ROOT.accum",
-						"sortBy" : {
-							"notShardKey" : 1
-						}
-					}
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$bottom" : {
@@ -6812,6 +6676,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -6901,6 +6766,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -6919,15 +6785,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$first" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -6940,6 +6797,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -7074,6 +6932,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -7163,6 +7022,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -7181,15 +7041,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$first" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -7202,6 +7053,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -7336,6 +7188,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -7425,6 +7278,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -7443,15 +7297,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$last" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -7464,6 +7309,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -7598,6 +7444,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -7687,6 +7534,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -7705,15 +7553,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$last" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -7726,6 +7565,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -7827,6 +7667,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -7881,6 +7722,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -7899,15 +7741,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$first" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -7921,6 +7754,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -8021,6 +7855,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -8075,6 +7910,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -8093,15 +7929,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$last" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -8115,6 +7942,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -8658,20 +8486,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$first" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$shardKey"
@@ -8822,20 +8642,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$last" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$shardKey"
@@ -8994,6 +8806,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"l1" : {
 					"$first" : "$shardKey"
@@ -9098,6 +8911,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"l1" : {
 					"$first" : "$shardKey"
@@ -9119,18 +8933,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"l1" : {
-					"$first" : "$$ROOT.l1"
-				},
-				"l2" : {
-					"$first" : "$$ROOT.l2"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -9151,6 +8953,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"l1" : {
 					"$first" : "$shardKey"
@@ -9311,6 +9114,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"l1" : {
 					"$last" : "$shardKey"
@@ -9415,6 +9219,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"l1" : {
 					"$last" : "$shardKey"
@@ -9436,18 +9241,6 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"l1" : {
-					"$last" : "$$ROOT.l1"
-				},
-				"l2" : {
-					"$last" : "$$ROOT.l2"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
@@ -9468,6 +9261,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"l1" : {
 					"$last" : "$shardKey"
@@ -9634,20 +9428,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$first" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$first" : "$notShardKey"
@@ -9810,20 +9596,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"accum" : {
-					"$last" : "$$ROOT.accum"
-				}
-			}
 		}
 	],
 	"shardsPart" : [
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"accum" : {
 					"$last" : "$notShardKey"
@@ -9963,6 +9741,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"r" : {
 					"$first" : "$$ROOT"
@@ -10048,6 +9827,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"r" : {
 					"$first" : "$$ROOT"
@@ -10065,15 +9845,6 @@
 				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
-			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"r" : {
-					"$first" : "$$ROOT.r"
-				}
 			}
 		}
 	],
@@ -10095,6 +9866,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"r" : {
 					"$first" : "$$ROOT"
@@ -10233,6 +10005,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"r" : {
 					"$last" : "$$ROOT"
@@ -10318,6 +10091,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"r" : {
 					"$last" : "$$ROOT"
@@ -10335,15 +10109,6 @@
 				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
-			}
-		},
-		{
-			"$group" : {
-				"$doingMerge" : true,
-				"_id" : "$$ROOT._id",
-				"r" : {
-					"$last" : "$$ROOT.r"
-				}
 			}
 		}
 	],
@@ -10365,6 +10130,7 @@
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"r" : {
 					"$last" : "$$ROOT"

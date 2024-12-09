@@ -151,7 +151,7 @@ bool pathSetContainsOverlappingPath(const OrderedPathSet& paths, const std::stri
  * Given a set of paths which exist at the end of the provided pipeline, find the
  * paths these existed as at the start of the pipeline.
  *
- * If any of the paths were added or overwritten by intermediate stages, the result will be empty.
+ * If any of the paths were added or overwritten by intermediate stages, the result will omit them.
  */
 OrderedPathSet traceOriginatingPaths(const Pipeline::SourceContainer& pipeline,
                                      const OrderedPathSet& pathsOfInterest);

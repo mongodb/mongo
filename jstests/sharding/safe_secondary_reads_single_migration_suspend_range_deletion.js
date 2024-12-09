@@ -26,6 +26,8 @@
  *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *    requires_scripting,
+ *    # TODO SERVER-72748: Update test to incorporate $willBeMerged in $group.
+ *    featureFlagShardFilteringDistinctScan_incompatible
  * ]
  */
 import {

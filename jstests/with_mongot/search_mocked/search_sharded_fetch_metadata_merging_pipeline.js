@@ -1,6 +1,7 @@
 /**
  * Test that we properly fetch the metadata merging pipeline during planning.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
@@ -98,6 +99,11 @@ const explainMergingPipelineHistory = [{
     }
 }];
 
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ShardFilteringDistinctScan")) {
+    mergingPipelineHistory[0].response.metaPipeline[0].$group.$willBeMerged = false;
+    explainMergingPipelineHistory[0].response.metaPipeline[0].$group.$willBeMerged = false;
+}
+
 const setPipelineOptimizationMode = (mode) => {
     testDB.adminCommand({configureFailPoint: 'disablePipelineOptimization', mode});
 };
@@ -164,7 +170,7 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
         assert.eq(["$mergeCursors"], Object.keys(mergingPipeline[0]));
         if (shouldReferenceSearchMeta || disablePipelineOptimization) {
             // Second element sets the variable given the sub-pipeline provided above.
-            assert.eq({
+            const acc = {
                 "$setVariableFromSubPipeline": {
                     "setVariable": "$$SEARCH_META",
                     "pipeline": [{
@@ -174,9 +180,11 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
                         }
                     }]
                 }
-            },
-                      mergingPipeline[1],
-                      tojson(explain));
+            };
+            if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ShardFilteringDistinctScan")) {
+                acc.$setVariableFromSubPipeline.pipeline[0].$group.$willBeMerged = false;
+            }
+            assert.eq(acc, mergingPipeline[1], tojson(explain));
         } else {
             // No references to $$SEARCH_META in the pipeline should make us skip adding the
             // $setVariableFromSubPipeline stage.

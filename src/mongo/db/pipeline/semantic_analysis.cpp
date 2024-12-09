@@ -50,7 +50,6 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
-#include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::semantic_analysis {
@@ -265,6 +264,9 @@ boost::optional<Iterator> lookForNestUnnestPattern(
  * process and return an iterator to the first stage which either (a) does not preserve
  * 'pathsOfInterest,' as before, or (b) does not meet this callback function's criteria.
  *
+ * The 'unpreservedPathPolicy' determines how to behave when a path is modified- see
+ * 'UnpreservedPathPolicy' for details.
+ *
  * This should only be used internally; callers who need to track path renames through an
  * aggregation pipeline should use one of the publically exposed options available in the header.
  */
@@ -315,9 +317,17 @@ std::pair<Iterator, StringMap<std::string>> multiStageRenamedPaths(
         //'pathsOfInterest' always holds the current names of the paths we're interested in, so
         // it needs to be updated after each stage.
         pathsOfInterest.clear();
-        for (auto it = renameMap.cbegin(); it != renameMap.cend(); ++it) {
-            renameMap[it->first] = (*renamed)[it->second];
-            pathsOfInterest.emplace(it->second);
+        for (const auto& [key, value] : renameMap) {
+            if (auto itr = renamed->find(value); itr != renamed->end()) {
+                renameMap[key] = (*renamed)[value];
+                pathsOfInterest.emplace(value);
+            } else {
+                // The rename map exists, but does not contain one of the paths of interest.
+                // This is only permitted for UnpreservedPathPolicy::Discard.
+                tassert(9245701,
+                        "renamedPath returned incomplete map instead of failing",
+                        unpreservedPathPolicy == UnpreservedPathPolicy::Discard);
+            }
         }
     }
     return {end, renameMap};
@@ -507,7 +517,13 @@ OrderedPathSet traceOriginatingPaths(const Pipeline::SourceContainer& pipeline,
     const auto& renameMap = *optMap;
     OrderedPathSet res;
     for (const auto& path : pathsOfInterest) {
-        res.insert(renameMap.at(path));
+        if (auto itr = renameMap.find(path); itr != renameMap.end()) {
+            // When we hit 'itr' == end(), 'path' was added to the stage by something other than a
+            // rename. This is important for determining if a $group is a superset of the shard key,
+            // because 'path' would have been dropped here, and if 'path' was part of the shard key,
+            // we can't push down the $group.
+            res.insert(itr->second);
+        }
     }
     return res;
 }

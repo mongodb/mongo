@@ -2721,6 +2721,7 @@ Execution Engine: classic
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$a",
 				"accum" : {
 					"$top" : {
@@ -2880,6 +2881,7 @@ Execution Engine: classic
 		},
 		{
 			"$group" : {
+				"$willBeMerged" : false,
 				"_id" : "$a",
 				"accum" : {
 					"$top" : {

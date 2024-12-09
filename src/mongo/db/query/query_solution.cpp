@@ -1804,8 +1804,12 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> GroupNode::clone() const {
-    auto copy = std::make_unique<GroupNode>(
-        children[0]->clone(), groupByExpression, accumulators, doingMerge, shouldProduceBson);
+    auto copy = std::make_unique<GroupNode>(children[0]->clone(),
+                                            groupByExpression,
+                                            accumulators,
+                                            doingMerge,
+                                            willBeMerged,
+                                            shouldProduceBson);
     return copy;
 }
 

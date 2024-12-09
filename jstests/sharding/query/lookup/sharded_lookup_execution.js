@@ -510,7 +510,7 @@ st.shardColl(
 pipeline = [
     {$match: {customer: "Alice"}},
     {$unwind: "$products"},
-    {$group: {_id: "$_id", products: {$push: {_id: "$products._id"}}}},
+    {$group: {_id: {$add: ["$_id", 42]}, products: {$push: {_id: "$products._id"}}}},
     {$unwind: "$products"},
     {$project: {_id: "$products._id"}},
     {$lookup: {

@@ -336,6 +336,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["count"], vps)},
         false /*doingMerge*/,
+        false /*willBeMerged*/,
         true /*shouldProduceBson*/);
 
     runTest(std::move(groupNode), BSON_ARRAY(BSON("_id" << BSONNULL << "count" << 3)));
