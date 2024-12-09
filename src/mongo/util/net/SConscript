@@ -252,9 +252,10 @@ if get_option('ssl') == 'on':
     env.CppUnitTest(
         target='util_net_ssl_test',
         source=[
-            'ssl_manager_test.cpp',
-            'ssl_options_test.cpp',
-            'sock_test.cpp',
+            "ssl_manager_test.cpp",
+            "ssl_options_test.cpp",
+            "sock_test.cpp",
+            "sock_test_utils.cpp",
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/client/connection_string',

@@ -764,6 +764,23 @@ certs:
   - 'ca.pem'
   - 'intermediate-ca.pem'
 
+- name: "intermediate-ca-B.pem"
+  description: Secondary intermediate CA issued by the primary root CA.
+  Subject: {CN: "Intermediate CA B"}
+  extensions:
+    basicConstraints: {CA: true}
+  Issuer: "ca.pem"
+
+- name: "intermediate-ca-B-leaf.pem"
+  description: First end-entity certificate signed by intermediate CA B
+  Subject: {CN: "End-entity certificate via Intermediate CA B"}
+  Issuer: "intermediate-ca-B.pem"
+  extensions:
+    extendedKeyUsage: [serverAuth, clientAuth]
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+
 ###
 # Split Horizon
 ###
