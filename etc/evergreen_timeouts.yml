@@ -10,6 +10,29 @@
 # in alphabetical order.
 
 overrides:
+  amazon2:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  amazon2-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-amazon2:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-amazon2-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  amazon2023:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  amazon2023-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
 
   # We increased the timeout since comparison results speed were slowed down due to resolving
   # Object.entries correctly.
@@ -17,7 +40,13 @@ overrides:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150 # 2.5 hours
   - task: aggregation_blockprocessing_fuzzer
-    exec_timeout: 150 # 2.5 hours
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_no_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
 
   enterprise-amazon-linux2-arm64-all-feature-flags:
   - task: cursor_hints_to_query_settings_replset_passthrough
@@ -27,6 +56,36 @@ overrides:
   - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
     exec_timeout: 240  # 4 hours
 
+  enterprise-amazon2-streams:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-amazon2023:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-amazon2023-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-amazon2023-arm64-fuzzers:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_no_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  debian12:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-debian12-64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
   enterprise-macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
@@ -35,6 +94,10 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
+  enterprise-rhel-8-64-bit:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
   enterprise-rhel-8-64-bit-dynamic-all-feature-flags:
   - task: cursor_hints_to_query_settings_replset_passthrough
     exec_timeout: 240  # 4 hours
@@ -42,6 +105,50 @@ overrides:
     exec_timeout: 240  # 4 hours
   - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
     exec_timeout: 240  # 4 hours
+
+  enterprise-rhel-8-64-bit-dynamic-classic-engine:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_no_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-8-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  rhel-8-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  rhel8:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-93-64-bit:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-93-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  rhel93:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  rhel93-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
 
   enterprise-rhel8-debug-tsan:
   - task: aggregation_expression_multiversion_fuzzer
@@ -61,6 +168,66 @@ overrides:
   - task: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm
     exec_timeout: 180  # 3 hours
 
+  enterprise-suse15-64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  suse15:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2004-64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2004-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  ubuntu2004:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  ubuntu2004-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2204-64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2204-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  ubuntu2204:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  ubuntu2204-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  ubuntu2404:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  ubuntu2404-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2404:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2404-64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2404-arm64:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
   enterprise-windows-all-feature-flags-required:
   - task: buildscripts_test
     exec_timeout: 15
@@ -72,16 +239,24 @@ overrides:
   windows-compile-required:
     - task: buildscripts_test
       exec_timeout: 15
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  enterprise-windows-inmem:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  windows:
+  - task: aggregation_blockprocessing_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: buildscripts_test
+    exec_timeout: 15
 
   windows-debug-suggested:
     - task: buildscripts_test
       exec_timeout: 15
 
   enterprise-windows-wtdevelop:
-    - task: buildscripts_test
-      exec_timeout: 15
-
-  windows:
     - task: buildscripts_test
       exec_timeout: 15
 
@@ -101,7 +276,7 @@ overrides:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 360  # 6 hours
   - task: aggregation_blockprocessing_fuzzer
-    exec_timeout: 360  # 6 hours
+    exec_timeout: 720  # 12 hours
   - task: aggregation_wildcard_fuzzer
     exec_timeout: 300  # 5 hours
   - task: aggregation_multiversion_fuzzer_last_continuous
@@ -118,10 +293,32 @@ overrides:
     exec_timeout: 150  # 2.5 hours
 
   rhel8-debug-aubsan-all-feature-flags:
+  - task: update_fuzzer
+    exec_timeout: 600 # 10 hours
   - task: update_timeseries_fuzzer
-    exec_timeout: 180  # 3 hours
+    exec_timeout: 180 # 3 hours
+  - task: change_stream_serverless_no_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+
+  rhel8-debug-aubsan:
+  - task: update_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: update_timeseries_fuzzer
+    exec_timeout: 180 # 3 hours
+  - task: change_stream_serverless_no_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_serverless_fuzzer
+    exec_timeout: 600 # 10 hours
+  - task: change_stream_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
 
   rhel8-debug-aubsan-classic-engine:
+  - task: update_fuzzer
+    exec_timeout: 600  # 10 hours
   - task: update_timeseries_fuzzer
     exec_timeout: 180  # 3 hours
 
@@ -129,7 +326,7 @@ overrides:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150 # 2.5 hours
   - task: aggregation_blockprocessing_fuzzer
-    exec_timeout: 150 # 2.5 hours
+    exec_timeout: 600 # 10 hours
 
   enterprise-rhel-81-ppc64le:
   - task: buildscripts_test
