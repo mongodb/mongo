@@ -5,16 +5,16 @@ filters:
       - 10gen/query-execution
   - "*empty_ts*.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "autoid.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "validate_user_documents.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "write_error_message_truncation.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "write_result.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
