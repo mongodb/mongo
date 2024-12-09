@@ -337,9 +337,9 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:mytable",
                                                      "statistics=(fast)",
-                                                     WT_STAT_DSRC_LSM_CHUNK_COUNT);
+                                                     WT_STAT_DSRC_BTREE_ENTRIES);
     ASSERT_OK(result.getStatus());
-    // Expect statistics value to be zero for a LSM key on a Btree.
+    // Expect statistics value to be zero as there are no entries in the Btree.
     ASSERT_EQUALS(0U, result.getValue());
 }
 
