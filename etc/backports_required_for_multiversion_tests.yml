@@ -369,6 +369,8 @@ last-continuous:
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js
     ticket: SERVER-90173
+  - test_file: jstests/aggregation/sources/redact/root_redact.js
+    ticket: SERVER-91339
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
   - test_file: jstests/core/wildcard_index_validindex.js
@@ -792,6 +794,8 @@ last-lts:
     ticket: SERVER-90485
   - test_file: jstests/aggregation/group_by_objectid.js
     ticket: SERVER-90173
+  - test_file: jstests/aggregation/sources/redact/root_redact.js
+    ticket: SERVER-91339
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
   - test_file: jstests/core/wildcard_index_validindex.js
