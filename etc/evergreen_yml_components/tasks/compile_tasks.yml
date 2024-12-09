@@ -708,11 +708,27 @@ tasks:
           bazel_build_tags: --bazel-build-tag=mongo_unittest
           compiling_for_test: true
 
+  - name: compile_libraries_for_unittests
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "scons compile"
+        vars:
+          # Target the conf to just run the bazel part of the build
+          targets: \$BUILD_ROOT/scons/\$VARIANT_DIR/sconf_temp
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_build_tags: --bazel-build-tag=mongo_library
+
   - name: compile_and_run_unittests_first_quarter
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
@@ -737,6 +753,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
@@ -761,6 +778,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
@@ -785,6 +803,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
     exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
@@ -2261,6 +2280,7 @@ task_groups:
     name: compile_test_parallel_unittest_stream_TG
     max_hosts: -1
     tasks:
+      - compile_libraries_for_unittests
       - compile_and_run_unittests_first_quarter
       - compile_and_run_unittests_second_quarter
       - compile_and_run_unittests_third_quarter
