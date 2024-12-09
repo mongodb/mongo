@@ -37,6 +37,8 @@ last-continuous:
     ticket: SERVER-44422
   - test_file: jstests/sharding/query/delete_with_partial_shard_key.js
     ticket: SERVER-44422
+  - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
+    ticket: SERVER-86669
   - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
     ticket: SERVER-51943
   - test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
@@ -446,6 +448,8 @@ last-lts:
     ticket: SERVER-51259
   - test_file: jstests/sharding/mongos_quiesce_mode.js
     ticket: SERVER-51259
+  - test_file: jstests/sharding/secondaries_clear_filtering_metadata.js
+    ticket: SERVER-86669
   - test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
     ticket: SERVER-51943
   - test_file: jstests/core/txns/errors_on_committed_transaction.js

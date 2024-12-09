@@ -587,9 +587,16 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
                                                const BSONObj& idIndex,
                                                const OplogSlot& createOpTime,
                                                bool fromMigrate) {
-    // Only the shard primay nodes control the collection creation and secondaries just follow
-    // Secondaries CSR will be the defaulted one (UNKNOWN in most of the cases)
+    // Only the shard primary nodes control the collection creation.
     if (!opCtx->writesAreReplicated()) {
+        // On secondaries node of sharded cluster we force the cleanup of the filtering metadata in
+        // order to remove anything that was left from any previous collection instance. This could
+        // happen by first having an UNSHARDED version for a collection that didn't exist followed
+        // by a movePrimary to the current shard.
+        if (ShardingState::get(opCtx)->enabled()) {
+            CollectionShardingRuntime::get(opCtx, collectionName)->clearFilteringMetadata(opCtx);
+        }
+
         return;
     }
 
