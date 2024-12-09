@@ -49,11 +49,19 @@ public:
         repl::createOplog(opCtx);
     }
 
-    BSONObj runCommand(BSONObj cmd) {
+    BSONObj runCommand(BSONObj cmd,
+                       const DatabaseName& dbName = kDatabaseName,
+                       boost::optional<long> errorCode = boost::none) {
         DBDirectClient client(opCtx);
 
         BSONObj result;
-        ASSERT_TRUE(client.runCommand(kDatabaseName, cmd, result)) << result;
+        if (!errorCode) {
+            ASSERT_TRUE(client.runCommand(dbName, cmd, result)) << result;
+        } else {
+            ASSERT_FALSE(client.runCommand(dbName, cmd, result)) << result;
+            ASSERT_TRUE(result.hasField("code") && result["code"].isNumber()) << result;
+            ASSERT_EQ(result["code"].Number(), *errorCode) << result;
+        }
         return result;
     }
 

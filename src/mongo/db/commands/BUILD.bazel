@@ -1006,6 +1006,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "profile_cmd_test_utils",
+    srcs = [
+        "profile_cmd_test_utils.cpp",
+    ],
+    hdrs = [
+        "profile_cmd_test_utils.h",
+    ],
+    deps = [
+        ":profile_common",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
     name = "mongod_fcv",
     srcs = [
         "feature_compatibility_version.cpp",
@@ -1639,6 +1653,7 @@ mongo_cc_unit_test(
         "fle_compact_test.cpp",
         "list_collections_filter_test.cpp",
         "parse_log_component_settings_test.cpp",
+        "profile_cmd_test.cpp",
         "server_status_command_test.cpp",
         "server_status_metric_test.cpp",
         "set_cluster_parameter_invocation_test.cpp",
@@ -1664,6 +1679,7 @@ mongo_cc_unit_test(
         ":dbcheck_command",
         ":list_collections_filter",
         ":mongod",
+        ":profile_cmd_test_utils",
         ":profile_common",
         ":server_status_core",
         ":servers",

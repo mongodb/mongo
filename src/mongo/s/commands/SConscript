@@ -19,9 +19,11 @@ env.CppUnitTest(
         "query_cmd/cluster_find_and_modify_test.cpp",
         "query_cmd/cluster_find_test.cpp",
         "query_cmd/cluster_insert_test.cpp",
+        "query_cmd/cluster_profile_cmd_test.cpp",
         "query_cmd/cluster_update_test.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/profile_cmd_test_utils",
         "$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory",
         "$BUILD_DIR/mongo/db/read_write_concern_defaults_mock",
         "$BUILD_DIR/mongo/db/service_context_non_d",
