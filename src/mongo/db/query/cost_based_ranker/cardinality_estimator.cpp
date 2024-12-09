@@ -458,6 +458,23 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
         return _inputCard;
     }
 
+    // Iterate over all intervals over individual index fields (OILs). These intervals are
+    // partitioned into two groups.
+    // - The first group consists of a prefix of point intervals(equalities) possibly followed by a
+    // singe range (inequality). These intervals allow to form a pair of start and end keys used to
+    // scan the index. The number of keys between the start and end keys define the cost of the
+    // index scan itself.
+    // - The second group of intervals could be considered to be applied against the matching index
+    // keys to filter them out. We call these the "residual" conditions.
+    //
+    // The combined CE of all index scan intervals are used to estimate the number of matching
+    // keys passed to the parent QSN node. This partitioning of intervals provides an upper bound
+    // to the number of keys scanned by the "recursive index navigation" strategy.
+    // Example - given the index bounds: {[3,3], [42,42], ['a','z'], [13,13], ['df','jz']}
+    // The "equality prefix is: {[3,3], [42,42], ['a','z']}
+    // The residual intervals (conditions) are: {[13,13], ['df','jz']}
+    std::vector<SelectivityEstimate> residualSels;
+    bool isEqPrefix = true;  // Tracks if an OIL is part of an equality prefix
     // Ignore selectivities pushed by other operators up to this point.
     size_t selOffset = _conjSels.size();
     for (const auto& field : node->fields) {
@@ -468,10 +485,19 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
             return ceRes;
         }
         SelectivityEstimate sel = ceRes.getValue() / _inputCard;
-        _conjSels.emplace_back(sel);
+        if (isEqPrefix) {
+            _conjSels.emplace_back(sel);
+        } else {
+            residualSels.emplace_back(sel);
+        }
+        isEqPrefix = isEqPrefix && oil->isPoint();
     }
 
-    return conjCard(selOffset, _inputCard);
+    auto res = conjCard(selOffset, _inputCard);
+    for (const auto& sel : residualSels) {
+        _conjSels.emplace_back(std::move(sel));
+    }
+    return res;
 }
 
 CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node) {

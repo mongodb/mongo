@@ -39,11 +39,19 @@ class CostEstimator {
 public:
     CostEstimator(EstimateMap& estimateMap) : _estimateMap{estimateMap} {};
 
-    void estimatePlan(const QuerySolution& plan) {
-        costTree(plan.root());
+    /**
+     * Estimate the cost of a query plan and all its nodes.
+     * Return the total cost of the query plan.
+     */
+    CostEstimate estimatePlan(const QuerySolution& plan) {
+        return costTree(plan.root());
     }
 
 private:
+    /**
+     * Recursively estimate the cost of all nodes of a QSN plan tree, and store those costs
+     * in the corresponding QSNEstimate of each node. Return the cost of the root node.
+     */
     CostEstimate costTree(const QuerySolutionNode* node);
 
     /**
