@@ -53,17 +53,6 @@ bmEnv.Library(
     AIB_COMPONENT="benchmarks",
 )
 
-env.Library(
-    target="task_executor_proxy",
-    source=[
-        "task_executor_proxy.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-    ],
-    AIB_COMPONENT="benchmarks",
-)
-
 env.CppUnitTest(
     target="unittest_test",
     source=[

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -1369,6 +1369,7 @@ mongo_cc_library(
         "initial_syncer_common_stats.cpp",
         "initial_syncer_factory.cpp",
         "multiapplier.cpp",
+        "multiapplier.h",
     ],
     hdrs = [
         "callback_completion_guard.h",
@@ -1856,6 +1857,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "replmocks",
     srcs = [
+        "multiapplier.h",
         "oplog_fetcher_mock.cpp",
         "replication_consistency_markers_mock.cpp",
         "replication_coordinator_external_state_mock.cpp",
@@ -1955,5 +1957,663 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/db/session:logical_session_id",
+    ],
+)
+
+mongo_cc_library(
+    name = "task_executor_mock",
+    srcs = [
+        "task_executor_mock.cpp",
+    ],
+    hdrs = [
+        "task_executor_mock.h",
+    ],
+    deps = [
+        "//src/mongo/unittest:task_executor_proxy",
+    ],
+)
+
+mongo_cc_library(
+    name = "rollback_test_fixture",
+    srcs = [
+        "rollback_test_fixture.cpp",
+    ],
+    hdrs = [
+        "rollback_source.h",
+        "rollback_test_fixture.h",
+    ],
+    deps = [
+        ":oplog_interface_mock",
+        ":optime",
+        ":replication_process",
+        ":replication_recovery",
+        ":replmocks",
+        ":storage_interface_impl",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:read_write_concern_defaults_mock",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/transaction",
+    ],
+)
+
+mongo_cc_library(
+    name = "idempotency_test_util",
+    srcs = [
+        "idempotency_document_structure.cpp",
+        "idempotency_scalar_generator.cpp",
+    ],
+    hdrs = [
+        "idempotency_document_structure.h",
+        "idempotency_scalar_generator.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_coordinator_test_fixture",
+    srcs = [
+        "replication_coordinator_test_fixture.cpp",
+        "replication_recovery_mock.h",
+    ],
+    hdrs = [
+        "replication_coordinator_test_fixture.h",
+    ],
+    deps = [
+        ":repl_coordinator_impl",
+        ":replmocks",
+        ":topology_coordinator",
+        "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db:read_write_concern_defaults_mock",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "sync_source_selector_mock",
+    srcs = [
+        "sync_source_selector_mock.cpp",
+    ],
+    hdrs = [
+        "sync_source_selector_mock.h",
+    ],
+    deps = [
+        ":optime",
+        "//src/mongo:base",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "data_replicator_external_state_mock",
+    srcs = [
+        "data_replicator_external_state.h",
+        "data_replicator_external_state_mock.cpp",
+        "multiapplier.h",
+    ],
+    hdrs = [
+        "data_replicator_external_state_mock.h",
+    ],
+    deps = [
+        ":oplog_application_interface",
+        ":oplog_buffer_blocking_queue",
+        ":oplog_entry",
+        ":optime",
+        ":replica_set_messages",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "mock_repl_coord_server_fixture",
+    srcs = [
+        "mock_repl_coord_server_fixture.cpp",
+    ],
+    hdrs = [
+        "mock_repl_coord_server_fixture.h",
+        "replication_recovery_mock.h",
+    ],
+    deps = [
+        ":oplog",
+        ":oplog_entry",
+        ":replmocks",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/collection_crud",
+    ],
+)
+
+mongo_cc_library(
+    name = "primary_only_service_test_fixture",
+    srcs = [
+        "primary_only_service_test_fixture.cpp",
+    ],
+    hdrs = [
+        "primary_only_service_test_fixture.h",
+    ],
+    deps = [
+        ":primary_only_service",
+        ":repl_coordinator_interface",
+        ":replmocks",
+        ":wait_for_majority_service",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_applier_impl_test_fixture",
+    srcs = [
+        "oplog_applier_impl_test_fixture.cpp",
+    ],
+    hdrs = [
+        "oplog_applier_impl_test_fixture.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":oplog_application",
+        ":replmocks",
+        ":storage_interface_impl",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/catalog:health_log",
+        "//src/mongo/db/catalog:health_log_interface",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)
+
+mongo_cc_library(
+    name = "idempotency_test_fixture",
+    srcs = [
+        "idempotency_test_fixture.cpp",
+    ],
+    hdrs = [
+        "idempotency_test_fixture.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":oplog_applier_impl_test_fixture",
+        ":oplog_entry_test_helpers",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog/validate:collection_validation",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_applier_batcher_test_fixture",
+    srcs = [
+        "oplog_applier_batcher_test_fixture.cpp",
+    ],
+    hdrs = [
+        "oplog_applier_batcher_test_fixture.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":oplog_entry",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:txn_cmd_request",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_idempotency_test",
+    srcs = [
+        "idempotency_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":idempotency_test_fixture",
+        ":idempotency_test_util",
+        "//src/mongo/db/update:update_test_helpers",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_misc_test",
+    srcs = [
+        "abstract_async_component_test.cpp",
+        "apply_ops_test.cpp",
+        "dbcheck_test.cpp",
+        "delayable_timeout_callback_test.cpp",
+        "get_next_optimes_test.cpp",
+        "idempotency_document_structure_test.cpp",
+        "insert_group_test.cpp",
+        "isself_test.cpp",
+        "member_config_test.cpp",
+        "optime_extract_test.cpp",
+        "primary_only_service_test.cpp",
+        "primary_only_service_util_test.cpp",
+        "read_concern_args_test.cpp",
+        "repl_client_info_test.cpp",
+        "repl_set_write_concern_mode_definitions_test.cpp",
+        "replication_process_test.cpp",
+        "replication_recovery_mock.h",
+        "reporter_test.cpp",
+        "scatter_gather_test.cpp",
+        "speculative_majority_read_info_test.cpp",
+        "split_horizon_test.cpp",
+        "split_prepare_session_manager_test.cpp",
+        "sync_source_resolver_test.cpp",
+        "task_runner_test.cpp",
+        "task_runner_test_fixture.cpp",
+        "task_runner_test_fixture.h",
+        "vote_requester_test.cpp",
+        "wait_for_majority_service_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "abstract_async_component",
+        ":data_replicator_external_state_mock",
+        ":dbcheck",
+        ":dbcheck_test_fixture",
+        ":delayable_timeout_callback",
+        ":idempotency_test_fixture",
+        ":idempotency_test_util",
+        ":image_collection_entry",
+        ":isself",
+        ":oplog",
+        ":oplog_application_interface",
+        ":oplog_applier_batcher_test_fixture",
+        ":oplog_entry",
+        ":oplog_write",
+        ":optime",
+        ":primary_only_service_test_fixture",
+        ":repl_coordinator_impl",
+        ":repl_server_parameters",
+        ":replica_set_aware_service",
+        ":replica_set_messages",
+        ":replication_consistency_markers_impl",
+        ":replication_process",
+        ":replmocks",
+        ":reporter",
+        ":scatter_gather",
+        ":speculative_majority_read_info",
+        ":split_horizon",
+        ":split_prepare_session_manager",
+        ":storage_interface_impl",
+        ":sync_source_resolver",
+        ":sync_source_selector_mock",
+        ":task_executor_mock",
+        ":task_runner",
+        ":timestamp_block",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/client:replica_set_monitor_protocol_test_util",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:health_log",
+        "//src/mongo/db/commands:create_command",
+        "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index_builds:index_build_entry_helpers",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/update:update_test_helpers",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/unittest",
+        "//src/mongo/unittest:task_executor_proxy",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+# The following two tests appear to clash when combined with the above list.
+
+mongo_cc_unit_test(
+    name = "db_repl_coordinator_test",
+    srcs = [
+        "replication_coordinator_impl_elect_v1_test.cpp",
+        "replication_coordinator_impl_heartbeat_v1_test.cpp",
+        "replication_coordinator_impl_reconfig_test.cpp",
+        "replication_coordinator_impl_test.cpp",
+        "topology_coordinator_v1_test.cpp",
+        "//src/mongo/unittest:ensure_fcv.h",
+    ],
+    tags = [
+        "compile_requires_large_memory_gcc",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        ":isself",
+        ":repl_coordinator_impl",
+        ":repl_coordinator_test_fixture",
+        ":repl_server_parameters",
+        ":topology_coordinator",
+        "//src/mongo/db:read_write_concern_defaults_mock",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "oplog_application_test",
+    srcs = [
+        "multiapplier_test.cpp",
+        "oplog_applier_impl_test.cpp",
+        "oplog_applier_test.cpp",
+        "oplog_buffer_batched_queue_test.cpp",
+        "oplog_buffer_blocking_queue_test.cpp",
+        "oplog_buffer_collection_test.cpp",
+        "oplog_buffer_proxy_test.cpp",
+        "oplog_entry_test.cpp",
+        "oplog_fetcher_test.cpp",
+        "oplog_test.cpp",
+        "oplog_writer_batcher_test.cpp",
+        "oplog_writer_impl_test.cpp",
+    ],
+    tags = [
+        "compile_requires_large_memory_gcc",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        ":data_replicator_external_state_mock",
+        ":idempotency_test_fixture",
+        ":idempotency_test_util",
+        ":oplog",
+        ":oplog_application_interface",
+        ":oplog_applier_batcher_test_fixture",
+        ":oplog_applier_impl_test_fixture",
+        ":oplog_buffer_batched_queue",
+        ":oplog_buffer_collection",
+        ":oplog_buffer_proxy",
+        ":oplog_entry",
+        ":oplog_entry_test_helpers",
+        ":oplog_fetcher",
+        ":oplog_interface_local",
+        ":oplog_interface_mock",
+        ":oplog_interface_remote",
+        ":oplog_write",
+        ":repl_coordinator_impl",
+        ":repl_coordinator_test_fixture",
+        ":repl_server_parameters",
+        ":task_executor_mock",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:server_base",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rollback_test",
+    srcs = [
+        "roll_back_local_operations_test.cpp",
+        "rollback_checker_test.cpp",
+        "rollback_impl_test.cpp",
+        "//src/mongo/db/catalog:collection_mock.h",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":oplog_interface_local",
+        ":oplog_interface_remote",
+        ":repl_coordinator_impl",
+        ":repl_coordinator_test_fixture",
+        ":repl_server_parameters",
+        ":roll_back_local_operations",
+        ":rollback_checker",
+        ":rollback_impl",
+        ":rollback_test_fixture",
+        ":task_executor_mock",
+        "//src/mongo/client:dbclient_mockcursor",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "initial_syncer_test",
+    srcs = [
+        "initial_syncer_test.cpp",
+        "replication_recovery_mock.h",
+        "//src/mongo/db/storage:storage_engine_mock.h",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":abstract_async_component",
+        ":data_replicator_external_state_mock",
+        ":initial_syncer",
+        ":oplog_applier_impl_test_fixture",
+        ":oplog_fetcher",
+        ":replmocks",
+        ":sync_source_resolver",
+        ":sync_source_selector_mock",
+        ":task_executor_mock",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "storage_timestamp_test",
+    srcs = [
+        "replication_recovery_mock.h",
+        "storage_timestamp_test.cpp",
+        "//src/mongo/dbtests:dbtests.h",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":oplog_application",
+        ":oplog_entry_test_helpers",
+        ":replication_consistency_markers_impl",
+        ":replication_process",
+        ":replmocks",
+        ":storage_interface_impl",
+        ":timestamp_block",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/index_builds:index_build_entry_helpers",
+        "//src/mongo/db/index_builds:multi_index_block",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/transaction",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "repl_set_config_and_heartbeat_test",
+    srcs = [
+        "check_quorum_for_config_change_test.cpp",
+        "repl_set_config_checks_test.cpp",
+        "repl_set_config_test.cpp",
+        "repl_set_config_test.h",
+        "repl_set_heartbeat_args_v1_test.cpp",
+        "repl_set_heartbeat_response_test.cpp",
+        "repl_set_request_votes_args_test.cpp",
+        "repl_set_tag_test.cpp",
+        "//src/mongo/unittest:ensure_fcv.h",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":repl_coordinator_impl",
+        ":replmocks",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "replication_recovery_test",
+    srcs = [
+        "replication_consistency_markers_impl_test.cpp",
+        "replication_recovery_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":oplog_applier_impl_test_fixture",
+        ":oplog_entry",
+        ":replication_recovery",
+        ":storage_interface",
+        "//src/mongo/db/session:session_catalog_mongod",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "storage_interface_impl_test",
+    srcs = [
+        "storage_interface_impl_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":oplog_applier_impl_test_fixture",
+        ":replication_process",
+        ":storage_interface",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "topology_version_observer_test",
+    srcs = [
+        "topology_version_observer_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":repl_coordinator_impl",
+        ":repl_coordinator_test_fixture",
+        ":topology_version_observer",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/util:clock_sources",
+    ],
+)
+
+mongo_cc_library(
+    name = "cloner_test_fixtures",
+    srcs = [
+        "cloner_test_fixture.cpp",
+        "initial_sync_cloner_test_fixture.cpp",
+    ],
+    hdrs = [
+        "cloner_test_fixture.h",
+        "initial_sync_cloner_test_fixture.h",
+    ],
+    deps = [
+        ":repl_server_parameters",
+        ":repl_sync_shared_data",
+        ":replmocks",
+        ":storage_interface_impl",
+        # Required for service context test fixture
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_cloners_test",
+    srcs = [
+        "all_database_cloner_test.cpp",
+        "collection_cloner_test.cpp",
+        "database_cloner_test.cpp",
+        "initial_sync_shared_data_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":cloner_test_fixtures",
+        ":initial_sync_cloners",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_set_aware_service_test",
+    srcs = [
+        "replica_set_aware_service_test.cpp",
+        "//src/mongo/db/catalog:database_holder_mock.h",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":repl_coordinator_impl",
+        ":repl_coordinator_test_fixture",
+        ":replica_set_aware_service",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/catalog:database_holder",
     ],
 )

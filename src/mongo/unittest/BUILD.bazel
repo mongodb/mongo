@@ -91,6 +91,18 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "task_executor_proxy",
+    srcs = [
+        "task_executor_proxy.cpp",
+        "task_executor_proxy.h",
+    ],
+    deps = [
+        "//src/mongo/executor:task_executor_interface",
+    ],
+    #AIB_COMPONENT="benchmarks",
+)
+
 idl_generator(
     name = "unittest_options_gen",
     src = "unittest_options.idl",
