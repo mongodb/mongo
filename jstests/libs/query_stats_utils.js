@@ -219,7 +219,7 @@ function assertExpectedResults(results,
         sum: NumberLong(expectedDocsReturnedSum),
         max: NumberLong(expectedDocsReturnedMax),
         min: NumberLong(expectedDocsReturnedMin),
-        sumOfSquares: NumberLong(expectedDocsReturnedSumOfSq)
+        sumOfSquares: expectedDocsReturnedSumOfSq
     },
                  metrics.docsReturned);
 
@@ -251,7 +251,7 @@ function assertExpectedResults(results,
                 // possible for the min or max to be equal.
                 assert.gte(totalExecMicros[field], firstResponseExecMicros[field]);
             } else {
-                assert.gt(totalExecMicros[field], firstResponseExecMicros[field]);
+                assert(bsonWoCompare(totalExecMicros[field], firstResponseExecMicros[field]) > 0);
             }
         } else {
             // If there are no getMore calls, totalExecMicros fields should be equal to

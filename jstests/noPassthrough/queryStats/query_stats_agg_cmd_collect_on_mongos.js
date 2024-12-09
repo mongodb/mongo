@@ -69,7 +69,7 @@ const db = mongos.getDB("test");
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 2,
-                          /* expectedDocsReturnedSumOfSq */ 4,
+                          /* expectedDocsReturnedSumOfSq */ NumberDecimal("4"),
                           /* getMores */ true);
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
@@ -94,7 +94,7 @@ const db = mongos.getDB("test");
                           /* expectedDocsReturnedSum */ 5,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 0,
-                          /* expectedDocsReturnedSumOfSq */ 9,
+                          /* expectedDocsReturnedSumOfSq */ NumberDecimal("9"),
                           /* getMores */ true);
 }
 
@@ -135,7 +135,7 @@ const db = mongos.getDB("test");
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 1,
                           /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 2,
+                          /* expectedDocsReturnedSumOfSq */ NumberDecimal("2"),
                           /* getMores */ false);
 }
 

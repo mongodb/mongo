@@ -61,7 +61,7 @@ coll.insert({v: 4});
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 2,
-                          /* expectedDocsReturnedSumOfSq */ 4,
+                          /* expectedDocsReturnedSumOfSq */ NumberDecimal("4"),
                           /* getMores */ true);
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
@@ -77,7 +77,7 @@ coll.insert({v: 4});
                           /* expectedDocsReturnedSum */ 3,
                           /* expectedDocsReturnedMax */ 2,
                           /* expectedDocsReturnedMin */ 0,
-                          /* expectedDocsReturnedSumOfSq */ 5,
+                          /* expectedDocsReturnedSumOfSq */ NumberDecimal("5"),
                           /* getMores */ true);
 }
 
@@ -110,7 +110,7 @@ coll.insert({v: 4});
                           /* expectedDocsReturnedSum */ 2,
                           /* expectedDocsReturnedMax */ 1,
                           /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 2,
+                          /* expectedDocsReturnedSumOfSq */ NumberDecimal("2"),
                           /* getMores */ false);
 }
 

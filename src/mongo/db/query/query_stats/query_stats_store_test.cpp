@@ -1403,4 +1403,25 @@ TEST_F(QueryStatsStoreTest,
         })",
         shapified);
 }
+
+BSONObj toBSON(AggregatedMetric am) {
+    BSONObjBuilder builder;
+    am.appendTo(builder, "m");
+    return builder.obj();
+}
+
+TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowTest) {
+    // Ensure sumOfSquares is initialized correctly.
+    AggregatedMetric aggMetric;
+    auto res = toBSON(aggMetric).getObjectField("m").getField("sumOfSquares").Decimal();
+
+    ASSERT_EQ(res, Decimal128());
+
+    // Aggregating with the maximum int value does not overflow the sumOfSquares field.
+    auto maxVal = std::numeric_limits<uint64_t>::max();
+    aggMetric.aggregate(maxVal);
+    res = toBSON(aggMetric).getObjectField("m").getField("sumOfSquares").Decimal();
+
+    ASSERT_EQ(res, Decimal128(maxVal).power(Decimal128(2.0)));
+}
 }  // namespace mongo::query_stats
