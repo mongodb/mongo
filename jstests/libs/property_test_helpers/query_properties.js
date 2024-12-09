@@ -1,19 +1,33 @@
 import {
     aggPipelineModel,
     aggPipelineNoOrsModel,
+    maxNumLeafParametersPerFamily
 } from "jstests/libs/property_test_helpers/query_models.js";
 import {getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 /*
- * Properties take the collection we're testing, a list of queries to use during the property test,
- * and some helpers which include a comparator, a control collection, etc.
+ * Properties take the collection we're testing, a list of query families to use during the property
+ * test, and some helpers which include a comparator, a control collection, etc.
+ *
+ * The `getQuery(i, j)` function returns query shape `i` with it's `j`th parameters plugged in.
+ * For example, to get different query shapes we would call
+ *      getQuery(0, 0)
+ *      getQuery(1, 0)
+ *      ...
+ * To get the same query shape with different parameters, we would call
+ *      getQuery(0, 0)
+ *      getQuery(0, 1)
+ *      ...
+ * TODO SERVER-98132 redesign getQuery to be more opaque about how many query shapes and constants
+ * there are.
  */
 
 // Motivation: Query correctness.
-function queryHasSameResultsAsControlCollScan(experimentColl, queries, testHelpers) {
-    for (let i = 0; i < queries.length; i++) {
-        const query = queries[i];
+function queryHasSameResultsAsControlCollScan(experimentColl, getQuery, testHelpers) {
+    for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
+        const query = getQuery(queryIx, 0 /* paramIx */);
+
         const controlResults = testHelpers.controlColl.aggregate(query).toArray();
         const experimentalResults = experimentColl.aggregate(query).toArray();
         if (!testHelpers.comp(controlResults, experimentalResults)) {
@@ -32,8 +46,8 @@ function queryHasSameResultsAsControlCollScan(experimentColl, queries, testHelpe
 }
 
 // Motivation: Auto-parameterization and plan cache correctness.
-function repeatQueriesReturnSameResults(experimentColl, queries, testHelpers) {
-    const query = queries[0];
+function repeatQueriesReturnSameResults(experimentColl, getQuery, testHelpers) {
+    const query = getQuery(0 /* queryIx */, 0 /* paramIx */);
     const firstResult = experimentColl.aggregate(query).toArray();
     for (let repeatRun = 0; repeatRun < 5; repeatRun++) {
         const repeatResult = experimentColl.aggregate(query).toArray();
@@ -51,9 +65,8 @@ function repeatQueriesReturnSameResults(experimentColl, queries, testHelpers) {
 
 // Motivation: Check that the plan cache key we use to lookup in the cache and to store in the cache
 // are consistent.
-function repeatQueriesUseCache(experimentColl, queries, testHelpers) {
-    const query = queries[0];
-
+function repeatQueriesUseCache(experimentColl, getQuery, testHelpers) {
+    const query = getQuery(0 /* queryIx */, 0 /* paramIx */);
     const explain = experimentColl.explain().aggregate(query);
     if (getRejectedPlans(explain).length === 0) {
         return {passed: true};
@@ -75,9 +88,10 @@ function repeatQueriesUseCache(experimentColl, queries, testHelpers) {
     const sbeHitsAfter = serverStatusAfter.metrics.query.planCache.sbe.hits;
     // If neither the SBE plan cache hits nor the classic plan cache hits have incremented, then our
     // query must not have hit the cache.
-    if (checkSbeFullyEnabled(testHelpers.experimentDb) && sbeHitsAfter - sbeHitsBefore === 4) {
+    // We check for at least one hit, since ties can prevent a plan from being cached right away.
+    if (checkSbeFullyEnabled(testHelpers.experimentDb) && sbeHitsAfter - sbeHitsBefore > 0) {
         return {passed: true};
-    } else if (classicHitsAfter - classicHitsBefore === 4) {
+    } else if (classicHitsAfter - classicHitsBefore > 0) {
         return {passed: true};
     }
     return {
@@ -87,36 +101,40 @@ function repeatQueriesUseCache(experimentColl, queries, testHelpers) {
         explain,
         classicHitsBefore,
         classicHitsAfter,
+        sbeHitsBefore,
+        sbeHitsAfter,
         planCacheState: testHelpers.getPlanCache(experimentColl).list()
     };
 }
 
 // Motivation: Auto-parameterization and fetching from the plan cache correctness.
-function cachedQueriesHaveSameResultsAsControlCollScan(experimentColl, queries, testHelpers) {
-    // Get the query shape cached.
-    const initialQuery = queries[0];
-    for (let i = 0; i < 3; i++) {
-        experimentColl.aggregate(initialQuery).toArray();
-    }
+function queriesUsingCacheHaveSameResultsAsControl(experimentColl, getQuery, testHelpers) {
+    for (let queryShapeIx = 0; queryShapeIx < testHelpers.numQueryShapes; queryShapeIx++) {
+        // Get the query shape cached.
+        const initialQuery = getQuery(queryShapeIx, 0 /* paramIx */);
+        for (let i = 0; i < 3; i++) {
+            experimentColl.aggregate(initialQuery).toArray();
+        }
 
-    // Check that following queries, with different parameters, have correct results. These queries
-    // won't always use the cached plan because we don't model our autoparameterization rules in
-    // this test, but that's okay.
-    for (let i = 1; i < queries.length; i++) {
-        const query = queries[i];
-        const controlResults = testHelpers.controlColl.aggregate(query).toArray();
-        const experimentResults = experimentColl.aggregate(query).toArray();
-        if (!testHelpers.comp(controlResults, experimentResults)) {
-            return {
-                passed: false,
-                message: 'A query potentially using the plan cache has incorrect results. ' +
-                    'The query that created the cache entry likely has different parameters.',
-                initialQuery,
-                query,
-                explain: experimentColl.explain().aggregate(query),
-                controlResults,
-                experimentResults
-            };
+        // Check that following queries, with different parameters, have correct results. These
+        // queries won't always use the cached plan because we don't model our autoparameterization
+        // rules in this test, but that's okay.
+        for (let paramIx = 1; paramIx < maxNumLeafParametersPerFamily; paramIx++) {
+            const query = getQuery(queryShapeIx, paramIx);
+            const controlResults = testHelpers.controlColl.aggregate(query).toArray();
+            const experimentResults = experimentColl.aggregate(query).toArray();
+            if (!testHelpers.comp(controlResults, experimentResults)) {
+                return {
+                    passed: false,
+                    message: 'A query potentially using the plan cache has incorrect results. ' +
+                        'The query that created the cache entry likely has different parameters.',
+                    initialQuery,
+                    query,
+                    explain: experimentColl.explain().aggregate(query),
+                    controlResults,
+                    experimentResults
+                };
+            }
         }
     }
 
@@ -124,8 +142,8 @@ function cachedQueriesHaveSameResultsAsControlCollScan(experimentColl, queries, 
 }
 
 // Motivation: Check that our plan cache keys are deterministic.
-function identicalQueryCreatesAtMostOneCacheEntry(experimentColl, queries, testHelpers) {
-    const query = queries[0];
+function identicalQueryCreatesAtMostOneCacheEntry(experimentColl, getQuery, testHelpers) {
+    const query = getQuery(0 /* queryIx */, 0 /* paramIx */);
     const cacheBefore = testHelpers.getPlanCache(experimentColl).list();
     for (let i = 0; i < 5; i++) {
         experimentColl.aggregate(query).toArray();
@@ -167,10 +185,10 @@ export const propertyTests = [
         numRuns: 300
     },
     {
-        propertyFn: cachedQueriesHaveSameResultsAsControlCollScan,
+        propertyFn: queriesUsingCacheHaveSameResultsAsControl,
         aggModel: aggPipelineModel,
         numQueriesNeeded: 10,
-        numRuns: 100
+        numRuns: 300
     },
     {
         propertyFn: identicalQueryCreatesAtMostOneCacheEntry,

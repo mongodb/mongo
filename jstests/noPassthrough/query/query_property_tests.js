@@ -3,13 +3,18 @@
  * properties include caching rules, correctness against classic engine collscans, and others.
  */
 
+import {
+    concreteQueryFromFamily
+} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {listOfIndexesModel} from "jstests/libs/property_test_helpers/query_models.js";
 import {propertyTests} from "jstests/libs/property_test_helpers/query_properties.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 // Force classic control collection with no indexes.
-const controlConn =
-    MongoRunner.runMongod({setParameter: {internalQueryFrameworkControl: "forceClassicEngine"}});
+const controlConn = MongoRunner.runMongod({
+    setParameter:
+        {internalQueryFrameworkControl: "forceClassicEngine", internalQueryDisablePlanCache: true}
+});
 assert.neq(controlConn, null, "mongod failed to start up");
 const controlDb = controlConn.getDB(jsTestName());
 const controlColl = controlDb.control_collection;
@@ -62,7 +67,7 @@ function getPlanCache(coll) {
 
 // Clear any state in the collection (other than data, which doesn't change). Create indexes the
 // test uses, then run the property test.
-function runProperty(propertyFn, isTs, indexes, pipelines) {
+function runProperty(propertyFn, isTs, indexes, queries) {
     const experimentColl = isTs ? experimentTsColl : experimentPlainColl;
     // Clear all state and create indexes.
     getPlanCache(experimentColl).clear();
@@ -75,9 +80,17 @@ function runProperty(propertyFn, isTs, indexes, pipelines) {
         experimentDb,
         controlColl,
         getPlanCache,
-        serverStatus: () => experimentDb.serverStatus()
+        serverStatus: () => experimentDb.serverStatus(),
+        numQueries: queries.length,
     };
-    return propertyFn(experimentColl, pipelines, testHelpers);
+
+    function getQuery(queryIx, paramIx) {
+        assert.lt(queryIx, queries.length);
+        const query = queries[queryIx];
+        return concreteQueryFromFamily(query, paramIx);
+    }
+
+    return propertyFn(experimentColl, getQuery, testHelpers);
 }
 
 // We need a custom reporter function to get more details on the failure. The default won't show
