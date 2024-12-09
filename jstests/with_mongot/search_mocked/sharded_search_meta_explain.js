@@ -113,9 +113,6 @@ function runExplainTest(verbosity) {
                 }
             }
         }];
-        if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ShardFilteringDistinctScan")) {
-            metaPipeline[0].$group.$willBeMerged = false;
-        }
 
         const mergingPipelineHistory = [{
             expectedCommand: {

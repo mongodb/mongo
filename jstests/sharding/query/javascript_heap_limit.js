@@ -25,21 +25,10 @@ assert.commandWorked(mongosColl.insert([{x: 0}, {x: 2}]));
 const tooSmallHeapSizeMB = 10;
 const sufficentHeapSizeMB = 100;
 
-function setHeapSizeLimitMBOneNode({db, queryLimit, globalLimit}) {
+function setHeapSizeLimitMB({db, queryLimit, globalLimit}) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryJavaScriptHeapSizeLimitMB: queryLimit}));
     assert.commandWorked(db.adminCommand({setParameter: 1, jsHeapLimitMB: globalLimit}));
-}
-
-function setHeapSizeLimitMB({queryLimit, globalLimit}) {
-    st.forEachMongos((conn) => {
-        setHeapSizeLimitMBOneNode(
-            {db: conn.getDB("test"), queryLimit: queryLimit, globalLimit: globalLimit});
-    });
-    st.forEachConnection((conn) => {
-        setHeapSizeLimitMBOneNode(
-            {db: conn.getDB("test"), queryLimit: queryLimit, globalLimit: globalLimit});
-    });
 }
 
 function allocateLargeString() {

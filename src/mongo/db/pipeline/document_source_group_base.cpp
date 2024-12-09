@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/variables.h"
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -40,28 +41,33 @@
 #include <cstddef>
 #include <memory>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_group_base.h"
-#include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/semantic_analysis.h"
-#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -100,12 +106,7 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
     }
 
     if (_groupProcessor.doingMerge()) {
-        insides[kDoingMergeSpecField] = opts.serializeLiteral(true);
-    } else if (pExpCtx->isFeatureFlagShardFilteringDistinctScanEnabled() &&
-               !_groupProcessor.willBeMerged()) {
-        // Only serialize this flag when it is set to false & we are not already merging -
-        // otherwise, mongod must infer from the expression context what to do.
-        insides[kWillBeMergedSpecField] = opts.serializeLiteral(_groupProcessor.willBeMerged());
+        insides["$doingMerge"] = opts.serializeLiteral(true);
     }
 
     serializeAdditionalFields(insides, opts);
@@ -308,11 +309,6 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
     BSONObjIterator groupIterator(groupObj);
     VariablesParseState vps = pExpCtx->variablesParseState;
     pExpCtx->setSbeGroupCompatibility(SbeCompatibility::noRequirements);
-
-    // If 'kWillBeMergedSpecField' is missing, we will infer whether or not this stage needs to be
-    // merged based on the expression context.
-    _groupProcessor.setWillBeMerged(pExpCtx->getNeedsMerge());
-
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         StringData pFieldName = groupField.fieldNameStringData();
@@ -320,15 +316,10 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
             uassert(15948, "a group's _id may only be specified once", idExpressions.empty());
             _groupProcessor.setIdExpression(parseIdExpression(pExpCtx, groupField, vps));
             invariant(!idExpressions.empty());
-        } else if (pFieldName == kDoingMergeSpecField) {
+        } else if (pFieldName == "$doingMerge") {
             massert(17030, "$doingMerge should be true if present", groupField.Bool());
 
             _groupProcessor.setDoingMerge(true);
-        } else if (pFieldName == kWillBeMergedSpecField) {
-            // If mongos sets this field, we should always use it regardless of feature flag / FCV,
-            // since mongos already decided what the merging pipeline needs to do.
-            _groupProcessor.setWillBeMerged(groupField.Bool());
-
         } else if (isSpecFieldReserved(pFieldName)) {
             // No-op: field is used by the derived class.
         } else {
@@ -382,8 +373,7 @@ public:
         visitChildren(expr);
     }
     void visit(const ExpressionFieldPath* efp) override {
-        // Note: we can't infer used fields from $$ROOT.
-        if (!efp->isVariableReference() && !efp->isROOT()) {
+        if (!efp->isVariableReference()) {
             fields.insert(efp->getFieldPathWithoutCurrentPrefix().fullPath());
         }
     }
@@ -570,95 +560,11 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
                 pExpCtx, groupId, getSourceName(), std::move(fields), docsNeeded)};
 }
 
-/**
- * Verify if the current $group is appended to `pipeline`, it would group on a superset of the
- * shard key. This considers any renames which occur in the pipeline.
- */
-bool DocumentSourceGroupBase::groupIsOnShardKey(
-    const Pipeline& pipeline, const boost::optional<OrderedPathSet>& initialShardKeyPaths) const {
-    if (!initialShardKeyPaths) {
-        return false;
-    }
-
-    const auto& shardKeyPaths = *initialShardKeyPaths;
-
-    const auto groupExprs = getTriviallyReferencedPaths();
-    if (groupExprs.empty()) {
-        // The group _id doesn't contain any simple referenced paths; it may be
-        // a constant, or a more complex computation. In any case, it is not
-        // guaranteed that the group can be pushed down as it doesn't directly
-        // contain the shard key.
-        return false;
-    }
-
-    const auto& stages = pipeline.getSources();
-    // Walk backwards through the pipeline to find the original paths for
-    // these fields, before any renames.
-    const auto originPaths = semantic_analysis::traceOriginatingPaths(stages, groupExprs);
-
-    if (originPaths.empty()) {
-        // The group _id does not include fields which are derived from the shard key purely by
-        // rename/projection. Even if the entire shard key is used to compute the _id, that alone is
-        // not sufficient to guarantee the _id will uniquely occur on one shard.
-        return false;
-    }
-
-    if (!std::includes(originPaths.begin(),
-                       originPaths.end(),
-                       shardKeyPaths.begin(),
-                       shardKeyPaths.end(),
-                       originPaths.key_comp())) {
-        // The group does not include all of the paths of the shard key; it cannot be
-        // pushed down.
-        return false;
-    }
-    return true;
-}
-
-boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceGroupBase::pipelineDependentDistributedPlanLogic(
-    const DocumentSourceGroup::DistributedPlanContext& ctx) {
-    if (!pExpCtx->isFeatureFlagShardFilteringDistinctScanEnabled()) {
-        // Feature flag guards ability to entirely push down a $group; if disabled
-        // do not perform any pipeline aware logic.
-        return distributedPlanLogic();
-    }
-
-    if (!CollatorInterface::isSimpleCollator(pExpCtx->getCollator())) {
-        // A collation on the aggregation may result in the aggregation being more coarse-grained
-        // than the shard-key, i.e. pushing the $group down fully may result in more group keys than
-        // we actually want.
-        return distributedPlanLogic();
-    }
-
-    // TODO SERVER-97135: Refactor so we can remove the following check.
-    auto mergeStage = ctx.pipelineSuffix.getSources().empty()
-        ? nullptr
-        : dynamic_cast<DocumentSourceMerge*>(ctx.pipelineSuffix.getSources().back().get());
-    if (mergeStage) {
-        // This $group may be eligible for a $exchange optimisation, which fully pushing down $group
-        // would prevent.
-        return distributedPlanLogic();
-    }
-
-    if (groupIsOnShardKey(ctx.pipelinePrefix, ctx.shardKeyPaths)) {
-        // This group can fully execute on a shard, because no two shards will return the same group
-        // key. Prior calls to distributedPlanLogic() may have set the 'willBeMerged' flag to true,
-        // so we set it to false here to ensure it is correct.
-        _groupProcessor.setWillBeMerged(false);
-        return boost::none;
-    }
-    // Fall back to non-pipeline dependent.
-    return distributedPlanLogic();
-}
-
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGroupBase::distributedPlanLogic() {
     VariablesParseState vps = pExpCtx->variablesParseState;
     /* the merger will use the same grouping key */
     auto mergerGroupByExpression = ExpressionFieldPath::parse(pExpCtx.get(), "$$ROOT._id", vps);
-
-    auto clone = this->clone(pExpCtx);
 
     std::vector<AccumulationStatement> mergerAccumulators;
     const auto& accumulatedFields = _groupProcessor.getAccumulationStatements();
@@ -682,9 +588,8 @@ DocumentSourceGroupBase::distributedPlanLogic() {
             tassert(9158201,
                     "casting AccumulatorState* to AccumulatorPercentile* failed",
                     accumPercentile);
-            static_cast<DocumentSourceGroup*>(clone.get())->_groupProcessor.setWillBeMerged(false);
             if (accumPercentile->getMethod() != PercentileMethodEnum::kApproximate) {
-                return DistributedPlanLogic{nullptr, std::move(clone), boost::none};
+                return DistributedPlanLogic{nullptr, this, boost::none};
             }
         }
         mergerAccumulators.emplace_back(std::move(copiedAccumulatedField));
@@ -694,11 +599,8 @@ DocumentSourceGroupBase::distributedPlanLogic() {
     boost::intrusive_ptr<DocumentSourceGroup> mergingGroup = DocumentSourceGroup::create(
         pExpCtx, std::move(mergerGroupByExpression), std::move(mergerAccumulators));
     mergingGroup->_groupProcessor.setDoingMerge(true);
-
-    static_cast<DocumentSourceGroup*>(clone.get())->_groupProcessor.setWillBeMerged(true);
-
     // {shardsStage, mergingStage, sortPattern}
-    return DistributedPlanLogic{std::move(clone), mergingGroup, boost::none};
+    return DistributedPlanLogic{this, mergingGroup, boost::none};
 }
 
 }  // namespace mongo

@@ -29,9 +29,11 @@
 
 #include "mongo/db/pipeline/split_pipeline.h"
 
+#include <algorithm>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
@@ -39,7 +41,6 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 
 namespace mongo {
@@ -104,7 +105,6 @@ public:
                      boost::optional<OrderedPathSet> shardKeyPaths)
         : _splitPipeline(
               SplitPipeline::mergeOnlyWithEmptyShardsPipeline(std::move(pipelineToSplit))),
-
           _initialShardKeyPaths(std::move(shardKeyPaths)) {}
 
     PipelineSplitter(const PipelineSplitter& other) = delete;
@@ -123,8 +123,8 @@ public:
         // The order in which optimizations are applied can have significant impact on the
         // efficiency of the final pipeline. Be Careful!
         _moveEligibleStreamingStagesBeforeSortOnShards();
-        if (_splitPipeline.mergePipeline->getContext()
-                ->isFeatureFlagShardFilteringDistinctScanEnabled()) {
+        if (feature_flags::gFeatureFlagShardFilteringDistinctScan.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             _moveGroupFollowingSortFromMergerToShards();
         }
         _moveFinalUnwindFromShardsToMerger();
@@ -158,12 +158,8 @@ private:
      * the merge pipeline.
      */
     auto _popFirstMergeStage() {
-        boost::intrusive_ptr<DocumentSource> current = _splitPipeline.mergePipeline->popFront();
-        return std::make_pair(current,
-                              current->pipelineDependentDistributedPlanLogic(
-                                  {.pipelinePrefix = *_splitPipeline.shardsPipeline,
-                                   .pipelineSuffix = *_splitPipeline.mergePipeline,
-                                   .shardKeyPaths = _initialShardKeyPaths}));
+        auto current = _splitPipeline.mergePipeline->popFront();
+        return std::make_pair(current, current->distributedPlanLogic());
     }
 
     /**
@@ -229,18 +225,6 @@ private:
     }
 
     /**
-     * Push a stage down to the shardsPipeline completely, with no matching merge stage for
-     * the router.
-     */
-    void pushdownEntireStage(boost::intrusive_ptr<DocumentSource> source) {
-        // Verify that this stage has not accidentally been left in the merge pipeline.
-        tassert(9245700,
-                "Erroneously attempted to pushdown a stage which is still in mergePipeline",
-                source != _splitPipeline.mergePipeline->peekFront());
-        _splitPipeline.shardsPipeline->addFinalSource(std::move(source));
-    }
-
-    /**
      * Moves everything before a splittable stage to the shards. If there are no splittable
      * stages, moves everything to the shards. It is not safe to call this optimization multiple
      * times.
@@ -252,7 +236,7 @@ private:
             // Check if this source is splittable.
             if (!distributedPlanLogic) {
                 // Move the source from the merger _sources to the shard _sources.
-                pushdownEntireStage(std::move(current));
+                _splitPipeline.shardsPipeline->addFinalSource(current);
                 continue;
             }
 
@@ -349,19 +333,50 @@ private:
             return;
         }
 
-        if (!firstMergerGroup->groupIsOnShardKey(*_splitPipeline.shardsPipeline,
-                                                 _initialShardKeyPaths)) {
+        if (!_initialShardKeyPaths) {
             return;
         }
 
-        auto [group, groupDistributedLogic] = _popFirstMergeStage();
-        _splitPipeline.shardCursorsSortSpec = boost::none;
+        const auto& shardKeyPaths = *_initialShardKeyPaths;
+
+        const auto groupExprs = firstMergerGroup->getTriviallyReferencedPaths();
+        if (groupExprs.empty()) {
+            // The group _id doesn't contain any simple referenced paths; it may be
+            // a constant, or a more complex computation. In any case, it is not
+            // guaranteed that the group can be pushed down as it doesn't directly
+            // contain the shard key.
+            return;
+        }
+
+        const auto& stages = _splitPipeline.shardsPipeline->getSources();
+        // Walk backwards through the pipeline to find the original paths for
+        // these fields, before any renames.
+        const auto originPaths = semantic_analysis::traceOriginatingPaths(stages, groupExprs);
+
+        if (originPaths.empty()) {
+            // The group _id relies on fields which are not derived from the underlying
+            // document purely by rename/projection. Even if the entire shard key is used
+            // to compute the _id, that alone is not sufficient to guarantee the _id will
+            // uniquely occur on one shard.
+            return;
+        }
+
+        if (!std::includes(originPaths.begin(),
+                           originPaths.end(),
+                           shardKeyPaths.begin(),
+                           shardKeyPaths.end(),
+                           originPaths.key_comp())) {
+            // The group does not include all of the paths of the shard key; it cannot be
+            // pushed down.
+            return;
+        }
+
+        // The $group can be partially pushed down to the shards.
+        const auto groupDistributedLogic = firstMergerGroup->distributedPlanLogic();
         if (groupDistributedLogic) {
-            // The $group can be partially pushed down to the shards.
+            _splitPipeline.mergePipeline->popFront();
+            _splitPipeline.shardCursorsSortSpec = boost::none;
             _addSplitStages(*groupDistributedLogic);
-        } else {
-            // The $group can be entirely pushed down to the shards.
-            pushdownEntireStage(group);
         }
     }
 

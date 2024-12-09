@@ -1551,7 +1551,6 @@ TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
         boost::intrusive_ptr<ExpressionConstant>(new ExpressionConstant(expCtx.get(), Value(0))),
         {},
         false,
-        false,
         false);
     node.computeProperties();
 

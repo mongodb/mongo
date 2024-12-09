@@ -156,7 +156,6 @@ protected:
                                                      docSrcGroup->getIdExpression(),
                                                      docSrcGroup->getAccumulationStatements(),
                                                      false /*doingMerge*/,
-                                                     false /*willBeMerged*/,
                                                      true /*shouldProduceBson*/);
 
         // Makes a QuerySolution from the root group node.

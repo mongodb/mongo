@@ -30,6 +30,7 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
@@ -830,16 +831,6 @@ std::vector<SbExprSbSlotVector> generateAllMergingExprs(StageBuilderState& state
 }
 
 /**
- * Helper to temporarily set a value in the current scope & reset it to its previous value on scope
- * exit.
- */
-auto makeValueGuard(auto* dst, auto val) {
-    return ScopeGuard{[dst, old = std::exchange(*dst, std::move(val))]() mutable {
-        *dst = std::move(old);
-    }};
-}
-
-/**
  * This function performs any computations needed after the HashAggStage (or BlockHashAggStage)
  * for the accumulators from 'groupNode'.
  *
@@ -857,11 +848,6 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> gene
     const GroupNode& groupNode,
     bool idIsSingleKey,
     SbExpr idConstantValue) {
-    // This group may be fully pushed down to execute on a shard; if so it will not be
-    // merged on the router, and should emit the final agg results (not partial values).
-    // Temporarily override `needsMerge` with the value for this particular group.
-    const auto needsMergeGuard =
-        makeValueGuard(&state.needsMerge, groupNode.willBeMerged && state.needsMerge);
     SbBuilder b(state, groupNode.nodeId());
 
     SbExpr idFinalExpr;

@@ -113,6 +113,12 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
+		},
+		{
+			"$group" : {
+				"$doingMerge" : true,
+				"_id" : "$$ROOT._id"
+			}
 		}
 	],
 	"shardsPart" : [
@@ -125,7 +131,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$shardKey"
 			}
 		}
@@ -172,7 +177,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$shardKey"
 			}
 		}
@@ -219,7 +223,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$shardKey"
 			}
 		}
@@ -268,6 +271,15 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
+		},
+		{
+			"$group" : {
+				"$doingMerge" : true,
+				"_id" : "$$ROOT._id",
+				"first" : {
+					"$first" : "$$ROOT.first"
+				}
+			}
 		}
 	],
 	"shardsPart" : [
@@ -280,7 +292,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"first" : {
 					"$first" : "$otherField"
@@ -323,7 +334,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"first" : {
 					"$first" : "$otherField"
@@ -366,7 +376,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$shardKey",
 				"first" : {
 					"$first" : "$otherField"
@@ -429,6 +438,15 @@
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
+		},
+		{
+			"$group" : {
+				"$doingMerge" : true,
+				"_id" : "$$ROOT._id",
+				"last" : {
+					"$last" : "$$ROOT.last"
+				}
+			}
 		}
 	],
 	"shardsPart" : [
@@ -455,7 +473,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$renamedShardKey",
 				"last" : {
 					"$last" : "$otherField"
@@ -514,7 +531,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$renamedShardKey",
 				"last" : {
 					"$last" : "$otherField"
@@ -573,7 +589,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$renamedShardKey",
 				"last" : {
 					"$last" : "$otherField"
@@ -626,7 +641,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$otherField"
 			}
 		}
@@ -778,7 +792,6 @@
 		},
 		{
 			"$group" : {
-				"$willBeMerged" : false,
 				"_id" : "$shardKey"
 			}
 		}

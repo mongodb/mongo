@@ -207,7 +207,9 @@ Value GroupProcessorBase::expandId(const Value& val) {
     return md.freezeToValue();
 }
 
-Document GroupProcessorBase::makeDocument(const Value& id, const Accumulators& accums) {
+Document GroupProcessorBase::makeDocument(const Value& id,
+                                          const Accumulators& accums,
+                                          bool mergeableOutput) {
     const size_t n = _accumulatedFields.size();
     MutableDocument out(1 + n);
 
@@ -216,7 +218,7 @@ Document GroupProcessorBase::makeDocument(const Value& id, const Accumulators& a
 
     // Add the rest of the fields.
     for (size_t i = 0; i < n; ++i) {
-        Value val = accums[i]->getValue(_willBeMerged);
+        Value val = accums[i]->getValue(mergeableOutput);
         if (val.missing()) {
             // we return null in this case so return objects are predictable
             out.addField(_accumulatedFields[i].fieldName, Value(BSONNULL));

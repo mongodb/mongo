@@ -34,9 +34,11 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
+#include <exception>
 #include <memory>
 #include <set>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -92,8 +94,6 @@ public:
      */
     StringMap<boost::intrusive_ptr<Expression>> getIdFields() const;
 
-    boost::optional<DistributedPlanLogic> pipelineDependentDistributedPlanLogic(
-        const DistributedPlanContext& ctx) final;
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
     /**
@@ -217,13 +217,6 @@ public:
         _sbeCompatibility = sbeCompatibility;
     }
 
-    bool willBeMerged() const {
-        return _groupProcessor.willBeMerged();
-    }
-
-    bool groupIsOnShardKey(const Pipeline& pipeline,
-                           const boost::optional<OrderedPathSet>& initialShardKeyPaths) const;
-
 protected:
     DocumentSourceGroupBase(StringData stageName,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -254,9 +247,6 @@ protected:
     GroupProcessor _groupProcessor;
 
 private:
-    static constexpr StringData kDoingMergeSpecField = "$doingMerge"_sd;
-    static constexpr StringData kWillBeMergedSpecField = "$willBeMerged"_sd;
-
     /**
      * Returns true if 'dottedPath' is one of the group keys present in '_idExpressions'.
      */

@@ -424,19 +424,6 @@ public:
         };
     };
 
-    /**
-     * Describes context pipelineDependentDistributedPlanLogic() should take into account to make a
-     * decision about whether or not a document source can be pushed down to shards.
-     */
-    struct DistributedPlanContext {
-        // The pipeline up to but not including the current document source.
-        const Pipeline& pipelinePrefix;
-        // The pipeline after and not including the document source.
-        const Pipeline& pipelineSuffix;
-        // The set of paths provided by the shard key.
-        const boost::optional<OrderedPathSet>& shardKeyPaths;
-    };
-
     ~DocumentSource() override {}
 
     /**
@@ -905,21 +892,6 @@ public:
      * 'mergingStage'.
      */
     virtual boost::optional<DistributedPlanLogic> distributedPlanLogic() = 0;
-
-    /**
-     * Check if a source is able to run in parallel across a distributed collection, given
-     * sharding context and that it will be evaluated _after_ pipelinePrefix, and _before_
-     * pipelineSuffix.
-     *
-     * For stages which do not have any pipeline-dependent behaviour, the default impl
-     * calls distributedPlanLogic.
-     *
-     * See distributedPlanLogic() for conditions and return values.
-     */
-    virtual boost::optional<DistributedPlanLogic> pipelineDependentDistributedPlanLogic(
-        const DistributedPlanContext& ctx) {
-        return distributedPlanLogic();
-    }
 
     /**
      * Returns true if it would be correct to execute this stage in parallel across the shards in

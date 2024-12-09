@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <memory>
 #include <utility>
 
 #include "mongo/db/exec/plan_stats.h"
@@ -169,22 +170,6 @@ public:
         _doingMerge = doingMerge;
     }
 
-    /**
-     * Returns true if this GroupProcessor is used by the shard part of a split $group which will be
-     * merged together later.
-     */
-    bool willBeMerged() const {
-        return _willBeMerged;
-    }
-
-    /**
-     * Tell this object that it is the shard part of a split group, and the results will
-     * be merged later.
-     */
-    void setWillBeMerged(bool willBeMerged) {
-        _willBeMerged = willBeMerged;
-    }
-
     const GroupStats& getStats() const {
         return _stats;
     }
@@ -200,7 +185,7 @@ public:
     void freeMemory();
 
 protected:
-    Document makeDocument(const Value& id, const Accumulators& accums);
+    Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
 
     // Converts the internal representation of the group key to the _id shape specified by the
     // user.
@@ -220,12 +205,7 @@ protected:
     // Caching these helps avoid lookups in the map in MemoryUsageTracker for every input document.
     std::vector<MemoryUsageTracker::Impl*> _accumulatedFieldMemoryTrackers;
 
-    // Only set to true for a merging $group when a $group is split by distributedPlanLogic().
     bool _doingMerge{false};
-
-    // Only set to true when a $group is split by distributedPlanLogic(), and only for the $group
-    // pushed down to shards.
-    bool _willBeMerged{false};
 
     MemoryUsageTracker _memoryTracker;
 

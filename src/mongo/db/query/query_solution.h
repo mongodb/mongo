@@ -1639,13 +1639,11 @@ struct GroupNode : public QuerySolutionNode {
               boost::intrusive_ptr<Expression> groupByExpression,
               std::vector<AccumulationStatement> accs,
               bool merging,
-              bool willBeMerged,
               bool shouldProduceBson)
         : QuerySolutionNode(std::move(child)),
           groupByExpression(groupByExpression),
           accumulators(std::move(accs)),
           doingMerge(merging),
-          willBeMerged(willBeMerged),
           shouldProduceBson(shouldProduceBson) {
         // Use the DepsTracker to extract the fields that the 'groupByExpression' and accumulator
         // expressions depend on.
@@ -1691,7 +1689,6 @@ struct GroupNode : public QuerySolutionNode {
     boost::intrusive_ptr<Expression> groupByExpression;
     std::vector<AccumulationStatement> accumulators;
     bool doingMerge;
-    bool willBeMerged;
 
     // Carries the fields this GroupNode depends on. Namely, 'requiredFields' contains the union of
     // the fields in the 'groupByExpressions' and the fields in the input Expressions of the

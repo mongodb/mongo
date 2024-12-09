@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/bson_test_util.h"
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <cstdint>
@@ -70,7 +69,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -85,55 +83,8 @@ namespace {
 
 static const char* const ns = "unittests.document_source_group_tests";
 
-/**
- * Test helper which owns the pipeline and shard keys required for a DistributedPlanContext.
- *
- * DistributedPlanContext takes references to the noted values, as it is designed to encapsulate
- * a group of arguments passed from elsewhere, but does not require ownership in production code.
- *
- * For tests, this means each test needs to maintain ownership of the relevant fields. This either
- * leads to repetition, or use of members on the fixture.
- *
- * To separate concerns but allow a helper method to construct and return a DistributedPlanContext,
- * this helper handles that ownership.
- */
-class OwningDistributedPlanContext : public DocumentSourceGroup::DistributedPlanContext {
-public:
-    OwningDistributedPlanContext(std::unique_ptr<Pipeline, PipelineDeleter> pipelinePrefix,
-                                 std::unique_ptr<Pipeline, PipelineDeleter> pipelineSuffix,
-                                 boost::optional<OrderedPathSet> shardKeys)
-        : DocumentSourceGroup::DistributedPlanContext{*pipelinePrefix,
-                                                      *pipelineSuffix,
-                                                      this->shardKeys},
-          pipelinePrefix(std::move(pipelinePrefix)),
-          pipelineSuffix(std::move(pipelineSuffix)),
-          shardKeys(std::move(shardKeys)) {}
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelinePrefix;
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelineSuffix;
-    boost::optional<OrderedPathSet> shardKeys;
-};
-
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
-class DocumentSourceGroupTest : public AggregationContextFixture {
-public:
-    auto makePlanCtx(StringData pipelineJson, OrderedPathSet shardKeys) {
-        auto bson = fromjson(pipelineJson);
-        std::vector<BSONObj> rawPipeline;
-        for (const auto& element : bson) {
-            rawPipeline.push_back(element.Obj());
-        }
-        auto pipeline =
-            Pipeline::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
-
-        auto pipelineSuffix =
-            Pipeline::makePipeline({}, getExpCtx(), {.attachCursorSource = false});
-        return OwningDistributedPlanContext(
-            std::move(pipeline), std::move(pipelineSuffix), std::move(shardKeys));
-    }
-    auto makePlanCtx(OrderedPathSet shardKeys) {
-        return makePlanCtx("[]", std::move(shardKeys));
-    }
-};
+using DocumentSourceGroupTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto expCtx = getExpCtx();
@@ -331,7 +282,11 @@ TEST_F(DocumentSourceGroupTest, GroupRedactsCorrectWithIdSingleField) {
     })");
     auto docSource = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$group":{"_id":"$HASH<foo>"}})",
+        R"({
+            "$group": {
+                "_id": "$HASH<foo>"
+            }
+        })",
         redact(*docSource));
 }
 
@@ -362,11 +317,7 @@ TEST_F(DocumentSourceGroupTest, GroupRedactsCorrectWithIdDocument) {
                 },
                 "HASH<foo>": {
                     "$sum": {
-                        "$multiply": [
-                            "$HASH<a>.HASH<b>",
-                            "$HASH<c>",
-                            "$HASH<d>"
-                        ]
+                        "$multiply": ["$HASH<a>.HASH<b>", "$HASH<c>", "$HASH<d>"]
                     }
                 },
                 "HASH<bar>": {
@@ -401,10 +352,7 @@ TEST_F(DocumentSourceGroupTest, StreamingGroupRedactsCorrectly) {
                 "HASH<a>": {
                     "$first": "$HASH<b>"
                 },
-                "$monotonicIdFields": [
-                    "HASH<a>",
-                    "HASH<b>"
-                ]
+                "$monotonicIdFields": [ "HASH<a>", "HASH<b>" ]
             }
         })",
         redact(*docSource));
@@ -483,67 +431,6 @@ TEST_F(DocumentSourceGroupTest, CorrectlyReportsTriviallyReferencedExprsFromID) 
     expect(R"([{"foo":["$a", "$b"]}])", {"a", "b"});
 }
 
-
-TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfWithoutShardKey) {
-    auto spec = fromjson(R"({$group: {_id: "$x.y"}})");
-    auto group = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
-    auto distributedPlanLogic = group->distributedPlanLogic();
-    ASSERT_EQ(distributedPlanLogic->mergingStages.size(), 1UL);
-    ASSERT_BSONOBJ_EQ(distributedPlanLogic->shardsStage->serializeToBSONForDebug(),
-                      group->serializeToBSONForDebug());
-}
-
-TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfIdNotSupersetOfShardKey) {
-    auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
-    boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
-        DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "b", "d"}));
-    ASSERT_EQ(distributedPlanLogic->mergingStages.size(), 1UL);
-    ASSERT_BSONOBJ_EQ(distributedPlanLogic->shardsStage->serializeToBSONForDebug(),
-                      group->serializeToBSONForDebug());
-}
-
-TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdEqualToShardKey) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
-    auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
-    boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
-        DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "b", "c"}));
-    ASSERT_FALSE(distributedPlanLogic);
-}
-
-TEST_F(DocumentSourceGroupTest, DistributedLogicDoesRequireMergeIfIdEqualToShardKeyButFFDisabled) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", false);
-    auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
-    boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
-        DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "b", "c"}));
-    ASSERT_TRUE(distributedPlanLogic);
-}
-
-TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdSupersetOfShardKey) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
-    auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
-    boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
-        DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "c"}));
-    ASSERT_FALSE(distributedPlanLogic);
-}
-
-TEST_F(DocumentSourceGroupTest,
-       DistributedLogicDoesRequireMergeIfIdSupersetOfShardKeyButFFDisabled) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", false);
-    auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
-    boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
-        DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "c"}));
-    ASSERT_TRUE(distributedPlanLogic);
-}
 
 BSONObj toBson(const boost::intrusive_ptr<DocumentSource>& source) {
     std::vector<Value> arr;
