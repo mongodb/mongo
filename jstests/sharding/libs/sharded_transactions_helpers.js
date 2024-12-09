@@ -159,7 +159,7 @@ export function disableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
     });
 }
 
-// Override value for the ShardingTest.other.shardOptions field to safely use
+// Override value for the ShardingTest.other.rsOptions field to safely use
 // disableStaleVersionAndSnapshotRetriesWithinTransactions().
 export const kShardOptionsForDisabledStaleShardVersionRetries = {
     // Relax the default constraint for in-transaction metadata refreshes to avoid spurious
