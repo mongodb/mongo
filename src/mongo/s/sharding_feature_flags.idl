@@ -202,3 +202,10 @@ feature_flags:
     cpp_varname: feature_flags::gUseTopologyChangeCoordinators
     default: false
     shouldBeFCVGated: true
+  # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+  featureFlagShardAuthoritativeDbMetadata:
+    description: "Feature flag to enable the authoritative model to store shard-local information
+                  for database metadata."
+    cpp_varname: feature_flags::gShardAuthoritativeDbMetadata
+    default: false
+    shouldBeFCVGated: false
