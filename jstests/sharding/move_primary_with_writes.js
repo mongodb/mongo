@@ -5,9 +5,6 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// TODO SERVER-87501 Review all usages of ErrorCodes.MovePrimaryInProgress in this file once v8.0
-// branches out
-
 let st = new ShardingTest({
     mongos: 2,
     shards: 2,
@@ -196,7 +193,7 @@ function buildCommands(collName, isCollTracked) {
                 {aggregate: collName, cursor: {}, pipeline: [{$match: {}}, {$out: "testOutColl"}]},
             shouldFail: true,
             isAdminCommand: false,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
+            errorCodes: [ErrorCodes.LockBusy]
         },
         {
             command: {
@@ -222,12 +219,12 @@ function buildCommands(collName, isCollTracked) {
             command: {create: "testCollection"},
             shouldFail: true,
             isAdminCommand: false,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
+            errorCodes: [ErrorCodes.LockBusy]
         },
         {
             command: {create: "testView", viewOn: collName, pipeline: [{$match: {}}]},
             shouldFail: true,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress],
+            errorCodes: [ErrorCodes.LockBusy],
             isAdminCommand: false
         },
         {
@@ -239,29 +236,25 @@ function buildCommands(collName, isCollTracked) {
             command: {collMod: collName, index: {keyPattern: {c: 1}, expireAfterSeconds: 3600}},
             shouldFail: true,
             isAdminCommand: false,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
+            errorCodes: [ErrorCodes.LockBusy]
         },
         {
             command: {collMod: collName + "View", viewOn: collName, pipeline: [{$match: {_id: 1}}]},
             shouldFail: true,
             isAdminCommand: false,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
+            errorCodes: [ErrorCodes.LockBusy]
         },
         {
             command: {convertToCapped: "unshardedFoo", size: 1000000},
             shouldFail: true,
             isAdminCommand: false,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
+            errorCodes: [ErrorCodes.LockBusy]
         },
         {
             command: {dropIndexes: collName, index: collName + "Index"},
             shouldFail: true,
             isAdminCommand: false,
-            errorCodes: [
-                ErrorCodes.LockBusy,
-                ErrorCodes.MovePrimaryInProgress,
-                ErrorCodes.InterruptedDueToReplStateChange
-            ]
+            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.InterruptedDueToReplStateChange]
         },
         {
             command: {drop: collName},
