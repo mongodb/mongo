@@ -29,16 +29,20 @@
 
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringCollectionCatalog);
 
 /**
  * This class represents catalog state for normal (i.e., not change stream or collectionless)
@@ -64,8 +68,6 @@ public:
             _uuid = _collections.getMainCollection()->uuid();
         }
     }
-
-    void validate() const override {}
 
     bool lockAcquired() const override {
         return _ctx.has_value();
@@ -140,6 +142,12 @@ private:
         // be potentially different than the one obtained before and will be in sync with
         // the opened snapshot.
         _catalog = CollectionCatalog::get(_aggExState.getOpCtx());
+
+        hangAfterAcquiringCollectionCatalog.executeIf(
+            [&](const auto&) { hangAfterAcquiringCollectionCatalog.pauseWhileSet(); },
+            [&](const BSONObj& data) {
+                return _aggExState.getExecutionNss().coll() == data["collection"].valueStringData();
+            });
     }
 
 protected:
@@ -172,6 +180,8 @@ public:
         : DefaultAggCatalogState{aggExState, auto_get_collection::ViewMode::kViewsForbidden} {}
 
     void validate() const override {
+        AggCatalogState::validate();
+
         // Raise an error if original nss is a view. We do not need to check this if we are opening
         // a stream on an entire db or across the cluster.
         if (!_aggExState.getOriginalNss().isCollectionlessAggregateNS()) {
@@ -211,8 +221,6 @@ public:
     explicit CollectionlessAggCatalogState(const AggExState& aggExState)
         : AggCatalogState{aggExState}, _catalog(CollectionCatalog::latest(aggExState.getOpCtx())) {}
 
-    void validate() const override {}
-
     bool lockAcquired() const override {
         // Collectionless pipelines never acquire catalog locks, and thus never contain a valid
         // catalog context.
@@ -220,6 +228,8 @@ public:
     }
 
     void getStatsTrackerIfNeeded(boost::optional<AutoStatsTracker>& tracker) const override {
+        // If this is a collectionless aggregation, we won't create '_ctx' but will still need an
+        // AutoStatsTracker to record CurOp and Top entries.
         tracker.emplace(_aggExState.getOpCtx(),
                         _aggExState.getExecutionNss(),
                         Top::LockType::NotLocked,
@@ -564,6 +574,7 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
     }
 
     collectionState->validate();
+
     return collectionState;
 }
 
@@ -589,6 +600,26 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
     });
 
     return expCtx;
+}
+
+void AggCatalogState::validate() const {
+    if (_aggExState.getRequest().getResumeAfter()) {
+        uassert(ErrorCodes::InvalidPipelineOperator,
+                "$_resumeAfter is not supported on view",
+                !getCtx().getView());
+        const auto& collection = getCtx().getCollection();
+        const bool isClusteredCollection = collection && collection->isClustered();
+        uassertStatusOK(
+            query_request_helper::validateResumeAfter(_aggExState.getOpCtx(),
+                                                      *_aggExState.getRequest().getResumeAfter(),
+                                                      isClusteredCollection));
+    }
+
+    // If collectionUUID was provided, verify the collection exists and has the expected UUID.
+    checkCollectionUUIDMismatch(_aggExState.getOpCtx(),
+                                _aggExState.getExecutionNss(),
+                                getCollections().getMainCollection(),
+                                _aggExState.getRequest().getCollectionUUID());
 }
 
 /**

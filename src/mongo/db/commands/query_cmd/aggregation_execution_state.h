@@ -368,9 +368,10 @@ public:
     AggCatalogState(AggCatalogState&&) = delete;
 
     /**
-     * Perform any validation needed after accessing the catalog.
+     * Perform any validation needed after accessing the catalog. This virtual class has some
+     * general validation for all AggCatalogTypes, and each subclass may add extra validation.
      */
-    void virtual validate() const = 0;
+    virtual void validate() const;
 
     /**
      * Returns true iff this instance may have acquired a catalog lock and has a valid catalog

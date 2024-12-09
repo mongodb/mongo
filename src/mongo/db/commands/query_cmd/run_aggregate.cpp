@@ -59,7 +59,6 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
@@ -95,7 +94,6 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -140,8 +138,12 @@ using std::unique_ptr;
 using NamespaceStringSet = stdx::unordered_set<NamespaceString>;
 
 Counter64& allowDiskUseFalseCounter = *MetricBuilder<Counter64>{"query.allowDiskUseFalse"};
-
 namespace {
+// Ticks for server-side Javascript deprecation log messages.
+Rarely _samplerAccumulatorJs, _samplerFunctionJs;
+
+MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
+
 std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
     const AggExState& aggExState,
     boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -184,14 +186,40 @@ std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
     pipeline->appendPipeline(std::move(userPipeline));
     return pipeline;
 }
-}  // namespace
 
-namespace {
-// Ticks for server-side Javascript deprecation log messages.
-Rarely _samplerAccumulatorJs, _samplerFunctionJs;
+bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
+                                       rpc::ReplyBuilderInterface* result) {
+    // The isRetryableWrite() check here is to check that the client executed write was
+    // a retryable write (which would've spawned an internal session for a retryable write to
+    // execute the two phase write without shard key protocol), otherwise we skip the retryable
+    // write check.
+    auto isClusterQueryWithoutShardKeyCmd =
+        aggExState.getRequest().getIsClusterQueryWithoutShardKeyCmd();
+    if (!aggExState.getOpCtx()->isRetryableWrite() || !isClusterQueryWithoutShardKeyCmd) {
+        return false;
+    }
 
-MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
-MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringCollectionCatalog);
+    auto stmtId = aggExState.getRequest().getStmtId();
+    tassert(7058100, "StmtId must be set for a retryable write without shard key", stmtId);
+    bool wasWriteAlreadyApplied = TransactionParticipant::get(aggExState.getOpCtx())
+                                      .checkStatementExecuted(aggExState.getOpCtx(), *stmtId);
+    if (!wasWriteAlreadyApplied) {
+        return false;
+    }
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    CursorResponseBuilder responseBuilder(result, options);
+    boost::optional<CursorMetrics> metrics = aggExState.getRequest().getIncludeQueryStatsMetrics()
+        ? boost::make_optional(CursorMetrics{})
+        : boost::none;
+    responseBuilder.setWasStatementExecuted(true);
+    responseBuilder.done(
+        0LL,
+        aggExState.getOriginalNss(),
+        std::move(metrics),
+        SerializationContext::stateCommandReply(aggExState.getRequest().getSerializationContext()));
+    return true;
+}
 
 /**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
@@ -738,6 +766,12 @@ void executeExplain(const AggExState& aggExState,
 Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result);
 
 // TODO SERVER-93539 take a ResolvedViewAggExState instead of a AggExState that gets set as a view.
+/**
+ * Resolve the view by finding the underlying collection and stitching the view pipelines and this
+ * request's pipeline together. We then release our locks before recursively calling runAggregate(),
+ * which will re-acquire locks on the underlying collection. (The lock must be released because
+ * recursively acquiring locks on the database will prohibit yielding.)
+ */
 Status runAggregateOnView(AggExState& aggExState,
                           std::unique_ptr<AggCatalogState> aggCatalogState,
                           rpc::ReplyBuilderInterface* result) {
@@ -979,32 +1013,9 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
     // If we are running a retryable write without shard key, check if the write was applied on this
     // shard, and if so, return early with an empty cursor with $_wasStatementExecuted
-    // set to true. The isRetryableWrite() check here is to check that the client executed write was
-    // a retryable write (which would've spawned an internal session for a retryable write to
-    // execute the two phase write without shard key protocol), otherwise we skip the retryable
-    // write check.
-    auto isClusterQueryWithoutShardKeyCmd =
-        aggExState.getRequest().getIsClusterQueryWithoutShardKeyCmd();
-    if (aggExState.getOpCtx()->isRetryableWrite() && isClusterQueryWithoutShardKeyCmd) {
-        auto stmtId = aggExState.getRequest().getStmtId();
-        tassert(7058100, "StmtId must be set for a retryable write without shard key", stmtId);
-        if (TransactionParticipant::get(aggExState.getOpCtx())
-                .checkStatementExecuted(aggExState.getOpCtx(), *stmtId)) {
-            CursorResponseBuilder::Options options;
-            options.isInitialResponse = true;
-            CursorResponseBuilder responseBuilder(result, options);
-            boost::optional<CursorMetrics> metrics =
-                aggExState.getRequest().getIncludeQueryStatsMetrics()
-                ? boost::make_optional(CursorMetrics{})
-                : boost::none;
-            responseBuilder.setWasStatementExecuted(true);
-            responseBuilder.done(0LL,
-                                 aggExState.getOriginalNss(),
-                                 std::move(metrics),
-                                 SerializationContext::stateCommandReply(
-                                     aggExState.getRequest().getSerializationContext()));
-            return Status::OK();
-        }
+    // set to true.
+    if (checkRetryableWriteAlreadyApplied(aggExState, result)) {
+        return Status::OK();
     }
 
     // Going forward this operation must never ignore interrupt signals while waiting for lock
@@ -1018,67 +1029,41 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState.createAggCatalogState();
 
-    hangAfterAcquiringCollectionCatalog.executeIf(
-        [&](const auto&) { hangAfterAcquiringCollectionCatalog.pauseWhileSet(); },
-        [&](const BSONObj& data) {
-            return aggExState.getExecutionNss().coll() == data["collection"].valueStringData();
-        });
-
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
-    {
-        // If this is a collectionless aggregation, we won't create 'ctx' but will still need an
-        // AutoStatsTracker to record CurOp and Top entries.
-        boost::optional<AutoStatsTracker> statsTracker;
-        aggCatalogState->getStatsTrackerIfNeeded(statsTracker);
+    boost::optional<AutoStatsTracker> statsTracker;
+    aggCatalogState->getStatsTrackerIfNeeded(statsTracker);
 
-        if (aggExState.getRequest().getResumeAfter()) {
-            uassert(ErrorCodes::InvalidPipelineOperator,
-                    "$_resumeAfter is not supported on view",
-                    !aggCatalogState->getCtx().getView());
-            const auto& collection = aggCatalogState->getCtx().getCollection();
-            const bool isClusteredCollection = collection && collection->isClustered();
-            uassertStatusOK(
-                query_request_helper::validateResumeAfter(aggExState.getOpCtx(),
-                                                          *aggExState.getRequest().getResumeAfter(),
-                                                          isClusteredCollection));
-        }
-
-        // If collectionUUID was provided, verify the collection exists and has the expected UUID.
-        checkCollectionUUIDMismatch(aggExState.getOpCtx(),
-                                    aggExState.getExecutionNss(),
-                                    aggCatalogState->getCollections().getMainCollection(),
-                                    aggExState.getRequest().getCollectionUUID());
-
-        // If this is a view, resolve it by finding the underlying collection and stitching view
-        // pipelines and this request's pipeline together. We then release our locks before
-        // recursively calling runAggregate(), which will re-acquire locks on the underlying
-        // collection.  (The lock must be released because recursively acquiring locks on the
-        // database will prohibit yielding.)
+    // If this is a view, we must resolve the view, then recursively call runAggregate from
+    // runAggregateOnView.
+    if (aggCatalogState->lockAcquired() && aggCatalogState->getCtx().getView()) {
         // We do not need to expand the view pipeline when there is a $collStats stage, as
-        // $collStats is supported on a view namespace. For a time-series collection, however, the
-        // view is abstracted out for the users, so we needed to resolve the namespace to get the
-        // underlying bucket collection.
-        if (aggCatalogState->lockAcquired() && aggCatalogState->getCtx().getView() &&
-            (!aggExState.startsWithCollStats() ||
-             aggCatalogState->getCtx().getView()->timeseries())) {
+        // $collStats is supported on a view namespace. For a time-series collection, however,
+        // the view is abstracted out for the users, so we needed to resolve the namespace to
+        // get the underlying bucket collection.
+        bool shouldViewBeExpanded =
+            !aggExState.startsWithCollStats() || aggCatalogState->getCtx().getView()->timeseries();
+        if (shouldViewBeExpanded) {
             return runAggregateOnView(aggExState, std::move(aggCatalogState), result);
         }
-
-        expCtx = aggCatalogState->createExpressionContext();
-
-        // Prepare the parsed pipeline for execution. This involves parsing the pipeline,
-        // registering query stats, rewriting the pipeline to support queryable encryption, and
-        // optimizing and rewriting the pipeline if necessary.
-        StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> swPipeline =
-            preparePipeline(aggExState, *aggCatalogState, expCtx);
-        if (!swPipeline.isOK()) {
-            return swPipeline.getStatus();
-        }
-
-        execs = prepareExecutors(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
     }
+
+    expCtx = aggCatalogState->createExpressionContext();
+
+    // Prepare the parsed pipeline for execution. This involves parsing the pipeline,
+    // registering query stats, rewriting the pipeline to support queryable encryption, and
+    // optimizing and rewriting the pipeline if necessary.
+    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> swPipeline =
+        preparePipeline(aggExState, *aggCatalogState, expCtx);
+    if (!swPipeline.isOK()) {
+        return swPipeline.getStatus();
+    }
+
+    execs = prepareExecutors(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
+
+    // Dispose of the statsTracker to update stats for Top and CurOp.
+    statsTracker.reset();
 
     // Having released the collection lock, we can now begin to fetch results from the pipeline.
     // If both explain and cursor are specified, explain wins.
