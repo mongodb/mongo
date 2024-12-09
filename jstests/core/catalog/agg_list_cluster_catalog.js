@@ -173,6 +173,13 @@ jsTest.log("The stage must run collectionless.");
         9621301);
 }
 
+jsTest.log("The stage must take an object.");
+{
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: 1, pipeline: [{$listClusterCatalog: "wrong"}], cursor: {}}),
+        9621302);
+}
+
 jsTest.log("The stage must return the collection for the specified user db.");
 {
     setupUserCollections(db, kDb1);

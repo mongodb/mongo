@@ -95,6 +95,10 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFrom
     uassert(9621301,
             "The $listClusterCatalog stage must run on a database, not a collection.",
             expCtx->getNamespaceString().isCollectionlessAggregateNS());
+
+    uassert(9621302,
+            str::stream() << kStageName << " must take an object but found: " << elem,
+            elem.type() == BSONType::Object);
     /**
      * Compose the pipeline to generate an entry for each existing collection and its related
      * sharding informations.
