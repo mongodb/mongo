@@ -16,3 +16,4 @@
 - featureFlagSearchInSbe
 - featureFlagEgressGrpcForSearch
 - featureFlagDualCatalogCache
+- featureFlagCreateDatabaseDDLCoordinator
