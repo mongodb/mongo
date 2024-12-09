@@ -1566,7 +1566,8 @@ tasks:
         params:
           binary: bash
           args:
-            - "./src/evergreen/run_python_script.sh"
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "validate_commit_message"
             - "buildscripts/validate_commit_message.py"
           env:
             JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
