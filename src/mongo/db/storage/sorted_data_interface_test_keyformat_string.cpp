@@ -404,14 +404,14 @@ TEST_F(SortedDataInterfaceTest, BuilderAddKeyWithReservedRecordIdStr) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         RecordId reservedLoc(record_id_helpers::reservedIdFor(
             record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::String));
         ASSERT(record_id_helpers::isReserved(reservedLoc));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
+        builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc));
         txn.commit();
     }
 

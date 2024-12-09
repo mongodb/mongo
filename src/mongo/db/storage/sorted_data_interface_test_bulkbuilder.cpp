@@ -34,7 +34,6 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -50,10 +49,10 @@ TEST_F(SortedDataInterfaceTest, BuilderAddKey) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
         txn.commit();
     }
 
@@ -73,10 +72,10 @@ TEST_F(SortedDataInterfaceTest, BuilderAddKeyString) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(keyString1.getValueCopy()));
+        builder->addKey(keyString1.getValueCopy());
         txn.commit();
     }
 
@@ -90,14 +89,14 @@ TEST_F(SortedDataInterfaceTest, BuilderAddKeyWithReservedRecordIdLong) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         RecordId reservedLoc(record_id_helpers::reservedIdFor(
             record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
         ASSERT(record_id_helpers::isReserved(reservedLoc));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
+        builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc));
         txn.commit();
     }
 
@@ -112,18 +111,17 @@ TEST_F(SortedDataInterfaceTest, BuilderAddCompoundKey) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
+        builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1));
         txn.commit();
     }
 
     ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
 }
 
-// Add the same key multiple times using a bulk builder and verify that duplicate key information is
-// returned when duplicates are not allowed.
+// Add the same key multiple times using a bulk builder results in an invalid index with duplicates.
 TEST_F(SortedDataInterfaceTest, BuilderAddSameKey) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
@@ -131,44 +129,15 @@ TEST_F(SortedDataInterfaceTest, BuilderAddSameKey) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), false));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            builder->addKey(makeKeyString(sorted.get(), key1, loc2)), key1, boost::none);
+        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
+        builder->addKey(makeKeyString(sorted.get(), key1, loc2));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
-}
-
-/**
- * Add the same KeyString multiple times using a bulk builder and verify that duplicate key
- * information is returned when duplicates are not allowed.
- */
-TEST_F(SortedDataInterfaceTest, BuilderAddSameKeyString) {
-    const auto sorted(
-        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
-
-    key_string::Builder keyStringLoc1(
-        sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    key_string::Builder keyStringLoc2(
-        sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
-
-    ASSERT(sorted->isEmpty(opCtx()));
-
-    {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), false));
-
-        StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(keyStringLoc1.getValueCopy()));
-        ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            builder->addKey(keyStringLoc2.getValueCopy()), key1, boost::none);
-        txn.commit();
-    }
-
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
 }
 
 // Add the same key multiple times using a bulk builder and verify that
@@ -180,11 +149,11 @@ TEST_F(SortedDataInterfaceTest, BuilderAddSameKeyWithDupsAllowed) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true /* allow duplicates */));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
+        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
+        builder->addKey(makeKeyString(sorted.get(), key1, loc2));
         txn.commit();
     }
 
@@ -207,11 +176,11 @@ TEST_F(SortedDataInterfaceTest, BuilderAddSameKeyStringWithDupsAllowed) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true /* allow duplicates */));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(keyStringLoc1.getValueCopy()));
-        ASSERT_FALSE(builder->addKey(keyStringLoc2.getValueCopy()));
+        builder->addKey(keyStringLoc1.getValueCopy());
+        builder->addKey(keyStringLoc2.getValueCopy());
         txn.commit();
     }
 
@@ -226,12 +195,12 @@ TEST_F(SortedDataInterfaceTest, BuilderAddMultipleKeys) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
+        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
+        builder->addKey(makeKeyString(sorted.get(), key2, loc2));
+        builder->addKey(makeKeyString(sorted.get(), key3, loc3));
         txn.commit();
     }
 
@@ -255,12 +224,12 @@ TEST_F(SortedDataInterfaceTest, BuilderAddMultipleKeyStrings) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(keyString1.getValueCopy()));
-        ASSERT_FALSE(builder->addKey(keyString2.getValueCopy()));
-        ASSERT_FALSE(builder->addKey(keyString3.getValueCopy()));
+        builder->addKey(keyString1.getValueCopy());
+        builder->addKey(keyString2.getValueCopy());
+        builder->addKey(keyString3.getValueCopy());
         txn.commit();
     }
 
@@ -275,14 +244,14 @@ TEST_F(SortedDataInterfaceTest, BuilderAddMultipleCompoundKeys) {
     ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx(), true));
+        const auto builder(sorted->makeBulkBuilder(opCtx()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
-        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
+        builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1));
+        builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2));
+        builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4));
+        builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3));
+        builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5));
         txn.commit();
     }
 

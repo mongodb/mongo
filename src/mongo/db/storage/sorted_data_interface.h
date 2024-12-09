@@ -90,11 +90,9 @@ public:
      * builder.
      *
      * @param opCtx the transaction under which keys are added to 'this' index
-     * @param dupsAllowed true if duplicate keys are allowed, and false
-     *        otherwise
      */
-    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
-                                                                        bool dupsAllowed) = 0;
+    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(
+        OperationContext* opCtx) = 0;
 
     /**
      * Inserts the given key into the index, which must have a RecordId appended to the end. Returns
@@ -445,15 +443,15 @@ public:
     /**
      * Adds 'keyString' to intermediate storage.
      *
-     * 'keyString' must be > or >= the last key passed to this function (depends on _dupsAllowed).
-     * If this is violated an error Status (ErrorCodes::InternalError) will be returned.
+     * 'keyString' must be > or >= the last key passed to this function, depending on whether the
+     * thing being built supports duplicates. The behavior if this in violated is unspecified and
+     * must not be relied on by the caller.
      *
      * Some storage engines require callers to manage a WriteUnitOfWork to perform these inserts
      * transactionally. Other storage engines do not perform inserts transactionally and will ignore
      * any parent WriteUnitOfWork.
      */
-    virtual boost::optional<SortedDataInterface::DuplicateKey> addKey(
-        const key_string::Value& keyString) = 0;
+    virtual void addKey(const key_string::Value& keyString) = 0;
 };
 
 /**

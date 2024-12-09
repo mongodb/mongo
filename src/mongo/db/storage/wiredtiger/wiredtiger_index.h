@@ -297,7 +297,6 @@ protected:
     class BulkBuilder;
     class IdBulkBuilder;
     class StandardBulkBuilder;
-    class UniqueBulkBuilder;
 
     /*
      * The data format version is effectively const after the WiredTigerIndex instance is
@@ -324,8 +323,7 @@ public:
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
-                                                                bool dupsAllowed) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override;
 
     bool unique() const override {
         return true;
@@ -382,8 +380,7 @@ public:
     std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
                                       bool isForward = true) const override;
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
-                                                                bool dupsAllowed) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override;
 
     bool unique() const override {
         return true;
@@ -442,8 +439,7 @@ public:
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
-                                                                bool dupsAllowed) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override;
 
     bool unique() const override {
         return false;

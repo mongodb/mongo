@@ -298,10 +298,7 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    boost::optional<SortedDataInterface::DuplicateKey> addKey(
-        const key_string::Value& keyString) override {
-        return {};
-    }
+    void addKey(const key_string::Value& keyString) override {}
 };
 
 class DevNullSortedDataInterface : public SortedDataInterface {
@@ -314,8 +311,7 @@ public:
 
     ~DevNullSortedDataInterface() override {}
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
-                                                                bool dupsAllowed) override {
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override {
         return {};
     }
 

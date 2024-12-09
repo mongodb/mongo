@@ -759,18 +759,24 @@ RecordId WiredTigerIndex::_decodeRecordIdAtEnd(const void* buffer, size_t size) 
 class WiredTigerIndex::BulkBuilder : public SortedDataBuilderInterface {
 public:
     BulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx)
-        : _ordering(idx->_ordering),
+        : _idx(idx),
           _opCtx(opCtx),
           _metrics(ResourceConsumption::MetricsCollector::get(opCtx)),
           _cursor(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
                   idx->uri()) {}
 
 protected:
-    void setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
-        cursor->set_key(cursor, item);
+    void setKey(const void* ptr, size_t size) {
+        WiredTigerItem item(ptr, size);
+        _cursor->set_key(_cursor.get(), item.Get());
     }
 
-    const Ordering _ordering;
+    void setValue(const void* ptr, size_t size) {
+        WiredTigerItem item(ptr, size);
+        _cursor->set_value(_cursor.get(), item.Get());
+    }
+
+    WiredTigerIndex* _idx;
     OperationContext* const _opCtx;
     ResourceConsumption::MetricsCollector& _metrics;
     WiredTigerBulkLoadCursor _cursor;
@@ -778,123 +784,46 @@ protected:
 
 
 /**
- * Bulk builds a non-unique index.
+ * Bulk builds a non-id index.
  */
 class WiredTigerIndex::StandardBulkBuilder : public BulkBuilder {
 public:
-    StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx)
-        : BulkBuilder(idx, opCtx), _idx(idx) {}
-
-    boost::optional<DuplicateKey> addKey(const key_string::Value& keyString) override {
-        dassertRecordIdAtEnd(keyString, _idx->rsKeyFormat());
-
-        // Can't use WiredTigerCursor since we aren't using the cache.
-        WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
-        setKey(_cursor.get(), item.Get());
-
-        const key_string::TypeBits typeBits = keyString.getTypeBits();
-        WiredTigerItem valueItem = typeBits.isAllZeros()
-            ? emptyItem
-            : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
-
-        _cursor->set_value(_cursor.get(), valueItem.Get());
-
-        invariantWTOK(wiredTigerCursorInsert(
-                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
-                          _cursor.get()),
-                      _cursor->session);
-
-        _metrics.incrementOneIdxEntryWritten(_idx->uri(), item.size);
-
-        return {};
-    }
-
-private:
-    WiredTigerIndex* _idx;
-};
-
-/**
- * Bulk builds a unique index.
- *
- * In order to support unique indexes in dupsAllowed mode this class only does an actual insert
- * after it sees a key after the one we are trying to insert. This allows us to gather up all
- * duplicate ids and insert them all together. This is necessary since bulk cursors can only
- * append data.
- */
-class WiredTigerIndex::UniqueBulkBuilder : public BulkBuilder {
-public:
-    UniqueBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx, bool dupsAllowed)
-        : BulkBuilder(idx, opCtx),
-          _idx(idx),
-          _dupsAllowed(dupsAllowed),
-          _previousKeyString(idx->getKeyStringVersion()) {
+    StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx) : BulkBuilder(idx, opCtx) {
         invariant(!_idx->isIdIndex());
     }
 
-    boost::optional<DuplicateKey> addKey(const key_string::Value& newKeyString) override {
-        dassertRecordIdAtEnd(newKeyString, _idx->rsKeyFormat());
+    void addKey(const key_string::Value& keyString) override {
+        dassertRecordIdAtEnd(keyString, _idx->rsKeyFormat());
 
-        // Do a duplicate check, but only if dups aren't allowed.
-        if (!_dupsAllowed) {
-            const int cmp = (_idx->_rsKeyFormat == KeyFormat::Long)
-                ? newKeyString.compareWithoutRecordIdLong(_previousKeyString)
-                : newKeyString.compareWithoutRecordIdStr(_previousKeyString);
-            if (cmp == 0) {
-                // Duplicate found!
-                return DuplicateKey{key_string::toBson(newKeyString, _idx->_ordering)};
-            } else {
-                /*
-                 * _previousKeyString.isEmpty() is only true on the first call to addKey().
-                 * newKeyString must be greater than previous key.
-                 */
-                invariant(_previousKeyString.isEmpty() || cmp > 0);
-            }
+        setKey(keyString.getBuffer(), keyString.getSize());
+
+        const key_string::TypeBits typeBits = keyString.getTypeBits();
+        if (typeBits.isAllZeros()) {
+            setValue(nullptr, 0);
+        } else {
+            setValue(typeBits.getBuffer(), typeBits.getSize());
         }
-
-        // Can't use WiredTigerCursor since we aren't using the cache.
-        WiredTigerItem keyItem(newKeyString.getBuffer(), newKeyString.getSize());
-        setKey(_cursor.get(), keyItem.Get());
-
-        const key_string::TypeBits typeBits = newKeyString.getTypeBits();
-        WiredTigerItem valueItem = typeBits.isAllZeros()
-            ? emptyItem
-            : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
-
-        _cursor->set_value(_cursor.get(), valueItem.Get());
 
         invariantWTOK(wiredTigerCursorInsert(
                           *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
                           _cursor.get()),
                       _cursor->session);
 
-        _metrics.incrementOneIdxEntryWritten(_idx->uri(), keyItem.size);
-
-        // Don't copy the key again if dups are allowed.
-        if (!_dupsAllowed)
-            _previousKeyString.resetFromBuffer(newKeyString.getBuffer(), newKeyString.getSize());
-
-        return {};
+        _metrics.incrementOneIdxEntryWritten(_idx->uri(), keyString.getSize());
     }
-
-private:
-    WiredTigerIndex* _idx;
-    const bool _dupsAllowed;
-    key_string::Builder _previousKeyString;
 };
 
+/**
+ * Bulk builds an id index.
+ */
 class WiredTigerIndex::IdBulkBuilder : public BulkBuilder {
 public:
-    IdBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx)
-        : BulkBuilder(idx, opCtx), _idx(idx), _previousKeyString(idx->getKeyStringVersion()) {
+    IdBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx) : BulkBuilder(idx, opCtx) {
         invariant(_idx->isIdIndex());
     }
 
-    boost::optional<DuplicateKey> addKey(const key_string::Value& newKeyString) override {
+    void addKey(const key_string::Value& newKeyString) override {
         dassertRecordIdAtEnd(newKeyString, KeyFormat::Long);
-
-        const int cmp = newKeyString.compareWithoutRecordIdLong(_previousKeyString);
-        // _previousKeyString.isEmpty() is only true on the first call to addKey().
-        invariant(_previousKeyString.isEmpty() || cmp > 0);
 
         RecordId id;
         auto sizeWithoutRecordId = key_string::sizeWithoutRecordIdLongAtEnd(
@@ -909,32 +838,20 @@ public:
             value.appendTypeBits(typeBits);
         }
 
-        WiredTigerItem keyItem(newKeyString.getBuffer(), sizeWithoutRecordId);
-        WiredTigerItem valueItem(value.getBuffer(), value.getSize());
-
-        setKey(_cursor.get(), keyItem.Get());
-        _cursor->set_value(_cursor.get(), valueItem.Get());
+        setKey(newKeyString.getBuffer(), sizeWithoutRecordId);
+        setValue(value.getBuffer(), value.getSize());
 
         invariantWTOK(wiredTigerCursorInsert(
                           *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
                           _cursor.get()),
                       _cursor->session);
 
-        _metrics.incrementOneIdxEntryWritten(_idx->uri(), keyItem.size);
-
-        _previousKeyString.resetFromBuffer(newKeyString.getBuffer(), newKeyString.getSize());
-        return {};
+        _metrics.incrementOneIdxEntryWritten(_idx->uri(), sizeWithoutRecordId);
     }
-
-private:
-    WiredTigerIndex* _idx;
-    key_string::Builder _previousKeyString;
 };
 
 std::unique_ptr<SortedDataBuilderInterface> WiredTigerIdIndex::makeBulkBuilder(
-    OperationContext* opCtx, bool dupsAllowed) {
-    // Duplicates are not actually allowed on the _id index, however we accept the parameter
-    // regardless.
+    OperationContext* opCtx) {
     return std::make_unique<IdBulkBuilder>(this, opCtx);
 }
 
@@ -1574,8 +1491,8 @@ std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexUnique::newCursor(
 }
 
 std::unique_ptr<SortedDataBuilderInterface> WiredTigerIndexUnique::makeBulkBuilder(
-    OperationContext* opCtx, bool dupsAllowed) {
-    return std::make_unique<UniqueBulkBuilder>(this, opCtx, dupsAllowed);
+    OperationContext* opCtx) {
+    return std::make_unique<StandardBulkBuilder>(this, opCtx);
 }
 
 bool WiredTigerIndexUnique::isTimestampSafeUniqueIdx() const {
@@ -2000,9 +1917,7 @@ std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexStandard::newCursor(
 }
 
 std::unique_ptr<SortedDataBuilderInterface> WiredTigerIndexStandard::makeBulkBuilder(
-    OperationContext* opCtx, bool dupsAllowed) {
-    // We aren't unique so dups better be allowed.
-    invariant(dupsAllowed);
+    OperationContext* opCtx) {
     return std::make_unique<StandardBulkBuilder>(this, opCtx);
 }
 

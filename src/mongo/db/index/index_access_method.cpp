@@ -922,10 +922,6 @@ public:
 
     std::unique_ptr<Sorter::Iterator> finalizeSort();
 
-    std::unique_ptr<SortedDataBuilderInterface> setUpBulkInserter(OperationContext* opCtx,
-                                                                  const IndexCatalogEntry* entry,
-                                                                  bool dupsAllowed);
-
     void debugEnsureSorted(const Sorter::Data& data);
 
     bool duplicateCheck(OperationContext* opCtx,
@@ -933,10 +929,6 @@ public:
                         const Sorter::Data& data,
                         bool dupsAllowed,
                         const RecordIdHandlerFn& onDuplicateRecord);
-
-    Status keyCommitted(const KeyHandlerFn& onDuplicateKeyInserted,
-                        const Sorter::Data& data,
-                        bool isDup);
 
     Status commit(OperationContext* opCtx,
                   const CollectionPtr& collection,
@@ -1137,15 +1129,6 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::finalizeSort() {
     return std::unique_ptr<Sorter::Iterator>(_sorter->done());
 }
 
-std::unique_ptr<SortedDataBuilderInterface>
-SortedDataIndexAccessMethod::BulkBuilderImpl::setUpBulkInserter(OperationContext* opCtx,
-                                                                const IndexCatalogEntry* entry,
-                                                                bool dupsAllowed) {
-    _ns = entry->getNSSFromCatalog(opCtx);
-    return _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, dupsAllowed);
-}
-
-
 void SortedDataIndexAccessMethod::BulkBuilderImpl::debugEnsureSorted(const Sorter::Data& data) {
     if (data.first.compare(_previousKey) < 0) {
         LOGV2_FATAL_NOTRACE(31171,
@@ -1163,31 +1146,43 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
     bool dupsAllowed,
     const RecordIdHandlerFn& onDuplicateRecord) {
 
-    auto descriptor = entry->descriptor();
-
-    bool isDup = false;
-    if (descriptor->unique()) {
-        int cmpData = (_iam->getSortedDataInterface()->rsKeyFormat() == KeyFormat::Long)
-            ? data.first.compareWithoutRecordIdLong(_previousKey)
-            : data.first.compareWithoutRecordIdStr(_previousKey);
-        isDup = (cmpData == 0);
+    // Duplicate checking is only applicable to unique (including id) indexes
+    if (!entry->descriptor()->unique()) {
+        return false;
     }
 
-    // Before attempting to insert, perform a duplicate key check.
-    if (isDup && !dupsAllowed) {
-        uassertStatusOK(_iam->_handleDuplicateKey(opCtx, entry, data.first, onDuplicateRecord));
+    auto keyFormat = _iam->getSortedDataInterface()->rsKeyFormat();
+    auto& key = data.first;
+    int cmpData = (keyFormat == KeyFormat::Long) ? key.compareWithoutRecordIdLong(_previousKey)
+                                                 : key.compareWithoutRecordIdStr(_previousKey);
+    if (cmpData != 0) {
+        invariant(cmpData > 0);
+        return false;
     }
-    return isDup;
-}
 
-Status SortedDataIndexAccessMethod::BulkBuilderImpl::keyCommitted(
-    const KeyHandlerFn& onDuplicateKeyInserted, const Sorter::Data& data, bool isDup) {
-    _previousKey = data.first;
-
-    if (isDup) {
-        return onDuplicateKeyInserted(data.first);
+    if (dupsAllowed) {
+        return true;
     }
-    return Status::OK();
+
+    RecordId recordId = (keyFormat == KeyFormat::Long)
+        ? key_string::decodeRecordIdLongAtEnd(key.getBuffer(), key.getSize())
+        : key_string::decodeRecordIdStrAtEnd(key.getBuffer(), key.getSize());
+
+    // If supplied, onDuplicateRecord may be able to clean up the state, such as by moving the
+    // duplicate to a different collection
+    if (onDuplicateRecord) {
+        uassertStatusOK(onDuplicateRecord(recordId));
+        return true;
+    }
+
+    // Otherwise we just report the duplicate error
+    BSONObj dupKey = key_string::toBson(key, _iam->getSortedDataInterface()->getOrdering());
+    uassertStatusOK(buildDupKeyErrorStatus(dupKey.getOwned(),
+                                           entry->getNSSFromCatalog(opCtx),
+                                           entry->descriptor()->indexName(),
+                                           entry->descriptor()->keyPattern(),
+                                           entry->descriptor()->collation()));
+    MONGO_COMPILER_UNREACHABLE;  // The status will never be OK
 }
 
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
@@ -1200,7 +1195,8 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
     const RecordIdHandlerFn& onDuplicateRecord) {
     Timer timer;
 
-    auto builder = setUpBulkInserter(opCtx, entry, dupsAllowed);
+    _ns = entry->getNSSFromCatalog(opCtx);
+    auto builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx);
     auto it = finalizeSort();
 
     ProgressMeterHolder pm;
@@ -1244,7 +1240,9 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
             debugEnsureSorted(data);
         }
 
-        // Before attempting to insert, perform a duplicate key check.
+        // Before attempting to insert, check if this key is a duplicate of the previous one
+        // inserted. onDuplicateRecord may attempt to perform a write to repair the state, which can
+        // potentially fail.
         bool isDup;
         try {
             isDup = duplicateCheck(opCtx, entry, data, dupsAllowed, onDuplicateRecord);
@@ -1253,21 +1251,17 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
         }
 
         if (isDup && !dupsAllowed) {
+            // onDuplicateRecord took care of processing this duplicate key, so we don't need to do
+            // anything.
             continue;
         }
+
+        _previousKey = data.first;
 
         try {
             writeConflictRetry(opCtx, "addingKey", _ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
-                if (auto duplicate = builder->addKey(data.first)) {
-                    uassertStatusOK(buildDupKeyErrorStatus(duplicate->key,
-                                                           collection->ns(),
-                                                           entry->descriptor()->indexName(),
-                                                           entry->descriptor()->keyPattern(),
-                                                           entry->descriptor()->collation(),
-                                                           std::move(duplicate->foundValue),
-                                                           std::move(duplicate->id)));
-                }
+                builder->addKey(data.first);
                 wunit.commit();
             });
         } catch (DBException& e) {
@@ -1277,9 +1271,10 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
             return status;
         }
 
-        Status status = keyCommitted(onDuplicateKeyInserted, data, isDup);
-        if (!status.isOK())
-            return status;
+        if (isDup) {
+            if (auto status = onDuplicateKeyInserted(data.first); !status.isOK())
+                return status;
+        }
 
         // Yield locks every 'yieldIterations' key insertions.
         if (yieldIterations > 0 && (++iterations % yieldIterations == 0)) {
@@ -1412,26 +1407,6 @@ std::string nextFileName() {
     static const uint64_t randomSuffix = SecureRandom().nextUInt64();
     return str::stream() << "extsort-index." << indexAccessMethodFileCounter.fetchAndAdd(1) << '-'
                          << randomSuffix;
-}
-
-Status SortedDataIndexAccessMethod::_handleDuplicateKey(
-    OperationContext* opCtx,
-    const IndexCatalogEntry* entry,
-    const key_string::Value& dataKey,
-    const RecordIdHandlerFn& onDuplicateRecord) {
-    RecordId recordId = (KeyFormat::Long == _newInterface->rsKeyFormat())
-        ? key_string::decodeRecordIdLongAtEnd(dataKey.getBuffer(), dataKey.getSize())
-        : key_string::decodeRecordIdStrAtEnd(dataKey.getBuffer(), dataKey.getSize());
-    if (onDuplicateRecord) {
-        return onDuplicateRecord(recordId);
-    }
-
-    BSONObj dupKey = key_string::toBson(dataKey, getSortedDataInterface()->getOrdering());
-    return buildDupKeyErrorStatus(dupKey.getOwned(),
-                                  entry->getNSSFromCatalog(opCtx),
-                                  entry->descriptor()->indexName(),
-                                  entry->descriptor()->keyPattern(),
-                                  entry->descriptor()->collation());
 }
 
 Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
