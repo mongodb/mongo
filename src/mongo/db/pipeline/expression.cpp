@@ -2391,6 +2391,8 @@ Value ExpressionMap::evaluate(const Document& root, Variables* variables) const 
 
 /* ------------------------- ExpressionMeta ----------------------------- */
 
+using MetaType = DocumentMetadataFields::MetaType;
+
 REGISTER_EXPRESSION_CONDITIONALLY(meta,
                                   ExpressionMeta::parse,
                                   AllowedWithApiStrict::kConditionally,
@@ -2398,81 +2400,29 @@ REGISTER_EXPRESSION_CONDITIONALLY(meta,
                                   boost::none,
                                   true);
 
-namespace {
-const std::string textScoreName = "textScore";
-const std::string randValName = "randVal";
-const std::string searchScoreName = "searchScore";
-const std::string searchHighlightsName = "searchHighlights";
-const std::string geoNearDistanceName = "geoNearDistance";
-const std::string geoNearPointName = "geoNearPoint";
-const std::string recordIdName = "recordId";
-const std::string indexKeyName = "indexKey";
-const std::string sortKeyName = "sortKey";
-const std::string searchScoreDetailsName = "searchScoreDetails";
-const std::string searchSequenceTokenName = "searchSequenceToken";
-const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
-const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
-const std::string vectorSearchScoreName = "vectorSearchScore";
-const std::string scoreName = "score";
-
-using MetaType = DocumentMetadataFields::MetaType;
-const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
-    {scoreName, MetaType::kScore},
-    {vectorSearchScoreName, MetaType::kVectorSearchScore},
-    {geoNearDistanceName, MetaType::kGeoNearDist},
-    {geoNearPointName, MetaType::kGeoNearPoint},
-    {indexKeyName, MetaType::kIndexKey},
-    {randValName, MetaType::kRandVal},
-    {recordIdName, MetaType::kRecordId},
-    {searchHighlightsName, MetaType::kSearchHighlights},
-    {searchScoreName, MetaType::kSearchScore},
-    {searchScoreDetailsName, MetaType::kSearchScoreDetails},
-    {searchSequenceTokenName, MetaType::kSearchSequenceToken},
-    {sortKeyName, MetaType::kSortKey},
-    {textScoreName, MetaType::kTextScore},
-    {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
-    {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
-};
-
-const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTypeToMetaName = {
-    {MetaType::kScore, scoreName},
-    {MetaType::kVectorSearchScore, vectorSearchScoreName},
-    {MetaType::kGeoNearDist, geoNearDistanceName},
-    {MetaType::kGeoNearPoint, geoNearPointName},
-    {MetaType::kIndexKey, indexKeyName},
-    {MetaType::kRandVal, randValName},
-    {MetaType::kRecordId, recordIdName},
-    {MetaType::kSearchHighlights, searchHighlightsName},
-    {MetaType::kSearchScore, searchScoreName},
-    {MetaType::kSearchScoreDetails, searchScoreDetailsName},
-    {MetaType::kSearchSequenceToken, searchSequenceTokenName},
-    {MetaType::kSortKey, sortKeyName},
-    {MetaType::kTextScore, textScoreName},
-    {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
-    {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
-};
-
-}  // namespace
-
 void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* const expCtx,
-                                                             StringData metadataFieldName) {
+                                                             MetaType type) {
     const bool apiStrict = expCtx->getOperationContext() &&
         APIParameters::get(expCtx->getOperationContext()).getAPIStrict().value_or(false);
     // TODO SERVER-97104: add 'scoreDetails' here.
-    static const StringSet kUnstableFields = {
-        "searchScore", "indexKey", "textScore", "searchHighlights", "searchSequenceToken", "score"};
-    const bool usesUnstableField = kUnstableFields.contains(metadataFieldName);
+    static const std::set<MetaType> kUnstableMetaFields = {MetaType::kSearchScore,
+                                                           MetaType::kIndexKey,
+                                                           MetaType::kTextScore,
+                                                           MetaType::kSearchHighlights,
+                                                           MetaType::kSearchSequenceToken,
+                                                           MetaType::kScore};
+    const bool usesUnstableField = kUnstableMetaFields.contains(type);
     uassert(ErrorCodes::APIStrictError,
-            "Provided apiStrict is true with an unstable parameter",
+            str::stream() << "Provided apiStrict is true with an unstable meta field \""
+                          << DocumentMetadataFields::serializeMetaType(type) << "\"",
             !apiStrict || !usesUnstableField);
 }
 
 void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFF(ExpressionContext* const expCtx,
-                                                                   StringData metadataFieldName) {
+                                                                   MetaType type) {
     // TODO SERVER-97104: add 'scoreDetails' here.
-    static const StringSet kHybridScoringProtectedFields = {"score"};
-    const bool usesHybridScoringProtectedField =
-        kHybridScoringProtectedFields.contains(metadataFieldName);
+    static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore};
+    const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
     const bool hybridScoringFFEnabled =
         feature_flags::gFeatureFlagSearchHybridScoringPrerequisites
             .isEnabledUseLastLTSFCVWhenUninitialized(
@@ -2488,16 +2438,13 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
                                                 const VariablesParseState& vpsIn) {
     uassert(17307, "$meta only supports string arguments", expr.type() == String);
 
-    const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
+    const auto typeName = expr.valueStringData();
+    // parseMetaType() validates by throwing a uassert if typeName is an invalid meta type name.
+    const auto metaType = DocumentMetadataFields::parseMetaType(typeName);
 
-    if (iter != kMetaNameToMetaType.end()) {
-        auto typeName = iter->first;
-        _assertMetaFieldCompatibleWithStrictAPI(expCtx, typeName);
-        _assertMetaFieldCompatibleWithHybridScoringFF(expCtx, typeName);
-        return new ExpressionMeta(expCtx, iter->second);
-    } else {
-        uasserted(17308, "Unsupported argument to $meta: " + expr.String());
-    }
+    _assertMetaFieldCompatibleWithStrictAPI(expCtx, metaType);
+    _assertMetaFieldCompatibleWithHybridScoringFF(expCtx, metaType);
+    return new ExpressionMeta(expCtx, metaType);
 }
 
 ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaType)
@@ -2518,9 +2465,7 @@ ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaTyp
 }
 
 Value ExpressionMeta::serialize(const SerializationOptions& options) const {
-    const auto nameIter = kMetaTypeToMetaName.find(_metaType);
-    invariant(nameIter != kMetaTypeToMetaName.end());
-    return Value(DOC("$meta" << nameIter->second));
+    return Value(DOC("$meta" << DocumentMetadataFields::serializeMetaType(_metaType)));
 }
 
 Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const {

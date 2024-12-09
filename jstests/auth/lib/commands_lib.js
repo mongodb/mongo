@@ -6754,7 +6754,7 @@ export const authCommandsLib = {
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
           ]
-        },    
+        },
         {
           testname: "updateRole_authenticationRestrictions",
           command: {updateRole: "testRole", authenticationRestrictions: []},
@@ -8361,6 +8361,17 @@ export const authCommandsLib = {
         disableSearch: true,
         skipTest: _ => !TestData.setParameters.featureFlagSearchHybridScoring,
         testcases: testcases_transformationOnly
+      },
+      {
+        testname: "aggregate_$setMetadata",
+        command: {
+            aggregate: "foo",
+            cursor: {},
+            pipeline: [{$setMetadata: {score: 5}}]
+        },
+        setup: db => { db.createCollection("foo"); },
+        disableSearch: true,
+        testcases: testcases_transformationOnlyExpectFail
       },
       {
         testname: "aggregate_$scoreFusion",

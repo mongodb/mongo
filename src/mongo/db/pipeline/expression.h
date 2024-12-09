@@ -2457,13 +2457,13 @@ private:
      * with it.
      */
     static void _assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* expCtx,
-                                                        StringData metadataFieldName);
+                                                        DocumentMetadataFields::MetaType type);
     /**
      * Asserts that 'featureFlagSearchHybridScoringPrerequisites' feature flag is enabled, if the
      * requested metadata field requires it.
      */
-    static void _assertMetaFieldCompatibleWithHybridScoringFF(ExpressionContext* expCtx,
-                                                              StringData metadataFieldName);
+    static void _assertMetaFieldCompatibleWithHybridScoringFF(
+        ExpressionContext* expCtx, DocumentMetadataFields::MetaType type);
 
     DocumentMetadataFields::MetaType _metaType;
 };

@@ -89,6 +89,15 @@ public:
     };
 
     /**
+     * Parses the MetaType from a given type name.
+     *
+     * Throws a user exception if the provided name is not a recognized name as argument to $meta.
+     */
+    static DocumentMetadataFields::MetaType parseMetaType(StringData name);
+
+    static StringData serializeMetaType(DocumentMetadataFields::MetaType type);
+
+    /**
      * Reads serialized metadata out of 'buf', and uses it to populate 'out'. Expects 'buf' to have
      * been written to by a previous call to serializeForSorter(). It is illegal to pass a null
      * pointer for 'out'.
@@ -153,6 +162,17 @@ public:
     operator bool() const {
         return static_cast<bool>(_holder);
     }
+
+    /**
+     * Sets the given MetaType field to the Value provided.
+     *
+     * Throws a user exception if the type of the Value is not compatible with the type held in the
+     * metadata holder.
+     *
+     * The sort key cannot be set using this method since it must also be specified if the sort key
+     * is a single element sort key.
+     */
+    void setMetaFieldFromValue(MetaType type, Value val);
 
     bool hasTextScore() const {
         return _holder && _holder->metaFields.test(MetaType::kTextScore);
