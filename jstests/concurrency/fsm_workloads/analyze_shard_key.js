@@ -484,13 +484,21 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         }
 
         // Validate the frequency metrics. Likewise, due to the concurrent writes by other threads,
-        // it is not feasible to assert on the exact "mostCommonValues". Also, if the shard key is
-        // unique and the suite performs unclean shutdown, then the length of "mostCommonValues" may
-        // be less than analyzeShardKeyNumMostCommonValues since unclean shutdown can cause
-        // $collStats to return wrong number of documents and the calculation of the cardinality and
-        // frequency metrics for a unique shard key depends on the metrics returned by $collStats.
-        const shouldCheckMostCommonValues = !(this.shardKeyOptions.isUnique && TestData.killShards);
-        if (shouldCheckMostCommonValues) {
+        // it is not feasible to assert on the exact "mostCommonValues". Also, the length of
+        // "mostCommonValues" may be less than analyzeShardKeyNumMostCommonValues if:
+        // - The shard key is unique and the suite performs unclean shutdown since the calculation
+        //   of the cardinality and frequency metrics for a unique shard key depends on the metrics
+        //   returned by $collStats and unclean shutdown can cause $collStats to return the wrong
+        //   number of documents.
+        // - The shard key is not unique and the balancer is enabled since the calculation of the
+        //   the cardinality and frequency metrics for a non unique shard key depends on running
+        //   an aggregate command with readConcern "available" (to avoid the expensive sharding
+        //   filtering) which can results in reads against the old owning shards, which may return
+        //   partial data.
+        const shouldSkipMostCommonValuesCheck =
+            (this.shardKeyOptions.isUnique && TestData.killShards) ||
+            (!this.shardKeyOptions.isUnique && TestData.runningWithBalancer);
+        if (!shouldSkipMostCommonValuesCheck) {
             assert.eq(metrics.mostCommonValues.length, this.analyzeShardKeyNumMostCommonValues);
         }
 
