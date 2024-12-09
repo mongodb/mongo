@@ -1,0 +1,23 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query
+  - "error_during_agg_getmore.js":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "agg_currentop.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "agg_js_on_mongos.js":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "agg_percentile.js":
+    approvers:
+      - 10gen/query-integration-analytic-extensions
+  - "agg_explain_fmt.js":
+    approvers:
+      - 10gen/query-optimization-explain
+  - "*targeting*":
+    approvers:
+      - 10gen/query-optimization-cluster-planning

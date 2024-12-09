@@ -21,3 +21,12 @@ filters:
   - "splitvector.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "opcounters_write_cmd.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "operation_latency_histogram.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "version_api*":
+    approvers:
+      - 10gen/query-optimization-parsers

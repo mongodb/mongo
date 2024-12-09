@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-write-exec
   - "*empty_ts*.js":
     approvers:
       - 10gen/server-collection-write-path

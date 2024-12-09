@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "*query_stats*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "keystring_index.js":
+    approvers:
+      - 10gen/query-execution-indexing
+  - "timeseries_collection_mixed_type.js":
+    approvers:
+      - 10gen/query-integration-timeseries

@@ -13,7 +13,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     runWithFailpoint,
     setupCollectionAndGetExplainTestCases
-} from "jstests/noPassthrough/explain_and_profile_optimization_stats_util.js";
+} from "jstests/noPassthrough/query/explain/explain_and_profile_optimization_stats_util.js";
 
 const dbName = jsTestName();
 const collName = "jstests_profile_stats";

@@ -8,4 +8,10 @@ filters:
       - 10gen/query-integration-query-stats
   - "plan_cache*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-plan-cache
+  - "cbr_infrastructure.js":
+    approvers:
+      - 10gen/query-optimization-cost-based-ranker
+  - "external_sort_text_agg.js":
+    approvers:
+      - 10gen/query-integration-staff-leads

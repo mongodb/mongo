@@ -65,7 +65,7 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_replan.js
     - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
     - jstests/concurrency/fsm_workloads/query/update/update_rename.js
     - jstests/concurrency/fsm_workloads/query/update/update_rename_noindex.js

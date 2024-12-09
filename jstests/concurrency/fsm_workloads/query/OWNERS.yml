@@ -5,10 +5,13 @@ filters:
       - 10gen/query
   - "find_flip_sbe_enabled.js":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-execution-sbe
   - "plan_cache_drop_database.js":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-plan-cache
   - "profile_command.js":
     approvers:
       - 10gen/query-integration-observability
+  - "drop_index_during_replan.js":
+    approvers:
+      - 10gen/query-optimization-runtime-planners

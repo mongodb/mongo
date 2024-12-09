@@ -263,10 +263,14 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     (function testRoundtripOverMultiplePipesUsingBsonFile() {
         jsTestLog("Testing testRoundtripOverMultiplePipesUsingBsonFile()");
 
-        _writeTestPipeBsonFile(
-            pipeName1, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
-        _writeTestPipeBsonFile(
-            pipeName2, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
+        _writeTestPipeBsonFile(pipeName1,
+                               objsPerPipe,
+                               "jstests/noPassthrough/query/external_data_source.bson",
+                               pipeDir);
+        _writeTestPipeBsonFile(pipeName2,
+                               objsPerPipe,
+                               "jstests/noPassthrough/query/external_data_source.bson",
+                               pipeDir);
         let cursor = db.coll.aggregate([{$project: {_id: 0}}], {
             $_externalDataSources: [{
                 collName: "coll",
