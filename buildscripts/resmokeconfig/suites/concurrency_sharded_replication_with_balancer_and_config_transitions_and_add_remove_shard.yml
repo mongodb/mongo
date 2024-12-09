@@ -82,6 +82,11 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
+    # These tests runs a large number of inserts while chunk migrations occur, which can cause the test
+    # to time out because we don't do inserts with bucket reopening.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_reopening_respects_control_closed.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_crud_operations_respect_control_closed.js
+
     # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/concurrency/fsm_workloads/cleanup_orphaned_while_migrating.js
