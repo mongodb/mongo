@@ -338,6 +338,18 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
                 listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
             }
 
+            // Append the readConcern to the command and check it's a 'local' level.
+            const auto& readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
+            tassert(9746001,
+                    str::stream() << "listCollections only allows 'local' read concern. Trying "
+                                     "to call it with '"
+                                  << repl::readConcernLevels::toString(readConcernLevel)
+                                  << "' read concern level.",
+                    readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
+
+            BSONObj cmdToRun = applyReadWriteConcern(
+                opCtx, /*appendRC=*/true, /*appendWC=*/false, listCollectionsCmd.toBSON({}));
+
             const auto shard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
             Shard::QueryResponse resultCollections;
@@ -347,7 +359,7 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
                     opCtx,
                     ReadPreferenceSetting::get(opCtx),
                     nss.dbName(),
-                    appendDbVersionIfPresent(listCollectionsCmd.toBSON({}), cdb->getVersion()),
+                    appendDbVersionIfPresent(cmdToRun, cdb->getVersion()),
                     opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1)));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 return std::vector<BSONObj>();
