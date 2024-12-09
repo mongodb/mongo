@@ -23,7 +23,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
       test_flags: >-
-        --excludeWithAnyTags=requires_external_data_source
+        --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
         --enableEnterpriseTests=off
       multiversion_platform: debian12
       multiversion_edition: targeted
@@ -69,7 +69,7 @@ buildvariants:
         --ssl MONGO_DISTMOD=debian12
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=requires_external_data_source
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
