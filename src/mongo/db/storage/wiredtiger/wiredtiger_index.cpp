@@ -290,7 +290,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  bool isLogged,
                                  bool isReadOnly)
     : SortedDataInterface(ident,
-                          _handleVersionInfo(ctx, uri, desc, isLogged, isReadOnly),
+                          _handleVersionInfo(ctx, uri, ident, desc, isLogged, isReadOnly),
                           Ordering::make(desc->keyPattern()),
                           rsKeyFormat),
       _uri(uri),
@@ -761,8 +761,45 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
         _collation);
 }
 
+void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
+                                               const std::string& uri,
+                                               StringData ident,
+                                               const IndexDescriptor* desc) {
+    auto indexVersion = desc->version();
+    auto isIndexVersion1 = indexVersion == IndexDescriptor::IndexVersion::kV1;
+    auto isIndexVersion2 = indexVersion == IndexDescriptor::IndexVersion::kV2;
+    auto isDataFormat6 = _dataFormatVersion == kDataFormatV1KeyStringV0IndexVersionV1;
+    auto isDataFormat8 = _dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2;
+    auto isDataFormat13 = _dataFormatVersion == kDataFormatV5KeyStringV0UniqueIndexVersionV1;
+    auto isDataFormat14 = _dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2;
+    // Only fixes the index data format when it could be from an edge case when converting the
+    // uniqueness of the index. Specifically:
+    // * The index is a secondary unique index, but the data format version is 6 (v1) or 8 (v2).
+    // * The index is a non-unique index, but the data format version is 13 (v1) or 14 (v2).
+    if ((!desc->isIdIndex() && desc->unique() &&
+         ((isIndexVersion1 && isDataFormat6) || (isIndexVersion2 && isDataFormat8))) ||
+        (!desc->unique() &&
+         ((isIndexVersion1 && isDataFormat13) || (isIndexVersion2 && isDataFormat14)))) {
+        auto engine = opCtx->getServiceContext()->getStorageEngine();
+        engine->getEngine()->alterIdentMetadata(
+            opCtx, ident, desc, /* isForceUpdateMetadata */ false);
+        auto prevVersion = _dataFormatVersion;
+        // The updated data format is guaranteed to be within the supported version range.
+        _dataFormatVersion = WiredTigerUtil::checkApplicationMetadataFormatVersion(
+                                 opCtx, uri, kMinimumIndexVersion, kMaximumIndexVersion)
+                                 .getValue();
+        LOGV2_WARNING(6818600,
+                      "Fixing index metadata data format version",
+                      "namespace"_attr = desc->getEntry()->getNSSFromCatalog(opCtx),
+                      "indexName"_attr = desc->indexName(),
+                      "prevVersion"_attr = prevVersion,
+                      "newVersion"_attr = _dataFormatVersion);
+    }
+}
+
 KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                        const std::string& uri,
+                                                       StringData ident,
                                                        const IndexDescriptor* desc,
                                                        bool isLogged,
                                                        bool isReadOnly) {
@@ -779,6 +816,8 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         fassertFailedWithStatus(28579, indexVersionStatus);
     }
     _dataFormatVersion = version.getValue();
+
+    _repairDataFormatVersion(ctx, uri, ident, desc);
 
     if (!desc->isIdIndex() && desc->unique() &&
         (_dataFormatVersion < kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||

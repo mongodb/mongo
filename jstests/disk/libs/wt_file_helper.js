@@ -234,3 +234,16 @@ let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
     runWiredTigerTool("-h", conn.dbpath, "truncate", uri);
     return startMongodOnExistingPath(conn.dbpath, mongodOptions);
 };
+
+/**
+ * Stops the given mongod and runs the alter command to modify the index table's metadata.
+ */
+let alterIndexFormatVersion = function(uri, conn, formatVersion) {
+    MongoRunner.stopMongod(conn, null, {skipValidation: true});
+    runWiredTigerTool(
+        "-h",
+        conn.dbpath,
+        "alter",
+        "table:" + uri,
+        "app_metadata=(formatVersion=" + formatVersion + "),exclusive_refreshed=false");
+};
