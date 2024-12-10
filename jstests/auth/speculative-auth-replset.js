@@ -10,7 +10,7 @@ const kAuthenticationFailedLogId = 5286307;
 function countAuthInLog(conn) {
     let logCounts = {speculative: 0, cluster: 0, speculativeCluster: 0};
 
-    checkLog.getGlobalLog(conn).forEach((line) => {
+    cat(conn.fullOptions.logFile).trim().split("\n").forEach((line) => {
         // Iterate through the log and verify our auth.
         const entry = JSON.parse(line);
         if (entry.id === kAuthenticationSuccessfulLogId) {
@@ -46,7 +46,8 @@ const rst = new ReplSetTest({
             // Disable heartbeat logging to prevent exceeding the maximum log lines in checklog.
             logComponentVerbosity: tojson({replication: {heartbeats: 0}}),
             "failpoint.disableQueryAnalysisSampler": tojson({mode: "alwaysOn"}),
-        }
+        },
+        useLogFiles: true,
     },
     keyFile: 'jstests/libs/key1',
 });
@@ -122,7 +123,7 @@ Object.keys(initialMechStats).forEach(function(mech) {
 
     // Speculative and cluster auth counts should align with the authentication
     // events in the server log.
-    let logCounts = countAuthInLog(admin);
+    let logCounts = countAuthInLog(admin.getMongo());
 
     assert.eq(logCounts.speculative,
               newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful -
@@ -147,7 +148,7 @@ Object.keys(initialMechStats).forEach(function(mech) {
         // Repoll values for a retry.
         jsTest.log('Cluster counts mismatched: ' + logCount + ' != ' + mechStatCount);
         newMechStats = getMechStats(admin);
-        logCounts = countAuthInLog(admin);
+        logCounts = countAuthInLog(admin.getMongo());
         return false;
     }, "Cluster counts never stabilized", kClusterCountNumRetries, kClusterCountRetryIntervalMS);
 }
