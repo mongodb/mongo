@@ -770,23 +770,21 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, NoCustomCodeRequestTimeoutHi
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeout) {
+    auto fpGuard = configureFailCommand("ping", {}, Milliseconds(30000));
+
     // Kick off operation
     auto cb = makeCallbackHandle();
-    auto request = makeTestCommand(Milliseconds{1000}, makeSleepCmdObj());
+    auto request = makeTestCommand(
+        Milliseconds{1000}, BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired);
     auto deferred = runCommand(cb, request);
 
     waitForHello();
 
     auto result = deferred.get(interruptible());
-
-    // mongos doesn't implement the ping command, so ignore the response there, otherwise
-    // check that we've timed out.
-    if (!pingCommandMissing(result)) {
-        ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
-        ASSERT(result.elapsed);
-        ASSERT_EQ(result.target, fixture().getServers().front());
-        assertNumOps(0u, 1u, 0u, 0u);
-    }
+    ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
+    ASSERT(result.elapsed);
+    ASSERT_EQ(result.target, fixture().getServers().front());
+    assertNumOps(0u, 1u, 0u, 0u);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
