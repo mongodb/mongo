@@ -268,3 +268,8 @@ feature_flags:
         cpp_varname: feature_flags::gTSBucketingParametersUnchanged
         default: false
         shouldBeFCVGated: true
+    featureFlagStorageEngineInterruptibility:
+        description: "Enable support for interrupting user operations in storage engines and rolling back transactions immediately that are targeted by the storage engine."
+        cpp_varname: feature_flags::gStorageEngineInterruptibility 
+        default: false
+        shouldBeFCVGated: false
