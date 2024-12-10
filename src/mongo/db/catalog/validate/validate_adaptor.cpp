@@ -301,12 +301,13 @@ Status _validateTimeseriesBucketingParametersChanged(const CollectionPtr& coll,
         auto originalBucketRoundingSeconds = options.getBucketRoundingSeconds();
         auto originalGranularity = options.getGranularity();
 
-        LOGV2_ERROR(9175400,
-                    "A time series bucketing parameter was changed",
-                    logAttrs(coll->ns()),
-                    "currentBucketMaxSpanSeconds"_attr = originalBucketMaxSpanSeconds,
-                    "currentBucketRoundingSeconds"_attr = originalBucketRoundingSeconds,
-                    "currentGranularity"_attr = originalGranularity);
+        LOGV2_ERROR_OPTIONS(9175400,
+                            {logv2::LogTruncation::Disabled},
+                            "A time series bucketing parameter was changed",
+                            logAttrs(coll->ns()),
+                            "currentBucketMaxSpanSeconds"_attr = originalBucketMaxSpanSeconds,
+                            "currentBucketRoundingSeconds"_attr = originalBucketRoundingSeconds,
+                            "currentGranularity"_attr = originalGranularity);
     }
 
     return Status::OK();
@@ -707,10 +708,11 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         if (status.code() != ErrorCodes::NonConformantBSON) {
             return status;
         }
-        LOGV2_WARNING(6825900,
-                      "Document is not conformant to BSON specifications",
-                      "recordId"_attr = recordId,
-                      "reason"_attr = status);
+        LOGV2_WARNING_OPTIONS(6825900,
+                              {logv2::LogTruncation::Disabled},
+                              "Document is not conformant to BSON specifications",
+                              "recordId"_attr = recordId,
+                              "reason"_attr = status);
         (*nNonCompliantDocuments)++;
         results->addWarning(kBSONValidationNonConformantReason);
     }
@@ -830,16 +832,19 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
             // If status is not okay, dataSize is not reliable.
             if (!status.isOK()) {
-                LOGV2(4835001,
-                      "Document corruption details - Document validation failed with error",
-                      "recordId"_attr = record->id,
-                      "error"_attr = status);
+                LOGV2_OPTIONS(4835001,
+                              {logv2::LogTruncation::Disabled},
+                              "Document corruption details - Document validation failed with error",
+                              "recordId"_attr = record->id,
+                              "error"_attr = status);
             } else {
-                LOGV2(4835002,
-                      "Document corruption details - Document validation failure; size mismatch",
-                      "recordId"_attr = record->id,
-                      "validatedBytes"_attr = validatedSize,
-                      "recordBytes"_attr = dataSize);
+                LOGV2_OPTIONS(
+                    4835002,
+                    {logv2::LogTruncation::Disabled},
+                    "Document corruption details - Document validation failure; size mismatch",
+                    "recordId"_attr = record->id,
+                    "validatedBytes"_attr = validatedSize,
+                    "recordBytes"_attr = dataSize);
             }
 
             if (_validateState->fixErrors()) {
@@ -869,11 +874,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             auto result = coll->checkValidation(opCtx, record->data.toBson());
 
             if (result.first != Collection::SchemaValidationResult::kPass) {
-                LOGV2_WARNING(5363500,
-                              "Document is not compliant with the collection's schema",
-                              logAttrs(coll->ns()),
-                              "recordId"_attr = record->id,
-                              "reason"_attr = result.second);
+                LOGV2_WARNING_OPTIONS(5363500,
+                                      {logv2::LogTruncation::Disabled},
+                                      "Document is not compliant with the collection's schema",
+                                      logAttrs(coll->ns()),
+                                      "recordId"_attr = record->id,
+                                      "reason"_attr = result.second);
 
                 nNonCompliantDocuments++;
                 results->addWarning(kSchemaValidationFailedReason);
@@ -890,11 +896,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 // This log id should be kept in sync with the associated warning messages that are
                 // returned to the client.
                 if (!bucketStatus.isOK()) {
-                    LOGV2_WARNING(6698300,
-                                  "Document is not compliant with time-series specifications",
-                                  logAttrs(coll->ns()),
-                                  "recordId"_attr = record->id,
-                                  "reason"_attr = bucketStatus);
+                    LOGV2_WARNING_OPTIONS(
+                        6698300,
+                        {logv2::LogTruncation::Disabled},
+                        "Document is not compliant with time-series specifications",
+                        logAttrs(coll->ns()),
+                        "recordId"_attr = record->id,
+                        "reason"_attr = bucketStatus);
                     nNonCompliantDocuments++;
                     if (TestingProctor::instance().isEnabled()) {
                         // In testing this is a fatal error. Some time-series checks are vital to
@@ -909,30 +917,31 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                     coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
                 if (!containsMixedSchemaDataResponse.isOK() &&
                     results->addError(kMalformedMinMaxTimeseriesBucket)) {
-                    LOGV2_WARNING(8469900,
-                                  kMalformedMinMaxTimeseriesBucket,
-                                  logAttrs(coll->ns()),
-                                  "bucketId"_attr = record->id,
-                                  "error"_attr = containsMixedSchemaDataResponse.getStatus());
-                    ;
+                    LOGV2_WARNING_OPTIONS(8469900,
+                                          {logv2::LogTruncation::Disabled},
+                                          kMalformedMinMaxTimeseriesBucket,
+                                          logAttrs(coll->ns()),
+                                          "bucketId"_attr = record->id,
+                                          "error"_attr =
+                                              containsMixedSchemaDataResponse.getStatus());
                 } else if (containsMixedSchemaDataResponse.isOK() &&
                            containsMixedSchemaDataResponse.getValue()) {
                     bool mixedSchemaAllowed =
                         coll->getTimeseriesBucketsMayHaveMixedSchemaData().get();
                     if (mixedSchemaAllowed &&
                         results->addWarning(kExpectedMixedSchemaTimeseriesWarning)) {
-                        LOGV2_WARNING(8469901,
-                                      kExpectedMixedSchemaTimeseriesWarning,
-                                      logAttrs(coll->ns()),
-                                      "bucketId"_attr = record->id);
-                        ;
+                        LOGV2_WARNING_OPTIONS(8469901,
+                                              {logv2::LogTruncation::Disabled},
+                                              kExpectedMixedSchemaTimeseriesWarning,
+                                              logAttrs(coll->ns()),
+                                              "bucketId"_attr = record->id);
                     } else if (!mixedSchemaAllowed &&
                                results->addError(kUnexpectedMixedSchemaTimeseriesError)) {
-                        LOGV2_WARNING(8469902,
-                                      kUnexpectedMixedSchemaTimeseriesError,
-                                      logAttrs(coll->ns()),
-                                      "bucketId"_attr = record->id);
-                        ;
+                        LOGV2_WARNING_OPTIONS(8469902,
+                                              {logv2::LogTruncation::Disabled},
+                                              kUnexpectedMixedSchemaTimeseriesError,
+                                              logAttrs(coll->ns()),
+                                              "bucketId"_attr = record->id);
                     }
                 }
             }
