@@ -76,6 +76,7 @@ var $config = extendWorkload($config, function($config, $super) {
             const reshardCollectionCmdObj = {
                 reshardCollection: ns,
                 key: newShardKey,
+                numInitialChunks: 1,
             };
 
             print(`Started resharding collection ${ns}: ${tojson({newShardKey})}`);
