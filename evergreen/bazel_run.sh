@@ -14,6 +14,8 @@ cd src
 set -o errexit
 set -o verbose
 
+activate_venv
+
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Args: ${args} Target: ${target}"
 
@@ -55,9 +57,11 @@ echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
 echo "bazel run --verbose_failures $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
 
 # Run bazel command, retrying up to five times
-for i in {1..5}; do
-  eval $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target} && RET=0 && break || RET=$? && sleep 1
-  echo "Bazel failed to execute, retrying..."
+MAX_ATTEMPTS=5
+for ((i = 1; i <= $MAX_ATTEMPTS; i++)); do
+  eval $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target} &>> bazel_output.log && RET=0 && break || RET=$? && sleep 1
+  if [ $i -lt $MAX_ATTEMPTS ]; then echo "Bazel failed to execute, retrying ($(($i + 1)) of $MAX_ATTEMPTS attempts)... " &>> bazel_output.log; fi
 done
 
+$python ./buildscripts/simple_report.py --test-name "bazel run ${args} ${target}" --log-file bazel_output.log --exit-code $RET
 exit $RET
