@@ -3,6 +3,10 @@
  */
 const coll = db.find_all_values_at_path_expression;
 coll.drop();
+
+// In query stats, this fails with a different error code.
+const errorCodes = [9567004, 9423101];
+
 // Insert some documents because running aggregation on a non-existent collection on mongos will
 // return empty instead of erroring.
 let documents = [{a: 4}, {a: 5, b: 1}, {a: 0, b: 1}, {a: 0, b: 1}, {a: 2, b: {c: 1}}];
@@ -16,7 +20,7 @@ assert.commandFailedWithCode(db.runCommand({
     ],
     cursor: {}
 }),
-                             9567004);
+                             errorCodes);
 assert.commandFailedWithCode(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [
@@ -26,4 +30,4 @@ assert.commandFailedWithCode(db.runCommand({
     ],
     cursor: {}
 }),
-                             9567004);
+                             errorCodes);
