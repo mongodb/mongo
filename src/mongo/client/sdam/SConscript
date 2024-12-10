@@ -4,35 +4,16 @@ Import("env")
 
 env = env.Clone()
 
-sdam_json_test = env.Program(
+sdam_json_test = env.BazelProgram(
     target="sdam_json_test",
-    source=[
-        "sdam_json_test_runner.cpp",
-    ],
+    source=[],
     AIB_COMPONENT="sdam-json-test",
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/connection_string",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "json_test",
-        "sdam",
-        "sdam_test_util",
-    ],
 )[0]
 
-server_selection_json_test = env.Program(
+server_selection_json_test = env.BazelProgram(
     target="server_selection_json_test",
-    source=[
-        "server_selection_json_test_runner.cpp",
-    ],
+    source=[],
     AIB_COMPONENT="server-selection-json-test",
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/connection_string",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "json_test",
-        "sdam",
-        "sdam_test_util",
-    ],
 )[0]
 
 env.CppUnitTest(

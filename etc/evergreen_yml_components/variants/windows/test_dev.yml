@@ -98,6 +98,8 @@ buildvariants:
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.requires_execution_on_windows_patch_build
         distros:
           - windows-2022-xxlarge
+      # server_selection_json_test & server_discovery_and_monitoring_json_test depend on this
+      - name: compile_unittest_libaries_TG
 
   - <<: *windows_compile_variant_dependency
     name: enterprise-windows-all-feature-flags-required

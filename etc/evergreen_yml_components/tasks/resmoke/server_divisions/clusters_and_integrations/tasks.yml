@@ -797,6 +797,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
     commands:
       - func: "do scons setup"
       - func: "scons compile"
@@ -804,6 +805,7 @@ tasks:
           targets: install-sdam-json-test
           compiling_for_test: true
           install_dir: build/install/bin
+          bazel_build_tags: --bazel-build-tag=mongo_binary
       - func: "run tests"
         vars:
           suite: sdam_json_test
@@ -819,6 +821,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
     commands:
       - func: "do scons setup"
       - func: "scons compile"
@@ -826,6 +829,7 @@ tasks:
           targets: install-server-selection-json-test
           compiling_for_test: true
           install_dir: build/install/bin
+          bazel_build_tags: --bazel-build-tag=mongo_binary
       - func: "run tests"
 
   - <<: *task_template

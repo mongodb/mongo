@@ -2286,6 +2286,12 @@ task_groups:
       - compile_and_run_unittests_third_quarter
       - compile_and_run_unittests_fourth_quarter
 
+  - <<: *compile_task_group_template
+    name: compile_unittest_libaries_TG
+    max_hosts: -1
+    tasks:
+      - compile_libraries_for_unittests
+
   # These `parallel` task groups are only appropriate for builders that
   # use --link-model=dynamic, and have scons_cache_scope: shared and
   # scons_cache_mode: all. Such builders are able to share all build
