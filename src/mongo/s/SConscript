@@ -3,7 +3,6 @@
 Import(
     [
         "env",
-        "get_option",
         "have_sasl_lib",
         "http_client",
         "version_extra",
@@ -24,10 +23,6 @@ env.SConscript(
         "env",
     ],
 )
-
-
-def shouldBuildGRPC(myEnv):
-    return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
 
 
 if env.TargetOSIs("windows"):

@@ -1,37 +1,11 @@
 # -*- mode: python -*-
 
 Import("env")
-Import("get_option")
 
 env = env.Clone()
 
 env.CppUnitTest(
     target="s_commands_test",
-    source=[
-        "cluster_command_test_fixture.cpp",
-        "cluster_validate_db_metadata_cmd_test.cpp",
-        "document_shard_key_update_test.cpp",
-        "query_cmd/cluster_aggregate_test.cpp",
-        "query_cmd/cluster_bulk_write_test.cpp",
-        "query_cmd/cluster_delete_test.cpp",
-        "query_cmd/cluster_distinct_test.cpp",
-        "query_cmd/cluster_explain_test.cpp",
-        "query_cmd/cluster_find_and_modify_test.cpp",
-        "query_cmd/cluster_find_test.cpp",
-        "query_cmd/cluster_insert_test.cpp",
-        "query_cmd/cluster_profile_cmd_test.cpp",
-        "query_cmd/cluster_update_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands/profile_cmd_test_utils",
-        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory",
-        "$BUILD_DIR/mongo/db/read_write_concern_defaults_mock",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/vector_clock",
-        "$BUILD_DIR/mongo/s/query/planner/cluster_aggregate",
-        "$BUILD_DIR/mongo/s/sharding_mongos_test_fixture",
-        "$BUILD_DIR/mongo/transport/service_executor",
-        "cluster_commands",
-        "cluster_commands_common",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -354,5 +354,40 @@ mongo_cc_library(
         "//src/mongo/s:mongos_topology_coordinator",
         "//src/mongo/s:sharding_api",
         "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "s_commands_test",
+    srcs = [
+        "cluster_command_test_fixture.cpp",
+        "cluster_command_test_fixture.h",
+        "cluster_validate_db_metadata_cmd_test.cpp",
+        "document_shard_key_update_test.cpp",
+        "//src/mongo/db/session:logical_session_cache_noop.h",
+        "//src/mongo/s/commands/query_cmd:cluster_aggregate_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_bulk_write_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_delete_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_distinct_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_explain_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_find_and_modify_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_find_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_insert_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_profile_cmd_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_update_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":cluster_commands",
+        ":cluster_commands_common",
+        "//src/mongo/db:read_write_concern_defaults_mock",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/commands:profile_cmd_test_utils",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/s/query/planner:cluster_aggregate",
+        "//src/mongo/transport:service_executor",
     ],
 )

@@ -3,7 +3,6 @@
 Import(
     [
         "env",
-        "get_option",
         "http_client",
         "ssl_provider",
     ]

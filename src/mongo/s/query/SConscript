@@ -14,14 +14,3 @@ env.SConscript(
         "env",
     ],
 )
-
-env.Library(
-    target="mongos_docs_needed_bounds",
-    source=[
-        "document_source_visitor_docs_needed_bounds.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds_visitor",
-        "exec/router_exec_stage",
-    ],
-)

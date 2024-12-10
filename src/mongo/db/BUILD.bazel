@@ -3475,6 +3475,44 @@ mongo_cc_library(
 )
 
 mongo_cc_binary(
+    name = "mongotrafficreader",
+    srcs = [
+        "traffic_reader_main.cpp",
+    ],
+    exec_properties = select({
+        "@platforms//cpu:x86_64": {
+            "Pool": "large_mem_x86_64",
+        },
+        "@platforms//cpu:aarch64": {
+            "Pool": "large_memory_arm64",
+        },
+        "//conditions:default": {},
+    }),
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-ldl",
+            "-lrt",
+            "-latomic",
+        ],
+        "@platforms//os:windows": [
+            "-latomic",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "devcore",
+        "dist_test",
+    ],
+    deps = [
+        ":traffic_reader",
+        "//src/mongo:base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/rpc:message",
+        "//src/mongo/util:signal_handlers",
+    ],
+)
+
+mongo_cc_binary(
     name = "mongod",
     srcs = [
         "mongod.cpp",

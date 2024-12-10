@@ -3,9 +3,7 @@
 Import(
     [
         "env",
-        "get_option",
         "have_sasl_lib",
-        "has_option",
         "http_client",
         "version_extra",
         "version_parts",
@@ -22,10 +20,6 @@ env.InjectThirdParty(
         "s2",
     ]
 )
-
-
-def shouldBuildGRPC(myEnv):
-    return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
 
 
 env.SConscript(
@@ -157,17 +151,21 @@ env.CppUnitTest(
 asioEnv = env.Clone()
 asioEnv.InjectThirdParty("asio")
 
-env.Program(
+env.BazelProgram(
     target="mongotrafficreader",
-    source=[
-        "traffic_reader_main.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/rpc/message",
-        "$BUILD_DIR/mongo/util/signal_handlers",
-        "concurrency/lock_manager",
-        "traffic_reader",
+    source=[],
+    LIBDEPS=[],
+    AIB_COMPONENT="mongotrafficreader",
+    AIB_COMPONENTS_EXTRA=[
+        "core",
+        "default",
+        "devcore",
+        "dist",
+        "dist-test",
+        "integration-tests",
+        "serverless",
+        "serverless-test",
+        "servers",
     ],
 )
 

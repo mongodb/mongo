@@ -6,8 +6,6 @@ Import(
     [
         "endian",
         "env",
-        "get_option",
-        "has_option",
         "use_libunwind",
         "use_system_version_of_library",
         "version_extra",

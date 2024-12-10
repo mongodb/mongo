@@ -5,8 +5,6 @@ import sys
 Import(
     [
         "env",
-        "has_option",
-        "get_option",
         "use_libunwind",
         "version_extra",
         "version_parts",

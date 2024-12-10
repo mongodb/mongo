@@ -1,7 +1,6 @@
 # -*- mode: python; -*-
 
 Import("env")
-Import("get_option")
 
 env = env.Clone()
 

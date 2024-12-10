@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -12,4 +12,66 @@ exports_files(
 idl_generator(
     name = "simulator_options_gen",
     src = "simulator_options.idl",
+)
+
+mongo_cc_library(
+    name = "simulation",
+    srcs = [
+        "event_queue.cpp",
+        "simulation.cpp",
+        "simulator_options.cpp",
+        "simulator_options_init.cpp",
+        ":simulator_options_gen",
+    ],
+    hdrs = [
+        "event_queue.h",
+        "simulation.h",
+        "simulator_options.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:server_options_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/util:pcre_wrapper",
+        "//src/mongo/util:tick_source_mock",
+        "//src/mongo/util/options_parser:options_parser_init",
+    ],
+)
+
+mongo_cc_library(
+    name = "simulator_main",
+    srcs = [
+        "simulator_main.cpp",
+    ],
+    deps = [
+        ":simulation",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "workload_characteristics",
+    srcs = [
+        "workload_characteristics.cpp",
+    ],
+    hdrs = [
+        "workload_characteristics.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "tools_workload_characteristics_test",
+    srcs = [
+        "workload_characteristics_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":workload_characteristics",
+        "//src/mongo/unittest",
+    ],
 )

@@ -23,3 +23,15 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "mongos_docs_needed_bounds",
+    srcs = [
+        "document_source_visitor_docs_needed_bounds.cpp",
+        "//src/mongo/db/pipeline/visitors:document_source_visitor_registry_mongos.h",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline:docs_needed_bounds_visitor",
+        "//src/mongo/s/query/exec:router_exec_stage",
+    ],
+)
