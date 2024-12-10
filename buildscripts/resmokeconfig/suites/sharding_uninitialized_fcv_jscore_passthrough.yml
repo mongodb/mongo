@@ -75,6 +75,8 @@ selector:
     - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
     # analyzeShardKey cannot run directly on a shard replica set
     - jstests/core_sharding/analyze_shard_key/*.js
+    # This test runs many aggregations, and the override slows them down enough to hit the timeout.
+    - jstests/core/timeseries/query/timeseries_group_aggregations.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
