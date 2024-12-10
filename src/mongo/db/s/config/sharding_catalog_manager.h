@@ -665,12 +665,6 @@ public:
     void cleanUpPlacementHistory(OperationContext* opCtx, const Timestamp& earliestClusterTime);
 
     /**
-     * Updates the config.settings schema for FCV upgrade and downgrade.
-     * TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
-     */
-    Status upgradeDowngradeConfigSettings(OperationContext* opCtx);
-
-    /**
      * Schedules an asynchronous unset of the addOrRemoveShardInProgress cluster parameter, in case
      * a previous addShard/removeShard left it enabled after a failure or crash.
      */

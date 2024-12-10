@@ -867,42 +867,18 @@ Status ShardingCatalogManager::_initConfigCollections(OperationContext* opCtx) {
     return Status::OK();
 }
 
-// TODO (SERVER-83264): Move new validator to _initConfigSettings and remove old validator once 8.0
-// becomes last LTS.
-BSONObj createConfigSettingsValidator() {
-    // (Generic FCV reference): on versions where the balancerSettingsSchema feature flag is
-    // enabled, install an extended validator. This must be the case even for transitional FCV
-    // states, as the validator is installed during FCV upgrade.
-    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    auto targetVersion = fcvSnapshot.isUpgradingOrDowngrading()
-        ? getTransitionFCVInfo(fcvSnapshot.getVersion()).to
-        : fcvSnapshot.getVersion();
-
-    if (feature_flags::gBalancerSettingsSchema.isEnabledOnVersion(targetVersion)) {
-        const auto noopValidator = BSON(
-            "properties" << BSON(
-                "_id" << BSON("enum" << BSON_ARRAY(AutoMergeSettingsType::kKey
-                                                   << ReadWriteConcernDefaults::kPersistedDocumentId
-                                                   << "audit"))));
-        return BSON("$jsonSchema" << BSON("oneOf" << BSON_ARRAY(BalancerSettingsType::kSchema
-                                                                << ChunkSizeSettingsType::kSchema
-                                                                << noopValidator)));
-    } else {
-        const auto noopValidator = BSON(
-            "properties" << BSON(
-                "_id" << BSON("enum" << BSON_ARRAY(BalancerSettingsType::kKey
-                                                   << AutoMergeSettingsType::kKey
-                                                   << ReadWriteConcernDefaults::kPersistedDocumentId
-                                                   << "audit"))));
-        return BSON("$jsonSchema" << BSON(
-                        "oneOf" << BSON_ARRAY(ChunkSizeSettingsType::kSchema << noopValidator)));
-    }
-}
-
 Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
 
-    const auto fullValidator = createConfigSettingsValidator();
+    const auto noopValidator =
+        BSON("properties" << BSON(
+                 "_id" << BSON("enum" << BSON_ARRAY(
+                                   AutoMergeSettingsType::kKey
+                                   << ReadWriteConcernDefaults::kPersistedDocumentId << "audit"))));
+    const auto fullValidator =
+        BSON("$jsonSchema" << BSON("oneOf" << BSON_ARRAY(BalancerSettingsType::kSchema
+                                                         << ChunkSizeSettingsType::kSchema
+                                                         << noopValidator)));
 
     BSONObj cmd = BSON("create" << NamespaceString::kConfigSettingsNamespace.coll());
     BSONObj result;
@@ -1702,10 +1678,5 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
 
     LOGV2_DEBUG(7068808, 2, "Cleaning up placement history - done deleting entries");
 }
-
-Status ShardingCatalogManager::upgradeDowngradeConfigSettings(OperationContext* opCtx) {
-    return _initConfigSettings(opCtx);
-}
-
 
 }  // namespace mongo

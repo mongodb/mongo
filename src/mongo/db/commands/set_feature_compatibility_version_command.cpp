@@ -764,18 +764,7 @@ private:
 
         if (role && role->has(ClusterRole::ConfigServer)) {
             _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
-            // TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
-            _upgradeConfigSettingsSchema(opCtx, requestedVersion);
             _initializePlacementHistory(opCtx, requestedVersion);
-        }
-    }
-
-    void _upgradeConfigSettingsSchema(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gBalancerSettingsSchema.isEnabledOnVersion(requestedVersion)) {
-            LOGV2(8260900, "Updating schema on config.settings");
-            uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->upgradeDowngradeConfigSettings(opCtx));
         }
     }
 
@@ -848,18 +837,6 @@ private:
                     }
                     wunit.commit();
                 });
-        }
-    }
-
-    void _downgradeConfigSettingsSchema(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion) {
-        if (feature_flags::gBalancerSettingsSchema.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            LOGV2(8260901, "Updating schema on config.settings");
-            uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->upgradeDowngradeConfigSettings(opCtx));
         }
     }
 
@@ -1275,8 +1252,6 @@ private:
             // be able to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
             _createReshardingCoordinatorUniqueIndex(opCtx, requestedVersion, originalVersion);
-            // TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
-            _downgradeConfigSettingsSchema(opCtx, requestedVersion, originalVersion);
         }
 
         if (role && role->has(ClusterRole::ShardServer)) {

@@ -94,13 +94,6 @@ feature_flags:
     default: true
     version: 8.0
     shouldBeFCVGated: true
-  # TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
-  featureFlagBalancerSettingsSchema:
-    description: "Feature flag for updating the config settings schema to enforce balancer settings"
-    cpp_varname: feature_flags::gBalancerSettingsSchema
-    default: true
-    version: 7.3
-    shouldBeFCVGated: true
   # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
   featureFlagPlacementHistoryPostFCV73 :
     description: "Feature flag that marks a version change in the logic that generates config.placementHistory;
