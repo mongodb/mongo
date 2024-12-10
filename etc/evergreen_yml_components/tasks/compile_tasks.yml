@@ -761,7 +761,7 @@ tasks:
           targets: install-second-quarter-unittests install-second-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_second_group --bazel-build-tag=mongo_library
+          bazel_build_tags: --bazel-build-tag=mongo_unittest_second_group --bazel-build-tag=mongo_library --bazel-build-tag=stitch_support_test
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -1000,7 +1000,7 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-stitch-support install-stitch-support-debug install-stitch-support-dev
-          bazel_build_tags: --bazel-build-tag=mongo_library
+          bazel_build_tags: --bazel-build-tag=stitch_support
           task_compile_flags: >-
             --link-model=dynamic-sdk
             --ssl=off
@@ -1043,7 +1043,7 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-stitch-support-test
-          bazel_build_tags: --bazel-build-tag=mongo_library
+          bazel_build_tags: --bazel-build-tag=stitch_support_test
           compiling_for_test: true
           task_compile_flags: >-
             --ssl=off

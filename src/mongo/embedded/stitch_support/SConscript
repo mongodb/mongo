@@ -10,19 +10,7 @@ Import("get_option")
 env = env.Clone()
 
 stitchSupportEnv = env.Clone()
-stitchSupportEnv.AppendUnique(
-    CPPDEFINES=[
-        "STITCH_SUPPORT_COMPILING",
-    ],
-)
-
-if get_option("link-model") == "static":
-    stitchSupportEnv.AppendUnique(
-        CPPDEFINES=[
-            "STITCH_SUPPORT_STATIC",
-        ],
-    )
-elif get_option("link-model") == "dynamic-sdk":
+if get_option("link-model") == "dynamic-sdk":
     # TODO(SERVER-59134): This fails to honor the libdeps-debug flag
     stitchSupportEnv["LIBDEPS_SHLIBEMITTER"] = partial(
         libdeps.libdeps_emitter,
@@ -38,22 +26,6 @@ stitchSupportEnv.AppendUnique(
     ],
 )
 
-stitchSupportTargets = stitchSupportEnv.Library(
-    target="stitch_support",
-    source=[
-        "stitch_support.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/query/collation/collator_factory_icu",
-        "$BUILD_DIR/mongo/db/query/collation/collator_factory_interface",
-        "$BUILD_DIR/mongo/db/query/write_ops/parsed_update",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/vector_clock_trivial",
-    ],
-    AIB_COMPONENT="stitch-support",
-)
-
 env.AutoInstall(
     "$PREFIX_INCLUDEDIR/stitch_support/v1/stitch_support",
     source=["stitch_support.h"],
@@ -65,14 +37,7 @@ if get_option("link-model") != "dynamic-sdk":
     stitchSupportTestEnv = env.Clone()
     unitTest = stitchSupportTestEnv.CppUnitTest(
         target="stitch_support_test",
-        source=[
-            "stitch_support_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/db/service_context_non_d",
-            "$BUILD_DIR/mongo/unittest/unittest",
-            "stitch_support",
-        ],
+        source=[],
         UNITTEST_HAS_CUSTOM_MAINLINE=True,
         AIB_COMPONENT="stitch-support-test",
     )
