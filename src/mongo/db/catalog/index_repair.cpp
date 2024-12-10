@@ -191,13 +191,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
     } else {
         invariant(insertStatus.code() == ErrorCodes::DuplicateKey);
 
-        RecordId rid;
-        if (keyFormat == KeyFormat::Long) {
-            rid = key_string::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
-        } else {
-            invariant(keyFormat == KeyFormat::String);
-            rid = key_string::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
-        }
+        RecordId rid = key_string::decodeRecordIdAtEnd(ks.getView(), keyFormat);
 
         auto dupKeyInfo = insertStatus.extraInfo<DuplicateKeyErrorInfo>();
         auto dupKeyRid = dupKeyInfo->getDuplicateRid();

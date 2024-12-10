@@ -191,14 +191,6 @@ public:
 
 private:
     /**
-     * Helper that takes in a keystring WITH a RecordId appended at the end, and returns its
-     * owned buffer without the RecordId appended at the end.
-     */
-    StringData _stripRecordIdFromKeyString(const key_string::Value& keyString,
-                                           const key_string::Version& version,
-                                           const Collection* collection);
-
-    /**
      * Runs the secondary extra index keys check
      */
     void _extraIndexKeysCheck(OperationContext* opCtx);

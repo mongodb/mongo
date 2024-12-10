@@ -117,9 +117,8 @@ int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry&
     return lhs.loc.compare(rhs.loc);  // is supposed to ignore ordering
 }
 
-StringData IndexEntryComparison::makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
-                                                                   bool isForward,
-                                                                   key_string::Builder& builder) {
+std::span<const char> IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+    const IndexSeekPoint& seekPoint, bool isForward, key_string::Builder& builder) {
     const bool inclusive = seekPoint.firstExclusive < 0;
     const auto discriminator = isForward == inclusive ? key_string::Discriminator::kExclusiveBefore
                                                       : key_string::Discriminator::kExclusiveAfter;
@@ -145,11 +144,12 @@ StringData IndexEntryComparison::makeKeyStringFromSeekPointForSeek(const IndexSe
     return builder.finishAndGetBuffer(discriminator);
 }
 
-StringData IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
-                                                                 Ordering ord,
-                                                                 bool isForward,
-                                                                 bool inclusive,
-                                                                 key_string::Builder& builder) {
+std::span<const char> IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+    const BSONObj& bsonKey,
+    Ordering ord,
+    bool isForward,
+    bool inclusive,
+    key_string::Builder& builder) {
     return makeKeyStringFromBSONKey(bsonKey,
                                     ord,
                                     isForward == inclusive
@@ -158,10 +158,11 @@ StringData IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSONObj& 
                                     builder);
 }
 
-StringData IndexEntryComparison::makeKeyStringFromBSONKey(const BSONObj& bsonKey,
-                                                          Ordering ord,
-                                                          key_string::Discriminator discrim,
-                                                          key_string::Builder& builder) {
+std::span<const char> IndexEntryComparison::makeKeyStringFromBSONKey(
+    const BSONObj& bsonKey,
+    Ordering ord,
+    key_string::Discriminator discrim,
+    key_string::Builder& builder) {
     builder.resetToKey(bsonKey, ord, discrim);
     return builder.finishAndGetBuffer();
 }
@@ -261,8 +262,7 @@ Status buildDupKeyErrorStatus(const key_string::Value& keyString,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation,
                               const Ordering& ordering) {
-    const BSONObj key = key_string::toBson(
-        keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+    const BSONObj key = key_string::toBson(keyString.getView(), ordering, keyString.getTypeBits());
 
     return buildDupKeyErrorStatus(key, collectionNamespace, indexName, keyPattern, indexCollation);
 }
@@ -271,8 +271,7 @@ Status buildDupKeyErrorStatus(OperationContext* opCtx,
                               const key_string::Value& keyString,
                               const Ordering& ordering,
                               const IndexDescriptor* desc) {
-    const BSONObj key = key_string::toBson(
-        keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+    const BSONObj key = key_string::toBson(keyString.getView(), ordering, keyString.getTypeBits());
     return buildDupKeyErrorStatus(opCtx, key, desc);
 }
 

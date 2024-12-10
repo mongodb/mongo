@@ -70,15 +70,10 @@
 
 namespace mongo {
 
-using std::string;
-
 template class StackBufBuilderBase<key_string::TypeBits::SmallStackSize>;
 
 namespace key_string {
-
-
 namespace {
-
 namespace CType {
 // canonical types namespace. (would be enum class CType: uint8_t in C++11)
 // Note 0-9 and 246-255 are disallowed and reserved for value encodings.
@@ -396,12 +391,12 @@ StringData readCStringWithNuls(BufReader* reader, std::string* scratch) {
     return *scratch;
 }
 
-string readInvertedCString(BufReader* reader) {
+std::string readInvertedCString(BufReader* reader) {
     const char* start = static_cast<const char*>(reader->pos());
     const char* end = static_cast<const char*>(memchr(start, 0xFF, reader->remaining()));
     keyStringAssert(50817, "Failed to find '0xFF' in inverted string.", end);
     size_t actualBytes = end - start;
-    string s(start, actualBytes);
+    std::string s(start, actualBytes);
     for (size_t i = 0; i < s.size(); i++) {
         s[i] = ~s[i];
     }
@@ -409,7 +404,7 @@ string readInvertedCString(BufReader* reader) {
     return s;
 }
 
-string readInvertedCStringWithNuls(BufReader* reader) {
+std::string readInvertedCStringWithNuls(BufReader* reader) {
     std::string out;
     bool firstPass = true;
     do {
@@ -438,27 +433,27 @@ string readInvertedCStringWithNuls(BufReader* reader) {
     return out;
 }
 
-#define keyStringAssertWithBuffer(id, msg, cond, buffer, bufferSize, ...) \
-    do {                                                                  \
-        if (MONGO_unlikely(!(cond))) {                                    \
-            logUassert(id, msg, buffer, bufferSize, ##__VA_ARGS__);       \
-        }                                                                 \
+#define keyStringAssertWithBuffer(id, msg, cond, buffer, ...) \
+    do {                                                      \
+        if (MONGO_unlikely(!(cond))) {                        \
+            logUassert(id, msg, buffer, ##__VA_ARGS__);       \
+        }                                                     \
     } while (false)
 
 
 template <size_t N, typename... Args>
-void logUassert(int32_t id,
-                const char (&msg)[N],
-                const unsigned char* buffer,
-                size_t bufferSize,
-                Args... args) {
-    auto encoded = base64::encode(buffer, bufferSize);
+void logUassert(int32_t id, const char (&msg)[N], std::span<const char> buffer, Args... args) {
+    auto encoded = base64::encode(buffer.data(), buffer.size());
     LOGV2_OPTIONS(id,
                   logv2::LogOptions(logv2::LogTruncation::Disabled, logv2::UserAssertAfterLog()),
                   msg,
                   "buffer"_attr = encoded,
-                  "bufferSize"_attr = bufferSize,
+                  "bufferSize"_attr = buffer.size(),
                   args...);
+}
+
+BufReader makeBufReader(std::span<const char> buf) {
+    return BufReader(buf.data(), buf.size());
 }
 
 }  // namespace
@@ -1690,8 +1685,8 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kRegEx: {
             if (inverted) {
-                string pattern = readInvertedCString(reader);
-                string flags = readInvertedCString(reader);
+                std::string pattern = readInvertedCString(reader);
+                std::string flags = readInvertedCString(reader);
                 *stream << BSONRegEx(pattern, flags);
             } else {
                 StringData pattern = readCString(reader);
@@ -2450,11 +2445,12 @@ Decimal128 adjustDecimalExponent(TypeBits::ReaderBase* typeBits, Decimal128 num)
 
 template <class BufferT>
 std::string BuilderBase<BufferT>::toString() const {
-    return hexblob::encode(getBuffer(), getSize());
+    auto view = getView();
+    return hexblob::encode(view.data(), view.size());
 }
 
 std::string Value::toString() const {
-    return hexblob::encode(getBuffer(), getSize());
+    return hexblob::encode(_buffer.get(), _ksSize);
 }
 
 TypeBits& TypeBits::operator=(const TypeBits& tb) {
@@ -2703,9 +2699,9 @@ uint8_t TypeBits::ExplainReader::readDecimalExponent() {
     return _reader.readDecimalExponent();
 }
 
-size_t getKeySize(const char* buffer, size_t len, Ordering ord, Version version) {
-    invariant(len > 0);
-    BufReader reader(buffer, len);
+size_t getKeySize(std::span<const char> data, Ordering ord, Version version) {
+    invariant(data.size() > 0);
+    auto reader = makeBufReader(data);
     unsigned remainingBytes;
     for (int i = 0; (remainingBytes = reader.remaining()); i++) {
         const bool invert = (ord.get(i) == -1);
@@ -2718,18 +2714,17 @@ size_t getKeySize(const char* buffer, size_t len, Ordering ord, Version version)
         filterKeyFromKeyString(ctype, &reader, invert, version);
     }
 
-    invariant(len > remainingBytes);
+    invariant(data.size() > remainingBytes);
     // Key size = buffer len - number of bytes comprising the RecordId
-    return (len - (remainingBytes - 1));
+    return data.size() - (remainingBytes - 1);
 }
 
 // This discriminator byte only exists in KeyStrings for queries, not in KeyStrings stored in an
 // index.
-Discriminator decodeDiscriminator(const char* buffer,
-                                  size_t len,
+Discriminator decodeDiscriminator(std::span<const char> data,
                                   Ordering ord,
                                   const TypeBits& typeBits) {
-    BufReader reader(buffer, len);
+    auto reader = makeBufReader(data);
     TypeBits::Reader typeBitsReader(typeBits);
     for (int i = 0; reader.remaining(); i++) {
         const bool invert = (ord.get(i) == -1);
@@ -2751,7 +2746,7 @@ Discriminator decodeDiscriminator(const char* buffer,
 
 int Value::computeElementCount(Ordering ord) const {
     int count = 0;
-    BufReader reader(getBuffer(), getSize());
+    BufReader reader(_buffer.get(), _ksSize);
     for (int i = 0; reader.remaining(); i++) {
         const bool invert = (ord.get(i) == -1);
         uint8_t ctype = readType<uint8_t>(&reader, invert);
@@ -2764,12 +2759,11 @@ int Value::computeElementCount(Ordering ord) const {
     return count;
 }
 
-void toBsonSafe(const char* buffer,
-                size_t len,
+void toBsonSafe(std::span<const char> data,
                 Ordering ord,
                 TypeBits::ReaderBase& typeBitsReader,
                 BSONObjBuilder& builder) {
-    BufReader reader(buffer, len);
+    auto reader = makeBufReader(data);
     for (int i = 0; reader.remaining(); i++) {
         const bool invert = (ord.get(i) == -1);
         uint8_t ctype = readType<uint8_t>(&reader, invert);
@@ -2788,139 +2782,145 @@ void toBsonSafe(const char* buffer,
     }
 }
 
-void toBsonSafe(const char* buffer,
-                size_t len,
+void toBsonSafe(std::span<const char> data,
                 Ordering ord,
                 const TypeBits& typeBits,
                 BSONObjBuilder& builder) {
     TypeBits::Reader typeBitsReader(typeBits);
-    return toBsonSafe(buffer, len, ord, typeBitsReader, builder);
+    return toBsonSafe(data, ord, typeBitsReader, builder);
 }
 
 int Value::compareWithoutDiscriminator(const Value& other) const {
-    return key_string::compare(
-        getBuffer(),
-        other.getBuffer(),
-        !isEmpty() ? sizeWithoutDiscriminatorAtEnd(getBuffer(), getSize()) : 0,
-        !other.isEmpty() ? sizeWithoutDiscriminatorAtEnd(other.getBuffer(), other.getSize()) : 0);
+    return key_string::compare(withoutDiscriminatorAtEnd(getView()),
+                               withoutDiscriminatorAtEnd(other.getView()));
 }
 
-BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
+BSONObj toBsonSafe(std::span<const char> data, Ordering ord, const TypeBits& typeBits) {
     BSONObjBuilder builder;
-    toBsonSafe(buffer, len, ord, typeBits, builder);
+    toBsonSafe(data, ord, typeBits, builder);
     return builder.obj();
 }
 
-BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) noexcept {
-    return toBsonSafe(buffer, len, ord, typeBits);
+BSONObj toBson(std::span<const char> data, Ordering ord, const TypeBits& typeBits) noexcept {
+    return toBsonSafe(data, ord, typeBits);
 }
 
-BSONObj toBson(StringData data, Ordering ord, const TypeBits& typeBits) {
-    return toBson(data.rawData(), data.size(), ord, typeBits);
-}
-
-BSONObj toBson(StringData data, Ordering ord, StringData typeBitsRawBuffer, Version version) {
+BSONObj toBson(std::span<const char> data,
+               Ordering ord,
+               std::span<const char> typeBitsRawBuffer,
+               Version version) {
     BSONObjBuilder builder;
-    BufReader br(typeBitsRawBuffer.rawData(), typeBitsRawBuffer.size());
+    auto br = makeBufReader(typeBitsRawBuffer);
     auto reader = TypeBits::getReaderFromBuffer(version, &br);
-    toBsonSafe(data.rawData(), data.size(), ord, reader, builder);
+    toBsonSafe(data, ord, reader, builder);
     return builder.obj();
 }
 
-RecordId decodeRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize) {
+RecordId decodeRecordIdLongAtEnd(std::span<const char> buf) {
+    invariant(buf.size() > 0);
     RecordId recordId;
-    sizeWithoutRecordIdLongAtEnd(bufferRaw, bufSize, &recordId);
+    withoutRecordIdLongAtEnd(buf, &recordId);
     return recordId;
 }
 
-int32_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize, RecordId* recordId) {
-    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
-    keyStringAssertWithBuffer(
-        8273006, "Input too short to encode RecordId", bufSize >= 2, buffer, bufSize);
-    const unsigned char lastByte = *(buffer + bufSize - 1);
+std::span<const char> withoutRecordIdLongAtEnd(std::span<const char> buf, RecordId* recordId) {
+    if (buf.empty()) {
+        return buf;
+    }
+    keyStringAssertWithBuffer(8273006, "Input too short to encode RecordId", buf.size() >= 2, buf);
+    const unsigned char lastByte = buf.back();
     const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
 
     keyStringAssertWithBuffer(8273001,
                               "Encoded RecordId size is too big",
-                              bufSize >= ridSize,
-                              buffer,
-                              bufSize,
+                              buf.size() >= ridSize,
+                              buf,
                               "ridSize"_attr = ridSize);
     if (recordId) {
-        const unsigned char* firstBytePtr = buffer + bufSize - ridSize;
-        BufReader reader(firstBytePtr, ridSize);
-        *recordId = decodeRecordIdLong(&reader);
+        *recordId = decodeRecordIdLong(buf.last(ridSize));
     }
-    return bufSize - ridSize;
+    return buf.subspan(0, buf.size() - ridSize);
 }
 
-int32_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize) {
+std::span<const char> withoutDiscriminatorAtEnd(std::span<const char> buf) {
+    if (buf.empty()) {
+        return buf;
+    }
     keyStringAssertWithBuffer(8328701,
                               "Input too short to decode RecordId",
-                              bufSize >= 2,
-                              static_cast<const unsigned char*>(bufferRaw),
-                              bufSize);  // smallest possible encoding of a RecordId.
-    const char* ptr = static_cast<const char*>(bufferRaw) + bufSize - 1;
-    uint8_t ctype = ConstDataView(ptr).read<uint8_t>();
+                              buf.size() >= 2,  // smallest possible encoding of a RecordId.
+                              buf);
+    uint8_t ctype = buf.back();
     tassert(8328700,
             fmt::format(
                 "Expect keystring to have a kEnd, kLess, or kGreater byte at the end. Found: {}",
                 ctype),
             ctype == kEnd || ctype == kLess || ctype == kGreater);
-    return bufSize - 1;
+    return buf.first(buf.size() - 1);
 }
 
-RecordId decodeRecordIdLong(BufReader* reader) {
-    const unsigned bufSize = reader->remaining();
-    const unsigned char* firstBytePtr = static_cast<const unsigned char*>(reader->pos());
+namespace {
+RecordId decodeRecordIdLong(std::span<const char> buffer, size_t& ridSize) {
     keyStringAssertWithBuffer(
-        843441, "Input too short to decode RecordId", bufSize >= 2, firstBytePtr, bufSize);
+        843441, "Input too short to decode RecordId", buffer.size() >= 2, buffer);
 
-    const unsigned char firstByte = *firstBytePtr;
+    const unsigned char firstByte = buffer[0];
     const unsigned numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte
     uint64_t repr = firstByte & 0x1f;               // low 5 bits in firstByte
 
-    const unsigned ridSize = numExtraBytes + 2;
+    ridSize = numExtraBytes + 2;
     keyStringAssertWithBuffer(8434401,
                               "Encoded RecordId size is too big",
-                              bufSize >= ridSize,
-                              firstBytePtr,
-                              bufSize,
+                              buffer.size() >= ridSize,
+                              buffer,
                               "ridSize"_attr = ridSize);
     unsigned offset = 1;
     for (; offset < numExtraBytes + 1; offset++) {
-        repr = (repr << 8) | firstBytePtr[offset];
+        repr = (repr << 8) | uint8_t(buffer[offset]);
     }
 
-    const unsigned char lastByte = firstBytePtr[offset];
+    const unsigned char lastByte = buffer[offset];
     keyStringAssertWithBuffer(8273000,
                               "Number of extra bytes for RecordId is not encoded correctly",
                               (lastByte & 0x7) == numExtraBytes,
-                              firstBytePtr,
-                              bufSize,
+                              buffer,
                               "low 3 bits of lastByte"_attr = lastByte & 0x7,
                               "high 3 bits of firstByte"_attr = numExtraBytes);
-
-    // Only advance the reader once we know we will return something.
-    reader->skip(ridSize);
 
     repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
     return RecordId(repr);
 }
+}  // namespace
 
-RecordId decodeRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
-    RecordId recordId;
-    sizeWithoutRecordIdStrAtEnd(bufferRaw, bufSize, &recordId);
+RecordId decodeRecordIdLong(std::span<const char> buffer) {
+    size_t ridSize = 0;
+    return decodeRecordIdLong(buffer, ridSize);
+}
+
+RecordId decodeRecordIdLong(BufReader* reader) {
+    std::span buffer(static_cast<const char*>(reader->pos()), reader->remaining());
+    size_t ridSize = 0;
+    auto recordId = decodeRecordIdLong(buffer, ridSize);
+    reader->skip(ridSize);
     return recordId;
 }
 
-int32_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize, RecordId* recordId) {
+RecordId decodeRecordIdStrAtEnd(std::span<const char> buf) {
+    invariant(buf.size() > 0);
+    RecordId recordId;
+    withoutRecordIdStrAtEnd(buf, &recordId);
+    return recordId;
+}
+
+std::span<const char> withoutRecordIdStrAtEnd(std::span<const char> bufferRaw, RecordId* recordId) {
+    if (bufferRaw.empty()) {
+        return bufferRaw;
+    }
+
     // See _appendRecordIdStr for the encoding scheme.
     // The RecordId binary string size is decoded right-to-left, up to the size byte
     // without continuation bit.
-
-    invariant(bufSize > 0);
-    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
+    auto buffer = reinterpret_cast<const unsigned char*>(bufferRaw.data());
 
     // Decode RecordId binary string size
     size_t ridSize = 0;
@@ -2928,23 +2928,25 @@ int32_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize, Recor
 
     // Continuation bytes
     size_t sizeByteId = 0;
-    for (; buffer[bufSize - 1 - sizeByteId] & 0x80; sizeByteId++) {
-        keyStringAssert(
-            8273002,
-            fmt::format("size bytes too long. bufSize: {}, sizeByteId: {}", bufSize, sizeByteId),
-            bufSize > sizeByteId + 1 /* this is cont, so next byte must be within buffer */);
+    for (; buffer[bufferRaw.size() - 1 - sizeByteId] & 0x80; sizeByteId++) {
+        keyStringAssert(8273002,
+                        fmt::format("size bytes too long. bufSize: {}, sizeByteId: {}",
+                                    bufferRaw.size(),
+                                    sizeByteId),
+                        bufferRaw.size() >
+                            sizeByteId + 1 /* this is cont, so next byte must be within buffer */);
         keyStringAssert(
             8273003,
             fmt::format("size bytes longer than maximum allowed bytes. sizeByteId: {}", sizeByteId),
             sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
-        sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId] & 0x7F;
+        sizes[sizeByteId] = buffer[bufferRaw.size() - 1 - sizeByteId] & 0x7F;
     }
     // Last (non-continuation) byte
     keyStringAssert(
         8273004,
         fmt::format("size bytes longer than maximum allowed bytes. sizeByteId: {}", sizeByteId),
         sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
-    sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId];
+    sizes[sizeByteId] = buffer[bufferRaw.size() - 1 - sizeByteId];
 
     const size_t numSegments = sizeByteId + 1;
 
@@ -2955,47 +2957,31 @@ int32_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize, Recor
 
     keyStringAssertWithBuffer(8273005,
                               "RecordId too long",
-                              bufSize >= ridSize + numSegments,
-                              buffer,
-                              bufSize,
+                              bufferRaw.size() >= ridSize + numSegments,
+                              bufferRaw,
                               "ridSize"_attr = ridSize,
                               "numSegments"_attr = numSegments);
 
+    auto ridOffset = bufferRaw.size() - ridSize - numSegments;
     if (recordId) {
-        *recordId = RecordId(
-            reinterpret_cast<const char*>(buffer) + (bufSize - ridSize - numSegments), ridSize);
+        *recordId = RecordId(bufferRaw.subspan(ridOffset, ridSize));
     }
-    return bufSize - ridSize - numSegments;
+    return bufferRaw.first(ridOffset);
 }
 
-int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize) {
+int compare(std::span<const char> left, std::span<const char> right) {
     // memcmp has undefined behavior if either leftBuf or rightBuf is a null pointer.
-    if (MONGO_unlikely(leftSize == 0))
-        return rightSize == 0 ? 0 : -1;
-    else if (MONGO_unlikely(rightSize == 0))
-        return 1;
-
-    int min = std::min(leftSize, rightSize);
-
-    int cmp = memcmp(leftBuf, rightBuf, min);
-
-    if (cmp) {
-        if (cmp < 0)
-            return -1;
-        return 1;
+    if (MONGO_likely(left.data() && right.data())) {
+        int cmp = std::memcmp(left.data(), right.data(), std::min(left.size(), right.size()));
+        if (cmp != 0)
+            return cmp < 0 ? -1 : 1;
     }
-
-    // keys match
-
-    if (leftSize == rightSize)
-        return 0;
-
-    return leftSize < rightSize ? -1 : 1;
+    auto cmp = left.size() <=> right.size();
+    return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
 }
 
 int Value::compareWithTypeBits(const Value& other) const {
-    return key_string::compare(
-        getBuffer(), other.getBuffer(), _buffer.size(), other._buffer.size());
+    return key_string::compare(getViewWithTypeBits(), other.getViewWithTypeBits());
 }
 
 boost::optional<uint8_t> getAndValidateNextStoredCtype(BufReader* reader, bool inverted) {
@@ -3057,7 +3043,7 @@ void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Vers
 }
 
 void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
-    dassert(decodeRecordIdLongAtEnd(_buffer.get(), _ksSize).isValid());
+    dassert(decodeRecordIdLongAtEnd(getView()).isValid());
 
     const int32_t sizeWithoutRecordId = getSizeWithoutRecordId();
     buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
@@ -3066,7 +3052,7 @@ void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
 }
 
 void Value::serializeWithoutRecordIdStr(BufBuilder& buf) const {
-    dassert(decodeRecordIdStrAtEnd(_buffer.get(), _ksSize).isValid());
+    dassert(decodeRecordIdStrAtEnd(getView()).isValid());
 
     const int32_t sizeWithoutRecordId = getSizeWithoutRecordId();
     buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
@@ -3078,22 +3064,13 @@ Value Value::deserialize(BufReader& buf,
                          key_string::Version version,
                          boost::optional<KeyFormat> ridFormat) {
     const int32_t sizeOfKeystring = buf.read<LittleEndian<int32_t>>();
-    const void* keystringPtr = buf.skip(sizeOfKeystring);
+    auto keystring = buf.readBytes(sizeOfKeystring);
 
     BufBuilder newBuf;
-    newBuf.appendBuf(keystringPtr, sizeOfKeystring);
+    newBuf.appendBuf(keystring.data(), keystring.size());
 
     // We have to decode the RecordId because we don't serialize that information.
-    const auto ridOffset = [&] {
-        if (!ridFormat) {
-            return sizeOfKeystring;
-        } else if (KeyFormat::Long == *ridFormat) {
-            return sizeWithoutRecordIdLongAtEnd(keystringPtr, sizeOfKeystring);
-        } else if (KeyFormat::String == *ridFormat) {
-            return sizeWithoutRecordIdStrAtEnd(keystringPtr, sizeOfKeystring);
-        }
-        MONGO_UNREACHABLE;
-    }();
+    const auto withoutRid = ridFormat ? withoutRecordIdAtEnd(keystring, *ridFormat) : keystring;
 
     auto typeBits = TypeBits::fromBuffer(version, &buf);  // advances the buf
     if (typeBits.isAllZeros()) {
@@ -3106,7 +3083,7 @@ Value Value::deserialize(BufReader& buf,
     const size_t newBufLen = newBuf.len();
     return {version,
             sizeOfKeystring,
-            sizeOfKeystring - ridOffset,
+            static_cast<int32_t>(sizeOfKeystring - withoutRid.size()),
             SharedBufferFragment(newBuf.release(), newBufLen)};
 }
 
@@ -3116,7 +3093,10 @@ size_t Value::getApproximateSize() const {
     return size;
 }
 
-Value Value::makeValue(Version version, StringData ks, StringData rid, StringData typeBits) {
+Value Value::makeValue(Version version,
+                       std::span<const char> ks,
+                       std::span<const char> rid,
+                       std::span<const char> typeBits) {
     const auto bufSize = ks.size() + rid.size() + (typeBits.size() > 0 ? typeBits.size() : 1);
     BufBuilder buf(bufSize);
     buf.appendBuf(ks.data(), ks.size());
@@ -3171,15 +3151,14 @@ BSONObj rehydrateKey(const BSONObj& keyPatternBson, const BSONObj& keyStringBson
     return b.obj();
 }
 
-std::string explain(const char* buffer,
-                    int len,
+std::string explain(std::span<const char> buffer,
                     const BSONObj& keyPattern,
                     const TypeBits& typeBits,
                     boost::optional<KeyFormat> keyFormat) {
     const auto ord = Ordering::make(keyPattern);
 
     auto keyPatternIter = keyPattern.begin();
-    BufReader reader(buffer, len);
+    auto reader = makeBufReader(buffer);
     str::stream str;
     TypeBits::Reader typeBitsReader(typeBits);
     for (int i = 0; reader.remaining(); i++) {
@@ -3232,16 +3211,8 @@ std::string explain(const char* buffer,
     if (!reader.remaining()) {
         str << "No RecordId\n";
     } else if (keyFormat) {
-        const auto startPos = reader.pos();
-        const auto startOff = reader.offset();
-
-        RecordId recordId;
-        if (keyFormat == KeyFormat::Long) {
-            recordId = key_string::decodeRecordIdLongAtEnd(buffer, len);
-        } else {
-            recordId = key_string::decodeRecordIdStrAtEnd(buffer, len);
-        }
-        str << "Bytes: 0x" << hexblob::encodeLower(startPos, (len - startOff)) << "\n";
+        RecordId recordId = key_string::decodeRecordIdAtEnd(buffer, *keyFormat);
+        str << "Bytes: 0x" << hexblob::encodeLower(reader.pos(), reader.remaining()) << "\n";
         auto kfString = (*keyFormat == KeyFormat::Long) ? "Long" : "String";
         str << fmt::format("  RecordId {}: {}\n", kfString, recordId.toString());
     } else {

@@ -4221,7 +4221,7 @@ public:
         BSONObj obj(buffer);
 
         RecordStore* rs = coll()->getRecordStore();
-        RecordId rid(OID::gen().view().view(), OID::kOIDSize);
+        RecordId rid({OID::gen().view().view(), OID::kOIDSize});
         {
             beginTransaction();
             ASSERT_OK(rs->insertRecord(&_opCtx, rid, obj.objdata(), obj.objsize(), timestampToUse));

@@ -372,7 +372,7 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
 
         // Check key in index for only document.
         auto first = makeFirstKeyString(*sortedDataInterface);
-        auto firstKeyString = StringData(first.getBuffer(), first.getSize());
+        auto firstKeyString = first.getView();
         key_string::Value keyStringWithRecordId;
         {
             auto cursor = sortedDataInterface->newCursor(opCtx);

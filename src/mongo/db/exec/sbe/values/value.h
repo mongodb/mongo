@@ -1511,7 +1511,6 @@ inline RecordId* getRecordIdView(Value val) noexcept {
 }
 
 std::pair<TypeTags, Value> makeNewRecordId(int64_t rid);
-std::pair<TypeTags, Value> makeNewRecordId(const char* str, int32_t size);
 std::pair<TypeTags, Value> makeCopyRecordId(const RecordId&);
 
 inline ValueBlock* getValueBlock(Value v) {

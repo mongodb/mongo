@@ -680,14 +680,6 @@ void DbChecker::doCollection(OperationContext* opCtx) noexcept {
     }
 }
 
-
-StringData DbChecker::_stripRecordIdFromKeyString(const key_string::Value& keyString,
-                                                  const key_string::Version& version,
-                                                  const Collection* collection) {
-    const size_t keyStringSize = keyString.getSizeWithoutRecordId();
-    return {keyString.getBuffer(), keyStringSize};
-}
-
 void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
     if (MONGO_unlikely(hangBeforeExtraIndexKeysCheck.shouldFail())) {
         LOGV2_DEBUG(7844908, 3, "Hanging due to hangBeforeExtraIndexKeysCheck failpoint");
@@ -1267,7 +1259,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 
     // If we're in the middle of an index check, snapshotFirstKeyWithRecordId should be set.
     // Strip the recordId and seek.
-    if (snapshotFirstKeyWithRecordId.is_initialized()) {
+    if (snapshotFirstKeyWithRecordId) {
         // If this is the beginning of a batch, update the batch first key.
         if (batchStats.batchStartWithRecordId.isEmpty() &&
             batchStats.batchStartBsonWithoutRecordId.isEmpty()) {
@@ -1276,8 +1268,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         // Create keystring to seek without recordId. This is because if the index
         // is an older format unique index, the keystring will not have the recordId appended, so we
         // need to seek for the keystring without the recordId.
-        auto snapshotFirstKeyWithoutRecordId = _stripRecordIdFromKeyString(
-            snapshotFirstKeyWithRecordId.get(), version, collection.get());
+        auto snapshotFirstKeyWithoutRecordId =
+            snapshotFirstKeyWithRecordId->getViewWithoutRecordId();
         snapshotFirstKeyStringBsonRehydrated = key_string::rehydrateKey(
             index->keyPattern(),
             _keyStringToBsonSafeHelper(snapshotFirstKeyWithRecordId.get(), ordering));
@@ -1467,18 +1459,9 @@ bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
             indexDescriptor->keyPattern(),
             _keyStringToBsonSafeHelper(nextIndexKeyWithRecordId.get().keyString, ordering)));
 
-    const bool isDistinctNextKeyString = [&] {
-        switch (collection->getRecordStore()->keyFormat()) {
-            case KeyFormat::Long:
-                return currKeyStringWithRecordId.compareWithoutRecordIdLong(
-                           batchStats.nextKeyToBeCheckedWithRecordId) != 0;
-
-            case KeyFormat::String:
-                return currKeyStringWithRecordId.compareWithoutRecordIdStr(
-                           batchStats.nextKeyToBeCheckedWithRecordId) != 0;
-        }
-        MONGO_UNREACHABLE;
-    }();
+    const bool isDistinctNextKeyString = currKeyStringWithRecordId.compareWithoutRecordId(
+                                             batchStats.nextKeyToBeCheckedWithRecordId,
+                                             collection->getRecordStore()->keyFormat()) != 0;
 
     const bool shouldEndSnapshot =
         numKeysInSnapshot >= repl::dbCheckMaxTotalIndexKeysPerSnapshot.load();

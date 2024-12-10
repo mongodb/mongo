@@ -53,8 +53,8 @@ void BM_RecordIdCompareLong(benchmark::State& state) {
 
 void BM_RecordIdCompareSmallStr(benchmark::State& state) {
     std::string str1(20, 'x');
-    RecordId rid1(str1.c_str(), str1.size());
-    RecordId rid2(str1.c_str(), str1.size());
+    RecordId rid1(str1);
+    RecordId rid2(str1);
     for (auto _ : state) {
         benchmark::DoNotOptimize(rid1 > rid2);
         benchmark::ClobberMemory();
@@ -92,7 +92,7 @@ void BM_RecordIdCopyMedString(benchmark::State& state) {
     char buf[bufLen];
     memset(buf, 'x', bufLen);
 
-    RecordId rid = RecordId(buf, bufLen);
+    RecordId rid = RecordId(buf);
     for (auto _ : state) {
         RecordId tmp;
         benchmark::DoNotOptimize(tmp = rid);
@@ -105,7 +105,7 @@ void BM_RecordIdCopyBigString(benchmark::State& state) {
     char buf[bufLen];
     memset(buf, 'x', bufLen);
 
-    RecordId rid = RecordId(buf, bufLen);
+    RecordId rid = RecordId(buf);
     for (auto _ : state) {
         RecordId tmp;
         benchmark::DoNotOptimize(tmp = rid);

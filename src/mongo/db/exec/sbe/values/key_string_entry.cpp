@@ -57,11 +57,11 @@ std::unique_ptr<KeyStringEntry> KeyStringEntry::makeCopy() const {
 void KeyStringEntry::serialize(BufBuilder& buf) const {
     buf.appendUChar(static_cast<uint8_t>(_version));
     buf.appendNum(_key.size());
-    buf.appendStrBytes(_key);
+    buf.appendBuf(_key.data(), _key.size());
     buf.appendNum(_typeBits.size());
-    buf.appendStrBytes(_typeBits);
+    buf.appendBuf(_typeBits.data(), _typeBits.size());
     buf.appendNum(_rid.size());
-    buf.appendStrBytes(_rid);
+    buf.appendBuf(_rid.data(), _rid.size());
 }
 
 KeyStringEntry* KeyStringEntry::deserialize(BufReader& buf) {

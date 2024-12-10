@@ -49,19 +49,13 @@ TEST(SortedDataInterfaceTest, SortedDataKeyValueViewTest) {
 
     char ridBuf[12];
     memset(ridBuf, 0x55, 12);
-    RecordId rid(ridBuf, 12);
+    RecordId rid(ridBuf);
 
     for (auto version : {key_string::Version::V0, key_string::Version::V1}) {
         auto keyString = makeKeyString(version, ALL_ASCENDING, key, rid);
-        auto ksSize =
-            getKeySize(keyString.getBuffer(), keyString.getSize(), ALL_ASCENDING, version);
-        auto tb = keyString.getTypeBits();
-        auto view = SortedDataKeyValueView(keyString.getBuffer(),
-                                           ksSize,
-                                           keyString.getBuffer() + ksSize, /* ridData */
-                                           keyString.getSize() - ksSize,   /* ridSize */
-                                           tb.getBuffer(),
-                                           tb.getSize(),
+        auto view = SortedDataKeyValueView(keyString.getView(),
+                                           keyString.getRecordIdView(),
+                                           keyString.getTypeBitsView(),
                                            version,
                                            true,
                                            &rid);
@@ -69,8 +63,7 @@ TEST(SortedDataInterfaceTest, SortedDataKeyValueViewTest) {
         auto bsonObj = key_string::toBson(value, ALL_ASCENDING);
         ASSERT_BSONOBJ_EQ(bsonObj, BSONObj::stripFieldNames(key));
         ASSERT_EQ(&rid, view.getRecordId());
-        ASSERT_EQ(*view.getRecordId(),
-                  key_string::decodeRecordIdStrAtEnd(value.getBuffer(), value.getSize()));
+        ASSERT_EQ(*view.getRecordId(), key_string::decodeRecordIdStrAtEnd(value.getView()));
 
         // Round trip the Value through a View and compare
         auto view2 = SortedDataKeyValueView::fromValue(value);

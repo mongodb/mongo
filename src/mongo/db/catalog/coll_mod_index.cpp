@@ -376,10 +376,8 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
     for (auto indexEntry = indexCursor->nextKeyString(); indexEntry;
          indexEntry = indexCursor->nextKeyString()) {
         if (prevIndexEntry &&
-            (indexEntry->loc.isLong()
-                 ? indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString)
-                 : indexEntry->keyString.compareWithoutRecordIdStr(prevIndexEntry->keyString)) ==
-                0) {
+            indexEntry->keyString.compareWithoutRecordId(prevIndexEntry->keyString,
+                                                         indexEntry->loc.keyFormat()) == 0) {
             if (recordsWithDuplicateKeys.empty()) {
                 recordsWithDuplicateKeys.push_back(std::move(prevIndexEntry->loc));
             }

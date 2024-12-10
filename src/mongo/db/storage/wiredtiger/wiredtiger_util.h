@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include <span>
+
 #include "mongo/db/catalog/import_options.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
@@ -47,23 +48,43 @@ class WiredTigerConfigParser;
 class WiredTigerKVEngine;
 class WiredTigerSessionCache;
 
-struct WiredTigerItem : public WT_ITEM {
-    WiredTigerItem(const void* d, size_t s) {
-        data = d;
-        size = s;
+/**
+ * A wrapper for WT_ITEM to make it more convenient to work with from C++.
+ */
+class WiredTigerItem {
+public:
+    WiredTigerItem() = default;
+    WiredTigerItem(const void* d, size_t s) noexcept {
+        _item = {d, s};
     }
-    WiredTigerItem(StringData str) {
-        data = str.data();
-        size = str.size();
+    WiredTigerItem(std::span<const char> str) noexcept : WiredTigerItem(str.data(), str.size()) {}
+
+    // Get this item as a WT_ITEM pointer
+    // The pointer returned by get() must not be allowed to live longer than *this.
+    WT_ITEM* get() {
+        return &_item;
     }
-    // NOTE: do not call Get() on a temporary.
-    // The pointer returned by Get() must not be allowed to live longer than *this.
-    WT_ITEM* Get() {
-        return this;
+    const WT_ITEM* get() const {
+        return &_item;
     }
-    const WT_ITEM* Get() const {
-        return this;
+
+    // Conform to std::ranges::contiguous_range and std::ranges::sized_range so that buffers read
+    // from WiredTiger can be consumed as ranges.
+    size_t size() const noexcept {
+        return _item.size;
     }
+    const char* data() const noexcept {
+        return static_cast<const char*>(_item.data);
+    }
+    const char* begin() const noexcept {
+        return data();
+    }
+    const char* end() const noexcept {
+        return data() + size();
+    }
+
+private:
+    WT_ITEM _item = {nullptr, 0};
 };
 
 class WiredTigerUtil {

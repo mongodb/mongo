@@ -249,7 +249,7 @@ std::string ShardKeyPattern::toKeyString(const BSONObj& shardKey) {
         ks.appendBSONElement(elem);
     }
 
-    return {ks.getBuffer(), ks.getSize()};
+    return {ks.getView().data(), ks.getView().size()};
 }
 
 bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {

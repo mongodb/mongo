@@ -336,8 +336,8 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
                   "hashUpper"_attr = hashUpper,
                   "hashLower"_attr = hashLower);
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
-            auto keyStringBson = key_string::toBsonSafe(
-                ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
+            auto keyStringBson =
+                key_string::toBsonSafe(ks.getView(), indexInfo->ord, ks.getTypeBits());
             key_string::logKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](record)");
         }
@@ -375,8 +375,8 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                   "hashUpper"_attr = hashUpper,
                   "hashLower"_attr = hashLower);
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
-            auto keyStringBson = key_string::toBsonSafe(
-                ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
+            auto keyStringBson =
+                key_string::toBsonSafe(ks.getView(), indexInfo->ord, ks.getTypeBits());
             key_string::logKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](index)");
         }
@@ -574,9 +574,8 @@ void _validateKeyOrder(OperationContext* opCtx,
 
     if (unique) {
         // Unique indexes must not have duplicate keys.
-        const int cmp = currKey->loc.isLong()
-            ? currKey->keyString.compareWithoutRecordIdLong(prevKey->keyString)
-            : currKey->keyString.compareWithoutRecordIdStr(prevKey->keyString);
+        const int cmp =
+            currKey->keyString.compareWithoutRecordId(prevKey->keyString, currKey->loc.keyFormat());
         if (cmp != 0) {
             return;
         }
@@ -608,7 +607,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
 
     key_string::Builder firstKeyStringBuilder(
         version, BSONObj(), indexInfo.ord, key_string::Discriminator::kExclusiveBefore);
-    StringData firstKeyString = firstKeyStringBuilder.finishAndGetBuffer();
+    std::span firstKeyString = firstKeyStringBuilder.finishAndGetBuffer();
     boost::optional<KeyStringEntry> prevIndexKeyStringEntry;
 
     // Ensure that this index has an open index cursor.
@@ -830,10 +829,8 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
               "recordId"_attr = recordId,
               "record"_attr = redact(recordBson));
         for (auto& key : *documentKeySet) {
-            auto indexKey = key_string::toBsonSafe(key.getBuffer(),
-                                                   key.getSize(),
-                                                   iam->getSortedDataInterface()->getOrdering(),
-                                                   key.getTypeBits());
+            auto indexKey = key_string::toBsonSafe(
+                key.getView(), iam->getSortedDataInterface()->getOrdering(), key.getTypeBits());
             const BSONObj rehydratedKey = _rehydrateKey(descriptor->keyPattern(), indexKey);
             LOGV2(7556101,
                   "Index key for document with multikey inconsistency",
@@ -944,8 +941,7 @@ void KeyStringIndexConsistency::_foundInconsistency(OperationContext* opCtx,
         recordId, results.getRecordTimestampsPtr());
     info.accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(opCtx, ks);
 
-    const BSONObj& indexKey =
-        key_string::toBsonSafe(ks.getBuffer(), ks.getSize(), info.ord, ks.getTypeBits());
+    const BSONObj& indexKey = key_string::toBsonSafe(ks.getView(), info.ord, ks.getTypeBits());
     BSONObj rehydratedKey = _rehydrateKey(info.keyPattern, indexKey);
 
     BSONObjBuilder infoBuilder;
