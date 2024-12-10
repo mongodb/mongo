@@ -64,11 +64,13 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -958,11 +960,39 @@ Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
     return std::next(itr);
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::viewPipelineHelperForSearch(
+    const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
+    ResolvedNamespace resolvedNs,
+    std::vector<BSONObj> currentPipeline,
+    MakePipelineOptions opts,
+    NamespaceString originalNs) {
+    // Search queries on mongot-indexed views behave differently than non-search aggregations on
+    // views. When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
+    // view transforms as part of its subpipeline. In this way, the view stages will always
+    // be applied directly after $_internalSearchMongotRemote and before the remaining
+    // stages of the user pipeline. This is to ensure the stages following
+    // $search/$vectorSearch in the user pipeline will receive the modified documents: when
+    // storedSource is disabled, idLookup will retrieve full/unmodified documents during
+    // (from the _id values returned by mongot), apply the view's data transforms, and pass
+    // said transformed documents through the rest of the user pipeline.
+
+    // For returnStoredSource queries, the documents returned by mongot already include the
+    // fields transformed by the view pipeline. As such, mongod doesn't need to apply
+    // the view pipeline after idLookup. But for regular/non-stored source search queries, we
+    // need to set the resolved namespace so that idLookup knows to apply the view.
+    if (!search_helper_bson_obj::isStoredSource(currentPipeline)) {
+        const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
+        search_helpers::setResolvedNamespaceForSearch(originalNs, resolvedView, subPipelineExpCtx);
+    }
+    // return the user pipeline without appending the view stages.
+    return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
+}
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,
-    MakePipelineOptions opts) {
+    MakePipelineOptions opts,
+    NamespaceString originalNs) {
 
     // Update subpipeline's ExpressionContext with the resolved namespace.
     subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
@@ -970,8 +1000,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
     if (resolvedNs.pipeline.empty()) {
         return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
-    auto resolvedPipeline = std::move(resolvedNs.pipeline);
 
+    if (search_helper_bson_obj::isMongotPipeline(currentPipeline)) {
+        return Pipeline::viewPipelineHelperForSearch(
+            subPipelineExpCtx, resolvedNs, currentPipeline, opts, originalNs);
+    }
+
+    auto resolvedPipeline = std::move(resolvedNs.pipeline);
     // When we get a resolved pipeline back, we may not yet have its namespaces available in the
     // expression context, e.g. if the view's pipeline contains a $lookup on another collection.
     LiteParsedPipeline liteParsedPipeline(resolvedNs.ns, resolvedPipeline);

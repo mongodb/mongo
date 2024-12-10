@@ -758,22 +758,6 @@ assert.sameMembers(
     ],
     collBase.aggregate(makeLookupSearchPipeline(view1.getName(), lookupSearchViewQuery)).toArray());
 
-// $unionWith against non-trivial view($search) fails.
-view1.drop();
-assert.commandWorked(db.createView(view1.getName(), coll.getName(), [
-    {$project: {"_id": 1}},
-]));
-
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collBase.getName(),
-    pipeline: [
-        {$project: {"localField": 1, "_id": 0}},
-        {$unionWith: {coll: view1.getName(), pipeline: [{$search: unionSearchQuery}]}}
-    ],
-    cursor: {}
-}),
-                             40602);
-
 // $unionWith against trivial view($search) passes.
 const unionSearchViewQuery = setupSearchQuery("cakes",
                                               1,

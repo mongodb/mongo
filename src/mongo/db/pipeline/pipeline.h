@@ -224,11 +224,19 @@ public:
     static Pipeline::SourceContainer::iterator optimizeEndOfPipeline(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
 
+    static std::unique_ptr<Pipeline, PipelineDeleter> viewPipelineHelperForSearch(
+        const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
+        ResolvedNamespace resolvedNs,
+        std::vector<BSONObj> currentPipeline,
+        MakePipelineOptions opts,
+        NamespaceString originalNs);
+
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipelineFromViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
         ResolvedNamespace resolvedNs,
         std::vector<BSONObj> currentPipeline,
-        MakePipelineOptions opts);
+        MakePipelineOptions opts,
+        NamespaceString originalNs = NamespaceString());
 
     /**
      * Callers can optionally specify 'newExpCtx' to construct the deep clone with it. This will be

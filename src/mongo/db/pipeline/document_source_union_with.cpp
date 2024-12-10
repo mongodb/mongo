@@ -74,8 +74,8 @@ namespace {
 std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     ResolvedNamespace resolvedNs,
-    std::vector<BSONObj> currentPipeline) {
-
+    std::vector<BSONObj> currentPipeline,
+    NamespaceString userNss) {
     auto validatorCallback = [](const Pipeline& pipeline) {
         const auto& sources = pipeline.getSources();
         std::for_each(sources.begin(), sources.end(), [](auto& src) {
@@ -96,7 +96,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
         expCtx->copyForSubPipeline(resolvedNs.ns, resolvedNs.uuid),
         resolvedNs,
         std::move(currentPipeline),
-        opts);
+        opts,
+        userNss);
 }
 
 }  // namespace
@@ -117,9 +118,10 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString unionNss,
     std::vector<BSONObj> pipeline)
-    : DocumentSourceUnionWith(expCtx,
-                              buildPipelineFromViewDefinition(
-                                  expCtx, expCtx->getResolvedNamespace(unionNss), pipeline)) {
+    : DocumentSourceUnionWith(
+          expCtx,
+          buildPipelineFromViewDefinition(
+              expCtx, expCtx->getResolvedNamespace(unionNss), pipeline, unionNss)) {
     _userNss = std::move(unionNss);
     _userPipeline = std::move(pipeline);
 }
@@ -299,7 +301,8 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
             _pipeline = buildPipelineFromViewDefinition(
                 pExpCtx,
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
-                std::move(serializedPipe));
+                std::move(serializedPipe),
+                e->getNamespace());
             logShardedViewFound(e);
             return doGetNext();
         }
@@ -461,7 +464,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 auto resolvedPipeline = buildPipelineFromViewDefinition(
                     pExpCtx,
                     ResolvedNamespace{e->getNamespace(), e->getPipeline()},
-                    std::move(serializedPipe));
+                    std::move(serializedPipe),
+                    e->getNamespace());
                 return preparePipelineAndExplain(resolvedPipeline.release());
             }
         }();

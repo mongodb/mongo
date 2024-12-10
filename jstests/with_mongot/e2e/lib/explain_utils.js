@@ -67,6 +67,30 @@ export function assertViewNotApplied(explainStages, viewPipeline) {
      */
     assert.neq(explainStages.slice(0, viewPipeline.length), viewPipeline);
 }
+
+export function extractUnionWithSubPipelineExplainOutput(explainStages) {
+    for (const stage of explainStages) {
+        // Found the $unionWith stage in the explain output.
+        if (stage["$unionWith"]) {
+            return stage["$unionWith"].pipeline;
+        }
+    }
+}
+/**
+ * As the name attempts to suggest, this functions assumes the user ran a top-level $search
+ * aggregation joined via $unionWith with another $search sub-level aggregation. It asserts that the
+ * top-level $search explain contains the outerViewPipeline in its _idLookup and similarly, it
+ * asserts that the $unionWith $search subpipeline contains the innerView pipeline in its idLookup.
+ */
+export function assertUnionWithSearchPipelinesApplyViews(
+    explainStages, outerViewPipeline, innerViewPipeline) {
+    // This will assert that the top-level search has the view correctly pushed down to idLookup.
+    assertIdLookupContainsViewPipeline(explainStages, outerViewPipeline);
+    let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explainStages);
+    // Make sure the $unionWith.search subpipeline has the view correctly pushed down to idLookup.
+    assertIdLookupContainsViewPipeline(unionWithSubPipeExplain, innerViewPipeline);
+}
+
 /**
  * This function checks that the explain output for $search queries from an e2e test contains the
  * information that it should.
