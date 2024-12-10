@@ -530,32 +530,43 @@
 [
 	{
 		"cachedPlan" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey]"
-				],
-				"b" : [
-					"[MinKey, MaxKey]"
-				]
+			"inputStage" : {
+				"direction" : "forward",
+				"indexBounds" : {
+					"a" : [
+						"[MinKey, MaxKey]"
+					],
+					"b" : [
+						"[MinKey, MaxKey]"
+					],
+					"c" : [
+						"[MinKey, MaxKey]"
+					]
+				},
+				"indexName" : "a_1_b_1_c_1",
+				"indexVersion" : 2,
+				"isFetching" : false,
+				"isMultiKey" : false,
+				"isPartial" : false,
+				"isShardFiltering" : false,
+				"isSparse" : false,
+				"isUnique" : false,
+				"keyPattern" : {
+					"a" : 1,
+					"b" : 1,
+					"c" : 1
+				},
+				"multiKeyPaths" : {
+					"a" : [ ],
+					"b" : [ ],
+					"c" : [ ]
+				},
+				"stage" : "DISTINCT_SCAN"
 			},
-			"indexName" : "a_1_b_1",
-			"indexVersion" : 2,
-			"isFetching" : true,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isShardFiltering" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1,
-				"b" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ],
-				"b" : [ ]
-			},
-			"stage" : "DISTINCT_SCAN"
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				
+			}
 		},
 		"createdFromQuery" : {
 			"projection" : {
@@ -600,32 +611,43 @@
 [
 	{
 		"cachedPlan" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey]"
-				],
-				"b" : [
-					"[MinKey, MaxKey]"
-				]
+			"inputStage" : {
+				"direction" : "forward",
+				"indexBounds" : {
+					"a" : [
+						"[MinKey, MaxKey]"
+					],
+					"b" : [
+						"[MinKey, MaxKey]"
+					],
+					"c" : [
+						"[MinKey, MaxKey]"
+					]
+				},
+				"indexName" : "a_1_b_1_c_1",
+				"indexVersion" : 2,
+				"isFetching" : false,
+				"isMultiKey" : false,
+				"isPartial" : false,
+				"isShardFiltering" : false,
+				"isSparse" : false,
+				"isUnique" : false,
+				"keyPattern" : {
+					"a" : 1,
+					"b" : 1,
+					"c" : 1
+				},
+				"multiKeyPaths" : {
+					"a" : [ ],
+					"b" : [ ],
+					"c" : [ ]
+				},
+				"stage" : "DISTINCT_SCAN"
 			},
-			"indexName" : "a_1_b_1",
-			"indexVersion" : 2,
-			"isFetching" : true,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isShardFiltering" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1,
-				"b" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ],
-				"b" : [ ]
-			},
-			"stage" : "DISTINCT_SCAN"
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				
+			}
 		},
 		"createdFromQuery" : {
 			"projection" : {

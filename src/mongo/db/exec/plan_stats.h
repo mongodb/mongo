@@ -478,6 +478,10 @@ struct DistinctScanStats : public SpecificStats {
 
     // How many keys did we look at while distinct-ing?
     size_t keysExamined = 0;
+    // The total number of full documents touched by the embedded fetch stage, if one exists.
+    size_t docsExamined = 0;
+    // How many chunk skips were performed while distinct-ing?
+    size_t chunkSkips = 0;
 
     BSONObj keyPattern;
 

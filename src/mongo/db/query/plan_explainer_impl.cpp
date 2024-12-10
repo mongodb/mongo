@@ -192,6 +192,11 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
     } else if (STAGE_TEXT_OR == type) {
         const TextOrStats* spec = static_cast<const TextOrStats*>(specific);
         return spec->fetches;
+    } else if (STAGE_DISTINCT_SCAN == type) {
+        // If a FETCH stage is embedded within a covered DISTINCT_SCAN, the DISTINCT_SCAN will hold
+        // the 'docsExamined' value.
+        const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
+        return spec->docsExamined;
     }
 
     return 0;
@@ -399,6 +404,13 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
+            if (spec->isShardFilteringDistinctScanEnabled) {
+                // Because we push FETCH and SHARD_FILTERING stages into the DISTINCT_SCAN stage
+                // when applicable, we don't see FETCH's docsExamined or SHARD_FILTERING's
+                // chunkSkips in the explain output. We add them to DISTINCT_SCAN's explain here.
+                bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
+                bob->appendNumber("chunkSkips", static_cast<long long>(spec->chunkSkips));
+            }
         }
     } else if (STAGE_FETCH == stats.stageType) {
         FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());

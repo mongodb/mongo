@@ -218,6 +218,11 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
 
             if (_needsFetch) {
                 const auto fetchRet = doFetch(member, id, out);
+                // We need to increment 'works' to account for the additional work that
+                // comes from performing the fetch within a distinct scan. We also increment
+                // distinct scan's docsExamined as we would in the fetch stage.
+                ++_commonStats.works;
+                ++_specificStats.docsExamined;
                 if (fetchRet != PlanStage::ADVANCED) {
                     return fetchRet;
                 }
@@ -264,8 +269,13 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             } else if (_shardFilterer) {
                 // We need one last check before we can return the key if we've been initialized
                 // with a shard filter. If this document is an orphan, we need to try the next one;
-                // otherwise, we can proceed with a regular distinct scan.
+                // otherwise, we can proceed with a regular distinct scan. We also need to increment
+                // the 'works' value to account for the extra shard filtering work that is performed
+                // within the distinct scan's work, and distinct scan's 'chunkSkips' to reflect the
+                // work is being done in the embedded SHARD_FILTERING stage.
                 belongs = _shardFilterer->documentBelongsToMe(*member);
+                ++_commonStats.works;
+                ++_specificStats.chunkSkips;
             }
 
             switch (belongs) {

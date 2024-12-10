@@ -490,15 +490,6 @@ Execution Engine: classic
 				"rejectedPlans" : [
 					[
 						{
-							"stage" : "PROJECTION_COVERED",
-							"transformBy" : {
-								"_id" : 0,
-								"a" : 1,
-								"b" : 1,
-								"c" : 1
-							}
-						},
-						{
 							"direction" : "forward",
 							"indexBounds" : {
 								"a" : [
@@ -506,13 +497,10 @@ Execution Engine: classic
 								],
 								"b" : [
 									"[MinKey, MaxKey]"
-								],
-								"c" : [
-									"[MinKey, MaxKey]"
 								]
 							},
-							"indexName" : "a_1_b_1_c_1",
-							"isFetching" : false,
+							"indexName" : "a_1_b_1",
+							"isFetching" : true,
 							"isMultiKey" : false,
 							"isPartial" : false,
 							"isShardFiltering" : false,
@@ -520,13 +508,11 @@ Execution Engine: classic
 							"isUnique" : false,
 							"keyPattern" : {
 								"a" : 1,
-								"b" : 1,
-								"c" : 1
+								"b" : 1
 							},
 							"multiKeyPaths" : {
 								"a" : [ ],
-								"b" : [ ],
-								"c" : [ ]
+								"b" : [ ]
 							},
 							"stage" : "DISTINCT_SCAN"
 						}
@@ -568,6 +554,15 @@ Execution Engine: classic
 				],
 				"winningPlan" : [
 					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1,
+							"c" : 1
+						}
+					},
+					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -575,10 +570,13 @@ Execution Engine: classic
 							],
 							"b" : [
 								"[MinKey, MaxKey]"
+							],
+							"c" : [
+								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_1_b_1",
-						"isFetching" : true,
+						"indexName" : "a_1_b_1_c_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -586,11 +584,13 @@ Execution Engine: classic
 						"isUnique" : false,
 						"keyPattern" : {
 							"a" : 1,
-							"b" : 1
+							"b" : 1,
+							"c" : 1
 						},
 						"multiKeyPaths" : {
 							"a" : [ ],
-							"b" : [ ]
+							"b" : [ ],
+							"c" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}
@@ -643,15 +643,6 @@ Execution Engine: classic
 				"rejectedPlans" : [
 					[
 						{
-							"stage" : "PROJECTION_COVERED",
-							"transformBy" : {
-								"_id" : 0,
-								"a" : 1,
-								"b" : 1,
-								"c" : 1
-							}
-						},
-						{
 							"direction" : "forward",
 							"indexBounds" : {
 								"a" : [
@@ -659,13 +650,10 @@ Execution Engine: classic
 								],
 								"b" : [
 									"[MinKey, MaxKey]"
-								],
-								"c" : [
-									"[MinKey, MaxKey]"
 								]
 							},
-							"indexName" : "a_1_b_1_c_1",
-							"isFetching" : false,
+							"indexName" : "a_1_b_1",
+							"isFetching" : true,
 							"isMultiKey" : false,
 							"isPartial" : false,
 							"isShardFiltering" : false,
@@ -673,13 +661,11 @@ Execution Engine: classic
 							"isUnique" : false,
 							"keyPattern" : {
 								"a" : 1,
-								"b" : 1,
-								"c" : 1
+								"b" : 1
 							},
 							"multiKeyPaths" : {
 								"a" : [ ],
-								"b" : [ ],
-								"c" : [ ]
+								"b" : [ ]
 							},
 							"stage" : "DISTINCT_SCAN"
 						}
@@ -721,6 +707,15 @@ Execution Engine: classic
 				],
 				"winningPlan" : [
 					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1,
+							"c" : 1
+						}
+					},
+					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -728,10 +723,13 @@ Execution Engine: classic
 							],
 							"b" : [
 								"[MinKey, MaxKey]"
+							],
+							"c" : [
+								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_1_b_1",
-						"isFetching" : true,
+						"indexName" : "a_1_b_1_c_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -739,11 +737,13 @@ Execution Engine: classic
 						"isUnique" : false,
 						"keyPattern" : {
 							"a" : 1,
-							"b" : 1
+							"b" : 1,
+							"c" : 1
 						},
 						"multiKeyPaths" : {
 							"a" : [ ],
-							"b" : [ ]
+							"b" : [ ],
+							"c" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}
@@ -2602,7 +2602,7 @@ Execution Engine: classic
 }
 ```
 
-### Multiplanning tie between DISTINCT_SCAN and IXSCAN
+### Multiplanning tie between DISTINCT_SCAN and IXSCAN favors DISTINCT_SCAN
 ### Pipeline
 ```json
 [
@@ -2657,28 +2657,26 @@ Execution Engine: classic
 							"direction" : "forward",
 							"indexBounds" : {
 								"a" : [
-									"(0.0, inf.0]"
+									"[inf.0, 0.0)"
 								],
 								"b" : [
 									"[MinKey, MaxKey]"
 								]
 							},
-							"indexName" : "a_1_b_1",
-							"isFetching" : false,
+							"indexName" : "a_-1_b_1",
 							"isMultiKey" : false,
 							"isPartial" : false,
-							"isShardFiltering" : false,
 							"isSparse" : false,
 							"isUnique" : false,
 							"keyPattern" : {
-								"a" : 1,
+								"a" : -1,
 								"b" : 1
 							},
 							"multiKeyPaths" : {
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN"
+							"stage" : "IXSCAN"
 						}
 					]
 				],
@@ -2695,41 +2693,37 @@ Execution Engine: classic
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
-								"[inf.0, 0.0)"
+								"(0.0, inf.0]"
 							],
 							"b" : [
 								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_-1_b_1",
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : false,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
-							"a" : -1,
+							"a" : 1,
 							"b" : 1
 						},
 						"multiKeyPaths" : {
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "IXSCAN"
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
 		},
 		{
-			"$group" : {
-				"_id" : "$a",
-				"accum" : {
-					"$top" : {
-						"output" : "$b",
-						"sortBy" : {
-							"a" : 1,
-							"b" : 1
-						}
-					}
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accum" : "$b"
 				}
 			}
 		}

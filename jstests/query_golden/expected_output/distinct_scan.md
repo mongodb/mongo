@@ -311,7 +311,7 @@ Execution Engine: classic
 {  "_id" : 1,  "firstField" : 1 }
 {  "_id" : 2,  "firstField" : 3 }
 {  "_id" : 3,  "firstField" : 7 }
-{  "_id" : 4,  "firstField" : 3 }
+{  "_id" : 4,  "firstField" : 2 }
 {  "_id" : 7,  "firstField" : 1 }
 ```
 ### Summarized explain
@@ -324,37 +324,24 @@ Execution Engine: classic
 				"rejectedPlans" : [
 					[
 						{
-							"stage" : "PROJECTION_COVERED",
-							"transformBy" : {
-								"_id" : 0,
-								"a" : 1,
-								"b" : 1
-							}
-						},
-						{
 							"direction" : "forward",
 							"indexBounds" : {
 								"a" : [
 									"[MinKey, MaxKey]"
-								],
-								"b" : [
-									"[MinKey, MaxKey]"
 								]
 							},
-							"indexName" : "a_1_b_1",
-							"isFetching" : false,
+							"indexName" : "a_1",
+							"isFetching" : true,
 							"isMultiKey" : false,
 							"isPartial" : false,
 							"isShardFiltering" : false,
 							"isSparse" : false,
 							"isUnique" : false,
 							"keyPattern" : {
-								"a" : 1,
-								"b" : 1
+								"a" : 1
 							},
 							"multiKeyPaths" : {
-								"a" : [ ],
-								"b" : [ ]
+								"a" : [ ]
 							},
 							"stage" : "DISTINCT_SCAN"
 						}
@@ -362,24 +349,37 @@ Execution Engine: classic
 				],
 				"winningPlan" : [
 					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
 								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_1",
-						"isFetching" : true,
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
-							"a" : 1
+							"a" : 1,
+							"b" : 1
 						},
 						"multiKeyPaths" : {
-							"a" : [ ]
+							"a" : [ ],
+							"b" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}

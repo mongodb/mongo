@@ -160,6 +160,18 @@ public:
                 log_detail::logScoreBoost(score);
             }
         }
+        // In the case of ties (notably covered DISTINCT_SCAN vs covered IXSCAN), prefer
+        // solutions that use a DISTINCT_SCAN.
+        if (hasStage(STAGE_DISTINCT_SCAN, stats)) {
+            tassert(9246800,
+                    "STAGE_DISTINCT_SCAN found with distinct multiplanning disabled",
+                    feature_flags::gFeatureFlagShardFilteringDistinctScan
+                        .isEnabledUseLastLTSFCVWhenUninitialized(
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            score += epsilon;
+            log_detail::logScoreBoost(score);
+        }
+
         return score;
     }
 

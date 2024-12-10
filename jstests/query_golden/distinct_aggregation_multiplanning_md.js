@@ -2,8 +2,6 @@
  * Tests that the aggregation will go through the process of multiplanning when the pipeline can be
  * rewritten for the distinct case.
  *
- * TODO SERVER-92468: Ensure we correctly pick covered plans over non-covered plans in these tests.
- *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
  * ]
@@ -104,8 +102,7 @@ outputAggregationPlanAndResults(coll, [
     {$group: {_id: "$a", accumB: {$first: "$b"}, accumC: {$first: "$c"}, accumD: {$first: "$d"}}}
 ]);
 
-// TODO SERVER-92468: See if we have to do something to break the tie.
-subSection("Multiplanning tie between DISTINCT_SCAN and IXSCAN");
+subSection("Multiplanning tie between DISTINCT_SCAN and IXSCAN favors DISTINCT_SCAN");
 const coll2 = db[jsTestName() + "-2"];
 coll2.drop();
 const distinctDocs = [];
