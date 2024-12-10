@@ -1,27 +1,11 @@
 # -*- mode: python -*-
 
 Import("env")
-Import("get_option")
 
 env = env.Clone()
 
 env.CppUnitTest(
     target="process_interface_test",
-    source=[
-        "mongos_process_interface_test.cpp",
-        "shardsvr_process_interface_test.cpp",
-        "standalone_process_interface_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/vector_clock_mongod",
-        "$BUILD_DIR/mongo/s/sharding_mongos_test_fixture",
-        "mongos_process_interface",
-        "shardsvr_process_interface",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

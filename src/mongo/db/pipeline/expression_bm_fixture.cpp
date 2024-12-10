@@ -35,7 +35,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <random>
-#include <s2cellid.h>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

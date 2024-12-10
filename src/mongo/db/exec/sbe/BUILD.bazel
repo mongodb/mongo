@@ -488,3 +488,16 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/collation:collator_interface_mock",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "abt_lower_test",
+    srcs = [
+        "//src/mongo/db/exec/sbe/abt:abt_lower_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":abt_unit_test_utils",
+        ":query_sbe_abt",
+        "//src/mongo/unittest",
+    ],
+)

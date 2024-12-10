@@ -135,14 +135,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="abt_lower_test",
-    source=[
-        "abt/abt_lower_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "abt_unit_test_utils",
-        "query_sbe_abt",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

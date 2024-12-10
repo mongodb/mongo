@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -121,6 +121,38 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:service_context",
         "//src/mongo/util/concurrency:admission_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ingress_admission_control_test",
+    srcs = [
+        "ingress_admission_control_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":ingress_admission_control",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "throughput_probing_test",
+    srcs = [
+        "throughput_probing_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":execution_control",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/unittest",
+        "//src/mongo/util:mock_periodic_runner",
+        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 

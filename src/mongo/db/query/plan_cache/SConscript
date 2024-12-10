@@ -6,14 +6,6 @@ Import(
 
 env = env.Clone()
 
-env.Library(
-    target="plan_cache_test_util",
-    source=[
-        "plan_cache_test_util.cpp",
-    ],
-    LIBDEPS=["$BUILD_DIR/mongo/db/query_exec"],
-)
-
 env.Benchmark(
     target="plan_cache_key_encoding_bm",
     source=[

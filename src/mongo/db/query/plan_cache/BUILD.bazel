@@ -33,3 +33,16 @@ mongo_cc_library(
         "//src/mongo/db/query/query_settings:utils",
     ],
 )
+
+mongo_cc_library(
+    name = "plan_cache_test_util",
+    srcs = [
+        "plan_cache_test_util.cpp",
+    ],
+    hdrs = [
+        "plan_cache_test_util.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+    ],
+)

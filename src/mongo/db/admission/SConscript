@@ -6,30 +6,12 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="ingress_admission_control_test",
-    source=[
-        "ingress_admission_control_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "ingress_admission_control",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="throughput_probing_test",
-    source=[
-        "throughput_probing_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "$BUILD_DIR/mongo/util/concurrency/ticketholder",
-        "$BUILD_DIR/mongo/util/mock_periodic_runner",
-        "execution_control",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
