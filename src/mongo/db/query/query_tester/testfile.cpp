@@ -263,7 +263,7 @@ void QueryFile::parseHeader(std::fstream& fs) {
     const auto nameNoExtension = getBaseNameFromFilePath(_filePath);
     uassert(9670402,
             str::stream{} << "Expected first test line of " << _filePath.string()
-                          << " to match the test name, but got " << nameNoExtension,
+                          << " to match the test name, but got " << lineFromFile,
             nameNoExtension == lineFromFile);
     _comments.preCollName = readLine(fs, lineFromFile);
     uassert(9670411,
