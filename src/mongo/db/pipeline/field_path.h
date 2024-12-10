@@ -136,14 +136,6 @@ public:
     }
 
     /**
-     * Returns the full path as StringData instead of const std::string&, not including the prefix
-     * 'FieldPath::prefix'.
-     */
-    StringData fullPathStringData() const {
-        return _fieldPath;
-    }
-
-    /**
      * Returns the full path, including the prefix 'FieldPath::prefix'.
      */
     std::string fullPathWithPrefix() const {
@@ -167,14 +159,6 @@ public:
     }
 
     FieldPath concat(const FieldPath& tail) const;
-
-    bool isPrefixOf(const FieldPath& rhsPath) const {
-        auto lhsStr = fullPathStringData();
-        auto rhsStr = rhsPath.fullPathStringData();
-        return lhsStr.size() < rhsStr.size()
-            ? rhsStr.startsWith(lhsStr) && rhsStr[lhsStr.size()] == '.'
-            : lhsStr == rhsStr;
-    }
 
 private:
     FieldPath(std::string string, std::vector<size_t> dots, std::vector<size_t> hashes)
