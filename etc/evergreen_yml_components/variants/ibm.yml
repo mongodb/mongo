@@ -27,6 +27,8 @@ buildvariants:
     multiversion_edition: enterprise
     test_flags: >-
       --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer,ppc64le_incompatible
+    timeout_secs: 7200 # 2 hours idle timeout
+    exec_timeout_secs: 43200 # 12 hours exec timeout
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -81,6 +83,8 @@ buildvariants:
     multiversion_edition: enterprise
     test_flags: >-
       --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer,ppc64le_incompatible
+    timeout_secs: 7200 # 2 hours idle timeout
+    exec_timeout_secs: 43200 # 12 hours exec timeout
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
