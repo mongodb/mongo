@@ -66,7 +66,6 @@ selector:
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/**/explain_upsert.js
     - jstests/core/**/bench_test1.js
     - jstests/core/index/index_partial_write_ops.js
     - jstests/core/index/index_stats.js

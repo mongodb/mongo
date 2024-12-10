@@ -59,7 +59,6 @@ selector:
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/**/explain_upsert.js
     - jstests/core/query/distinct/distinct_semantics.js
     - jstests/core/timeseries/query/timeseries_union_with.js
     - jstests/core/index/express_id_eq.js

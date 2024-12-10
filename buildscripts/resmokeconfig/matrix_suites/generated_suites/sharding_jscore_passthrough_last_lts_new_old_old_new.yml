@@ -54,7 +54,6 @@ selector:
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/**/explain_upsert.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

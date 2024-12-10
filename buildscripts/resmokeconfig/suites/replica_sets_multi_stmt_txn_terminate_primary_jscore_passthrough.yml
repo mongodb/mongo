@@ -192,9 +192,6 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
 
-    # Expect drops/creates to fail or have a certain response:
-    - jstests/core/**/explain_upsert.js
-
     # Expect certain responses, but retries of successfully completed commands may return
     # different values:
     - jstests/core/**/create_indexes.js

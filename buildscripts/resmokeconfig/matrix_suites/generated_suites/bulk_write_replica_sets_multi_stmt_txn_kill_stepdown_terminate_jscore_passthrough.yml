@@ -198,7 +198,6 @@ selector:
     - jstests/core/**/updatef.js
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
-    - jstests/core/**/explain_upsert.js
     - jstests/core/**/create_indexes.js
     - jstests/core/**/objid5.js
     - jstests/core/**/coveredIndex1.js

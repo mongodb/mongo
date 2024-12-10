@@ -28,7 +28,6 @@
         - jstests/core/**/fsync.js
 
         # Expect drops/creates to fail or have a certain response:
-        - jstests/core/**/explain_upsert.js
         - jstests/core/**/indexes_multiple_commands.js
 
         # Expect certain responses, but retries of successfully completed commands may return
@@ -113,7 +112,6 @@
         - jstests/core/**/shell_connection_strings.js
 
         # Expect drops/creates to fail or have a certain response:
-        - jstests/core/**/explain_upsert.js
         - jstests/core/**/indexes_multiple_commands.js
 
         # Expect certain responses, but retries of successfully completed commands may return

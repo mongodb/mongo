@@ -111,7 +111,6 @@ selector:
     - jstests/core/query/and/and2.js
     - jstests/core/query/cursor/getmore_invalidated_documents.js
     - jstests/core/query/explain/explain_multi_plan.js
-    - jstests/core/query/explain/explain_upsert.js
     - jstests/core/query/inc/inc-SERVER-7446.js
     - jstests/core/query/inc/inc3.js
     - jstests/core/query/pull/pull.js
