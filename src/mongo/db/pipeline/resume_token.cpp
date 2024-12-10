@@ -310,21 +310,21 @@ ResumeTokenData ResumeToken::getData() const {
 }
 
 Document ResumeToken::toDocument(const SerializationOptions& options) const {
-    /*
-     * This is our default resume token for the representative query shape.
-     * We use a high water mark token, otherwise a resume event is expected when reparsing.
-     * When serializing the "_typeBits", we purposely avoid serializing with SerializationOptions,
-     * as this will result in mistakenly add '?undefined' to the Document.
-     * The serialization of the Document will typically exclude the "_typeBits" if they
-     * were unset, which is the case for "kDefaultToken".
-     */
-    static const auto kDefaultToken = makeHighWaterMarkToken(Timestamp(), 0);
-    return Document{{kDataFieldName,
-                     options.serializeLiteral(_hexKeyString, Value(kDefaultToken._hexKeyString))},
-                    {kTypeBitsFieldName,
-                     options.literalPolicy != LiteralSerializationPolicy::kToDebugTypeString
-                         ? options.serializeLiteral(_typeBits, kDefaultToken._typeBits)
-                         : kDefaultToken._typeBits}};
+    // This is our default resume token for the representative query shape.
+    static const auto kDefaultTokenQueryStats = makeHighWaterMarkToken(Timestamp(), 1);
+
+    return Document{
+        {kDataFieldName,
+         options.serializeLiteral(_hexKeyString, Value(kDefaultTokenQueryStats._hexKeyString))},
+
+        // When serializing with 'kToDebugTypeString' 'serializeLiteral' will return an
+        // incorrect result. Therefore, we prefer to always exclude '_typeBits'  when serializing
+        // the debug string by passing an empty value, since '_typeBits' is rarely set and will
+        // always be either missing or of type BinData.
+        {kTypeBitsFieldName,
+         options.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString
+             ? Value()
+             : options.serializeLiteral(_typeBits, kDefaultTokenQueryStats._typeBits)}};
 }
 
 BSONObj ResumeToken::toBSON(const SerializationOptions& options) const {

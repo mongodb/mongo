@@ -152,16 +152,16 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     return preImageField.getDocument().getOwned();
 }
 
-Value DocumentSourceChangeStreamAddPreImage::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamAddPreImage::doSerialize(const SerializationOptions& opts) const {
     return opts.verbosity
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
                Document{{"stage"_sd, "internalAddPreImage"_sd},
                         {"fullDocumentBeforeChange"_sd,
                          FullDocumentBeforeChangeMode_serializer(_fullDocumentBeforeChangeMode)}}}})
-        : Value(Document{{kStageName,
-                          DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode)
-                              .toBSON(opts)}});
+        : Value(Document{
+              {kStageName,
+               DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode).toBSON()}});
 }
 
 std::string DocumentSourceChangeStreamAddPreImage::makePreImageNotFoundErrorMsg(

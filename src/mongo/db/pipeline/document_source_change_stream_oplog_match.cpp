@@ -96,8 +96,8 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
 
 DocumentSourceChangeStreamOplogMatch::DocumentSourceChangeStreamOplogMatch(
     Timestamp clusterTime, const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceMatch(change_stream_filter::buildOplogMatchFilter(expCtx, clusterTime),
-                          expCtx) {
+    : DocumentSourceInternalChangeStreamMatch(
+          change_stream_filter::buildOplogMatchFilter(expCtx, clusterTime), expCtx) {
     _clusterTime = clusterTime;
     expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
 }
@@ -204,7 +204,7 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
     return nextChangeStreamStageItr;
 }
 
-Value DocumentSourceChangeStreamOplogMatch::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamOplogMatch::doSerialize(const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
@@ -214,13 +214,10 @@ Value DocumentSourceChangeStreamOplogMatch::serialize(const SerializationOptions
         sub.done();
     } else {
         BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged ||
-            opts.transformIdentifiers) {
-            sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,
-                       getMatchExpression()->serialize(opts));
-        } else {
-            DocumentSourceChangeStreamOplogMatchSpec(_predicate).serialize(&sub);
-        }
+
+        // 'SerializationOptions' are not required here, since serialization for explain and query
+        // stats occur before this function call.
+        DocumentSourceChangeStreamOplogMatchSpec(_predicate).serialize(&sub);
         sub.done();
     }
     return Value(builder.obj());

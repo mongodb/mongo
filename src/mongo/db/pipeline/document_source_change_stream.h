@@ -336,4 +336,29 @@ public:
     }
 };
 
+/**
+ * A DocumentSource class for all internal change stream stages. This class is useful for
+ * shared logic between all of the internal change stream stages. For internally created match
+ * stages see 'DocumentSourceInternalChangeStreamMatch'.
+ */
+class DocumentSourceInternalChangeStreamStage : public DocumentSource {
+public:
+    DocumentSourceInternalChangeStreamStage(StringData stageName,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(stageName, expCtx) {}
+
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {
+        if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged ||
+            opts.transformIdentifiers) {
+            // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
+            // query stats. For query stats we will serialize only the user specified $changeStream
+            // stage.
+            return Value();
+        }
+        return doSerialize(opts);
+    }
+
+    virtual Value doSerialize(const SerializationOptions& opts) const = 0;
+};
+
 }  // namespace mongo

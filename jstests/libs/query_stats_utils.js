@@ -448,8 +448,8 @@ function checkChangeStreamEntry({queryStatsEntry, db, collectionName, numExecs, 
     assert.eq(collectionName, queryStatsEntry.key.queryShape.cmdNs.coll);
 
     // Confirm entry is a change stream request.
-    let stringifiedPipeline = JSON.stringify(queryStatsEntry.key.queryShape.pipeline, null, 0);
-    assert(stringifiedPipeline.includes("_internalChangeStream"));
+    const pipelineShape = queryStatsEntry.key.queryShape.pipeline;
+    assert(pipelineShape[0].hasOwnProperty("$changeStream"), pipelineShape);
 
     // TODO SERVER-76263 Support reporting 'collectionType' on a sharded cluster.
     if (!FixtureHelpers.isMongos(db)) {

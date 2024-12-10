@@ -41,7 +41,7 @@ namespace mongo {
  * its "fullDocumentBeforeChange" field shall be the optime of the noop oplog entry containing the
  * pre-image. This stage replaces that field with the actual pre-image document.
  */
-class DocumentSourceChangeStreamAddPreImage final : public DocumentSource {
+class DocumentSourceChangeStreamAddPreImage final : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamAddPreImage"_sd;
     static constexpr StringData kFullDocumentBeforeChangeFieldName =
@@ -68,7 +68,8 @@ public:
 
     DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           FullDocumentBeforeChangeModeEnum mode)
-        : DocumentSource(kStageName, expCtx), _fullDocumentBeforeChangeMode(mode) {
+        : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
+          _fullDocumentBeforeChangeMode(mode) {
         // This stage should never be created with FullDocumentBeforeChangeMode::kOff.
         invariant(_fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kOff);
     }
@@ -108,7 +109,7 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const char* getSourceName() const final {
         return kStageName.rawData();

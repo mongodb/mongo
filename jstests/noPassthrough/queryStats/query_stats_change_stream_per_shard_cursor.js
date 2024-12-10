@@ -3,7 +3,7 @@
  * @tags: [
  *   requires_sharding,
  *   uses_change_streams,
- *   featureFlagQueryStats,
+ *   requires_fcv_60
  * ]
  */
 load("jstests/libs/query_stats_utils.js");
