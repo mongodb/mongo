@@ -15,13 +15,13 @@ defaults:
   group:
     thresholds:
       hot_bf:
-        count: 15
+        count: 8
         grace_period_days: 7
       cold_bf:
-        count: 50
+        count: 32
         grace_period_days: 7
       perf_bf:
-        count: 15
+        count: 8
         grace_period_days: 14
     slack_tags: []
   team:
