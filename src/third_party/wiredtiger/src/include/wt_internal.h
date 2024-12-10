@@ -91,8 +91,6 @@ struct __wt_block_desc;
 typedef struct __wt_block_desc WT_BLOCK_DESC;
 struct __wt_block_header;
 typedef struct __wt_block_header WT_BLOCK_HEADER;
-struct __wt_block_mods;
-typedef struct __wt_block_mods WT_BLOCK_MODS;
 struct __wt_bloom;
 typedef struct __wt_bloom WT_BLOOM;
 struct __wt_bloom_hash;
@@ -135,6 +133,8 @@ struct __wt_chunkcache_pinned_list;
 typedef struct __wt_chunkcache_pinned_list WT_CHUNKCACHE_PINNED_LIST;
 struct __wt_ckpt;
 typedef struct __wt_ckpt WT_CKPT;
+struct __wt_ckpt_block_mods;
+typedef struct __wt_ckpt_block_mods WT_CKPT_BLOCK_MODS;
 struct __wt_ckpt_connection;
 typedef struct __wt_ckpt_connection WT_CKPT_CONNECTION;
 struct __wt_ckpt_session;
@@ -523,12 +523,12 @@ typedef uint64_t wt_timestamp_t;
 #include "../evict/evict.h"
 #include "capacity.h"
 #include "cell.h"
+#include "cursor.h" /* required by checkpoint */
 #include "../checkpoint/checkpoint.h"
 #include "compact.h"
 #include "conf_keys.h" /* required by conf.h */
 #include "conf.h"
 #include "config.h"
-#include "cursor.h"
 #include "dlh.h"
 #include "error.h"
 #include "futex.h"

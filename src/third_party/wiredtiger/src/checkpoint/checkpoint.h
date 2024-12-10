@@ -82,6 +82,93 @@ struct __wt_ckpt_connection {
 };
 
 /*
+ * WT_CKPT_BLOCK_MODS --
+ *     Block modifications from an incremental identifier going forward.
+ */
+struct __wt_ckpt_block_mods {
+    const char *id_str;
+
+    WT_ITEM bitstring;
+    uint64_t nbits; /* Number of bits in bitstring */
+
+    uint64_t offset; /* Zero bit offset for bitstring */
+    uint64_t granularity;
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_CKPT_BLOCK_MODS_RENAME 0x1u /* Entry is from a rename */
+#define WT_CKPT_BLOCK_MODS_VALID 0x2u  /* Entry is valid */
+                                       /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t flags;
+};
+
+/*
+ * WT_CKPT --
+ *     Encapsulation of checkpoint information, shared by the metadata, the btree engine, and the
+ * block manager.
+ */
+#define WT_CHECKPOINT "WiredTigerCheckpoint"
+#define WT_CKPT_FOREACH(ckptbase, ckpt) for ((ckpt) = (ckptbase); (ckpt)->name != NULL; ++(ckpt))
+#define WT_CKPT_FOREACH_NAME_OR_ORDER(ckptbase, ckpt) \
+    for ((ckpt) = (ckptbase); (ckpt)->name != NULL || (ckpt)->order != 0; ++(ckpt))
+
+struct __wt_ckpt {
+    char *name; /* Name or NULL */
+
+    /*
+     * Each internal checkpoint name is appended with a generation to make it a unique name. We're
+     * solving two problems: when two checkpoints are taken quickly, the timer may not be unique
+     * and/or we can even see time travel on the second checkpoint if we snapshot the time
+     * in-between nanoseconds rolling over. Second, if we reset the generational counter when new
+     * checkpoints arrive, we could logically re-create specific checkpoints, racing with cursors
+     * open on those checkpoints. I can't think of any way to return incorrect results by racing
+     * with those cursors, but it's simpler not to worry about it.
+     */
+    int64_t order; /* Checkpoint order */
+
+    uint64_t sec; /* Wall clock time */
+
+    uint64_t size; /* Checkpoint size */
+
+    uint64_t write_gen;     /* Write generation */
+    uint64_t run_write_gen; /* Runtime write generation. */
+
+    char *block_metadata;   /* Block-stored metadata */
+    char *block_checkpoint; /* Block-stored checkpoint */
+
+    WT_CKPT_BLOCK_MODS backup_blocks[WT_BLKINCR_MAX];
+
+    WT_TIME_AGGREGATE ta; /* Validity window */
+
+    WT_ITEM addr; /* Checkpoint cookie string */
+    WT_ITEM raw;  /* Checkpoint cookie raw */
+
+    void *bpriv; /* Block manager private */
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_CKPT_ADD 0x01u             /* Checkpoint to be added */
+#define WT_CKPT_BLOCK_MODS_LIST 0x02u /* Return list of modified blocks */
+#define WT_CKPT_DELETE 0x04u          /* Checkpoint to be deleted */
+#define WT_CKPT_FAKE 0x08u            /* Checkpoint is a fake */
+#define WT_CKPT_UPDATE 0x10u          /* Checkpoint requires update */
+                                      /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t flags;
+};
+
+/*
+ * WT_CKPT_SNAPSHOT --
+ *     Snapshot and timestamp information associated with a checkpoint.
+ */
+struct __wt_ckpt_snapshot {
+    uint64_t ckpt_id;
+    uint64_t oldest_ts;
+    uint64_t stable_ts;
+    uint64_t snapshot_write_gen;
+    uint64_t snapshot_min;
+    uint64_t snapshot_max;
+    uint64_t *snapshot_txns;
+    uint32_t snapshot_count;
+};
+
+/*
  * Inactive should always be 0. Other states are roughly ordered by appearance in the checkpoint
  * life cycle.
  */

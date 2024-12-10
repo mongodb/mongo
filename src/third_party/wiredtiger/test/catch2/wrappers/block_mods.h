@@ -14,7 +14,7 @@ class block_mods {
 public:
     block_mods();
     ~block_mods();
-    WT_BLOCK_MODS *
+    WT_CKPT_BLOCK_MODS *
     get_wt_block_mods()
     {
         return &_block_mods;
@@ -22,5 +22,5 @@ public:
 
 private:
     void init_block_mods();
-    WT_BLOCK_MODS _block_mods;
+    WT_CKPT_BLOCK_MODS _block_mods;
 };

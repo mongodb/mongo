@@ -51,6 +51,7 @@ class TypeStats(object):
         self.gran_blocks = 0
         self.pct20 = 0
         self.pct80 = 0
+        self.single = 0
 
 typestats = dict()
 for n, t in zip(global_names, global_types):
@@ -96,7 +97,7 @@ def compute_type(filename, filemeta):
     # For collections and indexes, if logging is disabled, then they are replicated.
     #   if logging is enabled on an index, it is a local table.
     #   if logging is enabled on a collection, it is a local table unless it has 'oplog' in its
-    #   app_private string. There should only be one oplog in a system.
+    #   app_metadata string. There should only be one oplog in a system.
     # Any other file name is a system table.
     disabled = 'log=(enabled=false)'
     is_oplog = 'oplogKeyExtraction'
@@ -188,7 +189,7 @@ def compare_file(olderdir, newerdir, opts, filename, cmp_size):
     # Time how long it takes to compare each file.
     start = time.asctime()
     # Compare the bytes in cmp_size blocks between both files.
-    for b in range(0, num_cmp_blocks + 1):
+    for b in range(0, num_cmp_blocks):
         # Compare the two blocks. We know both files are at least min_size so all reads should work.
         buf1 = fp1.read(cmp_size)
         buf2 = fp2.read(cmp_size)
@@ -235,6 +236,9 @@ def compare_file(olderdir, newerdir, opts, filename, cmp_size):
     fp2.close()
     end = time.asctime()
     ts.gran_blocks += total_gran_blocks
+    # Count how many single granularity block files there are.
+    if total_gran_blocks <= 1:
+        ts.single += 1
 
     # Report for each file.
     if f1_size < f2_size:
@@ -246,23 +250,22 @@ def compare_file(olderdir, newerdir, opts, filename, cmp_size):
     else:
         change = "remained equal"
         change_diff = 0
-    chg_block_pct = round(abs(chg_blocks / total_gran_blocks * 100))
-    chg_byte_pct = round(abs(total_bytes_diff / min_size * 100))
+    chg_block_pct = round(chg_blocks / total_gran_blocks * 100)
+    chg_byte_pct = round(total_bytes_diff / min_size * 100)
     pct20_blocks = 0
     pct80_blocks = 0
     if chg_blocks != 0:
         ts.files_changed += 1
-        pct20_blocks = round(abs(pct20_count / chg_blocks * 100))
-        pct80_blocks = round(abs(pct80_count / chg_blocks * 100))
+        pct20_blocks = round(pct20_count / chg_blocks * 100)
+        pct80_blocks = round(pct80_count / chg_blocks * 100)
     if not opts.terse:
-        # Print the time even if no changes because we may want to know how long it took to not
-        # see any changes.
-        print(f'{filename}: time: started {start} completed {end}')
         if total_bytes_diff == 0:
             # If the file is unchanged return now.
-            print(f'{filename}: is unchanged')
+            if opts.verbose:
+                print(f'{filename}: is unchanged {f1_size}')
             return
 
+        print(f'{filename}: time: started {start} completed {end}')
         # Otherwise print out the change information.
         if change_diff != 0:
             print(f'{filename}: size: {f1_size} {f2_size} {change} by {change_diff} bytes')
@@ -274,7 +277,7 @@ def compare_file(olderdir, newerdir, opts, filename, cmp_size):
             print(f'{filename}: smallest 20%: {pct20_count} of {chg_blocks} changed blocks ({pct20_blocks}%) differ by {pct20} bytes or less of {opts.granularity}')
             print(f'{filename}: largest 80%: {pct80_count} of {chg_blocks} changed blocks ({pct80_blocks}%) differ by {pct80} bytes or more of {opts.granularity}')
         print("")
-    else:
+    elif total_bytes_diff != 0:
         # Print a terse summary all on one line.
         print(
             f'{filename}: bytes: {total_bytes_diff} of {min_size} {chg_byte_pct}%;'
@@ -294,6 +297,7 @@ def print_summary(opts):
     total_files = 0
     total_files_changed = 0
     total_gran_blocks = 0
+    total_single_files = 0
     for t in global_types:
         ts = typestats[t]
         total_chg_bytes += ts.bytes
@@ -301,10 +305,13 @@ def print_summary(opts):
         total_files += ts.files
         total_files_changed += ts.files_changed
         total_gran_blocks += ts.gran_blocks
-    chg_blocks = round(abs(total_chg_blocks / total_gran_blocks * 100))
+        total_single_files += ts.single
+    chg_blocks = round(total_chg_blocks / total_gran_blocks * 100)
+    single_pct = round(total_single_files / total_files * 100)
     if not opts.terse:
         print(f'Total: {total_chg_bytes} bytes changed in {total_chg_blocks} changed granularity-sized ({opts.granularity}) blocks ({chg_blocks}%) of {total_gran_blocks} blocks overall')
         print(f'Total: {total_files_changed} {plural("file", total_files_changed)} changed out of {total_files} total files')
+    print(f'Total: {total_single_files} single block {plural("file", total_single_files)} ({single_pct}%) changed out of {total_files} total files')
 
     # Walk through all the types printing out final information per type.
     for n, t in zip(global_names, global_types):
@@ -312,20 +319,23 @@ def print_summary(opts):
         changed = plural('file', ts.files_changed)
         total = plural('file', ts.files)
         if not opts.terse:
+            print("")
             print(f'{n}: {ts.files_changed} {changed} changed out of {ts.files} {total}')
         if ts.gran_blocks != 0:
-            chg_blocks = round(abs(ts.chg_blocks / ts.gran_blocks * 100))
-            pct20_blocks = round(abs(ts.pct20 / ts.gran_blocks * 100))
-            pct80_blocks = round(abs(ts.pct80 / ts.gran_blocks * 100))
+            chg_blocks = round(ts.chg_blocks / ts.gran_blocks * 100)
+            chg_block_bytes = ts.chg_blocks * opts.granularity
+            chg_bytes_pct = round(ts.bytes / chg_block_bytes * 100)
+            pct20_blocks = round(ts.pct20 / ts.chg_blocks * 100)
+            pct80_blocks = round(ts.pct80 / ts.chg_blocks * 100)
             if not opts.terse:
-                print(f'{ts.files_changed} changed {changed}: differs by {ts.bytes} bytes in {ts.chg_blocks} changed granularity blocks')
+                print(f'{ts.files_changed} changed {changed}: differs by {ts.bytes} bytes ({chg_bytes_pct}%) in {ts.chg_blocks} changed granularity blocks ({chg_block_bytes} block bytes)')
                 print(f'{ts.files_changed} changed {changed}: differs by {ts.chg_blocks} ({chg_blocks}%) granularity blocks in {ts.gran_blocks} total granularity blocks')
                 print(f'{n}: smallest 20%: {ts.pct20} of {ts.chg_blocks} changed blocks ({pct20_blocks}%) differ by {pct20} bytes or less of {opts.granularity}')
                 print(f'{n}: largest 80%: {ts.pct80} of {ts.chg_blocks} changed blocks ({pct80_blocks}%) differ by {pct80} bytes or more of {opts.granularity}')
             else:
                 # Print a terse summary all on one line.
                 all_bytes = opts.granularity * ts.gran_blocks
-                pct_bytes = round(abs(ts.bytes / all_bytes * 100))
+                pct_bytes = round(ts.bytes / all_bytes * 100)
                 print(
                     f'{n}: files: {ts.files_changed} of {ts.files};'
                     f' bytes: {ts.bytes} of {all_bytes} {pct_bytes}%;'

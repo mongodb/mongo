@@ -2567,11 +2567,9 @@ __conn_session_size(WT_SESSION_IMPL *session, const char *cfg[], uint32_t *vp)
     v = WT_EXTRA_INTERNAL_SESSIONS;
 
     /* Then, add in the thread counts applications can configure. */
-    WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
-    v += cval.val;
+    v += WT_EVICT_MAX_WORKERS;
 
-    WT_RET(__wt_config_gets(session, cfg, "lsm_manager.worker_thread_max", &cval));
-    v += cval.val;
+    v += WT_LSM_MAX_WORKERS;
 
     /* If live restore is enabled add its thread count. */
     if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE)) {

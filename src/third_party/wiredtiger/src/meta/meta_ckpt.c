@@ -25,7 +25,7 @@ static int
 __ckpt_load_blk_mods(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt)
 {
     WT_BLKINCR *blkincr;
-    WT_BLOCK_MODS *blk_mod;
+    WT_CKPT_BLOCK_MODS *blk_mod;
     WT_CONFIG blkconf;
     WT_CONFIG_ITEM b, k, v;
     WT_CONNECTION_IMPL *conn;
@@ -81,14 +81,14 @@ __ckpt_load_blk_mods(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt
         ret = __wt_config_subgets(session, &v, "rename", &b);
         WT_RET_NOTFOUND_OK(ret);
         if (ret == 0 && b.val)
-            F_SET(blk_mod, WT_BLOCK_MODS_RENAME);
+            F_SET(blk_mod, WT_CKPT_BLOCK_MODS_RENAME);
         else
-            F_CLR(blk_mod, WT_BLOCK_MODS_RENAME);
+            F_CLR(blk_mod, WT_CKPT_BLOCK_MODS_RENAME);
         ret = __wt_config_subgets(session, &v, "blocks", &b);
         WT_RET_NOTFOUND_OK(ret);
         if (ret != WT_NOTFOUND) {
             WT_RET(__wt_backup_load_incr(session, &b, &blk_mod->bitstring, blk_mod->nbits));
-            F_SET(blk_mod, WT_BLOCK_MODS_VALID);
+            F_SET(blk_mod, WT_CKPT_BLOCK_MODS_VALID);
         }
     }
     return (ret == WT_NOTFOUND ? 0 : ret);
@@ -519,7 +519,7 @@ static int
 __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
 {
     WT_BLKINCR *blk;
-    WT_BLOCK_MODS *blk_mod;
+    WT_CKPT_BLOCK_MODS *blk_mod;
     uint64_t i;
     bool free, setup;
 
@@ -543,7 +543,7 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
         if (!F_ISSET(blk, WT_BLKINCR_VALID)) {
             free = true;
             setup = false;
-        } else if (F_ISSET(blk_mod, WT_BLOCK_MODS_VALID) &&
+        } else if (F_ISSET(blk_mod, WT_CKPT_BLOCK_MODS_VALID) &&
           WT_STRING_MATCH(blk_mod->id_str, blk->id_str, strlen(blk->id_str))) {
             /* We match, keep our entry and don't set up. */
             setup = false;
@@ -556,16 +556,16 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
 
         /* If we are keeping or setting up an entry on a rename, set the flag. */
         if (rename && (!free || setup))
-            F_SET(blk_mod, WT_BLOCK_MODS_RENAME);
+            F_SET(blk_mod, WT_CKPT_BLOCK_MODS_RENAME);
 
         /* Free any old information if we need to do so. */
-        if (free && F_ISSET(blk_mod, WT_BLOCK_MODS_VALID)) {
+        if (free && F_ISSET(blk_mod, WT_CKPT_BLOCK_MODS_VALID)) {
             __wt_free(session, blk_mod->id_str);
             __wt_buf_free(session, &blk_mod->bitstring);
             blk_mod->nbits = 0;
             blk_mod->granularity = 0;
             blk_mod->offset = 0;
-            F_CLR(blk_mod, WT_BLOCK_MODS_VALID);
+            F_CLR(blk_mod, WT_CKPT_BLOCK_MODS_VALID);
         }
 
         /* Set up the block list to point to the current information. */
@@ -575,7 +575,7 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
             blk_mod->granularity = S2C(session)->incr_granularity;
             blk_mod->nbits = 0;
             blk_mod->offset = 0;
-            F_SET(blk_mod, WT_BLOCK_MODS_VALID);
+            F_SET(blk_mod, WT_CKPT_BLOCK_MODS_VALID);
         }
     }
     return (0);
@@ -635,7 +635,7 @@ __meta_blk_mods_load(
      */
     F_SET(ckpt, WT_CKPT_ADD);
     if (F_ISSET(S2C(session), WT_CONN_INCR_BACKUP)) {
-        F_SET(ckpt, WT_CKPT_BLOCK_MODS);
+        F_SET(ckpt, WT_CKPT_BLOCK_MODS_LIST);
         WT_RET(__ckpt_valid_blk_mods(session, ckpt, rename));
     }
     return (0);
@@ -1169,7 +1169,7 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
 static int
 __ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
 {
-    WT_BLOCK_MODS *blk;
+    WT_CKPT_BLOCK_MODS *blk;
     WT_ITEM bitstring;
     u_int i;
     bool skip_rename, valid;
@@ -1177,7 +1177,7 @@ __ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
     WT_CLEAR(bitstring);
     skip_rename = valid = false;
     for (i = 0, blk = &ckpt->backup_blocks[0]; i < WT_BLKINCR_MAX; ++i, ++blk)
-        if (F_ISSET(blk, WT_BLOCK_MODS_VALID))
+        if (F_ISSET(blk, WT_CKPT_BLOCK_MODS_VALID))
             valid = true;
 
     /*
@@ -1193,7 +1193,7 @@ __ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
      */
     WT_RET(__wt_buf_catfmt(session, buf, ",checkpoint_backup_info=("));
     for (i = 0, blk = &ckpt->backup_blocks[0]; i < WT_BLKINCR_MAX; ++i, ++blk) {
-        if (!F_ISSET(blk, WT_BLOCK_MODS_VALID))
+        if (!F_ISSET(blk, WT_CKPT_BLOCK_MODS_VALID))
             continue;
 
         /*
@@ -1202,7 +1202,7 @@ __ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
          * versions of WiredTiger
          */
         if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_BACKUP_RENAME) &&
-          !F_ISSET(blk, WT_BLOCK_MODS_RENAME) && __wt_random(&session->rnd) % 10 == 0)
+          !F_ISSET(blk, WT_CKPT_BLOCK_MODS_RENAME) && __wt_random(&session->rnd) % 10 == 0)
             skip_rename = true;
 
         WT_RET(__wt_raw_to_hex(session, blk->bitstring.data, blk->bitstring.size, &bitstring));
@@ -1210,9 +1210,9 @@ __ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
           "%s\"%s\"=(id=%" PRIu32 ",granularity=%" PRIu64 ",nbits=%" PRIu64 ",offset=%" PRIu64
           "%s,blocks=%.*s)",
           i == 0 ? "" : ",", blk->id_str, i, blk->granularity, blk->nbits, blk->offset,
-          skip_rename                          ? "" :
-            F_ISSET(blk, WT_BLOCK_MODS_RENAME) ? ",rename=1" :
-                                                 ",rename=0",
+          skip_rename                               ? "" :
+            F_ISSET(blk, WT_CKPT_BLOCK_MODS_RENAME) ? ",rename=1" :
+                                                      ",rename=0",
           (int)bitstring.size, (char *)bitstring.data));
         /* The hex string length should match the appropriate number of bits. */
         WT_ASSERT(session, (blk->nbits >> 2) <= bitstring.size);

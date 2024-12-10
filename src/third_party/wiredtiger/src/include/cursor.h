@@ -49,6 +49,9 @@
             F_SET(cursor, WT_CURSTD_EVICT_REPOSITION);                              \
     } while (0)
 
+/* Maximum number of incremental backups. */
+#define WT_BLKINCR_MAX 2
+
 struct __wt_cursor_backup {
     WT_CURSOR iface;
 

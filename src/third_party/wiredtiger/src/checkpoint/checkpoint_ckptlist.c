@@ -51,7 +51,7 @@ __wt_ckptlist_saved_free(WT_SESSION_IMPL *session)
 void
 __wt_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
-    WT_BLOCK_MODS *blk_mod;
+    WT_CKPT_BLOCK_MODS *blk_mod;
     uint64_t i;
 
     if (ckpt == NULL)
@@ -67,7 +67,7 @@ __wt_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
         blk_mod = &ckpt->backup_blocks[i];
         __wt_buf_free(session, &blk_mod->bitstring);
         __wt_free(session, blk_mod->id_str);
-        F_CLR(blk_mod, WT_BLOCK_MODS_VALID);
+        F_CLR(blk_mod, WT_CKPT_BLOCK_MODS_VALID);
     }
 
     WT_CLEAR(*ckpt); /* Clear to prepare for re-use. */
