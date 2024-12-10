@@ -14,9 +14,8 @@ use Antithesis today.
 ## Base Images
 
 The `base_images` directory consists of the building blocks for creating a MongoDB test topology.
-These images are uploaded to the Antithesis Docker registry weekly during the
-`antithesis_image_push` task. For more visibility into how these images are built and uploaded to
-the Antithesis Docker registry, please see that task.
+These images are uploaded to the Antithesis Docker registry [nightly](https://github.com/10gen/mongo/blob/6cf8b162a61173eb372b54213def6dd61e1fd684/etc/evergreen_yml_components/variants/ubuntu/test_dev_master_and_lts_branches_only.yml#L28) during the
+[`antithesis image build and push`](https://github.com/10gen/mongo/blob/020632e3ae328f276b2c251417b5a39389af6141/etc/evergreen_yml_components/definitions.yml#L2823) function.
 
 ### mongo_binaries
 
@@ -37,14 +36,9 @@ buildscript/resmoke.py run --suite antithesis_concurrency_sharded_with_stepdowns
 
 **Every topology must have 1 workload container.**
 
-Note: During `workload` image build, `buildscripts/antithesis_suite.py` runs, which generates
+Note: During `workload` image build, `evergreen/antithesis_image_build_and_push.sh` runs, which generates
 "antithesis compatible" test suites and prepends them with `antithesis_`. These are the test suites
-that can run in antithesis and are available from witihin the `workload` container.
-
-## Topologies
-
-The `topologies` directory consists of subdirectories representing various mongo test topologies.
-Each topology has a `Dockerfile`, a `docker-compose.yml` file and a `scripts` directory.
+that can run in antithesis and are available from within the `workload` container.
 
 ### Dockerfile
 
@@ -53,7 +47,7 @@ consists of a `docker-compose.yml`, a `logs` directory, a `scripts` directory an
 directory. If this is structured properly, you should be able to copy the files & directories
 from this image and run `docker-compose up` to set up the desired topology.
 
-Example from `buildscripts/antithesis/topologies/sharded_cluster/Dockerfile`:
+Example from what `buildscripts/resmokelib/testing/docker_cluster_image_builder.py` generates:
 
 ```Dockerfile
 FROM scratch
@@ -65,8 +59,8 @@ ADD debug /debug
 ```
 
 All topology images are built and uploaded to the Antithesis Docker registry during the
-`antithesis_image_push` task. Some of these directories are created during the
-`evergreen/antithesis_image_build.sh` script such as `/data` and `/logs`.
+`antithesis image build and push` task. Some of these directories are created during the
+`evergreen/antithesis_image_build_and_push.sh` script such as `/data` and `/logs`.
 
 Note: These images serve solely as a filesystem containing all necessary files for a topology,
 therefore use `FROM scratch`.
@@ -180,7 +174,7 @@ be affected by network fuzzing. For instance, you would likely not want the `wor
 to be affected by network fuzzing -- as shown in the example above.
 
 Use the `evergreen-latest-master` tag for all images. This is updated automatically in
-`evergreen/antithesis_image_build.sh` during the `antithesis_image_build` task -- if needed.
+`evergreen/antithesis_image_build_and_push.sh` -- if needed.
 
 ### scripts
 
@@ -193,43 +187,9 @@ loop for `python` scripts or you can use `tail -f /dev/null` for shell scripts.
 
 ## How do I create a new topology for Antithesis testing?
 
-To create a new topology for Antithesis testing is easy & requires a few simple steps.
+This should be done with care to ensure we are using our limited resources efficiently.
 
-1. Add a new directory in `buildscripts/antithesis/topologies` to represent your desired topology.
-   You can use existing topologies as an example.
-2. Make sure that your workload test suite runs against your topology without any failures. This
-   may require tagging some tests as `antithesis-incompatible`.
-3. Update the `antithesis_image_push` task so that your new topology image is
-   uploaded to the Antithesis Docker registry.
-4. Reach out to #server-testing on Slack & provide the new topology image name as well as the
-   desired test suite to run.
-5. Include the Correctness team on the code review.
-
-These are the required updates to `evergreen/antithesis_image_build.sh`:
-
-- Add the following command for each of your `mongos` and `mongod` containers in your topology to
-  create your log directories.
-
-```shell
-mkdir -p antithesis/topologies/[topology_name]/{logs,data}/[container_name]
-```
-
-- Build an image for your new topology ending in `-config`
-
-```shell
-cd [your_topology_dir]
-sed -i s/evergreen-latest-master/$tag/ docker-compose.yml
-sudo docker build . -t [your-topology-name]-config:$tag
-```
-
-These are the required updates to `evergreen/antithesis_image_push.sh`:
-
-- Push your new image to the Antithesis Docker registry
-
-```shell
-sudo docker tag "[your-topology-name]-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/[your-topology-name]-config:$tag"
-sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/[your-topology-name]-config:$tag"
-```
+Create a new task extending the `antithesis_task_template`, tagged with `antithesis`, passing the specified `suite` to the `antithesis image build and push` task. See other examples to get started.
 
 ## Additional Resources
 
