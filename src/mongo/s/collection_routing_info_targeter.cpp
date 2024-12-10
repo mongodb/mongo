@@ -97,7 +97,6 @@ constexpr auto kIdFieldName = "_id"_sd;
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
 
 using UpdateType = write_ops::UpdateModification::Type;
-using shard_key_pattern_query_util::QueryTargetingInfo;
 
 /**
  * Update expressions are bucketed into one of two types for the purposes of shard targeting:
@@ -454,8 +453,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     OperationContext* opCtx,
     const BatchItemRef& itemRef,
     bool* useTwoPhaseWriteProtocol,
-    bool* isNonTargetedWriteWithoutShardKeyWithExactId,
-    std::set<ChunkRange>* chunkRanges) const {
+    bool* isNonTargetedWriteWithoutShardKeyWithExactId) const {
     // If the update is replacement-style:
     // 1. Attempt to target using the query. If this fails, AND the query targets more than one
     //    shard,
@@ -533,15 +531,15 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         getUpdateExprForTargeting(expCtx, shardKeyPattern, query, updateOp.getUpdateMods());
 
     // Utility function to target an update by shard key, and to handle any potential error results.
-    auto targetByShardKey = [this, &collation, &chunkRanges, isUpsert, isMulti](
-                                StatusWith<BSONObj> swShardKey, std::string msg) {
+    auto targetByShardKey = [this, &collation, isUpsert, isMulti](StatusWith<BSONObj> swShardKey,
+                                                                  std::string msg) {
         const auto& shardKey = uassertStatusOKWithContext(std::move(swShardKey), msg);
         if (shardKey.isEmpty()) {
             uasserted(ErrorCodes::ShardKeyNotFound,
                       str::stream() << msg << " :: could not extract exact shard key");
         } else {
             return std::vector{
-                uassertStatusOKWithContext(_targetShardKey(shardKey, collation, chunkRanges), msg)};
+                uassertStatusOKWithContext(_targetShardKey(shardKey, collation), msg)};
         }
     };
 
@@ -559,7 +557,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
 
     // We first try to target based on the update's query. It is always valid to forward any update
     // or upsert to a single shard, so return immediately if we are able to target a single shard.
-    auto endPoints = uassertStatusOK(_targetQuery(*cq, chunkRanges));
+    auto endPoints = uassertStatusOK(_targetQuery(*cq));
     if (endPoints.size() == 1) {
         // The check is structured in this way to check if the query does not contain a shard key,
         // but is still targetable to a single shard. We don't explicitly use the result of
@@ -583,9 +581,6 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         // using the query, we attempt to extract the shard key from the replacement and target
         // based on it.
         if (updateOp.getUpdateMods().type() == write_ops::UpdateModification::Type::kReplacement) {
-            if (chunkRanges) {
-                chunkRanges->clear();
-            }
             return targetByShardKey(shardKeyPattern.extractShardKeyFromDoc(updateExpr),
                                     "Failed to target update by replacement document");
         }
@@ -626,8 +621,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     OperationContext* opCtx,
     const BatchItemRef& itemRef,
     bool* useTwoPhaseWriteProtocol,
-    bool* isNonTargetedWriteWithoutShardKeyWithExactId,
-    std::set<ChunkRange>* chunkRanges) const {
+    bool* isNonTargetedWriteWithoutShardKeyWithExactId) const {
     const auto& deleteOp = itemRef.getDeleteRef();
     const bool isMulti = deleteOp.getMulti();
     const auto collation = write_ops::collationOf(deleteOp);
@@ -685,7 +679,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
 
     // We first try to target based on the delete's query. It is always valid to forward any delete
     // to a single shard, so return immediately if we are able to target a single shard.
-    auto endpoints = uassertStatusOK(_targetQuery(*cq, chunkRanges));
+    auto endpoints = uassertStatusOK(_targetQuery(*cq));
     if (endpoints.size() == 1) {
         if (!deleteOp.getMulti()) {
             getQueryCounters(opCtx).deleteOneTargetedShardedCount.increment(1);
@@ -747,17 +741,11 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
 }
 
 StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQuery(
-    const CanonicalQuery& query, std::set<ChunkRange>* chunkRanges) const {
+    const CanonicalQuery& query) const {
 
     std::set<ShardId> shardIds;
     try {
-        if (chunkRanges) {
-            QueryTargetingInfo info;
-            getShardIdsForCanonicalQuery(query, _cri.cm, &shardIds, &info);
-            chunkRanges->swap(info.chunkRanges);
-        } else {
-            getShardIdsForCanonicalQuery(query, _cri.cm, &shardIds, nullptr);
-        }
+        getShardIdsForCanonicalQuery(query, _cri.cm, &shardIds);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -787,7 +775,7 @@ StatusWith<ShardEndpoint> CollectionRoutingInfoTargeter::_targetShardKey(
 }
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetAllShards(
-    OperationContext* opCtx, std::set<ChunkRange>* chunkRanges) const {
+    OperationContext* opCtx) const {
     // This function is only called if doing a multi write that targets more than one shard. This
     // implies the collection is sharded, so we should always have a chunk manager.
     invariant(_cri.cm.isSharded());
@@ -798,10 +786,6 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetAllShards(
     for (auto&& shardId : shardIds) {
         ShardVersion shardVersion = _cri.getShardVersion(shardId);
         endpoints.emplace_back(std::move(shardId), std::move(shardVersion), boost::none);
-    }
-
-    if (chunkRanges) {
-        _cri.cm.getAllChunkRanges(chunkRanges);
     }
 
     return endpoints;

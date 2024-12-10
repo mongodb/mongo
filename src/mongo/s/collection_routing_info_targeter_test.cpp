@@ -521,7 +521,6 @@ TEST_F(CollectionRoutingInfoTargeterWithChunkRangesTest,
 }
 
 void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedShardKey() {
-    std::set<ChunkRange> chunkRanges;
     // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
     // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
     // [100, MaxKey).
@@ -537,19 +536,10 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     auto res = criTargeter.targetUpdate(operationContext(),
                                         BatchItemRef(&request, 0),
                                         nullptr /* useTwoPhaseWriteProtocol */,
-                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                        checkChunkRanges ? &chunkRanges : nullptr);
+                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 2);
     ASSERT_EQUALS(res[0].shardName, "3");
     ASSERT_EQUALS(res[1].shardName, "4");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 2);
-        ASSERT_TRUE(chunkRanges.contains(
-            {BSON("a.b" << 0 << "c.d" << MINKEY), BSON("a.b" << 100 << "c.d" << MINKEY)}));
-        ASSERT_TRUE(chunkRanges.contains(
-            {BSON("a.b" << 100 << "c.d" << MINKEY), BSON("a.b" << MAXKEY << "c.d" << MAXKEY)}));
-        chunkRanges.clear();
-    }
 
     // When update targets using query.
     auto requestAndSet = buildUpdate(kNss,
@@ -559,33 +549,18 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestAndSet, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "3");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 0 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << 100 << "c.d" << MINKEY));
-        chunkRanges.clear();
-    }
 
     auto requestLT =
         buildUpdate(kNss, fromjson("{'a.b': {$lt : -101}}"), fromjson("{a: {b: 111}}"), false);
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestLT, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
-                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
-        chunkRanges.clear();
-    }
 
     // For op-style updates, query on _id gets targeted to all shards.
     auto requestOpUpdate =
@@ -593,28 +568,8 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestOpUpdate, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 5);
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 5);
-        auto itRange = chunkRanges.cbegin();
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << MINKEY << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << BSONNULL << "c.d" << MINKEY));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << BSONNULL << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << -100 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 0 << "c.d" << MINKEY));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 0 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 100 << "c.d" << MINKEY));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
-        chunkRanges.clear();
-    }
 
     // For replacement style updates, query on _id uses replacement doc to target. If the
     // replacement doc doesn't have shard key fields, then update should be routed to the shard
@@ -623,17 +578,9 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestReplUpdate, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
-                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
-        chunkRanges.clear();
-    }
 
     // Upsert without full shard key.
     auto requestFullKey =
@@ -642,16 +589,9 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
         criTargeter.targetUpdate(operationContext(),
                                  BatchItemRef(&requestFullKey, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
-                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr);
+                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(resUpsert.size(), 1);
     ASSERT_EQUALS(resUpsert[0].shardName, "4");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
-        chunkRanges.clear();
-    }
 
     // Upsert with full shard key.
     auto requestSuccess =
@@ -659,16 +599,9 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestSuccess, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "4");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
-        chunkRanges.clear();
-    }
 }
 
 TEST_F(CollectionRoutingInfoTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
@@ -696,7 +629,6 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
                                splitPoints);
 
     for (int i = 0; i < 1000; i++) {
-        std::set<ChunkRange> chunkRanges;
         auto updateQueryObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
 
         // Verify that the given document is being routed based on hashed value of 'i' in
@@ -706,16 +638,10 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
             criTargeter.targetUpdate(operationContext(),
                                      BatchItemRef(&request, 0),
                                      nullptr /* useTwoPhaseWriteProtocol */,
-                                     nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                     checkChunkRanges ? &chunkRanges : nullptr);
+                                     nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
         ASSERT_EQUALS(res.size(), 1);
         auto chunk = findChunk(updateQueryObj["a"]["b"]);
         ASSERT_EQUALS(res[0].shardName, chunk.getShardId());
-        if (checkChunkRanges) {
-            ASSERT_EQUALS(chunkRanges.size(), 1);
-            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), chunk.getMin());
-            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), chunk.getMax());
-        }
     }
 
     // Range queries will be able to target using the two phase write protocol.
@@ -725,13 +651,8 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
     auto res = criTargeter.targetUpdate(operationContext(),
                                         BatchItemRef(&requestUpdate, 0),
                                         nullptr /* useTwoPhaseWriteProtocol */,
-                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                        checkChunkRanges ? &chunkRanges : nullptr);
+                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 4);
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 4);
-        chunkRanges.clear();
-    }
 }
 
 TEST_F(CollectionRoutingInfoTargeterTest, TargetDeleteWithExactId) {
@@ -743,7 +664,6 @@ TEST_F(CollectionRoutingInfoTargeterWithChunkRangesTest, TargetDeleteWithExactId
 }
 
 void CollectionRoutingInfoTargeterTest::testTargetDeleteWithExactId() {
-    std::set<ChunkRange> chunkRanges;
     std::vector<BSONObj> splitPoints = {
         BSON("a.b" << BSONNULL), BSON("a.b" << -100), BSON("a.b" << 0), BSON("a.b" << 100)};
     auto criTargeter = prepare(BSON("a.b" << 1), splitPoints);
@@ -752,27 +672,8 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithExactId() {
     auto res = criTargeter.targetDelete(operationContext(),
                                         BatchItemRef(&requestId, 0),
                                         nullptr /* useTwoPhaseWriteProtocol */,
-                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                        checkChunkRanges ? &chunkRanges : nullptr);
+                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res[0].shardName, "0");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 5);
-        auto itRange = chunkRanges.cbegin();
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << MINKEY));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << BSONNULL));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << BSONNULL));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << -100));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << -100));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 0));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 0));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << 100));
-        ++itRange;
-        ASSERT_BSONOBJ_EQ(itRange->getMin(), BSON("a.b" << 100));
-        ASSERT_BSONOBJ_EQ(itRange->getMax(), BSON("a.b" << MAXKEY));
-    }
 }
 
 TEST_F(CollectionRoutingInfoTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
@@ -785,7 +686,6 @@ TEST_F(CollectionRoutingInfoTargeterWithChunkRangesTest,
 }
 
 void CollectionRoutingInfoTargeterTest::testTargetDeleteWithRangePrefixHashedShardKey() {
-    std::set<ChunkRange> chunkRanges;
     // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has
     // chunk [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
     // [100, MaxKey).
@@ -800,16 +700,9 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithRangePrefixHashedSha
     auto res = criTargeter.targetDelete(operationContext(),
                                         BatchItemRef(&requestPartialKey, 0),
                                         nullptr /* useTwoPhaseWriteProtocol */,
-                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                        checkChunkRanges ? &chunkRanges : nullptr);
+                                        nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "4");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
-        chunkRanges.clear();
-    }
 
     // Test delete with range query.
     auto requestPartialKey2 = buildDelete(kNss, fromjson("{'a.b': {$gt: 0}}"));
@@ -817,19 +710,10 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithRangePrefixHashedSha
         criTargeter.targetDelete(operationContext(),
                                  BatchItemRef(&requestPartialKey2, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
-                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr);
+                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(resMultipleShards.size(), 2);
     ASSERT_EQUALS(resMultipleShards[0].shardName, "3");
     ASSERT_EQUALS(resMultipleShards[1].shardName, "4");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 2);
-        ASSERT_TRUE(chunkRanges.contains(
-            {BSON("a.b" << 0 << "c.d" << MINKEY), BSON("a.b" << 100 << "c.d" << MINKEY)}));
-        ASSERT_TRUE(chunkRanges.contains(
-            {BSON("a.b" << 100 << "c.d" << MINKEY), BSON("a.b" << MAXKEY << "c.d" << MAXKEY)}));
-        chunkRanges.clear();
-    }
 
     // Test delete with no shard key.
     auto requestNoShardKey = buildDelete(kNss, fromjson("{'k': 0}"));
@@ -837,30 +721,17 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithRangePrefixHashedSha
         criTargeter.targetDelete(operationContext(),
                                  BatchItemRef(&requestNoShardKey, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
-                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr);
+                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(resNoShardKey.size(), 5);
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 5);
-        chunkRanges.clear();
-    }
 
     // Delete targeted correctly with full shard key in query.
     auto requestFullKey = buildDelete(kNss, fromjson("{'a.b': -101, 'c.d': 5}"));
     res = criTargeter.targetDelete(operationContext(),
                                    BatchItemRef(&requestFullKey, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(),
-                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << -100 << "c.d" << MINKEY));
-        chunkRanges.clear();
-    }
 
     // Query with MinKey value should go to chunk '0' because MinKey is smaller than BSONNULL.
     auto requestMinKey =
@@ -868,32 +739,17 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithRangePrefixHashedSha
     res = criTargeter.targetDelete(operationContext(),
                                    BatchItemRef(&requestMinKey, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "0");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << MINKEY << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(),
-                          BSON("a.b" << BSONNULL << "c.d" << MINKEY));
-        chunkRanges.clear();
-    }
 
     auto requestMinKey2 = buildDelete(kNss, fromjson("{'a.b':  0, 'c.d': 5}"));
     res = criTargeter.targetDelete(operationContext(),
                                    BatchItemRef(&requestMinKey2, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
-                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                   checkChunkRanges ? &chunkRanges : nullptr);
+                                   nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "3");
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 0 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << 100 << "c.d" << MINKEY));
-        chunkRanges.clear();
-    }
 }
 
 TEST_F(CollectionRoutingInfoTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
@@ -906,7 +762,6 @@ TEST_F(CollectionRoutingInfoTargeterWithChunkRangesTest,
 }
 
 void CollectionRoutingInfoTargeterTest::testTargetDeleteWithHashedPrefixHashedShardKey() {
-    std::set<ChunkRange> chunkRanges;
     auto findChunk = [&](BSONElement elem) {
         return collectionRoutingInfo->cm.findIntersectingChunkWithSimpleCollation(
             BSON("a.b" << BSONElementHasher::hash64(elem, BSONElementHasher::DEFAULT_HASH_SEED)));
@@ -931,17 +786,10 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithHashedPrefixHashedSh
             criTargeter.targetDelete(operationContext(),
                                      BatchItemRef(&request, 0),
                                      nullptr /* useTwoPhaseWriteProtocol */,
-                                     nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                     checkChunkRanges ? &chunkRanges : nullptr);
+                                     nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
         ASSERT_EQUALS(res.size(), 1);
         auto chunk = findChunk(queryObj["a"]["b"]);
         ASSERT_EQUALS(res[0].shardName, chunk.getShardId());
-        if (checkChunkRanges) {
-            ASSERT_EQUALS(chunkRanges.size(), 1);
-            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), chunk.getMin());
-            ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), chunk.getMax());
-            chunkRanges.clear();
-        }
     }
 
     // Range queries on hashed field can target using the two phase write protocol.
@@ -950,13 +798,8 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithHashedPrefixHashedSh
         criTargeter.targetDelete(operationContext(),
                                  BatchItemRef(&request, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
-                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr);
+                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */);
     ASSERT_EQUALS(resRangeQuery.size(), 4);
-    if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 4);
-        chunkRanges.clear();
-    }
 }
 
 TEST(CollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {

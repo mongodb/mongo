@@ -78,7 +78,7 @@ public:
     ShardEndpoint targetInsert(OperationContext* opCtx,
                                const BSONObj& doc,
                                std::set<ChunkRange>* chunkRanges = nullptr) const override {
-        auto endpoints = _targetQuery(doc, chunkRanges);
+        auto endpoints = _targetQuery(doc);
         ASSERT_EQ(1U, endpoints.size());
         return endpoints.front();
     }
@@ -92,9 +92,8 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-        std::set<ChunkRange>* chunkRanges = nullptr) const override {
-        return _targetQuery(itemRef.getUpdateRef().getFilter(), chunkRanges);
+        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
+        return _targetQuery(itemRef.getUpdateRef().getFilter());
     }
 
     /**
@@ -106,13 +105,11 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-        std::set<ChunkRange>* chunkRanges = nullptr) const override {
-        return _targetQuery(itemRef.getDeleteRef().getFilter(), chunkRanges);
+        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
+        return _targetQuery(itemRef.getDeleteRef().getFilter());
     }
 
-    std::vector<ShardEndpoint> targetAllShards(
-        OperationContext* opCtx, std::set<ChunkRange>* chunkRanges = nullptr) const override {
+    std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override {
         std::vector<ShardEndpoint> endpoints;
         for (const auto& range : _mockRanges) {
             endpoints.push_back(range.endpoint);
@@ -183,8 +180,7 @@ private:
      * the form { field : { $gte : <value>, $lt : <value> } }. If chunkRanges is not nullptr, also
      * populates set of ChunkRange for the chunks that are targeted.
      */
-    std::vector<ShardEndpoint> _targetQuery(const BSONObj& query,
-                                            std::set<ChunkRange>* chunkRanges) const;
+    std::vector<ShardEndpoint> _targetQuery(const BSONObj& query) const;
 
     NamespaceString _nss;
 

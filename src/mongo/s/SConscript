@@ -126,6 +126,7 @@ env.CppUnitTest(
         "routing_table_history_test.cpp",
         "sessions_collection_sharded_test.cpp",
         "shard_key_pattern_query_util_index_bounds_test.cpp",
+        "shard_key_pattern_query_util_chunk_ranges_test.cpp",
         "shard_key_pattern_test.cpp",
         "shard_version_test.cpp",
         "sharding_task_executor_test.cpp",

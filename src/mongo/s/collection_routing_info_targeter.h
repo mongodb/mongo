@@ -111,8 +111,7 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-        std::set<ChunkRange>* chunkRanges = nullptr) const override;
+        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override;
 
     /**
      * Attempts to target an delete request by shard key and returns a vector of shards to target.
@@ -125,11 +124,9 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-        std::set<ChunkRange>* chunkRanges = nullptr) const override;
+        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override;
 
-    std::vector<ShardEndpoint> targetAllShards(
-        OperationContext* opCtx, std::set<ChunkRange>* chunkRanges = nullptr) const override;
+    std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override;
 
     void noteCouldNotTarget() override;
 
@@ -242,8 +239,7 @@ private:
      *
      * Returns !OK with message if query could not be targeted.
      */
-    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query,
-                                                        std::set<ChunkRange>* chunkRanges) const;
+    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query) const;
 
     /**
      * Returns a ShardEndpoint for an exact shard key query.
@@ -255,7 +251,7 @@ private:
      */
     StatusWith<ShardEndpoint> _targetShardKey(const BSONObj& shardKey,
                                               const BSONObj& collation,
-                                              std::set<ChunkRange>* chunkRanges) const;
+                                              std::set<ChunkRange>* chunkRanges = nullptr) const;
 
     // Full namespace of the collection for this targeter
     NamespaceString _nss;

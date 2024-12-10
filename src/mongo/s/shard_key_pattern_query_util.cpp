@@ -466,8 +466,18 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const BSONObj& collation,
                          const ChunkManager& cm,
                          std::set<ShardId>* shardIds,
-                         QueryTargetingInfo* info,
                          bool bypassIsFieldHashedCheck) {
+    return getShardIdsAndChunksForQuery(
+        expCtx, query, collation, cm, shardIds, nullptr, bypassIsFieldHashedCheck);
+}
+
+void getShardIdsAndChunksForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                  const BSONObj& query,
+                                  const BSONObj& collation,
+                                  const ChunkManager& cm,
+                                  std::set<ShardId>* shardIds,
+                                  QueryTargetingInfo* info,
+                                  bool bypassIsFieldHashedCheck) {
     if (info) {
         tassert(7670301, "Invalid QueryTargetingInfo", info->chunkRanges.empty());
     }
@@ -494,14 +504,22 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
 
-    getShardIdsForCanonicalQuery(*cq, cm, shardIds, info, bypassIsFieldHashedCheck);
+    getShardIdsAndChunksForCanonicalQuery(*cq, cm, shardIds, info, bypassIsFieldHashedCheck);
 }
 
 void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
                                   const ChunkManager& cm,
                                   std::set<ShardId>* shardIds,
-                                  QueryTargetingInfo* info,
                                   bool bypassIsFieldHashedCheck) {
+    return getShardIdsAndChunksForCanonicalQuery(
+        query, cm, shardIds, nullptr, bypassIsFieldHashedCheck);
+}
+
+void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
+                                           const ChunkManager& cm,
+                                           std::set<ShardId>* shardIds,
+                                           QueryTargetingInfo* info,
+                                           bool bypassIsFieldHashedCheck) {
     if (info) {
         tassert(7670300, "Invalid non-empty 'info->chunkRanges'", info->chunkRanges.empty());
     }

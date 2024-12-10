@@ -105,7 +105,7 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_getTarg
 
     std::set<ShardId> shardIds;  // This is not used.
     QueryTargetingInfo info;
-    getShardIdsForQuery(expCtx, filter, collation, _getChunkManager(), &shardIds, &info);
+    getShardIdsAndChunksForQuery(expCtx, filter, collation, _getChunkManager(), &shardIds, &info);
 
     return info;
 }

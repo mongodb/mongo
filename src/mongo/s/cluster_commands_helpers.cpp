@@ -276,7 +276,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
                 CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
         }
 
-        getShardIdsForQuery(expCtx, query, collation, cm, &shardIds, nullptr /* info */);
+        getShardIdsForQuery(expCtx, query, collation, cm, &shardIds);
     }
     for (const auto& shardToSkip : shardsToSkip) {
         shardIds.erase(shardToSkip);
@@ -811,7 +811,7 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
         // The collection has a routing table. Use it to decide which shards to target based on the
         // query and collation.
         std::set<ShardId> shardIds;
-        getShardIdsForQuery(expCtx, query, collation, cm, &shardIds, nullptr /* info */);
+        getShardIdsForQuery(expCtx, query, collation, cm, &shardIds);
         return shardIds;
     }
 
@@ -848,7 +848,7 @@ std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query
         }
 
         std::set<ShardId> shardIds;
-        getShardIdsForCanonicalQuery(query, cm, &shardIds, nullptr /* info */);
+        getShardIdsForCanonicalQuery(query, cm, &shardIds);
         return shardIds;
     }
 

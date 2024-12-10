@@ -173,8 +173,7 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
                                                      boost::none,  // explain
                                                      parsedInfo.let,
                                                      boost::none /* legacyRuntimeConstants */);
-    getShardIdsForQuery(
-        expCtx, query, collation, cm, &allShardsContainingChunksForNs, nullptr /* info */);
+    getShardIdsForQuery(expCtx, query, collation, cm, &allShardsContainingChunksForNs);
 
     // We must either get a subset of shards to target in the case of a partial shard key or we must
     // target all shards.

@@ -150,9 +150,13 @@ protected:
         }();
         auto expCtx =
             make_intrusive<ExpressionContextForTest>(operationContext(), kNss, std::move(cif));
-        getShardIdsForQuery(expCtx, query, queryCollation, chunkManager, &shardIds, &info);
+        getShardIdsAndChunksForQuery(expCtx, query, queryCollation, chunkManager, &shardIds, &info);
         _assertShardIdsMatch(expectedShardIds, shardIds);
-        // The test coverage for chunk ranges is in CollectionRoutingInfoTargeterTest.
+        // The test coverage for chunk ranges, specifically related to update and delete queries,
+        // is in ShardKeyPatternQueryUtilTest.
+        // TODO SERVER-97928: There are still tests for insert queries in
+        // CollectionRoutingInfoTargeterTest. These can be moved to ShardKeyPatternQueryUtilTest
+        // after the cleanup of chunk ranges in the insert functionality.
         ASSERT_EQ(expectedQueryTargetingInfo.desc, info.desc);
     }
 
@@ -648,8 +652,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
 
     const auto expCtx = make_intrusive<ExpressionContextForTest>();
     shardIds.clear();
-    getShardIdsForQuery(
-        expCtx, BSON("x" << BSON("$gt" << -20)), {}, chunkManager, &shardIds, nullptr /* info */);
+    getShardIdsForQuery(expCtx, BSON("x" << BSON("$gt" << -20)), {}, chunkManager, &shardIds);
     ASSERT_EQ(2, shardIds.size());
 }
 

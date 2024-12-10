@@ -453,9 +453,7 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(
                 kShardName2,
                 ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200}),
@@ -552,9 +550,7 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(
                 kShardName2,
                 ShardVersionFactory::make(ChunkVersion({epoch, Timestamp(1, 1)}, {101, 200}),
@@ -754,9 +750,7 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -909,9 +903,7 @@ TEST_F(BatchWriteExecTest,
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -1036,9 +1028,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -1173,9 +1163,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -1305,9 +1293,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             if (targetAll) {
                 return std::vector{
                     ShardEndpoint(
@@ -1936,12 +1922,11 @@ TEST_F(BatchWriteExecTest, FireAndForgetBatchUpdateGetsReplyWithOnlyOkStatus) {
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef,
-                                                bool* useTwoPhaseWriteProtocol,
-                                                bool* isNonTargetedWriteWithoutShardKeyWithExactId,
-                                                std::set<ChunkRange>* chunkRange) const override {
-            invariant(chunkRange == nullptr);
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            bool* useTwoPhaseWriteProtocol,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -2059,12 +2044,11 @@ TEST_F(BatchWriteExecTest, FireAndForgetBatchDeleteGetsReplyWithOnlyOkStatus) {
         using MockNSTargeter::MockNSTargeter;
 
     protected:
-        std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
-                                                const BatchItemRef& itemRef,
-                                                bool* useTwoPhaseWriteProtocol,
-                                                bool* isNonTargetedWriteWithoutShardKeyWithExactId,
-                                                std::set<ChunkRange>* chunkRange) const override {
-            invariant(chunkRange == nullptr);
+        std::vector<ShardEndpoint> targetDelete(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            bool* useTwoPhaseWriteProtocol,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId) const override {
             return std::vector{ShardEndpoint(
                 kShardName2,
                 ShardVersionFactory::make(ChunkVersion({epoch, Timestamp(1, 1)}, {101, 200}),
@@ -2157,9 +2141,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatch) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -2177,26 +2159,22 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatch) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         std::vector<ShardEndpoint> targetDelete(
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -2305,9 +2283,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatch) 
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -2324,26 +2300,22 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatch) 
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         std::vector<ShardEndpoint> targetDelete(
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -2459,9 +2431,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchNonR
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -2478,26 +2448,22 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchNonR
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         std::vector<ShardEndpoint> targetDelete(
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -2597,9 +2563,7 @@ TEST_F(BatchWriteExecTest, BatchedUpdateOneWithIdWithoutShardKeyWriteConcernErro
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -2616,13 +2580,11 @@ TEST_F(BatchWriteExecTest, BatchedUpdateOneWithIdWithoutShardKeyWriteConcernErro
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -2712,9 +2674,7 @@ TEST_F(BatchWriteExecTest,
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -2731,13 +2691,11 @@ TEST_F(BatchWriteExecTest,
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         // Mock a single targeter refresh
@@ -2865,9 +2823,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchRetr
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -2885,26 +2841,22 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchRetr
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         std::vector<ShardEndpoint> targetDelete(
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -3036,9 +2988,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchNo
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -3061,25 +3011,21 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchNo
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
         std::vector<ShardEndpoint> targetUpdate(
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -3215,9 +3161,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRe
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -3240,26 +3184,22 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRe
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         std::vector<ShardEndpoint> targetDelete(
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -3400,9 +3340,7 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyNonRetryableError) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -3420,13 +3358,11 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyNonRetryableError) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -3515,9 +3451,7 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleNonRetryab
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -3535,13 +3469,11 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleNonRetryab
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
     };
 
@@ -3630,9 +3562,7 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleRetryableE
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -3650,13 +3580,11 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleRetryableE
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         // Mock a single targeter refresh
@@ -3777,9 +3705,7 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedMultipleRetryabl
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -3797,13 +3723,11 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedMultipleRetryabl
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         // Mock a single targeter refresh
@@ -3927,9 +3851,7 @@ TEST_F(BatchWriteExecTest,
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -3947,13 +3869,11 @@ TEST_F(BatchWriteExecTest,
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return targetWriteOp(opCtx,
                                  itemRef,
                                  useTwoPhaseWriteProtocol,
-                                 isNonTargetedWriteWithoutShardKeyWithExactId,
-                                 chunkRange);
+                                 isNonTargetedWriteWithoutShardKeyWithExactId);
         }
 
         // Mock a single targeter refresh
@@ -4138,8 +4058,7 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRanges = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -4288,9 +4207,7 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),
@@ -4446,9 +4363,7 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
-            invariant(chunkRange == nullptr);
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
                                                  ChunkVersion({epoch, timestamp}, {100, 200}),

@@ -3498,8 +3498,7 @@ protected:
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{kEndpoint1, kEndpoint2, kEndpoint3};
         }
@@ -3507,8 +3506,7 @@ protected:
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{kEndpoint1, kEndpoint2, kEndpoint3};
         }
@@ -6297,8 +6295,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteWriteWithoutShardKeyWithIdAwaitsAllShard
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
-            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
-            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override {
             *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             return std::vector{
                 ShardEndpoint(kShardIdA,

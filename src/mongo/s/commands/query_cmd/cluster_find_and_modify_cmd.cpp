@@ -574,7 +574,6 @@ ShardId targetSingleShard(boost::intrusive_ptr<ExpressionContext> expCtx,
                         collation,
                         cm,
                         &shardIds,
-                        nullptr,
                         true);
 
     uassert(ErrorCodes::ShardKeyNotFound,

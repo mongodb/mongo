@@ -132,19 +132,45 @@ struct QueryTargetingInfo {
 
 /**
  * Populates 'shardIds' with the shard ids for a query with given filter and collation. If the
- * collation is empty, it uses the collection default collation for targeting. If 'info' is not
- * null, populates it with the ChunkRanges that the query targets and a description about whether
- * the query targets a single shard key value, multiple but not all shard key values or all shard
- * key values. If 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed
- * and assumes that any non-collatable shard key was not hashed from a collatable type.
+ * collation is empty, it uses the collection default collation for targeting. If
+ * 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed and assumes
+ * that any non-collatable shard key was not hashed from a collatable type.
  */
 void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const BSONObj& query,
                          const BSONObj& collation,
                          const ChunkManager& cm,
                          std::set<ShardId>* shardIds,
-                         shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr,
                          bool bypassIsFieldHashedCheck = false);
+
+/**
+ * Populates 'shardIds' with the shard ids for a query with given filter and collation. If the
+ * collation is empty, it uses the collection default collation for targeting. If 'info' is not
+ * null, populates it with the ChunkRanges that the query targets and a description about whether
+ * the query targets a single shard key value, multiple but not all shard key values or all shard
+ * key values. If 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed
+ * and assumes that any non-collatable shard key was not hashed from a collatable type.
+ *
+ * IMPORTANT: populating ChunkRanges can significantly degrade the execution time of this function.
+ * If you only require shard IDs, consider using getShardIdsForQuery for better performance.
+ */
+void getShardIdsAndChunksForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                  const BSONObj& query,
+                                  const BSONObj& collation,
+                                  const ChunkManager& cm,
+                                  std::set<ShardId>* shardIds,
+                                  shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr,
+                                  bool bypassIsFieldHashedCheck = false);
+
+/**
+ * Populates 'shardIds' with the shard ids for a query with given filter. If
+ * 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed and assumes
+ * that any non-collatable shard key was not hashed from a collatable type.
+ */
+void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
+                                  const ChunkManager& cm,
+                                  std::set<ShardId>* shardIds,
+                                  bool bypassIsFieldHashedCheck = false);
 
 /**
  * Populates 'shardIds' with the shard ids for a query with given filter. If 'info' is
@@ -152,11 +178,16 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
  * whether the query targets a single shard key value, multiple but not all shard key values or all
  * shard key values.  If 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was
  * hashed and assumes that any non-collatable shard key was not hashed from a collatable type.
+ *
+ * IMPORTANT: populating ChunkRanges can significantly degrade the execution time of this function.
+ * If you only require shard IDs, consider using getShardIdsForCanonicalQuery for better
+ * performance.
  */
-void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
-                                  const ChunkManager& cm,
-                                  std::set<ShardId>* shardIds,
-                                  shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr,
-                                  bool bypassIsFieldHashedCheck = false);
+void getShardIdsAndChunksForCanonicalQuery(
+    const CanonicalQuery& query,
+    const ChunkManager& cm,
+    std::set<ShardId>* shardIds,
+    shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr,
+    bool bypassIsFieldHashedCheck = false);
 
 }  // namespace mongo

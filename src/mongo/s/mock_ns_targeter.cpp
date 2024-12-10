@@ -78,8 +78,7 @@ MockNSTargeter::MockNSTargeter(const NamespaceString& nss, std::vector<MockRange
     ASSERT(!_mockRanges.empty());
 }
 
-std::vector<ShardEndpoint> MockNSTargeter::_targetQuery(const BSONObj& query,
-                                                        std::set<ChunkRange>* chunkRanges) const {
+std::vector<ShardEndpoint> MockNSTargeter::_targetQuery(const BSONObj& query) const {
     const ChunkRange queryRange(parseRange(query));
 
     std::vector<ShardEndpoint> endpoints;
@@ -87,9 +86,6 @@ std::vector<ShardEndpoint> MockNSTargeter::_targetQuery(const BSONObj& query,
     for (const auto& range : _mockRanges) {
         if (queryRange.overlapWith(range.range)) {
             endpoints.push_back(range.endpoint);
-            if (chunkRanges) {
-                chunkRanges->emplace(range.range);
-            }
         }
     }
 
