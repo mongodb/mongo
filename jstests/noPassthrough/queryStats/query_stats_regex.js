@@ -27,13 +27,13 @@ assert.commandWorked(bulk.execute());
 
 {
     coll.find({foo: {$regex: "/^ABC/i"}}).itcount();
-    const queryStats = getLatestQueryStatsEntry(testDB);
+    const queryStats = getLatestQueryStatsEntry(testDB, {collName: coll.getName()});
     assert.eq({"foo": {"$regex": "?string"}}, queryStats.key.queryShape.filter, queryStats);
 }
 
 {
     coll.find({foo: {$regex: ".*", $options: "m"}}).itcount();
-    const queryStats = getLatestQueryStatsEntry(testDB);
+    const queryStats = getLatestQueryStatsEntry(testDB, {collName: coll.getName()});
     assert.eq({"foo": {"$regex": "?string", "$options": "?string"}},
               queryStats.key.queryShape.filter,
               queryStats);
