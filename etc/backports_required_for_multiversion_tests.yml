@@ -377,6 +377,8 @@ last-continuous:
     ticket: SERVER-93105
   - test_file: jstests/sharding/refresh_sessions.js
     ticket: SERVER-94635
+  - test_file: jstests/change_streams/report_post_batch_resume_token.js
+    ticket: SERVER-92904
   - test_file: jstests/core/negated_geo_queries.js
     ticket: SERVER-92193
   - test_file: jstests/core/query/find_all_values_at_path_expression.js
@@ -806,6 +808,8 @@ last-lts:
     ticket: SERVER-93105
   - test_file: jstests/sharding/refresh_sessions.js
     ticket: SERVER-94635
+  - test_file: jstests/change_streams/report_post_batch_resume_token.js
+    ticket: SERVER-92904
   - test_file: jstests/core/negated_geo_queries.js
     ticket: SERVER-92193
   - test_file: jstests/core/query/find_all_values_at_path_expression.js
