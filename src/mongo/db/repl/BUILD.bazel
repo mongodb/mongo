@@ -1869,6 +1869,7 @@ mongo_cc_library(
         "replication_consistency_markers_mock.h",
         "replication_coordinator_external_state_mock.h",
         "replication_coordinator_mock.h",
+        "replication_recovery_mock.h",
         "storage_interface_mock.h",
         "//src/mongo/db/storage:snapshot_manager.h",
     ],
@@ -2022,7 +2023,6 @@ mongo_cc_library(
     name = "repl_coordinator_test_fixture",
     srcs = [
         "replication_coordinator_test_fixture.cpp",
-        "replication_recovery_mock.h",
     ],
     hdrs = [
         "replication_coordinator_test_fixture.h",
@@ -2090,7 +2090,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "mock_repl_coord_server_fixture.h",
-        "replication_recovery_mock.h",
     ],
     deps = [
         ":oplog",
@@ -2233,7 +2232,6 @@ mongo_cc_unit_test(
         "repl_client_info_test.cpp",
         "repl_set_write_concern_mode_definitions_test.cpp",
         "replication_process_test.cpp",
-        "replication_recovery_mock.h",
         "reporter_test.cpp",
         "scatter_gather_test.cpp",
         "speculative_majority_read_info_test.cpp",
@@ -2439,7 +2437,6 @@ mongo_cc_unit_test(
     name = "initial_syncer_test",
     srcs = [
         "initial_syncer_test.cpp",
-        "replication_recovery_mock.h",
         "//src/mongo/db/storage:storage_engine_mock.h",
     ],
     tags = ["mongo_unittest_first_group"],
@@ -2464,7 +2461,6 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "storage_timestamp_test",
     srcs = [
-        "replication_recovery_mock.h",
         "storage_timestamp_test.cpp",
         "//src/mongo/dbtests:dbtests.h",
     ],

@@ -70,6 +70,16 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "logical_session_cache_noop",
+    hdrs = [
+        "logical_session_cache_noop.h",
+    ],
+    deps = [
+        ":logical_session_cache",
+    ],
+)
+
 idl_generator(
     name = "kill_sessions_gen",
     src = "kill_sessions.idl",

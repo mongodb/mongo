@@ -292,6 +292,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "database_holder_mock",
+    hdrs = [
+        "database_holder_mock.h",
+    ],
+    deps = [
+        ":database_holder",
+    ],
+)
+
+mongo_cc_library(
     name = "document_validation",
     srcs = [
         "document_validation.cpp",
@@ -634,13 +644,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "collection_mock",
+    hdrs = [
+        "collection_mock.h",
+    ],
+    deps = [":collection_options"],
+)
+
 mongo_cc_unit_test(
     name = "db_catalog_test",
     srcs = [
         "backwards_compatible_collection_options_util_test.cpp",
         "coll_mod_test.cpp",
         "collection_catalog_test.cpp",
-        "collection_mock.h",
         "collection_options_test.cpp",
         "collection_test.cpp",
         "collection_writer_test.cpp",
@@ -657,8 +674,6 @@ mongo_cc_unit_test(
         "throttle_cursor_test.cpp",
         "//src/mongo/db/catalog/validate:collection_validation_test.cpp",
         "//src/mongo/db/catalog/validate:validate_results_test.cpp",
-        "//src/mongo/db/op_observer:operation_logger_mock.h",
-        "//src/mongo/db/storage:sorted_data_interface_test_assert.h",
     ],
     tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
@@ -671,6 +686,7 @@ mongo_cc_unit_test(
         ":catalog_impl",
         ":catalog_test_fixture",
         ":collection_catalog",
+        ":collection_mock",
         ":collection_options",
         ":collection_query_info",
         ":database_holder",
@@ -703,6 +719,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/op_observer:operation_logger_mock",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/datetime:date_time_support",
@@ -712,6 +729,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/storage:sorted_data_interface_test_assert",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/db/timeseries:timeseries_collmod",
         "//src/mongo/db/timeseries:timeseries_options",

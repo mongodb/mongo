@@ -694,7 +694,6 @@ mongo_cc_unit_test(
         "db_raii_multi_collection_test.cpp",
         "db_raii_test.cpp",
         "shard_role_test.cpp",
-        "//src/mongo/db/catalog:database_holder_mock.h",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
@@ -705,6 +704,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/catalog:collection_uuid_mismatch_info",
         "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:database_holder_mock",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/query/client_cursor",
@@ -713,6 +713,35 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:progress_meter",
         "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "vector_clock_test",
+    srcs = [
+        "keys_collection_document_test.cpp",
+        "logical_time_test.cpp",
+        "read_write_concern_defaults_test.cpp",
+        "time_proof_service_test.cpp",
+        "vector_clock_mongod_test.cpp",
+        "vector_clock_test.cpp",
+        "vector_clock_test_fixture.cpp",
+        "vector_clock_test_fixture.h",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":keys_collection_client_direct",
+        ":keys_collection_document",
+        ":read_write_concern_defaults_mock",
+        ":signed_logical_time",
+        ":vector_clock",
+        ":vector_clock_mutable",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/op_observer:operation_logger_mock",
+        "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/util:clock_source_mock",
     ],
 )
 

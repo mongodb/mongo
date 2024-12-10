@@ -169,6 +169,14 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "operation_logger_mock",
+    hdrs = [
+        "operation_logger.h",
+        "operation_logger_mock.h",
+    ],
+)
+
+mongo_cc_library(
     name = "user_write_block_mode_op_observer",
     srcs = [
         "user_write_block_mode_op_observer.cpp",

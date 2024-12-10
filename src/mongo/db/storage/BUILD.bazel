@@ -570,6 +570,13 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "sorted_data_interface_test_assert",
+    hdrs = [
+        "sorted_data_interface_test_assert.h",
+    ],
+)
+
 # TODO(SERVER-96857): Remove cycle created by moving //src/mongo/db/storage:record_store.h to //src/mongo/db/storage:record_store_base
 filegroup(
     name = "record_store_hdrs",

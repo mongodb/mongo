@@ -446,6 +446,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "mock_async_rpc",
+    hdrs = [
+        "mock_async_rpc.h",
+    ],
+    deps = [
+        ":async_rpc",
+    ],
+)
+
+mongo_cc_library(
     name = "network_interface_mock",
     srcs = [
         "mock_network_fixture.cpp",

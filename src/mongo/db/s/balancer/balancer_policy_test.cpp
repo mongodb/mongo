@@ -46,7 +46,6 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunks_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
