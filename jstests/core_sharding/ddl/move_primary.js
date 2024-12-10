@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_2_or_more_shards,
+ *   does_not_support_stepdowns,
  * ]
  */
 
