@@ -102,7 +102,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_cleanupOnAbort(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _exitCriticalSection(opCtx, executor, token);
+                _exitCriticalSection(opCtx, executor, token, true /* throwIfReasonDiffers */);
             }
         });
 }
@@ -139,11 +139,13 @@ void CreateDatabaseCoordinator::_enterCriticalSection(
 void CreateDatabaseCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) {
+    const CancellationToken& token,
+    bool throwIfReasonDiffers) {
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(
         NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()));
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
+    unblockCRUDOperationsRequest.setThrowIfReasonDiffers(throwIfReasonDiffers);
 
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
@@ -212,7 +214,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                     invariant(createdDatabase.is_initialized());
                     _result = ConfigsvrCreateDatabaseResponse(createdDatabase->getVersion());
                 }
-                _exitCriticalSection(opCtx, executor, token);
+                _exitCriticalSection(opCtx, executor, token, false /* throwIfReasonDiffers */);
                 refreshDatabaseCache(opCtx, dbName, _doc.getPrimaryShard().get());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {

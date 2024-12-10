@@ -80,7 +80,8 @@ private:
 
     void _exitCriticalSection(OperationContext* opCtx,
                               std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                              const CancellationToken& token);
+                              const CancellationToken& token,
+                              bool throwIfReasonDiffers);
 
     const BSONObj _critSecReason;
 
