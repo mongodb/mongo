@@ -52,6 +52,7 @@ namespace executor {
 namespace {
 
 ConnectionPool::Options makeMongotConnPoolOptions() {
+    // TODO SERVER-97158: Set singleUseConnections flag if using egress grpc
     ConnectionPool::Options mongotOptions;
     mongotOptions.skipAuthentication = globalMongotParams.skipAuthToMongot;
     mongotOptions.controllerFactory = [] {
@@ -65,20 +66,29 @@ ConnectionPool::Options makeMongotConnPoolOptions() {
 
 struct State {
     State() {
+        transport::TransportProtocol protocol = globalMongotParams.useGRPC
+            ? transport::TransportProtocol::GRPC
+            : transport::TransportProtocol::MongoRPC;
+
         // Make the MongotExecutor and associated NetworkInterface.
-        auto mongotExecutorNetworkInterface =
-            makeNetworkInterface("MongotExecutor", nullptr, nullptr, makeMongotConnPoolOptions());
+        auto mongotExecutorNetworkInterface = makeNetworkInterface(
+            "MongotExecutor", nullptr, nullptr, makeMongotConnPoolOptions(), protocol);
         auto mongotThreadPool =
             std::make_unique<NetworkInterfaceThreadPool>(mongotExecutorNetworkInterface.get());
         mongotExecutor = ThreadPoolTaskExecutor::create(std::move(mongotThreadPool),
                                                         std::move(mongotExecutorNetworkInterface));
 
         // Make a separate searchIndexMgmtExecutor that's independently configurable.
+        // TODO SERVER-97158: Set singleUseConnections flag if using egress grpc
         ConnectionPool::Options searchIndexPoolOptions;
         searchIndexPoolOptions.skipAuthentication =
             globalSearchIndexParams.skipAuthToSearchIndexServer;
-        std::shared_ptr<NetworkInterface> searchIdxNI = makeNetworkInterface(
-            "SearchIndexMgmtExecutor", nullptr, nullptr, std::move(searchIndexPoolOptions));
+        std::shared_ptr<NetworkInterface> searchIdxNI =
+            makeNetworkInterface("SearchIndexMgmtExecutor",
+                                 nullptr,
+                                 nullptr,
+                                 std::move(searchIndexPoolOptions),
+                                 protocol);
         auto searchIndexThreadPool =
             std::make_unique<NetworkInterfaceThreadPool>(searchIdxNI.get());
         searchIndexMgmtExecutor = ThreadPoolTaskExecutor::create(std::move(searchIndexThreadPool),
