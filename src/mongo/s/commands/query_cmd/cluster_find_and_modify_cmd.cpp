@@ -924,14 +924,14 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
         return;
     }
 
-    // Throw if a non-OK status is not because of any of the above errors.
-    uassertStatusOK(responseStatus);
-
     // First append the properly constructed writeConcernError. It will then be skipped in
     // appendElementsUnique.
     if (auto wcErrorElem = response["writeConcernError"]) {
         appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
     }
+
+    // Throw if a non-OK status is not because of any of the above errors.
+    uassertStatusOK(responseStatus);
 
     result->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(response));
 }
@@ -1147,10 +1147,11 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
         auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
-        uassertStatusOK(getStatusFromCommandResult(commitResponse));
         if (auto wcErrorElem = commitResponse["writeConcernError"]) {
             appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
         }
+
+        uassertStatusOK(getStatusFromCommandResult(commitResponse));
     } catch (DBException& e) {
         if (e.code() != ErrorCodes::DuplicateKey ||
             (e.code() == ErrorCodes::DuplicateKey &&
