@@ -101,7 +101,7 @@ Pipeline::SourceContainer::iterator DocumentSourceListMqlEntities::doOptimizeAt(
 }
 
 Value DocumentSourceListMqlEntities::serialize(const SerializationOptions& opts) const {
-    MONGO_UNREACHABLE;
+    return Value(DOC(kStageName << DOC(kEntityTypeFieldName << MqlEntityType_serializer(_type))));
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
@@ -114,7 +114,7 @@ DocumentSource::GetNextResult DocumentSourceListMqlEntities::doGetNext() {
         return GetNextResult::makeEOF();
     }
     auto res = Document(
-        BSON("name" << _results.back() << "entityType" << MqlEntityType_serializer(_type)));
+        BSON("name" << _results.back() << kEntityTypeFieldName << MqlEntityType_serializer(_type)));
     _results.pop_back();
     return res;
 }

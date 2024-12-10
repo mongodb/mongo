@@ -70,6 +70,7 @@ public:
     };
 
     static constexpr StringData kStageName = "$listMqlEntities"_sd;
+    static constexpr StringData kEntityTypeFieldName = "entityType"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

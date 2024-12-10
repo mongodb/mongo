@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
@@ -37,12 +38,12 @@ namespace {
 
 class DocumentSourceListMqlEntitiesTest : public AggregationContextFixture {
 public:
-    void parse(const BSONObj& spec) {
+    boost::intrusive_ptr<DocumentSource> parse(const BSONObj& spec) {
         auto expCtx = getExpCtx();
         expCtx->setNamespaceString(NamespaceString::createNamespaceString_forTest(
             DatabaseName::kAdmin.db(omitTenant),
             NamespaceString::kCollectionlessAggregateCollection));
-        DocumentSourceListMqlEntities::createFromBson(spec.firstElement(), expCtx);
+        return DocumentSourceListMqlEntities::createFromBson(spec.firstElement(), expCtx);
     }
 };
 
@@ -67,6 +68,15 @@ TEST_F(DocumentSourceListMqlEntitiesTest, AggStages) {
     ASSERT_EQ("docSource2", ds.getNext().getDocument().getField("name").getString());
     ASSERT_EQ("docSource3", ds.getNext().getDocument().getField("name").getString());
     ASSERT(ds.getNext().isEOF());
+}
+
+TEST_F(DocumentSourceListMqlEntitiesTest, Serialize) {
+    auto listMqlEntitiesDS =
+        parse(fromjson("{$listMqlEntities: {'entityType': 'aggregationStages'}}"));
+    ASSERT_VALUE_EQ(
+        boost::dynamic_pointer_cast<DocumentSourceListMqlEntities>(listMqlEntitiesDS)->serialize(),
+        Value(DOC("$listMqlEntities" << DOC("entityType"_sd
+                                            << "aggregationStages"_sd))));
 }
 
 }  // namespace
