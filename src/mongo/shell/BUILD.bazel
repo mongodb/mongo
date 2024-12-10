@@ -506,6 +506,7 @@ mongo_cc_binary(
     tags = [
         "devcore",
         "dist_test",
+        "jstestshell",
     ],
     #+ env.WindowsResourceFile("mongo.rc"),
     deps = [

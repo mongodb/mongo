@@ -942,6 +942,7 @@ tasks:
           targets: archive-jstestshell
           compiling_for_test: true
           separate_debug: on
+          bazel_build_tags: --bazel-build-tag=jstestshell
           task_compile_flags: >-
             PREFIX=dist-test
             --link-model=static
