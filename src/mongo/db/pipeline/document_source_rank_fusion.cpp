@@ -86,17 +86,21 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
         DocumentSourceSearch::kStageName,
         DocumentSourceGeoNear::kStageName};
     auto sources = pipeline.getSources();
+
+    static const std::string rankPipelineMsg =
+        "All subpipelines to the $rankFusion stage must begin with one of $search, "
+        "$vectorSearch, $geoNear, $scoreFusion, $rankFusion or have a custom $sort in "
+        "the pipeline.";
+    uassert(9834300,
+            str::stream() << "$rankFusion input pipeline cannot be empty. " << rankPipelineMsg,
+            !sources.empty());
+
     auto firstStageName = sources.front()->getSourceName();
     auto isRankedPipeline = implicitlyOrderedStages.contains(firstStageName) ||
         std::any_of(sources.begin(), sources.end(), [](auto& stage) {
                                 return stage->getSourceName() == DocumentSourceSort::kStageName;
                             });
-    uassert(9191100,
-            str::stream()
-                << "All subpipelines to the $rankFusion stage must begin with one of $search, "
-                   "$vectorSearch, $geoNear, $scoreFusion, $rankFusion or have a custom $sort in "
-                   "the pipeline.",
-            isRankedPipeline);
+    uassert(9191100, rankPipelineMsg, isRankedPipeline);
 
     std::for_each(sources.begin(), sources.end(), [](auto& stage) {
         if (stage->getSourceName() == DocumentSourceGeoNear::kStageName) {

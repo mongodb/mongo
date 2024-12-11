@@ -94,14 +94,14 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
-                pipelines: []
+                pipelines: {}
             }
         }
     })");
 
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::TypeMismatch);
+                       ErrorCodes::BadValue);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
@@ -274,6 +274,22 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNotRankedPipeline) {
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        9191100);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    pipeOne: []
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9834300);
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
