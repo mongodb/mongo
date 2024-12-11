@@ -98,13 +98,6 @@ boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailP
     return boost::none;
 }
 
-bucket_catalog::CombineWithInsertsFromOtherClients canCombineTimeseriesInsertWithOtherClients(
-    OperationContext* opCtx, const mongo::write_ops::InsertCommandRequest& request) {
-    return isTimeseriesWriteRetryable(opCtx) || request.getOrdered()
-        ? bucket_catalog::CombineWithInsertsFromOtherClients::kDisallow
-        : bucket_catalog::CombineWithInsertsFromOtherClients::kAllow;
-}
-
 TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
     write_ops_exec::WriteResult&& reply, const mongo::write_ops::InsertCommandRequest& request) {
     invariant(reply.results.size() == 1,
@@ -851,15 +844,14 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         timeseries::CompressAndWriteBucketFunc compressAndWriteBucketFunc =
             compressUncompressedBucketOnReopen;
 
-        auto swResult = timeseries::attemptInsertIntoBucket(
-            opCtx,
-            bucketCatalog,
-            bucketsColl,
-            timeSeriesOptions,
-            measurementDoc,
-            timeseries::BucketReopeningPermittance::kAllowed,
-            canCombineTimeseriesInsertWithOtherClients(opCtx, request),
-            compressAndWriteBucketFunc);
+        auto swResult =
+            timeseries::attemptInsertIntoBucket(opCtx,
+                                                bucketCatalog,
+                                                bucketsColl,
+                                                timeSeriesOptions,
+                                                measurementDoc,
+                                                timeseries::BucketReopeningPermittance::kAllowed,
+                                                compressAndWriteBucketFunc);
 
         if (auto error = write_ops_exec::generateError(
                 opCtx, swResult.getStatus(), start + index, errors->size())) {

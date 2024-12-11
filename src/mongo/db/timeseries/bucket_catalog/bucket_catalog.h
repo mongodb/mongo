@@ -36,39 +36,24 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <list>
-#include <map>
 #include <memory>
-#include <queue>
-#include <set>
 #include <variant>
-#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/query/write_ops/single_write_result_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
-#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
-#include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/views/view.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/tracking/btree_map.h"
 #include "mongo/util/tracking/flat_hash_set.h"
 #include "mongo/util/tracking/inlined_vector.h"
@@ -95,15 +80,6 @@ struct InsertContext {
     bool operator==(const InsertContext& other) const {
         return key == other.key;
     };
-};
-
-
-/**
- * Whether to allow inserts to be batched together with those from other clients.
- */
-enum class CombineWithInsertsFromOtherClients {
-    kAllow,
-    kDisallow,
 };
 
 /**
@@ -187,7 +163,7 @@ struct Stripe {
 };
 
 /**
- * This class holds all the data used to coordinate and combine time series inserts amongst threads.
+ * This class holds all the data used to coordinate time series inserts amongst threads.
  */
 class BucketCatalog {
 public:
@@ -253,8 +229,7 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
  *
  * If a suitable bucket is found or opened, returns a 'SuccessfulInsertion' containing the
  * 'WriteBatch' into which 'doc' was inserted and a list of any buckets that were closed to make
- * space to insert 'doc'. Any caller who receives the same batch may commit or abort the batch after
- * claiming commit rights. See 'WriteBatch' for more details.
+ * space to insert 'doc'.
  *
  * If a 'ReopeningContext' is returned, it contains either a bucket ID, corresponding to an archived
  * bucket which should be fetched, an aggregation pipeline that can be used to search for a
@@ -266,15 +241,13 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                    const StringDataComparator* comparator,
                                    const BSONObj& doc,
                                    OperationId,
-                                   CombineWithInsertsFromOtherClients combine,
                                    InsertContext& insertContext,
                                    const Date_t& time,
                                    uint64_t storageCacheSizeBytes);
 
 /**
  * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
- * closed in order to make space to insert the document. Any caller who receives the same batch may
- * commit or abort the batch after claiming commit rights. See WriteBatch for more details.
+ * closed in order to make space to insert the document.
  *
  * We will attempt to reopen the bucket passed via 'reopeningContext' and attempt to add
  * 'doc' to that bucket. Otherwise we will attempt to find a suitable open bucket, or open a new
@@ -284,7 +257,6 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                                     const StringDataComparator* comparator,
                                                     const BSONObj& doc,
                                                     OperationId,
-                                                    CombineWithInsertsFromOtherClients combine,
                                                     ReopeningContext& reopeningContext,
                                                     InsertContext& insertContext,
                                                     const Date_t& time,
@@ -292,8 +264,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
 
 /**
  * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
- * closed in order to make space to insert the document. Any caller who receives the same batch may
- * commit or abort the batch after claiming commit rights. See WriteBatch for more details.
+ * closed in order to make space to insert the document.
  *
  * We will attempt to find a suitable open bucket, or open a new bucket if none exists.
  */
@@ -301,7 +272,6 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
                                 const StringDataComparator* comparator,
                                 const BSONObj& doc,
                                 OperationId,
-                                CombineWithInsertsFromOtherClients combine,
                                 InsertContext& insertContext,
                                 const Date_t& time,
                                 uint64_t storageCacheSizeBytes);

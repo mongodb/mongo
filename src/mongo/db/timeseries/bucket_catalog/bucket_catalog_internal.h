@@ -211,7 +211,6 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     WithLock stripeLock,
     const BSONObj& doc,
     OperationId,
-    CombineWithInsertsFromOtherClients combine,
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,

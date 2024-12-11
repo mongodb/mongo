@@ -32,7 +32,6 @@
 
 #include <cstdint>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -67,29 +66,24 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
-#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
-#include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decimal_counter.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -216,7 +210,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
     const Collection* bucketsColl,
     const TimeseriesOptions& options,
     const BSONObj& measurementDoc,
-    bucket_catalog::CombineWithInsertsFromOtherClients combine,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     bucket_catalog::InsertContext& insertContext,
     const Date_t& time) {
@@ -228,7 +221,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                                                   bucketsColl->getDefaultCollator(),
                                                   measurementDoc,
                                                   opCtx->getOpID(),
-                                                  combine,
                                                   insertContext,
                                                   time,
                                                   getStorageCacheSizeBytes(opCtx));
@@ -272,7 +264,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                         bucketsColl->getDefaultCollator(),
                         measurementDoc,
                         opCtx->getOpID(),
-                        combine,
                         reopeningContext,
                         insertContext,
                         time,
@@ -379,7 +370,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
     TimeseriesOptions& timeSeriesOptions,
     const BSONObj& measurementDoc,
     BucketReopeningPermittance reopening,
-    bucket_catalog::CombineWithInsertsFromOtherClients combine,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
     auto insertContextAndDate = bucket_catalog::prepareInsert(bucketCatalog,
                                                               bucketsColl->uuid(),
@@ -399,7 +389,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                     bucketsColl,
                     timeSeriesOptions,
                     measurementDoc,
-                    combine,
                     compressAndWriteBucketFunc,
                     std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
                     std::get<Date_t>(insertContextAndDate.getValue()));
@@ -434,7 +423,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                             bucketsColl->getDefaultCollator(),
                             measurementDoc,
                             opCtx->getOpID(),
-                            combine,
                             std::get<bucket_catalog::InsertContext>(
                                 insertContextAndDate.getValue()),
                             std::get<Date_t>(insertContextAndDate.getValue()),
@@ -449,7 +437,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                 bucketsColl->getDefaultCollator(),
                 measurementDoc,
                 opCtx->getOpID(),
-                combine,
                 std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
                 std::get<Date_t>(insertContextAndDate.getValue()),
                 getStorageCacheSizeBytes(opCtx));
@@ -468,15 +455,14 @@ TimeseriesBatches insertIntoBucketCatalogForUpdate(
     TimeseriesBatches batches;
 
     for (const auto& measurement : measurements) {
-        auto result = uassertStatusOK(
-            attemptInsertIntoBucket(opCtx,
-                                    bucketCatalog,
-                                    bucketsColl.get(),
-                                    timeSeriesOptions,
-                                    measurement,
-                                    BucketReopeningPermittance::kDisallowed,
-                                    bucket_catalog::CombineWithInsertsFromOtherClients::kDisallow,
-                                    compressAndWriteBucketFunc));
+        auto result =
+            uassertStatusOK(attemptInsertIntoBucket(opCtx,
+                                                    bucketCatalog,
+                                                    bucketsColl.get(),
+                                                    timeSeriesOptions,
+                                                    measurement,
+                                                    BucketReopeningPermittance::kDisallowed,
+                                                    compressAndWriteBucketFunc));
         auto* insertResult = get_if<bucket_catalog::SuccessfulInsertion>(&result);
         invariant(insertResult);
         batches.emplace_back(std::move(insertResult->batch));

@@ -117,16 +117,14 @@ protected:
         mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
         const mongo::NamespaceString& nss,
         const UUID& uuid,
-        const mongo::BSONObj& doc,
-        CombineWithInsertsFromOtherClients combine);
+        const mongo::BSONObj& doc);
 
     StatusWith<mongo::timeseries::bucket_catalog::InsertResult> _tryInsertOneHelper(
         OperationContext* opCtx,
         mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
         const mongo::NamespaceString& nss,
         const UUID& uuid,
-        const mongo::BSONObj& doc,
-        CombineWithInsertsFromOtherClients combine);
+        const mongo::BSONObj& doc);
 
     StatusWith<mongo::timeseries::bucket_catalog::InsertResult>
     _insertOneWithReopeningContextHelper(OperationContext* opCtx,
@@ -134,8 +132,7 @@ protected:
                                          const mongo::NamespaceString& nss,
                                          const UUID& uuid,
                                          const mongo::BSONObj& doc,
-                                         ReopeningContext& reopeningContext,
-                                         CombineWithInsertsFromOtherClients combine);
+                                         ReopeningContext& reopeningContext);
 
     long long _getExecutionStat(const UUID& uuid, StringData stat);
 
@@ -294,7 +291,6 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
                          _getCollator(ns),
                          BSON(_timeField << time),
                          _opCtx->getOpID(),
-                         CombineWithInsertsFromOtherClients::kAllow,
                          std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                          std::get<Date_t>(insertContextAndTime),
                          kStorageCacheSizeBytes);
@@ -307,8 +303,7 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
     mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
     const mongo::NamespaceString& nss,
     const UUID& uuid,
-    const mongo::BSONObj& doc,
-    CombineWithInsertsFromOtherClients combine = CombineWithInsertsFromOtherClients::kAllow) {
+    const mongo::BSONObj& doc) {
 
     auto insertContextAndTime = uassertStatusOK(
         prepareInsert(catalog, uuid, _getCollator(nss), _getTimeseriesOptions(nss), doc));
@@ -317,7 +312,6 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
                   _getCollator(nss),
                   doc,
                   opCtx->getOpID(),
-                  combine,
                   std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                   std::get<Date_t>(insertContextAndTime),
                   kStorageCacheSizeBytes);
@@ -328,8 +322,7 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
     mongo::timeseries::bucket_catalog::BucketCatalog& catalog,
     const mongo::NamespaceString& nss,
     const UUID& uuid,
-    const mongo::BSONObj& doc,
-    CombineWithInsertsFromOtherClients combine = CombineWithInsertsFromOtherClients::kAllow) {
+    const mongo::BSONObj& doc) {
 
     auto insertContextAndTime = uassertStatusOK(
         prepareInsert(catalog, uuid, _getCollator(nss), _getTimeseriesOptions(nss), doc));
@@ -338,7 +331,6 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
                      _getCollator(nss),
                      doc,
                      _opCtx->getOpID(),
-                     combine,
                      std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                      std::get<Date_t>(insertContextAndTime),
                      kStorageCacheSizeBytes);
@@ -351,8 +343,7 @@ BucketCatalogTest::_insertOneWithReopeningContextHelper(
     const mongo::NamespaceString& nss,
     const UUID& uuid,
     const mongo::BSONObj& doc,
-    ReopeningContext& reopeningContext,
-    CombineWithInsertsFromOtherClients combine = CombineWithInsertsFromOtherClients::kAllow) {
+    ReopeningContext& reopeningContext) {
 
     auto insertContextAndTime = uassertStatusOK(
         prepareInsert(catalog, uuid, _getCollator(nss), _getTimeseriesOptions(nss), doc));
@@ -361,7 +352,6 @@ BucketCatalogTest::_insertOneWithReopeningContextHelper(
                                       _getCollator(nss),
                                       doc,
                                       _opCtx->getOpID(),
-                                      combine,
                                       reopeningContext,
                                       std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                                       std::get<Date_t>(insertContextAndTime),
@@ -1080,65 +1070,16 @@ TEST_F(BucketCatalogTest, InsertRollsOverAlternateBucket) {
     }
 }
 
-TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
-    auto result1 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
-    auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
-
-    auto doc2 = BSON(_timeField << Date_t::now());
-    auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
-    auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
-
-    auto result3 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kAllow);
-    auto batch3 = get<SuccessfulInsertion>(result3.getValue()).batch;
-
-    auto result4 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kAllow);
-    auto batch4 = get<SuccessfulInsertion>(result4.getValue()).batch;
-
-    ASSERT_NE(batch1, batch2);
-    ASSERT_NE(batch1, batch3);
-    ASSERT_NE(batch2, batch3);
-    ASSERT_EQ(batch3, batch4);
-
-    _commit(_ns1, batch1, 0);
-    _commit(_ns1, batch2, 1);
-    _commit(_ns1, batch3, 2, 2);
-}
-
 TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
-    auto result1 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+    auto result1 =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
                                     *_bucketCatalog,
                                     _ns1,
                                     _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+                                    BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
 
     ASSERT(claimWriteBatchCommitRights(*batch1));
@@ -1163,28 +1104,22 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
-    auto result1 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+    auto result1 =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
                                     *_bucketCatalog,
                                     _ns1,
                                     _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+                                    BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
 
     auto result3 = _insertOneHelper(_makeOperationContext().second.get(),
                                     *_bucketCatalog,
                                     _ns1,
                                     _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+                                    BSON(_timeField << Date_t::now()));
     auto batch3 = get<SuccessfulInsertion>(result3.getValue()).batch;
 
     ASSERT_EQ(batch1->bucketId, batch2->bucketId);
@@ -1218,31 +1153,22 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
     ASSERT(isWriteBatchFinished(*batch2));
 
     // Make sure a new batch ends up in a new bucket.
-    auto result4 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+    auto result4 =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch4 = get<SuccessfulInsertion>(result4.getValue()).batch;
     ASSERT_NE(batch2->bucketId, batch4->bucketId);
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
-    auto result1 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+    auto result1 =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
                                     *_bucketCatalog,
                                     _ns1,
                                     _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+                                    BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 1 and 2 use the same bucket.
@@ -1260,31 +1186,22 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
 
     // Ensure a batch started after batch 2 aborts, does not insert future measurements into the
     // aborted batch/bucket.
-    auto result3 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+    auto result3 =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch3 = get<SuccessfulInsertion>(result3.getValue()).batch;
     ASSERT_NE(batch1->bucketId, batch3->bucketId);
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
-    auto result1 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+    auto result1 =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
                                     *_bucketCatalog,
                                     _ns1,
                                     _uuid1,
-                                    BSON(_timeField << Date_t::now()),
-                                    CombineWithInsertsFromOtherClients::kDisallow);
+                                    BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 2 is the first batch to commit the time field.

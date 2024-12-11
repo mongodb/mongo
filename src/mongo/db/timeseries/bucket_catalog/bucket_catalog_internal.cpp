@@ -33,11 +33,8 @@
 #include <climits>
 #include <limits>
 #include <list>
-#include <map>
-#include <set>
 #include <string>
 #include <tuple>
-#include <type_traits>
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -71,7 +68,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -79,6 +75,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/tracking/unordered_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -90,16 +87,6 @@ MONGO_FAIL_POINT_DEFINE(hangTimeSeriesBatchPrepareWaitingForConflictingOperation
 stdx::mutex _bucketIdGenLock;
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
 AtomicWord<uint64_t> _bucketIdGenCounter{static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64())};
-
-OperationId getOpId(OperationId opId, CombineWithInsertsFromOtherClients combine) {
-    switch (combine) {
-        case CombineWithInsertsFromOtherClients::kAllow:
-            return 0;
-        case CombineWithInsertsFromOtherClients::kDisallow:
-            return opId;
-    }
-    MONGO_UNREACHABLE;
-}
 
 std::string rolloverActionToString(RolloverAction action) {
     switch (action) {
@@ -731,7 +718,6 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     WithLock stripeLock,
     const BSONObj& doc,
     OperationId opId,
-    CombineWithInsertsFromOtherClients combine,
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
@@ -789,11 +775,8 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                            sizesToBeAdded);
     }
 
-    auto batch = activeBatch(catalog.trackingContexts,
-                             bucket,
-                             getOpId(opId, combine),
-                             insertContext.stripeNumber,
-                             insertContext.stats);
+    auto batch = activeBatch(
+        catalog.trackingContexts, bucket, opId, insertContext.stripeNumber, insertContext.stats);
     batch->measurements.push_back(doc);
     for (auto&& field : newFieldNamesToBeInserted) {
         batch->newFieldNamesToBeInserted[field] = field.hash();
