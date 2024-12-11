@@ -112,4 +112,10 @@ void validateRangeBoundsDecimal128(const boost::optional<Decimal128>& min,
                                    uint32_t trimFactor,
                                    const boost::optional<uint32_t>& precision);
 
+void validateTextSearchIndex(BSONType fieldType,
+                             StringData fieldPath,
+                             QueryTypeConfig& query,
+                             boost::optional<bool> previousCaseSensitivity,
+                             boost::optional<bool> previousDiacriticSensitivity,
+                             boost::optional<int64_t> previousContention);
 }  // namespace mongo

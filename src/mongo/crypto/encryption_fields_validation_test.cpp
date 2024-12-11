@@ -307,5 +307,140 @@ TEST(FLEValidationUtils, ValidateTrimFactorRangeDecimal128) {
     validateRangeBoundsDecimal128(Decimal128(1), Decimal128(100), 100, 100, 2);
 }
 
+QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
+    constexpr StringData field = "foo"_sd;
+    constexpr int32_t kMin = 2, kMax = 80;
+    QueryTypeConfig qtc;
+    qtc.setQueryType(qtype);
+    qtc.setStrMaxLength(100);
+    qtc.setStrMinQueryLength(kMin);
+    qtc.setStrMaxQueryLength(kMax);
+    qtc.setCaseSensitive(true);
+    qtc.setDiacriticSensitive(false);
+    qtc.setContention(8);
+
+    validateTextSearchIndex(BSONType::String, field, qtc, boost::none, boost::none, boost::none);
+    validateTextSearchIndex(BSONType::String,
+                            field,
+                            qtc,
+                            qtc.getCaseSensitive(),
+                            qtc.getDiacriticSensitive(),
+                            qtc.getContention());
+
+    // Bad Type
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::Symbol, field, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783400);
+
+    // Missing min query length
+    qtc.setStrMinQueryLength(boost::none);
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783402);
+    qtc.setStrMinQueryLength(kMin);
+
+    // Missing max query length
+    qtc.setStrMaxQueryLength(boost::none);
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783403);
+    qtc.setStrMaxQueryLength(kMax);
+
+    // Missing case sensitive
+    qtc.setCaseSensitive(boost::none);
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783404);
+    qtc.setCaseSensitive(true);
+
+    // Missing diacritic sensitive
+    qtc.setDiacriticSensitive(boost::none);
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783405);
+    qtc.setDiacriticSensitive(false);
+
+    // min > max
+    qtc.setStrMinQueryLength(kMax + 1);
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783406);
+    qtc.setStrMinQueryLength(kMin);
+
+    // Case sensitive does not match previous
+    ASSERT_THROWS_CODE(validateTextSearchIndex(BSONType::String,
+                                               field,
+                                               qtc,
+                                               !qtc.getCaseSensitive().value(),
+                                               boost::none,
+                                               boost::none),
+                       AssertionException,
+                       9783409);
+
+    // Diacritic sensitive does not match previous
+    ASSERT_THROWS_CODE(validateTextSearchIndex(BSONType::String,
+                                               field,
+                                               qtc,
+                                               boost::none,
+                                               !qtc.getDiacriticSensitive().value(),
+                                               boost::none),
+                       AssertionException,
+                       9783410);
+
+    // Contention factor does not match previous
+    ASSERT_THROWS_CODE(
+        validateTextSearchIndex(
+            BSONType::String, field, qtc, boost::none, boost::none, qtc.getContention() + 1),
+        AssertionException,
+        9783411);
+    return qtc;
+}
+
+TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
+    QueryTypeConfig qtc = validateTextSearchIndexCommonTests(QueryTypeEnum::SubstringPreview);
+
+    // Missing max length
+    qtc.setStrMaxLength(boost::none);
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::String, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783407);
+    // max query length > max length
+    qtc.setStrMaxLength(100);
+    qtc.setStrMaxQueryLength(1000);
+    qtc.setStrMinQueryLength(1);
+    ASSERT_THROWS_CODE(validateTextSearchIndex(
+                           BSONType::String, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                       AssertionException,
+                       9783408);
+}
+
+TEST(FLEValidationUtils, ValidateTextSearchIndexSuffix) {
+    validateTextSearchIndexCommonTests(QueryTypeEnum::SuffixPreview);
+}
+
+TEST(FLEValidationUtils, ValidateTextSearchIndexPrefix) {
+    validateTextSearchIndexCommonTests(QueryTypeEnum::PrefixPreview);
+}
+
+TEST(FLEValidationUtils, ValidateTextSearchIndexBadQueryType) {
+    QueryTypeConfig qtc;
+    for (auto qtype :
+         {QueryTypeEnum::Equality, QueryTypeEnum::RangePreviewDeprecated, QueryTypeEnum::Range}) {
+        qtc.setQueryType(qtype);
+        ASSERT_THROWS_CODE(
+            validateTextSearchIndex(
+                BSONType::String, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+            AssertionException,
+            9783401);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

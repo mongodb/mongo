@@ -94,6 +94,7 @@ enums:
             kUnindexed: 1
             kEquality: 2
             kRange: 3
+            kTextSearch: 4
 
     Fle2PlaceholderType:
         description: "The type of payload to generate from a placeholder"

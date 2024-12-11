@@ -57,6 +57,9 @@ enums:
             # TODO SERVER-87670 Remove once 8.0 is lastLTS.
             RangePreviewDeprecated: "rangePreview"
             Range: "range"
+            SubstringPreview: "substringPreview"
+            SuffixPreview: "suffixPreview"
+            PrefixPreview: "prefixPreview"
 
 structs:
 
@@ -106,6 +109,38 @@ structs:
                 optional: true
                 stability: unstable
                 validator: {gte: 0}
+            strMaxLength:
+                description: >-
+                    The maximum allowed length for a substring-indexed field. If the user inserts a
+                    longer string, then the string will not be indexed for substring search.
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: { gt: 0 }
+            strMinQueryLength:
+                description: >-
+                    The minimum allowed length for inputs to prefix/suffix/substring lookups.
+                    (i.e. dictates the shortest string length we'll index)
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: { gt: 0 }
+            strMaxQueryLength:
+                description: >-
+                    The maximum allowed length for inputs to prefix/suffix/substring lookups.
+                    (i.e. dictates the longest string length we'll index)
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: { gt: 0 }
+            caseSensitive:
+                description: "Enables case folding in the StrEncode algorithm if set to false."
+                type: bool
+                optional: true
+            diacriticSensitive:
+                description: "Enables diacritic folding in the StrEncode algorithm if set to false."
+                type: bool
+                optional: true
 
     EncryptedField:
         description: "Information about encrypted fields"
