@@ -549,7 +549,7 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
                 exceptions=(subprocess.CalledProcessError,),
             )
     except subprocess.CalledProcessError as ex:
-        if platform.system() == "Windows" and tries_so_far == 0:
+        if os.environ.get("CI") is not None and tries_so_far == 0:
             print(
                 "Build failed, retrying with --jobs=4 in case linking failed due to hitting concurrency limits..."
             )
@@ -1241,8 +1241,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         "--dynamic_mode=off",
     ]
 
-    # Timeout linking on windows at 5 minutes to retry with a lower concurrency.
-    if platform.system() == "Windows":
+    # Timeout linking at 8 minutes to retry with a lower concurrency.
+    if os.environ.get("CI") is not None:
         bazel_internal_flags += [
             "--link_timeout_8min=True",
         ]
