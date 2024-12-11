@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -539,5 +539,133 @@ mongo_cc_library(
     deps = [
         ":task_executor_test_fixture",
         ":thread_pool_task_executor",
+    ],
+)
+
+mongo_cc_library(
+    name = "network_interface_fixture",
+    srcs = [
+        "network_interface_integration_fixture.cpp",
+    ],
+    hdrs = [
+        "executor_integration_test_fixture.h",
+        "network_interface_integration_fixture.h",
+    ],
+    deps = [
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/unittest:integration_test_main",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "network_executor_test",
+    srcs = [
+        "async_rpc_test.cpp",
+        "async_rpc_test_fixture.h",
+        "async_rpc_util_test.cpp",
+        "async_transaction_rpc.h",
+        "connection_pool_test.cpp",
+        "connection_pool_test_fixture.cpp",
+        "connection_pool_test_fixture.h",
+        "mock_async_rpc.h",
+        "mock_async_rpc_test.cpp",
+        "mock_network_fixture_test.cpp",
+        "network_interface_mock_test.cpp",
+        "network_interface_mock_test_fixture.cpp",
+        "network_interface_mock_test_fixture.h",
+        "pinned_connection_task_executor_test.cpp",
+        "pinned_connection_task_executor_test_fixture.h",
+        "test_network_connection_hook.h",
+        "//src/mongo/transport:mock_session.h",
+        "//src/mongo/transport:test_fixtures.h",
+        "//src/mongo/transport:transport_layer_mock.h",
+        "//src/mongo/unittest:join_thread.h",
+        "//src/mongo/util:executor_test_util.h",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "async_rpc",
+        "connection_pool_executor",
+        "egress_connection_closer_manager",
+        "network_interface_mock",
+        "network_interface_tl",
+        "network_test_env",
+        "pinned_connection_task_executor",
+        "thread_pool_task_executor_test_fixture",
+        "//src/mongo/client:remote_command_targeter",
+        "//src/mongo/client:remote_command_targeter_mock",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/commands:standalone",
+        "//src/mongo/db/repl:hello_command",
+        "//src/mongo/db/repl:task_executor_mock",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "task_executor_test",
+    srcs = [
+        "cancelable_executor.h",
+        "cancelable_executor_test.cpp",
+        "inline_executor_test.cpp",
+        "pinned_connection_task_executor_test_fixture.h",
+        "scoped_task_executor_test.cpp",
+        "split_timer_test.cpp",
+        "task_executor_cursor_test.cpp",
+        "task_executor_cursor_test_fixture.h",
+        "thread_pool_task_executor_test.cpp",
+        "//src/mongo/transport:mock_session.h",
+        "//src/mongo/transport:test_fixtures.h",
+        "//src/mongo/transport:transport_layer_mock.h",
+        "//src/mongo/unittest:join_thread.h",
+        "//src/mongo/util:executor_test_util.h",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    deps = [
+        "inline_executor",
+        "scoped_task_executor",
+        "task_executor_cursor",
+        "thread_pool_task_executor",
+        "thread_pool_task_executor_test_fixture",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "executor_integration_test",
+    srcs = [
+        "executor_integration_test_fixture.cpp",
+        "exhaust_response_reader_integration_test.cpp",
+        "network_interface_integration_test.cpp",
+        "task_executor_cursor_integration_test.cpp",
+        "thread_pool_task_executor_integration_test.cpp",
+    ],
+    deps = [
+        "network_interface_fixture",
+        "network_interface_tl",
+        "task_executor_cursor",
+        "//src/mongo/client:async_client",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:kill_operations_idl",
+        "//src/mongo/db/query/client_cursor:cursor_response_idl",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:pinned_connection_task_executor",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/concurrency:thread_pool",
     ],
 )

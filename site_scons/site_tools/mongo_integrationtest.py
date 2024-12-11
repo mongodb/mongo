@@ -59,7 +59,10 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     # components required to run them.
     kwargs["UNDECIDABLE_TEST"] = True
 
-    result = env.Program(target, source, **kwargs)
+    if not source:
+        result = env.BazelProgram(target, source, **kwargs)
+    else:
+        result = env.Program(target, source, **kwargs)
     env.RegisterTest("$INTEGRATION_TEST_LIST", result[0])
     env.Alias("$INTEGRATION_TEST_ALIAS", result[0])
 

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -116,4 +116,77 @@ idl_generator(
 idl_generator(
     name = "benchmark_options_gen",
     src = "benchmark_options.idl",
+)
+
+mongo_cc_library(
+    name = "integration_test_main",
+    srcs = [
+        "integration_test_main.cpp",
+        "integration_test_main_gen",
+    ],
+    hdrs = [
+        "integration_test.h",
+    ],
+    tags = ["integration-tests"],
+    deps = [
+        "unittest",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:server_options_base",
+        "//src/mongo/db:serverinit",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util:testing_options",
+        "//src/mongo/util/options_parser",
+        "//src/mongo/util/options_parser:options_parser_init",
+    ],
+)
+
+mongo_cc_library(
+    name = "benchmark_main",
+    srcs = [
+        "benchmark_main.cpp",
+        "benchmark_options_gen",
+        "log_test.h",
+    ],
+    tags = ["benchmarks"],
+    deps = [
+        # benchmark_main must not be made to depend on additional libraries.
+        # Additional requirements should be handled by the benchmark itself.
+        # Examples can be found in fail_point_bm and commands_bm. See SERVER-60691.
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "unittest_test",
+    srcs = [
+        "assert_that_test.cpp",
+        "bson_test_util_test.cpp",
+        "fixture_test.cpp",
+        "golden_test_test.cpp",
+        "inline_auto_update_test.cpp",
+        "temp_dir_test.cpp",
+        "thread_assertion_monitor_test.cpp",
+        "unittest_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "system_resource_canary_bm",
+    srcs = [
+        "system_resource_canary_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:processinfo",
+    ],
 )

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@poetry//:dependencies.bzl", "dependency")
 
@@ -138,5 +138,24 @@ mongo_cc_unit_test(
     deps = [
         ":secure_allocator",
         ":system_error",
+    ],
+)
+
+mongo_cc_library(
+    name = "benchmark",
+    srcs = [],
+    hdrs = [
+        "benchmark/benchmark.h",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "status_bm",
+    srcs = [
+        "status_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:processinfo",
+        "//src/third_party/benchmark",
     ],
 )

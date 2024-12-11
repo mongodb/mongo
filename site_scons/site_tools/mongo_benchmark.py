@@ -66,7 +66,10 @@ def build_benchmark(env, target, source, **kwargs):
         return bmEnv.AddToConsolidatedTarget(
             target, source, kwargs, "$BENCHMARK_ALIAS", "$BENCHMARK_LIST"
         )
-    result = bmEnv.Program(target, source, **kwargs)
+    if not source:
+        result = bmEnv.BazelProgram(target, source, **kwargs)
+    else:
+        result = bmEnv.Program(target, source, **kwargs)
     bmEnv.RegisterTest("$BENCHMARK_LIST", result[0])
     bmEnv.Alias("$BENCHMARK_ALIAS", result)
 

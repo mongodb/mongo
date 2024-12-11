@@ -45,19 +45,3 @@ env.CppLibfuzzerTest(
         "$BUILD_DIR/mongo/bson/bson_validate",
     ],
 )
-
-asioEnv = env.Clone()
-asioEnv.InjectThirdParty("asio")
-
-asioEnv.CppIntegrationTest(
-    target="bson_integration_test",
-    source=[
-        "ugly_bson_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/network_interface",
-        "$BUILD_DIR/mongo/executor/network_interface_fixture",
-        "$BUILD_DIR/mongo/rpc/message",
-        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-    ],
-)

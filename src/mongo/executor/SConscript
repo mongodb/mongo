@@ -4,101 +4,18 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="network_interface_fixture",
-    source=[
-        "network_interface_integration_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "$BUILD_DIR/mongo/unittest/integration_test_main",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "$BUILD_DIR/mongo/util/version_impl",
-    ],
+env.CppUnitTest(
+    target="network_executor_test",
+    source=[],
 )
 
 env.CppUnitTest(
-    target="network_executor_test",
-    source=[
-        "async_rpc_test.cpp",
-        "async_rpc_util_test.cpp",
-        "connection_pool_test.cpp",
-        "connection_pool_test_fixture.cpp",
-        "mock_async_rpc_test.cpp",
-        "mock_network_fixture_test.cpp",
-        "network_interface_mock_test.cpp",
-        "network_interface_mock_test_fixture.cpp",
-        "pinned_connection_task_executor_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/remote_command_targeter",
-        "$BUILD_DIR/mongo/client/remote_command_targeter_mock",
-        "$BUILD_DIR/mongo/db/commands/standalone",
-        "$BUILD_DIR/mongo/db/repl/hello_command",
-        "$BUILD_DIR/mongo/db/repl/task_executor_mock",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "async_rpc",
-        "connection_pool_executor",
-        "egress_connection_closer_manager",
-        "network_interface_mock",
-        "network_interface_tl",
-        "network_test_env",
-        "pinned_connection_task_executor",
-        "thread_pool_task_executor_test_fixture",
-    ],
-)
-env.CppUnitTest(
     target="task_executor_test",
-    source=[
-        "cancelable_executor_test.cpp",
-        "inline_executor_test.cpp",
-        "scoped_task_executor_test.cpp",
-        "split_timer_test.cpp",
-        "task_executor_cursor_test.cpp",
-        "thread_pool_task_executor_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "inline_executor",
-        "scoped_task_executor",
-        "task_executor_cursor",
-        "thread_pool_task_executor",
-        "thread_pool_task_executor_test_fixture",
-    ],
+    source=[],
     PROVE_ALIASES=["server-programmability"],
 )
 
 env.CppIntegrationTest(
     target="executor_integration_test",
-    source=[
-        "executor_integration_test_fixture.cpp",
-        "exhaust_response_reader_integration_test.cpp",
-        "network_interface_integration_test.cpp",
-        "task_executor_cursor_integration_test.cpp",
-        "thread_pool_task_executor_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/async_client",
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/db/commands/kill_operations_idl",
-        "$BUILD_DIR/mongo/db/query/client_cursor/cursor_response_idl",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-        "$BUILD_DIR/mongo/executor/pinned_connection_task_executor",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "$BUILD_DIR/mongo/util/version_impl",
-        "network_interface_fixture",
-        "network_interface_tl",
-        "task_executor_cursor",
-    ],
+    source=[],
 )
