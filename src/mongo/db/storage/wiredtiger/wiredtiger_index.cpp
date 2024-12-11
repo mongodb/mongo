@@ -1293,7 +1293,7 @@ protected:
     // These are owned copy of _kvView, made before the unowned data referenced by _kvView was
     // invalidated upon calling a next() variant or a save().
     key_string::Builder _key;
-    int32_t _keySizeWithoutRecordId;
+    int32_t _keySizeWithoutRecordId = 0;
 
     std::unique_ptr<key_string::Value> _endPosition;
 
@@ -1405,6 +1405,7 @@ public:
             // shorter than _key cannot have "prefix key" same as _key. Therefore we care only about
             // the keys with size greater than or equal to that of the _key.
             invariant(!_key.isEmpty());
+            invariant(_keySizeWithoutRecordId > 0);
             if (static_cast<int32_t>(item.size) >= _keySizeWithoutRecordId &&
                 std::memcmp(_key.getBuffer(), item.data, _keySizeWithoutRecordId) == 0) {
                 _lastMoveSkippedKey = false;
