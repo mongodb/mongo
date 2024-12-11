@@ -28,6 +28,7 @@
  */
 
 #pragma once
+#include "mongo/base/status.h"
 
 namespace mongo {
 
@@ -52,6 +53,10 @@ namespace mongo {
  *     }
  */
 bool getTestCommandsEnabled();
+
 void setTestCommandsEnabled(bool b);
+
+/** Callback for the enableTestCommands server parameter. */
+Status onUpdateTestCommandsEnabled(bool b);
 
 }  // namespace mongo

@@ -67,6 +67,20 @@ public:
     static constexpr LogSeverity Log() noexcept {
         return LogSeverity(0);
     }
+
+    /**
+     * Logs like a default (debug-0) level log in production, but debug-1 log in testing. This log
+     * level is for log lines that may be spammy in testing but are more rare in production. As
+     * such, they may be useful in investigations. This level also preserves backwards compatibility
+     * for logs that are no longer as useful as when they were introduced. It is preferred to use
+     * other severities over this one as it introduces a difference between testing and production.
+     *
+     * To ensure logs with this severity are tested, if using this severity make sure that the log's
+     * code path is run in a test where the verbosity for the log's component is set to at least 1.
+     */
+    static LogSeverity ProdOnly() {
+        return getSuppressProdOnly() ? LogSeverity::Debug(1) : LogSeverity::Log();
+    }
     /** @} */
 
     /**
@@ -148,6 +162,22 @@ public:
         return os << severity.toStringData();
     }
 
+    /** True when `LogSeverity::ProdOnly()` should be quiet (i.e. during testing). */
+    static bool getSuppressProdOnly() {
+        return _suppressProdOnly;
+    }
+
+    /**
+     * `LogSeverity::ProdOnly()` is verbose by default, but can be set to
+     * quiet by setting this suppression to true. This is also set
+     * as a side-effect of setting the server parameter
+     * 'enableTestCommands'.  Not synchronized. Call in single threaded
+     * mode only, i.e. startup or unit tests.
+     */
+    static void suppressProdOnly_forTest(bool b) {
+        _suppressProdOnly = b;
+    }
+
 private:
     explicit constexpr LogSeverity(int severity) noexcept : _severity{severity} {}
 
@@ -167,6 +197,9 @@ private:
     /// methods, isNoMoreSevereThan, isLessSevereThan, isMoreSevereThan, isNoLessSevereThan,
     /// isSameSeverity and isDifferentSeverity.
     int _severity;
+
+    /// Controls whether `LogSeverity::ProdOnly()` should be quiet.
+    static inline bool _suppressProdOnly = false;
 };
 
 }  // namespace mongo::logv2

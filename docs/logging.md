@@ -246,6 +246,19 @@ integer) required to indicate the desired debug level:
         message-string,
         attr0, ...);
 
+`LOGV2_PROD_ONLY` logs like a default `LOGV2` log in production, but debug-1 log
+in internal testing. It accepts the same arguments as `LOGV2`. This log level is
+for log lines that may be spammy in testing but are more rare in production. As
+such, they may be useful in investigations. This level also preserves backwards
+compatibility for logs that are no longer as useful as when they were introduced.
+To determine whether to log, this macro uses the `LogSeverity::ProdOnly()`
+level, which returns level `LogSeverity::Debug(1)` when in a testing environment
+and `LogSeverity::Log()` otherwise. Whether the server is in a testing
+environment is determined using the `enableTestCommands` server parameter.
+It is preferred to use other macros over this one as it introduces a difference
+between testing and production. There is also the `LOGV2_PROD_ONLY_OPTIONS`
+variation that takes `LogOptions`.
+
 ##### Example
 
     Status status = ...;

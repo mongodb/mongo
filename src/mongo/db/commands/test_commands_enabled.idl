@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "src/mongo/db/commands/test_commands_enabled.h"
 
 server_parameters:
     enableTestCommands:
@@ -35,6 +37,7 @@ server_parameters:
         set_at: startup
         cpp_vartype: bool
         cpp_varname: gEnableTestCommands
+        on_update: "onUpdateTestCommandsEnabled"
         default: false
         redact: false
 
