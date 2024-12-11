@@ -89,6 +89,14 @@ const runCommandInLoop = function(
             continue;
         }
 
+        if (cmdResult.code === ErrorCodes.OplogOperationUnsupported &&
+            cmdResult.errmsg.includes("Command not supported during resharding") &&
+            cmdResult.errmsg.includes("commitIndexBuild")) {
+            // TODO (SERVER-91708): Resharding should consider queued index builds waiting for
+            // active number of index builds to be below the threshold.
+            continue;
+        }
+
         if (cmdResult.code === ErrorCodes.CollectionUUIDMismatch) {
             if (expectedNonRetryableErrors.includes(ErrorCodes.CollectionUUIDMismatch)) {
                 break;
