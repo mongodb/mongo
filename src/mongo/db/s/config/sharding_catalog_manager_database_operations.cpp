@@ -350,13 +350,14 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
                                                           bool userSelectedPrimary) {
     // The database does not exist. Insert an entry for the new database into the sharding
     // catalog. Assign also a primary shard if the caller hasn't specified one.
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "createDatabase.start",
-                                           NamespaceString(dbName),
-                                           /* details */ BSONObj(),
-                                           ShardingCatalogClient::kMajorityWriteConcern,
-                                           _localConfigShard,
-                                           _localCatalogClient.get());
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx,
+        "createDatabase.start",
+        NamespaceString(dbName),
+        BSON("primaryShard" << primaryShard << "userSelectedPrimary" << userSelectedPrimary),
+        ShardingCatalogClient::kMajorityWriteConcern,
+        _localConfigShard,
+        _localCatalogClient.get());
 
     // The creation of a new database is described by the notification of multiple events, following
     // a 2-phase protocol:
@@ -452,13 +453,15 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
                       "err"_attr = notificationOutcome);
     }
 
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "createDatabase",
-                                           NamespaceString(dbName),
-                                           /* details */ BSONObj(),
-                                           ShardingCatalogClient::kMajorityWriteConcern,
-                                           _localConfigShard,
-                                           _localCatalogClient.get());
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx,
+        "createDatabase",
+        NamespaceString(dbName),
+        BSON("primaryShard" << db.getPrimary() << "userSelectedPrimary" << userSelectedPrimary
+                            << "version" << db.getVersion().toBSON()),
+        ShardingCatalogClient::kMajorityWriteConcern,
+        _localConfigShard,
+        _localCatalogClient.get());
 
     return db;
 }
