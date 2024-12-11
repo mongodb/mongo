@@ -2,6 +2,7 @@
 
 import os.path
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 
 import pymongo
 import pymongo.errors
@@ -177,12 +178,23 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def setup(self):
         """Set up the sharded cluster."""
-        if self.config_shard is None:
-            self.configsvr.setup()
 
-        # Start up each of the shards
-        for shard in self.shards:
-            shard.setup()
+        with ThreadPoolExecutor() as executor:
+            setup_tasks = []
+
+            if self.config_shard is None:
+                setup_tasks.append(executor.submit(self.configsvr.setup))
+
+            # Start up each of the shards
+            for shard in self.shards:
+                setup_tasks.append(executor.submit(shard.setup))
+
+            wait(setup_tasks)
+
+        # Need to get the new config shard connection string generated from the auto-bootstrap procedure
+        if self.use_auto_bootstrap_procedure and not self.embedded_router_mode:
+            for mongos in self.mongos:
+                mongos.mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
         if self.launch_mongot:
             # These mongot parameters are popped from shard.mongod_options when mongod is launched in above
@@ -190,6 +202,20 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             # need to be recreated here.
             self.mongotHost = "localhost:" + str(self.shards[-1].mongot_port)
             self.searchIndexManagementHostAndPort = self.mongotHost
+
+            for mongos in self.mongos:
+                # In search enabled sharded cluster, mongos has to be spun up with a connection string to a
+                # mongot in order to issue PlanShardedSearch commands.
+                mongos.mongos_options["mongotHost"] = self.mongotHost
+                mongos.mongos_options["searchIndexManagementHostAndPort"] = (
+                    self.searchIndexManagementHostAndPort
+                )
+
+        with ThreadPoolExecutor() as executor:
+            tasks = []
+            for mongos in self.mongos:
+                tasks.append(executor.submit(mongos.setup))
+            wait(tasks)
 
     def _all_mongo_d_s_t(self):
         """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""
@@ -228,34 +254,21 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
-        # Wait for the config server
-        if self.configsvr is not None and self.config_shard is None:
-            self.configsvr.await_ready()
+        with ThreadPoolExecutor() as executor:
+            tasks = []
 
-        # Wait for each of the shards
-        for shard in self.shards:
-            shard.await_ready()
+            # Wait for the config server
+            if self.configsvr is not None and self.config_shard is None:
+                tasks.append(executor.submit(self.configsvr.await_ready))
 
-        # Need to get the new config shard connection string generated from the auto-bootstrap procedure
-        if self.use_auto_bootstrap_procedure and not self.embedded_router_mode:
+            # Wait for each of the shards
+            for shard in self.shards:
+                tasks.append(executor.submit(shard.await_ready))
+
             for mongos in self.mongos:
-                mongos.mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
+                tasks.append(executor.submit(mongos.await_ready))
 
-        # We call mongos.setup() in self.await_ready() function instead of self.setup()
-        # because mongos routers have to connect to a running cluster.
-        for mongos in self.mongos:
-            if self.launch_mongot:
-                # In search enabled sharded cluster, mongos has to be spun up with a connection string to a
-                # mongot in order to issue PlanShardedSearch commands.
-                mongos.mongos_options["mongotHost"] = self.mongotHost
-                mongos.mongos_options["searchIndexManagementHostAndPort"] = (
-                    self.searchIndexManagementHostAndPort
-                )
-            # Start up the mongos.
-            mongos.setup()
-
-            # Wait for the mongos.
-            mongos.await_ready()
+            wait(tasks)
 
         client = interface.build_client(self, self.auth_options)
 

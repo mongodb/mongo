@@ -2,6 +2,7 @@
 
 import os.path
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 
 import bson
 import pymongo
@@ -177,15 +178,22 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
             start_node = 1
 
-        # Version-agnostic options for mongod/s can be set here.
-        # Version-specific options should be set in get_version_specific_options_for_mongod()
-        # to avoid options for old versions being applied to new Replicaset fixtures.
-        # If we are using the auto_bootstrap_procedure we don't need to setup the first node again.
-        for i in range(start_node, self.num_nodes):
-            self.nodes[i].setup()
+        with ThreadPoolExecutor() as executor:
+            tasks = []
+
+            # Version-agnostic options for mongod/s can be set here.
+            # Version-specific options should be set in get_version_specific_options_for_mongod()
+            # to avoid options for old versions being applied to new Replicaset fixtures.
+            # If we are using the auto_bootstrap_procedure we don't need to setup the first node again.
+            for i in range(start_node, self.num_nodes):
+                tasks.append(executor.submit(self.nodes[i].setup))
+
+            if self.initial_sync_node:
+                tasks.append(executor.submit(self.initial_sync_node.setup))
+
+            wait(tasks)
 
         if self.initial_sync_node:
-            self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
             if self.initial_sync_uninitialized_fcv:
                 self._pause_initial_sync_at_uninitialized_fcv(self.initial_sync_node)
@@ -297,9 +305,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # single voting member at a time.
             for ind in range(2, len(members) + 1):
                 self._add_node_to_repl_set(client, repl_config, ind, members)
-
-        self._await_secondaries()
-        self._await_newly_added_removals()
 
         if self.launch_mongot:
             # To model Atlas Search's coupled architecture, resmoke deploys a mongot for each
@@ -436,6 +441,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         """Wait for replica set to be ready."""
         self._await_primary()
         self._await_secondaries()
+        self._await_newly_added_removals()
         self._await_stable_recovery_timestamp()
         self._setup_cwrwc_defaults()
         self._await_read_concern_available()
