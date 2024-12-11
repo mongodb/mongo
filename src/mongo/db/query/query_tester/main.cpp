@@ -236,10 +236,12 @@ void printHelpString() {
     static const auto kHelpMap = std::map<std::string, std::string>{
         // Long-options come before short-options. Sorted in lexicographical order.
         {"--diff",
-         // Default to line-based diff here to make Evergreen integration easier.
-         "[line, word]. Use line- or word-based diff when displaying result set differences. "
-         "Defaults to line-based diff if not specified. Humans using terminals that support ANSI "
-         "color codes are recommended to use --diff word for easier-to-read output."},
+         // Default to word-based diff here to make output on ANSI supported terminals (i.e. the
+         // human user case) easier.
+         "[plain, word]. Use colored word-based diff or uncolored line based diff when displaying "
+         "result set differences. "
+         "Defaults to word-based diff if not specified. Humans using terminals that support ANSI "
+         "color codes are recommended to use the default --diff word for easier-to-read output."},
         {"--drop",
          "Drop the collections before loading them. Should be "
          "specified with the load argument or "
@@ -301,7 +303,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto outOpt = WriteOutOptions::kNone;
     auto populateAndExit = false;
     auto verbose = false;
-    auto diffStyle = DiffStyle::kLine;
+    auto diffStyle = DiffStyle::kWord;
     for (auto argNum = size_t{1}; argNum < parsedArgs.size(); ++argNum) {
         // Same order as in the help menu.
         if (parsedArgs[argNum] == "--diff") {
