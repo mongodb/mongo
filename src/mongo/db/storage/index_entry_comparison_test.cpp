@@ -124,11 +124,13 @@ void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
 
 TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectWithCollation) {
     auto keyPattern = BSON("a" << 1 << "b" << 1);
-    auto str = "abc"_sd;
+    auto str = "abc";
     auto keyValue = BSON("" << 10 << "" << str);
-    auto collation = BSON("x" << 'y');
+    auto collation = BSON("x"
+                          << "y");
     auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
-    auto expectedEncodedKeyValueField = BSON("a" << 10 << "b" << hexblob::encodeLower(str));
+    auto expectedEncodedKeyValueField =
+        BSON("a" << 10 << "b" << StringData(hexblob::encodeLower(str)));
     duplicateKeyErrorSerializationAndParseReturnTheSameObject(
         keyPattern, keyValue, collation, keyValueWithFieldName, expectedEncodedKeyValueField);
 }
@@ -139,7 +141,8 @@ TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectF
     auto keyValue = BSON("" << 10 << "" << str);
     auto collation = BSONObj();
     auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
-    auto expectedEncodedKeyValueField = BSON("a" << 10 << "b" << hexblob::encodeLower(str));
+    auto expectedEncodedKeyValueField =
+        BSON("a" << 10 << "b" << StringData(hexblob::encodeLower(str)));
     duplicateKeyErrorSerializationAndParseReturnTheSameObject(
         keyPattern, keyValue, collation, keyValueWithFieldName, expectedEncodedKeyValueField);
 }

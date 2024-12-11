@@ -152,7 +152,14 @@ void dassertCompIsSane(const Comparator& comp, const Key& lhs, const Key& rhs) {
     // debug builds considerably slower without any additional safety.
 
     // test reversed comparisons
-    invariant((comp(lhs, rhs) <=> 0) == (0 <=> comp(rhs, lhs)));
+    const int regular = comp(lhs, rhs);
+    if (regular == 0) {
+        invariant(comp(rhs, lhs) == 0);
+    } else if (regular < 0) {
+        invariant(comp(rhs, lhs) > 0);
+    } else {
+        invariant(comp(rhs, lhs) < 0);
+    }
 
     // test reflexivity
     invariant(comp(lhs, lhs) == 0);
@@ -651,7 +658,8 @@ private:
         bool operator()(const Ptr& lhs, const Ptr& rhs) const {
             // first compare data
             dassertCompIsSane(_comp, lhs->current(), rhs->current());
-            if (auto ret = _comp(lhs->current(), rhs->current()); ret != 0)
+            int ret = _comp(lhs->current(), rhs->current());
+            if (ret)
                 return ret > 0;
 
             // then compare fileNums to ensure stability

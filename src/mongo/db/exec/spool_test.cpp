@@ -80,7 +80,9 @@ public:
         WorkingSetMember* wsm = ws.get(id);
         visit(OverloadedVisitor{
                   [&](long value) { wsm->recordId = RecordId(value); },
-                  [&](const std::string& value) { wsm->recordId = RecordId(value); },
+                  [&](const std::string& value) {
+                      wsm->recordId = RecordId(value.c_str(), value.size());
+                  },
               },
               recordId);
         ws.transitionToRecordIdAndObj(id);

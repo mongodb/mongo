@@ -6988,7 +6988,8 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
 
     // The result omits the typebits so that the numeric value of different types have the same
     // binary representation.
-    return Value(BSONBinData{ksValue.getView().data(), ksValue.getSize(), BinDataGeneral});
+    return Value(
+        BSONBinData{ksValue.getBuffer(), static_cast<int>(ksValue.getSize()), BinDataGeneral});
 }
 
 /* --------------------------------- Parenthesis --------------------------------------------- */

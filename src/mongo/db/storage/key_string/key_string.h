@@ -32,12 +32,10 @@
 #include <absl/hash/hash.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/optional/optional.hpp>
-#include <compare>
 #include <cstdint>
 #include <cstring>
 #include <functional>
 #include <iosfwd>
-#include <span>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -65,6 +63,7 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
 namespace key_string {
 
 class BuilderInterface {
@@ -104,16 +103,16 @@ public:
 
 enum class Version : uint8_t { V0 = 0, V1 = 1, kLatestVersion = V1 };
 
-inline StringData keyStringVersionToString(Version version) {
+static StringData keyStringVersionToString(Version version) {
     return version == Version::V0 ? "V0" : "V1";
 }
 
-inline const Ordering ALL_ASCENDING = Ordering::allAscending();
+static const Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 
 // Encode the size of a RecordId binary string using up to 4 bytes, 7 bits per byte.
 // This supports encoding sizes that fit into 28 bits, which largely covers the
 // maximum BSON size.
-inline constexpr int kRecordIdStrEncodedSizeMaxBytes = 4;
+static const int kRecordIdStrEncodedSizeMaxBytes = 4;
 MONGO_STATIC_ASSERT(RecordId::kBigStrMaxSize < 1 << (7 * kRecordIdStrEncodedSizeMaxBytes));
 
 /**
@@ -214,13 +213,6 @@ public:
         }
 
         return rawSize + 1;  // Case 3
-    }
-
-    /**
-     * Gets the buffer as a span. See getBuffer() for information on how the buffer is encoded.
-     */
-    std::span<const char> getView() const {
-        return {getBuffer(), static_cast<size_t>(getSize())};
     }
 
     bool isLongEncoding() const {
@@ -448,6 +440,7 @@ private:
  * the full KeyString with the TypeBits appended at the end.
  */
 class Value {
+
 public:
     Value()
         : _versionAndRidSize(_encodeVersionAndRidSize(Version::kLatestVersion, 0)), _ksSize(0) {}
@@ -478,10 +471,7 @@ public:
         return *this;
     }
 
-    static Value makeValue(Version version,
-                           std::span<const char> ks,
-                           std::span<const char> rid,
-                           std::span<const char> typeBits);
+    static Value makeValue(Version version, StringData ks, StringData rid, StringData typeBits);
 
     /**
      * Compare with another key_string::Value or Builder.
@@ -489,9 +479,6 @@ public:
     template <class T>
     int compare(const T& other) const;
 
-    /**
-     * Compare with another key_string::Value or Builder, including the TypeBits in the comparison.
-     */
     int compareWithTypeBits(const Value& other) const;
 
     /**
@@ -501,8 +488,6 @@ public:
     int compareWithoutRecordIdLong(const T& other) const;
     template <class T>
     int compareWithoutRecordIdStr(const T& other) const;
-    template <class T>
-    int compareWithoutRecordId(const T& other, KeyFormat keyFormat) const;
 
     /**
      * Compare with another key_string::Value, ignoring the Discriminator byte of both.
@@ -529,32 +514,19 @@ public:
         return _ksSize == 0;
     }
 
-    // Get the span containing the keystring and record id, but not typebits
-    std::span<const char> getView() const {
-        return std::span<const char>(_buffer.get(), _ksSize);
-    }
-    // Get the span containing all three components
-    std::span<const char> getViewWithTypeBits() const {
-        return std::span<const char>(_buffer.get(), _buffer.size());
-    }
-    // Get the span containing just the keystring
-    std::span<const char> getViewWithoutRecordId() const {
-        return getView().first(getSizeWithoutRecordId());
-    }
-    // Get the span containing just the record id
-    std::span<const char> getRecordIdView() const {
-        return getView().last(getRecordIdSize());
-    }
-    // Get the span containing just the typebits
-    std::span<const char> getTypeBitsView() const {
-        return getViewWithTypeBits().subspan(_ksSize);
+    const char* getBuffer() const {
+        return _buffer.get();
     }
 
     // Returns the stored TypeBits.
     TypeBits getTypeBits() const {
-        auto view = getTypeBitsView();
-        BufReader reader(view.data(), view.size());
+        const char* buf = _buffer.get() + _ksSize;
+        BufReader reader(buf, _buffer.size() - _ksSize);
         return TypeBits::fromBuffer(getVersion(), &reader);
+    }
+
+    StringData getTypeBitsView() const {
+        return {_buffer.get() + _ksSize, _buffer.size() - _ksSize};
     }
 
     // Compute hash over key
@@ -718,7 +690,7 @@ public:
           _elemCount(other._elemCount),
           _ordering(other._ordering),
           _discriminator(other._discriminator) {
-        resetFromBuffer(other.getView());
+        resetFromBuffer(other.getBuffer(), other.getSize());
     }
 
     BuilderBase(Version version, const RecordId& rid) : BuilderBase(version) {
@@ -755,14 +727,13 @@ public:
      *
      * If 'discriminator' is specified, then it overrides the previously set _discriminator.
      */
-    std::span<const char> finishAndGetBuffer(
-        boost::optional<Discriminator> discriminator = boost::none) {
+    StringData finishAndGetBuffer(boost::optional<Discriminator> discriminator = boost::none) {
         invariant(_state == BuildState::kAppendingBSONElements || _state == BuildState::kEndAdded);
         if (discriminator) {
             _discriminator = *discriminator;
         }
         _doneAppending();
-        return {_buffer().buf(), static_cast<size_t>(_buffer().len())};
+        return {_buffer().buf(), static_cast<StringData::size_type>(_buffer().len())};
     }
 
     void appendRecordId(const RecordId& loc);
@@ -830,14 +801,14 @@ public:
                     Ordering ord,
                     Discriminator discriminator = Discriminator::kInclusive);
 
-    void resetFromBuffer(std::span<const char> buf) {
+    void resetFromBuffer(const void* buffer, size_t size) {
         _buffer().reset();
-        memcpy(_buffer().skip(buf.size()), buf.data(), buf.size());
+        memcpy(_buffer().skip(size), buffer, size);
     }
 
-    std::span<const char> getView() const {
+    const char* getBuffer() const {
         invariant(_state != BuildState::kReleased);
-        return std::span(_buffer().buf(), _buffer().len());
+        return _buffer().buf();
     }
 
     size_t getSize() const {
@@ -865,6 +836,14 @@ public:
      */
     template <class T>
     int compare(const T& other) const;
+
+    /**
+     * Compare with another key_string::Value or Builder, ignoring the RecordId part of both.
+     */
+    template <class T>
+    int compareWithoutRecordIdLong(const T& other) const;
+    template <class T>
+    int compareWithoutRecordIdStr(const T& other) const;
 
     /**
      * @return a hex encoding of this key
@@ -1135,34 +1114,57 @@ template <>
 struct isKeyString<HeapBuilder> : public std::true_type {};
 template <>
 struct isKeyString<PooledBuilder> : public std::true_type {};
+
 template <>
 struct isKeyString<Value> : public std::true_type {};
 
-// clang-format off
-template <typename T, typename U>
-    requires(!!isKeyString<T>())
-std::strong_ordering operator<=>(const T& lhs, const U& rhs) {
-    return lhs.compare(rhs) <=> 0;
+template <class T, class U>
+inline typename std::enable_if<isKeyString<T>::value, bool>::type operator<(const T& lhs,
+                                                                            const U& rhs) {
+    return lhs.compare(rhs) < 0;
 }
 
-template <typename T, typename U>
-    requires(!!isKeyString<T>())
-bool operator==(const T& lhs, const U& rhs) {
+template <class T, class U>
+inline typename std::enable_if<isKeyString<T>::value, bool>::type operator<=(const T& lhs,
+                                                                             const U& rhs) {
+    return lhs.compare(rhs) <= 0;
+}
+
+template <class T, class U>
+inline typename std::enable_if<isKeyString<T>::value, bool>::type operator==(const T& lhs,
+                                                                             const U& rhs) {
     return lhs.compare(rhs) == 0;
 }
 
+template <class T, class U>
+inline typename std::enable_if<isKeyString<T>::value, bool>::type operator>(const T& lhs,
+                                                                            const U& rhs) {
+    return lhs.compare(rhs) > 0;
+}
+
+template <class T, class U>
+inline typename std::enable_if<isKeyString<T>::value, bool>::type operator>=(const T& lhs,
+                                                                             const U& rhs) {
+    return lhs.compare(rhs) >= 0;
+}
+
+template <class T, class U>
+inline typename std::enable_if<isKeyString<T>::value, bool>::type operator!=(const T& lhs,
+                                                                             const U& rhs) {
+    return !(lhs == rhs);
+}
+
 template <class T>
-requires(!!isKeyString<T>())
-std::ostream& operator<<(std::ostream& stream, const T& value) {
+inline typename std::enable_if<isKeyString<T>::value, std::ostream&>::type operator<<(
+    std::ostream& stream, const T& value) {
     return stream << value.toString();
 }
-// clang-format on
 
 /**
  * Given a KeyString which may or may not have a RecordId, returns the length of the section without
  * the RecordId. More expensive than sizeWithoutRecordId(Long|Str)AtEnd
  */
-size_t getKeySize(std::span<const char> buffer, Ordering ord, Version version);
+size_t getKeySize(const char* buffer, size_t len, Ordering ord, Version version);
 
 /**
  * Decodes the given KeyString buffer into it's BSONObj representation. This is marked as
@@ -1171,94 +1173,67 @@ size_t getKeySize(std::span<const char> buffer, Ordering ord, Version version);
  *
  * If the buffer provided may not be valid, use the 'safe' version instead.
  */
-BSONObj toBson(std::span<const char> data, Ordering ord, const TypeBits& types) noexcept;
-BSONObj toBson(std::span<const char> data,
-               Ordering ord,
-               std::span<const char> typeBitsRawBuffer,
-               Version version);
-BSONObj toBsonSafe(std::span<const char> data, Ordering ord, const TypeBits& types);
-void toBsonSafe(std::span<const char> data,
-                Ordering ord,
-                const TypeBits& types,
-                BSONObjBuilder& builder);
-void toBsonSafe(std::span<const char> data,
+BSONObj toBson(StringData data, Ordering ord, const TypeBits& types);
+BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& types) noexcept;
+BSONObj toBson(StringData data, Ordering ord, StringData typeBitsRawBuffer, Version version);
+BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& types);
+void toBsonSafe(
+    const char* buffer, size_t len, Ordering ord, const TypeBits& types, BSONObjBuilder& builder);
+void toBsonSafe(const char* buffer,
+                size_t len,
                 Ordering ord,
                 TypeBits::ReaderBase& typeBitsReader,
                 BSONObjBuilder& builder);
-Discriminator decodeDiscriminator(std::span<const char> data,
+Discriminator decodeDiscriminator(const char* buffer,
+                                  size_t len,
                                   Ordering ord,
                                   const TypeBits& typeBits);
 
 template <class T>
 BSONObj toBson(const T& keyString, Ordering ord) noexcept {
-    return toBson(keyString.getView(), ord, keyString.getTypeBits());
+    return toBson(keyString.getBuffer(), keyString.getSize(), ord, keyString.getTypeBits());
 }
 
 /**
  * Decodes a RecordId long from the end of a buffer.
  */
-RecordId decodeRecordIdLongAtEnd(std::span<const char> buf);
+RecordId decodeRecordIdLongAtEnd(const void* buf, size_t size);
 
 /**
  * Decodes a RecordId string from the end of a buffer.
  * The RecordId string length cannot be determined by looking at the start of the string.
  */
-RecordId decodeRecordIdStrAtEnd(std::span<const char> buf);
+RecordId decodeRecordIdStrAtEnd(const void* buf, size_t size);
 
 /**
- * Decodes a RecordId in the given format from the end of a buffer.
+ * Given a KeyString with a RecordId in the long format, returns the length of the section without
+ * the RecordId.
+ * If a RecordId pointer is provided, also decode the RecordId into the pointer.
  */
-inline RecordId decodeRecordIdAtEnd(std::span<const char> buf, KeyFormat keyFormat) {
-    return keyFormat == KeyFormat::String ? decodeRecordIdStrAtEnd(buf)
-                                          : decodeRecordIdLongAtEnd(buf);
-}
+int32_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw,
+                                     size_t bufSize,
+                                     RecordId* recordId = nullptr);
 
 /**
- * Given a KeyString with a RecordId in the string format, returns the the section without the
- * RecordId.
+ * Given a KeyString with a RecordId in the string format, returns the length of the section without
+ * the RecordId.
  * If a RecordId pointer is provided, also decode the RecordId into the pointer.
  */
-std::span<const char> withoutRecordIdStrAtEnd(std::span<const char> buf,
-                                              RecordId* recordId = nullptr);
-/**
- * Given a KeyString with a RecordId in the long format, returns the the section without the
- * RecordId.
- * If a RecordId pointer is provided, also decode the RecordId into the pointer.
- */
-std::span<const char> withoutRecordIdLongAtEnd(std::span<const char> buf,
-                                               RecordId* recordId = nullptr);
-/**
- * Given a KeyString with a RecordId in the given format, returns the the section without the
- * RecordId.
- * If a RecordId pointer is provided, also decode the RecordId into the pointer.
- */
-inline std::span<const char> withoutRecordIdAtEnd(std::span<const char> buf,
-                                                  KeyFormat keyFormat,
-                                                  RecordId* recordId = nullptr) {
-    return keyFormat == KeyFormat::String ? withoutRecordIdStrAtEnd(buf, recordId)
-                                          : withoutRecordIdLongAtEnd(buf, recordId);
-}
+int32_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw,
+                                    size_t bufSize,
+                                    RecordId* recordId = nullptr);
 
 /**
- * Given a KeyString, returns the section without the discriminator.
+ * Given a KeyString, returns the length of the section without the discriminator.
  */
-std::span<const char> withoutDiscriminatorAtEnd(std::span<const char> buf);
+int32_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize);
 
 /**
  * Decodes a RecordId, consuming all bytes needed from reader.
  */
 RecordId decodeRecordIdLong(BufReader* reader);
 
-/**
- * Decodes a RecordId from a buffer.
- */
-RecordId decodeRecordIdLong(std::span<const char> buf);
-
-/**
- * Perform a lexigraphical comparison of two binary buffers. This always performs an unsigned
- * comparison even if char is signed.
- */
-int compare(std::span<const char> left, std::span<const char> right);
+int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize);
 
 /**
  * Read one KeyString component from the given 'reader' and 'typeBits' inputs and stream it to the
@@ -1284,37 +1259,57 @@ void appendSingleFieldToBSONAs(const char* buf,
 template <class BufferT>
 template <class T>
 int BuilderBase<BufferT>::compare(const T& other) const {
-    return key_string::compare(getView(), other.getView());
+    return key_string::compare(getBuffer(), other.getBuffer(), getSize(), other.getSize());
+}
+
+template <class BufferT>
+template <class T>
+int BuilderBase<BufferT>::compareWithoutRecordIdLong(const T& other) const {
+    return key_string::compare(
+        getBuffer(),
+        other.getBuffer(),
+        !isEmpty() ? sizeWithoutRecordIdLongAtEnd(getBuffer(), getSize()) : 0,
+        !other.isEmpty() ? sizeWithoutRecordIdLongAtEnd(other.getBuffer(), other.getSize()) : 0);
+}
+
+template <class BufferT>
+template <class T>
+int BuilderBase<BufferT>::compareWithoutRecordIdStr(const T& other) const {
+    return key_string::compare(
+        getBuffer(),
+        other.getBuffer(),
+        !isEmpty() ? sizeWithoutRecordIdStrAtEnd(getBuffer(), getSize()) : 0,
+        !other.isEmpty() ? sizeWithoutRecordIdStrAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 
 template <class T>
 int Value::compare(const T& other) const {
-    return key_string::compare(getView(), other.getView());
+    return key_string::compare(getBuffer(), other.getBuffer(), getSize(), other.getSize());
 }
 
 template <class T>
 int Value::compareWithoutRecordIdLong(const T& other) const {
-    return key_string::compare(withoutRecordIdLongAtEnd(getView()),
-                               withoutRecordIdLongAtEnd(other.getView()));
+    return key_string::compare(
+        getBuffer(),
+        other.getBuffer(),
+        !isEmpty() ? getSizeWithoutRecordId() : 0,
+        !other.isEmpty() ? sizeWithoutRecordIdLongAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 
 template <class T>
 int Value::compareWithoutRecordIdStr(const T& other) const {
-    return key_string::compare(withoutRecordIdStrAtEnd(getView()),
-                               withoutRecordIdStrAtEnd(other.getView()));
-}
-
-template <class T>
-int Value::compareWithoutRecordId(const T& other, KeyFormat keyFormat) const {
-    return keyFormat == KeyFormat::String ? compareWithoutRecordIdStr(other)
-                                          : compareWithoutRecordIdLong(other);
+    return key_string::compare(
+        getBuffer(),
+        other.getBuffer(),
+        !isEmpty() ? getSizeWithoutRecordId() : 0,
+        !other.isEmpty() ? sizeWithoutRecordIdStrAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 
 /**
  * Takes key string and key pattern information and uses it to present human-readable information
  * about an index or collection entry.
  *
- * 'logPrefix' adds a logging prefix. Useful for differentiating callers.
+ * 'logPrefix' addes a logging prefix. Useful for differentiating callers.
  */
 void logKeyString(const RecordId& recordId,
                   const Value& keyStringValue,
@@ -1333,7 +1328,8 @@ BSONObj rehydrateKey(const BSONObj& keyPatternBson, const BSONObj& keyStringBson
  * 'keyFormat' may be provided if the caller knows the RecordId format of this key string, if
  * any.
  */
-std::string explain(std::span<const char> buffer,
+std::string explain(const char* buffer,
+                    int len,
                     const BSONObj& keyPattern,
                     const TypeBits& typeBits,
                     boost::optional<KeyFormat> keyFormat);

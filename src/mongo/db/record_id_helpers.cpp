@@ -78,7 +78,7 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime, const KeyFormat keyFo
         case KeyFormat::String: {
             key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
             keyBuilder.appendTimestamp(opTime);
-            return RecordId(keyBuilder.getView());
+            return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
         }
         default: {
             MONGO_UNREACHABLE_TASSERT(6521004);
@@ -136,7 +136,7 @@ RecordId keyForElem(const BSONElement& elem) {
     // that compare similarly, but are of different types may not be used concurrently.
     key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendBSONElement(elem);
-    return RecordId(keyBuilder.getView());
+    return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 
 RecordId keyForObj(const BSONObj& obj) {
@@ -146,13 +146,13 @@ RecordId keyForObj(const BSONObj& obj) {
 RecordId keyForOID(OID oid) {
     key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendOID(oid);
-    return RecordId(keyBuilder.getView());
+    return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 
 RecordId keyForDate(Date_t date) {
     key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendDate(date);
-    return RecordId(keyBuilder.getView());
+    return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 
 void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fieldName) {
@@ -185,7 +185,7 @@ RecordId reservedIdFor(ReservationId res, KeyFormat keyFormat) {
         invariant(keyFormat == KeyFormat::String);
         constexpr char reservation[] = {
             kReservedStrPrefix, static_cast<char>(ReservationId::kWildcardMultikeyMetadataId)};
-        return RecordId(reservation);
+        return RecordId(reservation, sizeof(reservation));
     }
 }
 
@@ -196,7 +196,7 @@ RecordId maxRecordId(KeyFormat keyFormat) {
         invariant(keyFormat == KeyFormat::String);
         constexpr char reservation[] = {
             kReservedStrPrefix, static_cast<char>(ReservationId::kWildcardMultikeyMetadataId)};
-        return RecordId(reservation);
+        return RecordId(reservation, sizeof(reservation));
     }
 }
 
@@ -208,7 +208,8 @@ bool isReserved(const RecordId& id) {
         return id.getLong() >= kMinReservedLong && id.getLong() < RecordId::kMaxRepr;
     }
     // All RecordId strings that start with FF are considered reserved.
-    return id.getStr()[0] == kReservedStrPrefix;
+    auto strData = id.getStr();
+    return strData.rawData()[0] == kReservedStrPrefix;
 }
 
 }  // namespace record_id_helpers

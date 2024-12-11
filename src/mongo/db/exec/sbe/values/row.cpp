@@ -694,7 +694,7 @@ template <typename RowType>
 RowType RowBase<RowType>::deserializeFromKeyString(const key_string::Value& keyString,
                                                    BufBuilder* valueBufferBuilder,
                                                    boost::optional<size_t> numPrefixValsToRead) {
-    BufReader reader(keyString.getView().data(), keyString.getSize());
+    BufReader reader(keyString.getBuffer(), keyString.getSize());
     key_string::TypeBits typeBits(keyString.getTypeBits());
     key_string::TypeBits::Reader typeBitsReader(typeBits);
 

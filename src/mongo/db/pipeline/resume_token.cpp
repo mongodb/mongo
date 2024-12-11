@@ -181,7 +181,7 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
 
     auto keyObj = builder.obj();
     key_string::Builder encodedToken(key_string::Version::V1, keyObj, Ordering::make(BSONObj()));
-    _hexKeyString = encodedToken.toString();
+    _hexKeyString = hexblob::encode(encodedToken.getBuffer(), encodedToken.getSize());
     const auto& typeBits = encodedToken.getTypeBits();
     if (!typeBits.isAllZeros())
         _typeBits = Value(
@@ -213,8 +213,12 @@ ResumeTokenData ResumeToken::getData() const {
 
     BufBuilder hexDecodeBuf;  // Keep this in scope until we've decoded the bytes.
     hexblob::decode(_hexKeyString, &hexDecodeBuf);
-    auto internalBson = key_string::toBsonSafe(
-        std::span(hexDecodeBuf.buf(), hexDecodeBuf.len()), Ordering::allAscending(), typeBits);
+    BSONBinData keyStringBinData =
+        BSONBinData(hexDecodeBuf.buf(), hexDecodeBuf.len(), BinDataType::BinDataGeneral);
+    auto internalBson = key_string::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
+                                               keyStringBinData.length,
+                                               Ordering::make(BSONObj()),
+                                               typeBits);
 
     BSONObjIterator i(internalBson);
     ResumeTokenData result;

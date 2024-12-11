@@ -248,7 +248,7 @@ private:
 
         key_string::Builder builder(key_string::Version::kLatestVersion);
         builder.appendBinData(BSONBinData(block.data(), block.size(), BinDataType::BinDataGeneral));
-        auto recordId = RecordId(builder.getView());
+        auto recordId = RecordId(builder.getBuffer(), builder.getSize());
 
         incrementRead();
         return _cursor->seekExact(recordId);

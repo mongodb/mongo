@@ -77,13 +77,14 @@ std::pair<RecordId, key_string::TypeBits> encodeKeyString(key_string::Builder& k
                                                           const value::MaterializedRow& value) {
     value.serializeIntoKeyString(kb);
     auto typeBits = kb.getTypeBits();
-    auto rid = RecordId(kb.getView());
+    auto rid = RecordId(kb.getBuffer(), kb.getSize());
     return {rid, typeBits};
 }
 
 key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits typeBits) {
+    auto rawKey = rid.getStr();
     key_string::Builder kb{key_string::Version::kLatestVersion};
-    kb.resetFromBuffer(rid.getStr());
+    kb.resetFromBuffer(rawKey.rawData(), rawKey.size());
     kb.setTypeBits(typeBits);
     return kb.getValueCopy();
 }

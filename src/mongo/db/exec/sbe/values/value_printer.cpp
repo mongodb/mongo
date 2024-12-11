@@ -537,7 +537,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         case TypeTags::keyString: {
             auto ks = getKeyString(val);
-            stream << "KS(" << ks->toString() << ")";
+            stream << "KS(" << hexblob::encode(ks->getKeyStringView()) << ")";
             break;
         }
         case TypeTags::Timestamp: {

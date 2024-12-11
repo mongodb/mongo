@@ -44,6 +44,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/shared_buffer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -62,8 +63,10 @@ struct BsonsAndKeyStrings {
     int bsonSize = 0;
     int keystringSize = 0;
     BSONObj bsons[kSampleSize];
-    std::vector<char> keystrings[kSampleSize];
-    std::vector<char> typebits[kSampleSize];
+    SharedBuffer keystrings[kSampleSize];
+    size_t keystringLens[kSampleSize];
+    SharedBuffer typebits[kSampleSize];
+    size_t typebitsLens[kSampleSize];
 };
 
 enum BsonValueType {
@@ -109,15 +112,19 @@ static BsonsAndKeyStrings generateBsonsAndKeyStrings(BsonValueType bsonValueType
     result.bsonSize = 0;
     result.keystringSize = 0;
     for (int i = 0; i < kSampleSize; i++) {
-        result.bsons[i] = generateBson(bsonValueType);
-        result.bsonSize += result.bsons[i].objsize();
-        key_string::Builder ks(version, result.bsons[i], ALL_ASCENDING);
+        BSONObj bson = generateBson(bsonValueType);
+        key_string::Builder ks(version, bson, ALL_ASCENDING);
+        result.bsonSize += bson.objsize();
+        result.keystringSize += ks.getSize();
+        result.bsons[i] = bson;
 
-        result.keystrings[i].assign(ks.getView().begin(), ks.getView().end());
-        result.keystringSize += result.keystrings[i].size();
+        result.keystrings[i] = SharedBuffer::allocate(ks.getSize());
+        memcpy(result.keystrings[i].get(), ks.getBuffer(), ks.getSize());
+        result.keystringLens[i] = ks.getSize();
 
-        result.typebits[i].assign(ks.getTypeBits().getView().begin(),
-                                  ks.getTypeBits().getView().end());
+        result.typebits[i] = SharedBuffer::allocate(ks.getTypeBits().getSize());
+        memcpy(result.typebits[i].get(), ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize());
+        result.typebitsLens[i] = ks.getTypeBits().getSize();
     }
     return result;
 }
@@ -143,10 +150,10 @@ void BM_KeyStringToBSON(benchmark::State& state,
     for (auto _ : state) {
         benchmark::ClobberMemory();
         for (size_t i = 0; i < kSampleSize; i++) {
-            auto& typeBits = bsonsAndKeyStrings.typebits[i];
-            BufReader buf(typeBits.data(), typeBits.size());
+            BufReader buf(bsonsAndKeyStrings.typebits[i].get(), bsonsAndKeyStrings.typebitsLens[i]);
             benchmark::DoNotOptimize(
-                key_string::toBson(bsonsAndKeyStrings.keystrings[i],
+                key_string::toBson(bsonsAndKeyStrings.keystrings[i].get(),
+                                   bsonsAndKeyStrings.keystringLens[i],
                                    ALL_ASCENDING,
                                    key_string::TypeBits::fromBuffer(version, &buf)));
         }
@@ -212,7 +219,7 @@ void BM_KeyStringStackBuilderCopy(benchmark::State& state, BsonValueType bsonTyp
 
 void BM_KeyStringRecordIdStrAppend(benchmark::State& state, const size_t size) {
     const auto buf = std::string(size, 'a');
-    auto rid = RecordId(buf);
+    auto rid = RecordId(buf.c_str(), size);
     for (auto _ : state) {
         benchmark::ClobberMemory();
         benchmark::DoNotOptimize(key_string::Builder(key_string::Version::V1, rid));
@@ -221,10 +228,12 @@ void BM_KeyStringRecordIdStrAppend(benchmark::State& state, const size_t size) {
 
 void BM_KeyStringRecordIdStrDecode(benchmark::State& state, const size_t size) {
     const auto buf = std::string(size, 'a');
-    key_string::Builder ks(key_string::Version::V1, RecordId(buf));
+    key_string::Builder ks(key_string::Version::V1, RecordId(buf.c_str(), size));
+    auto ksBuf = ks.getBuffer();
+    auto ksSize = ks.getSize();
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        benchmark::DoNotOptimize(key_string::decodeRecordIdStrAtEnd(ks.getView()));
+        benchmark::DoNotOptimize(key_string::decodeRecordIdStrAtEnd(ksBuf, ksSize));
     }
 }
 

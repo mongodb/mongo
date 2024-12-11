@@ -509,19 +509,27 @@ TEST_F(SortedDataInterfaceTest, InsertAndSeekKeyString) {
 
         const auto cursor(sorted->newCursor(opCtx()));
 
-        auto ksEntry1 = cursor->seekForKeyString(keyString1WithoutRecordId.getView());
-        ASSERT_EQ(ksEntry1->keyString.compare(keyString1), 0);
-        ASSERT(ksEntry1->keyString.compare(keyString2) < 0);
-        auto kvEntry1 = cursor->seekForKeyValueView(keyString1WithoutRecordId.getView());
+        auto ksEntry1 = cursor->seekForKeyString(
+            {keyString1WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString1WithoutRecordId.getSize())});
+        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1), 0);
+        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2), -1);
+        auto kvEntry1 = cursor->seekForKeyValueView(
+            {keyString1WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString1WithoutRecordId.getSize())});
         ASSERT(!kvEntry1.isEmpty());
-        ASSERT_EQ(ksEntry1->keyString.compare(kvEntry1.getValueCopy()), 0);
+        ASSERT_EQUALS(ksEntry1->keyString.compare(kvEntry1.getValueCopy()), 0);
 
-        auto ksEntry2 = cursor->seekForKeyString(keyString2WithoutRecordId.getView());
-        ASSERT_EQ(ksEntry2->keyString.compare(keyString2), 0);
-        ASSERT(ksEntry2->keyString.compare(keyString1) > 0);
-        auto kvEntry2 = cursor->seekForKeyValueView(keyString2WithoutRecordId.getView());
+        auto ksEntry2 = cursor->seekForKeyString(
+            {keyString2WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString2WithoutRecordId.getSize())});
+        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2), 0);
+        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1), 1);
+        auto kvEntry2 = cursor->seekForKeyValueView(
+            {keyString2WithoutRecordId.getBuffer(),
+             static_cast<StringData::size_type>(keyString2WithoutRecordId.getSize())});
         ASSERT(!kvEntry2.isEmpty());
-        ASSERT_EQ(ksEntry2->keyString.compare(kvEntry2.getValueCopy()), 0);
+        ASSERT_EQUALS(ksEntry2->keyString.compare(kvEntry2.getValueCopy()), 0);
     }
 }
 
@@ -615,7 +623,7 @@ TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdIntoUniqueIndex) {
         constexpr char reservation[] = {
             static_cast<char>(0xFF),
             static_cast<char>(record_id_helpers::ReservationId::kWildcardMultikeyMetadataId)};
-        RecordId reservedId = RecordId(reservation);
+        RecordId reservedId = RecordId(reservation, sizeof(reservation));
         ASSERT(record_id_helpers::isReserved(reservedId));
 
         StorageWriteTransaction txn(recoveryUnit());
@@ -635,7 +643,7 @@ TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdIntoUniqueIndex) {
         constexpr char reservation[] = {
             static_cast<char>(0xFF),
             static_cast<char>(record_id_helpers::ReservationId::kWildcardMultikeyMetadataId) + 1};
-        RecordId reservedId = RecordId(reservation);
+        RecordId reservedId = RecordId(reservation, sizeof(reservation));
         ASSERT(record_id_helpers::isReserved(reservedId));
 
         StorageWriteTransaction txn(recoveryUnit());

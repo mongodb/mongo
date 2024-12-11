@@ -201,6 +201,11 @@ std::pair<TypeTags, Value> makeNewRecordId(int64_t rid) {
     return {TypeTags::RecordId, val};
 }
 
+std::pair<TypeTags, Value> makeNewRecordId(const char* str, int32_t size) {
+    auto val = bitcastFrom<RecordId*>(new RecordId(str, size));
+    return {TypeTags::RecordId, val};
+}
+
 std::pair<TypeTags, Value> makeCopyRecordId(const RecordId& rid) {
     auto copy = bitcastFrom<RecordId*>(new RecordId(rid));
     return {TypeTags::RecordId, copy};
@@ -739,7 +744,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::keyString && rhsTag == TypeTags::keyString) {
         auto result = getKeyString(lhsValue)->compare(*getKeyString(rhsValue));
-        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result < 0 ? -1 : result > 0 ? 1 : 0)};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Nothing && rhsTag == TypeTags::Nothing) {
         // Special case for Nothing in a hash table (group) and sort comparison.
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};

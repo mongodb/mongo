@@ -29,8 +29,7 @@
 
 #pragma once
 
-#include <span>
-
+#include "mongo/base/string_data.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
@@ -49,15 +48,15 @@ public:
         return _value != boost::none;
     }
 
-    std::span<const char> getKeyStringView() const {
+    StringData getKeyStringView() const {
         return _key;
     }
 
-    std::span<const char> getTypeBitsView() const {
+    StringData getTypeBitsView() const {
         return _typeBits;
     }
 
-    std::span<const char> getRecordIdView() const {
+    StringData getRecordIdView() const {
         return _rid;
     }
 
@@ -70,7 +69,7 @@ public:
     }
 
     int compare(const KeyStringEntry& other) const {
-        return key_string::compare(_key, other._key);
+        return key_string::compare(_key.data(), other._key.data(), _key.size(), other._key.size());
     }
 
     std::size_t hash() const {
@@ -97,14 +96,14 @@ public:
     static KeyStringEntry* deserialize(BufReader& buf);
 
     std::string toString() const {
-        return hexblob::encode({_key.data(), _key.size()});
+        return hexblob::encode(_key);
     }
 
 private:
-    std::span<const char> _key;
-    std::span<const char> _typeBits;
+    StringData _key;
+    StringData _typeBits;
     // For indexConsistencyCheck.
-    std::span<const char> _rid;
+    StringData _rid;
     key_string::Version _version;
     boost::optional<key_string::Value> _value;  // none means unowned view.
 

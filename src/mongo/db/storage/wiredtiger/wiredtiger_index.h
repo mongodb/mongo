@@ -52,7 +52,6 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
@@ -86,6 +85,7 @@ const int kMaximumIndexVersion = kDataFormatV6KeyStringV1UniqueIndexVersionV2;
 
 class IndexCatalogEntry;
 class IndexDescriptor;
+struct WiredTigerItem;
 
 namespace CollectionValidation {
 class ValidationOptions;
@@ -160,8 +160,7 @@ public:
                  const key_string::Value& keyString,
                  bool dupsAllowed) override;
 
-    boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                      std::span<const char> keyString) const override;
+    boost::optional<RecordId> findLoc(OperationContext* opCtx, StringData keyString) const override;
 
     IndexValidateResults validate(
         OperationContext* opCtx,
@@ -292,6 +291,8 @@ protected:
                                   const std::string& uri,
                                   StringData ident,
                                   const IndexDescriptor* desc);
+
+    RecordId _decodeRecordIdAtEnd(const void* buffer, size_t size);
 
     class BulkBuilder;
     class IdBulkBuilder;

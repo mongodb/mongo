@@ -156,7 +156,7 @@ int64_t HashAggBaseStage<Derived>::spillRowToDisk(const value::MaterializedRow& 
     // keys to be adjacent in the 'RecordStore' so that we can merge the partial aggregates with a
     // single pass.
     kb.appendNumberLong(_ridSuffixCounter++);
-    auto rid = RecordId(kb.getView());
+    auto rid = RecordId(kb.getBuffer(), kb.getSize());
 
     int spilledBytes = 0;
     if (collator) {

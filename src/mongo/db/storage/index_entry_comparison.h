@@ -109,7 +109,14 @@ struct KeyStringEntry {
         if (!kDebugBuild) {
             return;
         }
-        invariant(loc == key_string::decodeRecordIdAtEnd(ks.getView(), loc.keyFormat()));
+        loc.withFormat(
+            [](RecordId::Null n) { invariant(false); },
+            [&](int64_t rid) {
+                invariant(loc == key_string::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize()));
+            },
+            [&](const char* str, int size) {
+                invariant(loc == key_string::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+            });
     }
 
     key_string::Value keyString;
@@ -222,9 +229,9 @@ public:
      * Returned buffers are for use in lookups only and should never be inserted into the
      * database, as their format may change.
      */
-    static std::span<const char> makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
-                                                                   bool isForward,
-                                                                   key_string::Builder& builder);
+    static StringData makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
+                                                        bool isForward,
+                                                        key_string::Builder& builder);
 
     /**
      * Given a KeyString Builder reference, encodes the BSON Key into the builder and returns its
@@ -248,24 +255,24 @@ public:
      * 4. When isForward == false, inclusive == false, bsonKey will be encoded with kExclusiveBefore
      * (which is less than bsonKey).
      */
-    static std::span<const char> makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
-                                                                 Ordering ord,
-                                                                 bool isForward,
-                                                                 bool inclusive,
-                                                                 key_string::Builder& builder);
+    static StringData makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
+                                                      Ordering ord,
+                                                      bool isForward,
+                                                      bool inclusive,
+                                                      key_string::Builder& builder);
 
     /**
      * Given a KeyString Builder reference, encodes the BSON Key into the builder and returns its
      * owned buffer to pass in to SortedDataInterface::seek().
      *
-     * This function is similar to IndexEntryComparison::makeKeyStringFromBSONKeyForSeek()
+     * This funcition is similar to IndexEntryComparison::makeKeyStringFromBSONKeyForSeek()
      * but allows you to pick your own key_string::Discriminator based on wether or not the
      * resulting KeyString is for the start key or end key of a seek.
      */
-    static std::span<const char> makeKeyStringFromBSONKey(const BSONObj& bsonKey,
-                                                          Ordering ord,
-                                                          key_string::Discriminator discrim,
-                                                          key_string::Builder& builder);
+    static StringData makeKeyStringFromBSONKey(const BSONObj& bsonKey,
+                                               Ordering ord,
+                                               key_string::Discriminator discrim,
+                                               key_string::Builder& builder);
 
 private:
     // Ordering is used in comparison() to compare BSONElements

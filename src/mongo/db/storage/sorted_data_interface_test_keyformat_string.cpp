@@ -60,9 +60,9 @@ TEST_F(SortedDataInterfaceTest, KeyFormatStringInsertDuplicates) {
     char buf3[12];
     memset(buf3, 0xff, 12);
 
-    RecordId rid1(buf1);
-    RecordId rid2(buf2);
-    RecordId rid3(buf3);
+    RecordId rid1(buf1, 12);
+    RecordId rid2(buf2, 12);
+    RecordId rid3(buf3, 12);
 
     {
         StorageWriteTransaction txn(recoveryUnit());
@@ -128,9 +128,9 @@ TEST_F(SortedDataInterfaceTest, KeyFormatStringUniqueInsertRemoveDuplicates) {
     std::string buf2(12, 1);
     std::string buf3(12, '\xff');
 
-    RecordId rid1(buf1);
-    RecordId rid2(buf2);
-    RecordId rid3(buf3);
+    RecordId rid1(buf1.c_str(), 12);
+    RecordId rid2(buf2.c_str(), 12);
+    RecordId rid3(buf3.c_str(), 12);
 
     {
         StorageWriteTransaction txn(recoveryUnit());
@@ -223,9 +223,9 @@ TEST_F(SortedDataInterfaceTest, KeyFormatStringSetEndPosition) {
     char buf3[12];
     memset(buf3, 0xff, 12);
 
-    RecordId rid1(buf1);
-    RecordId rid2(buf2);
-    RecordId rid3(buf3);
+    RecordId rid1(buf1, 12);
+    RecordId rid2(buf2, 12);
+    RecordId rid3(buf3, 12);
 
     {
         StorageWriteTransaction txn(recoveryUnit());
@@ -292,9 +292,9 @@ TEST_F(SortedDataInterfaceTest, KeyFormatStringUnindex) {
     char buf3[12];
     memset(buf3, 0xff, 12);
 
-    RecordId rid1(buf1);
-    RecordId rid2(buf2);
-    RecordId rid3(buf3);
+    RecordId rid1(buf1, 12);
+    RecordId rid2(buf2, 12);
+    RecordId rid3(buf3, 12);
 
     {
         StorageWriteTransaction txn(recoveryUnit());
@@ -338,9 +338,9 @@ TEST_F(SortedDataInterfaceTest, KeyFormatStringUniqueUnindex) {
     std::string buf2(12, 1);
     std::string buf3(12, '\xff');
 
-    RecordId rid1(buf1);
-    RecordId rid2(buf2);
-    RecordId rid3(buf3);
+    RecordId rid1(buf1.c_str(), 12);
+    RecordId rid2(buf2.c_str(), 12);
+    RecordId rid3(buf3.c_str(), 12);
 
     {
         StorageWriteTransaction txn(recoveryUnit());

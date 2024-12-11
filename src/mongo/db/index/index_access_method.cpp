@@ -551,11 +551,15 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
                     boost::none /* loc */);
             invariant(keys->size() == 1);
             const key_string::Value& actualKey = *keys->begin();
-            dassert(key_string::decodeDiscriminator(actualKey.getView(),
+            dassert(key_string::decodeDiscriminator(actualKey.getBuffer(),
+                                                    actualKey.getSize(),
                                                     getSortedDataInterface()->getOrdering(),
                                                     actualKey.getTypeBits()) ==
                     key_string::Discriminator::kInclusive);
-            return _newInterface->findLoc(opCtx, actualKey.getView());
+            return _newInterface->findLoc(
+                opCtx,
+                StringData(actualKey.getBuffer(),
+                           static_cast<StringData::size_type>(actualKey.getSize())));
         } else {
             key_string::Builder requestedKeyString(getSortedDataInterface()->getKeyStringVersion(),
                                                    requestedKey,
@@ -1149,7 +1153,8 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
 
     auto keyFormat = _iam->getSortedDataInterface()->rsKeyFormat();
     auto& key = data.first;
-    int cmpData = key.compareWithoutRecordId(_previousKey, keyFormat);
+    int cmpData = (keyFormat == KeyFormat::Long) ? key.compareWithoutRecordIdLong(_previousKey)
+                                                 : key.compareWithoutRecordIdStr(_previousKey);
     if (cmpData != 0) {
         invariant(cmpData > 0);
         return false;
@@ -1159,7 +1164,9 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
         return true;
     }
 
-    RecordId recordId = key_string::decodeRecordIdAtEnd(key.getView(), keyFormat);
+    RecordId recordId = (keyFormat == KeyFormat::Long)
+        ? key_string::decodeRecordIdLongAtEnd(key.getBuffer(), key.getSize())
+        : key_string::decodeRecordIdStrAtEnd(key.getBuffer(), key.getSize());
 
     // If supplied, onDuplicateRecord may be able to clean up the state, such as by moving the
     // duplicate to a different collection

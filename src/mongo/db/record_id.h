@@ -42,7 +42,6 @@
 #include <limits>
 #include <new>
 #include <ostream>
-#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -56,7 +55,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/storage/key_format.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
@@ -154,21 +152,21 @@ public:
      * Construct a RecordId that holds a binary string. The raw value for RecordStore storage may be
      * retrieved using getStr().
      */
-    explicit RecordId(std::span<const char> buf) {
-        uassert(8273007, "key size must not be empty", buf.size() > 0);
-        uassert(5894900,
-                fmt::format(
-                    "Size of RecordId ({}) is above limit of {} bytes", buf.size(), kBigStrMaxSize),
-                buf.size() <= kBigStrMaxSize);
-        if (buf.size() <= kSmallStrMaxSize) {
+    explicit RecordId(const char* str, int32_t size) {
+        uassert(8273007, fmt::format("key size must be greater than 0. size: {}", size), size > 0);
+        uassert(
+            5894900,
+            fmt::format("Size of RecordId ({}) is above limit of {} bytes", size, kBigStrMaxSize),
+            size <= kBigStrMaxSize);
+        if (size <= kSmallStrMaxSize) {
             _format = Format::kSmallStr;
-            InlineStr::getSizeFrom(_data) = static_cast<uint8_t>(buf.size());
+            InlineStr::getSizeFrom(_data) = static_cast<uint8_t>(size);
             auto& arr = InlineStr::getArrayFrom(_data);
-            std::memcpy(arr.data(), buf.data(), buf.size());
+            std::memcpy(arr.data(), str, size);
         } else {
             _format = Format::kBigStr;
-            auto buffer = SharedBuffer::allocate(buf.size());
-            std::memcpy(buffer.get(), buf.data(), buf.size());
+            auto buffer = SharedBuffer::allocate(size);
+            std::memcpy(buffer.get(), str, size);
             auto* bufferPtr = &HeapStr::getBufferFrom(_data);
             new (bufferPtr) ConstSharedBuffer(std::move(buffer));
         }
@@ -214,14 +212,6 @@ public:
     // Returns true if this RecordId is storing a binary string.
     bool isStr() const {
         return _format == Format::kSmallStr || _format == Format::kBigStr;
-    }
-
-    /**
-     * Returns the type of this RecordID as a KeyFormat. Must not be null.
-     */
-    KeyFormat keyFormat() const {
-        invariant(_format != Format::kNull);
-        return isLong() ? KeyFormat::Long : KeyFormat::String;
     }
 
     /**
@@ -434,7 +424,7 @@ public:
         } else if (elem.type() == BSONType::BinData) {
             int size;
             auto str = elem.binData(size);
-            return RecordId(std::span(str, size));
+            return RecordId(str, size);
         } else {
             uasserted(ErrorCodes::BadValue,
                       fmt::format("Could not deserialize RecordId with type {}", elem.type()));
@@ -452,7 +442,8 @@ public:
             return RecordId(buf.read<LittleEndian<int64_t>>());
         } else if (format == Format::kSmallStr || format == Format::kBigStr) {
             const int size = buf.read<LittleEndian<int>>();
-            return RecordId(buf.readBytes(size));
+            const char* str = static_cast<const char*>(buf.skip(size));
+            return RecordId(str, size);
         } else {
             uasserted(ErrorCodes::BadValue,
                       fmt::format("Could not deserialize RecordId with type {}",

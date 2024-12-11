@@ -270,7 +270,8 @@ WorkingSetMember WorkingSetMember::deserialize(BufReader& buf) {
         } else {
             invariant(recordIdFormat == RecordIdFormat::String);
             auto size = buf.read<LittleEndian<int32_t>>();
-            wsm.recordId = RecordId{buf.readBytes(size)};
+            const char* recordIdStr = static_cast<const char*>(buf.skip(size));
+            wsm.recordId = RecordId{recordIdStr, size};
         }
     }
 

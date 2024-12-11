@@ -161,9 +161,9 @@ std::size_t computeRecordIdSize(const RecordId& id) {
 
 RecordId getKey(WT_CURSOR* cursor, KeyFormat keyFormat) {
     if (keyFormat == KeyFormat::String) {
-        WiredTigerItem item;
+        WT_ITEM item;
         invariantWTOK(cursor->get_key(cursor, &item), cursor->session);
-        return RecordId(item);
+        return RecordId(static_cast<const char*>(item.data), item.size);
     } else {
         std::int64_t recordId;
         invariantWTOK(cursor->get_key(cursor, &recordId), cursor->session);
@@ -180,7 +180,7 @@ RecordData getRecordData(WT_CURSOR* c) {
 
 void setKey(WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey* key) {
     if (auto itemPtr = get_if<WiredTigerItem>(key)) {
-        cursor->set_key(cursor, itemPtr->get());
+        cursor->set_key(cursor, itemPtr->Get());
     } else if (auto longPtr = get_if<int64_t>(key)) {
         cursor->set_key(cursor, *longPtr);
     }
@@ -251,9 +251,9 @@ public:
 
         RecordId id;
         if (_keyFormat == KeyFormat::String) {
-            WiredTigerItem item;
+            WT_ITEM item;
             invariantWTOK(_cursor->get_key(_cursor, &item), _cursor->session);
-            id = RecordId(item);
+            id = RecordId(static_cast<const char*>(item.data), item.size);
         } else {
             int64_t key;
             invariantWTOK(_cursor->get_key(_cursor, &key), _cursor->session);
@@ -721,7 +721,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         CursorKey key = makeCursorKey(record.id, _keyFormat);
         setKey(c, &key);
         WiredTigerItem value(record.data.data(), record.data.size());
-        c->set_value(c, value.get());
+        c->set_value(c, value.Get());
         int ret = WT_OP_CHECK(wiredTigerCursorInsert(wtRu, c));
 
         if (ret == WT_DUPLICATE_KEY) {
@@ -750,7 +750,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         // requires that each record be accounted for separately.
         if (!_isChangeCollection) {
             auto keyLength = computeRecordIdSize(record.id);
-            metricsCollector.incrementOneDocWritten(_uri, value.size() + keyLength);
+            metricsCollector.incrementOneDocWritten(_uri, value.size + keyLength);
         }
     }
     _changeNumRecordsAndDataSize(wtRu, nRecords, totalLength);
@@ -810,7 +810,7 @@ Status WiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
         std::vector<WT_MODIFY> entries(nentries);
 
         if ((ret = wiredtiger_calc_modify(
-                 c->session, &old_value, value.get(), kMaxDiffBytes, entries.data(), &nentries)) ==
+                 c->session, &old_value, value.Get(), kMaxDiffBytes, entries.data(), &nentries)) ==
             0) {
             invariantWTOK(WT_OP_CHECK(nentries == 0 ? c->reserve(c)
                                                     : wiredTigerCursorModify(
@@ -819,7 +819,7 @@ Status WiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
 
             WT_ITEM new_value;
             dassert(nentries == 0 ||
-                    (c->get_value(c, &new_value) == 0 && new_value.size == value.size() &&
+                    (c->get_value(c, &new_value) == 0 && new_value.size == value.size &&
                      memcmp(data, new_value.data, len) == 0));
             skip_update = true;
         } else if (ret != WT_NOTFOUND) {
@@ -828,7 +828,7 @@ Status WiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
     }
 
     if (!skip_update) {
-        c->set_value(c, value.get());
+        c->set_value(c, value.Get());
         ret = WT_OP_CHECK(wiredTigerCursorInsert(wtRu, c));
     }
     invariantWTOK(ret, c->session);
@@ -1711,7 +1711,7 @@ Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
         CursorKey key = makeCursorKey(record.id, WiredTigerRecordStore::keyFormat());
         setKey(c, &key);
         WiredTigerItem value(record.data.data(), record.data.size());
-        c->set_value(c, value.get());
+        c->set_value(c, value.Get());
         int ret = WT_OP_CHECK(wiredTigerCursorInsert(
             *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
         invariant(ret != WT_DUPLICATE_KEY);

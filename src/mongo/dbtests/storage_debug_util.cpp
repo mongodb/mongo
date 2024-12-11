@@ -104,7 +104,8 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
 
         for (auto keyStringEntry = indexCursor->nextKeyString(); keyStringEntry;
              keyStringEntry = indexCursor->nextKeyString()) {
-            auto keyString = key_string::toBsonSafe(keyStringEntry->keyString.getView(),
+            auto keyString = key_string::toBsonSafe(keyStringEntry->keyString.getBuffer(),
+                                                    keyStringEntry->keyString.getSize(),
                                                     ordering,
                                                     keyStringEntry->keyString.getTypeBits());
             key_string::logKeyString(keyStringEntry->loc,

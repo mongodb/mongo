@@ -803,7 +803,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         params);
 
     const auto id = StringData{"1"};
-    const auto rid = RecordId(id);
+    const auto rid = RecordId(id.rawData(), id.size());
     const auto data = "data";
     {
         StorageWriteTransaction txn(ru);
