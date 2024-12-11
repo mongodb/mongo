@@ -1191,6 +1191,12 @@ def generate(env: SCons.Environment.Environment) -> None:
         if distro_id is not None:
             distro_or_os = distro_id
 
+    mongo_version = env["MONGO_VERSION"]
+    # For developer builds we don't want to pass things
+    # that might change between commits
+    if os.environ.get("CI") is None:
+        mongo_version = "8.1.0-alpha"
+
     bazel_internal_flags = [
         "--config=dbg",
         f"--compiler_type={env.ToolchainName()}",
@@ -1228,7 +1234,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--js_engine={env.GetOption("js-engine")}',
         f'--use_sasl_client={env.GetOption("use-sasl-client") is not None}',
         "--define",
-        f"MONGO_VERSION={env['MONGO_VERSION']}",
+        f"MONGO_VERSION={mongo_version}",
         "--define",
         f"MONGO_DISTMOD={env['MONGO_DISTMOD']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
