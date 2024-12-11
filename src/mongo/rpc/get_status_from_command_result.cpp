@@ -84,7 +84,7 @@ Status getErrorStatusFromCommandResult(const BSONObj& result) {
         code = ErrorCodes::CommandNotFound;
     }
 
-    return Status(ErrorCodes::Error(code), errmsg, result);
+    return Status(ErrorCodes::Error(code), std::move(errmsg), result);
 }
 
 Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {
@@ -206,7 +206,7 @@ Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse) {
             errmsg = errMsgElem.str();
         }
 
-        return Status(ErrorCodes::Error(codeElem.Int()), errmsg, elem.Obj());
+        return Status(ErrorCodes::Error(codeElem.Int()), std::move(errmsg), elem.Obj());
     }
 
     return Status::OK();

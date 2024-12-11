@@ -134,7 +134,7 @@ public:
      */
     std::vector<RemoteCursor> takeCursors() {
         return std::exchange(_remoteCursors, {});
-    };
+    }
 
     static void killOpOnShards(ServiceContext* srvCtx,
                                std::shared_ptr<executor::TaskExecutor> executor,
@@ -250,8 +250,8 @@ void CursorEstablisher::waitForResponse() noexcept {
                 CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
             }
 
-            _remoteCursors.emplace_back(RemoteCursor(
-                response.shardId.toString(), *response.shardHostAndPort, std::move(cursorValue)));
+            _remoteCursors.emplace_back(
+                response.shardId.toString(), *response.shardHostAndPort, std::move(cursorValue));
         }
 
         if (response.shardHostAndPort && !hadValidCursor) {

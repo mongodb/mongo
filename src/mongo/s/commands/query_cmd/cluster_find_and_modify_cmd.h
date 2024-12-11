@@ -130,7 +130,7 @@ public:
                                                   const ShardId& shardId,
                                                   const NamespaceString& nss,
                                                   const BSONObj& cmdObj,
-                                                  Status responseStatus,
+                                                  const Status& responseStatus,
                                                   BSONObjBuilder* result);
 
 protected:

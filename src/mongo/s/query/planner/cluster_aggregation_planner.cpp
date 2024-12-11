@@ -671,7 +671,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     std::vector<OwnedRemoteCursor> ownedCursors;
     ownedCursors.reserve(cursors.size());
     for (auto&& cursor : cursors) {
-        ownedCursors.emplace_back(OwnedRemoteCursor(opCtx, std::move(cursor), executionNss));
+        ownedCursors.emplace_back(opCtx, std::move(cursor), executionNss);
     }
 
     // The merging pipeline is just a union of the results from each of the shards involved on the

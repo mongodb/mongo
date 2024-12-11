@@ -317,14 +317,13 @@ std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::
             str::stream() << kStageName << " must take a nested object but found: " << spec,
             spec.type() == BSONType::Object);
 
-    std::vector<LiteParsedPipeline> liteParsedPipelines;
-
     auto parsedSpec = RankFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
 
     // Ensure that all pipelines are valid ranked selection pipelines.
+    std::vector<LiteParsedPipeline> liteParsedPipelines;
     for (const auto& elem : inputPipesObj) {
-        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, getPipeline(elem)));
+        liteParsedPipelines.emplace_back(nss, getPipeline(elem));
     }
 
     return std::make_unique<DocumentSourceRankFusion::LiteParsed>(

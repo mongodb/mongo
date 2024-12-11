@@ -120,13 +120,12 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
             str::stream() << kStageName << " must take a nested object but found: " << spec,
             spec.type() == BSONType::Object);
 
-    std::vector<LiteParsedPipeline> liteParsedPipelines;
-
     auto parsedSpec = ScoreFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
 
     // Ensure that all pipelines are valid scored selection pipelines.
+    std::vector<LiteParsedPipeline> liteParsedPipelines;
     for (const auto& input : parsedSpec.getInputs()) {
-        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, input.getPipeline()));
+        liteParsedPipelines.emplace_back(nss, input.getPipeline());
     }
 
     return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(spec.fieldName(),

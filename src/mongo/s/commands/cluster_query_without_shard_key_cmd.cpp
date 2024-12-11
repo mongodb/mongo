@@ -459,7 +459,6 @@ public:
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry);
 
-            BSONObj targetDoc;
             Response res;
             bool wasStatementExecuted = false;
             std::vector<RemoteCursor> remoteCursors;
@@ -494,8 +493,8 @@ public:
                     continue;
                 }
 
-                remoteCursors.emplace_back(RemoteCursor(
-                    response.shardId.toString(), *response.shardHostAndPort, std::move(cursor)));
+                remoteCursors.emplace_back(
+                    response.shardId.toString(), *response.shardHostAndPort, std::move(cursor));
             }
 
             // For retryable writes, if the statement had already been executed successfully on a
@@ -604,8 +603,8 @@ public:
             while (!ars.done()) {
                 auto response = ars.next();
                 uassertStatusOK(response.swResponse);
-                responses.push_back(response);
                 shardId = response.shardId;
+                responses.push_back(std::move(response));
             }
 
             const auto millisElapsed = timer.millis();

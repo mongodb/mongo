@@ -150,7 +150,7 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
     std::vector<LiteParsedPipeline> liteParsedPipelines;
 
     for (auto&& rawPipeline : extractRawPipelines(spec)) {
-        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, rawPipeline.second));
+        liteParsedPipelines.emplace_back(nss, rawPipeline.second);
     }
 
     return std::make_unique<DocumentSourceFacet::LiteParsed>(spec.fieldName(),
