@@ -18,6 +18,18 @@ mongo_cc_library(
         "stitch_support.h",
         "//src/mongo/embedded:api_common.h",
     ],
+    additional_linker_inputs = select({
+        "@platforms//os:linux": [
+            ":libstitch_support.version_script.lds",
+        ],
+        "@platforms//os:macos": [
+            ":libstitch_support.exported_symbols_list.lds",
+        ],
+        "@platforms//os:windows": [
+            ":stitch_support.def",
+        ],
+        "//conditions:default": [],
+    }),
     copts = [
         "-Isrc/mongo/embedded",
     ],
@@ -26,6 +38,18 @@ mongo_cc_library(
     ] + select({
         "//bazel/config:linkstatic_enabled": [
             "STITCH_SUPPORT_STATIC",
+        ],
+        "//conditions:default": [],
+    }),
+    non_transitive_dyn_linkopts = select({
+        "@platforms//os:linux": [
+            "-Wl,--version-script=$(location :libstitch_support.version_script.lds)",
+        ],
+        "@platforms//os:macos": [
+            "-Wl,-exported_symbols_list,$(location :libstitch_support.exported_symbols_list.lds)",
+        ],
+        "@platforms//os:windows": [
+            "/DEF:$(location :stitch_support.def)",
         ],
         "//conditions:default": [],
     }),
