@@ -43,6 +43,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -241,8 +242,14 @@ void SingleServerDiscoveryMonitor::_doRemoteCommand() {
     }();
 
     if (!swCbHandle.isOK()) {
-        _onHelloFailure(swCbHandle.getStatus(), BSONObj());
-        uasserted(4615612, swCbHandle.getStatus().toString());
+        const auto& error = swCbHandle.getStatus();
+        _onHelloFailure(error, BSONObj());
+        // The attempt to schedule a remote command on the executor is only expected to fail during
+        // shutdown. Otherwise, terminating the process to not risk the cluster availability is the
+        // best action plan. Note that we cannot throw from here (i.e. a scheduled task).
+        invariant(ErrorCodes::isShutdownError(error.code()),
+                  "Encountered non-shutdown error while scheduling remote command");
+        return;
     }
 
     _helloOutstanding = true;
