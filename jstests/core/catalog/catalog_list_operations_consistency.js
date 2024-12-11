@@ -90,6 +90,11 @@ assert.commandWorked(
     db.runCommand({collMod: "timeseries_complex", timeseriesBucketsMayHaveMixedSchemaData: true}));
 assertCatalogListOperationsConsistencyForCollection(db.timeseries_complex);
 
+// TODO(SERVER-68439): Remove once the view and buckets are atomically created by DDLs.
+createViewAndCheckConsistency(
+    db, "timeseries_no_buckets", "system.buckets.timeseries_no_buckets", []);
+db.timeseries_no_buckets.drop();
+
 /**
  * Index test cases.
  */

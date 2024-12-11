@@ -135,22 +135,35 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
         assertNoUnrecognizedFields(
             tsUnrecognized, "`$listCatalog` timeseries entry", "listCollections", listCatalogEntry);
 
-        // For time series collections, the options are those of the buckets collection.
-        // `listCollections` only lists the options provided by the user to `createCollection`.
-        // Here, where we explicitly list the options that MongoDB internally sets in the
-        // bucket collection, and assume the rest are the user-provided options.
-        const tsBucketsCollection = listCatalogMap.get(tsViewOn);
-        const {
-            uuid: _md1,
-            validator: _md2,
-            clusteredIndex: _md3,
-            ...tsBucketsCollectionOptionsRest
-        } = tsBucketsCollection.md.options;
+        const tsOptions = (() => {
+            const tsBucketsCollection = listCatalogMap.get(tsViewOn);
+            // TODO(SERVER-68439): Remove once the view and buckets are atomically created by DDLs.
+            if (tsBucketsCollection === undefined) {
+                // Concurrent operations such as create+drop can leave behind a timeseries view
+                // with no corresponding buckets collection.
+                return {};
+            }
+
+            // For time series collections, the options are those of the buckets collection.
+            // However, note that `listCollections` only lists the options provided by the user to
+            // `createCollection`, according to the following list:
+            // https://github.com/10gen/mongo/blob/4cb49af83f4885f648c2ac5779f89a607e685da1/src/mongo/db/timeseries/timeseries_constants.h#L86-L92
+            const {
+                // This UUID identifies the buckets collection only. The view namespace has no UUID.
+                uuid: _md1,
+                // Those options are internally added by MongoDB to the buckets collection for
+                // performance and safety, and are hidden for the view namespace in listCollections.
+                validator: _md2,
+                clusteredIndex: _md3,
+                ...tsBucketsCollectionOptionsRest
+            } = tsBucketsCollection.md.options;
+            return tsBucketsCollectionOptionsRest;
+        })();
 
         return {
             name: nsName,
             type: nsType,
-            options: tsBucketsCollectionOptionsRest,
+            options: tsOptions,
             info: {readOnly: isDbReadOnly},
         };
     } else {
