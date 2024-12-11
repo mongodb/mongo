@@ -705,7 +705,7 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-unittests install-unittests-debug
-          bazel_build_tags: --bazel-build-tag=mongo_unittest
+          bazel_build_tags: --bazel-build-tag=mongo_unittest --bazel-build-tag=mongo_binary_unittest
           compiling_for_test: true
 
   - name: compile_libraries_for_unittests
@@ -736,7 +736,7 @@ tasks:
           targets: install-first-quarter-unittests install-first-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_first_group --bazel-build-tag=mongo_library
+          bazel_build_tags: --bazel-build-tag=mongo_unittest_first_group --bazel-build-tag=mongo_binary_unittest --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -761,7 +761,7 @@ tasks:
           targets: install-second-quarter-unittests install-second-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_second_group --bazel-build-tag=mongo_library --bazel-build-tag=stitch_support_test
+          bazel_build_tags: --bazel-build-tag=mongo_unittest_second_group --bazel-build-tag=mongo_binary_unittest --bazel-build-tag=stitch_support_test --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -786,7 +786,7 @@ tasks:
           targets: install-third-quarter-unittests install-third-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_third_group --bazel-build-tag=mongo_library
+          bazel_build_tags: --bazel-build-tag=mongo_unittest_third_group --bazel-build-tag=mongo_binary_unittest --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -811,7 +811,7 @@ tasks:
           targets: install-fourth-quarter-unittests install-fourth-quarter-unittests-debug
           compiling_for_test: true
           task_compile_flags: ${unittest_compile_flags}
-          bazel_build_tags: --bazel-build-tag=mongo_unittest_fourth_group --bazel-build-tag=mongo_library
+          bazel_build_tags: --bazel-build-tag=mongo_unittest_fourth_group --bazel-build-tag=mongo_binary_unittest --bazel-build-tag=mongo_library
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
