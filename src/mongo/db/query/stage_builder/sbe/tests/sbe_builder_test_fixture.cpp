@@ -181,4 +181,46 @@ void GoldenSbeStageBuilderTestFixture::insertDocuments(const std::vector<BSONObj
     }
 }
 
+void GoldenSbeExprBuilderTestFixture::setUp() {
+    SbeStageBuilderTestFixture::setUp();
+    _expCtx = new ExpressionContextForTest();
+    _state.emplace(operationContext(),
+                   _env,
+                   _planStageData.get(),
+                   _variables,
+                   nullptr /* yieldPolicy */,
+                   &_slotIdGenerator,
+                   &_frameIdGenerator,
+                   &_spoolIdGenerator,
+                   &_inListsMap,
+                   &_collatorsMap,
+                   &_sortSpecMap,
+                   _expCtx,
+                   false /* needsMerge */,
+                   false /* allowDiskUse */
+    );
+}
+
+void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,
+                                              sbe::value::TypeTags expectedTag,
+                                              sbe::value::Value expectedVal,
+                                              StringData test) {
+    auto sbeEExpr = sbExpr.lower(*_state);
+    // Print the stage explain output and verify.
+    _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    _gctx->outStream() << test << std::endl;
+    _gctx->outStream() << sbe::DebugPrinter().print(sbeEExpr->debugPrint());
+    _gctx->outStream() << std::endl;
+
+    sbe::CompileCtx _compileCtx(std::make_unique<sbe::RuntimeEnvironment>());
+    sbe::vm::CodeFragment code = sbeEExpr->compileDirect(_env.ctx);
+    sbe::vm::ByteCode vm;
+    auto [owned, resultsTag, resultsVal] = vm.run(&code);
+    sbe::value::ValueGuard resultGuard{owned, resultsTag, resultsVal};
+
+
+    ASSERT_TRUE(PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
+        << "for test: " << test << " expected: " << std::make_pair(expectedTag, expectedVal)
+        << " but got: " << std::make_pair(resultsTag, resultsVal);
+}
 }  // namespace mongo

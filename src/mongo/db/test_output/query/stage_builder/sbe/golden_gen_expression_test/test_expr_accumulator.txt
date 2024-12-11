@@ -1,0 +1,68 @@
+# Golden test output of GoldenGenExpressionTest/TestExprAccumulator
+ExpressionFromAccumulator<AccumulatorAvg>
+(avgOfArray(newArray(getField(s1, "bar"), 9.25L)) ?: null) 
+# Golden test output of GoldenGenExpressionTest/TestExprAccumulator
+ExpressionFromAccumulator<AccumulatorMax>
+
+    let [
+        l4.0 = getField(s1, "arr") 
+    ] 
+    in 
+        if (typeMatch(l4.0, 1088) ?: true) 
+        then null 
+        else 
+            if isArray(l4.0) 
+            then (maxOfArray(move(l4.0)) ?: null) 
+            else move(l4.0) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprAccumulator
+ExpressionFromAccumulator<AccumulatorMin>
+(minOfArray(newArray(getField(s1, "bar"), 9.25L)) ?: null) 
+# Golden test output of GoldenGenExpressionTest/TestExprAccumulator
+ExpressionFromAccumulator<AccumulatorStdDevPop>
+
+    let [
+        l8.0 = getField(s1, "arr") 
+    ] 
+    in 
+        if (typeMatch(l8.0, 1088) ?: true) 
+        then null 
+        else 
+            if isArray(l8.0) 
+            then (stdDevPop(move(l8.0)) ?: null) 
+            else 
+                if isNumber(move(l8.0)) 
+                then 0 
+                else null 
+
+# Golden test output of GoldenGenExpressionTest/TestExprAccumulator
+ExpressionFromAccumulator<AccumulatorStdDevSamp>
+
+    let [
+        l12.0 = 
+            let [
+                l13.0 = getField(s1, "arr") 
+            ] 
+            in 
+                if (typeMatch(l13.0, 1088) ?: true) 
+                then null 
+                else 
+                    if isArray(l13.0) 
+                    then (stdDevSamp(move(l13.0)) ?: null) 
+                    else null 
+    ] 
+    in 
+        if (typeMatch(l12.0, 1088) ?: true) 
+        then null 
+        else 
+            if isNumber(l12.0) 
+            then 
+                if ((4 != trunc(4)) ?: true) 
+                then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
+                else trunc(move(l12.0), 4) 
+            
+            else fail(5155300, "$trunc only supports numeric types") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprAccumulator
+ExpressionFromAccumulator<AccumulatorSum>
+(sumOfArray(newArray(getField(s1, "bar"), 9.25L)) ?: null) 

@@ -1,0 +1,133 @@
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionConcatArrays
+
+    let [
+        l5.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        let [
+            l6.0 = getField(s1, "arr1") 
+        ] 
+        in 
+            let [
+                l7.0 = concatArrays(l6.0, [2.5L, "str"], l5.0) 
+            ] 
+            in 
+                if exists(l7.0) 
+                then makeOwn(move(l7.0)) 
+                else 
+                    if ((typeMatch(move(l6.0), 1088) ?: true) || (typeMatch(move(l5.0), 1088) ?: true)) 
+                    then null 
+                    else fail(7158000, "$concatArrays only supports arrays") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionSetDifference
+
+    let [
+        l10.0 = getField(s1, "arr3") 
+    ] 
+    in 
+        let [
+            l11.0 = getField(s1, "arr2") 
+        ] 
+        in 
+            if ((typeMatch(l11.0, 1088) ?: true) || (typeMatch(l10.0, 1088) ?: true)) 
+            then null 
+            else 
+                if (!(isArray(l11.0)) || !(isArray(l10.0))) 
+                then fail(7158101, "All operands of $setDifference must be arrays.") 
+                else setDifference(move(l11.0), move(l10.0)) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionSetEquals
+
+    let [
+        l14.0 = getField(s1, "arr3") 
+    ] 
+    in 
+        let [
+            l15.0 = getField(s1, "arr2") 
+        ] 
+        in 
+            if ((!(isArray(l15.0)) || !(isArray(l14.0))) ?: true) 
+            then fail(7158100, "All operands of $setEquals must be arrays.") 
+            else setEquals(move(l15.0), move(l14.0)) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionSetIntersection
+
+    let [
+        l18.0 = getField(s1, "arr3") 
+    ] 
+    in 
+        let [
+            l19.0 = getField(s1, "arr2") 
+        ] 
+        in 
+            if ((typeMatch(l19.0, 1088) ?: true) || (typeMatch(l18.0, 1088) ?: true)) 
+            then null 
+            else 
+                if (!(isArray(l19.0)) || !(isArray(l18.0))) 
+                then fail(7158101, "All operands of $setIntersection must be arrays.") 
+                else setIntersection(move(l19.0), move(l18.0)) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionSetIsSubset
+
+    let [
+        l22.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if (!(isArray(l22.0)) ?: true) 
+        then fail(7158100, "All operands of $setIsSubset must be arrays.") 
+        else setIsSubset([2.5L, "str"], move(l22.0)) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionSetUnion
+
+    let [
+        l25.0 = getField(s1, "arr3") 
+    ] 
+    in 
+        let [
+            l26.0 = getField(s1, "arr2") 
+        ] 
+        in 
+            if ((typeMatch(l26.0, 1088) ?: true) || (typeMatch(l25.0, 1088) ?: true)) 
+            then null 
+            else 
+                if (!(isArray(l26.0)) || !(isArray(l25.0))) 
+                then fail(7158101, "All operands of $setUnion must be arrays.") 
+                else setUnion(move(l26.0), move(l25.0)) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionReverseArray
+
+    let [
+        l28.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if (typeMatch(l28.0, 1088) ?: true) 
+        then null 
+        else 
+            if isArray(l28.0) 
+            then reverseArray(move(l28.0)) 
+            else fail(7158002, "$reverseArray argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionSortArray
+
+    let [
+        l30.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if (typeMatch(l30.0, 1088) ?: true) 
+        then null 
+        else 
+            if isArray(l30.0) 
+            then sortArray(move(l30.0), {"" : -1L}) 
+            else fail(7158001, "$sortArray input argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionIsArray
+(isArray(getField(s1, "arr2")) ?: false) 
