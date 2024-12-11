@@ -45,32 +45,28 @@ function waitForFsyncLockToWaitForLock(st, numThreads) {
     });
 }
 
-function runTxn(mongosHost, dbName, collName) {
+let runTxn = async function(mongosHost, dbName, collName) {
+    const {withTxnAndAutoRetryOnMongos} =
+        await import("jstests/libs/auto_retry_transaction_in_sharding.js");
+
     const mongosConn = new Mongo(mongosHost);
     jsTest.log("Starting a cross-shard transaction with shard0 and shard1 as the participants " +
                "and shard0 as the coordinator shard");
-    const lsid = {id: UUID()};
-    const txnNumber = NumberLong(35);
-    assert.commandWorked(mongosConn.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{x: -1}],
-        lsid,
-        txnNumber,
-        startTransaction: true,
-        autocommit: false,
-    }));
-    assert.commandWorked(mongosConn.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{x: 1}],
-        lsid,
-        txnNumber,
-        autocommit: false,
-    }));
-    jsTest.log("Committing the cross-shard transaction");
-    assert.commandWorked(
-        mongosConn.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
+
+    let session = mongosConn.startSession();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.commandWorked(session.getDatabase(dbName).runCommand({
+            insert: collName,
+            documents: [{x: -1}],
+        }));
+
+        assert.commandWorked(session.getDatabase(dbName).runCommand({
+            insert: collName,
+            documents: [{x: 1}],
+        }));
+    });
     jsTest.log("Committed the cross-shard transaction");
-}
+};
 
 function runFsyncLock(primaryHost) {
     let primaryConn = new Mongo(primaryHost);

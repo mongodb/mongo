@@ -13,6 +13,7 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {
     moveChunkParallel,
     moveChunkStepNames,
@@ -259,35 +260,9 @@ test(
     "config.transactions entries for single-shard transactions which commit during transferMods phase are successfully migrated as dead-end sentinels",
     () => {
         const shardKeyValueOnShard0 = -100;
-        const lsid = {id: UUID()};
-        const txnNumber = 35;
 
         // Insert a single document on shard0.
         assert.commandWorked(mongos0TestColl.insert({x: shardKeyValueOnShard0}));
-
-        const cmdToRunInTransaction = {
-            update: collName,
-            updates: [
-                // Add a new field.
-                {q: {x: shardKeyValueOnShard0}, u: {$set: {a: 4}}},
-            ],
-            ordered: false,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            startTransaction: true,
-            autocommit: false
-        };
-
-        const fakeRetryCmd = {
-            update: collName,
-            updates: [
-                // Add a new field.
-                {q: {x: shardKeyValueOnShard0}, u: {$set: {a: 4}}},
-            ],
-            ordered: false,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber)
-        };
 
         pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -297,17 +272,22 @@ test(
         waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
         // Update a document being migrated.
-        const result = assert.commandWorked(mongos0TestDB.runCommand(cmdToRunInTransaction));
-        assert.eq(result.n, 1);
-        assert.eq(result.nModified, 1);
+        let session = st.s.startSession();
+        withTxnAndAutoRetryOnMongos(session, () => {
+            let sessionDB = session.getDatabase(dbName);
+            const cmdToRunInTransaction = {
+                update: collName,
+                updates: [
+                    // Add a new field.
+                    {q: {x: shardKeyValueOnShard0}, u: {$set: {a: 4}}},
+                ],
+                ordered: false,
+            };
 
-        assert.commandWorked(mongos0TestDB.adminCommand({
-            commitTransaction: 1,
-            writeConcern: {w: "majority"},
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }));
+            const result = assert.commandWorked(sessionDB.runCommand(cmdToRunInTransaction));
+            assert.eq(result.n, 1);
+            assert.eq(result.nModified, 1);
+        });
 
         // Check that the update from the transaction succeeded.
         const resultingDoc = mongos0TestColl.findOne({x: shardKeyValueOnShard0});
@@ -322,6 +302,16 @@ test(
         st.printShardingStatus();
         // Retry the command. This should retry against shard1, which should throw
         // IncompleteTransactionHistory.
+        const fakeRetryCmd = {
+            update: collName,
+            updates: [
+                // Add a new field.
+                {q: {x: shardKeyValueOnShard0}, u: {$set: {a: 4}}},
+            ],
+            ordered: false,
+            lsid: session.getSessionId(),
+            txnNumber: NumberLong(session.getTxnNumber_forTesting())
+        };
         assert.commandFailedWithCode(mongos0TestDB.runCommand(fakeRetryCmd),
                                      ErrorCodes.IncompleteTransactionHistory);
     });

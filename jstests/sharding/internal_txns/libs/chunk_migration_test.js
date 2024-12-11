@@ -11,9 +11,9 @@
  * Note that this fixture runs each runTest() against its own collection so it is illegal to make
  * more than one runTest() call.
  */
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {runCommandDuringTransferMods} from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {runTxnRetryOnTransientError} from "jstests/sharding/internal_txns/libs/fixture_helpers.js";
 import {
     getTxnEntriesForSession,
     makeAbortTransactionCmdObj,
@@ -358,7 +358,7 @@ export function InternalTransactionChunkMigrationTest() {
         testCase.setUpFunc();
 
         const lsid = getTransactionSessionId(txnType, testCase);
-        runTxnRetryOnTransientError(() => {
+        withRetryOnTransientTxnError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
             for (let i = 0; i < testCase.commands.length; i++) {
@@ -399,7 +399,7 @@ export function InternalTransactionChunkMigrationTest() {
         const lsid = getTransactionSessionId(txnType, testCase);
         // Give the session a different txnUUID to simulate a retry from a different mongos.
         lsid.txnUUID = UUID();
-        runTxnRetryOnTransientError(() => {
+        withRetryOnTransientTxnError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
             for (let i = 0; i < testCase.commands.length; i++) {

@@ -4,6 +4,9 @@
  *
  * @tags: [requires_fcv_71]
  */
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2, rs: {nodes: 1}});
@@ -34,13 +37,18 @@ function runAndVerifyCommand(testCase) {
     testColl.insert(testCase.docToInsert);
 
     // Run and commit transaction.
-    let res = assert.commandWorked(mongosConn.runCommand(testCase.cmdObj));
-    assert.commandWorked(mongosConn.adminCommand({
-        commitTransaction: 1,
-        lsid: testCase.cmdObj.lsid,
-        txnNumber: testCase.cmdObj.txnNumber,
-        autocommit: false
-    }));
+    let res;
+    let txnNumber = 1;
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        testCase.cmdObj.txnNumber = NumberLong(txnNum);
+        res = assert.commandWorked(mongosConn.runCommand(testCase.cmdObj));
+        assert.commandWorked(mongosConn.adminCommand({
+            commitTransaction: 1,
+            lsid: testCase.cmdObj.lsid,
+            txnNumber: testCase.cmdObj.txnNumber,
+            autocommit: false
+        }));
+    });
 
     switch (Object.keys(testCase.cmdObj.writeCmd)[0]) {
         case "update":

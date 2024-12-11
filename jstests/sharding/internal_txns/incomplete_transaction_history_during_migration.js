@@ -4,6 +4,7 @@
  *
  * @tags: [uses_transactions, requires_persistence]
  */
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test involves writing directly to the config.transactions collection which is not allowed
@@ -34,26 +35,30 @@ const originalChildLsid = {
     txnNumber: parentTxnNumber,
     txnUUID: UUID()
 };
-const childTxnNumber = NumberLong(1);
+let childTxnNumber = NumberLong(1);
 
 const updateCmdObj = {
     update: collName,
     updates: [{q: {x: 1}, u: {$set: {y: 1}}}],
     stmtId: NumberInt(0),
 };
-const res0 = assert.commandWorked(testDB.runCommand(Object.assign({}, updateCmdObj, {
-    lsid: originalChildLsid,
-    txnNumber: childTxnNumber,
-    autocommit: false,
-    startTransaction: true
-})));
-assert.eq(res0.nModified, 1, res0);
-assert.commandWorked(st.s.adminCommand({
-    commitTransaction: 1,
-    lsid: originalChildLsid,
-    txnNumber: childTxnNumber,
-    autocommit: false,
-}));
+
+withRetryOnTransientTxnError(() => {
+    childTxnNumber++;
+    const res0 = assert.commandWorked(testDB.runCommand(Object.assign({}, updateCmdObj, {
+        lsid: originalChildLsid,
+        txnNumber: NumberLong(childTxnNumber),
+        autocommit: false,
+        startTransaction: true
+    })));
+    assert.eq(res0.nModified, 1, res0);
+    assert.commandWorked(st.s.adminCommand({
+        commitTransaction: 1,
+        lsid: originalChildLsid,
+        txnNumber: NumberLong(childTxnNumber),
+        autocommit: false,
+    }));
+});
 
 // Manually update the config.transactions document for the retryable internal transaction to point
 // to an invalid op time.
@@ -75,9 +80,12 @@ const retryChildLsid = {
     txnNumber: parentTxnNumber,
     txnUUID: UUID()
 };
+
+// childTxnNumber is incremented each time the transaction is executed in case of retries. The last
+// actual executed txnNumber will be one less than the current value.
 assert.commandFailedWithCode(testDB.runCommand(Object.assign({}, updateCmdObj, {
     lsid: retryChildLsid,
-    txnNumber: childTxnNumber,
+    txnNumber: NumberLong(childTxnNumber),
     autocommit: false,
     startTransaction: true
 })),

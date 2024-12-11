@@ -3,6 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
@@ -93,12 +94,11 @@ const expectedSampledQueryDocs = [];
     };
 
     // Use a transaction, otherwise updateOp1 would get routed to all shards.
-    const lsid = {id: UUID()};
-    const txnNumber = NumberLong(1);
-    assert.commandWorked(mongosDB.runCommand(Object.assign(
-        {}, originalCmdObj0, {lsid, txnNumber, startTransaction: true, autocommit: false})));
-    assert.commandWorked(
-        mongosDB.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
+    const session = st.s.startSession();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        const sessionDB = session.getDatabase(dbName);
+        assert.commandWorked(sessionDB.runCommand(originalCmdObj0));
+    });
     assert.neq(mongosColl.findOne({x: 1, y: 10, z: [10, 0, 10]}), null);
     assert.neq(mongosColl.findOne({x: 2, y: 20, z: [2], w: 200}), null);
     assert.neq(mongosColl.findOne({x: 1002, y: 20, z: [2], w: 200}), null);
@@ -184,12 +184,11 @@ const expectedSampledQueryDocs = [];
     const originalCmdObj = {delete: collName, deletes: [deleteOp0, deleteOp1]};
 
     // Use a transaction, otherwise deleteOp1 would get routed to all shards.
-    const lsid = {id: UUID()};
-    const txnNumber = NumberLong(1);
-    assert.commandWorked(mongosDB.runCommand(Object.assign(
-        {}, originalCmdObj, {lsid, txnNumber, startTransaction: true, autocommit: false})));
-    assert.commandWorked(
-        mongosDB.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
+    const session = st.s.startSession();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        const sessionDB = session.getDatabase(dbName);
+        assert.commandWorked(sessionDB.runCommand(originalCmdObj));
+    });
     assert.eq(mongosColl.findOne({x: 3}), null);
     assert.eq(mongosColl.findOne({x: 4}), null);
 

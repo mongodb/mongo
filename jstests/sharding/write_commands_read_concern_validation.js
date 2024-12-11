@@ -5,6 +5,9 @@
  * - Throw InvalidOptions if a client specifies readConcern in all other cases.
  * @tags: [requires_fcv_51, uses_transactions, uses_multi_shard_transaction]
  */
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -43,50 +46,57 @@ function testWriteCommandOutsideTransaction(conn, cmdObj, readConcern, shouldByp
 function testWriteCommandInsideTransactionFirstCommand(conn, cmdObj, readConcern) {
     const lsid = {id: UUID()};
     const txnNumber = NumberLong(1);
-    const cmdObjWithReadConcern = Object.assign({}, cmdObj, {
-        readConcern: readConcern,
-        lsid: lsid,
-        txnNumber: txnNumber,
-        startTransaction: true,
-        autocommit: false
-    });
 
-    assert.commandWorked(conn.getDB(kDbName).runCommand(cmdObjWithReadConcern));
-    assert.commandWorked(conn.getDB(kDbName).adminCommand({
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: txnNumber,
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }));
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        const cmdObjWithReadConcern = Object.assign({}, cmdObj, {
+            readConcern: readConcern,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            startTransaction: true,
+            autocommit: false
+        });
+
+        assert.commandWorked(conn.getDB(kDbName).runCommand(cmdObjWithReadConcern));
+        assert.commandWorked(conn.getDB(kDbName).adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false,
+            writeConcern: {w: "majority"}
+        }));
+    });
 }
 
 function testWriteCommandInsideTransactionNotFirstCommand(conn, cmdObj, readConcern, kCollName) {
     const lsid = {id: UUID()};
     const txnNumber = NumberLong(1);
 
-    assert.commandWorked(conn.getDB(kDbName).runCommand({
-        findAndModify: kCollName,
-        query: {x: -10},
-        update: {$set: {z: -10}},
-        lsid: lsid,
-        txnNumber: txnNumber,
-        startTransaction: true,
-        autocommit: false
-    }));
-    const cmdObjWithReadConcern = Object.assign(
-        {},
-        cmdObj,
-        {readConcern: readConcern, lsid: lsid, txnNumber: txnNumber, autocommit: false});
-    const res = conn.getDB(kDbName).runCommand(cmdObjWithReadConcern);
-    assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-    assert.commandWorked(conn.getDB(kDbName).adminCommand({
-        abortTransaction: 1,
-        lsid: lsid,
-        txnNumber: txnNumber,
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }));
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        assert.commandWorked(conn.getDB(kDbName).runCommand({
+            findAndModify: kCollName,
+            query: {x: -10},
+            update: {$set: {z: -10}},
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            startTransaction: true,
+            autocommit: false
+        }));
+        const cmdObjWithReadConcern = Object.assign({}, cmdObj, {
+            readConcern: readConcern,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false
+        });
+        const res = conn.getDB(kDbName).runCommand(cmdObjWithReadConcern);
+        assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
+        assert.commandWorked(conn.getDB(kDbName).adminCommand({
+            abortTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false,
+            writeConcern: {w: "majority"}
+        }));
+    });
 }
 
 function runTest(conn, cmdObj, mongosConn, kCollName) {

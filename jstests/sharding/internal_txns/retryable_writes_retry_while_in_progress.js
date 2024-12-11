@@ -4,6 +4,9 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     makeCommitTransactionCmdObj,
@@ -33,35 +36,37 @@ function runTest({prepareBeforeRetry}) {
     const docToInsert = {x: 1};
     const stmtId = 1;
 
-    // Initialize initial and retry commands.
     const childLsid = {id: parentLsid.id, txnNumber: NumberLong(parentTxnNumber), txnUUID: UUID()};
     const childTxnNumber = 0;
-    const originalWriteCmdObj = {
-        insert: kCollName,
-        documents: [docToInsert],
-        lsid: childLsid,
-        txnNumber: NumberLong(childTxnNumber),
-        startTransaction: true,
-        autocommit: false,
-        stmtId: NumberInt(stmtId),
-    };
-    const commitCmdObj = makeCommitTransactionCmdObj(childLsid, childTxnNumber);
-    const retryWriteCmdObj = Object.assign({}, originalWriteCmdObj);
 
     // Start a retryable internal transaction.
-    assert.commandWorked(testDB.runCommand(originalWriteCmdObj));
-    if (prepareBeforeRetry) {
-        const prepareCmdObj = makePrepareTransactionCmdObj(childLsid, childTxnNumber);
-        const prepareTxnRes = assert.commandWorked(shard0Primary.adminCommand(prepareCmdObj));
-        commitCmdObj.commitTimestamp = prepareTxnRes.prepareTimestamp;
-    }
+    withRetryOnTransientTxnErrorIncrementTxnNum(childTxnNumber, (txnNum) => {
+        const originalWriteCmdObj = {
+            insert: kCollName,
+            documents: [docToInsert],
+            lsid: childLsid,
+            txnNumber: NumberLong(txnNum),
+            startTransaction: true,
+            autocommit: false,
+            stmtId: NumberInt(stmtId),
+        };
+        const commitCmdObj = makeCommitTransactionCmdObj(childLsid, txnNum);
+        const retryWriteCmdObj = Object.assign({}, originalWriteCmdObj);
 
-    // Retry should fail right away.
-    assert.commandFailedWithCode(testDB.runCommand(retryWriteCmdObj), 50911);
+        assert.commandWorked(testDB.runCommand(originalWriteCmdObj));
+        if (prepareBeforeRetry) {
+            const prepareCmdObj = makePrepareTransactionCmdObj(childLsid, txnNum);
+            const prepareTxnRes = assert.commandWorked(shard0Primary.adminCommand(prepareCmdObj));
+            commitCmdObj.commitTimestamp = prepareTxnRes.prepareTimestamp;
+        }
 
-    // Verify that the transaction can be committed, and that the write statement executed exactly
-    // once despite the retry.
-    assert.commandWorked(testDB.adminCommand(commitCmdObj));
+        // Retry should fail right away.
+        assert.commandFailedWithCode(testDB.runCommand(retryWriteCmdObj), 50911);
+
+        // Verify that the transaction can be committed, and that the write statement executed
+        // exactly once despite the retry.
+        assert.commandWorked(testDB.adminCommand(commitCmdObj));
+    });
     assert.eq(testColl.count({x: 1}), 1);
 
     assert.commandWorked(testColl.remove({}));

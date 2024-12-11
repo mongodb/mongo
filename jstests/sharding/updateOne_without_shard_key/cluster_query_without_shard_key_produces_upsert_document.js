@@ -10,6 +10,9 @@
  * ]
  */
 
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     WriteWithoutShardKeyTestUtil
@@ -215,21 +218,25 @@ const testCases = [
 testCases.forEach(testCase => {
     jsTest.log(testCase.logMessage + '\n' + tojson(testCase.cmdObj));
 
-    if (testCase.errorCode) {
-        assert.commandFailedWithCode(st.getDB(dbName).runCommand(testCase.cmdObj),
-                                     testCase.errorCode);
-    } else {
-        const res = assert.commandWorked(st.getDB(dbName).runCommand(testCase.cmdObj));
-        assert.eq(res.upsertRequired, testCase.upsertRequired, res);
-        testCase.expectedMods.forEach(mod => {
-            let field = Object.keys(mod)[0];
-            assert.eq(res.targetDoc[field], mod[field]);
-        });
+    let txnNumber = 0;
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        testCase.cmdObj.txnNumber = NumberLong(txnNum);
+        if (testCase.errorCode) {
+            assert.commandFailedWithCode(st.getDB(dbName).runCommand(testCase.cmdObj),
+                                         testCase.errorCode);
+        } else {
+            const res = assert.commandWorked(st.getDB(dbName).runCommand(testCase.cmdObj));
+            assert.eq(res.upsertRequired, testCase.upsertRequired, res);
+            testCase.expectedMods.forEach(mod => {
+                let field = Object.keys(mod)[0];
+                assert.eq(res.targetDoc[field], mod[field]);
+            });
 
-        if (!testCase.upsertRequired) {
-            assert.eq(null, res.targetDoc, res.targetDoc);
+            if (!testCase.upsertRequired) {
+                assert.eq(null, res.targetDoc, res.targetDoc);
+            }
         }
-    }
+    });
 });
 
 st.stop();

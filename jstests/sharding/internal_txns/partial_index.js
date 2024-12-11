@@ -4,6 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -136,21 +137,24 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     let childTxnNumber = 0;
 
     function runRetryableInternalTransaction(txnNumber) {
-        assert.commandWorked(mongosTestDB.runCommand({
-            insert: kCollName,
-            documents: [{x: 1}],
-            lsid: childLsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(stmtId++),
-            autocommit: false,
-            startTransaction: true
-        }));
-        assert.commandWorked(mongosTestDB.adminCommand({
-            commitTransaction: 1,
-            lsid: childLsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        }));
+        withRetryOnTransientTxnError(() => {
+            txnNumber++;
+            assert.commandWorked(mongosTestDB.runCommand({
+                insert: kCollName,
+                documents: [{x: 1}],
+                lsid: childLsid,
+                txnNumber: NumberLong(txnNumber),
+                stmtId: NumberInt(stmtId++),
+                autocommit: false,
+                startTransaction: true
+            }));
+            assert.commandWorked(mongosTestDB.adminCommand({
+                commitTransaction: 1,
+                lsid: childLsid,
+                txnNumber: NumberLong(txnNumber),
+                autocommit: false
+            }));
+        });
     }
 
     runRetryableInternalTransaction(childTxnNumber);
@@ -196,46 +200,58 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     assert(res.errmsg.includes("Please create an index directly "), tojson(res));
 
     // User transactions read from the partial index, so they fail.
-    assert.commandFailedWithCode(indexConn.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(11),
-        startTransaction: true,
-        autocommit: false
-    }),
-                                 ErrorCodes.BadValue);
+    let txnNum = 11;
+    withRetryOnTransientTxnError(() => {
+        txnNum++;
+        assert.commandFailedWithCode(indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: {id: UUID()},
+            txnNumber: NumberLong(txnNum),
+            startTransaction: true,
+            autocommit: false
+        }),
+                                     ErrorCodes.BadValue);
+    });
 
     // Non retryable internal transactions do not read from or update the partial index, so they can
     // succeed without the index existing.
     let nonRetryableTxnSession = {id: UUID(), txnUUID: UUID()};
-    assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: nonRetryableTxnSession,
-        txnNumber: NumberLong(11),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.commandWorked(indexConn.adminCommand({
-        commitTransaction: 1,
-        lsid: nonRetryableTxnSession,
-        txnNumber: NumberLong(11),
-        autocommit: false
-    }));
+    txnNum = 11;
+    withRetryOnTransientTxnError(() => {
+        txnNum++;
+        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: nonRetryableTxnSession,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false
+        }));
+        assert.commandWorked(indexConn.adminCommand({
+            commitTransaction: 1,
+            lsid: nonRetryableTxnSession,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false
+        }));
+    });
 
     // Retryable transactions read from the partial index, so they fail.
-    assert.commandFailedWithCode(indexConn.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: {id: UUID(), txnUUID: UUID(), txnNumber: NumberLong(2)},
-        txnNumber: NumberLong(11),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }),
-                                 ErrorCodes.BadValue);
+    txnNum = 11;
+    withRetryOnTransientTxnError(() => {
+        txnNum++;
+        assert.commandFailedWithCode(indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: {id: UUID(), txnUUID: UUID(), txnNumber: NumberLong(2)},
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false
+        }),
+                                     ErrorCodes.BadValue);
+    });
 
     // Recreating the partial index requires the exact options used internally, but in any order.
     assert.commandFailedWithCode(indexConn.getDB("config").runCommand({
@@ -262,54 +278,66 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         {insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}, txnNumber: NumberLong(11)}));
 
     let userSessionAfter = {id: UUID()};
-    assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: userSessionAfter,
-        txnNumber: NumberLong(11),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.commandWorked(indexConn.adminCommand({
-        commitTransaction: 1,
-        lsid: userSessionAfter,
-        txnNumber: NumberLong(11),
-        autocommit: false
-    }));
+    txnNum = 11;
+    withRetryOnTransientTxnError(() => {
+        txnNum++;
+        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: userSessionAfter,
+            txnNumber: NumberLong(txnNum),
+            startTransaction: true,
+            autocommit: false
+        }));
+        assert.commandWorked(indexConn.adminCommand({
+            commitTransaction: 1,
+            lsid: userSessionAfter,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false
+        }));
+    });
 
     let nonRetryableTxnSessionAfter = {id: UUID(), txnUUID: UUID()};
-    assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: nonRetryableTxnSessionAfter,
-        txnNumber: NumberLong(11),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.commandWorked(indexConn.adminCommand({
-        commitTransaction: 1,
-        lsid: nonRetryableTxnSessionAfter,
-        txnNumber: NumberLong(11),
-        autocommit: false
-    }));
+    txnNum = 11;
+    withRetryOnTransientTxnError(() => {
+        txnNum++;
+        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: nonRetryableTxnSessionAfter,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false
+        }));
+        assert.commandWorked(indexConn.adminCommand({
+            commitTransaction: 1,
+            lsid: nonRetryableTxnSessionAfter,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false
+        }));
+    });
 
     let retryableTxnSessionAfter = {id: UUID(), txnUUID: UUID(), txnNumber: NumberLong(2)};
-    assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: retryableTxnSessionAfter,
-        txnNumber: NumberLong(11),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.commandWorked(indexConn.adminCommand({
-        commitTransaction: 1,
-        lsid: retryableTxnSessionAfter,
-        txnNumber: NumberLong(11),
-        autocommit: false
-    }));
+    txnNum = 11;
+    withRetryOnTransientTxnError(() => {
+        txnNum++;
+        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: retryableTxnSessionAfter,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false
+        }));
+        assert.commandWorked(indexConn.adminCommand({
+            commitTransaction: 1,
+            lsid: retryableTxnSessionAfter,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false
+        }));
+    });
 
     if (!alwaysCreateFeatureFlagEnabled) {
         // We expect that if the partial index is dropped when the collection isn't empty, then on

@@ -8,6 +8,7 @@
  *   requires_fcv_71,
  * ]
  */
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2, rs: {nodes: 1}});
@@ -63,22 +64,18 @@ function testCommandNoMatchingDocument(testCase) {
     jsTest.log("Test that running the command against a collection with no match yields an empty" +
                " document and shard id for write command : " + tojson(testCase.writeCommand));
 
-    let lsid = {id: UUID()};
-    let txnNumber = NumberLong(1);
-    let cmdObj = {
-        _clusterQueryWithoutShardKey: 1,
-        writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0),
-        txnNumber: txnNumber,
-        lsid: lsid,
-        startTransaction: true,
-        autocommit: false
-    };
-    let res = assert.commandWorked(mongosConn.runCommand(cmdObj));
-    assert.commandWorked(mongosConn.adminCommand(
-        {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
-    assert.eq(res.targetDoc, null);
-    assert.eq(res.shardId, null);
+    let session = st.s.startSession();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
+        let cmdObj = {
+            _clusterQueryWithoutShardKey: 1,
+            writeCmd: testCase.writeCommand,
+        };
+        let res = assert.commandWorked(sessionDB.runCommand(cmdObj));
+
+        assert.eq(res.targetDoc, null);
+        assert.eq(res.shardId, null);
+    });
 
     let collectionDocCount = mongosConn.getCollection(shardedCollNameMultiShard).count();
     assert.eq(collectionDocCount, 0);
@@ -120,25 +117,19 @@ function testCommandShardedCollectionOnSingleShard(testCase) {
         _id: testCase.shardKeyValShard1
     });
 
-    let lsid = {id: UUID()};
-    let txnNumber = NumberLong(1);
-    let cmdObj = {
-        _clusterQueryWithoutShardKey: 1,
-        writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0),
-        txnNumber: txnNumber,
-        lsid: lsid,
-        startTransaction: true,
-        autocommit: false
-    };
-    let res = assert.commandWorked(mongosConn.runCommand(cmdObj));
-    assert.commandWorked(mongosConn.adminCommand(
-        {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
-    assert.neq(res.targetDoc["_id"], null);
+    let session = st.s.startSession();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
+        let cmdObj = {
+            _clusterQueryWithoutShardKey: 1,
+            writeCmd: testCase.writeCommand,
+        };
+        let res = assert.commandWorked(sessionDB.runCommand(cmdObj));
+        assert.neq(res.targetDoc["_id"], null);
 
-    // Make sure we are targeting the primary shard.
-    assert.eq(res.shardId, st.getPrimaryShardIdForDatabase(dbName));
-
+        // Make sure we are targeting the primary shard.
+        assert.eq(res.shardId, st.getPrimaryShardIdForDatabase(dbName));
+    });
     // Check that no modifications were made to the documents.
     let doc1After = mongosConn.getCollection(shardedCollNameSingleShard).findOne({
         _id: testCase.shardKeyValShard0
@@ -168,30 +159,26 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
         _id: testCase.shardKeyValShard1
     });
 
-    let lsid = {id: UUID()};
-    let txnNumber = NumberLong(1);
-    let cmdObj = {
-        _clusterQueryWithoutShardKey: 1,
-        writeCmd: testCase.writeCommand,
-        stmtId: NumberInt(0),
-        txnNumber: txnNumber,
-        lsid: lsid,
-        startTransaction: true,
-        autocommit: false
-    };
-    let res = assert.commandWorked(mongosConn.runCommand(cmdObj));
-    assert.commandWorked(mongosConn.adminCommand(
-        {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
-    assert.neq(res.targetDoc["_id"], null);
+    let session = st.s.startSession();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
 
-    // We can't actually get the shard key from the response since the command projects out only
-    // _id, but the way the test is structured, the _id and the shard key have the same value when
-    // inserted.
-    if (res.targetDoc["_id"] < splitPoint) {
-        assert.eq(res.shardId, st.shard0.shardName);
-    } else {
-        assert.eq(res.shardId, st.shard1.shardName);
-    }
+        let cmdObj = {
+            _clusterQueryWithoutShardKey: 1,
+            writeCmd: testCase.writeCommand,
+        };
+        let res = assert.commandWorked(sessionDB.runCommand(cmdObj));
+        assert.neq(res.targetDoc["_id"], null);
+
+        // We can't actually get the shard key from the response since the command projects out only
+        // _id, but the way the test is structured, the _id and the shard key have the same value
+        // when inserted.
+        if (res.targetDoc["_id"] < splitPoint) {
+            assert.eq(res.shardId, st.shard0.shardName);
+        } else {
+            assert.eq(res.shardId, st.shard1.shardName);
+        }
+    });
 
     // Check that no modifications were made to the documents.
     let doc1After = mongosConn.getCollection(shardedCollNameMultiShard).findOne({

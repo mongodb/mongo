@@ -105,24 +105,28 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
     let runNewTxnNumber = async function(primaryHost, parentSessionUUIDString, dbName, collName) {
         const {makeCommitTransactionCmdObj} =
             await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const {withRetryOnTransientTxnErrorIncrementTxnNum} =
+            await import("jstests/libs/auto_retry_transaction_in_sharding.js");
 
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
 
         const lsid = {id: UUID(parentSessionUUIDString), txnNumber: NumberLong(6), txnUUID: UUID()};
         const txnNumber = NumberLong(0);
-        const writeCmdObj = {
-            insert: collName,
-            documents: [{_id: 1}],
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            startTransaction: true,
-            autocommit: false
-        };
-        const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNumber);
+        withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+            const writeCmdObj = {
+                insert: collName,
+                documents: [{_id: 1}],
+                lsid: lsid,
+                txnNumber: NumberLong(txnNum),
+                startTransaction: true,
+                autocommit: false
+            };
+            const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNum);
 
-        assert.commandWorked(testDB.runCommand(writeCmdObj));
-        assert.commandWorked(testDB.adminCommand(commitCmdObj));
+            assert.commandWorked(testDB.runCommand(writeCmdObj));
+            assert.commandWorked(testDB.adminCommand(commitCmdObj));
+        });
     };
 
     const fp = configureFailPoint(primary, fpName);

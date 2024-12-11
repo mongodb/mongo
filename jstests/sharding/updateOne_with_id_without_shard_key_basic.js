@@ -5,6 +5,10 @@
  * @tags: [requires_fcv_80]
  */
 
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum,
+    withTxnAndAutoRetryOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -30,18 +34,16 @@ let fp = configureFailPoint(st.s, 'hangAfterCompletingWriteWithoutShardKeyWithId
 
 // Test that transactions do not use broadcast protocol per PM-3190.
 let session = st.s.startSession({retryWrites: false});
-session.startTransaction();
-
-let sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
-let updateCmd = {
-    updates: [
-        {q: {_id: -1}, u: {$inc: {counter: 1}}},
-    ],
-    txnNumber: NumberLong(0),
-};
-assert.commandWorked(sessionColl.runCommand("update", updateCmd));
-
-session.commitTransaction();
+withTxnAndAutoRetryOnMongos(session, () => {
+    let sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
+    let updateCmd = {
+        updates: [
+            {q: {_id: -1}, u: {$inc: {counter: 1}}},
+        ],
+        txnNumber: NumberLong(0),
+    };
+    assert.commandWorked(sessionColl.runCommand("update", updateCmd));
+});
 session.endSession();
 
 // Test that retryable internal transactions do not use broadcast protocol per PM-3190.
@@ -49,29 +51,34 @@ const lsidWithUUID = {
     id: UUID(),
     txnUUID: UUID()
 };
-assert.commandWorked(db.runCommand({
-    update: coll.getName(),
-    updates: [{q: {_id: -1}, u: {$inc: {counter: 1}}}],
-    lsid: lsidWithUUID,
-    txnNumber: NumberLong(1),
-    startTransaction: true,
-    autocommit: false
-}));
+let txnNumber = 1;
+withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+    assert.commandWorked(db.runCommand({
+        update: coll.getName(),
+        updates: [{q: {_id: -1}, u: {$inc: {counter: 1}}}],
+        lsid: lsidWithUUID,
+        txnNumber: NumberLong(txnNum),
+        startTransaction: true,
+        autocommit: false
+    }));
+});
 
 const lsidWithUUIDAndTxnNum = {
     id: UUID(),
     txnUUID: UUID(),
     txnNumber: NumberLong(2),
 };
-
-assert.commandWorked(db.runCommand({
-    update: coll.getName(),
-    updates: [{q: {_id: -5}, u: {$inc: {counter: 1}}}],
-    lsid: lsidWithUUIDAndTxnNum,
-    txnNumber: NumberLong(1),
-    startTransaction: true,
-    autocommit: false
-}));
+txnNumber = 1;
+withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+    assert.commandWorked(db.runCommand({
+        update: coll.getName(),
+        updates: [{q: {_id: -5}, u: {$inc: {counter: 1}}}],
+        lsid: lsidWithUUIDAndTxnNum,
+        txnNumber: NumberLong(txnNum),
+        startTransaction: true,
+        autocommit: false
+    }));
+});
 
 // Test that non-retryable writes do not use broadcast protocol per PM-3190.
 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {counter: 1}}));
@@ -79,8 +86,8 @@ assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {counter: 1}}));
 // Test that non-retryable write sessions do not use broadcast protocol per PM-3190.
 session = st.s.startSession({retryWrites: false});
 
-sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
-updateCmd = {
+let sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
+let updateCmd = {
     updates: [
         {q: {_id: 1}, u: {$inc: {counter: 1}}},
     ]

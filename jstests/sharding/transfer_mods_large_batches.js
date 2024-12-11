@@ -7,6 +7,9 @@
  * @tags: [uses_transactions]
  */
 import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {
     moveChunkParallel,
     moveChunkStepNames,
     pauseMoveChunkAtStep,
@@ -34,29 +37,30 @@ function insertLargeDocsInTransaction(collection, docIds, shardKey) {
     const lsid = {id: UUID()};
     const txnNumber = 0;
     const largeStr = "x".repeat(9 * 1024 * 1024);
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        for (let i = 0; i < docIds.length; ++i) {
+            const docToInsert = {_id: docIds[i]._id};
+            Object.assign(docToInsert, shardKey);
+            docToInsert.note = "large document to force separate _transferMods call";
+            docToInsert.padding = largeStr;
 
-    for (let i = 0; i < docIds.length; ++i) {
-        const docToInsert = {_id: docIds[i]._id};
-        Object.assign(docToInsert, shardKey);
-        docToInsert.note = "large document to force separate _transferMods call";
-        docToInsert.padding = largeStr;
+            const commandObj = {
+                documents: [docToInsert],
+                lsid: lsid,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false
+            };
 
-        const commandObj = {
-            documents: [docToInsert],
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false
-        };
+            if (i === 0) {
+                commandObj.startTransaction = true;
+            }
 
-        if (i === 0) {
-            commandObj.startTransaction = true;
+            assert.commandWorked(collection.runCommand("insert", commandObj));
         }
 
-        assert.commandWorked(collection.runCommand("insert", commandObj));
-    }
-
-    assert.commandWorked(collection.getDB().adminCommand(
-        {commitTransaction: 1, lsid: lsid, txnNumber: NumberLong(txnNumber), autocommit: false}));
+        assert.commandWorked(collection.getDB().adminCommand(
+            {commitTransaction: 1, lsid: lsid, txnNumber: NumberLong(txnNum), autocommit: false}));
+    });
 }
 
 assert.commandWorked(collection.insert([

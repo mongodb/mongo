@@ -12,8 +12,8 @@
  * is illegal to do more than one runTest() call.
  */
 
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {runTxnRetryOnTransientError} from "jstests/sharding/internal_txns/libs/fixture_helpers.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 import {
     getTxnEntriesForSession,
@@ -322,7 +322,7 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
         testCase.setUpFunc();
 
         const lsid = getTransactionSessionId(txnType, testCase);
-        runTxnRetryOnTransientError(() => {
+        withRetryOnTransientTxnError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
             for (let i = 0; i < testCase.commands.length; i++) {
@@ -366,7 +366,7 @@ export function InternalTransactionReshardingTest({reshardInPlace}) {
         const lsid = getTransactionSessionId(txnType, testCase);
         // Give the session a different txnUUID to simulate a retry from a different mongos.
         lsid.txnUUID = UUID();
-        runTxnRetryOnTransientError(() => {
+        withRetryOnTransientTxnError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
             for (let i = 0; i < testCase.commands.length; i++) {

@@ -4,6 +4,9 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
@@ -28,75 +31,77 @@ const lsid = {
     jsTest.log("Test small transaction with multiple findAndModify pre/post images");
     const txnNumber = NumberLong(0);
     let stmtId = 0;
-
-    // findAndModify with pre-image.
-    mongosTestDB.runCommand({
-        findAndModify: kCollName,
-        query: {_id: -1, x: -1},
-        update: {$inc: {x: -10}},
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        startTransaction: true,
-        autocommit: false,
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        // findAndModify with pre-image.
+        mongosTestDB.runCommand({
+            findAndModify: kCollName,
+            query: {_id: -1, x: -1},
+            update: {$inc: {x: -10}},
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId++),
+            startTransaction: true,
+            autocommit: false,
+        });
+        // findAndModify with post-image.
+        mongosTestDB.runCommand({
+            findAndModify: kCollName,
+            query: {_id: -2, x: -2},
+            update: {$inc: {x: -10}},
+            new: true,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId++),
+            autocommit: false,
+        });
+        assert.commandFailedWithCode(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054001);
     });
-    // findAndModify with post-image.
-    mongosTestDB.runCommand({
-        findAndModify: kCollName,
-        query: {_id: -2, x: -2},
-        update: {$inc: {x: -10}},
-        new: true,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        autocommit: false,
-    });
-    assert.commandFailedWithCode(
-        mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)), 6054001);
 }
 
 {
     jsTest.log("Test large transaction with multiple findAndModify pre/post images");
     const txnNumber = NumberLong(1);
     let stmtId = 0;
-
-    let makeInsertCmdObj = (doc) => {
-        return {
-            insert: kCollName,
-            documents: [Object.assign(doc, {y: new Array(kSize10MB).join("a")})],
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(stmtId++),
-            autocommit: false
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        let makeInsertCmdObj = (doc) => {
+            return {
+                insert: kCollName,
+                documents: [Object.assign(doc, {y: new Array(kSize10MB).join("a")})],
+                lsid: lsid,
+                txnNumber: NumberLong(txnNum),
+                stmtId: NumberInt(stmtId++),
+                autocommit: false
+            };
         };
-    };
 
-    mongosTestDB.runCommand(
-        Object.assign(makeInsertCmdObj({_id: -100, x: 100}), {startTransaction: true}));
-    // findAndModify with pre-image.
-    mongosTestDB.runCommand({
-        findAndModify: kCollName,
-        query: {_id: -1, x: -1},
-        update: {$inc: {x: -10}},
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        autocommit: false,
+        mongosTestDB.runCommand(
+            Object.assign(makeInsertCmdObj({_id: -100, x: 100}), {startTransaction: true}));
+        // findAndModify with pre-image.
+        mongosTestDB.runCommand({
+            findAndModify: kCollName,
+            query: {_id: -1, x: -1},
+            update: {$inc: {x: -10}},
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId++),
+            autocommit: false,
+        });
+        mongosTestDB.runCommand(makeInsertCmdObj({_id: -200, x: -200}));
+        // findAndModify with post-image.
+        mongosTestDB.runCommand({
+            findAndModify: kCollName,
+            query: {_id: -2, x: -2},
+            update: {$inc: {x: -10}},
+            new: true,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId++),
+            autocommit: false,
+        });
+        assert.commandFailedWithCode(
+            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054002);
     });
-    mongosTestDB.runCommand(makeInsertCmdObj({_id: -200, x: -200}));
-    // findAndModify with post-image.
-    mongosTestDB.runCommand({
-        findAndModify: kCollName,
-        query: {_id: -2, x: -2},
-        update: {$inc: {x: -10}},
-        new: true,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        autocommit: false,
-    });
-    assert.commandFailedWithCode(
-        mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNumber)), 6054002);
 }
 
 st.stop();

@@ -4,6 +4,7 @@
 //
 // @tags: [uses_transactions, uses_multi_shard_transaction]
 
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
@@ -32,13 +33,16 @@ const sessionDb = session.getDatabase('test');
 
 let txnNumber = 0;
 
-assert.commandWorked(sessionDb.runCommand({
-    insert: 'user',
-    documents: [{x: -10}, {x: 10}],
-    txnNumber: NumberLong(txnNumber),
-    startTransaction: true,
-    autocommit: false,
-}));
+withRetryOnTransientTxnError(() => {
+    txnNumber++;
+    assert.commandWorked(sessionDb.runCommand({
+        insert: 'user',
+        documents: [{x: -10}, {x: 10}],
+        txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
+        autocommit: false,
+    }));
+});
 
 // We can deterministically wait for the transaction to be aborted by waiting for currentOp
 // to cease reporting the inactive transaction: the transaction should disappear from the

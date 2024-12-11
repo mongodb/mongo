@@ -3,12 +3,14 @@ import "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 Random.setRandomSeed();
 
 export var {
     withTxnAndAutoRetryOnMongos,
     withRetryOnTransientTxnError,
+    withRetryOnTransientTxnErrorIncrementTxnNum,
     withAbortAndRetryOnTransientTxnError,
     retryOnceOnTransientOnMongos
 } = (() => {
@@ -59,8 +61,37 @@ export var {
             try {
                 func();
             } catch (e) {
-                if ((e.hasOwnProperty('errorLabels') &&
-                     e.errorLabels.includes('TransientTransactionError'))) {
+                if (TransactionsUtil.isTransientTransactionError(e)) {
+                    if (cleanup)
+                        cleanup();
+                    return false;
+                } else {
+                    throw e;
+                }
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Runs 'func' and automatically runs the cleanup function and retries using a higher txnNumber
+     * until it either succeeds or the server returns a non-TransientTransactionError error
+     * response.
+     *
+     * This function will not start and commit/abort the transaction, the caller is expected to
+     * do so inside func. It also takes in a cleanup function that the caller can choose to specify.
+     * Useful when the test case is testing transactions internals, and needs to manage or mutate
+     * some aspect of the transaction itself, and needs to do some clean up in addition to just
+     * aborting the transaction.
+     */
+    function withRetryOnTransientTxnErrorIncrementTxnNum(txnNum, func, cleanup = null) {
+        let currentTxnNumber;
+        assert.soon(() => {
+            try {
+                currentTxnNumber = txnNum++;
+                func(currentTxnNumber);
+            } catch (e) {
+                if (TransactionsUtil.isTransientTransactionError(e)) {
                     if (cleanup)
                         cleanup();
                     return false;
@@ -107,8 +138,7 @@ export var {
             try {
                 func();
             } catch (e) {
-                if ((e.hasOwnProperty('errorLabels') &&
-                     e.errorLabels.includes('TransientTransactionError'))) {
+                if (TransactionsUtil.isTransientTransactionError(e)) {
                     func();
                 } else {
                     throw e;
@@ -122,7 +152,8 @@ export var {
     return {
         withTxnAndAutoRetryOnMongos,
         withRetryOnTransientTxnError,
+        withRetryOnTransientTxnErrorIncrementTxnNum,
         withAbortAndRetryOnTransientTxnError,
-        retryOnceOnTransientOnMongos
+        retryOnceOnTransientOnMongos,
     };
 })();

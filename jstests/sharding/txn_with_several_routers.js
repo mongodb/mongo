@@ -5,6 +5,9 @@
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
 
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     flushRoutersAndRefreshShardMetadata
@@ -47,47 +50,49 @@ runTest(() => {
     let lsid = {id: UUID()};
     let txnNumber = 0;
 
-    // Start a new transaction on router 0 by inserting a document onto each shard.
-    assert.commandWorked(router0.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -5}, {_id: 5}, {_id: 15}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        // Start a new transaction on router 0 by inserting a document onto each shard.
+        assert.commandWorked(router0.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -5}, {_id: 5}, {_id: 15}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }));
 
-    // Try to start a new transaction with the same transaction number on router 1 by inserting
-    // a document onto each shard.
-    assert.commandFailedWithCode(router1.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -50}, {_id: 4}, {_id: 150}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-        // Because ordered writes are done serially for different shard targets and abort early
-        // on first error, this can leave the transaction on the other shards open.
-        // To ensure this router implicitly aborts the transaction on all participants (so
-        // that the next test case does not encounter an open transaction), make this
-        // router do an *unordered* write that touches all the same participants as the
-        // first router touched.
-        ordered: false,
-    }),
-                                 50911);
+        // Try to start a new transaction with the same transaction number on router 1 by inserting
+        // a document onto each shard.
+        assert.commandFailedWithCode(router1.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -50}, {_id: 4}, {_id: 150}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+            // Because ordered writes are done serially for different shard targets and abort early
+            // on first error, this can leave the transaction on the other shards open.
+            // To ensure this router implicitly aborts the transaction on all participants (so
+            // that the next test case does not encounter an open transaction), make this
+            // router do an *unordered* write that touches all the same participants as the
+            // first router touched.
+            ordered: false,
+        }),
+                                     50911);
 
-    // The automatic abort-on-error path will occur when the above
-    // statement fails, so commit will fail.
-    assert.commandFailedWithCode(router0.getDB(dbName).adminCommand({
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        autocommit: false,
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+        // The automatic abort-on-error path will occur when the above
+        // statement fails, so commit will fail.
+        assert.commandFailedWithCode(router0.getDB(dbName).adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            autocommit: false,
+        }),
+                                     ErrorCodes.NoSuchTransaction);
+    });
 });
 
 // Test that trying to run start txn from one router and running an operation for that same
@@ -97,38 +102,40 @@ runTest(() => {
     let txnNumber = 0;
     let stmtId = 0;
 
-    // Start a new transaction on router 0 by inserting a document onto each shard.
-    assert.commandWorked(router0.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -5}, {_id: 5}, {_id: 15}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        // Start a new transaction on router 0 by inserting a document onto each shard.
+        assert.commandWorked(router0.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -5}, {_id: 5}, {_id: 15}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId),
+            startTransaction: true,
+            autocommit: false,
+        }));
 
-    ++stmtId;
+        ++stmtId;
 
-    // Try to continue the same transaction but through router 1. Should fail because no txn
-    // with this number exists on that router.
-    assert.commandFailed(router1.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -50}, {_id: 4}, {_id: 150}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId),
-        autocommit: false,
-    }));
+        // Try to continue the same transaction but through router 1. Should fail because no txn
+        // with this number exists on that router.
+        assert.commandFailed(router1.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -50}, {_id: 4}, {_id: 150}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId),
+            autocommit: false,
+        }));
 
-    // Commit should succeed since the command from router 2 should never reach the shard.
-    assert.commandWorked(router0.getDB(dbName).adminCommand({
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        autocommit: false,
-    }));
+        // Commit should succeed since the command from router 2 should never reach the shard.
+        assert.commandWorked(router0.getDB(dbName).adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(0),
+            autocommit: false,
+        }));
+    });
 });
 
 // Test that trying to run start txn from one router, start txn on the second router with the
@@ -136,65 +143,68 @@ runTest(() => {
 runTest(() => {
     let lsid = {id: UUID()};
     let txnNumber = 0;
-    let stmtId = 0;
 
-    // Start a new transaction on router 0 by inserting a document onto the first shard
-    assert.commandWorked(router0.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -5}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        let stmtId = 0;
 
-    // Start a new transaction on router 1 with the same transaction number, targeting the last
-    // shard.
-    assert.commandWorked(router1.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: 15}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId),
-        startTransaction: true,
-        autocommit: false,
-    }));
+        // Start a new transaction on router 0 by inserting a document onto the first shard
+        assert.commandWorked(router0.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -5}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId),
+            startTransaction: true,
+            autocommit: false,
+        }));
 
-    ++stmtId;
+        // Start a new transaction on router 1 with the same transaction number, targeting the last
+        // shard.
+        assert.commandWorked(router1.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: 15}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId),
+            startTransaction: true,
+            autocommit: false,
+        }));
 
-    // Try to do an operation on the last shard through router 0. Fails because it sends
-    // startTxn: true to the new participant, which has already seen an operation from router 1.
-    // Implicitly aborts the transaction when the error is thrown.
-    assert.commandFailedWithCode(router0.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: 50}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId),
-        autocommit: false,
-    }),
-                                 50911);
+        ++stmtId;
 
-    // Commit through router 0 should fail.
-    assert.commandFailedWithCode(router0.getDB(dbName).adminCommand({
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId),
-        autocommit: false,
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+        // Try to do an operation on the last shard through router 0. Fails because it sends
+        // startTxn: true to the new participant, which has already seen an operation from router 1.
+        // Implicitly aborts the transaction when the error is thrown.
+        assert.commandFailedWithCode(router0.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: 50}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId),
+            autocommit: false,
+        }),
+                                     50911);
 
-    // Commit through router 1 should fail.
-    assert.commandFailedWithCode(router1.getDB(dbName).adminCommand({
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId),
-        autocommit: false,
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+        // Commit through router 0 should fail.
+        assert.commandFailedWithCode(router0.getDB(dbName).adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId),
+            autocommit: false,
+        }),
+                                     ErrorCodes.NoSuchTransaction);
+
+        // Commit through router 1 should fail.
+        assert.commandFailedWithCode(router1.getDB(dbName).adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            stmtId: NumberInt(stmtId),
+            autocommit: false,
+        }),
+                                     ErrorCodes.NoSuchTransaction);
+    });
 });
 
 st.stop();

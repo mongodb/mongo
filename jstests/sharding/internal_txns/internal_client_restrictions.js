@@ -3,70 +3,84 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
+import {
+    withRetryOnTransientTxnErrorIncrementTxnNum
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kCollName = "testColl";
 
 function verifyInternalSessionsForExternalClients(testDB, {expectFail}) {
+    let txnNumber = 1101;
     function runInternalSessionCommand(cmd) {
-        if (expectFail) {
-            const res =
-                assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
-            assert.eq(
-                res.errmsg, "Internal sessions are only allowed for internal clients", tojson(res));
-        } else {
-            assert.commandWorked(testDB.runCommand(cmd));
-            assert.commandWorked(testDB.runCommand({
-                commitTransaction: 1,
-                lsid: cmd.lsid,
-                txnNumber: cmd.txnNumber,
-                txnRetryCounter: cmd.txnRetryCounter,
-                autocommit: false,
-            }));
-        }
+        withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+            cmd.txnNumber = NumberLong(txnNum);
+
+            if (expectFail) {
+                const res =
+                    assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
+                assert.eq(res.errmsg,
+                          "Internal sessions are only allowed for internal clients",
+                          tojson(res));
+            } else {
+                assert.commandWorked(testDB.runCommand(cmd));
+                assert.commandWorked(testDB.runCommand({
+                    commitTransaction: 1,
+                    lsid: cmd.lsid,
+                    txnNumber: NumberLong(txnNum),
+                    txnRetryCounter: cmd.txnRetryCounter,
+                    autocommit: false,
+                }));
+            }
+        });
     }
 
     // Test with both internal transaction formats.
     runInternalSessionCommand({
         find: kCollName,
         lsid: {id: UUID(), txnUUID: UUID()},
-        txnNumber: NumberLong(1101),
+        txnNumber: NumberLong(txnNumber),
         startTransaction: true,
         autocommit: false,
     });
     runInternalSessionCommand({
         find: kCollName,
         lsid: {id: UUID(), txnNumber: NumberLong(3), txnUUID: UUID()},
-        txnNumber: NumberLong(1101),
+        txnNumber: NumberLong(txnNumber),
         startTransaction: true,
         autocommit: false,
     });
 }
 
 function verifyTxnRetryCounterForExternalClients(testDB, {expectFail}) {
+    let txnNumber = 1100;
     const findCmd = {
         find: kCollName,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(1100),
+        txnNumber: NumberLong(txnNumber),
         startTransaction: true,
         autocommit: false,
         txnRetryCounter: NumberInt(0),
     };
+    withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
+        findCmd.txnNumber = NumberLong(txnNum);
 
-    if (expectFail) {
-        const res =
-            assert.commandFailedWithCode(testDB.runCommand(findCmd), ErrorCodes.InvalidOptions);
-        assert.eq(res.errmsg, "txnRetryCounter is only allowed for internal clients", tojson(res));
-    } else {
-        assert.commandWorked(testDB.runCommand(findCmd));
-        assert.commandWorked(testDB.runCommand({
-            commitTransaction: 1,
-            lsid: findCmd.lsid,
-            txnNumber: findCmd.txnNumber,
-            txnRetryCounter: findCmd.txnRetryCounter,
-            autocommit: false,
-        }));
-    }
+        if (expectFail) {
+            const res =
+                assert.commandFailedWithCode(testDB.runCommand(findCmd), ErrorCodes.InvalidOptions);
+            assert.eq(
+                res.errmsg, "txnRetryCounter is only allowed for internal clients", tojson(res));
+        } else {
+            assert.commandWorked(testDB.runCommand(findCmd));
+            assert.commandWorked(testDB.runCommand({
+                commitTransaction: 1,
+                lsid: findCmd.lsid,
+                txnNumber: findCmd.txnNumber,
+                txnRetryCounter: findCmd.txnRetryCounter,
+                autocommit: false,
+            }));
+        }
+    });
 }
 
 const keyFile = "jstests/libs/key1";
