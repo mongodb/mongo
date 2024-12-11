@@ -64,7 +64,7 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_binary(
+mongo_cc_unit_test(
     name = "stitch_support_test",
     srcs = [
         "stitch_support_test.cpp",
@@ -72,7 +72,9 @@ mongo_cc_binary(
     copts = [
         "-Isrc/mongo/embedded",
     ],
+    has_custom_mainline = True,
     tags = [
+        "mongo_unittest_second_group",
         "stitch_support_test",
     ],
     target_compatible_with = select({
