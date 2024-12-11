@@ -11,3 +11,9 @@ env.SConscript(
         "env",
     ],
 )
+
+env.CppUnitTest(
+    target="tools_workload_characteristics_test",
+    source=[],
+    LIBDEPS=[],
+)

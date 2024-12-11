@@ -393,3 +393,9 @@ env.CppUnitTest(
     source=[],
     LIBDEPS=[],
 )
+
+env.CppUnitTest(
+    target="op_msg_fuzzer_fixture_test",
+    source=[],
+    LIBDEPS=[],
+)

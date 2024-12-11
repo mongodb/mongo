@@ -3508,15 +3508,6 @@ mongo_cc_binary(
     srcs = [
         "traffic_reader_main.cpp",
     ],
-    exec_properties = select({
-        "@platforms//cpu:x86_64": {
-            "Pool": "large_mem_x86_64",
-        },
-        "@platforms//cpu:aarch64": {
-            "Pool": "large_memory_arm64",
-        },
-        "//conditions:default": {},
-    }),
     linkopts = select({
         "@platforms//os:linux": [
             "-ldl",
@@ -3529,6 +3520,7 @@ mongo_cc_binary(
         "//conditions:default": [],
     }),
     tags = [
+        "compile_requires_large_memory_gcc",
         "devcore",
         "dist_test",
     ],
