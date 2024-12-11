@@ -673,6 +673,7 @@ mongo_cc_unit_test(
         "storage_engine_collection_options_flags_parser_test.cpp",
         "throttle_cursor_test.cpp",
         "//src/mongo/db/catalog/validate:collection_validation_test.cpp",
+        "//src/mongo/db/catalog/validate:index_consistency_test.cpp",
         "//src/mongo/db/catalog/validate:validate_results_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
