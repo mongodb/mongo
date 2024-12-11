@@ -186,7 +186,7 @@ public:
 
     void blackHoleNextOutgoingRequest() {
         NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        getNet()->blackHole(getNet()->getFrontOfUnscheduledQueue());
+        getNet()->blackHole(getNet()->getFrontOfReadyQueue());
     }
 
     std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,

@@ -389,12 +389,11 @@ NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNextRead
     return noi;
 }
 
-NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getFrontOfUnscheduledQueue() {
-    return getNthUnscheduledRequest(0);
+NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getFrontOfReadyQueue() {
+    return getNthReadyRequest(0);
 }
 
-NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNthUnscheduledRequest(
-    size_t n) {
+NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNthReadyRequest(size_t n) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
 
@@ -532,6 +531,28 @@ void NetworkInterfaceMock::runReadyNetworkOperations() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     _runReadyNetworkOperations_inlock(lk);
+}
+
+bool NetworkInterfaceMock::_hasUnfinishedNetworkOperations() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    for (auto& op : _operations) {
+        if (!op.isFinished()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void NetworkInterfaceMock::drainUnfinishedNetworkOperations() {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(_currentlyRunning == kNetworkThread);
+    }
+
+    while (_hasUnfinishedNetworkOperations()) {
+        runReadyNetworkOperations();
+    }
 }
 
 void NetworkInterfaceMock::waitForWork() {

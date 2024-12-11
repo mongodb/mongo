@@ -55,6 +55,7 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -521,6 +522,62 @@ TEST_F(NetworkInterfaceMockTest, CancelCommandAfterResponse) {
 
     ASSERT_EQ(before, after);
     ASSERT_OK(deferred.get().status);
+}
+
+TEST_F(NetworkInterfaceMockTest, DrainUnfinishedNetworkOperations) {
+    auto client = getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb{};
+    RemoteCommandRequest request{kUnimportantRequest};
+    RemoteCommandResponse resp = RemoteCommandResponse::make_forTest(BSON("foo"
+                                                                          << "bar"),
+                                                                     Milliseconds(30));
+
+    auto deferred = net().startCommand(cb, request, nullptr, CancellationToken::uncancelable());
+
+    Notification<void> unblocked;
+    stdx::thread blockedThread([&, this]() {
+        NetworkInterfaceMock::InNetworkGuard guard(&net());
+        net().drainUnfinishedNetworkOperations();
+        unblocked.set();
+    });
+    ScopeGuard joinGuard([&] { blockedThread.join(); });
+
+    NetworkInterfaceMock::NetworkOperationIterator req;
+    {
+        NetworkInterfaceMock::InNetworkGuard guard(&net());
+        ASSERT_TRUE(net().hasReadyRequests());
+        req = net().getNextReadyRequest();
+        ASSERT_FALSE(req->isFinished());
+
+        // Make sure that the drain function is still stuck until a response has been scheduled.
+        ASSERT_FALSE(unblocked);
+
+        // Schedule a response to be processed by drainUnfinishedNetworkOperations.
+        net().scheduleResponse(req, net().now(), resp);
+    }
+
+    {
+        // drainUnfinishedNetworkOperations will unblock once it has processed the response.
+        auto opCtx = client->makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
+        unblocked.get(opCtx.get());
+    }
+
+    {
+        // Ensure that the request is finished and there are no more ready requests.
+        NetworkInterfaceMock::InNetworkGuard guard(&net());
+        ASSERT_TRUE(req->isFinished());
+        ASSERT_FALSE(net().hasReadyRequests());
+    }
+
+    {
+        // Make sure that the request is fulfilled.
+        auto opCtx = client->makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
+        ASSERT_OK(deferred.get().status);
+    }
 }
 
 TEST_F(NetworkInterfaceMockTest, TestNumReadyRequests) {

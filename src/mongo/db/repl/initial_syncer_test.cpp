@@ -554,8 +554,7 @@ protected:
         ASSERT_TRUE(net->hasReadyRequests());
 
         if (cmdName != "") {
-            const NetworkInterfaceMock::NetworkOperationIterator req =
-                net->getFrontOfUnscheduledQueue();
+            const NetworkInterfaceMock::NetworkOperationIterator req = net->getFrontOfReadyQueue();
             const BSONObj reqBSON = req->getRequest().cmdObj;
             const BSONElement cmdElem = reqBSON.firstElement();
             auto reqCmdName = cmdElem.fieldNameStringData();

@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_mock.h"
@@ -45,7 +46,7 @@
 namespace mongo {
 namespace executor {
 
-class NetworkInterfaceMockTest : public mongo::unittest::Test {
+class NetworkInterfaceMockTest : public ServiceContextTest {
 public:
     NetworkInterfaceMockTest()
         : _net{}, _executor(&_net, 1, ThreadPoolMock::Options()), _tearDownCalled(false) {}

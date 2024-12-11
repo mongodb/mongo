@@ -98,6 +98,8 @@ void TaskExecutorTest::shutdownExecutorThread() {
 }
 
 void TaskExecutorTest::joinExecutorThread() {
+    _net->enterNetwork();
+    _net->drainUnfinishedNetworkOperations();
     _net->exitNetwork();
     _executor->join();
 }

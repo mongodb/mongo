@@ -230,8 +230,7 @@ protected:
         executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
-        executor::NetworkInterfaceMock::NetworkOperationIterator noi =
-            net->getNthUnscheduledRequest(n);
+        executor::NetworkInterfaceMock::NetworkOperationIterator noi = net->getNthReadyRequest(n);
         executor::RemoteCommandRequest retRequest = noi->getRequest();
         net->exitNetwork();
         return retRequest;

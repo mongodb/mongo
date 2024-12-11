@@ -96,7 +96,7 @@ void MockNetwork::runUntilIdle() {
         _net->runReadyNetworkOperations();
         if (_net->hasReadyRequests()) {
             // Peek the next request.
-            auto noi = _net->getFrontOfUnscheduledQueue();
+            auto noi = _net->getFrontOfReadyQueue();
             // Requests may have already been scheduled due to simultaneous interruptions.
             if (_net->isNetworkOperationIteratorAtEnd(noi))
                 continue;

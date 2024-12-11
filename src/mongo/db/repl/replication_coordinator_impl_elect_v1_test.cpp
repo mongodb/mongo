@@ -1120,7 +1120,7 @@ private:
             // right up until another event happens (like an election). This is
             // particularly important for simulating a catchup takeover because
             // we need to know specific info about the primary.
-            auto noi = net->getFrontOfUnscheduledQueue();
+            auto noi = net->getFrontOfReadyQueue();
             auto&& nextRequest = noi->getRequest();
             if (nextRequest.cmdObj.firstElement().fieldNameStringData() != "replSetHeartbeat") {
                 return;
@@ -2414,7 +2414,7 @@ protected:
                 net->runUntil(electionTimeoutWhen);
             }
             // Peek the next request, don't consume it yet.
-            const NetworkOpIter noi = net->getFrontOfUnscheduledQueue();
+            const NetworkOpIter noi = net->getFrontOfReadyQueue();
             const RemoteCommandRequest& request = noi->getRequest();
             LOGV2(21468,
                   "{request_target} processing {request_cmdObj}",
@@ -2500,7 +2500,7 @@ protected:
         while (net->now() < until) {
             while (net->hasReadyRequests()) {
                 // Peek the next request
-                auto noi = net->getFrontOfUnscheduledQueue();
+                auto noi = net->getFrontOfReadyQueue();
                 auto& request = noi->getRequest();
                 LOGV2(21471,
                       "{request_target} at {net_now} processing {request_cmdObj}",

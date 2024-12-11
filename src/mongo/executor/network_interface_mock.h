@@ -86,7 +86,7 @@ class NetworkConnectionHook;
  *
  * The mock has a fully virtualized notion of time and the the network.  When the
  * executor under test schedules a network operation, the startCommand
- * method of this class adds an entry to the _unscheduled queue for immediate consideration.
+ * method of this class adds an entry to the _operations queue for immediate consideration.
  * The test driver loop, when it examines the request, may schedule a response, ask the
  * interface to redeliver the request at a later virtual time, or to swallow the virtual
  * request until the end of the simulation.  The test driver loop can also instruct the
@@ -95,6 +95,18 @@ class NetworkConnectionHook;
  *
  * The thread acting as the "network" and the executor run thread are highly synchronized
  * by this code, allowing for deterministic control of operation interleaving.
+ *
+ * There are three descriptors used in the NetworkInterfaceMock for an operation:
+ *  1) A "ready request" refers to an operation that has been enqueued in the _operations
+ * queue, but does not have a corresponding response associated with it yet.
+ *
+ *  2) A "ready network operation" refers to an operation that has been enqueued in the _operation
+ * queue and has an associated response in the _responses queue. That response has not yet been
+ * processed by the network thread, and so the request is not yet complete.
+ *
+ * 3) An "unfinished network operation" refers to an operation that has not been finished. It may
+ * be waiting for a response to become available, or for the network thread to move forward and
+ * process that response.
  */
 class NetworkInterfaceMock : public NetworkInterface {
 public:
@@ -244,7 +256,8 @@ public:
     void exitNetwork();
 
     /**
-     * Returns true if there are unscheduled network requests to be processed.
+     * Returns true if there are requests that do not yet have responses in the _responses queue
+     * associated with them.
      *
      * This will not notice exhaust operations that have not yet finished but have processed all of
      * their available responses.
@@ -252,7 +265,8 @@ public:
     bool hasReadyRequests();
 
     /**
-     * Returns the current number of requests that have not started processing.
+     * Returns the current number of requests that do not yet have responses in the _responses queue
+     * associated with them.
      */
     size_t getNumReadyRequests();
 
@@ -262,23 +276,25 @@ public:
     bool isNetworkOperationIteratorAtEnd(const NetworkInterfaceMock::NetworkOperationIterator& itr);
 
     /**
-     * Gets the next unscheduled request to process, blocking until one is available.
+     * Gets the next request that does have an associated response, blocking until one is available.
+     *
+     * It will also process any ready network operations while it is blocking.
      *
      * Will not return until the executor thread is blocked in waitForWorkUntil or waitForWork.
      */
     NetworkOperationIterator getNextReadyRequest();
 
     /**
-     * Gets the first unscheduled request. There must be at least one unscheduled request in the
-     * queue. Equivalent to getNthUnscheduledRequest(0).
+     * Gets the first request without an associated response. There must be at least one such
+     * request in the queue. Equivalent to getNthReadyRequest(0).
      */
-    NetworkOperationIterator getFrontOfUnscheduledQueue();
+    NetworkOperationIterator getFrontOfReadyQueue();
 
     /**
-     * Get the nth (starting at 0) unscheduled request. Assumes there are at least n+1 unscheduled
-     * requests in the queue.
+     * Get the nth (starting at 0) request without an associated response. Assumes there are at
+     * least n+1 such requests in the queue.
      */
-    NetworkOperationIterator getNthUnscheduledRequest(size_t n);
+    NetworkOperationIterator getNthReadyRequest(size_t n);
 
     /**
      * Schedules "response" in response to "noi" at virtual time "when".
@@ -334,11 +350,25 @@ public:
     void advanceTime(Date_t newTime);
 
     /**
-     * Processes all ready, scheduled network operations.
+     * Processes all ready network operations (meaning requests with associated responses in the
+     * _responses queue).
+     *
+     * The caller must have assumed the role of the network thread through enterNetwork.
      *
      * Will not return until the executor thread is blocked in waitForWorkUntil or waitForWork.
      */
     void runReadyNetworkOperations();
+
+    /**
+     * Blocks until all requests have been marked as _isFinished, and processes responses as they
+     * become available.
+     *
+     * The caller must have assumed the role of the network thread through enterNetwork.
+     *
+     * Other threads must schedule responses for or cancel outstanding requests to unblock this
+     * function.
+     */
+    void drainUnfinishedNetworkOperations();
 
     /**
      * Sets the reply of the 'hello' handshake for a specific host. This reply will only
@@ -354,16 +384,7 @@ public:
     void setHandshakeReplyForHost(const HostAndPort& host, RemoteCommandResponse&& reply);
 
     /**
-     * Deliver the response to the callback handle if the handle is present.
-     * This represents interrupting the regular flow with, for example, a NetworkTimeout or
-     * CallbackCanceled error.
-     */
-    void _interruptWithResponse_inlock(stdx::unique_lock<stdx::mutex>& lk,
-                                       const TaskExecutor::CallbackHandle& cbHandle,
-                                       const TaskExecutor::ResponseStatus& response);
-
-    /**
-     * Returns true if there is no scheduled work (i.e. alarms and scheduled responses) for the
+     * Returns false if there is no scheduled work (i.e. alarms and scheduled responses) for the
      * network thread to process.
      */
     bool hasReadyNetworkOperations();
@@ -452,11 +473,25 @@ private:
                                   const TaskExecutor::ResponseStatus& response);
 
     /**
+     * Deliver the response to the callback handle if the handle is present.
+     * This represents interrupting the regular flow with, for example, a NetworkTimeout or
+     * CallbackCanceled error.
+     */
+    void _interruptWithResponse_inlock(stdx::unique_lock<stdx::mutex>& lk,
+                                       const TaskExecutor::CallbackHandle& cbHandle,
+                                       const TaskExecutor::ResponseStatus& response);
+
+    /**
      * Runs all ready network operations, called while holding "lk".  May drop and
      * reaquire "lk" several times, but will not return until the executor has blocked
      * in waitFor*.
      */
     void _runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>& lk);
+
+    /**
+     * Returns true if there are operations that have not yet been marked as isFinished().
+     */
+    bool _hasUnfinishedNetworkOperations();
 
     SemiFuture<TaskExecutor::ResponseStatus> _startOperation(
         const TaskExecutor::CallbackHandle& cbHandle,
