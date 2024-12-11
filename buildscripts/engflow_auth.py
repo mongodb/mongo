@@ -7,6 +7,7 @@ import os
 import platform
 import stat
 import subprocess
+import time
 import urllib.request
 from datetime import datetime
 
@@ -21,6 +22,9 @@ NORMALIZED_OS = {"Windows": "windows", "Darwin": "macos", "Linux": "linux"}
 
 GH_URL_PREFIX = "https://github.com/EngFlow/auth/releases/latest/download/"
 CLUSTER = "sodalite.cluster.engflow.com"
+
+LOGIN_TIMEOUT = 300
+CLI_WAIT_TIMEOUT = 5
 
 
 @retry(tries=3, delay=1)
@@ -79,13 +83,41 @@ def authenticate(binary_path: str):
         expiry_iso = json.loads(p.stdout)["token"]["expiry"][:23]
         if datetime.now() > datetime.fromisoformat(expiry_iso):
             need_login = True
-    if need_login:
-        p = subprocess.run(
-            f"{binary_path} login -store=file {CLUSTER}",
-            check=True,
-            shell=True,
-            capture_output=True,
+    if not need_login:
+        print("Already authenticated. Skipping authentication.")
+        return
+
+    p = subprocess.Popen(
+        f"{binary_path} login -store=file {CLUSTER}",
+        shell=True,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+
+    login_url = None
+
+    start_time = time.time()
+    while not login_url and time.time() < start_time + CLI_WAIT_TIMEOUT:
+        line = p.stderr.readline().strip()
+        if line.startswith("https://" + CLUSTER):
+            login_url = line
+            break
+
+    if not login_url:
+        print("CLI had unexpected output.")
+        p.kill()
+        return
+
+    print(f"Login via the following link to complete EngFlow authentication:\n{login_url}")
+
+    try:
+        p.wait(timeout=LOGIN_TIMEOUT)
+        print("Sucessfully authenticated with EngFlow!")
+    except subprocess.TimeoutExpired:
+        print(
+            "Timed out waiting for login attempt. Failed to authenticate with EngFlow. Builds will be run locally..."
         )
+        p.kill()
 
 
 def main():
