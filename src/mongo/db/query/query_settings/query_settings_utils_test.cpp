@@ -34,11 +34,14 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
@@ -63,7 +66,7 @@ public:
     static constexpr StringData kDbName = "foo"_sd;
 
     void setUp() final {
-        QuerySettingsManager::create(getServiceContext(), {});
+        QuerySettingsManager::create(getServiceContext(), {}, {});
 
         _opCtx = cc().makeOperationContext();
         _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});
@@ -191,7 +194,6 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForDistinct) {
                                       distinctCmdBSON));
     auto parsedDistinct =
         parsed_distinct_command::parse(expCtx(),
-                                       distinctCmdBSON,
                                        std::move(distinctCmd),
                                        ExtensionsCallbackNoop(),
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -231,7 +233,6 @@ TEST_F(QuerySettingsLoookupTest,
                                       distinctCmdBSON));
     auto parsedDistinct =
         parsed_distinct_command::parse(expCtx(),
-                                       distinctCmdBSON,
                                        std::move(distinctCommand),
                                        ExtensionsCallbackNoop(),
                                        MatchExpressionParser::kAllowAllSpecialFeatures);

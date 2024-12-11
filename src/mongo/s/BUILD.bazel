@@ -950,6 +950,7 @@ mongo_cc_library(
         "//src/mongo/db/ftdc:ftdc_mongos",
         "//src/mongo/db/process_health:fault_manager",
         "//src/mongo/db/query/query_settings:manager",
+        "//src/mongo/db/query/query_settings:utils",
         "//src/mongo/db/query/search:search_task_executors",
         "//src/mongo/db:read_write_concern_defaults",
         "//src/mongo/db:serverinit",

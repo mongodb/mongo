@@ -140,6 +140,7 @@
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
@@ -2150,7 +2151,8 @@ int mongod_main(int argc, char* argv[]) {
         ChangeStreamChangeCollectionManager::create(service);
     }
 
-    query_settings::QuerySettingsManager::create(service, {});
+    query_settings::QuerySettingsManager::create(
+        service, {}, query_settings::utils::sanitizeQuerySettingsHints);
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

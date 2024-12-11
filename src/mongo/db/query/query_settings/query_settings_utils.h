@@ -93,6 +93,6 @@ void validateQuerySettings(const QuerySettings& settings);
 void verifyQueryCompatibleWithSettings(const RepresentativeQueryInfo& representativeQueryInfo,
                                        const QuerySettings& settings);
 void simplifyQuerySettings(QuerySettings& settings);
-
+void sanitizeQuerySettingsHints(std::vector<QueryShapeConfiguration>& queryShapeConfigs);
 }  // namespace utils
 }  // namespace mongo::query_settings

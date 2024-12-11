@@ -3442,6 +3442,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
         "//src/mongo/db/query/query_settings:manager",
+        "//src/mongo/db/query/query_settings:utils",
         "//src/mongo/db/query/stats",
         "//src/mongo/db/repl:initial_syncer",
         "//src/mongo/db/repl:repl_coordinator_impl",

@@ -18,6 +18,24 @@ function isMinMaxQuery(cmdObj) {
     return 'min' in cmdObj || 'max' in cmdObj;
 }
 
+function isValidIndexHint(innerCmd) {
+    // Only intercept commands with cursor hints.
+    if (!innerCmd.hasOwnProperty("hint")) {
+        return false;
+    }
+    const hint = innerCmd.hint;
+    if (typeof hint !== "object") {
+        return true;
+    }
+    const objValues = Object.values(hint);
+    // Empty key-pattern index hint is not valid.
+    if (objValues.length === 0) {
+        return false;
+    }
+    // Only numeric values are accepted for key-pattern values.
+    return objValues.every(val => typeof val === 'number');
+}
+
 function requestsResumeToken(cmdObj) {
     // '$_requestResumeToken' need to be accompanied by '$natural' hints, so query settings
     // can't be used in this case.
@@ -36,11 +54,7 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     // exit early with the original command response.
     const db = conn.getDB(dbName);
     const innerCmd = getInnerCommand(cmdObj);
-    const shouldApplyQuerySettings =
-        // Only intercept commands with cursor hints.
-        "hint" in innerCmd &&
-        // TODO SERVER-96460 Validate against empty PQS index key pattern hints.
-        innerCmd["hint"] && Object.keys(innerCmd["hint"]).length > 0 &&
+    const shouldApplyQuerySettings = isValidIndexHint(innerCmd) &&
         // Only intercept command types supported by query settings.
         QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd)) &&
         !isMinMaxQuery(innerCmd) && !requestsResumeToken(innerCmd);

@@ -75,7 +75,7 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest(
     auth::AuthorizationBackendInterface::set(
         getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
 
-    query_settings::QuerySettingsManager::create(getServiceContext(), {});
+    query_settings::QuerySettingsManager::create(getServiceContext(), {}, {});
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {

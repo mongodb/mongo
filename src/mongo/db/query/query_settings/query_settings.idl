@@ -76,6 +76,7 @@ structs:
         type: NamespaceSpec
         stability: unstable
       allowedIndexes:
+        non_const_getter: true
         type: array<IndexHint>
         stability: unstable
 
@@ -86,6 +87,7 @@ structs:
     strict: false
     fields:
       indexHints:
+        non_const_getter: true
         type: IndexHintSpecs
         optional: true
         stability: unstable

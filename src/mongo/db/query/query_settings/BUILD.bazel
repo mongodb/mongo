@@ -87,6 +87,8 @@ mongo_cc_library(
     ],
     deps = [
         ":manager",
+        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query:canonical_query",
         "//src/mongo/db/query/query_shape",
     ],

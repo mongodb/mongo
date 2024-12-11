@@ -301,7 +301,7 @@ public:
 class ClientBase {
 public:
     ClientBase() : _client(&_opCtx) {
-        query_settings::QuerySettingsManager::create(_opCtx.getServiceContext(), {});
+        query_settings::QuerySettingsManager::create(_opCtx.getServiceContext(), {}, {});
     }
 
 protected:

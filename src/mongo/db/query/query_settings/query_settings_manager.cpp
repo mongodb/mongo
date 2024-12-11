@@ -114,9 +114,11 @@ QuerySettingsManager& QuerySettingsManager::get(OperationContext* opCtx) {
 }
 
 void QuerySettingsManager::create(
-    ServiceContext* service, std::function<void(OperationContext*)> clusterParameterRefreshFn) {
-    getQuerySettingsManager(service) =
-        std::make_unique<QuerySettingsManager>(service, clusterParameterRefreshFn);
+    ServiceContext* service,
+    std::function<void(OperationContext*)> clusterParameterRefreshFn,
+    std::function<void(std::vector<QueryShapeConfiguration>&)> sanitizeQuerySettingsHintsFn) {
+    getQuerySettingsManager(service) = std::make_unique<QuerySettingsManager>(
+        service, clusterParameterRefreshFn, sanitizeQuerySettingsHintsFn);
 }
 
 boost::optional<QuerySettings> QuerySettingsManager::getQuerySettingsForQueryShapeHash(
@@ -272,18 +274,23 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                          tenantId,
                          SerializationContext::stateDefault()),
         newValueElement.Obj());
+    auto& settingsArray = newSettings.getSettingsArray();
+
+    // TODO SERVER-97546 Remove PQS index hint sanitization.
+    querySettingsManager.sanitizeQuerySettingsHints(settingsArray);
+
     size_t rejectCount = 0;
-    for (const auto& config : newSettings.getSettingsArray()) {
+    for (const auto& config : settingsArray) {
         if (config.getSettings().getReject()) {
             ++rejectCount;
         }
     }
     querySettingsServerStatusSection.record(
-        /* count */ static_cast<int>(newSettings.getSettingsArray().size()),
+        /* count */ static_cast<int>(settingsArray.size()),
         /* size */ static_cast<int>(newValueElement.valuesize()),
         /* numSettingsWithReject */ static_cast<int>(rejectCount));
     querySettingsManager.setQueryShapeConfigurations(
-        std::move(newSettings.getSettingsArray()), newSettings.getClusterParameterTime(), tenantId);
+        std::move(settingsArray), newSettings.getClusterParameterTime(), tenantId);
     return Status::OK();
 }
 
@@ -297,6 +304,14 @@ LogicalTime QuerySettingsClusterParameter::getClusterParameterTime(
     const boost::optional<TenantId>& tenantId) const {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
     return querySettingsManager.getClusterParameterTime(tenantId);
+}
+
+// TODO SERVER-97546 Remove PQS index hint sanitization.
+void QuerySettingsManager::sanitizeQuerySettingsHints(
+    std::vector<QueryShapeConfiguration>& queryShapeConfigs) {
+    if (_sanitizeQuerySettingsHintsFn) {
+        _sanitizeQuerySettingsHintsFn(queryShapeConfigs);
+    }
 }
 
 };  // namespace mongo::query_settings

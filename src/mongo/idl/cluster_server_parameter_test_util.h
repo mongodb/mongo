@@ -84,7 +84,7 @@ public:
         ChangeStreamOptionsManager::create(service);
 
         // Set up the QuerySettingsManager so that it can be retrieved/set.
-        query_settings::QuerySettingsManager::create(service, {});
+        query_settings::QuerySettingsManager::create(service, {}, {});
 
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());

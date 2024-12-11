@@ -69,6 +69,12 @@ TEST(IndexHint, ShouldRejectHintAsArray) {
         IndexHint::parse(arrayHint.firstElement()), AssertionException, ErrorCodes::FailedToParse);
 }
 
+TEST(IndexHint, ShouldRejectNaturalWithMoreThanOneField) {
+    BSONObj arrayHint = BSON("$natural" << 1 << "a" << 1);
+    ASSERT_THROWS_CODE(
+        IndexHint::parse(arrayHint.firstElement()), AssertionException, ErrorCodes::FailedToParse);
+}
+
 TEST(IndexHint, SerializeNonEmptyHint) {
     auto indexKeyPattern = BSON("x" << 1);
     auto hint = IndexHint(indexKeyPattern);

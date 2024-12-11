@@ -824,6 +824,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/plan_cache:plan_cache_test.cpp",
         "//src/mongo/db/query/query_settings:query_settings_hash_test.cpp",
         "//src/mongo/db/query/query_settings:query_settings_manager_test.cpp",
+        "//src/mongo/db/query/query_settings:query_settings_utils_test.cpp",
         "//src/mongo/db/query/query_settings:query_settings_validation_test.cpp",
         "//src/mongo/db/query/query_shape:agg_cmd_shape_test.cpp",
         "//src/mongo/db/query/query_shape:cmd_with_let_shape_test.cpp",

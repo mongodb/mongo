@@ -77,6 +77,7 @@
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
@@ -820,13 +821,16 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ReadWriteConcernDefaults::create(serviceContext->getService(ClusterRole::RouterServer),
                                      readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
-    query_settings::QuerySettingsManager::create(serviceContext, [](OperationContext* opCtx) {
-        // QuerySettingsManager modifies a cluster-wide parameter and thus a refresh of the
-        // parameter after that modification should observe results of preceeding writes.
-        const bool kEnsureReadYourWritesConsistency = true;
-        uassertStatusOK(ClusterServerParameterRefresher::get(opCtx)->refreshParameters(
-            opCtx, kEnsureReadYourWritesConsistency));
-    });
+    query_settings::QuerySettingsManager::create(
+        serviceContext,
+        [](OperationContext* opCtx) {
+            // QuerySettingsManager modifies a cluster-wide parameter and thus a refresh of the
+            // parameter after that modification should observe results of preceeding writes.
+            const bool kEnsureReadYourWritesConsistency = true;
+            uassertStatusOK(ClusterServerParameterRefresher::get(opCtx)->refreshParameters(
+                opCtx, kEnsureReadYourWritesConsistency));
+        },
+        query_settings::utils::sanitizeQuerySettingsHints);
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();
