@@ -70,8 +70,6 @@ class test_verbose04(test_verbose_base):
       'WT_VERB_LOG',
       'WT_VERB_HS',
       'WT_VERB_HS_ACTIVITY',
-      'WT_VERB_LSM',
-      'WT_VERB_LSM_MANAGER',
       'WT_VERB_METADATA',
       'WT_VERB_MUTEX',
       'WT_VERB_PREFETCH',

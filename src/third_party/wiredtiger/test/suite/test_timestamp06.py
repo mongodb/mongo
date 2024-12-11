@@ -43,7 +43,6 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('col_fix', dict(empty=1, extra_config=',key_format=r,value_format=8t')),
         ('col_var', dict(empty=0, extra_config=',key_format=r')),
-        ('lsm', dict(empty=0, extra_config=',type=lsm')),
         ('row', dict(empty=0, extra_config='',)),
     ]
     ckpt = [

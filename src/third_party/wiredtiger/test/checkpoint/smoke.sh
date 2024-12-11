@@ -77,8 +77,3 @@ $TEST_WRAPPER ./t -t r -W 3 -r 2 -s 1 -x -n 100000 -k 100000 -C cache_size=100MB
 
 echo "checkpoint: row-store tables, Sweep and timestamps"
 $TEST_WRAPPER ./t -t r -W 3 -r 2 -s 1 -x -n 100000 -k 100000 -C cache_size=100MB
-
-# 5. LSM cases.
-
-echo "checkpoint: 6 LSM tables"
-$TEST_WRAPPER ./t -t l -T 6

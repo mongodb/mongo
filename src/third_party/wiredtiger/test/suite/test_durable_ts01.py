@@ -43,7 +43,6 @@ class test_durable_ts01(wttest.WiredTigerTestCase):
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),
-        ('lsm', dict(uri='lsm', ds=SimpleDataSet)),
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
     ]
 
@@ -54,7 +53,7 @@ class test_durable_ts01(wttest.WiredTigerTestCase):
     ]
 
     def keep(name, d):
-        return d['keyfmt'] != 'r' or (d['uri'] != 'lsm' and not d['ds'].is_lsm())
+        return d['keyfmt'] != 'r'
 
     scenarios = make_scenarios(types, format_values, iso_types, include=keep)
 

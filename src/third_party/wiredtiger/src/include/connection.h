@@ -449,8 +449,6 @@ struct __wt_connection_impl {
     /* Locked: file list */
     TAILQ_HEAD(__wt_fhhash, __wt_fh) * fhhash;
     TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
-    /* Locked: LSM handle list. */
-    TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
     /* Locked: Tiered system work queue. */
     TAILQ_HEAD(__wt_tiered_qh, __wt_tiered_work_unit) tieredqh;
 
@@ -549,8 +547,6 @@ struct __wt_connection_impl {
     wt_thread_t capacity_tid;          /* Capacity thread */
     bool capacity_tid_set;             /* Capacity thread set */
     WT_CONDVAR *capacity_cond;         /* Capacity wait mutex */
-
-    wt_shared WT_LSM_MANAGER lsm_manager; /* LSM worker thread information */
 
 #define WT_CONN_TIERED_STORAGE_ENABLED(conn) ((conn)->bstorage != NULL)
     WT_BUCKET_STORAGE *bstorage;     /* Bucket storage for the connection */
@@ -779,10 +775,9 @@ struct __wt_connection_impl {
 #define WT_CONN_SERVER_CHUNKCACHE_METADATA 0x008u
 #define WT_CONN_SERVER_COMPACT 0x010u
 #define WT_CONN_SERVER_LOG 0x020u
-#define WT_CONN_SERVER_LSM 0x040u
-#define WT_CONN_SERVER_STATISTICS 0x080u
-#define WT_CONN_SERVER_SWEEP 0x100u
-#define WT_CONN_SERVER_TIERED 0x200u
+#define WT_CONN_SERVER_STATISTICS 0x040u
+#define WT_CONN_SERVER_SWEEP 0x080u
+#define WT_CONN_SERVER_TIERED 0x100u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 
@@ -805,20 +800,19 @@ struct __wt_connection_impl {
 #define WT_CONN_IN_MEMORY 0x00008000u
 #define WT_CONN_LEAK_MEMORY 0x00010000u
 #define WT_CONN_LIVE_RESTORE 0x00020000u
-#define WT_CONN_LSM_MERGE 0x00040000u
-#define WT_CONN_MINIMAL 0x00080000u
-#define WT_CONN_OPTRACK 0x00100000u
-#define WT_CONN_PANIC 0x00200000u
-#define WT_CONN_PREFETCH_RUN 0x00400000u
-#define WT_CONN_READONLY 0x00800000u
-#define WT_CONN_READY 0x01000000u
-#define WT_CONN_RECONFIGURING 0x02000000u
-#define WT_CONN_RECOVERING 0x04000000u
-#define WT_CONN_RECOVERY_COMPLETE 0x08000000u
-#define WT_CONN_RTS_THREAD_RUN 0x10000000u
-#define WT_CONN_SALVAGE 0x20000000u
-#define WT_CONN_TIERED_FIRST_FLUSH 0x40000000u
-#define WT_CONN_WAS_BACKUP 0x80000000u
+#define WT_CONN_MINIMAL 0x00040000u
+#define WT_CONN_OPTRACK 0x00080000u
+#define WT_CONN_PANIC 0x00100000u
+#define WT_CONN_PREFETCH_RUN 0x00200000u
+#define WT_CONN_READONLY 0x00400000u
+#define WT_CONN_READY 0x00800000u
+#define WT_CONN_RECONFIGURING 0x01000000u
+#define WT_CONN_RECOVERING 0x02000000u
+#define WT_CONN_RECOVERY_COMPLETE 0x04000000u
+#define WT_CONN_RTS_THREAD_RUN 0x08000000u
+#define WT_CONN_SALVAGE 0x10000000u
+#define WT_CONN_TIERED_FIRST_FLUSH 0x20000000u
+#define WT_CONN_WAS_BACKUP 0x40000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 };

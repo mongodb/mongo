@@ -53,7 +53,7 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
     ]
 
     def keep(name, d):
-        return d['keyfmt'] != 'r' or (d['uri'] != 'lsm' and not d['ds'].is_lsm())
+        return d['keyfmt'] != 'r'
 
     scenarios = make_scenarios(types, fmt, iso_types, include=keep)
 

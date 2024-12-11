@@ -214,30 +214,6 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"logging.remove", "configure log file removal", C_BOOL, 50, 0, 0, V_GLOBAL_LOGGING_REMOVE},
 
-  {"lsm.auto_throttle", "throttle LSM inserts", C_BOOL | C_TABLE | C_TYPE_LSM, 90, 0, 0,
-    V_TABLE_LSM_AUTO_THROTTLE},
-
-  {"lsm.bloom", "configure bloom filters", C_BOOL | C_TABLE | C_TYPE_LSM, 95, 0, 0,
-    V_TABLE_LSM_BLOOM},
-
-  {"lsm.bloom_bit_count", "number of bits per item for bloom filters", C_TABLE | C_TYPE_LSM, 4, 64,
-    WT_THOUSAND, V_TABLE_LSM_BLOOM_BIT_COUNT},
-
-  {"lsm.bloom_hash_count", "number of hash values per item for bloom filters", C_TABLE | C_TYPE_LSM,
-    4, 32, 100, V_TABLE_LSM_BLOOM_HASH_COUNT},
-
-  {"lsm.bloom_oldest", "configure bloom_oldest=true", C_BOOL | C_TABLE | C_TYPE_LSM, 10, 0, 0,
-    V_TABLE_LSM_BLOOM_OLDEST},
-
-  {"lsm.chunk_size", "LSM chunk size (MB)", C_TABLE | C_TYPE_LSM, 1, 10, 100,
-    V_TABLE_LSM_CHUNK_SIZE},
-
-  {"lsm.merge_max", "maximum number of chunks to include in an LSM merge operation",
-    C_TABLE | C_TYPE_LSM, 4, 20, 100, V_TABLE_LSM_MERGE_MAX},
-
-  {"lsm.worker_threads", "number of LSM worker threads", C_TYPE_LSM, 3, 4, 20,
-    V_GLOBAL_LSM_WORKER_THREADS},
-
   {"ops.alter", "configure table alterations", C_BOOL, 10, 0, 0, V_GLOBAL_OPS_ALTER},
 
   {"ops.compaction", "configure compaction", C_BOOL, 10, 0, 0, V_GLOBAL_OPS_COMPACTION},
@@ -305,7 +281,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"runs.rows", "number of rows", C_TABLE, 10, M(1), M(100), V_TABLE_RUNS_ROWS},
 
-  {"runs.source", "data source type (file | lsm | table)", C_IGNORE | C_STRING | C_TABLE, 0, 0, 0,
+  {"runs.source", "data source type (file | table)", C_IGNORE | C_STRING | C_TABLE, 0, 0, 0,
     V_TABLE_RUNS_SOURCE},
 
   {"runs.tables", "number of tables", 0x0, 1, 32, V_MAX_TABLES_CONFIG, V_GLOBAL_RUNS_TABLES},

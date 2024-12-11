@@ -17,6 +17,3 @@ args="$args transaction.timestamps=1 "
 $TEST_WRAPPER ./t $args runs.type=fix
 $TEST_WRAPPER ./t $args runs.type=row
 $TEST_WRAPPER ./t $args runs.type=var
-
-# Temporarily disable LSM.
-# $TEST_WRAPPER ./t $args runs.type=row runs.source=lsm

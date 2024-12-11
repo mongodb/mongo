@@ -72,10 +72,6 @@ smoke_list=(
 	"$smoke_base_1 file_type=fix"
 	"$smoke_base_1 file_type=var"
 
-	# LSM
-    # Temporarily disabled: FIXME LSM
-	# "$smoke_base_1 file_type=row runs.source=lsm"
-
 	# Force the statistics server.
 	"$smoke_base_1 file_type=row statistics_server=1"
 

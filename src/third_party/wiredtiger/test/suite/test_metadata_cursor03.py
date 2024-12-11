@@ -35,7 +35,6 @@ class test_metadata03(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled)'
     types = [
         ('file', dict(uri='file:', use_cg=False, use_index=False)),
-        ('lsm', dict(uri='lsm:', use_cg=False, use_index=False)),
         ('table-cg', dict(uri='table:', use_cg=True, use_index=False)),
         ('table-index', dict(uri='table:', use_cg=False, use_index=True)),
         ('table-simple', dict(uri='table:', use_cg=False, use_index=False)),

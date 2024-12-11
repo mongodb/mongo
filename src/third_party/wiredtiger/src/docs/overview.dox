@@ -69,12 +69,6 @@ memory requirements.  Finally, row-and column-stores can be
 mixed-and-matched at the table level: for example, a row-store index can
 be created on a column-store table.
 
-WiredTiger supports @ref lsm, where updates are buffered in small files
-that fit in cache for fast random updates, then automatically merged into
-larger files in the background so that read latency approaches that of
-traditional Btree files.  LSM trees automatically create Bloom filters to
-avoid unnecessary reads from files that cannot containing matching keys.
-
 WiredTiger supports different-sized Btree internal and leaf pages in the
 same file.  Applications can maximize the amount of data transferred in
 each I/O by configuring large leaf pages, and still minimize CPU cache

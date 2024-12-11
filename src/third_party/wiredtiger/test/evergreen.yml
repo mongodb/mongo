@@ -3628,20 +3628,6 @@ tasks:
               exit 1
             fi
 
-  - name: format-stress-sanitizer-lsm-test
-    # FIXME-WT-6258: Re-enable the test once the outstanding issues with LSM are resolved.
-    # tags: ["stress-test-sanitizer"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
-      - func: "format test script"
-        vars:
-          additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-          # Run for 30 mins, and explicitly set data_source to LSM with a large cache
-          format_test_script_args: -t 30 data_source=lsm cache_minimum=5000
-
   - name: checkpoint-stress-test
     tags: ["stress-test-1"]
     exec_timeout_secs: 86400
@@ -4083,118 +4069,6 @@ tasks:
           test-name: code_complexity
           collection: CodeComplexity
 
-    #############################
-    # Performance Tests for lsm #
-    #############################
-
-  - name: perf-test-small-lsm
-    tags: ["lsm-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: small-lsm.wtperf
-          maxruns: 3
-          wtarg: -ops ['"load", "read"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: small-lsm.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: small-lsm.wtperf
-
-  - name: perf-test-medium-lsm
-    tags: ["lsm-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: medium-lsm.wtperf
-          maxruns: 1
-          wtarg: -ops ['"load", "read"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: medium-lsm.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: medium-lsm.wtperf
-
-  - name: perf-test-medium-lsm-compact
-    tags: ["lsm-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: medium-lsm-compact.wtperf
-          maxruns: 1
-          wtarg: -ops ['"load", "read"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: medium-lsm-compact.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: medium-lsm-compact.wtperf
-
-  - name: perf-test-medium-multi-lsm
-    tags: ["lsm-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: medium-multi-lsm.wtperf
-          maxruns: 1
-          wtarg: -ops ['"load", "read", "update"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: medium-multi-lsm.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: medium-multi-lsm.wtperf
-
-  - name: perf-test-parallel-pop-lsm
-    tags: ["lsm-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: parallel-pop-lsm.wtperf
-          maxruns: 1
-          wtarg: -ops ['"load"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: parallel-pop-lsm.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: parallel-pop-lsm.wtperf
-
-  - name: perf-test-update-lsm
-    tags: ["lsm-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: update-lsm.wtperf
-          maxruns: 1
-          wtarg: -ops ['"load", "read", "update", "insert"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: update-lsm.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: update-lsm.wtperf
-
     ###############################
     # Performance Tests for btree #
     ###############################
@@ -4531,25 +4405,6 @@ tasks:
         vars:
           test-name: update-checkpoint-btree.wtperf
 
-  - name: perf-test-update-checkpoint-lsm
-    # FIXME-WT-8867 Disable/Un-tag the LSM perf test till the support for LSM is restored.
-    # tags: ["checkpoint-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: update-checkpoint-lsm.wtperf
-          maxruns: 1
-          wtarg: "-bf ../../../bench/wtperf/runners/update-checkpoint.json"
-      - func: "upload stats to atlas"
-        vars:
-          test-name: update-checkpoint-lsm.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: update-checkpoint-lsm.wtperf
-
     ###############################
     # Performance Tests for stress #
     ###############################
@@ -4817,44 +4672,6 @@ tasks:
       - func: "upload stats to evergreen"
         vars:
           test-name: evict-btree-1.wtperf
-
-  - name: perf-test-evict-lsm
-    # FIXME-WT-8867 Disable/Un-tag the LSM perf test till the support for LSM is restored.
-    # tags: ["evict-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: evict-lsm.wtperf
-          maxruns: 1
-          wtarg: -ops ['"load", "read"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: evict-lsm.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: evict-lsm.wtperf
-
-  - name: perf-test-evict-lsm-1
-    # FIXME-WT-8867 Disable/Un-tag the LSM perf test till the support for LSM is restored.
-    # tags: ["evict-perf"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "run-perf-test"
-        vars:
-          perf-test-name: evict-lsm-1.wtperf
-          maxruns: 1
-          wtarg: -ops ['"read"']
-      - func: "upload stats to atlas"
-        vars:
-          test-name: evict-lsm-1.wtperf
-      - func: "upload stats to evergreen"
-        vars:
-          test-name: evict-lsm-1.wtperf
 
     ###########################################
     # Performance Tests for log consolidation #

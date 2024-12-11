@@ -22,13 +22,12 @@ they are used in other settings.
 <tr><td>block<td>block manager<td>the smallest granularity of data that is read from or written to a Btree file.  A btree page, when it appears on disk, may consist of one or more blocks.
 <tr><td>block compression<td>btree<td>after pages of btrees are encoded to be written, they may be compressed according to a configured algorithm.  Compressors may be added to WiredTiger via the extension mechanism.
 <tr><td>block manager<td>block manager<td>an internal API that abstracts writing, reading and allocating blocks to and from files.  A block manager is associated with a Btree.
-<tr><td>Bloom filter<td>lsm<td>a data structure that identifies that a key cannot be present.  Used by LSM.
+<tr><td>Bloom filter<td>general<td>a data structure that identifies that a key cannot be present.
 <tr><td>btcur<td>btree<td>a b-tree cursor.
 <tr><td>btree<td>btree<td>a data structure on disk or in memory that stores keys, it with its associated value. In WiredTiger, all btrees are in fact B+trees, meaning that adjacent keys and values are grouped into pages.
 <tr><td>bulk insert<td>btree<td>the capability to rapidly insert a set of ordered key value pairs into a Btree. In WiredTiger, a Btree's dhandle must be obtained exclusively, guaranteeing that the inserts can be done single threaded.
 <tr><td>cell<td>file format<td>a key or value packed as it appears on disk for a Btree.
 <tr><td>checkpoint<td>checkpoint<td>a stable point that bounds how much work recovery must do. Data committed before a checkpoint is guaranteed to reside in data files. Thus, recovery must replay log files starting at the last completed checkpoint.
-<tr><td>chunk<td>lsm<td>a single file within an LSM tree.
 <tr><td>collator<td>general<td>a comparison function that determines how keys will be ordered in a Btree. The default collator is byte oriented. A custom collator may be packaged as an extension and attached to a Btree.
 <tr><td>column<td>schema<td>a single field in a record, which must be unpacked from a raw key or value.
 <tr><td>column group<td>schema<td>a set of column store Btrees, whose record ids logically correspond. Together, a column group represents a table of data, with its columns being the union of columns in the individual Btrees.
@@ -65,8 +64,6 @@ they are used in other settings.
 <tr><td>key prefix compression<td>btree<td>a technique to store identical key prefixes only once per page.  See @ref file_formats_compression
 <tr><td>kv or k/v<td>btree<td>a key/value pair in a Btree.
 <tr><td>leaf page<td>btree<td>either in-memory or on disk, a page in a Btree that has a pairs of keys and values, and no pages beneath it.
-<tr><td>log structured merge tree (or LSM tree)<td>lsm<td>a data structure that stores keys and values (as a Btree), but composed of potentially many trees (Btrees in WiredTiger).
-<tr><td>LSM<td>lsm<td>see log structured merge tree
 <tr><td>merge<td>btree<td>the process of making a single page out of two adjacent smaller pages in a Btree.  This can occur with leaf pages or internal pages.
 <tr><td>metadata<td>general<td>a set of data that is used to help manage files, tables, indices and column groups in WiredTiger.
 <tr><td>metadata tracking<td>general<td>a technique to track a set of changes to the metadata, so they can be "rolled back" when an error occurs.

@@ -433,7 +433,7 @@ read:
              * making the problem better.
              */
             if (evict_skip || F_ISSET(session, WT_SESSION_RESOLVING_TXN) ||
-              LF_ISSET(WT_READ_NO_SPLIT) || btree->evict_disabled > 0 || btree->lsm_primary)
+              LF_ISSET(WT_READ_NO_SPLIT) || btree->evict_disabled > 0)
                 goto skip_evict;
 
             /*

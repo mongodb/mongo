@@ -54,9 +54,6 @@ Advanced applications may also open the following low-level cursor types:
 @row{<tt>file:\<file name\></tt>,
 	file cursor,
 	file key\, file value(s)}
-@row{<tt>lsm:\<name\></tt>,
-	LSM cursor (key=LSM key\, value=LSM value), LSM key\, LSM value\,<br>
-	see @ref lsm}
 </table>
 */
 
@@ -67,8 +64,8 @@ Advanced applications may also open the following low-level cursor types:
 WiredTiger provides access to data from a variety of sources.  At the
 lowest level, data may be stored in a file using a tree structure.  A
 relational schema supporting tables, indices and column groups is
-layered on top of file.  Additional sources include LSM trees and
-statistics, and applications can further extend the supported types by
+layered on top of file. Additional sources include statistics, log files
+and backups. Applications can further extend the supported types by
 implementing the ::WT_DATA_SOURCE interface.
 
 Common operations on all data sources are performed using WT_CURSOR

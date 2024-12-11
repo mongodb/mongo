@@ -16,8 +16,6 @@ variables:
   tasks:
     - name: compile
     - ".btree-perf"
-    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
-    # - ".lsm-perf"
     - ".stress-perf"
     - ".checkpoint-perf"
     - ".evict-perf"

@@ -316,7 +316,7 @@ if not run_test(conf_file):
     exit(-1)
 
 # Run a test with -C, -T, -o provided
-option_o = "verbose=2,conn_config=\"session_max=135\",table_config=\"type=lsm\",sample_interval=2,run_time=0,sample_rate=2,readonly=false"
+option_o = "verbose=2,conn_config=\"session_max=135\",sample_interval=2,run_time=0,sample_rate=2,readonly=false"
 option_C = "\"cache_size=10GB,session_max=115\""
 option_T = "\"allocation_size=8k,split_pct=92\""
 if not run_test(conf_file, option_C, option_T, option_o):

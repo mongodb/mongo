@@ -45,7 +45,6 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
 
     types = [
         ('file', dict(uri='file:', use_cg=False, use_index=False)),
-        ('lsm', dict(uri='lsm:', use_cg=False, use_index=False)),
         ('table-cg', dict(uri='table:', use_cg=True, use_index=False)),
         ('table-index', dict(uri='table:', use_cg=False, use_index=True)),
         ('table-simple', dict(uri='table:', use_cg=False, use_index=False)),
@@ -154,9 +153,6 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
     # Test that creating and dropping tables does not write individual
     # log records.
     def test_schema08_create(self):
-        if self.is_tiered_scenario() and (self.uri == 'lsm:' or self.uri == 'file:'):
-            self.skipTest('Tiered storage does not support LSM or file URIs.')
-
         self.count = 0
         self.lsns = []
         uri = self.uri + 'table0'

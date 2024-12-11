@@ -68,9 +68,6 @@ static const char *const list[] = {",cache_overhead=13", ",cache_overhead=27", "
   ",log=(prealloc=0)", ",log=(prealloc=1)", ",log=(remove=0)", ",log=(remove=1)",
   ",log=(zero_fill=0)", ",log=(zero_fill=1)",
 
-  ",lsm_manager=(merge=0)", ",lsm_manager=(merge=1)", ",lsm_manager=(worker_thread_max=5)",
-  ",lsm_manager=(worker_thread_max=18)", ",lsm_manager=(worker_thread_max=3)",
-
   ",shared_cache=(chunk=20MB)", ",shared_cache=(chunk=30MB)", ",shared_cache=(chunk=5MB)",
   ",shared_cache=(name=\"shared\")", ",shared_cache=(name=\"none\")", ",shared_cache=(quota=20MB)",
   ",shared_cache=(quota=30MB)", ",shared_cache=(quota=5MB)", ",shared_cache=(quota=0)",
@@ -89,12 +86,11 @@ static const char *const list[] = {",cache_overhead=13", ",cache_overhead=27", "
 
   ",verbose=(\"api\")", ",verbose=(\"block\")", ",verbose=(\"checkpoint\")",
   ",verbose=(\"compact\")", ",verbose=(\"eviction\")", ",verbose=(\"fileops\")",
-  ",verbose=(\"handleops\")", ",verbose=(\"log\")", ",verbose=(\"lsm\")",
-  ",verbose=(\"lsm_manager\")", ",verbose=(\"metadata\")", ",verbose=(\"mutex\")",
-  ",verbose=(\"overflow\")", ",verbose=(\"read\")", ",verbose=(\"reconcile\")",
-  ",verbose=(\"recovery\")", ",verbose=(\"salvage\")", ",verbose=(\"shared_cache\")",
-  ",verbose=(\"split\")", ",verbose=(\"transaction\")", ",verbose=(\"verify\")",
-  ",verbose=(\"version\")", ",verbose=(\"write\")", ",verbose=()"};
+  ",verbose=(\"handleops\")", ",verbose=(\"log\")", ",verbose=(\"metadata\")",
+  ",verbose=(\"mutex\")", ",verbose=(\"overflow\")", ",verbose=(\"read\")",
+  ",verbose=(\"reconcile\")", ",verbose=(\"recovery\")", ",verbose=(\"salvage\")",
+  ",verbose=(\"shared_cache\")", ",verbose=(\"split\")", ",verbose=(\"transaction\")",
+  ",verbose=(\"verify\")", ",verbose=(\"version\")", ",verbose=(\"write\")", ",verbose=()"};
 
 /*
  * handle_message --
@@ -179,9 +175,7 @@ main(int argc, char *argv[])
 
     testutil_check(wiredtiger_open(opts->home, &event_handler, "create", &opts->conn));
 
-    /* Open an LSM file so the LSM reconfiguration options make sense. */
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(session->create(session, opts->uri, "type=lsm,key_format=S,value_format=S"));
 
     /* Initialize the RNG. */
     __wt_random_init_seed(NULL, &rnd);

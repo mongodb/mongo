@@ -125,7 +125,7 @@ wts_salvage(TABLE *table, void *arg)
     (void)arg; /* unused argument */
     testutil_assert(table != NULL);
 
-    if (GV(OPS_SALVAGE) == 0 || DATASOURCE(table, "lsm"))
+    if (GV(OPS_SALVAGE) == 0)
         return;
 
     /* Save a copy of the interesting files so we can replay the salvage step as necessary. */

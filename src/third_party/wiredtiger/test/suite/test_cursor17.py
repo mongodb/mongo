@@ -31,24 +31,20 @@
 #
 import wttest
 import wiredtiger
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 class test_cursor17(wttest.WiredTigerTestCase):
     tablename = 'test_cursor17'
 
-    # Enable the lsm tests once it is supported.
     types = [
         ('file-row', dict(type='file:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('table-row', dict(type='table:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('file-var', dict(type='file:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
         ('table-var', dict(type='table:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
         ('file-fix', dict(type='file:', keyformat='r', valueformat='8t', dataset=SimpleDataSet)),
-        # ('lsm', dict(type='lsm:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('table-r-complex', dict(type='table:', keyformat='r', valueformat=None,
             dataset=ComplexDataSet)),
-        # ('table-i-complex-lsm', dict(type='table:', keyformat='i', valueformat=None,
-        #   dataset=ComplexLSMDataSet)),
     ]
 
     scenarios = make_scenarios(types)

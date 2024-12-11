@@ -131,8 +131,8 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
         return (false);
 
     /*
-     * LSM sets the "ignore cache size" flag when holding the LSM tree lock, in that case, or when
-     * holding the schema lock, we don't want this thread to block for eviction.
+     * Don't block to perform slow operations for sessions that set the "ignore cache size" flag, or
+     * when holding the schema lock.
      */
     return (!(F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE) ||
       FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA)));

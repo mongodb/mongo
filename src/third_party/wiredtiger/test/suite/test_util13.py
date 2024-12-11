@@ -28,7 +28,7 @@
 
 import os, re
 from suite_subprocess import suite_subprocess
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 import wiredtiger, wttest
 
 from wtscenario import make_scenarios
@@ -53,9 +53,6 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         ('file-simple', dict(uri='file:' + pfx, dataset=SimpleDataSet,
             table_config='prefix_compression_min=3', cfg='',
             cg_config='')),
-        ('lsm-simple', dict(uri='lsm:' + pfx, dataset=SimpleDataSet,
-            table_config='lsm=(bloom_bit_count=29)', cfg='bloom_bit_count=29',
-            cg_config='')),
         ('table-simple', dict(uri='table:' + pfx, dataset=SimpleDataSet,
             table_config='split_pct=50', cfg='',
             cg_config='')),
@@ -63,10 +60,6 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             dict(uri='table:' + pfx, dataset=ComplexDataSet,
             table_config='allocation_size=512B', cfg='',
             cg_config='allocation_size=512B')),
-        ('table-complex-lsm',
-            dict(uri='table:' + pfx, dataset=ComplexLSMDataSet,
-            table_config='lsm=(merge_max=5)', cfg='merge_max=5',
-            cg_config='lsm=(merge_max=5)'))
     ]
 
     scenarios = make_scenarios(types)

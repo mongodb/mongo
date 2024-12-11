@@ -637,9 +637,8 @@ err:
     /*
      * The application might do a WT_CURSOR.get_value call when we return, so we need a value and
      * the underlying functions didn't set one up. For various reasons, those functions may not have
-     * done a search and any previous value in the cursor might race with WT_CURSOR.reserve (and in
-     * cases like LSM, the reserve never encountered the original key). For simplicity, repeat the
-     * search here.
+     * done a search and any previous value in the cursor might race with WT_CURSOR.reserve. For
+     * simplicity, repeat the search here.
      */
     return (ret == 0 ? cursor->search(cursor) : ret);
 }
@@ -965,7 +964,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __curtable_update,                             /* update */
       __curtable_remove,                             /* remove */
       __curtable_reserve,                            /* reserve */
-      __wt_cursor_reconfigure,                       /* reconfigure */
+      __wti_cursor_reconfigure,                      /* reconfigure */
       __curtable_largest_key,                        /* largest_key */
       __curtable_bound,                              /* bound */
       __wt_cursor_notsup,                            /* cache */
@@ -1037,7 +1036,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
      */
     WT_ERR(__wt_config_gets_def(session, cfg, "next_random", 0, &cval));
     if (cval.val != 0) {
-        __wt_cursor_set_notsup(cursor);
+        __wti_cursor_set_notsup(cursor);
         cursor->next = __curtable_next_random;
         cursor->reset = __curtable_reset;
     }

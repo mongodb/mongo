@@ -226,9 +226,9 @@ __checkpoint_name_check(WT_SESSION_IMPL *session)
 
     /*
      * This function exists as a place for this comment: named checkpoints are only supported on
-     * file objects, and not on LSM trees. Confirm the metadata file contains no non-file objects.
-     * Skip any internal system objects. We don't want spurious error messages, other code will skip
-     * over them and the user has no control over their existence.
+     * file objects. Confirm the metadata file contains no non-file objects. Skip any internal
+     * system objects. We don't want spurious error messages, other code will skip over them and the
+     * user has no control over their existence.
      */
     WT_RET(__wt_metadata_cursor(session, &cursor));
     while ((ret = cursor->next(cursor)) == 0) {

@@ -40,13 +40,7 @@ Note quoting must be used when passing values to Wiredtiger
 configuration, as opposed to configuring the \c wtperf utility itself.
 
 The \c table_config configuration supports setting any WiredTiger object
-creation configuration value, for example, the above test can be
-converted to using an LSM store instead of a B+tree store, with
-additional LSM configuration, by changing \c conn_config to:
-
-@code
-table_config="lsm=(chunk_size=5MB),type=lsm,os_cache_dirty_max=16MB"
-@endcode
+creation configuration value.
 
 More complex workloads can be configured by creating more threads doing
 inserts and updates as well as reads.  For example, to configure two
@@ -143,7 +137,7 @@ connection configuration string
 @par close_conn (boolean, default=true)
 properly close connection at end of test. Setting to false does not sync data to disk and can  result in lost data after test exits.
 @par compact (boolean, default=false)
-post-populate compact for LSM merging activity
+post-populate compact
 @par compression (string, default="none")
 compression extension.  Allowed configuration values are: 'none', 'lz4', 'snappy', 'zlib',  'zstd'
 @par create (boolean, default=true)

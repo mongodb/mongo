@@ -57,8 +57,6 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     types = [
-        ('lsm', dict(tabletype='lsm', uri='lsm',
-                    create_params = 'key_format=i,value_format=i')),
         ('file-row', dict(tabletype='row', uri='file',
                     create_params = 'key_format=i,value_format=i')),
         ('file-var', dict(tabletype='var', uri='file',

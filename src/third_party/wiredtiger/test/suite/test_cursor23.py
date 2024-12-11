@@ -30,16 +30,13 @@
 #   Test cursor get_raw_key_value using complex schema
 
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_cursor23(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file-S', dict(type='file:', keyfmt='S', valfmt='S', dataset=SimpleDataSet, complex=False)),
-        ('lsm-S', dict(type='lsm:', keyfmt='S', valfmt='S', dataset=SimpleDataSet, complex=False)),
         ('table-S', dict(type='table:', keyfmt='S', valfmt='S', dataset=SimpleDataSet, complex=False)),
-        ('table-S-complex-lsm', dict(type='table:', keyfmt='S', valfmt='S',
-            dataset=ComplexLSMDataSet, complex=True)),
     ])
 
     def check_get_key_and_value(self, cursor, expected_key, expected_value):

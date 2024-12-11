@@ -42,7 +42,6 @@ class test_drop(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
-        ('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
     ])
 
     # Populate an object, remove it and confirm it no longer exists.
@@ -103,17 +102,6 @@ class test_drop(wttest.WiredTigerTestCase):
 
         confirm_does_not_exist(self, drop_uri)
 
-        # Skip if tiered because test_drop_dne contains: self.skipTest("negative tests for drop do not work in tiered storage").
-        if self.extra_config.find('type=lsm') == -1:
-            # Test dropping a non-existent table
-            # Fail without force or force=false
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.drop(drop_uri, None))
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.drop(drop_uri, "force=false"))
-            # Succeed with force=true.
-            self.session.drop(drop_uri, "force=true")
-
     # Test drop of an object.
     def test_drop(self):
         cnt = 0
@@ -129,7 +117,7 @@ class test_drop(wttest.WiredTigerTestCase):
         # SimpleIndexDataSet: A table with an index
         # Try almost all test combinations.
         # Skip if tiered since indices don't work for tiered.
-        if self.uri == "table:" and self.extra_config.find('type=lsm') == -1:
+        if self.uri == "table:":
             for with_cursor in [False, True]:
                 for reopen in [False, True]:
                     for with_transaction in [False, True]:
@@ -141,7 +129,7 @@ class test_drop(wttest.WiredTigerTestCase):
         # ComplexDataSet: A complex, multi-file table object.
         # Try all test combinations.
         # Skip if tiered since column groups don't work for tiered.
-        if self.uri == "table:" and self.extra_config.find('type=lsm') == -1:
+        if self.uri == "table:":
             for with_cursor in [False, True]:
                 for reopen in [False, True]:
                     for with_transaction in [False, True]:
@@ -157,7 +145,6 @@ class test_drop(wttest.WiredTigerTestCase):
         uri = self.uri + self.name
         cguri = 'colgroup:' + self.name
         idxuri = 'index:' + self.name + ':indexname'
-        lsmuri = 'lsm:' + self.name
         confirm_does_not_exist(self, uri)
         self.session.drop(uri, 'force')
         self.assertRaises(
@@ -170,7 +157,3 @@ class test_drop(wttest.WiredTigerTestCase):
         self.session.drop(idxuri, 'force')
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.drop(idxuri, None))
-
-        self.session.drop(lsmuri, 'force')
-        self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: self.session.drop(lsmuri, None))

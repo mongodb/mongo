@@ -412,16 +412,6 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
  */
 #define WT_CONNECTION_STATS_BASE 1000
 struct __wt_connection_stats {
-    int64_t lsm_work_queue_app;
-    int64_t lsm_work_queue_manager;
-    int64_t lsm_rows_merged;
-    int64_t lsm_checkpoint_throttle;
-    int64_t lsm_merge_throttle;
-    int64_t lsm_work_queue_switch;
-    int64_t lsm_work_units_discarded;
-    int64_t lsm_work_units_done;
-    int64_t lsm_work_units_created;
-    int64_t lsm_work_queue_max;
     int64_t autocommit_readonly_retry;
     int64_t autocommit_update_retry;
     int64_t background_compact_fail;
@@ -1055,7 +1045,6 @@ struct __wt_connection_stats {
     int64_t application_evict_snapshot_refreshed;
     int64_t application_cache_time;
     int64_t txn_release_blocked;
-    int64_t conn_close_blocked_lsm;
     int64_t dhandle_lock_blocked;
     int64_t page_index_slot_ref_blocked;
     int64_t prepared_transition_blocked_page;
@@ -1131,18 +1120,6 @@ struct __wt_connection_stats {
  */
 #define WT_DSRC_STATS_BASE 2000
 struct __wt_dsrc_stats {
-    int64_t bloom_false_positive;
-    int64_t bloom_hit;
-    int64_t bloom_miss;
-    int64_t bloom_page_evict;
-    int64_t bloom_page_read;
-    int64_t bloom_count;
-    int64_t lsm_chunk_count;
-    int64_t lsm_generation_max;
-    int64_t lsm_lookup_no_bloom;
-    int64_t lsm_checkpoint_throttle;
-    int64_t lsm_merge_throttle;
-    int64_t bloom_size;
     int64_t autocommit_readonly_retry;
     int64_t autocommit_update_retry;
     int64_t backup_blocks_compressed;

@@ -410,18 +410,15 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
           "is applicable only on simple tables");
 
     /*
-     * The alter flag is used so LSM can apply some special logic, the exclusive flag avoids
-     * conflicts with other operations and the lock only flag is required because we don't need to
-     * have a handle to update the metadata and opening the handle causes problems when meta
-     * tracking is enabled.
+     * The exclusive flag avoids conflicts with other operations and the lock only flag is required
+     * because we don't need to have a handle to update the metadata and opening the handle causes
+     * problems when meta tracking is enabled.
      */
-    flags = WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY;
+    flags = WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY;
     if (WT_PREFIX_MATCH(uri, "file:"))
         return (__wti_execute_handle_operation(session, uri, __alter_file, newcfg, flags));
     if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
         return (__alter_tree(session, uri, newcfg));
-    if (WT_PREFIX_MATCH(uri, "lsm:"))
-        return (__wt_lsm_tree_worker(session, uri, __alter_file, NULL, newcfg, flags));
     if (WT_PREFIX_MATCH(uri, "object:"))
         return (__alter_object(session, uri, newcfg));
     if (WT_PREFIX_MATCH(uri, "table:"))

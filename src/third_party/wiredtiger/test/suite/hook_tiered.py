@@ -41,7 +41,7 @@
 #
 # 2. If we create an object that is *not* a table:, we add options to its config
 #    so that it will be stored local-only.  Tiered storage isn't intended (yet?) for
-#    use with lsm or column store.
+#    use with column store.
 #
 # 3. We add calls to flush_tier().  Currently we only flush after a checkpoint() call,
 #    but we should add others.
@@ -227,12 +227,12 @@ def session_create_replace(orig_session_create, session_self, uri, config):
     else:
         new_config = config
 
-    # If the test isn't creating a table (i.e., it's a column store or lsm) create it as a
+    # If the test isn't creating a table (i.e., it's a column store) create it as a
     # "local only" object.  Otherwise we get tiered storage from the connection defaults.
     # We want readonly connections to do the real call, see comment in testcase_is_readonly.
     #
     # Column store testing is disallowed with tiered storage.
-    if not uri.startswith("table:") or "key_format=r" in new_config or "type=lsm" in new_config or testcase_is_readonly():
+    if not uri.startswith("table:") or "key_format=r" in new_config or testcase_is_readonly():
         new_config = new_config + ',tiered_storage=(name=none)'
 
     WiredTigerTestCase.verbose(None, 3,
@@ -297,7 +297,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
         skip_categories = [
             ("backup",               "Can't backup a tiered table"),
             ("inmem",                "In memory tests don't make sense with tiered storage"),
-            ("lsm",                  "LSM is not supported with tiering"),
             ("modify_smoke_recover", "Copying WT dir doesn't copy the bucket directory"),
             ("test_salvage",         "Salvage tests directly name files ending in '.wt'"),
             ("test_config_json",     "Tiered hook's create function can't handle a json config string"),

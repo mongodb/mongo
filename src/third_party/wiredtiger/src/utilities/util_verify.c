@@ -177,11 +177,10 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 
             /*
              * Typically each WT file will have multiple entries, and so only run verify on table
-             * and lsm entries to prevent unnecessary work. Skip over the double up entries and also
-             * any entries that are not supported with verify.
+             * entries to prevent unnecessary work. Skip over the double up entries and also any
+             * entries that are not supported with verify.
              */
-            if ((WT_PREFIX_MATCH(key, "table:") || WT_PREFIX_MATCH(key, "lsm:")) &&
-              !WT_PREFIX_MATCH(key, WT_SYSTEM_PREFIX)) {
+            if (WT_PREFIX_MATCH(key, "table:") && !WT_PREFIX_MATCH(key, WT_SYSTEM_PREFIX)) {
                 if (abort_on_error)
                     WT_ERR_ERROR_OK(verify_one(session, config, key), ENOTSUP, false);
                 else

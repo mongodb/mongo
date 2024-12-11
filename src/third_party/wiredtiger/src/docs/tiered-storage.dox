@@ -10,9 +10,7 @@ up of blocks that reside in one or more files on the local file system and
 zero or more cloud objects (e.g., stored in S3). The btree spans this set of
 files and objects by encoding a block's location in the pointer that links
 blocks in the btree. A tiered btree is contrasted with a regular (non-tiered)
-btree that is contained in a single file. It is also different from an LSM
-(see @ref lsm) tree, which WiredTiger implements as multiple regular btrees,
-each in its own file.
+btree that is contained in a single file.
 
 When in use, a tiered btree, like a regular btree, may have some
 recently used or modified data that resides in memory pages.

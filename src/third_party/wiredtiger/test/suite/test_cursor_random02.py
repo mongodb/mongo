@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 #    Cursor next_random operations
 class test_cursor_random02(wttest.WiredTigerTestCase):
     types = [
-        ('lsm', dict(type='lsm:random')),
         ('table', dict(type='table:random'))
     ]
     config = [

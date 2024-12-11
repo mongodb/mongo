@@ -126,7 +126,7 @@ __wti_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
  * __wt_cursor_modify_notsup - Default function for cursor types where the modify operation
  * is not supported.
  *
- * __wt_cursor_modify_value_format_notsup - Default function for cursor types where the modify
+ * __wti_cursor_modify_value_format_notsup - Default function for cursor types where the modify
  * operation is supported with specific value formats of the cursor.
  */
 
@@ -144,11 +144,11 @@ __wt_cursor_modify_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 }
 
 /*
- * __wt_cursor_modify_value_format_notsup --
+ * __wti_cursor_modify_value_format_notsup --
  *     Unsupported value format for cursor modify.
  */
 int
-__wt_cursor_modify_value_format_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
+__wti_cursor_modify_value_format_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 {
     WT_SESSION_IMPL *session;
 
@@ -200,11 +200,11 @@ __wt_cursor_reopen_notsup(WT_CURSOR *cursor, bool check_only)
 }
 
 /*
- * __wt_cursor_set_notsup --
+ * __wti_cursor_set_notsup --
  *     Reset the cursor methods to not-supported.
  */
 void
-__wt_cursor_set_notsup(WT_CURSOR *cursor)
+__wti_cursor_set_notsup(WT_CURSOR *cursor)
 {
     /*
      * Set cursor methods other than close, reconfigure and reset, to fail. Close is unchanged so
@@ -1238,11 +1238,11 @@ __cursor_config_debug(WT_CURSOR *cursor, const char *cfg[])
 }
 
 /*
- * __wt_cursor_reconfigure --
+ * __wti_cursor_reconfigure --
  *     Set runtime-configurable settings.
  */
 int
-__wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
+__wti_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
@@ -1580,7 +1580,7 @@ __wt_cursor_init(
      * initialized (file cursors have a faster implementation).
      */
     if ((WT_STREQ(cursor->value_format, "u") || WT_STREQ(cursor->value_format, "S")) &&
-      cursor->modify == __wt_cursor_modify_value_format_notsup)
+      cursor->modify == __wti_cursor_modify_value_format_notsup)
         cursor->modify = __cursor_modify;
 
     /* Tiered cursors are not yet candidates for caching. */

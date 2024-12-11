@@ -3,18 +3,6 @@
 #include "wt_internal.h"
 
 static const char *const __stats_dsrc_desc[] = {
-  "LSM: bloom filter false positives",
-  "LSM: bloom filter hits",
-  "LSM: bloom filter misses",
-  "LSM: bloom filter pages evicted from cache",
-  "LSM: bloom filter pages read into cache",
-  "LSM: bloom filters in the LSM tree",
-  "LSM: chunks in the LSM tree",
-  "LSM: highest merge generation in the LSM tree",
-  "LSM: queries that could have benefited from a Bloom filter that did not exist",
-  "LSM: sleep for LSM checkpoint throttle",
-  "LSM: sleep for LSM merge throttle",
-  "LSM: total size of bloom filters",
   "autocommit: retries for readonly operations",
   "autocommit: retries for update operations",
   "backup: total modified incremental blocks with compressed data",
@@ -362,18 +350,6 @@ __wt_stat_dsrc_discard(WT_SESSION_IMPL *session, WT_DATA_HANDLE *handle)
 void
 __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 {
-    stats->bloom_false_positive = 0;
-    stats->bloom_hit = 0;
-    stats->bloom_miss = 0;
-    stats->bloom_page_evict = 0;
-    stats->bloom_page_read = 0;
-    stats->bloom_count = 0;
-    stats->lsm_chunk_count = 0;
-    stats->lsm_generation_max = 0;
-    stats->lsm_lookup_no_bloom = 0;
-    stats->lsm_checkpoint_throttle = 0;
-    stats->lsm_merge_throttle = 0;
-    stats->bloom_size = 0;
     stats->autocommit_readonly_retry = 0;
     stats->autocommit_update_retry = 0;
     stats->backup_blocks_compressed = 0;
@@ -675,19 +651,6 @@ __wt_stat_dsrc_clear_all(WT_DSRC_STATS **stats)
 void
 __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
 {
-    to->bloom_false_positive += from->bloom_false_positive;
-    to->bloom_hit += from->bloom_hit;
-    to->bloom_miss += from->bloom_miss;
-    to->bloom_page_evict += from->bloom_page_evict;
-    to->bloom_page_read += from->bloom_page_read;
-    to->bloom_count += from->bloom_count;
-    to->lsm_chunk_count += from->lsm_chunk_count;
-    if (from->lsm_generation_max > to->lsm_generation_max)
-        to->lsm_generation_max = from->lsm_generation_max;
-    to->lsm_lookup_no_bloom += from->lsm_lookup_no_bloom;
-    to->lsm_checkpoint_throttle += from->lsm_checkpoint_throttle;
-    to->lsm_merge_throttle += from->lsm_merge_throttle;
-    to->bloom_size += from->bloom_size;
     to->autocommit_readonly_retry += from->autocommit_readonly_retry;
     to->autocommit_update_retry += from->autocommit_update_retry;
     to->backup_blocks_compressed += from->backup_blocks_compressed;
@@ -1005,19 +968,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
 {
     int64_t v;
 
-    to->bloom_false_positive += WT_STAT_DSRC_READ(from, bloom_false_positive);
-    to->bloom_hit += WT_STAT_DSRC_READ(from, bloom_hit);
-    to->bloom_miss += WT_STAT_DSRC_READ(from, bloom_miss);
-    to->bloom_page_evict += WT_STAT_DSRC_READ(from, bloom_page_evict);
-    to->bloom_page_read += WT_STAT_DSRC_READ(from, bloom_page_read);
-    to->bloom_count += WT_STAT_DSRC_READ(from, bloom_count);
-    to->lsm_chunk_count += WT_STAT_DSRC_READ(from, lsm_chunk_count);
-    if ((v = WT_STAT_DSRC_READ(from, lsm_generation_max)) > to->lsm_generation_max)
-        to->lsm_generation_max = v;
-    to->lsm_lookup_no_bloom += WT_STAT_DSRC_READ(from, lsm_lookup_no_bloom);
-    to->lsm_checkpoint_throttle += WT_STAT_DSRC_READ(from, lsm_checkpoint_throttle);
-    to->lsm_merge_throttle += WT_STAT_DSRC_READ(from, lsm_merge_throttle);
-    to->bloom_size += WT_STAT_DSRC_READ(from, bloom_size);
     to->autocommit_readonly_retry += WT_STAT_DSRC_READ(from, autocommit_readonly_retry);
     to->autocommit_update_retry += WT_STAT_DSRC_READ(from, autocommit_update_retry);
     to->backup_blocks_compressed += WT_STAT_DSRC_READ(from, backup_blocks_compressed);
@@ -1366,16 +1316,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
 }
 
 static const char *const __stats_connection_desc[] = {
-  "LSM: application work units currently queued",
-  "LSM: merge work units currently queued",
-  "LSM: rows merged in an LSM tree",
-  "LSM: sleep for LSM checkpoint throttle",
-  "LSM: sleep for LSM merge throttle",
-  "LSM: switch work units currently queued",
-  "LSM: tree maintenance operations discarded",
-  "LSM: tree maintenance operations executed",
-  "LSM: tree maintenance operations scheduled",
-  "LSM: tree queue hit maximum",
   "autocommit: retries for readonly operations",
   "autocommit: retries for update operations",
   "background-compact: background compact failed calls",
@@ -2032,7 +1972,6 @@ static const char *const __stats_connection_desc[] = {
   "thread-yield: application thread snapshot refreshed for eviction",
   "thread-yield: application thread time waiting for cache (usecs)",
   "thread-yield: connection close blocked waiting for transaction state stabilization",
-  "thread-yield: connection close yielded for lsm manager shutdown",
   "thread-yield: data handle lock yielded",
   "thread-yield: get reference for page index and slot time sleeping (usecs)",
   "thread-yield: page access yielded due to prepare state change",
@@ -2147,16 +2086,6 @@ __wt_stat_connection_discard(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *handl
 void
 __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 {
-    /* not clearing lsm_work_queue_app */
-    /* not clearing lsm_work_queue_manager */
-    stats->lsm_rows_merged = 0;
-    stats->lsm_checkpoint_throttle = 0;
-    stats->lsm_merge_throttle = 0;
-    /* not clearing lsm_work_queue_switch */
-    stats->lsm_work_units_discarded = 0;
-    stats->lsm_work_units_done = 0;
-    stats->lsm_work_units_created = 0;
-    stats->lsm_work_queue_max = 0;
     stats->autocommit_readonly_retry = 0;
     stats->autocommit_update_retry = 0;
     stats->background_compact_fail = 0;
@@ -2790,7 +2719,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->application_evict_snapshot_refreshed = 0;
     stats->application_cache_time = 0;
     stats->txn_release_blocked = 0;
-    stats->conn_close_blocked_lsm = 0;
     stats->dhandle_lock_blocked = 0;
     stats->page_index_slot_ref_blocked = 0;
     stats->prepared_transition_blocked_page = 0;
@@ -2875,16 +2803,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
 {
     int64_t v;
 
-    to->lsm_work_queue_app += WT_STAT_CONN_READ(from, lsm_work_queue_app);
-    to->lsm_work_queue_manager += WT_STAT_CONN_READ(from, lsm_work_queue_manager);
-    to->lsm_rows_merged += WT_STAT_CONN_READ(from, lsm_rows_merged);
-    to->lsm_checkpoint_throttle += WT_STAT_CONN_READ(from, lsm_checkpoint_throttle);
-    to->lsm_merge_throttle += WT_STAT_CONN_READ(from, lsm_merge_throttle);
-    to->lsm_work_queue_switch += WT_STAT_CONN_READ(from, lsm_work_queue_switch);
-    to->lsm_work_units_discarded += WT_STAT_CONN_READ(from, lsm_work_units_discarded);
-    to->lsm_work_units_done += WT_STAT_CONN_READ(from, lsm_work_units_done);
-    to->lsm_work_units_created += WT_STAT_CONN_READ(from, lsm_work_units_created);
-    to->lsm_work_queue_max += WT_STAT_CONN_READ(from, lsm_work_queue_max);
     to->autocommit_readonly_retry += WT_STAT_CONN_READ(from, autocommit_readonly_retry);
     to->autocommit_update_retry += WT_STAT_CONN_READ(from, autocommit_update_retry);
     to->background_compact_fail += WT_STAT_CONN_READ(from, background_compact_fail);
@@ -3625,7 +3543,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, application_evict_snapshot_refreshed);
     to->application_cache_time += WT_STAT_CONN_READ(from, application_cache_time);
     to->txn_release_blocked += WT_STAT_CONN_READ(from, txn_release_blocked);
-    to->conn_close_blocked_lsm += WT_STAT_CONN_READ(from, conn_close_blocked_lsm);
     to->dhandle_lock_blocked += WT_STAT_CONN_READ(from, dhandle_lock_blocked);
     to->page_index_slot_ref_blocked += WT_STAT_CONN_READ(from, page_index_slot_ref_blocked);
     to->prepared_transition_blocked_page +=

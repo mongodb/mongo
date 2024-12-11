@@ -5,8 +5,7 @@
 WiredTiger supports three underlying file formats: row-store and
 column-store, with an underlying special case of column-store for
 bit-field values. All three formats are B+tree implementations of
-key/value stores. WiredTiger also supports @ref lsm, implemented as a
-tree of B+trees. In addition, there is experimental support for
+key/value stores. In addition, there is experimental support for
 @ref tiered_storage, allowing a B+tree to span multiple files and
 cloud objects.
 
@@ -50,19 +49,11 @@ the primary key is a record number, there are advantages to storing
 columns in separate files, or the underlying data is a set of bits,
 column-store format may be a better choice.
 
-Both row- and column-store formats can maintain high volumes of writes,
-but for data sets requiring sustained, extreme write throughput,
-@ref lsm are usually a better choice.  For applications that do not
-require extreme write throughput, row- or column-store is likely to be
-a better choice because the read throughput is better than with LSM trees
-(an effect that becomes more pronounced as additional read threads are
-added).
+Both row- and column-store formats can maintain high volumes of writes.
 
 Applications with complex schemas may also benefit from using multiple
 storage formats, that is, using a combination of different formats in
-the database, and even in individual tables (for example, a sparse, wide
-table configured with a column-store primary, where indexes are stored
-in an LSM tree).
+the database, and even in individual tables.
 
 Finally, as WiredTiger makes it easy to switch back-and-forth between
 storage configurations, it's usually worthwhile benchmarking possible

@@ -44,9 +44,8 @@ typedef struct {
 } CONFIG;
 
 static CONFIG config[] = {{"file:xxx", "key_format=S,value_format=S", 0},
-  {"file:xxx", "key_format=r,value_format=S", 1}, {"lsm:xxx", "key_format=S,value_format=S", 0},
-  {"table:xxx", "key_format=S,value_format=S", 0}, {"table:xxx", "key_format=r,value_format=S", 1},
-  {NULL, NULL, 0}};
+  {"file:xxx", "key_format=r,value_format=S", 1}, {"table:xxx", "key_format=S,value_format=S", 0},
+  {"table:xxx", "key_format=r,value_format=S", 1}, {NULL, NULL, 0}};
 
 #define SMALL_MAX MEGABYTE
 static size_t lengths[] = {20,       /* Check configuration */

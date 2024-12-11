@@ -117,10 +117,6 @@ class LogStat(Stat):
     prefix = 'log'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, LogStat.prefix, desc, flags)
-class LSMStat(Stat):
-    prefix = 'LSM'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LSMStat.prefix, desc, flags)
 class SessionStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
@@ -604,18 +600,6 @@ conn_stats = [
     LogStat('log_zero_fills', 'log files manually zero-filled'),
 
     ##########################################
-    # LSM statistics
-    ##########################################
-    LSMStat('lsm_rows_merged', 'rows merged in an LSM tree'),
-    LSMStat('lsm_work_queue_app', 'application work units currently queued', 'no_clear,no_scale'),
-    LSMStat('lsm_work_queue_manager', 'merge work units currently queued', 'no_clear,no_scale'),
-    LSMStat('lsm_work_queue_max', 'tree queue hit maximum'),
-    LSMStat('lsm_work_queue_switch', 'switch work units currently queued', 'no_clear,no_scale'),
-    LSMStat('lsm_work_units_created', 'tree maintenance operations scheduled'),
-    LSMStat('lsm_work_units_discarded', 'tree maintenance operations discarded'),
-    LSMStat('lsm_work_units_done', 'tree maintenance operations executed'),
-
-    ##########################################
     # Performance Histogram Stats
     ##########################################
     PerfHistStat('perf_hist_fsread_latency_gt1000', 'file system read latency histogram (bucket 7) - 1000ms+'),
@@ -786,7 +770,6 @@ conn_stats = [
     YieldStat('application_cache_time', 'application thread time waiting for cache (usecs)'),
     YieldStat('application_evict_snapshot_refreshed', 'application thread snapshot refreshed for eviction'),
     YieldStat('child_modify_blocked_page', 'page reconciliation yielded due to child modification'),
-    YieldStat('conn_close_blocked_lsm', 'connection close yielded for lsm manager shutdown'),
     YieldStat('dhandle_lock_blocked', 'data handle lock yielded'),
     YieldStat('page_busy_blocked', 'page acquire busy blocked'),
     YieldStat('page_del_rollback_blocked', 'page delete rollback time sleeping for state change (usecs)'),
@@ -931,20 +914,6 @@ dsrc_stats = [
     CursorStat('cursor_update', 'update calls'),
     CursorStat('cursor_update_bytes', 'update key and value bytes', 'size'),
     CursorStat('cursor_update_bytes_changed', 'update value size change', 'size'),
-
-    ##########################################
-    # LSM statistics
-    ##########################################
-    LSMStat('bloom_count', 'bloom filters in the LSM tree', 'no_scale'),
-    LSMStat('bloom_false_positive', 'bloom filter false positives'),
-    LSMStat('bloom_hit', 'bloom filter hits'),
-    LSMStat('bloom_miss', 'bloom filter misses'),
-    LSMStat('bloom_page_evict', 'bloom filter pages evicted from cache'),
-    LSMStat('bloom_page_read', 'bloom filter pages read into cache'),
-    LSMStat('bloom_size', 'total size of bloom filters', 'no_scale,size'),
-    LSMStat('lsm_chunk_count', 'chunks in the LSM tree', 'no_scale'),
-    LSMStat('lsm_generation_max', 'highest merge generation in the LSM tree', 'max_aggregate,no_scale'),
-    LSMStat('lsm_lookup_no_bloom', 'queries that could have benefited from a Bloom filter that did not exist'),
 
     ##########################################
     # Reconciliation statistics
@@ -1120,12 +1089,6 @@ conn_dsrc_stats = [
     CursorErrorStat('cursor_search_error', 'cursor search calls that return an error'),
     CursorErrorStat('cursor_search_near_error', 'cursor search near calls that return an error'),
     CursorErrorStat('cursor_update_error', 'cursor update calls that return an error'),
-
-    ##########################################
-    # LSM statistics
-    ##########################################
-    LSMStat('lsm_checkpoint_throttle', 'sleep for LSM checkpoint throttle'),
-    LSMStat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
 
     ##########################################
     # Reconciliation statistics

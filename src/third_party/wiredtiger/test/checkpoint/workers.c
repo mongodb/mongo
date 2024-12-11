@@ -43,10 +43,9 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 {
     int ret;
     char config[256];
-    const char *kf, *lsm, *vf;
+    const char *kf, *vf;
 
     kf = cookie->type == COL || cookie->type == FIX ? "r" : "q";
-    lsm = cookie->type == LSM ? ",type=lsm" : "";
     vf = cookie->type == FIX ? "8t" : "S";
 
     /*
@@ -56,10 +55,10 @@ create_table(WT_SESSION *session, COOKIE *cookie)
         testutil_snprintf(config, sizeof(config),
           "key_format=%s,value_format=%s,allocation_size=512,"
           "leaf_page_max=1KB,internal_page_max=1KB,"
-          "memory_page_max=64KB,log=(enabled=false),%s",
-          kf, vf, lsm);
+          "memory_page_max=64KB,log=(enabled=false)",
+          kf, vf);
     else
-        testutil_snprintf(config, sizeof(config), "key_format=%s,value_format=%s,%s", kf, vf, lsm);
+        testutil_snprintf(config, sizeof(config), "key_format=%s,value_format=%s", kf, vf);
 
     if ((ret = session->create(session, cookie->uri, config)) != 0)
         if (ret != EEXIST)

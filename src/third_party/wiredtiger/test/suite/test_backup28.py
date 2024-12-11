@@ -33,7 +33,7 @@ from wtscenario import make_scenarios
 
 # test_backup28.py
 # Test selective backup with different schema types. Recovering a partial backup with target uris
-# including colgroups, index or lsm formats should raise a message. The only supported types are
+# including colgroups or index formats should raise a message. The only supported types are
 # table formats in the uri list.
 class test_backup28(backup_base):
     dir='backup.dir'    # Backup directory name
@@ -41,7 +41,6 @@ class test_backup28(backup_base):
 
     types = [
         ('file', dict(pfx='file:', target_uri_list=["file:table0"])),
-        ('lsm', dict(pfx='lsm:', target_uri_list=["lsm:table0"])),
         ('table-simple', dict(pfx='table:', target_uri_list=["table:table0"])),
         ('table-cg', dict(pfx='table:', target_uri_list=["index:table0:i0", "table:table0"])),
         ('table-index', dict(pfx='table:', target_uri_list=["colgroup:table0:g0", "table:table0"])),
@@ -58,7 +57,7 @@ class test_backup28(backup_base):
         # Create the main table.
         self.session.create(uri, create_params + cgparam)
 
-        if (self.pfx != "lsm:" and self.pfx != "file:"):
+        if self.pfx != "file:":
             # Add in column group and index tables.
             colgroup_param = 'columns=(v),'
             suburi = 'colgroup:table0:g0'
@@ -85,7 +84,7 @@ class test_backup28(backup_base):
             backup_conn.close()
         else:
             # After the full backup, perform partial backup restore adding the target uris of
-            # indexes, colgroups or lsm. This should fail and return with a message, as we only allow
+            # indexes or colgroups. This should fail and return with a message, as we only allow
             # table formats.
             self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open(self.dir, "backup_restore_target={0}".format(target_uri_list_format)),

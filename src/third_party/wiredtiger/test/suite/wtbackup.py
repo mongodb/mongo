@@ -85,12 +85,10 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     #
     # Populate a set of objects.
     #
-    def populate(self, objs, do_checkpoint=False, skiplsm=False):
+    def populate(self, objs, do_checkpoint=False):
         cg_config = ''
         for i in objs:
             if len(i) > 2:
-                if i[2] and skiplsm:
-                    continue
                 if i[2] == self.populate_big:
                     self.rows = 50000 # Big Object
                 else:

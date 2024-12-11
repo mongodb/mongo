@@ -23,8 +23,7 @@ the page eviction statistics for the database.
 Objects can be created as cache resident - that is their contents will
 remain in cache and never be considered for the purposes of cache
 eviction. Cache residence can be configured with the WT_SESSION::create
-"cache_resident" configuration string. LSM tree objects do not support
-the "cache_resident" setting.
+"cache_resident" configuration string.
 
 Configuring a cache resident object has several effects:
 

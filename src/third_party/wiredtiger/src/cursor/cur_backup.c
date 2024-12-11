@@ -711,10 +711,6 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
         F_SET(cb, WT_CURBACKUP_INCR);
     }
 
-    /* Return an error if block-based incremental backup is performed with open LSM trees. */
-    if (incremental_config && !TAILQ_EMPTY(&conn->lsmqh))
-        WT_ERR_MSG(session, ENOTSUP, "LSM does not work with block-based incremental backup");
-
 err:
     if (ret != 0 && cb->incr_src != NULL) {
         F_CLR(cb->incr_src, WT_BLKINCR_INUSE);
@@ -974,14 +970,13 @@ __backup_list_uri_append(WT_SESSION_IMPL *session, const char *name, bool *skip)
     /*
      * While reading the metadata file, check there are no data sources that can't support hot
      * backup. This checks for a data source that's non-standard, which can't be backed up, but is
-     * also sanity checking: if there's an entry backed by anything other than a file or lsm entry,
-     * we're confused.
+     * also sanity checking: if there's an entry backed by anything other than a file, we're
+     * confused.
      */
     if (!WT_PREFIX_MATCH(name, "file:") && !WT_PREFIX_MATCH(name, "colgroup:") &&
-      !WT_PREFIX_MATCH(name, "index:") && !WT_PREFIX_MATCH(name, "lsm:") &&
-      !WT_PREFIX_MATCH(name, "object:") && !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) &&
-      !WT_PREFIX_MATCH(name, "table:") && !WT_PREFIX_MATCH(name, "tier:") &&
-      !WT_PREFIX_MATCH(name, "tiered:"))
+      !WT_PREFIX_MATCH(name, "index:") && !WT_PREFIX_MATCH(name, "object:") &&
+      !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) && !WT_PREFIX_MATCH(name, "table:") &&
+      !WT_PREFIX_MATCH(name, "tier:") && !WT_PREFIX_MATCH(name, "tiered:"))
         WT_RET_MSG(session, ENOTSUP, "hot backup is not supported for objects of type %s", name);
 
     /* Add the metadata entry to the backup file. */

@@ -31,7 +31,7 @@
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, SimpleIndexDataSet
-from wtdataset import SimpleLSMDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import ComplexDataSet
 from wtscenario import make_scenarios
 
 # Test WT_CURSOR.reserve.
@@ -45,17 +45,12 @@ class test_reserve(wttest.WiredTigerTestCase):
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),
-        ('lsm', dict(uri='lsm', ds=SimpleDataSet)),
         ('table-complex', dict(uri='table', ds=ComplexDataSet)),
-        ('table-complex-lsm', dict(uri='table', ds=ComplexLSMDataSet)),
         ('table-index', dict(uri='table', ds=SimpleIndexDataSet)),
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
-        ('table-simple-lsm', dict(uri='table', ds=SimpleLSMDataSet)),
     ]
 
     def keep(name, d):
-        if d['keyfmt'] == 'r' and (d['uri'] == 'lsm' or d['ds'].is_lsm()):
-            return False
         # The complex data sets have their own built-in value schemas that are not FLCS.
         if d['valfmt'] == '8t' and d['ds'] == ComplexDataSet:
             return False

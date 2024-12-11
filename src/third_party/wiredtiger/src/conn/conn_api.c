@@ -1105,11 +1105,8 @@ err:
      */
     session->txn->isolation = WT_ISO_READ_UNCOMMITTED;
 
-    WT_TRET(__wt_lsm_manager_destroy(session));
-
     /*
-     * After the LSM threads have exited, we won't open more files for the application. However, the
-     * sweep server is still running and it can close file handles at the same time the final
+     * The sweep server is still running and it can close file handles at the same time the final
      * checkpoint is reviewing open data handles (forcing checkpoint to reopen handles). Shut down
      * the sweep server.
      */
@@ -1375,8 +1372,7 @@ __conn_config_readonly(const char *cfg[])
       "checkpoint=(wait=0),"
       "config_base=false,"
       "create=false,"
-      "log=(prealloc=false,remove=false),"
-      "lsm_manager=(merge=false),";
+      "log=(prealloc=false,remove=false),";
     __conn_config_append(cfg, readonly);
 }
 
@@ -2228,8 +2224,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
       {"eviction", WT_VERB_EVICTION}, {"fileops", WT_VERB_FILEOPS},
       {"generation", WT_VERB_GENERATION}, {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG},
       {"history_store", WT_VERB_HS}, {"history_store_activity", WT_VERB_HS_ACTIVITY},
-      {"lsm", WT_VERB_LSM}, {"lsm_manager", WT_VERB_LSM_MANAGER}, {"metadata", WT_VERB_METADATA},
-      {"mutex", WT_VERB_MUTEX}, {"prefetch", WT_VERB_PREFETCH},
+      {"metadata", WT_VERB_METADATA}, {"mutex", WT_VERB_MUTEX}, {"prefetch", WT_VERB_PREFETCH},
       {"out_of_order", WT_VERB_OUT_OF_ORDER}, {"overflow", WT_VERB_OVERFLOW},
       {"read", WT_VERB_READ}, {"reconcile", WT_VERB_RECONCILE}, {"recovery", WT_VERB_RECOVERY},
       {"recovery_progress", WT_VERB_RECOVERY_PROGRESS}, {"rts", WT_VERB_RTS},
@@ -2568,8 +2563,6 @@ __conn_session_size(WT_SESSION_IMPL *session, const char *cfg[], uint32_t *vp)
 
     /* Then, add in the thread counts applications can configure. */
     v += WT_EVICT_MAX_WORKERS;
-
-    v += WT_LSM_MAX_WORKERS;
 
     /* If live restore is enabled add its thread count. */
     if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE)) {
@@ -3060,7 +3053,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     WT_ERR(__wt_conf_compile_init(session, cfg));
     WT_ERR(__wti_conn_statistics_config(session, cfg));
-    WT_ERR(__wt_lsm_manager_config(session, cfg));
     WT_ERR(__wti_sweep_config(session, cfg));
 
     /* Initialize the OS page size for mmap */

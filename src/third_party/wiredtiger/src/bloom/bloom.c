@@ -244,12 +244,12 @@ __wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash)
 }
 
 /*
- * __wt_bloom_hash_get --
+ * __bloom_hash_get --
  *     Tests whether the key (as given by its hash signature) is in the Bloom filter. Returns zero
  *     if found, WT_NOTFOUND if not.
  */
-int
-__wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
+static int
+__bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 {
     WT_CURSOR *c;
     WT_DECL_RET;
@@ -314,7 +314,7 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key) WT_GCC_FUNC_ATTRIBUTE((visibility(
     WT_BLOOM_HASH bhash;
 
     __wt_bloom_hash(bloom, key, &bhash);
-    return (__wt_bloom_hash_get(bloom, &bhash));
+    return (__bloom_hash_get(bloom, &bhash));
 }
 
 /*

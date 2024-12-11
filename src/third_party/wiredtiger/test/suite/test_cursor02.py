@@ -41,7 +41,6 @@ class test_cursor02(TestCursorTracker):
     """
     scenarios = make_scenarios([
         ('row', dict(tablekind='row', uri='table')),
-        ('lsm-row', dict(tablekind='row', uri='lsm')),
         ('col', dict(tablekind='col', uri='table')),
         ('fix', dict(tablekind='fix', uri='table'))
     ])

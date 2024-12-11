@@ -873,7 +873,7 @@ __evict_pass(WT_SESSION_IMPL *session)
               __wt_atomic_load32(&evict->evict_aggressive_score) < WT_EVICT_SCORE_MAX) {
                 /*
                  * Back off if we aren't making progress: walks hold the handle list lock, blocking
-                 * other operations that can free space in cache, such as LSM discarding handles.
+                 * other operations that can free space in cache.
                  *
                  * Allow this wait to be interrupted (e.g. if a checkpoint completes): make sure we
                  * wait for a non-zero number of microseconds).

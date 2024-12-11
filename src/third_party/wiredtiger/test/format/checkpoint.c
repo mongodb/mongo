@@ -77,7 +77,7 @@ checkpoint(void *arg)
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
-    named_checkpoints = !g.lsm_config;
+    named_checkpoints = true;
     /* Tiered tables do not support named checkpoints. */
     if (g.tiered_storage_config)
         named_checkpoints = false;
@@ -90,10 +90,10 @@ checkpoint(void *arg)
         }
 
         /*
-         * LSM and data-sources don't support named checkpoints. Also, don't attempt named
-         * checkpoints during a hot backup. It's OK to create named checkpoints during a hot backup,
-         * but we can't delete them, so repeating an already existing named checkpoint will fail
-         * when we can't drop the previous one.
+         * Some data-sources don't support named checkpoints. Also, don't attempt named checkpoints
+         * during a hot backup. It's OK to create named checkpoints during a hot backup, but we
+         * can't delete them, so repeating an already existing named checkpoint will fail when we
+         * can't drop the previous one.
          */
         ckpt_config = NULL;
         ckpt_vrfy_name = "WiredTigerCheckpoint";

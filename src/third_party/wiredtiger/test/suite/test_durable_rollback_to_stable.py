@@ -44,12 +44,11 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),
-        ('lsm', dict(uri='lsm', ds=SimpleDataSet)),
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
     ]
 
     def keep(name, d):
-        return d['keyfmt'] != 'r' or (d['uri'] != 'lsm' and not d['ds'].is_lsm())
+        return d['keyfmt'] != 'r'
 
     scenarios = make_scenarios(types, format_values, include=keep)
 

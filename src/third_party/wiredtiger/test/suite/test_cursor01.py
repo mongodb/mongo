@@ -45,7 +45,6 @@ class test_cursor01(wttest.WiredTigerTestCase):
         ('file-col', dict(tablekind='col',uri='file')),
         ('file-fix', dict(tablekind='fix',uri='file')),
         ('file-row', dict(tablekind='row',uri='file')),
-        ('lsm-row', dict(tablekind='row',uri='lsm')),
         ('table-col', dict(tablekind='col',uri='table')),
         ('table-fix', dict(tablekind='fix',uri='table')),
         ('table-row', dict(tablekind='row',uri='table'))

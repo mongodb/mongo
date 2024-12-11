@@ -646,9 +646,7 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
             WT_RET(__wt_curindex_open(session, uri, owner, cfg, cursorp));
         break;
     case 'l':
-        if (WT_PREFIX_MATCH(uri, "lsm:"))
-            WT_RET(__wt_clsm_open(session, uri, owner, cfg, cursorp));
-        else if (WT_PREFIX_MATCH(uri, "log:"))
+        if (WT_PREFIX_MATCH(uri, "log:"))
             WT_RET(__wt_curlog_open(session, uri, cfg, cursorp));
         break;
 
@@ -812,9 +810,8 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
         uri = to_dup->uri;
         if (!WT_PREFIX_MATCH(uri, "backup:") && !WT_PREFIX_MATCH(uri, "colgroup:") &&
           !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "file:") &&
-          !WT_PREFIX_MATCH(uri, "lsm:") && !WT_PREFIX_MATCH(uri, WT_METADATA_URI) &&
-          !WT_PREFIX_MATCH(uri, "table:") && !WT_PREFIX_MATCH(uri, "tiered:") &&
-          __wt_schema_get_source(session, uri) == NULL)
+          !WT_PREFIX_MATCH(uri, WT_METADATA_URI) && !WT_PREFIX_MATCH(uri, "table:") &&
+          !WT_PREFIX_MATCH(uri, "tiered:") && __wt_schema_get_source(session, uri) == NULL)
             WT_ERR(__wt_bad_object_type(session, uri));
     }
 
@@ -1021,11 +1018,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
     /* Disallow objects in the WiredTiger name space. */
     WT_ERR(__wt_str_name_check(session, uri));
 
-    /*
-     * Type configuration only applies to tables, column groups and indexes. We don't want
-     * applications to attempt to layer LSM on top of their extended data-sources, and the fact we
-     * allow LSM as a valid URI is an invitation to that mistake: nip it in the bud.
-     */
+    /* Type configuration only applies to tables, column groups and indexes. */
     if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "index:") &&
       !WT_PREFIX_MATCH(uri, "table:")) {
         /*

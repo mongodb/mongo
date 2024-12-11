@@ -401,10 +401,6 @@ create_database(const char *home, WT_CONNECTION **connp)
           GV(BLOCK_CACHE_CACHE_ON_CHECKPOINT) == 0 ? "false" : "true",
           GV(BLOCK_CACHE_CACHE_ON_WRITES) == 0 ? "false" : "true", GV(BLOCK_CACHE_SIZE));
 
-    /* LSM configuration. */
-    if (g.lsm_config)
-        CONFIG_APPEND(p, ",lsm_manager=(worker_thread_max=%" PRIu32 "),", GV(LSM_WORKER_THREADS));
-
     /* Eviction configuration. */
     if (GV(CACHE_EVICT_MAX) != 0)
         CONFIG_APPEND(p, ",eviction=(threads_max=%" PRIu32 ")", GV(CACHE_EVICT_MAX));
@@ -559,25 +555,6 @@ create_object(TABLE *table, void *arg)
     if (GV(ASSERT_READ_TIMESTAMP))
         CONFIG_APPEND(
           p, ",assert=(read_timestamp=%s)", g.transaction_timestamps_config ? "none" : "never");
-
-    /* Configure LSM. */
-    if (DATASOURCE(table, "lsm")) {
-        CONFIG_APPEND(p, ",type=lsm,lsm=(");
-        CONFIG_APPEND(p, "auto_throttle=%s,", TV(LSM_AUTO_THROTTLE) ? "true" : "false");
-        CONFIG_APPEND(p, "chunk_size=%" PRIu32 "MB,", TV(LSM_CHUNK_SIZE));
-        /*
-         * We can't set bloom_oldest without bloom, and we want to test with Bloom filters on most
-         * of the time anyway.
-         */
-        if (TV(LSM_BLOOM_OLDEST))
-            TV(LSM_BLOOM) = 1;
-        CONFIG_APPEND(p, "bloom=%s,", TV(LSM_BLOOM) ? "true" : "false");
-        CONFIG_APPEND(p, "bloom_bit_count=%" PRIu32 ",", TV(LSM_BLOOM_BIT_COUNT));
-        CONFIG_APPEND(p, "bloom_hash_count=%" PRIu32 ",", TV(LSM_BLOOM_HASH_COUNT));
-        CONFIG_APPEND(p, "bloom_oldest=%s,", TV(LSM_BLOOM_OLDEST) ? "true" : "false");
-        CONFIG_APPEND(p, "merge_max=%" PRIu32 ",", TV(LSM_MERGE_MAX));
-        CONFIG_APPEND(p, ",)");
-    }
 
     if (max == 0)
         testutil_die(ENOMEM, "WT_SESSION.create configuration buffer too small");

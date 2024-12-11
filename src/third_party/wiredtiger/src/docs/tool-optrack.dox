@@ -135,7 +135,7 @@ through the log files. The quickest way is to generate CSV files viewable with
 `t2` -- MongoDB's internal tool. With `t2`, you can view the frequency of
 tracked operations across time and across threads, like this:
 
-![Perf output visualized with t2](optrack-t2-slow-lsm-worker-thread.png)
+![Perf output visualized with t2](optrack-t2-slow-worker-thread.png)
 
 To produce a CSV file that can be loaded directly into `t2`, run the following
 command:

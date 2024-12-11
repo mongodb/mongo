@@ -32,7 +32,7 @@
 import wttest
 from wiredtiger import stat
 
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_stat03.py
@@ -49,8 +49,6 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
         # The complex data sets ignore any passed-in value format.
         ('table-complex-row', dict(uri='table:' + pfx, dataset=ComplexDataSet, kf='S', vf=None)),
         ('table-complex-var', dict(uri='table:' + pfx, dataset=ComplexDataSet, kf='r', vf=None)),
-        ('table-complex-lsm', dict(uri='table:' + pfx,
-            dataset=ComplexLSMDataSet, kf='S', vf=None))
     ]
 
     scenarios = make_scenarios(uri)

@@ -42,8 +42,7 @@ __meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 
         /*
          * We need to pull the handle into the session handle cache and make sure it's referenced to
-         * stop other internal code dropping the handle (e.g in LSM when cleaning up obsolete
-         * chunks). Holding the schema lock isn't enough.
+         * stop other internal code dropping the handle. Holding the schema lock isn't enough.
          *
          * Handles that are busy are skipped without the whole operation failing. This deals among
          * other cases with checkpoint encountering handles that are locked (e.g., for bulk loads or

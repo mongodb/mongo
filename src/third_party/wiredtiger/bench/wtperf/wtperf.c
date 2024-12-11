@@ -1809,8 +1809,7 @@ close_reopen(WTPERF *wtperf)
         return (0);
     /*
      * Reopen the connection. We do this so that the workload phase always starts with the on-disk
-     * files, and so that read-only workloads can be identified. This is particularly important for
-     * LSM, where the merge algorithm is more aggressive for read-only trees.
+     * files, and so that read-only workloads can be identified.
      */
     /* wtperf->conn is released no matter the return value from close(). */
     ret = wtperf->conn->close(wtperf->conn, "final_flush=true");
@@ -2457,8 +2456,8 @@ start_run(WTPERF *wtperf)
     /* Optional workload. */
     if (wtperf->workers_cnt != 0 && (opts->run_time != 0 || opts->run_ops != 0)) {
         /*
-         * If we have a workload, close and reopen the connection so that LSM can detect read-only
-         * workloads.
+         * If we have a workload, close and reopen the connection so that read-only workloads can be
+         * detected.
          */
         if (close_reopen(wtperf) != 0)
             goto err;

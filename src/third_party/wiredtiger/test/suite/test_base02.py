@@ -46,8 +46,6 @@ class test_base02(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
-        ('lsm', dict(uri='lsm:')),
-        ('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
     ])
 
     def create_and_drop(self, confstr):

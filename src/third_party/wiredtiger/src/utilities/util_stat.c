@@ -64,7 +64,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 
     /*
      * If there are no arguments, the statistics cursor operates on the connection, otherwise, the
-     * optional remaining argument is a file or LSM name.
+     * optional remaining argument is a file.
      */
     switch (argc) {
     case 0:

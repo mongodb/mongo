@@ -438,10 +438,6 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
         _file_to_fileid[key] = id;
     }
 
-    /* Special handling for LSM. */
-    else if (starts_with(key, "lsm:"))
-        throw model_exception("The model does not currently support LSM");
-
     /* Special handling for tables. */
     else if (starts_with(key, "table:")) {
         /* There is currently nothing to do. The table will get created with the colgroup. */

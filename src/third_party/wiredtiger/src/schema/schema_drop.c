@@ -117,10 +117,9 @@ __drop_table(
     /*
      * Open the table so we can drop its column groups and indexes.
      *
-     * Ideally we would keep the table locked exclusive across the drop, but for now we rely on the
-     * global table lock to prevent the table being reopened while it is being dropped. One issue is
-     * that the WT_WITHOUT_LOCKS macro can drop and reacquire the global table lock, avoiding
-     * deadlocks while waiting for LSM operation to quiesce.
+     * FIXME-WT-13812: Investigate table locking during session->drop Ideally we would keep the
+     * table locked exclusive across the drop, but for now we rely on the global table lock to
+     * prevent the table being reopened while it is being dropped.
      *
      * Temporarily getting the table exclusively serves the purpose of ensuring that cursors on the
      * table that are already open must at least be closed before this call proceeds.
@@ -355,8 +354,6 @@ __schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], bool
         ret = __drop_file(session, uri, force, cfg, check_visibility);
     else if (WT_PREFIX_MATCH(uri, "index:"))
         ret = __drop_index(session, uri, force, cfg, check_visibility);
-    else if (WT_PREFIX_MATCH(uri, "lsm:"))
-        ret = __wt_lsm_tree_drop(session, uri, cfg, check_visibility);
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __drop_table(session, uri, force, cfg, check_visibility);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))

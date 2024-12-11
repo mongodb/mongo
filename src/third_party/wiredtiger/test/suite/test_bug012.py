@@ -39,29 +39,19 @@ class test_bug012(wttest.WiredTigerTestCase):
             self.session.create('table:A', 'collator="xyzzy"'), msg)
 
     # Test we detect illegal key and value formats. Key and value formats are
-    # one configuration we can expect to fail when incorrectly specified as
-    # part of an LSM configuration, so test that path too. (Unknown collators
-    # compressors and other extensions won't fail when configured to LSM as we
-    # cannot know what extensions will be loaded when the LSM file is actually
-    # created.)
+    # one configuration we can expect to fail when incorrectly specified.
     #
     # Test that we detect illegal key formats.
     def test_illegal_key_format(self):
         msg = '/Invalid type/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create('table:A', 'key_format="xyzzy"'), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.create('table:A',
-                'type=lsm,lsm=(bloom_config=(key_format="xyzzy"))'), msg)
 
     # Test that we detect illegal value formats.
     def test_illegal_value_format(self):
         msg = '/Invalid type/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create('table:A', 'value_format="xyzzy"'), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.create('table:A',
-                'type=lsm,lsm=(bloom_config=(value_format="xyzzy"))'), msg)
 
     # Test that we detect illegal compressors.
     def test_illegal_compressor(self):

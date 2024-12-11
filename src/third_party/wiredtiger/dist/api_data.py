@@ -104,8 +104,8 @@ source_meta = [
     Config('type', 'file', r'''
         set the type of data source used to store a column group, index or simple table.
         By default, a \c "file:" URI is derived from the object name. The \c type configuration
-        can be used to switch to a different data source, such as LSM or an extension configured
-        by the application'''),
+        can be used to switch to a different data source or an extension configured by the 
+        application'''),
 ]
 
 format_meta = common_meta + [
@@ -122,65 +122,6 @@ format_meta = common_meta + [
         manipulate raw byte arrays. Value items of type 't' are bitfields, and when configured
         with record number type keys, will be stored using a fixed-length store''',
         type='format', func='__wt_struct_confchk'),
-]
-
-lsm_config = [
-    Config('lsm', '', r'''
-        options only relevant for LSM data sources''',
-        type='category', subconfig=[
-        Config('auto_throttle', 'true', r'''
-            Throttle inserts into LSM trees if flushing to disk isn't keeping up''',
-            type='boolean'),
-        Config('bloom', 'true', r'''
-            create Bloom filters on LSM tree chunks as they are merged''',
-            type='boolean'),
-        Config('bloom_bit_count', '16', r'''
-            the number of bits used per item for LSM Bloom filters''',
-            min='2', max='1000'),
-        Config('bloom_config', '', r'''
-            config string used when creating Bloom filter files, passed to WT_SESSION::create'''),
-        Config('bloom_hash_count', '8', r'''
-            the number of hash values per item used for LSM Bloom filters''',
-            min='2', max='100'),
-        Config('bloom_oldest', 'false', r'''
-            create a Bloom filter on the oldest LSM tree chunk. Only supported if Bloom filters
-            are enabled''',
-            type='boolean'),
-        Config('chunk_count_limit', '0', r'''
-            the maximum number of chunks to allow in an LSM tree. This option automatically
-            times out old data. As new chunks are added old chunks will be removed. Enabling
-            this option disables LSM background merges''',
-            type='int'),
-        Config('chunk_max', '5GB', r'''
-            the maximum size a single chunk can be. Chunks larger than this size are not
-            considered for further merges. This is a soft limit, and chunks larger than this
-            value can be created. Must be larger than chunk_size''',
-            min='100MB', max='10TB'),
-        Config('chunk_size', '10MB', r'''
-            the maximum size of the in-memory chunk of an LSM tree. This limit is soft, it is
-            possible for chunks to be temporarily larger than this value. This overrides the
-            \c memory_page_max setting''',
-            min='512K', max='500MB'),
-        Config('merge_custom', '', r'''
-            configure the tree to merge into a custom data source''',
-            type='category', subconfig=[
-            Config('prefix', '', r'''
-                custom data source prefix instead of \c "file"'''),
-            Config('start_generation', '0', r'''
-                merge generation at which the custom data source is used (zero indicates no
-                custom data source)''',
-                min='0', max='10'),
-            Config('suffix', '', r'''
-                custom data source suffix instead of \c ".lsm"'''),
-            ]),
-        Config('merge_max', '15', r'''
-            the maximum number of chunks to include in a merge operation''',
-            min='2', max='100'),
-        Config('merge_min', '0', r'''
-            the minimum number of chunks to include in a merge operation. If set to 0 or 1 half
-            the value of merge_max is used''',
-            max='100'),
-    ]),
 ]
 
 tiered_config = [
@@ -233,8 +174,8 @@ file_runtime_config = common_runtime_config + [
         to an appropriate operating system advisory call where available''',
         choices=['none', 'random', 'sequential']),
     Config('cache_resident', 'false', r'''
-        do not ever evict the object's pages from cache. Not compatible with LSM tables; see
-        @ref tuning_cache_resident for more information''',
+        do not ever evict the object's pages from cache, see @ref tuning_cache_resident for more
+        information''',
         type='boolean'),
     Config('log', '', r'''
         the transaction log configuration for this object. Only valid if \c log is enabled in
@@ -363,8 +304,7 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         the maximum size a page can grow to in memory before being reconciled to disk. The
         specified size will be adjusted to a lower bound of <code>leaf_page_max</code>, and an
         upper bound of <code>cache_size / 10</code>. This limit is soft - it is possible for
-        pages to be temporarily larger than this value. This setting is ignored for LSM trees,
-        see \c chunk_size''',
+        pages to be temporarily larger than this value.''',
         min='512B', max='10TB'),
     Config('prefix_compression', 'false', r'''
         configure prefix compression on row-store leaf pages''',
@@ -407,15 +347,6 @@ file_meta = file_config + [
         type='boolean', undoc=True),
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
-]
-
-lsm_meta = file_config + lsm_config + [
-    Config('last', '0', r'''
-        the last allocated chunk ID'''),
-    Config('chunks', '', r'''
-        active chunks in the LSM tree'''),
-    Config('old_chunks', '', r'''
-        obsolete chunks in the LSM tree'''),
 ]
 
 tiered_meta = file_meta + tiered_config + [
@@ -784,20 +715,6 @@ connection_runtime_config = [
         list, where each option specifies an event handler category e.g. 'error' represents
         the messages from the WT_EVENT_HANDLER::handle_error method.''',
         type='list', choices=['error', 'message']),
-    Config('lsm_manager', '', r'''
-        configure database wide options for LSM tree management. The LSM manager is started
-        automatically the first time an LSM tree is opened. The LSM manager uses a session
-        from the configured session_max''',
-        type='category', subconfig=[
-        Config('worker_thread_max', '4', r'''
-            Configure a set of threads to manage merging LSM trees in the database. Each worker
-            thread uses a session handle from the configured session_max''',
-            min='3',     # !!! Must match WT_LSM_MIN_WORKERS
-            max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
-        Config('merge', 'true', r'''
-            merge LSM chunks where possible''',
-            type='boolean')
-        ]),
     Config('operation_timeout_ms', '0', r'''
         this option is no longer supported, retained for backward compatibility.''',
         min=0),
@@ -901,8 +818,6 @@ connection_runtime_config = [
             'history_store',
             'history_store_activity',
             'log',
-            'lsm',
-            'lsm_manager',
             'metadata',
             'mutex',
             'out_of_order',
@@ -1025,7 +940,7 @@ statistics_log_configuration_common = [
     Config('on_close', 'false', r'''log statistics on database close''',
         type='boolean'),
     Config('sources', '', r'''
-        if non-empty, include statistics for the list of "file:" and "lsm:" data source URIs,
+        if non-empty, include statistics for the list of "file:" data source URIs,
         if they are open at the time of the statistics logging.''',
         type='list'),
     Config('timestamp', '"%b %d %H:%M:%S"', r'''
@@ -1416,8 +1331,6 @@ methods = {
 
 'index.meta' : Method(index_meta),
 
-'lsm.meta' : Method(lsm_meta),
-
 'object.meta' : Method(object_meta),
 
 'table.meta' : Method(table_meta),
@@ -1470,7 +1383,7 @@ methods = {
         type='int'),
 ]),
 
-'WT_SESSION.create' : Method(file_config + lsm_config + tiered_config +
+'WT_SESSION.create' : Method(file_config + tiered_config +
         source_meta + index_only_config + table_only_config + [
     Config('exclusive', 'false', r'''
         fail if the object exists. When false (the default), if the object exists, check that its
@@ -1934,8 +1847,7 @@ methods = {
         modified. If true, this option forces the checkpoint''',
         type='boolean'),
     Config('name', '', r'''
-        if set, specify a name for the checkpoint (note that checkpoints including LSM trees
-        may not be named)'''),
+        if set, specify a name for the checkpoint'''),
     Config('use_timestamp', 'true', r'''
         if true (the default), create the checkpoint as of the last stable timestamp if timestamps
         are in use, or with all committed  updates if there is no stable timestamp set. If false,

@@ -122,7 +122,7 @@ python-nvd3 installed.
      $ ./configure && make -j 12
      $ echo "Run an application that will generate statistics"
      $ mkdir WT_TEST && ./bench/wtperf/wtperf \
-	-O bench/wtperf/runners/update-lsm.wtperf \
+	-O bench/wtperf/runners/update-btree.wtperf \
 	-o "conn_config=\"cache_size=1G,statistics=[fast,clear],statistics_log=(wait=30)\""
      $ echo "Now generate a graph from the statistics"
      $ python ./tools/wtstats.py WT_TEST/WiredTigerStat.*
@@ -135,8 +135,8 @@ something like:
 
 If you double click on the "btree cursor insert calls per second" key, it will
 show just that statistic in the window. Depending on the test you ran (I ran a
-modified version of the `update-large-lsm.wtperf` configuration), the graph may
-look something like:
+modified version of the `update-large-record-btree.wtperf` configuration),
+the graph may look something like:
 
 ![Cursor insert graph](https://raw.github.com/wiki/wiredtiger/wiredtiger/attachments/wtstats_cursor_inserts.png)
 
@@ -152,8 +152,7 @@ this is probably the rate we will sustain once the cache is full.
 
 - At 510 seconds we see a huge spike to 210k inserts a second - this
 corresponds to the time in the wtperf application where we are about to switch
-from populating a database, to running the workload phase. Since this is an LSM
-tree, the inserts here are the result of merge operations.
+from populating a database, to running the workload phase.
 
 - The remainder of the time we sustain approximately 80k inserts a second - this
 is probably the steady state during the workload phase of the benchmark.

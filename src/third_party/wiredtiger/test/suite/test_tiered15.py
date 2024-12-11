@@ -41,7 +41,6 @@ class test_tiered15(TieredConfigMixin, wttest.WiredTigerTestCase):
         ('tiered', dict(type='tiered', tiered_err=True, non_tiered_err=True, non_tiered_errmsg="/Invalid argument/")),
         ('colgroup', dict(type='colgroup', tiered_err=True, non_tiered_err=True, non_tiered_errmsg=None)),
         ('index', dict(type='index', tiered_err=True, non_tiered_err=True, non_tiered_errmsg="/Invalid argument/")),
-        ('lsm', dict(type='lsm', tiered_err=True, non_tiered_err=False, non_tiered_errmsg=None)),
         ('backup', dict(type='backup', tiered_err=True, non_tiered_err=False, non_tiered_errmsg="/Operation not supported/")),
     ]
 

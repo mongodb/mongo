@@ -305,7 +305,7 @@ __wti_curbulk_init(
     cbt = &cbulk->cbt;
 
     /* Bulk cursors only support insert and close (reset is a no-op). */
-    __wt_cursor_set_notsup(cursor);
+    __wti_cursor_set_notsup(cursor);
     switch (CUR2BT(cbt)->type) {
     case BTREE_COL_FIX:
         cursor->insert = bitmap ? __curbulk_insert_fix_bitmap : __curbulk_insert_fix;

@@ -41,7 +41,6 @@ class test_import07(test_import_base):
     nrows = 100
     scenarios = make_scenarios([
         ('colgroup', dict(prefix='colgroup:')),
-        ('lsm', dict(prefix='lsm:')),
         ('index', dict(prefix='index:')),
     ])
 

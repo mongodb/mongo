@@ -28,7 +28,7 @@
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, SimpleIndexDataSet
-from wtdataset import SimpleLSMDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import ComplexDataSet
 from wtscenario import filter_scenarios, make_scenarios
 
 # test_overwrite.py
@@ -42,13 +42,10 @@ class test_overwrite(wttest.WiredTigerTestCase):
         ('var', dict(keyfmt='r',valuefmt='S')),
     ]
     types = [
-        ('file', dict(uri='file:', lsm=False, ds=SimpleDataSet)),
-        ('lsm', dict(uri='lsm:', lsm=True, ds=SimpleDataSet)),
-        ('table-complex', dict(uri='table:', lsm=False, ds=ComplexDataSet)),
-        ('table-complex-lsm', dict(uri='table:', lsm=True, ds=ComplexLSMDataSet)),
-        ('table-index', dict(uri='table:', lsm=False, ds=SimpleIndexDataSet)),
-        ('table-simple', dict(uri='table:', lsm=False, ds=SimpleDataSet)),
-        ('table-simple-lsm', dict(uri='table:', lsm=True, ds=SimpleLSMDataSet)),
+        ('file', dict(uri='file:', ds=SimpleDataSet)),
+        ('table-complex', dict(uri='table:', ds=ComplexDataSet)),
+        ('table-index', dict(uri='table:', ds=SimpleIndexDataSet)),
+        ('table-simple', dict(uri='table:', ds=SimpleDataSet)),
     ]
 
     # The cursor fast path logic checks against the exact string only, but other valid
@@ -60,9 +57,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         ('cfg4', dict(cursor_cfg=',,,,overwrite=false', valid=True)),
         ('cfg5', dict(cursor_cfg='append=false,overwrite=false', valid=True)),
     ]
-    # Skip record number keys with LSM.
-    scenarios = filter_scenarios(make_scenarios(types, keyfmt, cursor_configs),
-        lambda name, d: not (d['lsm'] and d['keyfmt'] == 'r'))
+    scenarios = make_scenarios(types, keyfmt, cursor_configs)
 
     # Confirm a cursor configured with/without overwrite correctly handles
     # non-existent records during insert and update operations.

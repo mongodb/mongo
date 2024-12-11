@@ -84,7 +84,6 @@ for f in "$@"; do
     {
         echo "$fp" 2>/dev/null |
         sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
-            -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
             -e '/WT_TRACK_OP_INIT/,/WT_TRACK_OP_END/{=;p;}' \
             -e '/va_start/,/va_end/{=;p;}' $f | \
             sed 'N;s/\n/:/' | \

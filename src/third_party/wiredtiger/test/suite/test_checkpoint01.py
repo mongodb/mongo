@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_checkpoint01.py
@@ -310,15 +310,6 @@ class test_checkpoint_illegal_name(wttest.WiredTigerTestCase):
                     lambda: self.session.open_cursor(uri, None, conf), msg)
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.open_cursor("file:WiredTigerHS.wt", None, conf), msg)
-
-# Check we can't name checkpoints that include LSM tables.
-class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):
-    def test_checkpoint_lsm_name(self):
-        ds = ComplexLSMDataSet(self, "table:checkpoint", 1000)
-        ds.populate()
-        msg = '/object does not support named checkpoints/'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.checkpoint("name=ckpt"), msg)
 
 class test_checkpoint_empty(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([

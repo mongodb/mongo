@@ -40,7 +40,6 @@ class test_cursor04(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios([
         ('row', dict(tablekind='row', uri='table')),
-        ('lsm-row', dict(tablekind='row', uri='lsm')),
         ('col', dict(tablekind='col', uri='table')),
         ('fix', dict(tablekind='fix', uri='table'))
     ])

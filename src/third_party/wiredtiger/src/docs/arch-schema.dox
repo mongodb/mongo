@@ -34,12 +34,6 @@ Database schema defines how data files are organized in the database home folder
  Where \c "<table name>" is the table name passed into WT_SESSION::create. And \c "<index name>"
  is the index name defined during index creation. See @ref schema_indices for more
  information on how to create a table index.
- - LSM trees are store on the file system in \c "<table name>-<chunk id>.lsm" files. Where
- \c "<table name>" is the name that was specified as a part of the \c name parameter to
- WT_SESSION::create. \c "<chunk id>" is the chunk index managed by WiredTiger. More information
- on LSM trees can be found on this page @ref lsm.
- - Bloom filters for LSM trees are stored in the files with the same name as the LSM tree chunk,
- but with a different extension: "<table name>-<chunk id>.bf". See @ref lsm_bloom for more details.
 
 @section schema_integrity Schema Integrity
 

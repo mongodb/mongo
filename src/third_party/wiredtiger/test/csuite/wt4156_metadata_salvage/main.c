@@ -465,12 +465,10 @@ main(int argc, char *argv[])
      */
     TABLE_INFO table_data[] = {{"file:aaa-file.SS", "key_format=S,value_format=S", false},
       {"file:bbb-file.rS", "key_format=r,value_format=S", false},
-      {"lsm:ccc-lsm.SS", "key_format=S,value_format=S", false},
       {"table:ddd-table.SS", "key_format=S,value_format=S", false},
       {"table:eee-table.rS", "key_format=r,value_format=S", false},
       {"file:fff-file.SS", "key_format=S,value_format=S", false},
       {"file:ggg-file.rS", "key_format=r,value_format=S", false},
-      {"lsm:hhh-lsm.SS", "key_format=S,value_format=S", false},
       {"table:iii-table.SS", "key_format=S,value_format=S", false},
       {"table:jjj-table.rS", "key_format=r,value_format=S", false},
       {CORRUPT, "key_format=S,value_format=S", false}, {NULL, NULL, false}};

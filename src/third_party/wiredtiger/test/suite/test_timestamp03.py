@@ -49,7 +49,6 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         ('file-row', dict(uri='file:', key_format='i', value_format='S')),
         ('file-col', dict(uri='file:', key_format='r', value_format='S')),
         ('file-col-fix', dict(uri='file:', key_format='r', value_format='8t')),
-        ('lsm', dict(uri='lsm:', key_format='i', value_format='S')),
         ('table-row', dict(uri='table:', key_format='i', value_format='S')),
         ('table-col', dict(uri='table:', key_format='r', value_format='S')),
         ('table-col-fix', dict(uri='table:', key_format='r', value_format='8t')),
@@ -72,7 +71,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     def verify_metadata(self, metadata_uri, metastr):
         c = self.session.open_cursor('metadata:', None, None)
         c.set_key(metadata_uri)
-        check_meta = metadata_uri.find("lsm:") == 0 or metadata_uri.find("file:") == 0
+        check_meta = metadata_uri.find("file:") == 0
         if check_meta:
             self.assertNotEqual(c.search(), wiredtiger.WT_NOTFOUND)
             value = c.get_value()

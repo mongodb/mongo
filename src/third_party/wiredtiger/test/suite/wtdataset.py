@@ -105,10 +105,6 @@ class BaseDataSet(object):
     def postfill_create(self):
         pass
 
-    @classmethod
-    def is_lsm(cls):
-        return False
-
     def populate(self, create=True, variant=1):
         self.testcase.pr('populate variant ' + str(variant) + ': ' + self.uri + ' with '
                          + str(self.rows) + ' rows')
@@ -200,20 +196,6 @@ class SimpleDataSet(BaseDataSet):
             self.testcase.assertEqual(val, self.value(i, variant))
         self.testcase.assertEqual(i, self.rows)
 
-class SimpleLSMDataSet(SimpleDataSet):
-    """
-    SimpleLSMDataSet is identical to SimpleDataSet, but using LSM files
-    via the type=lsm configuration.
-    """
-    def __init__(self, testcase, uri, rows, **kwargs):
-        kwargs['config'] = kwargs.get('config', '') + ',type=lsm'
-        super(SimpleLSMDataSet, self).__init__(
-            testcase, uri, rows, **kwargs)
-
-    @classmethod
-    def is_lsm(cls):
-        return True
-
 class SimpleIndexDataSet(SimpleDataSet):
     """
     SimpleIndexDataSet is identical to SimpleDataSet, adding one index
@@ -242,20 +224,6 @@ class SimpleIndexDataSet(SimpleDataSet):
             ik = (v, k)  # The index key is columns=(v,k).
             self.testcase.assertEqual(v, idxcursor[ik])
         idxcursor.close()
-
-class SimpleIndexLSMDataSet(SimpleIndexDataSet):
-    """
-    SimpleIndexLSMDataSet is identical to SimpleIndexDataSet, but
-    using LSM files.
-    """
-    def __init__(self, testcase, uri, rows, **kwargs):
-        kwargs['config'] = kwargs.get('config', '') + ',type=lsm'
-        super(SimpleIndexLSMDataSet, self).__init__(
-            testcase, uri, rows, **kwargs)
-
-    @classmethod
-    def is_lsm(cls):
-        return True
 
 class ComplexDataSet(BaseDataSet):
     """
@@ -351,19 +319,6 @@ class ComplexDataSet(BaseDataSet):
             self.testcase.assertEqual(s3, v[2])
             self.testcase.assertEqual(s4, v[3])
         self.testcase.assertEqual(i, self.rows)
-
-class ComplexLSMDataSet(ComplexDataSet):
-    """
-    ComplexLSMDataSet is identical to ComplexDataSet, but using LSM files.
-    """
-    def __init__(self, testcase, uri, rows, **kwargs):
-        kwargs['cgconfig'] = kwargs.get('cgconfig', '') + ',type=lsm'
-        super(ComplexLSMDataSet, self).__init__(
-            testcase, uri, rows, **kwargs)
-
-    @classmethod
-    def is_lsm(cls):
-        return True
 
 # A data set based on ComplexDataSet that allows large values (depending on a multiplier),
 # the ability to update keys with different values, and track the expected value for each key.

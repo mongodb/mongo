@@ -114,8 +114,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
         idx = NULL;
         WT_ERR(__wti_schema_get_index(session, uri, false, false, &idx));
         WT_ERR(__wt_schema_worker(session, idx->source, file_func, name_func, cfg, open_flags));
-    } else if (WT_PREFIX_MATCH(uri, "lsm:")) {
-        WT_ERR(__wt_lsm_tree_worker(session, uri, file_func, name_func, cfg, open_flags));
     } else if (WT_PREFIX_MATCH(uri, "table:")) {
         /*
          * Note: we would like to use open_flags here (e.g., to lock the table exclusive during

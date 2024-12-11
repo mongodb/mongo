@@ -1486,9 +1486,6 @@ main(int argc, char *argv[])
             if (num_iterations == 0)
                 num_iterations = 1;
             break;
-        case 'L':
-            table_pfx = "lsm";
-            break;
         case 'l':
             use_lazyfs = true;
             break;

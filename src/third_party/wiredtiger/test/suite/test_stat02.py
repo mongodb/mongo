@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import itertools, wiredtiger, wttest
-from wtdataset import SimpleDataSet, SimpleLSMDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
@@ -38,9 +38,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     uri = [
         ('file',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
         ('table', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
-        ('table-lsm', dict(uri='table:' + pfx, dataset=SimpleLSMDataSet)),
         ('complex', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
-        ('complex-lsm', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
     data_config = [
         ('none', dict(data_config='none', ok=[])),
@@ -103,7 +101,6 @@ class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
         ('dsrc_clear_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
         ('dsrc_clear_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
         ('dsrc_clear_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
-        ('dsrc_clear_4', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
 
     scenarios = make_scenarios(uri)
@@ -132,7 +129,6 @@ class test_stat_cursor_fast(wttest.WiredTigerTestCase):
         ('fast_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
         ('fast_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
         ('fast_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
-        ('fast_4', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
 
     scenarios = make_scenarios(uri)
@@ -174,7 +170,6 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
         ('dsrc_error_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
         ('dsrc_error_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
         ('dsrc_error_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
-        ('dsrc_error_4', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
 
     scenarios = make_scenarios(uri)

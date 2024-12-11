@@ -653,7 +653,7 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
 
     /*
      * We need to pull the handle into the session handle cache and make sure it's referenced to
-     * stop other internal code dropping the handle (e.g in LSM when cleaning up obsolete chunks).
+     * stop other internal code dropping the handle.
      */
     if ((ret = __wt_session_get_dhandle(session, dhandle->name, dhandle->checkpoint, NULL, 0)) != 0)
         return (ret == EBUSY ? 0 : ret);

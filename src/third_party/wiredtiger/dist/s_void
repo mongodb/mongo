@@ -79,7 +79,6 @@ func_ok()
         -e '/int __wt_errno$/d' \
         -e '/int __wt_get_vm_pagesize$/d' \
         -e '/int __wt_lex_compare_skip$/d' \
-        -e '/int __wti_lsm_manager_pop_entry$/d' \
         -e '/int __wt_once$/d' \
         -e '/int __wti_posix_directory_list_free$/d' \
         -e '/int __wt_session_breakpoint$/d' \

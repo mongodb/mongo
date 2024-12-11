@@ -46,7 +46,6 @@ class test_prepare03(wttest.WiredTigerTestCase):
         ('file-col', dict(tablekind='col',uri='file', format='key_format=r,value_format=S')),
         ('file-fix', dict(tablekind='fix',uri='file', format='key_format=r,value_format=8t')),
         ('file-row', dict(tablekind='row',uri='file', format='key_format=S,value_format=S')),
-        ('lsm-row', dict(tablekind='row',uri='lsm', format='key_format=S,value_format=S')),
         ('table-col', dict(tablekind='col',uri='table', format='key_format=r,value_format=S')),
         ('table-fix', dict(tablekind='fix',uri='table', format='key_format=r,value_format=8t')),
         ('table-row', dict(tablekind='row',uri='table', format='key_format=S,value_format=S'))
@@ -191,8 +190,5 @@ class test_prepare03(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction("commit_timestamp=2b")
         self.session.timestamp_transaction("durable_timestamp=2b")
         self.session.commit_transaction()
-        # FIXME-WT-3682: There is a bug with search_near operation when no key is set.
-        if self.uri == 'lsm':
-            cursor.set_key(self.genkey(self.nentries))
         cursor.search_near()
         cursor.close()

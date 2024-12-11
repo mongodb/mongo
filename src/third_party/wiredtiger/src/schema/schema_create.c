@@ -1363,8 +1363,6 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
         ret = __create_colgroup(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "file:"))
         ret = __create_file(session, uri, exclusive, config);
-    else if (WT_PREFIX_MATCH(uri, "lsm:"))
-        ret = __wt_lsm_tree_create(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "index:"))
         ret = __create_index(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "object:"))

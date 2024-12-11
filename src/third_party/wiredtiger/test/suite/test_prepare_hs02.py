@@ -43,7 +43,6 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         ('col', dict(s_config='key_format=r,value_format=i')),
         ('col-fix', dict(s_config='key_format=r,value_format=8t')),
         ('row', dict(s_config='key_format=i,value_format=i')),
-        ('lsm', dict(s_config='key_format=i,value_format=i,type=lsm')),
     ]
 
     # Transaction end types

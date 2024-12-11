@@ -45,12 +45,9 @@ class test_cursor12(wttest.WiredTigerTestCase):
     ]
     types = [
         ('file', dict(uri='file:modify')),
-        ('lsm', dict(uri='lsm:modify')),
         ('table', dict(uri='table:modify')),
     ]
-    # Skip record number keys with LSM.
-    scenarios = filter_scenarios(make_scenarios(types, keyfmt, valuefmt),
-        lambda name, d: not ('lsm' in d['uri'] and d['keyfmt'] == 'r'))
+    scenarios = make_scenarios(types, keyfmt, valuefmt)
 
     # List with original value, final value, and modifications to get
     # there.

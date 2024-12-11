@@ -95,7 +95,7 @@ DEF_OPT_AS_CONFIG_STRING(conn_config, "create,statistics=(fast),statistics_log=(
 DEF_OPT_AS_BOOL(close_conn, 1,
   "properly close connection at end of test. Setting to false does not sync data to disk and can "
   "result in lost data after test exits.")
-DEF_OPT_AS_BOOL(compact, 0, "post-populate compact for LSM merging activity")
+DEF_OPT_AS_BOOL(compact, 0, "post-populate compact")
 DEF_OPT_AS_STRING(compression, "none",
   "compression extension.  Allowed configuration values are: 'none', 'lz4', 'snappy', 'zlib', "
   "'zstd'")

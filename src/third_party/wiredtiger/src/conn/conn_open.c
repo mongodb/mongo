@@ -79,12 +79,6 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     wt_conn = &conn->iface;
     session = conn->default_session;
 
-    /*
-     * The LSM services are not shut down in this path (which is called when wiredtiger_open hits an
-     * error (as well as during normal shutdown). Assert they're not running.
-     */
-    WT_ASSERT(session, !FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LSM));
-
     /* Shut down the subsystems, ensuring workers see the state change. */
     F_SET(conn, WT_CONN_CLOSING);
     WT_FULL_BARRIER();

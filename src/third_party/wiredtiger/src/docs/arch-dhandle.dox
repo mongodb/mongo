@@ -4,7 +4,7 @@ The data handle (dhandle) (\c WT_DATA_HANDLE) is a generic representation of
 any named data source. Dhandles are required to access any data source in the
 system. For the dhandle of B-Tree type, the \c void *handle field can be used
 like so `(WT_BTREE *)dhandle->handle` to get the B-Tree. For other data sources
-such as the table, LSM or tiered storage types, a type cast can be used on the
+such as the table or tiered storage types, a type cast can be used on the
 \c dhandle itself to gain access to the structure for the data source. The
 dhandle structure also contains a set of flags, some reference counts, and
 individual data source statistics.

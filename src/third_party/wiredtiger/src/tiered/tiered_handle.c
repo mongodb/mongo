@@ -236,10 +236,7 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     __wt_free(session, config);
     WT_ERR(__wt_strndup(session, build->data, build->size, &config));
 
-    /*
-     * XXX Need to verify user doesn't create a table of the same name. What does LSM do? It
-     * definitely has the same problem with chunks.
-     */
+    /* XXX Need to verify user doesn't create a table of the same name. */
     __wt_verbose(
       session, WT_VERB_TIERED, "TIER_CREATE_LOCAL: schema create LOCAL: %s : %s", name, config);
     WT_ERR(__wt_schema_create(session, name, config));

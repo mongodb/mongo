@@ -6,8 +6,12 @@ __bit_nclr
 __live_restore_debug_dump_extent_list
 __ovfl_discard_dump
 __ovfl_reuse_dump
+__wt_bloom_create
 __wt_bloom_drop
+__wt_bloom_finalize
 __wt_bloom_get
+__wt_bloom_insert
+__wt_bloom_open
 __wt_bulk_insert_fix
 __wt_bulk_insert_row
 __wt_bulk_insert_var

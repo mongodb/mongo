@@ -1001,9 +1001,9 @@ __live_restore_fs_remove(
     }
 
     /*
-     * The tombstone here is useful as it tells us that we will never need to look in the
-     * destination for this file in the future. One such case is when a file is created, removed and
-     * then created again with the same name.
+     * The tombstone here is useful as it tells us that we will never need to look in the source for
+     * this file in the future. One such case is when a file is created, removed and then created
+     * again with the same name.
      */
     __live_restore_fs_create_tombstone(fs, session, name, flags);
 

@@ -139,14 +139,12 @@ __compact_end(WT_SESSION_IMPL *session)
 static int
 __compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
 {
+    WT_UNUSED(skipp);
+
     /*
-     * Add references to schema URI objects to the list of objects to be compacted. Skip over LSM
-     * trees or we will get false positives on the "file:" URIs for the chunks.
+     * Add references to schema URI objects to the list of objects to be compacted.
      */
-    if (WT_PREFIX_MATCH(uri, "lsm:")) {
-        session->compact->lsm_count++;
-        *skipp = true;
-    } else if (WT_PREFIX_MATCH(uri, "file:"))
+    if (WT_PREFIX_MATCH(uri, "file:"))
         session->compact->file_count++;
     if (WT_PREFIX_MATCH(uri, "tiered:"))
         WT_RET(ENOTSUP);
@@ -461,9 +459,8 @@ __wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *confi
     }
 
     /*
-     * Non-LSM object compaction requires checkpoints, which are impossible in transactional
-     * contexts. Disallow in all contexts (there's no reason for LSM to allow this, possible or
-     * not), and check now so the error message isn't confusing.
+     * Object compaction requires checkpoints, which are impossible in transactional contexts.
+     * Disallow in all contexts, and check now so the error message isn't confusing.
      */
     WT_ERR(__wt_txn_context_check(session, false));
 
@@ -471,8 +468,8 @@ __wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *confi
     WT_ERR(__wt_str_name_check(session, uri));
 
     if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "file:") &&
-      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "lsm:") &&
-      !WT_PREFIX_MATCH(uri, "table:") && !WT_PREFIX_MATCH(uri, "tiered:")) {
+      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:") &&
+      !WT_PREFIX_MATCH(uri, "tiered:")) {
         if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
             ret = dsrc->compact == NULL ?
               __wt_object_unsupported(session, uri) :
@@ -514,8 +511,6 @@ __wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *confi
           session, uri, __compact_handle_append, __compact_uri_analyze, cfg, 0)));
     WT_ERR(ret);
 
-    if (session->compact->lsm_count != 0)
-        WT_ERR(__wt_schema_worker(session, uri, NULL, __wt_lsm_compact, cfg, 0));
     if (session->compact->file_count != 0)
         WT_ERR(__compact_worker(session));
 

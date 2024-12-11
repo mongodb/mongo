@@ -6,8 +6,6 @@ timestamp or its transaction id is not committed according to the recovery check
 The recovery checkpoint snapshot corresponds to the checkpoint transaction snapshot details saved at
 the end of every checkpoint.
 
-RTS works for all storage types except for LSM trees.
-
 @section rts-overview Overview of RTS
 
 RTS scans tables in the database to remove any unstable modifications. A table is selected by RTS if

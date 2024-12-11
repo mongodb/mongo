@@ -43,7 +43,6 @@ static const char *config_file_type(u_int);
 static bool config_fix(TABLE *);
 static void config_in_memory(void);
 static void config_in_memory_reset(void);
-static void config_lsm_reset(TABLE *);
 static void config_map_backup_incr(const char *, bool *);
 static void config_map_checkpoint(const char *, u_int *);
 static void config_map_file_type(const char *, u_int *);
@@ -198,7 +197,7 @@ config_table_am(TABLE *table)
     }
 
     if (!config_explicit(table, "runs.type")) {
-        if (config_explicit(table, "runs.source") && DATASOURCE(table, "lsm"))
+        if (config_explicit(table, "runs.source"))
             config_single(table, "runs.type=row", false);
         else
             switch (mmrand(&g.data_rnd, 1, 10)) {
@@ -233,27 +232,6 @@ config_table_am(TABLE *table)
             config_single(table, "runs.source=file", false);
             break;
         case 2: /* 20% */
-#if 0
-            /*
-             * We currently disable random LSM testing, that is, it can be specified explicitly but
-             * we won't randomly choose LSM as a data_source configuration.
-             *
-             * LSM requires a row-store and backing disk. Don't configure LSM if in-memory,
-             * timestamps or truncation are configured, they result in cache problems.
-             *
-             * FIXME WT-4162: Remove the timestamp test when WT-4162 resolved.
-             */
-            if (table->type != ROW || GV(RUNS_IN_MEMORY))
-                break;
-            if (config_explicit(NULL, "transaction.timestamps") && GV(TRANSACTION_TIMESTAMPS))
-                break;
-            if (GV(BACKUP) && config_explicit(NULL, "backup.incremental") &&
-              g.backup_incr_flag == INCREMENTAL_BLOCK)
-                break;
-            if (config_explicit(table, "ops.truncate") && TV(OPS_TRUNCATE))
-                break;
-            config_single(table, "runs.source=lsm", false);
-#endif
             /* FALLTHROUGH */
         case 3:
         case 4:
@@ -261,10 +239,6 @@ config_table_am(TABLE *table)
             config_single(table, "runs.source=table", false);
             break;
         }
-
-    /* If data_source and file_type were both set explicitly, we may still have a mismatch. */
-    if (DATASOURCE(table, "lsm") && table->type != ROW)
-        testutil_die(EINVAL, "%s: lsm data_source is only compatible with row file_type", progname);
 }
 
 /*
@@ -281,8 +255,7 @@ config_table(TABLE *table, void *arg)
     testutil_assert(table != NULL);
 
     /*
-     * Choose a file format and a data source: they're interrelated (LSM is only compatible with
-     * row-store) and other items depend on them.
+     * Choose a file format and a data source: they're interrelated and other items depend on them.
      */
     config_table_am(table);
 
@@ -300,8 +273,7 @@ config_table(TABLE *table, void *arg)
                 config_promote(table, cp, &tables[0]->v[cp->off]);
 
     /*
-     * Build the top-level object name: we're overloading data_source in our configuration, LSM
-     * objects are "tables", but files are tested as well.
+     * Build the top-level object name: we're overloading data_source in our configuration.
      */
     if (ntables == 0)
         testutil_snprintf(
@@ -454,12 +426,6 @@ config_table(TABLE *table, void *arg)
     /* Only row-store tables support a collation order. */
     if (table->type != ROW)
         config_off(table, "btree.reverse");
-
-    /* Give LSM a final review and flag if there's at least one LSM data source. */
-    if (DATASOURCE(table, "lsm")) {
-        g.lsm_config = true;
-        config_lsm_reset(table);
-    }
 }
 
 /*
@@ -739,22 +705,6 @@ config_cache(void)
     if (GV(CACHE) < cache)
         GV(CACHE) = (uint32_t)cache;
 
-    /*
-     * Ensure cache size sanity for LSM runs. An LSM tree open requires 3 chunks plus a page for
-     * each participant in up to three concurrent merges. Integrate a thread count into that
-     * calculation by requiring 3 chunks/pages per configured thread. That might be overkill, but
-     * LSM runs are more sensitive to small caches than other runs, and a generous cache avoids
-     * stalls we're not interested in chasing.
-     */
-    if (g.lsm_config) {
-        cache = WT_LSM_TREE_MINIMUM_SIZE(table_sumv(V_TABLE_LSM_CHUNK_SIZE) * WT_MEGABYTE,
-          workers * table_sumv(V_TABLE_LSM_MERGE_MAX),
-          workers * table_sumv(V_TABLE_BTREE_LEAF_PAGE_MAX) * WT_MEGABYTE);
-        cache = (cache + (WT_MEGABYTE - 1)) / WT_MEGABYTE;
-        if (GV(CACHE) < cache)
-            GV(CACHE) = (uint32_t)cache;
-    }
-
     if (cache_maximum_explicit && GV(CACHE) > GV(CACHE_MAXIMUM))
         GV(CACHE) = GV(CACHE_MAXIMUM);
 
@@ -764,9 +714,8 @@ config_cache(void)
 
 dirty_eviction_config:
     /* Adjust the dirty eviction settings to reduce test driven cache stuck failures. */
-    if (g.lsm_config || GV(CACHE) < 20) {
-        WARN("Setting cache.eviction_dirty_trigger=95 due to %s",
-          g.lsm_config ? "LSM" : "micro cache");
+    if (GV(CACHE) < 20) {
+        WARN("%s", "Setting cache.eviction_dirty_trigger=95 due to micro cache");
         config_single(NULL, "cache.eviction_dirty_trigger=95", false);
     } else if (GV(CACHE) / workers <= 2 && !config_explicit(NULL, "cache.eviction_dirty_trigger")) {
         WARN("Cache is minimally configured (%" PRIu32
@@ -964,8 +913,7 @@ config_in_memory(void)
 {
     /*
      * Configure in-memory before anything else, in-memory has many related requirements. Don't
-     * configure in-memory if there's any incompatible configurations, so we don't have to
-     * reconfigure in-memory every time we configure something like LSM, that's too painful.
+     * configure in-memory if there's any incompatible configurations.
      *
      * Limit the number of tables in any in-memory run, otherwise it's too easy to blow out the
      * cache.
@@ -1050,47 +998,6 @@ config_in_memory_reset(void)
         config_off(NULL, "ops.verify");
     if (!config_explicit(NULL, "prefetch"))
         config_off(NULL, "prefetch");
-}
-
-/*
- * config_lsm_reset --
- *     LSM configuration review.
- */
-static void
-config_lsm_reset(TABLE *table)
-{
-    /*
-     * Turn off truncate for LSM runs (some configurations with truncate always result in a
-     * timeout).
-     */
-    if (config_explicit(table, "ops.truncate")) {
-        if (DATASOURCE(table, "lsm"))
-            testutil_die(EINVAL, "LSM (currently) incompatible with truncate configurations");
-        config_off(table, "ops.truncate");
-    }
-
-    /*
-     * Turn off prepare and timestamps for LSM runs (prepare requires timestamps).
-     *
-     * FIXME: WT-4162.
-     */
-    if (config_explicit(NULL, "ops.prepare"))
-        testutil_die(EINVAL, "LSM (currently) incompatible with prepare configurations");
-    config_off(NULL, "ops.prepare");
-    if (config_explicit(NULL, "transaction.timestamps"))
-        testutil_die(EINVAL, "LSM (currently) incompatible with timestamp configurations");
-    config_off(NULL, "transaction.timestamps");
-
-    /*
-     * LSM does not work with block-based incremental backup, disable the incremental backup
-     * mechanism if configured to be block based.
-     */
-    if (GV(BACKUP)) {
-        if (config_explicit(NULL, "backup.incremental"))
-            testutil_die(
-              EINVAL, "LSM (currently) incompatible with incremental backup configurations");
-        config_single(NULL, "backup.incremental=off", false);
-    }
 }
 
 /*
@@ -1684,20 +1591,15 @@ config_print_table(FILE *fp, TABLE *table)
     CONFIG *cp;
     CONFIGV *v, *gv;
     char buf[128];
-    bool lsm;
 
     testutil_snprintf(buf, sizeof(buf), "table%u.", table->id);
     fprintf(fp, "############################################\n");
     fprintf(fp, "#  TABLE PARAMETERS: table %u\n", table->id);
     fprintf(fp, "############################################\n");
 
-    lsm = DATASOURCE(table, "lsm");
     for (cp = configuration_list; cp->name != NULL; ++cp) {
         /* Skip global items. */
         if (!F_ISSET(cp, C_TABLE))
-            continue;
-        /* Skip mismatched objects and configurations. */
-        if (!lsm && F_ISSET(cp, C_TYPE_LSM))
             continue;
         if (!C_TYPE_MATCH(cp, table->type))
             continue;
@@ -1744,10 +1646,6 @@ config_print(bool error_display)
     for (cp = configuration_list; cp->name != NULL; ++cp) {
         /* Skip table count if tables not configured (implying an old-style CONFIG file). */
         if (ntables == 0 && cp->off == V_GLOBAL_RUNS_TABLES)
-            continue;
-
-        /* Skip mismatched objects and configurations. */
-        if (!g.lsm_config && F_ISSET(cp, C_TYPE_LSM))
             continue;
 
         /* Skip mismatched table items if the global table is the only table. */
@@ -2027,7 +1925,6 @@ config_single(TABLE *table, const char *s, bool explicit)
             config_map_checkpoint(equalp, &g.checkpoint_config);
         else if (strncmp(s, "runs.source", strlen("runs.source")) == 0 &&
           strncmp("file", equalp, strlen("file")) != 0 &&
-          strncmp("lsm", equalp, strlen("lsm")) != 0 &&
           strncmp("table", equalp, strlen("table")) != 0) {
             testutil_die(EINVAL, "Invalid data source option: %s", equalp);
         } else if (strncmp(s, "runs.type", strlen("runs.type")) == 0) {

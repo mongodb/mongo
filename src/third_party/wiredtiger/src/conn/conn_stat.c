@@ -168,15 +168,10 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
         WT_ERR(__wt_calloc_def(session, cnt + 1, &sources));
         __wt_config_subinit(session, &objectconf, &cval);
         for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt) {
-            /*
-             * Only allow "file:" and "lsm:" for now: "file:" works because it's been converted to
-             * data handles, "lsm:" works because we can easily walk the list of open LSM objects,
-             * even though it hasn't been converted.
-             */
-            if (!WT_PREFIX_MATCH(k.str, "file:") && !WT_PREFIX_MATCH(k.str, "lsm:"))
+            /* Only allow "file:" for now, it works because it's been converted to data handles. */
+            if (!WT_PREFIX_MATCH(k.str, "file:"))
                 WT_ERR_MSG(session, EINVAL,
-                  "statistics_log sources configuration only supports objects of type \"file\" or "
-                  "\"lsm\"");
+                  "statistics_log sources configuration only supports objects of type \"file\"");
             WT_ERR(__wt_strndup(session, k.str, k.len, &sources[cnt]));
         }
         WT_ERR_NOTFOUND_OK(ret, false);
@@ -408,63 +403,6 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __statlog_lsm_apply --
- *     Review the list open LSM trees, and dump statistics on demand. XXX This code should be
- *     removed when LSM objects are converted to data handles.
- */
-static int
-__statlog_lsm_apply(WT_SESSION_IMPL *session)
-{
-#define WT_LSM_TREE_LIST_SLOTS 100
-    WT_LSM_TREE *lsm_tree, *list[WT_LSM_TREE_LIST_SLOTS];
-    WT_DECL_RET;
-    int cnt;
-    bool locked;
-    char **p;
-
-    cnt = 0;
-
-    /*
-     * Walk the list of LSM trees, checking for a match on the set of sources.
-     *
-     * XXX We can't hold the schema lock for the traversal because the LSM statistics code acquires
-     * the tree lock, and the LSM cursor code acquires the tree lock and then acquires the schema
-     * lock, it's a classic deadlock. This is temporary code so I'm not going to do anything fancy.
-     * It is OK to not keep holding the schema lock after populating the list of matching LSM trees,
-     * since the __wt_lsm_tree_get call will bump a reference count, so the tree won't go away.
-     */
-    __wt_spin_lock(session, &S2C(session)->schema_lock);
-    locked = true;
-    TAILQ_FOREACH (lsm_tree, &S2C(session)->lsmqh, q) {
-        if (cnt == WT_LSM_TREE_LIST_SLOTS)
-            break;
-        for (p = S2C(session)->stat_sources; *p != NULL; ++p)
-            if (WT_PREFIX_MATCH(lsm_tree->name, *p)) {
-                WT_ERR(__wt_lsm_tree_get(session, lsm_tree->name, false, &list[cnt++]));
-                break;
-            }
-    }
-    __wt_spin_unlock(session, &S2C(session)->schema_lock);
-    locked = false;
-
-    while (cnt > 0) {
-        --cnt;
-        WT_TRET(__statlog_dump(session, list[cnt]->name, false));
-        __wt_lsm_tree_release(session, list[cnt]);
-    }
-
-err:
-    if (locked)
-        __wt_spin_unlock(session, &S2C(session)->schema_lock);
-    /* Release any LSM trees on error. */
-    while (cnt > 0) {
-        --cnt;
-        __wt_lsm_tree_release(session, list[cnt]);
-    }
-    return (ret);
-}
-
-/*
  * __statlog_log_one --
  *     Output a set of statistics into the current log file.
  */
@@ -512,14 +450,6 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
     if (conn->stat_sources != NULL && F_ISSET(conn, WT_CONN_RECOVERY_COMPLETE))
         WT_RET(__wt_conn_btree_apply(session, NULL, __statlog_apply, NULL, NULL));
 
-    /*
-     * Walk the list of open LSM trees, dumping any that match the list of object sources. Only walk
-     * handles after the connection after completes recovery.
-     *
-     * XXX This code should be removed when LSM objects are converted to data handles.
-     */
-    if (conn->stat_sources != NULL && F_ISSET(conn, WT_CONN_RECOVERY_COMPLETE))
-        WT_RET(__statlog_lsm_apply(session));
     WT_RET(__statlog_print_footer(session));
 
     /* Flush. */
