@@ -11,13 +11,6 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Checking UUID and index consistency requires querying the config primary, but this test
-// shuts down 2 out of the 3 config servers. Therefore, we cannot do the check on this test.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-TestData.skipCheckingIndexesConsistentAcrossCluster = true;
-TestData.skipCheckOrphans = true;
-TestData.skipCheckShardFilteringMetadata = true;
-
 var st = new ShardingTest({name: 'sync_conn_cmd', shards: TestData.configShard ? 1 : 0, config: 3});
 st.s.setSecondaryOk();
 
@@ -64,18 +57,23 @@ testCountWithQuery();
 testInvalidCount();
 
 // Test with the first config server down
-MongoRunner.stopMongod(st.c0);
+st.configRS.stop(0, undefined /* signal */, undefined /* opts */, {forRestart: true});
 
 testNormalCount();
 testCountWithQuery();
 testInvalidCount();
 
 // Test with the first and second config server down
-MongoRunner.stopMongod(st.c1);
+st.configRS.stop(1, undefined /* signal */, undefined /* opts */, {forRestart: true});
 jsTest.log('Second server is down');
 
 testNormalCount();
 testCountWithQuery();
 testInvalidCount();
+
+// Restart the config servers to ensure teardown checks can execute correctly. Shut down the final
+// node so we can use the canonical helper for restarting the entire CSRS.
+st.configRS.stop(2, undefined /* signal */, undefined /* opts */, {forRestart: true});
+st.restartAllConfigServers();
 
 st.stop();
