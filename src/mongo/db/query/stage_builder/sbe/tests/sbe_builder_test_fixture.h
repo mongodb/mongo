@@ -135,34 +135,4 @@ protected:
     std::unique_ptr<GoldenTestContext> _gctx;
 };
 
-class GoldenSbeExprBuilderTestFixture : public GoldenSbeStageBuilderTestFixture {
-public:
-    GoldenSbeExprBuilderTestFixture() : _env(std::make_unique<sbe::RuntimeEnvironment>()) {}
-
-    void setUp() override;
-
-    void tearDown() override {
-        _expCtx = nullptr;
-        SbeStageBuilderTestFixture::tearDown();
-    }
-
-    void runTest(stage_builder::SbExpr sbeExpr,
-                 sbe::value::TypeTags expectedTag,
-                 sbe::value::Value expectedVal,
-                 StringData test);
-
-protected:
-    stage_builder::Environment _env;
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
-    Variables _variables;
-    std::unique_ptr<stage_builder::PlanStageStaticData> _planStageData;
-    sbe::value::SlotIdGenerator _slotIdGenerator;
-    sbe::value::FrameIdGenerator _frameIdGenerator;
-    sbe::value::SpoolIdGenerator _spoolIdGenerator;
-    stage_builder::StageBuilderState::InListsMap _inListsMap;
-    stage_builder::StageBuilderState::CollatorsMap _collatorsMap;
-    stage_builder::StageBuilderState::SortSpecMap _sortSpecMap;
-    boost::optional<stage_builder::StageBuilderState> _state;
-};
-
 }  // namespace mongo
