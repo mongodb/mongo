@@ -259,16 +259,6 @@ void validateRangeBoundsInt(T typeInfo, uint32_t sparsity, uint32_t trimFactor) 
     validateRangeBoundsBase(domainSizeLog2, sparsity, trimFactor);
 }
 
-bool isTextSearchQueryType(QueryTypeEnum e) {
-    switch (e) {
-        case QueryTypeEnum::SubstringPreview:
-        case QueryTypeEnum::SuffixPreview:
-        case QueryTypeEnum::PrefixPreview:
-            return true;
-        default:
-            return false;
-    }
-}
 
 }  // namespace
 
@@ -425,130 +415,27 @@ void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfi
     }
 }
 
-void validateTextSearchIndex(BSONType fieldType,
-                             StringData fieldPath,
-                             QueryTypeConfig& query,
-                             boost::optional<bool> previousCaseSensitivity,
-                             boost::optional<bool> previousDiacriticSensitivity,
-                             boost::optional<std::int64_t> previousContention) {
-    uassert(9783400,
-            "Type '{}' is not a supported type for text search indexed encrypted field {}"_format(
-                typeName(fieldType), fieldPath),
-            fieldType == BSONType::String);
-    auto qTypeStr = QueryType_serializer(query.getQueryType());
-
-    uassert(9783401,
-            "Query type is not a text search query type",
-            isTextSearchQueryType(query.getQueryType()));
-
-    uassert(9783402,
-            "strMinQueryLength parameter is required for {} query type of field {}"_format(
-                qTypeStr, fieldPath),
-            query.getStrMinQueryLength().has_value());
-    uassert(9783403,
-            "strMaxQueryLength parameter is required for {} query type of field {}"_format(
-                qTypeStr, fieldPath),
-            query.getStrMaxQueryLength().has_value());
-    uassert(9783404,
-            "caseSensitive parameter is required for {} query type of field {}"_format(qTypeStr,
-                                                                                       fieldPath),
-            query.getCaseSensitive().has_value());
-    uassert(9783405,
-            "diacriticSensitive parameter is required for {} query type of field {}"_format(
-                qTypeStr, fieldPath),
-            query.getDiacriticSensitive().has_value());
-    uassert(9783406,
-            "strMinQueryLength cannot be greater than strMaxQueryLength",
-            query.getStrMinQueryLength().value() <= query.getStrMaxQueryLength().value());
-
-    if (query.getQueryType() == QueryTypeEnum::SubstringPreview) {
-        uassert(9783407,
-                "strMaxLength parameter is required for {} query type of field {}"_format(
-                    qTypeStr, fieldPath),
-                query.getStrMaxLength().has_value());
-        uassert(9783408,
-                "strMaxQueryLength cannot be greater than strMaxLength",
-                query.getStrMaxQueryLength().value() <= query.getStrMaxLength().value());
-    }
-
-    if (previousCaseSensitivity.has_value() &&
-        query.getCaseSensitive().value() != *previousCaseSensitivity) {
-        uasserted(9783409,
-                  "caseSensitive parameter must be the same for all query types of field {}"_format(
-                      fieldPath));
-    }
-    if (previousDiacriticSensitivity.has_value() &&
-        query.getDiacriticSensitive().value() != *previousDiacriticSensitivity) {
-        uasserted(
-            9783410,
-            "diacriticSensitive parameter must be the same for all query types of field {}"_format(
-                fieldPath));
-    }
-    if (previousContention.has_value() && query.getContention() != *previousContention) {
-        uasserted(9783411,
-                  "contention parameter must be the same for all query types of field {}"_format(
-                      fieldPath));
-    };
-}
-
 void validateEncryptedField(const EncryptedField* field) {
     if (field->getQueries().has_value()) {
-        std::vector<QueryTypeConfig> queryTypeConfigs;
-        visit(OverloadedVisitor{
-                  [&queryTypeConfigs](QueryTypeConfig config) {
-                      queryTypeConfigs.push_back(std::move(config));
-                  },
-                  [&queryTypeConfigs](std::vector<QueryTypeConfig> configs) {
-                      if (!gFeatureFlagQETextSearchPreview.isEnabledUseLastLTSFCVWhenUninitialized(
-                              serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        auto encryptedIndex =
+            visit(OverloadedVisitor{
+                      [](QueryTypeConfig config) { return config; },
+                      [](std::vector<QueryTypeConfig> configs) {
+                          // TODO SERVER-67421 - remove restriction that only one query type
+                          // can be specified per field
                           uassert(6338404,
                                   "Exactly one query type should be specified per field",
                                   configs.size() == 1);
-                      } else {
-                          uassert(9783412,
-                                  "At least one query type should be specified per field",
-                                  configs.size() >= 1);
-                      }
-                      queryTypeConfigs = std::move(configs);
+                          return configs[0];
+                      },
                   },
-              },
-              field->getQueries().value());
+                  field->getQueries().value());
 
         uassert(6412601,
                 "BSON type needs to be specified for an indexed field",
                 field->getBsonType().has_value());
         auto fieldType = typeFromName(field->getBsonType().value());
 
-        if (queryTypeConfigs.size() > 1) {
-            uassert(9783413,
-                    "The number of query types for an encrypted field cannot exceed two",
-                    queryTypeConfigs.size() == 2);
-            auto qtype1 = queryTypeConfigs.front().getQueryType();
-            auto qtype2 = queryTypeConfigs.back().getQueryType();
-            uassert(9783414,
-                    "Multiple query types may only include the {} and {} query types"_format(
-                        QueryType_serializer(QueryTypeEnum::SuffixPreview),
-                        QueryType_serializer(QueryTypeEnum::PrefixPreview)),
-                    (qtype1 == QueryTypeEnum::SuffixPreview &&
-                     qtype2 == QueryTypeEnum::PrefixPreview) ||
-                        (qtype2 == QueryTypeEnum::SuffixPreview &&
-                         qtype1 == QueryTypeEnum::PrefixPreview));
-            validateTextSearchIndex(fieldType,
-                                    field->getPath(),
-                                    queryTypeConfigs.front(),
-                                    boost::none,
-                                    boost::none,
-                                    boost::none);
-            validateTextSearchIndex(fieldType,
-                                    field->getPath(),
-                                    queryTypeConfigs.back(),
-                                    queryTypeConfigs.front().getCaseSensitive(),
-                                    queryTypeConfigs.front().getDiacriticSensitive(),
-                                    queryTypeConfigs.front().getContention());
-            return;
-        }
-
-        auto& encryptedIndex = queryTypeConfigs.front();
         switch (encryptedIndex.getQueryType()) {
             case QueryTypeEnum::Equality:
                 uassert(6338405,
@@ -573,22 +460,6 @@ void validateEncryptedField(const EncryptedField* field) {
                 // valid so that we can start up with existing rangePreview collections.
             case QueryTypeEnum::Range: {
                 validateRangeIndex(fieldType, field->getPath(), encryptedIndex);
-                break;
-            }
-            case QueryTypeEnum::SubstringPreview:
-            case QueryTypeEnum::SuffixPreview:
-            case QueryTypeEnum::PrefixPreview: {
-                uassert(9783415,
-                        "Query type {} is not a supported query type"_format(
-                            QueryType_serializer(encryptedIndex.getQueryType())),
-                        gFeatureFlagQETextSearchPreview.isEnabledUseLastLTSFCVWhenUninitialized(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-                validateTextSearchIndex(fieldType,
-                                        field->getPath(),
-                                        encryptedIndex,
-                                        boost::none,
-                                        boost::none,
-                                        boost::none);
                 break;
             }
         }
