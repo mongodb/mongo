@@ -49,22 +49,20 @@ namespace mongo {
  * the results of any number of ranked subpipelines with reciprocal rank fusion.
  *
  * You can see an sample desugared pipeline in ranked_fusion_verbose_replace_root_test.js, but
- * conceptually: $rankFusion, given input pipelines p1 to pX, desugars into the pipeline:
- * - Score-generating stage from p1 (e.g., $vectorSearch).
- * - Via $group and $unwind, for each document returned:
- *     - Add a rank field: first_rank.
- *     - Add a score field: first_score.
- *         - Score is calculated via: 1 / (rank + (rankConstant = 60)).
- * - For each additional pipeline pX add a:
- *     - $unionWith {
- *          The same steps that were run on p1, but for pipeline px:
- *          thus, adding fields xth_score and xth_rank. }
- *          TODO SERVER-95164: change note about naming if applicable.
- * - $group the docs via ID.
- * - Zero null scores.
- * - Prepare the output:
- *      - Add a new “score” field and nest first_score and second_score within it.
- *      - Sort in descending score order.
+ * conceptually, this stage, given n input pipelines each with a unique name, desugars into a
+ * pipeline consisting of:
+ * - The first input pipeline (e.g. $vectorSearch).
+ * - $group, $unwind and $addFields that for each document returned will:
+ *     - Add a rank field: <pipeline name>_rank (e.g. vs_rank).
+ *     - Add a score field: <pipeline name>_score (e.g. vs_score).
+ *         - Score is calculated with the formula 1 / (rank + rankConstant). Currently rankConstant
+ *           is set to 60.
+ * - n-1 $unionWith stages on the same collection, which take as input pipelines:
+ *     - The nth input pipeline.
+ *     - $group, $unwind and $addFields which do the same thing as described above.
+ * - $group by ID and turn null scores into 0.
+ * - $addFields for a 'score' field which will add the n scores for each document.
+ * - $sort in descending order.
  */
 class DocumentSourceRankFusion final {
 public:
