@@ -1733,6 +1733,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                      groupStage->getIdExpression(),
                                                      groupStage->getAccumulationStatements(),
                                                      groupStage->doingMerge(),
+                                                     groupStage->willBeMerged(),
                                                      isLastSource /* shouldProduceBson */);
             continue;
         }

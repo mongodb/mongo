@@ -111,7 +111,10 @@ res = runExample("$_id",
                      lang: 'js',
                  },
                  {allowDiskUse: false});
-assert.commandFailedWithCode(res, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed]);
+// If featureFlagShardFilteringDistinctScan is on, we will push this $group down to shards on
+// sharded collection passthrough suites, and may run out of space during JS execution of init().
+assert.commandFailedWithCode(
+    res, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.JSInterpreterFailure]);
 
 // Verify that having large number of documents doesn't cause the $accumulator to run out of memory.
 coll.drop();

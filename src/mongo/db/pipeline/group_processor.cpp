@@ -32,7 +32,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/spill_util.h"
@@ -115,7 +114,7 @@ boost::optional<Document> GroupProcessor::getNextSpilled() {
         _firstPartOfNextGroup = _sorterIterator->next();
     }
 
-    return makeDocument(currentId, _currentAccumulators, _expCtx->getNeedsMerge());
+    return makeDocument(currentId, _currentAccumulators);
 }
 
 boost::optional<Document> GroupProcessor::getNextStandard() {
@@ -125,7 +124,7 @@ boost::optional<Document> GroupProcessor::getNextStandard() {
 
     auto& it = *_groupsIterator;
 
-    Document out = makeDocument(it->first, it->second, _expCtx->getNeedsMerge());
+    Document out = makeDocument(it->first, it->second);
     ++it;
     return out;
 }

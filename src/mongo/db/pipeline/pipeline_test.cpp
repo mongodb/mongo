@@ -4997,50 +4997,55 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupIfUsingAddFields) {
         "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]", /*inputPipeJson*/
         "[{$addFields: {new: '$shardKey'}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$group: {_id: '$shardKey'}}]",                     /*shardPipeJson*/
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        ",{$group: {_id: '$shardKey', $willBeMerged: false}}]", /*shardPipeJson*/
+        // Empty merge as group is fully pushed down.
+        "[]", /*mergePipeJson*/
         shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKey) {
     RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"_id"};
-    doTest("[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
-           "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: '$_id'}}]" /*shardPipeJson*/,
-           "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
-           shardKey);
+    doTest(
+        "[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
+        "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: '$_id', $willBeMerged: false}}]" /*shardPipeJson*/
+        ,
+        // Empty merge as group is fully pushed down.
+        "[]" /*mergePipeJson*/,
+        shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKey) {
     RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
-    doTest(
-        "[{$sort: {a: 1}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]" /*inputPipeJson*/,
-        "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]" /*shardPipeJson*/
-        ,
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
-        shardKey);
+    doTest("[{$sort: {a: 1}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]", /*inputPipeJson*/
+           "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}, "
+           "$willBeMerged: false}}]", /*shardPipeJson*/
+           // Empty merge as group is fully pushed down.
+           "[]", /*mergePipeJson*/
+           shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInArray) {
     RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
-    doTest("[{$sort: {a: 1}}, {$group: {_id: ['$a', '$b', '$c']}}]" /*inputPipeJson*/,
-           "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b', '$c']}}]" /*shardPipeJson*/
-           ,
-           "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+    doTest("[{$sort: {a: 1}}, {$group: {_id: ['$a', '$b', '$c']}}]", /*inputPipeJson*/
+           "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b', '$c'], $willBeMerged: "
+           "false}}]", /*shardPipeJson*/
+           // Empty merge as group is fully pushed down.
+           "[]", /*mergePipeJson*/
            shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInNestedStructure) {
     RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
-    doTest(
-        "[{$sort: {a: 1}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]" /*inputPipeJson*/,
-        "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]" /*shardPipeJson*/
-        ,
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
-        shardKey);
+    doTest("[{$sort: {a: 1}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]", /*inputPipeJson*/
+           "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}, "
+           "$willBeMerged: false}}]", /*shardPipeJson*/
+           // Empty merge as group is fully pushed down.
+           "[]", /*mergePipeJson*/
+           shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyWithIrrelevantFieldsModified) {
@@ -5048,11 +5053,11 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyWithIrrelev
     const OrderedPathSet shardKey = {"a", "b"};
     doTest(
         "[{$addFields: {c:{$const:'foobar'}}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b', "
-        "'$c']}}]" /*inputPipeJson*/,
+        "'$c']}}]", /*inputPipeJson*/
         "[{$addFields: {c:{$const:'foobar'}}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', "
-        "'$b', '$c']}}]" /*shardPipeJson*/
-        ,
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        "'$b', '$c'], $willBeMerged: false}}]", /*shardPipeJson*/
+        // Empty merge as group is fully pushed down.
+        "[]", /*mergePipeJson*/
         shardKey);
 };
 
@@ -5062,8 +5067,9 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRena
     doTest(
         "[{$project:{'a':true, b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
         "[{$project:{_id:true, 'a':true, b:'$a'}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: "
-        "['$a', '$b']}}]",                                    /*shardPipeJson*/
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        "['$a', '$b'], $willBeMerged: false}}]", /*shardPipeJson*/
+        // Empty merge as group is fully pushed down.
+        "[]", /*mergePipeJson*/
         shardKey);
 };
 
@@ -5072,8 +5078,10 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRena
     const OrderedPathSet shardKey = {"a"};
     doTest(
         "[{$addFields:{b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
-        "[{$addFields:{b:'$a'}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b']}}]", /*shardPipeJson*/
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        "[{$addFields:{b:'$a'}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b'], "
+        "$willBeMerged: false}}]", /*shardPipeJson*/
+        // Empty merge as group is fully pushed down.
+        "[]", /*mergePipeJson*/
         shardKey);
 };
 
@@ -5083,8 +5091,9 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithUnrelatedExclusio
     doTest(
         "[{$project:{'c':false}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
         "[{$project:{'c':false, _id:true}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', "
-        "'$b']}}]",                                           /*shardPipeJson*/
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        "'$b'], $willBeMerged: false}}]", /*shardPipeJson*/
+        // Empty merge as group is fully pushed down.
+        "[]", /*mergePipeJson*/
         shardKey);
 };
 
@@ -5109,8 +5118,9 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithRenames) {
         "[{$project: {_id: true, rename: '$shardKey'}}"
         ",{$project: {_id: true, anotherRename: '$rename'}}"
         ",{$sort: {sortKey: {anotherRename: 1}}}"
-        ",{$group: {_id: '$anotherRename'}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        ",{$group: {_id: '$anotherRename', $willBeMerged: false}}]" /*shardPipeJson*/,
+        // Empty merge as group is fully pushed down.
+        "[]" /*mergePipeJson*/,
         shardKey);
 };
 
@@ -5125,8 +5135,9 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMultipleRenames) 
         "[{$project: {_id: true, rename: '$shardKey'}}"
         ",{$project: {_id: true, anotherRename: '$rename', anotherRename2: '$rename'}}"
         ",{$sort: {sortKey: {anotherRename2: 1}}}"
-        ",{$group: {_id: '$anotherRename2'}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        ",{$group: {_id: '$anotherRename2', $willBeMerged: false}}]" /*shardPipeJson*/,
+        // Empty merge as group is fully pushed down.
+        "[]" /*mergePipeJson*/,
         shardKey);
 };
 
@@ -5138,8 +5149,9 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMatchBetweenSortA
         ,
         "[{$match: {shardKey: {$eq: 'val'}}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$group: {_id: '$shardKey'}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        ",{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*shardPipeJson*/,
+        // Empty merge as group is fully pushed down.
+        "[]" /*mergePipeJson*/,
         shardKey);
 };
 
@@ -5150,8 +5162,9 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithFirstAccumulator)
         "[{$sort: {shardKey: 1}}, {$group: {_id: '$shardKey', first: {$first: '$other'}}}]" /*inputPipeJson*/
         ,
         "[{$sort: {sortKey: {shardKey: 1}}}, {$group: {_id: '$shardKey', first: {$first: "
-        "'$other'}}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$$ROOT._id', first: {$first: '$$ROOT.first'}, $doingMerge: true}}]" /*mergePipeJson*/
+        "'$other'}, $willBeMerged: false}}]" /*shardPipeJson*/,
+        // Empty merge as group is fully pushed down.
+        "[]" /*mergePipeJson*/
         ,
         shardKey);
 };
@@ -5164,10 +5177,11 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithTopAccumulator) {
         ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}}}]" /*inputPipeJson*/
         ,
         "[{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}}}]" /*shardPipeJson*/
+        ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}, "
+        "$willBeMerged: false}}]" /*shardPipeJson*/
         ,
-        "[{$group: {_id: '$$ROOT._id', top: {$top: {output: '$$ROOT.top', sortBy: {other: 1}}}, "
-        "$doingMerge: true}}]" /*mergePipeJson*/,
+        // Empty merge as group is fully pushed down.
+        "[]" /*mergePipeJson*/,
         shardKey);
 };
 

@@ -163,8 +163,13 @@ struct StageBuilderState {
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
-    // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
+    // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongos'
     // flags to true so that shards can sends special partial aggregation results to the mongos.
+    // However, as $group can now be pushed down entirely if it specifies the entire shard key in
+    // _id, pipelines can exist with a fully pushed down $group followed by a partially
+    // pushed down $group - only the latter is permitted to generate partial results.
+    // To control this, generateGroupFinalStage may selectively override this to false
+    // for groups which have been fully pushed down.
     bool needsMerge;
 
     // A flag to indicate the user allows disk use for spilling.
