@@ -47,6 +47,12 @@ env.CppUnitTest(
     LIBDEPS=[],
 )
 
+env.CppUnitTest(
+    target="db_query_test",
+    source=[],
+    LIBDEPS=[],
+)
+
 env.Benchmark(
     target="canonical_query_bm",
     source=["canonical_query_bm.cpp"],
