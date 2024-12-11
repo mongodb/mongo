@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/type_traits.h"
@@ -1379,14 +1380,17 @@ private:
         using Base::Base;
         using Base::operator=;
 
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
         ResetOnMoveOptional(ResetOnMoveOptional&& other) noexcept(
-            std::is_nothrow_move_assignable_v<T>&& std::is_nothrow_move_constructible_v<T>)
-            : Base(other._stealBase()) {}
+            std::is_nothrow_move_constructible_v<Base>)
+            : Base(std::exchange(other._base(), {})) {}
+        MONGO_COMPILER_DIAGNOSTIC_POP
 
         ResetOnMoveOptional& operator=(ResetOnMoveOptional&& other) noexcept(
-            std::is_nothrow_move_assignable_v<T>&& std::is_nothrow_move_constructible_v<T>) {
+            std::is_nothrow_move_assignable_v<Base>) {
             if (this != &other)
-                _base() = other._stealBase();
+                _base() = std::exchange(other._base(), {});
             return *this;
         }
 
@@ -1397,10 +1401,6 @@ private:
 
         const Base& _base() const {
             return *this;
-        }
-
-        Base _stealBase() {
-            return std::exchange(_base(), {});
         }
     };
 

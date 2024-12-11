@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -85,7 +86,10 @@ public:
             sbe::makeEs(makeE<EVariable>(aggSlot), makeE<EVariable>(sortBySlot)));
         auto compiledLinearFillFinalize = compileExpression(*aggLinearFillFinalize);
 
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
         auto [stateTag, stateVal] = initState();
+        MONGO_COMPILER_DIAGNOSTIC_POP
         aggAccessor.reset(stateTag, stateVal);
 
         size_t idx = 0;

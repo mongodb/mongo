@@ -187,6 +187,7 @@ mongo_cc_library(
             "-Wno-unknown-warning-option",
             # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
             "-Wno-deprecated",
+            "-Wno-dangling-pointer",
         ],
     }),
     features = select({

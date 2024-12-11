@@ -33,6 +33,7 @@
 #include <boost/intrusive_ptr.hpp>
 #include <cstdlib>
 
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {
@@ -69,9 +70,12 @@ public:
     }
 
     friend void intrusive_ptr_release(const RefCountable* ptr) {
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ
         if (ptr->_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
             delete ptr;
         }
+        MONGO_COMPILER_DIAGNOSTIC_POP
     }
 
 protected:

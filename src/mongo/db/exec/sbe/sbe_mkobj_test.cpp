@@ -51,6 +51,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {
@@ -85,6 +86,8 @@ public:
         auto objOutSlotId = generateSlotId();
         auto makeStageFn = [objOutSlotId](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> scanStage) {
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
             auto mkobj = makeS<MkObjStageType>(std::move(scanStage),
                                                objOutSlotId,
                                                scanSlot,
@@ -95,6 +98,7 @@ public:
                                                false,  // force new
                                                false,  // return old
                                                kEmptyPlanNodeId);
+            MONGO_COMPILER_DIAGNOSTIC_POP
 
             return std::make_pair(objOutSlotId, std::move(mkobj));
         };
@@ -128,6 +132,8 @@ public:
         auto objOutSlotId = generateSlotId();
         auto makeStageFn = [objOutSlotId](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> scanStage) {
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
             auto mkobj = makeS<MkObjStageType>(std::move(scanStage),
                                                objOutSlotId,
                                                scanSlot,
@@ -138,6 +144,7 @@ public:
                                                false,  // force new
                                                false,  // return old
                                                kEmptyPlanNodeId);
+            MONGO_COMPILER_DIAGNOSTIC_POP
 
             return std::make_pair(objOutSlotId, std::move(mkobj));
         };

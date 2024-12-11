@@ -59,6 +59,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -1822,7 +1823,10 @@ public:
             }
         }
         if (!spec["error"].missing()) {
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wdangling-reference")
             const vector<Value>& asserters = spec["error"].getArray();
+            MONGO_COMPILER_DIAGNOSTIC_POP
             size_t n = asserters.size();
             for (size_t i = 0; i < n; i++) {
                 const BSONObj obj = BSON(asserters[i].getString() << args);
@@ -2884,7 +2888,10 @@ public:
             }
         }
         if (!spec["error"].missing()) {
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wdangling-reference")
             const vector<Value>& asserters = spec["error"].getArray();
+            MONGO_COMPILER_DIAGNOSTIC_POP
             size_t n = asserters.size();
             for (size_t i = 0; i < n; i++) {
                 const BSONObj obj = BSON(asserters[i].getString() << args);

@@ -218,8 +218,21 @@
  *    which will produce a compiler warning if this type is assigned
  *    a temporary (xvalue) gsl::Owner type (such as std::string). This
  *    matches the annotation libc++ uses for std::string_view.
+ *
+ * MONGO_COMPILER_DIAGNOSTIC_*
+ *
+ *    Control diagnostic settings inline.
+ *
+ *    Example:
+ *        MONGO_COMPILER_DIAGNOSTIC_PUSH
+ *        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Warray-bounds")
+ *        char buf[0];
+ *        __builtin_strcpy(buf, "overflow");
+ *        MONGO_COMPILER_DIAGNOSTIC_POP
  */
 
+// Allows issuing pragmas through macros. Arguments appear exactly as they would in a #pragma.
+#define MONGO_COMPILER_PRAGMA(p) _Pragma(#p)
 
 #if defined(_MSC_VER)
 #include "mongo/platform/compiler_msvc.h"  // IWYU pragma: export

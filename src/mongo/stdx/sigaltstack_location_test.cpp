@@ -114,13 +114,13 @@ struct Hex {
 
 struct StackLocationTestChildThreadInfo {
     stack_t ss;
-    const char* handlerLocal;
+    uintptr_t handlerLocal;
 };
 static StackLocationTestChildThreadInfo stackLocationTestChildInfo{};
 
 extern "C" void stackLocationTestAction(int, siginfo_t*, void*) {
     char n;
-    stackLocationTestChildInfo.handlerLocal = &n;
+    stackLocationTestChildInfo.handlerLocal = reinterpret_cast<uintptr_t>(&n);
 }
 
 int stackLocationTest() {
@@ -147,7 +147,7 @@ int stackLocationTest() {
 
     uintptr_t altStackBegin = reinterpret_cast<uintptr_t>(stackLocationTestChildInfo.ss.ss_sp);
     uintptr_t altStackEnd = altStackBegin + stackLocationTestChildInfo.ss.ss_size;
-    uintptr_t handlerLocal = reinterpret_cast<uintptr_t>(stackLocationTestChildInfo.handlerLocal);
+    uintptr_t handlerLocal = stackLocationTestChildInfo.handlerLocal;
 
     std::cerr << "child sigaltstack[" << Hex(altStackEnd - altStackBegin) << "] = ["
               << Hex(altStackBegin) << ", " << Hex(altStackEnd) << ")\n"

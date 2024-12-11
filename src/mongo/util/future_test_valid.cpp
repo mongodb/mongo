@@ -39,6 +39,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -231,7 +232,10 @@ TEST(FutureValid, ShareTransfersValid) {
 }
 
 DEATH_TEST(FutureValid, ShareCrashesOnInvalidFuture, "Invariant failure") {
+    MONGO_COMPILER_DIAGNOSTIC_PUSH
+    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     callWithInvalidFuture([](auto&& fut) { return std::move(fut).share(); });
+    MONGO_COMPILER_DIAGNOSTIC_POP
 }
 
 /** Asserts that the SemiFuture is invalid() after `func`. */

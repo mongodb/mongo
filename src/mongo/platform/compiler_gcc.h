@@ -112,3 +112,38 @@
 #else
 #define MONGO_GSL_POINTER
 #endif
+
+// Both GCC and clang can use this abstract macro, mostly as an implementation detail. It's up to
+// callers to know when GCC and clang disagree on the name of the warning.
+#if defined(__clang__)
+#define MONGO_COMPILER_DIAGNOSTIC_PUSH MONGO_COMPILER_PRAGMA(clang diagnostic push)
+#define MONGO_COMPILER_DIAGNOSTIC_POP MONGO_COMPILER_PRAGMA(clang diagnostic pop)
+#define MONGO_COMPILER_DIAGNOSTIC_IGNORED(w) MONGO_COMPILER_PRAGMA(clang diagnostic ignored w)
+#else
+#define MONGO_COMPILER_DIAGNOSTIC_PUSH MONGO_COMPILER_PRAGMA(GCC diagnostic push)
+#define MONGO_COMPILER_DIAGNOSTIC_POP MONGO_COMPILER_PRAGMA(GCC diagnostic pop)
+#define MONGO_COMPILER_DIAGNOSTIC_IGNORED(w) MONGO_COMPILER_PRAGMA(GCC diagnostic ignored w)
+#endif  // clang
+
+#if !defined(__clang__) && __GNUC__ >= 14
+
+// TODO(SERVER-97447): We ignore these warnings on GCC 14 to facilitate transition to the v5
+// toolchain. They should be investigated more deeply by the teams owning each callsite.
+#define MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL(w) MONGO_COMPILER_DIAGNOSTIC_IGNORED(w)
+
+// We selectively ignore -Wstringop-overread on GCC 14 due to a known bug affecting
+// boost::container::small_vector: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108197.
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_SMALL_VECTOR \
+    MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overread")
+
+// We selectively ignore -Wstringop-overflow on GCC 14 due to strong suspicion that they are
+// false-positives. They involve an atomic read overflowing the destination, likely due to the
+// compiler incorrectly believing they might be referencing a NULL pointer.
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ \
+    MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overflow")
+
+#else
+#define MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL(w)
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_SMALL_VECTOR
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ
+#endif

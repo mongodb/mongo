@@ -47,6 +47,7 @@
 #include "mongo/bson/column/simple8b_builder.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/int128.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
@@ -928,7 +929,10 @@ TEST(Simple8b, Selector8SmallStartWith8SelectorAndAddSmallerValues) {
     expectedInts.insert(expectedInts.end(), 3, val);
 
     val = 6;
+    MONGO_COMPILER_DIAGNOSTIC_PUSH
+    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
     expectedInts.insert(expectedInts.end(), 1, val);
+    MONGO_COMPILER_DIAGNOSTIC_POP
 
     // test that buffer was correct
     std::vector<uint8_t> expectedBinary = {0x18, 0x75, 0x75, 0x75, 0xE3, 0xE3, 0xE3, 0x60};

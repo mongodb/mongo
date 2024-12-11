@@ -54,6 +54,7 @@
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/logv2/log_domain_global.h"
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 namespace {
@@ -182,11 +183,14 @@ BENCHMARK(BM_OnUpdate_System)->MinTime(10.0);
 void BM_OnInserts(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
     CollectionPtr collptr(&coll);
+    MONGO_COMPILER_DIAGNOSTIC_PUSH
+    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     std::vector<InsertStatement> statements(1,
                                             InsertStatement(BSON("_id"
                                                                  << "whatever"
                                                                  << "key"
                                                                  << "value")));
+    MONGO_COMPILER_DIAGNOSTIC_POP
     OpObserverRegistry registry;
     auto* serviceContext = setupServiceContext();
     repl::ReplSettings replSettings;

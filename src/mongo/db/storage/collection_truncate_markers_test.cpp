@@ -44,6 +44,7 @@
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util_core.h"
@@ -137,6 +138,8 @@ public:
 class TestCollectionMarkersWithPartialExpiration final
     : public CollectionTruncateMarkersWithPartialExpiration {
 public:
+    MONGO_COMPILER_DIAGNOSTIC_PUSH
+    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     TestCollectionMarkersWithPartialExpiration(int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
               {},
@@ -147,6 +150,7 @@ public:
               minBytesPerMarker,
               Microseconds(0),
               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
+    MONGO_COMPILER_DIAGNOSTIC_POP
 
     void setExpirePartialMarker(bool value) {
         _expirePartialMarker = value;

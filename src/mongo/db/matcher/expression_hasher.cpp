@@ -483,7 +483,7 @@ H AbslHashValue(H h, const AbslHashValueParams& toHash) {
     MatchExpressionHashVisitor<H> visitor{std::move(h), toHash.params};
     MatchExpressionWalker walker{&visitor, nullptr, nullptr};
     tree_walker::walk<true, MatchExpression>(&toHash.exprToHash, &walker);
-    return std::move(visitor.extractHashState());
+    return visitor.extractHashState();
 }
 
 size_t calculateHash(const MatchExpression& expr, const MatchExpressionHashParams& params) {

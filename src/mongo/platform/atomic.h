@@ -34,6 +34,7 @@
 #include <type_traits>
 
 #include "mongo/base/static_assert.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"
 
 namespace mongo {
@@ -83,7 +84,10 @@ public:
      * Gets the current value of this Atomic.
      */
     WordType load() const {
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ
         return _value.load();
+        MONGO_COMPILER_DIAGNOSTIC_POP
     }
 
     /**

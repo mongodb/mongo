@@ -73,6 +73,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/assert.h"
@@ -442,6 +443,8 @@ TEST_F(StorageInterfaceImplTest,
         storage.insertDocuments(opCtx, {nss.dbName(), *options.uuid}, transformInserts({op})));
 }
 
+MONGO_COMPILER_DIAGNOSTIC_PUSH
+MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
 TEST_F(StorageInterfaceImplTest,
        InsertDocumentsInsertsDocumentsOneAtATimeWhenAllAtOnceInsertingFails) {
     // Create a collection that does not support all-at-once inserting.
@@ -469,6 +472,7 @@ TEST_F(StorageInterfaceImplTest,
     // Check collection contents.
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc1.doc, doc2.doc});
 }
+MONGO_COMPILER_DIAGNOSTIC_POP
 
 TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {
     // Create fake oplog collection to hold operations.
