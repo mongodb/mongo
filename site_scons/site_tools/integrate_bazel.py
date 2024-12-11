@@ -380,27 +380,28 @@ def bazel_server_timeout_dumper(jvm_out, proc_pid, project_root):
         os.kill(int(proc_pid), signal.SIGTERM)
         p.wait()
 
-        if os.path.exists(".bazel_real"):
-            with tarfile.open(os.path.join(project_root, "jvm.out.tar.gz"), "w:gz") as tar:
-                tar.add(jvm_out)
+        if os.environ.get("CI"):
+            if os.path.exists(".bazel_real"):
+                with tarfile.open(os.path.join(project_root, "jvm.out.tar.gz"), "w:gz") as tar:
+                    tar.add(jvm_out)
 
-        try:
-            expansions = read_config_file(os.path.join(project_root, "../expansions.yml"))
-            task_id = expansions.get("task_id", None)
-            error_msg = (
-                "Bazel timed out waiting for remote action (from BF-35762).\n"
-                f"See task: <https://spruce.mongodb.com/task/{task_id}|here>."
-            )
+            try:
+                expansions = read_config_file(os.path.join(project_root, "../expansions.yml"))
+                task_id = expansions.get("task_id", None)
+                error_msg = (
+                    "Bazel timed out waiting for remote action (from BF-35762).\n"
+                    f"See task: <https://spruce.mongodb.com/task/{task_id}|here>."
+                )
 
-            evg_api = RetryingEvergreenApi.get_api(
-                config_file=os.path.join(project_root, ".evergreen.yml")
-            )
-            evg_api.send_slack_message(
-                target="#devprod-build-triager",
-                msg=error_msg,
-            )
-        except Exception:  # pylint: disable=broad-except
-            traceback.print_exc()
+                evg_api = RetryingEvergreenApi.get_api(
+                    config_file=os.path.join(project_root, ".evergreen.yml")
+                )
+                evg_api.send_slack_message(
+                    target="#devprod-build-triager",
+                    msg=error_msg,
+                )
+            except Exception:  # pylint: disable=broad-except
+                traceback.print_exc()
 
 
 def bazel_build_subproc_func(**kwargs):
@@ -412,9 +413,12 @@ def bazel_build_subproc_func(**kwargs):
         check=True,
         env=kwargs["env"],
     ).stdout.strip()
-    if os.path.exists(".bazel_real"):
-        with open(".bazel_real") as f:
-            kwargs["args"][0] = f.read().strip()
+
+    if os.environ.get("CI"):
+        if os.path.exists(".bazel_real"):
+            with open(".bazel_real") as f:
+                kwargs["args"][0] = f.read().strip()
+
     jvm_out = os.path.join(output_base, "server/jvm.out")
 
     bazel_proc = subprocess.Popen(**kwargs)
