@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "timeseries_index*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -11,7 +11,7 @@ filters:
       - 10gen/server-index-builds
   - "timeseries_index_spec.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "timeseries_index_ttl_partial.js":
     approvers:
       - 10gen/query-integration-timeseries

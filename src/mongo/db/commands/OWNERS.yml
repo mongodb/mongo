@@ -90,13 +90,13 @@ filters:
       - 10gen/server-catalog-and-routing
   - "set_index_commit_quorum*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-index-builds
   - "dbcommands*":
     approvers:
       - 10gen/server-storage-engine-integration
   - "collection_to_capped*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "resize_oplog*":
     approvers:
       - 10gen/server-storage-engine-integration

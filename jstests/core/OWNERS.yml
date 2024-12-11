@@ -14,10 +14,10 @@ filters:
       - 10gen/server-programmability
   - "capped/*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "clustered/*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "splitvector.js":
     approvers:
       - 10gen/server-cluster-scalability

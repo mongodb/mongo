@@ -5,4 +5,4 @@ filters:
       - 10gen/server-replication
   - "*capped*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path

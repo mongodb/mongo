@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "getmore_awaitdata_opcounters.js":
     approvers:
       - 10gen/query-execution-client-cursor

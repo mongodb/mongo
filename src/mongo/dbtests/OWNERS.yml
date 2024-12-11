@@ -5,13 +5,13 @@ filters:
       - 10gen/server-networking-and-observability
   - "indexupdatetests.cpp":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-index-builds
   - "insert_test.cpp":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/query-optimization-parsers
   - "jsobjtests.cpp":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-programmability
   - "storage_debug_util*":
     approvers:
       - 10gen/server-storage-engine-integration
