@@ -52,8 +52,15 @@ let sizeStorerData = getSizeStorerData();
 assert(sizeStorerData.includes(uri),
        "Size storer unexpectedly does not contain entry for " + uri + ": " + sizeStorerData);
 
-replTest.start(
-    primary, {setParameter: {minSnapshotHistoryWindowInSeconds: 0}}, true /* forRestart */);
+replTest.start(primary,
+               {
+                   setParameter: {
+                       minSnapshotHistoryWindowInSeconds: 0,
+                       // Set storage logComponentVerbosity to one so we see the log id 22237.
+                       logComponentVerbosity: tojson({storage: 1})
+                   }
+               },
+               true /* forRestart */);
 primary = replTest.getPrimary();
 
 const collIdent = getUriForColl(coll());

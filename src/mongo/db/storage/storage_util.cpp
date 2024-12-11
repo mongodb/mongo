@@ -172,13 +172,13 @@ void removeIndex(OperationContext* opCtx,
                 } else {
                     dropTime = *commitTimestamp;
                 }
-                LOGV2(22206,
-                      "Deferring table drop for index",
-                      "index"_attr = indexNameStr,
-                      logAttrs(nss),
-                      "uuid"_attr = uuid,
-                      "ident"_attr = ident->getIdent(),
-                      "dropTime"_attr = toBSON(dropTime));
+                LOGV2_PROD_ONLY(22206,
+                                "Deferring table drop for index",
+                                "index"_attr = indexNameStr,
+                                logAttrs(nss),
+                                "uuid"_attr = uuid,
+                                "ident"_attr = ident->getIdent(),
+                                "dropTime"_attr = toBSON(dropTime));
                 storageEngine->addDropPendingIdent(dropTime, ident, std::move(onDrop));
             } else {
                 LOGV2(6361201,
@@ -242,11 +242,11 @@ Status dropCollection(OperationContext* opCtx,
             } else {
                 dropTime = *commitTimestamp;
             }
-            LOGV2(22214,
-                  "Deferring table drop for collection",
-                  logAttrs(nss),
-                  "ident"_attr = ident->getIdent(),
-                  "dropTime"_attr = toBSON(dropTime));
+            LOGV2_PROD_ONLY(22214,
+                            "Deferring table drop for collection",
+                            logAttrs(nss),
+                            "ident"_attr = ident->getIdent(),
+                            "dropTime"_attr = toBSON(dropTime));
             storageEngine->addDropPendingIdent(dropTime, ident, std::move(onDrop));
         });
 

@@ -1122,10 +1122,11 @@ void WiredTigerRecordStore::validate(RecoveryUnit& ru,
             << "This is a transient issue as the collection was actively "
                "in use by other operations.";
 
-        LOGV2_WARNING(22408,
-                      "Could not complete validation, This is a transient issue as the collection "
-                      "was actively in use by other operations",
-                      "uri"_attr = _uri);
+        LOGV2_PROD_ONLY(
+            22408,
+            "Could not complete validation, This is a transient issue as the collection "
+            "was actively in use by other operations",
+            "uri"_attr = _uri);
         results->addWarning(msg);
         return;
     }

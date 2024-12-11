@@ -212,10 +212,10 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             const auto& dropTimestamp = timestampAndIdentInfo.first;
             auto& identInfo = timestampAndIdentInfo.second;
             const auto& identName = identInfo->identName;
-            LOGV2(22237,
-                  "Completing drop for ident",
-                  "ident"_attr = identName,
-                  "dropTimestamp"_attr = dropTimestamp);
+            LOGV2_PROD_ONLY(22237,
+                            "Completing drop for ident",
+                            "ident"_attr = identName,
+                            "dropTimestamp"_attr = dropTimestamp);
             WriteUnitOfWork wuow(opCtx);
             auto status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
                                              identName,
@@ -223,11 +223,11 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
                                              identInfo->onDrop);
             if (!status.isOK()) {
                 if (status == ErrorCodes::ObjectIsBusy) {
-                    LOGV2(6936300,
-                          "Drop-pending ident is still in use",
-                          "ident"_attr = identName,
-                          "dropTimestamp"_attr = dropTimestamp,
-                          "error"_attr = status);
+                    LOGV2_PROD_ONLY(6936300,
+                                    "Drop-pending ident is still in use",
+                                    "ident"_attr = identName,
+                                    "dropTimestamp"_attr = dropTimestamp,
+                                    "error"_attr = status);
 
                     stdx::lock_guard<stdx::mutex> lock(_mutex);
                     identInfo->identState = IdentInfo::State::kNotDropped;

@@ -189,10 +189,10 @@ void WiredTigerIndexUtil::validateStructure(
             << "This is a transient issue as the collection was actively "
                "in use by other operations.";
 
-        LOGV2_WARNING(51781,
-                      "Could not complete validation. This is a transient issue as "
-                      "the collection was actively in use by other operations",
-                      "uri"_attr = uri);
+        LOGV2_PROD_ONLY(51781,
+                        "Could not complete validation. This is a transient issue as "
+                        "the collection was actively in use by other operations",
+                        "uri"_attr = uri);
 
         results.addWarning(msg);
     } else if (err) {
