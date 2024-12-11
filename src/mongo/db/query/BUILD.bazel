@@ -668,38 +668,6 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
-    name = "query_bm_constants",
-    srcs = [
-        "query_bm_constants.cpp",
-    ],
-    hdrs = [
-        "query_bm_constants.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
-    name = "query_bm_fixture",
-    srcs = [
-        "query_bm_fixture.cpp",
-    ],
-    hdrs = [
-        "query_bm_fixture.h",
-        "//src/mongo/db:profiler_bm_fixture.h",
-    ],
-    deps = [
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db:read_write_concern_defaults_mock",
-        "//src/mongo/db:service_context_d",
-        "//src/mongo/db/catalog:catalog_test_fixture",
-        "//src/mongo/db/repl:storage_interface_impl",
-        "//src/third_party/benchmark",
-    ],
-)
-
-mongo_cc_library(
     name = "query_test_service_context",
     srcs = [
         "query_test_service_context.cpp",
