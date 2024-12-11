@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -65,6 +65,18 @@ mongo_cc_library(
         ":column",
         "//src/mongo:base",
         "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_binary(
+    name = "bson_column_encoder",
+    srcs = [
+        "bson_column_encoder.cpp",
+    ],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
     ],
 )
 

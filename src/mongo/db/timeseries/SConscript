@@ -17,25 +17,6 @@ env.SConscript(
 
 env.CppUnitTest(
     target="db_timeseries_test",
-    source=[
-        "bucket_compression_test.cpp",
-        "timeseries_dotted_path_support_test.cpp",
-        "timeseries_extended_range_test.cpp",
-        "timeseries_index_schema_conversion_functions_test.cpp",
-        "timeseries_options_test.cpp",
-        "timeseries_update_delete_util_test.cpp",
-        "timeseries_write_util_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog",
-        "bucket_compression",
-        "timeseries_conversion_util",
-        "timeseries_extended_range",
-        "timeseries_options",
-        "timeseries_write_util",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

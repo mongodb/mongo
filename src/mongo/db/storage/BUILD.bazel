@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -567,6 +567,166 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "record_store_test_harness",
+    srcs = [
+        "oplog_truncation_test.cpp",
+        "record_store_test_datafor.cpp",
+        "record_store_test_datasize.cpp",
+        "record_store_test_deleterecord.cpp",
+        "record_store_test_harness.cpp",
+        "record_store_test_insertrecord.cpp",
+        "record_store_test_oplog.cpp",
+        "record_store_test_randomiter.cpp",
+        "record_store_test_recorditer.cpp",
+        "record_store_test_recordstore.cpp",
+        "record_store_test_storagesize.cpp",
+        "record_store_test_truncate.cpp",
+        "record_store_test_updaterecord.cpp",
+        "record_store_test_updatewithdamages.cpp",
+    ],
+    hdrs = [
+        "record_store_test_harness.h",
+        "test_harness_helper.h",
+    ],
+    deps = [
+        ":oplog_truncation",
+        ":record_store_base",
+        ":storage_options",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:health_log_interface",
+        "//src/mongo/db/catalog:health_log_mock",
+        "//src/mongo/db/update:update_document_diff",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "recovery_unit_test_harness",
+    srcs = [
+        "recovery_unit_test_harness.cpp",
+    ],
+    hdrs = [
+        "recovery_unit_test_harness.h",
+        "test_harness_helper.h",
+    ],
+    deps = [
+        ":record_store_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "sorted_data_interface_test_harness",
+    srcs = [
+        "sorted_data_interface_test_assert.h",
+        "sorted_data_interface_test_harness.cpp",
+        "test_harness_helper.h",
+    ],
+    hdrs = [
+        "sorted_data_interface_test_harness.h",
+    ],
+    deps = [
+        ":index_entry_comparison",
+        ":storage_options",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "sorted_data_interface_tests",
+    srcs = [
+        "sorted_data_interface_test_bulkbuilder.cpp",
+        "sorted_data_interface_test_cursor.cpp",
+        "sorted_data_interface_test_cursor_advanceto.cpp",
+        "sorted_data_interface_test_cursor_end_position.cpp",
+        "sorted_data_interface_test_cursor_locate.cpp",
+        "sorted_data_interface_test_cursor_saverestore.cpp",
+        "sorted_data_interface_test_cursor_seek_exact.cpp",
+        "sorted_data_interface_test_dupkeycheck.cpp",
+        "sorted_data_interface_test_fullvalidate.cpp",
+        "sorted_data_interface_test_insert.cpp",
+        "sorted_data_interface_test_isempty.cpp",
+        "sorted_data_interface_test_key_value_view.cpp",
+        "sorted_data_interface_test_keyformat_string.cpp",
+        "sorted_data_interface_test_rollback.cpp",
+        "sorted_data_interface_test_spaceused.cpp",
+        "sorted_data_interface_test_unindex.cpp",
+    ],
+    deps = [
+        ":sorted_data_interface_test_harness",
+        ":storage_options",
+        "//src/mongo/db:shard_role_api",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_storage_test",
+    srcs = [
+        "collection_truncate_markers_test.cpp",
+        "disk_space_monitor_test.cpp",
+        "flow_control_test.cpp",
+        "index_entry_comparison_test.cpp",
+        "storage_engine_lock_file_test.cpp",
+        "storage_engine_metadata_test.cpp",
+        "storage_engine_test_fixture.h",
+        "storage_repair_observer_test.cpp",
+        "//src/mongo/db/storage/kv:durable_catalog_test.cpp",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper_test.cpp",
+        "//src/mongo/db/storage/kv:storage_engine_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":disk_space_monitor",
+        ":flow_control",
+        ":flow_control_parameters",
+        ":record_store_base",
+        ":storage_engine_common",
+        ":storage_engine_lock_file",
+        ":storage_engine_metadata",
+        ":storage_options",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db:startup_recovery",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/index_builds:resumable_index_builds_idl",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:topology_coordinator",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_engine_impl",
+        "//src/mongo/db/storage:storage_repair_observer",
+        "//src/mongo/db/storage/devnull:storage_devnull_core",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/util:periodic_runner_factory",
     ],
 )
 

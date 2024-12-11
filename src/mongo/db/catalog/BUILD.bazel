@@ -645,6 +645,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "health_log_mock",
+    srcs = [
+        "health_log_mock.cpp",
+    ],
+    hdrs = [
+        "health_log_mock.h",
+    ],
+    deps = [
+        ":health_log_interface",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
     name = "collection_mock",
     hdrs = [
         "collection_mock.h",

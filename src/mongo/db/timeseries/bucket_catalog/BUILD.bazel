@@ -69,7 +69,6 @@ mongo_cc_unit_test(
         "measurement_map_test.cpp",
         "minmax_test.cpp",
         "schema_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
@@ -81,6 +80,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )
 

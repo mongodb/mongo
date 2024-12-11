@@ -142,7 +142,6 @@
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/storage/test_harness_helper.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction_resources.h"

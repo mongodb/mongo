@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -86,5 +86,20 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/query/write_ops:write_ops_parsers",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_timeseries_write_ops_test",
+    srcs = [
+        "timeseries_write_ops_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )

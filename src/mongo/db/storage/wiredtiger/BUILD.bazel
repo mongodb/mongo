@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -164,5 +164,93 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_engine_metadata",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "wiredtiger_record_store_test_harness",
+    srcs = [
+        "wiredtiger_record_store_test_harness.cpp",
+    ],
+    hdrs = [
+        "wiredtiger_record_store_test_harness.h",
+    ],
+    deps = [
+        ":storage_wiredtiger_core",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/storage:record_store_test_harness",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "wiredtiger_index_test_harness",
+    srcs = [
+        "wiredtiger_index_test_harness.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/catalog:collection_mock.h",
+    ],
+    deps = [
+        "storage_wiredtiger_core",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/storage:sorted_data_interface_test_harness",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "storage_wiredtiger_test",
+    srcs = [
+        "wiredtiger_c_api_test.cpp",
+        "wiredtiger_error_util_test.cpp",
+        "wiredtiger_init_test.cpp",
+        "wiredtiger_kv_engine_test.cpp",
+        "wiredtiger_prepare_conflict_test.cpp",
+        "wiredtiger_recovery_unit_test.cpp",
+        "wiredtiger_session_cache_test.cpp",
+        "wiredtiger_size_storer_test.cpp",
+        "wiredtiger_stats_test.cpp",
+        "wiredtiger_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":storage_wiredtiger",
+        ":storage_wiredtiger_core",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:snapshot_window_options",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/storage:checkpointer",
+        "//src/mongo/db/storage:recovery_unit_test_harness",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_engine_metadata",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/kv:kv_engine_test_harness",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "storage_wiredtiger_record_store_and_index_test",
+    srcs = [
+        "wiredtiger_index_test.cpp",
+        "wiredtiger_record_store_test.cpp",
+        "wiredtiger_standard_index_test.cpp",
+        "wiredtiger_standard_record_store_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":storage_wiredtiger_core",
+        ":wiredtiger_index_test_harness",
+        ":wiredtiger_record_store_test_harness",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/storage:oplog_truncation",
+        "//src/mongo/db/storage:sorted_data_interface_tests",
     ],
 )

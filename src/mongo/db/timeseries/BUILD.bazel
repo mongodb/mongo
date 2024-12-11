@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -243,5 +243,32 @@ mongo_cc_library(
         "//src/mongo/db:shard_role",
         "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/exec:bucket_unpacker",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_timeseries_test",
+    srcs = [
+        "bucket_compression_test.cpp",
+        "timeseries_dotted_path_support_test.cpp",
+        "timeseries_extended_range_test.cpp",
+        "timeseries_index_schema_conversion_functions_test.cpp",
+        "timeseries_options_test.cpp",
+        "timeseries_update_delete_util_test.cpp",
+        "timeseries_write_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":bucket_compression",
+        ":timeseries_conversion_util",
+        ":timeseries_extended_range",
+        ":timeseries_options",
+        ":timeseries_write_util",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )

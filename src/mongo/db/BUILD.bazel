@@ -1317,7 +1317,6 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops:parsed_update.h",
         "//src/mongo/db/query/write_ops:update_result.h",
         "//src/mongo/db/stats:single_transaction_stats.h",
-        "//src/mongo/db/storage:test_harness_helper.h",
         "//src/mongo/util:roaring_bitmaps.h",
         "//src/mongo/util/concurrency:ticketholder_queue_stats.h",
     ],
@@ -4031,6 +4030,23 @@ mongo_cc_library(
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
         "//src/mongo/util:periodic_runner_factory",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "read_write_concern_test",
+    srcs = [
+        "read_write_concern_provenance_test.cpp",
+        "write_concern_options_test.cpp",
+        "write_concern_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":rw_concern_d",
+        ":service_context_test_fixture",
+        "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/transport:service_entry_point_test_fixture",
     ],
 )
 

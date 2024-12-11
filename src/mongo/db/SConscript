@@ -245,17 +245,8 @@ if wiredtiger:
 
     envWithAsio.CppUnitTest(
         target="read_write_concern_test",
-        source=[
-            "read_write_concern_provenance_test.cpp",
-            "write_concern_test.cpp",
-            "write_concern_options_test.cpp",
-        ],
-        LIBDEPS=[
-            "repl/repl_settings",
-            "repl/replmocks",
-            "rw_concern_d",
-            "service_context_test_fixture",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
     envWithAsio.CppUnitTest(

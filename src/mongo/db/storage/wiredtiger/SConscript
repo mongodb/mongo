@@ -14,84 +14,14 @@ wtEnv.InjectThirdParty(libraries=["valgrind"])
 
 wtEnv.CppUnitTest(
     target="storage_wiredtiger_test",
-    source=[
-        "wiredtiger_init_test.cpp",
-        "wiredtiger_c_api_test.cpp",
-        "wiredtiger_kv_engine_test.cpp",
-        "wiredtiger_prepare_conflict_test.cpp",
-        "wiredtiger_stats_test.cpp",
-        "wiredtiger_recovery_unit_test.cpp",
-        "wiredtiger_session_cache_test.cpp",
-        "wiredtiger_size_storer_test.cpp",
-        "wiredtiger_util_test.cpp",
-        "wiredtiger_error_util_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/db/snapshot_window_options",
-        "$BUILD_DIR/mongo/db/storage/checkpointer",
-        "$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness",
-        "$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness",
-        "$BUILD_DIR/mongo/db/storage/storage_engine_common",
-        "$BUILD_DIR/mongo/db/storage/storage_engine_metadata",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "storage_wiredtiger",
-        "storage_wiredtiger_core",
-    ],
-)
-
-wtEnv.Library(
-    target="wiredtiger_record_store_test_harness",
-    source=[
-        "wiredtiger_record_store_test_harness.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/storage/record_store_test_harness",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "storage_wiredtiger_core",
-    ],
-)
-
-wtEnv.Library(
-    target="wiredtiger_index_test_harness",
-    source=[
-        "wiredtiger_index_test_harness.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness",
-        "storage_wiredtiger_core",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 wtEnv.CppUnitTest(
     target="storage_wiredtiger_record_store_and_index_test",
-    source=[
-        "wiredtiger_record_store_test.cpp",
-        "wiredtiger_index_test.cpp",
-        "wiredtiger_standard_index_test.cpp",
-        "wiredtiger_standard_record_store_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/storage/oplog_truncation",
-        "$BUILD_DIR/mongo/db/storage/sorted_data_interface_tests",
-        "storage_wiredtiger_core",
-        "wiredtiger_index_test_harness",
-        "wiredtiger_record_store_test_harness",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 wtEnv.Benchmark(
