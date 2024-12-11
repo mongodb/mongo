@@ -175,14 +175,14 @@ std::string getBaseNameFromFilePath(const std::filesystem::path& filePath) {
     return filePath.stem().string();
 }
 
-std::vector<size_t> getFailedTestNums(const std::string& diffOutput) {
-    auto failedTestNums = std::vector<size_t>{};
+std::set<size_t> getFailedTestNums(const std::string& diffOutput) {
+    auto failedTestNums = std::set<size_t>{};
     auto line = std::string{};
     auto diffStream = std::istringstream{diffOutput};
 
     while (std::getline(diffStream, line)) {
         if (auto match = std::smatch{}; std::regex_search(line, match, kTestNumRegex)) {
-            failedTestNums.push_back(std::stoull(match[1]));
+            failedTestNums.insert(std::stoull(match[1]));
         }
     }
     return failedTestNums;

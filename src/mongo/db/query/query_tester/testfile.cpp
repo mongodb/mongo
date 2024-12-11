@@ -292,7 +292,7 @@ void QueryFile::parseHeader(std::fstream& fs) {
             lineFromFile.empty());
 }
 
-void QueryFile::printAndExtractFailedQueries(const std::vector<size_t>& failedQueryIds) const {
+void QueryFile::printAndExtractFailedQueries(const std::set<size_t>& failedQueryIds) const {
     const auto failPath = std::filesystem::path{_filePath}.replace_extension(".fail");
     auto fs = std::fstream{failPath, std::ios::out | std::ios::trunc};
     // Write out header without comments.
@@ -323,12 +323,12 @@ void QueryFile::printAndExtractFailedQueries(const std::vector<size_t>& failedQu
     }
 }
 
-void QueryFile::printFailedQueries(const std::vector<size_t>& failedQueryIds) const {
+void QueryFile::printFailedQueries(const std::set<size_t>& failedQueryIds) const {
     // Print the failed queries without any metadata extraction for feature processing.
     printFailedQueriesHelper(failedQueryIds);
 }
 
-void QueryFile::printFailedQueriesHelper(const std::vector<size_t>& failedTestNums,
+void QueryFile::printFailedQueriesHelper(const std::set<size_t>& failedTestNums,
                                          std::fstream* fs) const {
     std::cout << applyRed() << "------------------------------------------------------------"
               << applyReset() << std::endl

@@ -88,9 +88,9 @@ public:
      * (verbose) flag set, also extract and print out metadata about common features across failed
      * queries for an enriched debugging experience.
      */
-    void printAndExtractFailedQueries(const std::vector<size_t>& failedTestNums) const;
-    void printFailedQueries(const std::vector<size_t>& failedTestNums) const;
-    void printFailedQueriesHelper(const std::vector<size_t>& failedTestNums,
+    void printAndExtractFailedQueries(const std::set<size_t>& failedTestNums) const;
+    void printFailedQueries(const std::set<size_t>& failedTestNums) const;
+    void printFailedQueriesHelper(const std::set<size_t>& failedTestNums,
                                   std::fstream* fs = nullptr) const;
     bool readInEntireFile(ModeOption, size_t = kMinTestNum, size_t = kMaxTestNum);
     void runTestFile(DBClientConnection*, ModeOption);
