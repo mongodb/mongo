@@ -95,6 +95,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(crashOnMultikeyValidateFailure);
 MONGO_FAIL_POINT_DEFINE(failIndexKeyOrdering);
+MONGO_FAIL_POINT_DEFINE(failIndexTraversal);
 
 StringSet::hasher hash;
 
@@ -261,7 +262,7 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
         }
         StringBuilder ss;
         ss << "Index with name '" << indexName << "' has inconsistencies.";
-        results->getIndexResultsMap().at(indexName).addError(ss.str());
+        results->getIndexResultsMap().at(indexName).addError(ss.str(), false);
     }
 
     int numExtraIndexEntryErrors = 0;
@@ -281,7 +282,7 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
 
             StringBuilder ss;
             ss << "Index with name '" << indexName << "' has inconsistencies.";
-            results->getIndexResultsMap().at(indexName).addError(ss.str());
+            results->getIndexResultsMap().at(indexName).addError(ss.str(), false);
         }
     }
 
@@ -564,10 +565,10 @@ void _validateKeyOrder(OperationContext* opCtx,
     // the format (Key, RID), and all RecordIDs are unique.
     if (currKey->keyString.compare(prevKey->keyString) <= 0 ||
         MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
-        if (results && results->isValid()) {
-            results->addError(str::stream()
-                              << "index '" << descriptor->indexName()
-                              << "' is not in strictly ascending or descending order");
+        if (results) {
+            results->addError(str::stream() << "index '" << descriptor->indexName()
+                                            << "' is not in strictly ascending or descending order",
+                              false);
         }
         return;
     }
@@ -581,13 +582,14 @@ void _validateKeyOrder(OperationContext* opCtx,
             return;
         }
 
-        if (results && results->isValid()) {
+        if (results) {
             const auto bsonKey =
                 key_string::toBson(currKey->keyString, Ordering::make(descriptor->keyPattern()));
             results->addError(str::stream() << "Unique index '" << descriptor->indexName()
                                             << "' has duplicate key: " << bsonKey
                                             << ", first record: " << prevKey->loc
-                                            << ", second record: " << currKey->loc);
+                                            << ", second record: " << currKey->loc,
+                              false);
         }
     }
 }
@@ -631,7 +633,12 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                         "index"_attr = indexName,
                         "key"_attr = firstKeyString.toString());
         }
-        throw;
+        indexResults.addError(fmt::format("Error seeking index cursor: Error {}, prevKey {}",
+                                          ex.toString(),
+                                          prevIndexKeyStringEntry
+                                              ? prevIndexKeyStringEntry->keyString.toString()
+                                              : "No previous key"));
+        return numKeys;
     }
 
     const auto keyFormat =
@@ -685,6 +692,10 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         }
 
         try {
+            if (MONGO_unlikely(failIndexTraversal.shouldFail())) {
+                throw ExceptionFor<ErrorCodes::TemporarilyUnavailable>(
+                    Status(ErrorCodes::TemporarilyUnavailable, "Mocked error"));
+            }
             indexEntry = indexCursor->nextKeyString(opCtx);
         } catch (const DBException& ex) {
             if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict &&
@@ -696,7 +707,18 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                             "index"_attr = indexName,
                             "prevKey"_attr = prevIndexKeyStringEntry->keyString.toString());
             }
-            throw;
+            // Write conflicts shouldn't be happening, so if they happen surface them through
+            // validation failing to complete. This is to avoid creating churn with an index
+            // validation failure that says "WriteConflict"
+            if (ex.code() != ErrorCodes::WriteConflict) {
+                indexResults.addError(
+                    fmt::format("Error advancing index cursor: Error {}, prevKey {}",
+                                ex.toString(),
+                                prevIndexKeyStringEntry->keyString.toString()));
+                return numKeys;
+            } else {
+                throw;
+            }
         }
     }
 

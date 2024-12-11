@@ -739,10 +739,11 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     for (const auto& indexIdent : _validateState->getIndexIdents()) {
         const IndexDescriptor* descriptor =
             coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-        if (descriptor->isPartial() &&
-            !descriptor->getEntry()->getFilterExpression()->matchesBSON(recordBson))
+        if ((descriptor->isPartial() &&
+             !descriptor->getEntry()->getFilterExpression()->matchesBSON(recordBson)) ||
+            !results->getIndexValidateResult(descriptor->indexName()).continueValidation()) {
             continue;
-
+        }
 
         this->traverseRecord(opCtx, coll, descriptor->getEntry(), recordId, recordBson, results);
     }
