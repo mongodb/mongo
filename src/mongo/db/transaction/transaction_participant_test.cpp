@@ -5432,14 +5432,17 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
 };
 
 TEST_F(TxnParticipantTest, OldestActiveTransactionTimestampTimeout) {
-    // Block getOldestActiveTimestamp() by locking the config database.
     auto nss = NamespaceString::kSessionTransactionsTableNamespace;
-    AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
-    auto db = autoDb.ensureDbExists(opCtx());
-    ASSERT(db);
-    auto statusWith = TransactionParticipant::getOldestActiveTimestamp(Timestamp());
-    ASSERT_FALSE(statusWith.isOK());
-    ASSERT_TRUE(ErrorCodes::isInterruption(statusWith.getStatus().code()));
+    // Block getOldestActiveTimestamp() by locking the global lock in X mode.
+    {
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        Lock::GlobalLock globalLock(newOpCtx.get(), LockMode::MODE_X);
+        auto statusWith = TransactionParticipant::getOldestActiveTimestamp(Timestamp());
+        ASSERT_FALSE(statusWith.isOK());
+        ASSERT_TRUE(ErrorCodes::isInterruption(statusWith.getStatus().code()));
+    }
 };
 
 TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortAfterPrepare) {

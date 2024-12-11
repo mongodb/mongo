@@ -81,6 +81,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
@@ -655,35 +656,30 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
 
     try {
         auto opCtx = cc().makeOperationContext();
-        auto nss = NamespaceString::kSessionTransactionsTableNamespace;
-        auto deadline = Date_t::now() + Milliseconds(100);
-
-        Lock::DBLock dbLock(opCtx.get(), nss.dbName(), MODE_IS, deadline);
-        Lock::CollectionLock collLock(opCtx.get(), nss, MODE_IS, deadline);
-
-        auto databaseHolder = DatabaseHolder::get(opCtx.get());
-        auto db = databaseHolder->getDb(opCtx.get(), nss.dbName());
-        if (!db) {
-            // There is no config database, so there cannot be any active transactions.
-            return boost::none;
-        }
-
-        auto collection =
-            CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
-        if (!collection) {
-            return boost::none;
-        }
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         if (!stableTimestamp.isNull()) {
             shard_role_details::getRecoveryUnit(opCtx.get())
                 ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, stableTimestamp);
         }
 
-        // Scan. We guess that occasional scans are cheaper than the write overhead of an index.
+        const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+        const auto deadline = Date_t::now() + Milliseconds(100);
+
+        const AutoGetCollectionForReadLockFree collectionAcquisition(
+            opCtx.get(), nss, AutoGetCollection::Options{}.deadline(deadline));
+
+        if (!collectionAcquisition.getCollection()) {
+            return boost::none;
+        }
+        auto exec = InternalPlanner::collectionScan(opCtx.get(),
+                                                    &collectionAcquisition.getCollection(),
+                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                    InternalPlanner::Direction::FORWARD);
+
+        BSONObj doc;
         boost::optional<Timestamp> oldestTxnTimestamp;
-        auto cursor = collection->getCursor(opCtx.get());
-        while (auto record = cursor->next()) {
-            auto doc = record.value().data.toBson();
+        while (exec->getNext(&doc, nullptr) == PlanExecutor::ADVANCED) {
             auto txnRecord =
                 SessionTxnRecord::parse(IDLParserContext("parse oldest active txn record"), doc);
             if (txnRecord.getState() != DurableTxnStateEnum::kPrepared &&
@@ -697,7 +693,6 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
                 oldestTxnTimestamp = ts;
             }
         }
-
         return oldestTxnTimestamp;
     } catch (const DBException&) {
         return exceptionToStatus();
