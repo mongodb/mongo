@@ -2318,5 +2318,95 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
         })",
         asOneObj);
 }
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameEmpty) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    "": [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       15998);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    $matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       16410);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameContainsDot) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    "match.genres": [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       16412);
+}
 }  // namespace
 }  // namespace mongo

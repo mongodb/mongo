@@ -41,14 +41,6 @@ Status validatePipelinesObject(const BSONObj& pipelines) {
     }
 
     for (auto&& elem : pipelines) {
-        // Validate the name.
-        for (auto&& character : elem.fieldNameStringData()) {
-            if (!isalpha(character)) {
-                // TODO SERVER-96154 - need some more careful validation here.
-                return {ErrorCodes::Error{9612700},
-                        "Cannot use special characters in hybrid search pipeline names"};
-            }
-        }
         if (auto status = attemptToParsePipelineFromBSON(elem).getStatus(); !status.isOK()) {
             return status.withContext("Error parsing $rankFusion.input.pipelines");
         }

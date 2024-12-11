@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
@@ -348,8 +349,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     for (const auto& elem : spec.getInput().getPipelines()) {
         auto pipeline = Pipeline::parse(getPipeline(elem), pExpCtx);
         rankFusionPipelineValidator(*pipeline);
-        // TODO SERVER-96154 Validate field names.
-        inputPipelines[elem.fieldName()] = std::move(pipeline);
+
+        auto inputName = elem.fieldName();
+        FieldPath::uassertValidFieldName(inputName);
+        inputPipelines[inputName] = std::move(pipeline);
     }
 
     StringMap<double> weights = extractAndValidateWeights(spec, inputPipelines);
