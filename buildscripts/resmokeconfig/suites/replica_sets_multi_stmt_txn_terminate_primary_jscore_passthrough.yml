@@ -88,7 +88,7 @@ selector:
 
     # $collStats
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/query/collstats/views_coll_stats.js
+    - jstests/core/catalog/collstats/views_coll_stats.js
     - jstests/core/views/views_stats.js
 
     # Errors expected to happen in tests, which can cause transactions to get aborted.

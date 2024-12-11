@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "prepare_recordid_initialization.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "replicate_record_ids_dbhash.js":
     approvers:
       - 10gen/server-replication

@@ -117,7 +117,7 @@ selector:
     - jstests/core/**/index_stats.js
     - jstests/core/timeseries/ddl/timeseries_index_stats.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/query/collstats/views_coll_stats.js
+    - jstests/core/catalog/collstats/views_coll_stats.js
     - jstests/core/views/views_stats.js
     - jstests/core/**/bulk_api_ordered.js
     - jstests/core/**/bulk_api_unordered.js

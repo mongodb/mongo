@@ -12,7 +12,6 @@ selector:
     - jstests/core/query/json_schema/**/*.js
     - jstests/core/query/doc_validation/**/*.js
     - jstests/core/query/api/**/*.js
-    - jstests/core/query/collstats/**/*.js
     - jstests/core/query/queryable_encryption/**/*.js
     - jstests/core/query/sbe/**/*.js
 

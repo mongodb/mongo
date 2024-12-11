@@ -23,15 +23,13 @@ filters:
       - 10gen/query-integration-observability
   - "record_id*":
     approvers:
-      - 10gen/server-storage-execution
-      - 10gen/server-rss-sydney
+      - 10gen/server-storage-engine-integration
   - "replica_set_endpoint*":
     approvers:
       - 10gen/server-cluster-scalability
   - "repair*":
     approvers:
-      - 10gen/server-storage-execution
-      - 10gen/server-rss-sydney
+      - 10gen/server-storage-engine-integration
   - "*transaction*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -77,8 +75,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "startup_recovery*":
     approvers:
-      - 10gen/server-storage-execution
-      - 10gen/server-rss-sydney
+      - 10gen/server-storage-engine-integration
   - "field_ref*":
     approvers:
       - 10gen/query
@@ -138,22 +135,22 @@ filters:
       - 10gen/server-programmability
   - "prepare_conflict_tracker*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "repl_set_member_in_standalone_mode*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "server_recovery*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "mongod_options_storage.idl":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "dbhelpers*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "dbcommands.idl":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "bulk_write_shard_test.cpp":
     approvers:
       - 10gen/query-execution-write-exec

@@ -140,7 +140,7 @@ selector:
     - jstests/core/**/list_all_sessions.js
     - jstests/core/**/list_sessions.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/query/collstats/views_coll_stats.js
+    - jstests/core/catalog/collstats/views_coll_stats.js
     - jstests/core/views/views_stats.js
     - jstests/core/**/bulk_api_ordered.js
     - jstests/core/**/bulk_api_unordered.js

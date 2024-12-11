@@ -5,7 +5,7 @@ filters:
       - 10gen/server-security
   - "batched_write*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
   - "op_observer_impl*":
     approvers:
       - 10gen/server-replication
