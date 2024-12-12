@@ -1,0 +1,7 @@
+{key: {"some.geo": "2d"}, options: {}}
+{key: {"some.geo.sphere": "2dsphere"}, options: {}}
+{key: {"some.text": "text"}, options: {}}
+
+{ "_id": 1, "some": {"geo" : { "type" : "Point", "coordinates" : [ -28.07738969920038, -60.56425366155954 ] }}}
+{ "_id": 2, "some": {"geo" : {"sphere": { "type" : "Point", "coordinates" : [ -60.11373789756698, 58.90880026337197 ] }}}}
+{ "_id": 3, "some": {"text": "mumbo jumbo"}}

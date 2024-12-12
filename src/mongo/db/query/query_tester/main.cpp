@@ -124,6 +124,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const std::string& uriString,
                    const bool dropData,
                    const bool loadData,
+                   const bool createAllIndices,
                    const WriteOutOptions outOpt,
                    const ModeOption mode,
                    const bool populateAndExit,
@@ -143,7 +144,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         // Treat data load errors as failures, too.
         try {
             currFile.readInEntireFile(mode, startRange, endRange);
-            currFile.loadCollections(conn.get(), dropData, loadData, prevFileCollections);
+            currFile.loadCollections(
+                conn.get(), dropData, loadData, createAllIndices, prevFileCollections);
         } catch (const std::exception& exception) {
             std::cerr << std::endl
                       << testPath.string() << std::endl
@@ -253,6 +255,9 @@ void printHelpString() {
          "Load all collections specified in relevant test files. If "
          "not specified will assume data "
          "has already been loaded."},
+        {"--minimal-index",
+         "Only create the minimal set of indices necessary, currently just geospatial and text "
+         "indices."},
         {"--mode",
          "[run, compare, normalize]. Specify whether to just run and record "
          "results; expect all test files to specify results (default); or ensure that "
@@ -295,6 +300,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto testsToRun = std::vector<TestSpec>{};
     auto expectingNumAt = size_t{0} - 1;
     auto runningPartialFile = false;
+    auto createAllIndices = true;
     auto dropOpt = false;
     auto extractFeatures = false;
     auto loadOpt = false;
@@ -316,6 +322,8 @@ int queryTesterMain(const int argc, const char** const argv) {
             extractFeatures = true;
         } else if (parsedArgs[argNum] == "--load") {
             loadOpt = true;
+        } else if (parsedArgs[argNum] == "--minimal-index") {
+            createAllIndices = false;
         } else if (parsedArgs[argNum] == "--mode") {
             assertNextArgExists(parsedArgs, argNum, "--mode");
             mode = stringToModeOption(parsedArgs[argNum + 1]);
@@ -422,6 +430,7 @@ int queryTesterMain(const int argc, const char** const argv) {
                               mongoURIString.get(),
                               dropOpt,
                               loadOpt,
+                              createAllIndices,
                               outOpt,
                               mode,
                               populateAndExit,

@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <ostream>
+#include <regex>
 #include <vector>
 
 #include "command_helpers.h"
@@ -40,6 +41,11 @@
 
 namespace mongo::query_tester {
 namespace {
+
+// This regex matches geospatial and text indices.
+static const auto kAlwaysIncludedIndex =
+    std::regex{R"-([{,]\s*("?)[^":,]+\1\s*:\s*"(2d|2dsphere|text)"\s*[},])-"};
+
 void runCommandAssertOK(DBClientConnection*,
                         const BSONObj& command,
                         const std::string& db,
@@ -90,41 +96,51 @@ void moveResultsFile(const std::filesystem::path& actualPath,
     }
 }
 
-void readAndBuildIndexes(DBClientConnection* const conn,
-                         const std::string& dbName,
-                         const std::string& collName,
-                         std::fstream& fs) {
+void readAndBuildOrSkipIndexes(DBClientConnection* const conn,
+                               const std::string& dbName,
+                               const std::string& collName,
+                               std::fstream& fs,
+                               const bool createAllIndices) {
     verifyFileStreamGood(
         fs, std::filesystem::path{collName}, std::string{"Stream not ready to read indexes"});
     auto lineFromFile = std::string{};
     auto bob = BSONObjBuilder{};
     bob.append("createIndexes", collName);
     auto indexBuilder = BSONArrayBuilder{};
+    auto hasIndicesToCreate = false;
 
     readLine(fs, lineFromFile);
     for (auto indexNum = 0; !lineFromFile.empty(); readLine(fs, lineFromFile), ++indexNum) {
-        const auto& indexObj = fromFuzzerJson(lineFromFile);
-        BSONObjBuilder indexBob;
+        // Do index inclusion checks here.
+        if (createAllIndices || std::regex_search(lineFromFile, kAlwaysIncludedIndex)) {
+            hasIndicesToCreate = true;
 
-        // Append "key" field containing the index if present.
-        if (const auto keyObj = indexObj.getObjectField("key"); !keyObj.isEmpty()) {
-            indexBob.append("key", keyObj);
-            // Append "options" field containing the indexOptions if present.
-            if (const auto optionsObj = indexObj.getObjectField("options"); !optionsObj.isEmpty()) {
-                indexBob.appendElements(optionsObj);
+            const auto& indexObj = fromFuzzerJson(lineFromFile);
+            BSONObjBuilder indexBob;
+
+            // Append "key" field containing the index if present.
+            if (const auto keyObj = indexObj.getObjectField("key"); !keyObj.isEmpty()) {
+                indexBob.append("key", keyObj);
+                // Append "options" field containing the indexOptions if present.
+                if (const auto optionsObj = indexObj.getObjectField("options");
+                    !optionsObj.isEmpty()) {
+                    indexBob.appendElements(optionsObj);
+                }
+            } else {
+                // Otherwise, the entire object is just an index key.
+                indexBob.append("key", indexObj);
             }
-        } else {
-            // Otherwise, the entire object is just an index key.
-            indexBob.append("key", indexObj);
-        }
 
-        indexBob.append("name", mongo::str::stream{} << "index_" << indexNum);
-        indexBuilder.append(indexBob.done());
+            indexBob.append("name", mongo::str::stream{} << "index_" << indexNum);
+            indexBuilder.append(indexBob.done());
+        }
     }
 
-    bob.append("indexes", indexBuilder.arr());
-    const auto cmd = bob.done();
-    runCommandAssertOK(conn, cmd, dbName);
+    if (hasIndicesToCreate) {
+        bob.append("indexes", indexBuilder.arr());
+        const auto cmd = bob.done();
+        runCommandAssertOK(conn, cmd, dbName);
+    }
 }
 
 // Returns true if another batch is required.
@@ -172,11 +188,12 @@ bool readAndInsertNextBatch(DBClientConnection* const conn,
 bool readAndLoadCollFile(DBClientConnection* const conn,
                          const std::string& dbName,
                          const std::string& collName,
-                         const std::filesystem::path& filePath) {
+                         const std::filesystem::path& filePath,
+                         const bool createAllIndices) {
     auto collFile = std::fstream{filePath};
     verifyFileStreamGood(collFile, filePath, "Failed to open file");
     // Read in indexes.
-    readAndBuildIndexes(conn, dbName, collName, collFile);
+    readAndBuildOrSkipIndexes(conn, dbName, collName, collFile, createAllIndices);
     for (auto needMore = readAndInsertNextBatch(conn, dbName, collName, collFile);
          needMore && !collFile.eof();
          needMore = readAndInsertNextBatch(conn, dbName, collName, collFile)) {
@@ -232,6 +249,7 @@ size_t QueryFile::getTestsRun() const {
 void QueryFile::loadCollections(DBClientConnection* const conn,
                                 const bool dropData,
                                 const bool loadData,
+                                const bool createAllIndices,
                                 const std::set<CollectionSpec>& prevFileCollections) const {
     if (dropData) {
         dropStaleCollections(conn, prevFileCollections);
@@ -248,7 +266,8 @@ void QueryFile::loadCollections(DBClientConnection* const conn,
         for (const auto& collSpec : _collectionsNeeded) {
             if (prevFileCollections.find(collSpec) == prevFileCollections.end()) {
                 // Only load a collection if it wasn't marked as loaded by the previous file.
-                readAndLoadCollFile(conn, _databaseNeeded, collSpec.collName, collSpec.filePath);
+                readAndLoadCollFile(
+                    conn, _databaseNeeded, collSpec.collName, collSpec.filePath, createAllIndices);
             }
         }
     }

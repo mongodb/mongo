@@ -81,6 +81,7 @@ public:
     void loadCollections(DBClientConnection*,
                          bool dropData,
                          bool loadData,
+                         bool createAllIndices,
                          const std::set<CollectionSpec>& prevFileCollections) const;
 
     /**

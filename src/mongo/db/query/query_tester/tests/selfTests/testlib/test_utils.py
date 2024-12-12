@@ -71,6 +71,7 @@ def run_mongotest(
     mode: Mode,
     drop: bool = True,
     load: bool = True,
+    minimal_index: bool = False,
     out_result: bool = False,
 ) -> tuple[ExitCode, bytes]:
     """
@@ -84,6 +85,7 @@ def run_mongotest(
             NORMALIZE: Check that results in a given .results file are normalized. Can overwrite .results file if out_result is set.
         drop: If True mongotest will drop the test collection before running. Defaults to True.
         load: If True, mongotest will load data into test collection. Defaults to True.
+        minimal_index: If True, mongotest will only load a minimal set of indices. Defaults to False.
         out_result: If True, mongotest will produce an output .result file. It can only be true if mode is RUN or NORMALIZE. Defaults to False.
     Returns:
         Tuple containing the exit code and output (as bytes) from the mongotest execution.
@@ -106,6 +108,8 @@ def run_mongotest(
     cmd.extend(("--mode", mode.value))
     if out_result:
         cmd.extend(("--out", "result"))
+    if minimal_index:
+        cmd.append("--minimal-index")
 
     try:
         output = subprocess.run(
