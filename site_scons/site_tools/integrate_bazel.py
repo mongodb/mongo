@@ -561,7 +561,7 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
                 subprocess.run(
                     [os.path.abspath(Globals.bazel_executable), "shutdown"],
                     check=True,
-                    stdout=subprocess.STDOUT,
+                    stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     env={**os.environ.copy(), **Globals.bazel_env_variables},
                 )
