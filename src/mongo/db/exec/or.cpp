@@ -50,7 +50,15 @@ OrStage::OrStage(ExpressionContext* expCtx,
                  WorkingSet* ws,
                  bool dedup,
                  const MatchExpression* filter)
-    : PlanStage(kStageType, expCtx), _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) {}
+    : PlanStage(kStageType, expCtx),
+      _ws(ws),
+      _filter(filter),
+      _currentChild(0),
+      _dedup(dedup),
+      _recordIdDeduplicator(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
+                            static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
+                            static_cast<uint64_t>(internalRoaringBitmapsThreshold.load() /
+                                                  internalRoaringBitmapsMinimalDensity.load())) {}
 
 void OrStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
@@ -82,14 +90,11 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
             ++_specificStats.dupsTested;
 
             // ...and we've seen the RecordId before
-            if (_seen.end() != _seen.find(member->recordId)) {
+            if (!_recordIdDeduplicator.insert(member->recordId)) {
                 // ...drop it.
                 ++_specificStats.dupsDropped;
                 _ws->free(id);
                 return PlanStage::NEED_TIME;
-            } else {
-                // Otherwise, note that we've seen it.
-                _seen.insert(member->recordId);
             }
         }
 

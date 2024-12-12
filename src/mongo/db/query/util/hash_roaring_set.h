@@ -37,7 +37,7 @@
 
 namespace mongo {
 /**
- * A set of usigned 64 bit integers implemented as  a mixed data structure that uses hash table to
+ * A set of unsigned 64 bit integers implemented as  a mixed data structure that uses hash table to
  * store the first `threshold` elements. Once the set's density reaches at least
  * threshold/universeSize, it switches to Roaring Bitmaps.
  */

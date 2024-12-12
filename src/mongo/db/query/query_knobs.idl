@@ -1221,7 +1221,7 @@ server_parameters:
     redact: false
 
   internalRoaringBitmapsMinimalDensity:
-    description: "The minimal denstity required for the hybrid container to switch from hash table to Roaring Bitmaps."
+    description: "The minimal density required for the hybrid container to switch from hash table to Roaring Bitmaps."
     set_at: [ startup, runtime ]
     cpp_varname: internalRoaringBitmapsMinimalDensity
     cpp_vartype: AtomicDouble
