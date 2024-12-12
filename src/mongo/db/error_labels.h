@@ -51,6 +51,7 @@ constexpr inline auto kResumableChangeStream = "ResumableChangeStreamError"_sd;
 constexpr inline auto kNoWritesPerformed = "NoWritesPerformed"_sd;
 constexpr inline auto kStreamProcessorRetryableError = "StreamProcessorRetryableError"_sd;
 constexpr inline auto kStreamProcessorUserError = "StreamProcessorUserError"_sd;
+constexpr inline auto kSystemOverloadedError = "SystemOverloadedError"_sd;
 
 }  // namespace ErrorLabel
 
@@ -86,6 +87,7 @@ public:
     bool isErrorWithNoWritesPerformed() const;
     bool isStreamProcessorUserError() const;
     bool isStreamProcessorRetryableError() const;
+    bool isSystemOverloadedError() const;
 
 private:
     bool _isCommitOrAbort() const;
@@ -131,5 +133,10 @@ bool isStreamProcessorRetryableError(ErrorCodes::Error code);
  * Whether a stream processing error is a user error.
  */
 bool isStreamProcessorUserError(ErrorCodes::Error code);
+
+/**
+ * Whether the error is caused by the system being overloaded.
+ */
+bool isSystemOverloadedError(ErrorCodes::Error code);
 
 }  // namespace mongo

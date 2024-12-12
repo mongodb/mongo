@@ -131,6 +131,10 @@ bool ErrorLabelBuilder::isStreamProcessorRetryableError() const {
     return _code && mongo::isStreamProcessorRetryableError(_code.value());
 }
 
+bool ErrorLabelBuilder::isSystemOverloadedError() const {
+    return _code && mongo::isSystemOverloadedError(_code.value());
+}
+
 bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     // Determine whether this operation is a candidate for the ResumableChangeStreamError label.
     const bool mayNeedResumableChangeStreamErrorLabel =
@@ -323,6 +327,10 @@ bool isStreamProcessorRetryableError(ErrorCodes::Error code) {
     // on-call and we work on a mitigation. We keep these errors as retryable to make
     // the mitigation easier.
     return !isStreamProcessorUserError(code) || ErrorCodes::isStreamProcessorRetryableError(code);
+}
+
+bool isSystemOverloadedError(ErrorCodes::Error code) {
+    return ErrorCodes::isSystemOverloadedError(code);
 }
 
 }  // namespace mongo

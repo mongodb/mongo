@@ -38,6 +38,8 @@ error_categories:
   - InternalOnly
   - CursorInvalidatedError
   - PlannerEstimationError
+  # This category contains all errors due to the system being under pressure
+  - SystemOverloadedError
 
 error_codes:
   - {code: 0, name: OK}
@@ -811,7 +813,11 @@ error_codes:
 
   - {code: 431, name: ChunkMetadataInconsistency}
   - {code: 432, name: OfflineValidationFailedToComplete}
-  - {code: 433, name: AdmissionQueueOverflow}
+  - {
+      code: 433,
+      name: AdmissionQueueOverflow,
+      categories: [SystemOverloadedError],
+    }
   - {code: 434, name: NoDistinctScansForDistinctEligibleQuery}
   - {
       code: 435,
