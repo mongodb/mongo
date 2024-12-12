@@ -30,220 +30,313 @@
 #pragma once
 
 /**
- * Include "mongo/platform/compiler.h" to get compiler-targeted macro definitions and utilities.
+ * Compiler-targeted macro definitions and utilities.
+ */
+
+#if !defined(_MSC_VER) && !defined(__GNUC__)
+#error "Unsupported compiler family"
+#endif
+
+/**
+ * Define clang's has_feature macro for other compilers
+ * See https://clang.llvm.org/docs/LanguageExtensions.html#has-feature-and-has-extension
+ */
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
+/** Allows issuing pragmas through macros. Arguments appear exactly as in a #pragma. */
+#define MONGO_COMPILER_PRAGMA(p) _Pragma(#p)
+
+#if defined(__has_cpp_attribute)
+#define MONGO_COMPILER_HAS_ATTRIBUTE(x) __has_cpp_attribute(x)
+#else
+#define MONGO_COMPILER_HAS_ATTRIBUTE(x) 0
+#endif
+
+/** Microsoft Visual C++ (MSVC) only. */
+#if defined(_MSC_VER)
+#define MONGO_COMPILER_IF_MSVC(...) __VA_ARGS__
+#else
+#define MONGO_COMPILER_IF_MSVC(...)
+#endif
+
+/** Clang or GCC. */
+#if defined(__GNUC__)
+#define MONGO_COMPILER_IF_GNUC(...) __VA_ARGS__
+#else
+#define MONGO_COMPILER_IF_GNUC(...)
+#endif
+
+#if defined(__clang__)
+#define MONGO_COMPILER_IF_CLANG(...) MONGO_COMPILER_IF_GNUC(__VA_ARGS__)
+#define MONGO_COMPILER_IF_GCC(...)
+#else
+#define MONGO_COMPILER_IF_CLANG(...)
+#define MONGO_COMPILER_IF_GCC(...) MONGO_COMPILER_IF_GNUC(__VA_ARGS__)
+#endif
+
+/** GCC >= v14.x only. */
+#if __GNUC__ >= 14
+#define MONGO_COMPILER_IF_GCC14(...) MONGO_COMPILER_IF_GCC(__VA_ARGS__)
+#else
+#define MONGO_COMPILER_IF_GCC14(...)
+#endif
+
+/**
+ * Informs the compiler that the function is cold. This can have the following effects:
+ * - The function is optimized for size over speed.
+ * - The function may be placed in a special cold section of the binary, away from other code.
+ * - Code paths that call this function are considered implicitly unlikely.
  *
- * The following macros are provided in all compiler environments:
- *
- *
- * MONGO_COMPILER_COLD_FUNCTION
- *
- *   Informs the compiler that the function is cold. This can have the following effects:
- *   - The function is optimized for size over speed.
- *   - The function may be placed in a special cold section of the binary, away from other code.
- *   - Code paths that call this function are considered implicitly unlikely.
- *
- *
- * MONGO_COMPILER_NORETURN
- *
+ * Cannot use new attribute syntax due to grammatical placement, especially on lambdas.
+ */
+#define MONGO_COMPILER_COLD_FUNCTION MONGO_COMPILER_IF_GNUC(__attribute__((__cold__)))
+
+/**
  *   Instructs the compiler that the decorated function will not return through the normal return
  *   path. All noreturn functions are also implicitly cold since they are either run-once code
  *   executed at startup or shutdown or code that handles errors by throwing an exception.
  *
- *   Correct: MONGO_COMPILER_NORETURN void myAbortFunction();
- *
- *
- * MONGO_COMPILER_ALIGN_TYPE(ALIGNMENT)
- *
- *   Instructs the compiler to use the given minimum alignment for the decorated type.
- *
- *   Alignments should probably always be powers of two.  Also, note that most allocators will not
- *   be able to guarantee better than 16- or 32-byte alignment.
- *
- *   Correct:
- *     class MONGO_COMPILER_ALIGN_TYPE(16) MyClass {...};
- *
- *   Incorrect:
- *     MONGO_COMPILER_ALIGN_TYPE(16) class MyClass {...};
- *     class MyClass{...} MONGO_COMPILER_ALIGN_TYPE(16);
- *
- *
- * MONGO_COMPILER_ALIGN_VARIABLE(ALIGNMENT)
- *
- *   Instructs the compiler to use the given minimum alignment for the decorated variable.
- *
- *   Note that most allocators will not allow heap allocated alignments that are better than 16- or
- *   32-byte aligned.  Stack allocators may only guarantee up to the natural word length worth of
- *   alignment.
- *
- *   Correct:
- *     class MyClass {
- *         MONGO_COMPILER_ALIGN_VARIABLE(8) char a;
- *     };
- *
- *     MONGO_COMPILER_ALIGN_VARIABLE(8) class MyClass {...} singletonInstance;
- *
- *   Incorrect:
- *     int MONGO_COMPILER_ALIGN_VARIABLE(16) a, b;
- *
- *
- * MONGO_COMPILER_API_EXPORT
- *
+ *   Example:
+ *       MONGO_COMPILER_NORETURN void myAbortFunction();
+ */
+#define MONGO_COMPILER_NORETURN [[noreturn]] MONGO_COMPILER_COLD_FUNCTION
+
+/**
  *   Instructs the compiler to label the given type, variable or function as part of the
  *   exported interface of the library object under construction.
  *
- *   Correct:
+ *   Usage:
  *       MONGO_COMPILER_API_EXPORT int globalSwitch;
  *       class MONGO_COMPILER_API_EXPORT ExportedType { ... };
  *       MONGO_COMPILER_API_EXPORT SomeType exportedFunction(...);
  *
  *   NOTE: Rather than using this macro directly, one typically declares another macro named
- *   for the library, which is conditionally defined to either MONGO_COMIPLER_API_EXPORT or
+ *   for the library, which is conditionally defined to either MONGO_COMPILER_API_EXPORT or
  *   MONGO_COMPILER_API_IMPORT based on whether the compiler is currently building the library
  *   or building an object that depends on the library, respectively.  For example,
  *   MONGO_FOO_API might be defined to MONGO_COMPILER_API_EXPORT when building the MongoDB
  *   libfoo shared library, and to MONGO_COMPILER_API_IMPORT when building an application that
  *   links against that shared library.
  *
+ * NOTE(schwerin): These visibility and calling-convention macro definitions assume we're not using
+ * GCC/CLANG to target native Windows. If/when we decide to do such targeting, we'll need to change
+ * compiler flags on Windows to make sure we use an appropriate calling convention, and configure
+ * MONGO_COMPILER_API_EXPORT, MONGO_COMPILER_API_IMPORT and MONGO_COMPILER_API_CALLING_CONVENTION
+ * correctly.  I believe "correctly" is the following:
  *
- * MONGO_COMPILER_API_IMPORT
- *
+ *     #ifdef _WIN32
+ *     #define MONGO_COMIPLER_API_EXPORT __attribute__(( __dllexport__ ))
+ *     #define MONGO_COMPILER_API_IMPORT __attribute__(( __dllimport__ ))
+ *     #ifdef _M_IX86
+ *     #define MONGO_COMPILER_API_CALLING_CONVENTION __attribute__((__cdecl__))
+ *     #else
+ *     #define MONGO_COMPILER_API_CALLING_CONVENTION
+ *     #endif
+ *     #else // ... fall through to the definitions below.
+ */
+#define MONGO_COMPILER_API_EXPORT                 \
+    MONGO_COMPILER_IF_MSVC(__declspec(dllexport)) \
+    MONGO_COMPILER_IF_GNUC(__attribute__((__visibility__("default"))))
+
+/**
  *   Instructs the compiler to label the given type, variable or function as imported
  *   from another library, and not part of the library object under construction.
  *
- *   Same correct/incorrect usage as for MONGO_COMPILER_API_EXPORT.
+ *   Same usage as for MONGO_COMPILER_API_EXPORT.
+ */
+#define MONGO_COMPILER_API_IMPORT MONGO_COMPILER_IF_MSVC(__declspec(dllimport))
+
+/** Hide a symbol from dynamic linking. See https://gcc.gnu.org/wiki/Visibility. */
+#define MONGO_COMPILER_API_HIDDEN_FUNCTION \
+    MONGO_COMPILER_IF_GNUC(__attribute__((__visibility__("hidden"))))
+
+/**
+ * Overrides compiler heuristics to force a function to be inlined.
+ */
+#define MONGO_COMPILER_ALWAYS_INLINE MONGO_COMPILER_ALWAYS_INLINE_
+#if defined(_MSC_VER)
+#define MONGO_COMPILER_ALWAYS_INLINE_ __forceinline
+#elif MONGO_COMPILER_HAS_ATTRIBUTE(gnu::always_inline)
+#define MONGO_COMPILER_ALWAYS_INLINE_ [[gnu::always_inline]]
+#else
+#define MONGO_COMPILER_ALWAYS_INLINE_
+#endif
+
+/**
+ * Tells the compiler that it can assume that this line will never execute.
+ * Unlike with MONGO_UNREACHABLE, there is no runtime check and reaching this
+ * macro is completely undefined behavior. It should only be used where it is
+ * provably impossible to reach, even in the face of adversarial inputs, but for
+ * some reason the compiler cannot figure this out on its own, for example after
+ * a call to a function that never returns but cannot be labeled with
+ * MONGO_COMPILER_NORETURN. In almost all cases MONGO_UNREACHABLE is preferred.
+ */
+#define MONGO_COMPILER_UNREACHABLE          \
+    MONGO_COMPILER_IF_MSVC(__assume(false)) \
+    MONGO_COMPILER_IF_GNUC(__builtin_unreachable())
+
+/**
+ * Tells the compiler that it should not attempt to inline a function. This
+ * option is not guaranteed to eliminate all optimizations, it only is used to
+ * prevent a function from being inlined.
+ */
+#define MONGO_COMPILER_NOINLINE                  \
+    MONGO_COMPILER_IF_MSVC(__declspec(noinline)) \
+    MONGO_COMPILER_IF_GNUC([[gnu::noinline]])
+
+/**
+ * Alias for standard attribute `[[nodiscard]]`.
+ * https://en.cppreference.com/w/cpp/language/attributes/nodiscard
+ * TODO(SERVER-98127) Replace these with `[[nodiscard]]` when MSVC build is clean.
+ */
+#define MONGO_WARN_UNUSED_RESULT_FUNCTION MONGO_COMPILER_IF_GNUC([[nodiscard]])
+#define MONGO_WARN_UNUSED_RESULT_CLASS MONGO_COMPILER_IF_GNUC([[nodiscard]])
+
+/**
+ * Tells the compiler that the function always returns a non-null value, potentially allowing
+ * additional optimizations at call sites.
+ */
+#define MONGO_COMPILER_RETURNS_NONNULL MONGO_COMPILER_IF_GNUC([[gnu::returns_nonnull]])
+
+/**
+ * Tells the compiler that the function is "malloc like", in that the return value points
+ * to uninitialized memory which does not alias any other valid pointers.
+ */
+#define MONGO_COMPILER_MALLOC                    \
+    MONGO_COMPILER_IF_MSVC(__declspec(restrict)) \
+    MONGO_COMPILER_IF_GNUC([[gnu::malloc]])
+
+/**
+ * Tells the compiler that the parameter indexed by `varindex`
+ * provides the size of the allocated region that a "malloc like"
+ * function will return a pointer to, potentially allowing static
+ * analysis of use of the region when the argument to the
+ * allocation function is a constant expression.
+ */
+#define MONGO_COMPILER_ALLOC_SIZE(varindex) MONGO_COMPILER_IF_GNUC([[gnu::alloc_size(varindex)]])
+
+/**
+ * Tells the compiler that this data member is permitted to be overlapped with other non-static
+ * data members or base class subobjects of its class via subsituting in the
+ * [[no_unique_address]] attribute. On Windows, the [[msvc::no_unique_address]] attribute is
+ * substitued to prevent ABI-breaking changes and maintain backwards compatibility when
+ * compiling with MSVC. Older versions of MSVC will not take action based on the attribute,
+ * since the MSVC compiler ignores attributes it does not recognize.
+ */
+#define MONGO_COMPILER_NO_UNIQUE_ADDRESS MONGO_COMPILER_NO_UNIQUE_ADDRESS_
+#if MONGO_COMPILER_HAS_ATTRIBUTE(msvc::no_unique_address)  // Use 'msvc::' if avail.
+#define MONGO_COMPILER_NO_UNIQUE_ADDRESS_ [[msvc::no_unique_address]]
+#elif MONGO_COMPILER_HAS_ATTRIBUTE(no_unique_address)
+#define MONGO_COMPILER_NO_UNIQUE_ADDRESS_ [[no_unique_address]]
+#else
+#define MONGO_COMPILER_NO_UNIQUE_ADDRESS_
+#endif
+
+/**
+ * Do not optimize the function, static variable, or class template static data member, even if
+ * it is unused.
  *
+ * Example:
+ *     MONGO_COMPILER_USED int64_t locaInteger = 8675309;
+ *     MONGO_COMPILER_USED void localFunction() {}
  *
- * MONGO_COMPILER_API_CALLING_CONVENTION
- *
- *    Explicitly decorates a function declaration the api calling convention used for
- *    shared libraries.
- *
- *    Same correct/incorrect usage as for MONGO_COMPILER_API_EXPORT.
- *
- *
- * MONGO_COMPILER_ALWAYS_INLINE
- *
- *    Overrides compiler heuristics to force that a particular function should always
- *    be inlined.
- *
- *
- * MONGO_COMPILER_UNREACHABLE
- *
- *    Tells the compiler that it can assume that this line will never execute. Unlike with
- *    MONGO_UNREACHABLE, there is no runtime check and reaching this macro is completely undefined
- *    behavior. It should only be used where it is provably impossible to reach, even in the face of
- *    adversarial inputs, but for some reason the compiler cannot figure this out on its own, for
- *    example after a call to a function that never returns but cannot be labeled with
- *    MONGO_COMPILER_NORETURN. In almost all cases MONGO_UNREACHABLE is preferred.
- *
- *
- * MONGO_COMPILER_NOINLINE
- *
- *    Tells the compiler that it should not attempt to inline a function.  This option is not
- *    guaranteed to eliminate all optimizations, it only is used to prevent a function from being
- *    inlined.
- *
- *
- * MONGO_WARN_UNUSED_RESULT_CLASS
- *
- *    Tells the compiler that a class defines a type for which checking results is necessary.  Types
- *    thus defined turn functions returning them into "must check results" style functions.  Preview
- *    of the `[[nodiscard]]` C++17 attribute.
- *
- *
- * MONGO_WARN_UNUSED_RESULT_FUNCTION
- *
- *    Tells the compiler that a function returns a value for which consuming the result is
- *    necessary.  Functions thus defined are "must check results" style functions.  Preview of the
- *    `[[nodiscard]]` C++17 attribute.
- *
- *
- * MONGO_COMPILER_RETURNS_NONNULL
- *
- *    Tells the compiler that the function always returns a non-null value, potentially allowing
- *    additional optimizations at call sites.
- *
- *
- * MONGO_COMPILER_MALLOC
- *
- *    Tells the compiler that the function is "malloc like", in that the return value points
- *    to uninitialized memory which does not alias any other valid pointers.
- *
- *
- * MONGO_COMPILER_ALLOC_SIZE(varindex)
- *
- *    Tells the compiler that the parameter indexed by `varindex`
- *    provides the size of the allocated region that a "malloc like"
- *    function will return a pointer to, potentially allowing static
- *    analysis of use of the region when the argument to the
- *    allocation function is a constant expression.
- *
- *
- * MONGO_COMPILER_NO_UNIQUE_ADDRESS
- *
- *    Tells the compiler that this data member is permitted to be overlapped with other non-static
- *    data members or base class subobjects of its class via subsituting in the
- *    [[no_unique_address]] attribute. On Windows, the [[msvc::no_unique_address]] attribute is
- *    substitued to prevent ABI-breaking changes and maintain backwards compatibility when
- *    compiling with MSVC. Older versions of MSVC will not take action based on the attribute,
- *    since the MSVC compiler ignores attributes it does not recognize.
- *
- *
- * MONGO_COMPILER_USED
- *
- *    Do not optimize the function, static variable, or class template static data member, even if
- *    it is unused. Expands to `[[gnu::used]]` on GCC and Clang, and is ignored on MSVC.
- *
- *    Example:
- *        namespace {
- *        MONGO_COMPILER_USED int64_t locaInteger = 8675309;
- *        MONGO_COMPILER_USED void localFunction() {}
- *        template <typename T>
- *        struct someTemplatedStruct {
- *            MONGO_COMPILER_USED static inline int32_t classStaticInteger = 24601;
- *            MONGO_COMPILER_USED static constexpr auto classStaticString = "Unused string.";
- *        };
- *        }  // namespace
- *
- *    See:
- *    -
+ * See:
  * https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html#index-used-variable-attribute
- *    -
  * https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-used-function-attribute
- *
- *
- * MONGO_GSL_POINTER
- *
- *    Hints to the compiler that this type is a gsl::Pointer type,
- *    which will produce a compiler warning if this type is assigned
- *    a temporary (xvalue) gsl::Owner type (such as std::string). This
- *    matches the annotation libc++ uses for std::string_view.
- *
- * MONGO_COMPILER_DIAGNOSTIC_*
- *
- *    Control diagnostic settings inline.
- *
+ */
+#define MONGO_COMPILER_USED MONGO_COMPILER_IF_GNUC([[gnu::used]])
+
+/**
+ * Hints to the compiler that this type is a gsl::Pointer type,
+ * which will produce a compiler warning if this type is assigned
+ * a temporary (xvalue) gsl::Owner type (such as std::string). This
+ * matches the annotation libc++ uses for std::string_view.
+ */
+#define MONGO_GSL_POINTER MONGO_GSL_POINTER_
+#if MONGO_COMPILER_HAS_ATTRIBUTE(gsl::Pointer)
+#define MONGO_GSL_POINTER_ [[gsl::Pointer]]
+#else
+#define MONGO_GSL_POINTER_
+#endif
+
+/**
+ * Annotating methods with [[lifetimebound]] allows the compiler to do some more
+ * lifetime checking (e.g., "returned value should not outlive *this") and emit
+ * warnings. See
+ * https://clang.llvm.org/docs/AttributeReference.html#lifetimebound
+ */
+#define MONGO_COMPILER_LIFETIME_BOUND MONGO_COMPILER_LIFETIME_BOUND_
+#if MONGO_COMPILER_HAS_ATTRIBUTE(lifetimebound)
+#define MONGO_COMPILER_LIFETIME_BOUND_ [[lifetimebound]]
+#elif MONGO_COMPILER_HAS_ATTRIBUTE(msvc::lifetimebound)
+#define MONGO_COMPILER_LIFETIME_BOUND_ [[msvc::lifetimebound]]
+#elif MONGO_COMPILER_HAS_ATTRIBUTE(clang::lifetimebound)
+#define MONGO_COMPILER_LIFETIME_BOUND_ [[clang::lifetimebound]]
+#else
+#define MONGO_COMPILER_LIFETIME_BOUND_
+#endif
+
+/**
+ * As an instruction cache optimization, these rearrange emitted object code so
+ * that the unlikely path is moved aside. See
+ * https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html#index-_005f_005fbuiltin_005fexpect
+ */
+#define MONGO_likely(x)             \
+    MONGO_COMPILER_IF_MSVC(bool(x)) \
+    MONGO_COMPILER_IF_GNUC(static_cast<bool>(__builtin_expect(static_cast<bool>(x), 1)))
+#define MONGO_unlikely(x)           \
+    MONGO_COMPILER_IF_MSVC(bool(x)) \
+    MONGO_COMPILER_IF_GNUC(static_cast<bool>(__builtin_expect(static_cast<bool>(x), 0)))
+
+/**
+ * The `MONGO_COMPILER_DIAGNOSTIC_` macros locally control diagnostic settings.
  *    Example:
  *        MONGO_COMPILER_DIAGNOSTIC_PUSH
- *        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Warray-bounds")
- *        char buf[0];
- *        __builtin_strcpy(buf, "overflow");
+ *        MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wsome-warning")
+ *        ...
  *        MONGO_COMPILER_DIAGNOSTIC_POP
  */
 
-// Allows issuing pragmas through macros. Arguments appear exactly as they would in a #pragma.
-#define MONGO_COMPILER_PRAGMA(p) _Pragma(#p)
+#define MONGO_COMPILER_DIAGNOSTIC_PUSH                                \
+    MONGO_COMPILER_IF_GCC(MONGO_COMPILER_PRAGMA(GCC diagnostic push)) \
+    MONGO_COMPILER_IF_CLANG(MONGO_COMPILER_PRAGMA(clang diagnostic push))
 
-#if defined(_MSC_VER)
-#include "mongo/platform/compiler_msvc.h"  // IWYU pragma: export
-#elif defined(__GNUC__)
-#include "mongo/platform/compiler_gcc.h"  // IWYU pragma: export
-#else
-#error "Unsupported compiler family"
-#endif
+#define MONGO_COMPILER_DIAGNOSTIC_POP                                \
+    MONGO_COMPILER_IF_GCC(MONGO_COMPILER_PRAGMA(GCC diagnostic pop)) \
+    MONGO_COMPILER_IF_CLANG(MONGO_COMPILER_PRAGMA(clang diagnostic pop))
 
-// Define clang's has_feature macro for other compilers
-// See https://clang.llvm.org/docs/LanguageExtensions.html#has-feature-and-has-extension
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
+/**
+ * Both GCC and clang can use this abstract macro, mostly as an implementation
+ * detail. It's up to callers to know when GCC and clang disagree on the name of
+ * the warning.
+ */
+#define MONGO_COMPILER_DIAGNOSTIC_IGNORED(w)                               \
+    MONGO_COMPILER_IF_GCC(MONGO_COMPILER_PRAGMA(GCC diagnostic ignored w)) \
+    MONGO_COMPILER_IF_CLANG(MONGO_COMPILER_PRAGMA(clang diagnostic ignored w))
+
+/**
+ * TODO(SERVER-97447): We ignore these warnings on GCC 14 to facilitate
+ * transition to the v5 toolchain. They should be investigated more deeply by
+ * the teams owning each callsite.
+ */
+#define MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL(w) \
+    MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED(w))
+
+/**
+ * We selectively ignore `-Wstringop-overread` on GCC 14 due to a known bug
+ * affecting `boost::container::small_vector`:
+ * https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108197.
+ */
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_SMALL_VECTOR \
+    MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overread"))
+
+/**
+ * We selectively ignore `-Wstringop-overflow` on GCC 14 due to strong suspicion
+ * that they are false-positives. They involve an atomic read overflowing the
+ * destination, likely due to the compiler incorrectly believing they might be
+ * referencing a null pointer.
+ */
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ \
+    MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overflow"))

@@ -311,8 +311,6 @@ mongo_cc_library(
         "//src/mongo/platform:atomic_word.h",
         "//src/mongo/platform:bits.h",
         "//src/mongo/platform:compiler.h",
-        "//src/mongo/platform:compiler_gcc.h",
-        "//src/mongo/platform:compiler_msvc.h",
         "//src/mongo/platform:decimal128.h",
         "//src/mongo/platform:endian.h",
         "//src/mongo/platform:int128.h",

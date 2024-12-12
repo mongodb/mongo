@@ -1,5 +1,4 @@
 [
-    {include: ["\"mongo/platform/compiler_gcc.h\"", "private", "\"mongo/platform/compiler.h\"", "public"]},
     {include: ["\"float.h\"", "private", "<cfloat>", "public"]},
     {include: ["\"limits.h\"", "private", "<climits>", "public"]},
     {include: ["\"stdarg.h\"", "private", "<cstdarg>", "public"]},
