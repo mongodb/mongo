@@ -28,15 +28,18 @@
  */
 
 #include <memory>
+#include <string>
 
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -64,5 +67,81 @@ TEST_F(InternalConvertBucketIndexStatsTest, QueryShapeAndRedaction) {
         })",
         redact(*stage));
 }
+
+TEST_F(InternalConvertBucketIndexStatsTest, TestParseErrorWithWrongSpec) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    BSONObj specObj = fromjson("{$_internalConvertBucketIndexStats: {}}");
+    ASSERT_THROWS_CODE(DocumentSourceInternalConvertBucketIndexStats::createFromBson(
+                           specObj.firstElement(), expCtx),
+                       AssertionException,
+                       5480004);
+
+    specObj = fromjson("{$_internalConvertBucketIndexStats: {timeField: 1}}");
+    ASSERT_THROWS_CODE(DocumentSourceInternalConvertBucketIndexStats::createFromBson(
+                           specObj.firstElement(), expCtx),
+                       AssertionException,
+                       5480001);
+
+    specObj = fromjson("{$_internalConvertBucketIndexStats: {timeField: 't', metaField: 1}}");
+    ASSERT_THROWS_CODE(DocumentSourceInternalConvertBucketIndexStats::createFromBson(
+                           specObj.firstElement(), expCtx),
+                       AssertionException,
+                       5480002);
+
+    specObj = fromjson(
+        "{$_internalConvertBucketIndexStats: {timeField: 't', metaField: 'm', unknownParam: "
+        "true}}");
+    ASSERT_THROWS_CODE(DocumentSourceInternalConvertBucketIndexStats::createFromBson(
+                           specObj.firstElement(), expCtx),
+                       AssertionException,
+                       5480003);
+}
+
+TEST_F(InternalConvertBucketIndexStatsTest, TestParseWithValidSpec) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    BSONObj specObj =
+        fromjson("{$_internalConvertBucketIndexStats: {timeField: 't', metaField: 'm'}}");
+    DocumentSourceInternalConvertBucketIndexStats::createFromBson(specObj.firstElement(), expCtx);
+}
+
+TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithoutMetaField) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto timeseriesOptions = TimeseriesConversionOptions{"t"};
+    auto convertIndexStatsStage =
+        std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
+
+    // Create a mock index spec on the buckets collection.
+    auto source = DocumentSourceMock::createForTest(
+        {"{spec: {name: 'twoFieldIndex', key: {'control.min.t': 1, 'control.max.t': 1, "
+         "'control.min.metric': 1, 'control.max.metric': 1}}}"},
+        expCtx);
+    convertIndexStatsStage->setSource(source.get());
+    auto next = convertIndexStatsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.getDocument(),
+        Document(fromjson(
+            "{spec: {name: 'twoFieldIndex', key: {t: 1, metric: 1}}, key: {t: 1, metric: 1}}")));
+}
+
+TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithMetaField) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto timeseriesOptions = TimeseriesConversionOptions{"t", std::string("m")};
+    auto convertIndexStatsStage =
+        std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
+
+    // Create a mock index spec on the buckets collection.
+    auto source = DocumentSourceMock::createForTest(
+        {"{spec: {name: 'threeFieldIndex', key: {'meta': 1, 'control.min.t': 1, 'control.max.t': "
+         "1, 'control.min.metric': 1, 'control.max.metric': 1}}}"},
+        expCtx);
+    convertIndexStatsStage->setSource(source.get());
+    auto next = convertIndexStatsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(),
+                       Document(fromjson("{spec: {name: 'threeFieldIndex', key: {m: 1, t: 1, "
+                                         "metric: 1}}, key: {m: 1, t: 1, metric: 1}}")));
+}
+
 }  // namespace
 }  // namespace mongo
