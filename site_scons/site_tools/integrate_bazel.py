@@ -554,6 +554,17 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
             )
     except subprocess.CalledProcessError as ex:
         if os.environ.get("CI") is not None and tries_so_far == 0:
+            if platform.system() == "Windows":
+                print(
+                    "Killing Bazel between retries on Windows to work around file access deadlock"
+                )
+                subprocess.run(
+                    [os.path.abspath(Globals.bazel_executable), "shutdown"],
+                    check=True,
+                    stdout=subprocess.STDOUT,
+                    stderr=subprocess.STDOUT,
+                    env={**os.environ.copy(), **Globals.bazel_env_variables},
+                )
             print(
                 "Build failed, retrying with --jobs=4 in case linking failed due to hitting concurrency limits..."
             )
