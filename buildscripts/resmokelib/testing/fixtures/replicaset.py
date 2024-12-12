@@ -2,7 +2,7 @@
 
 import os.path
 import time
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import bson
 import pymongo
@@ -191,7 +191,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             if self.initial_sync_node:
                 tasks.append(executor.submit(self.initial_sync_node.setup))
 
-            wait(tasks)
+            # Wait for the setup of all nodes to complete
+            for task in as_completed(tasks):
+                task.result()
 
         if self.initial_sync_node:
             self.initial_sync_node.await_ready()

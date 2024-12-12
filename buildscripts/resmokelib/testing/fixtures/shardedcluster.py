@@ -2,7 +2,7 @@
 
 import os.path
 import time
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pymongo
 import pymongo.errors
@@ -180,16 +180,18 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Set up the sharded cluster."""
 
         with ThreadPoolExecutor() as executor:
-            setup_tasks = []
+            tasks = []
 
             if self.config_shard is None:
-                setup_tasks.append(executor.submit(self.configsvr.setup))
+                tasks.append(executor.submit(self.configsvr.setup))
 
             # Start up each of the shards
             for shard in self.shards:
-                setup_tasks.append(executor.submit(shard.setup))
+                tasks.append(executor.submit(shard.setup))
 
-            wait(setup_tasks)
+            # Wait for the setup of all nodes to complete
+            for task in as_completed(tasks):
+                task.result()
 
         # Need to get the new config shard connection string generated from the auto-bootstrap procedure
         if self.use_auto_bootstrap_procedure and not self.embedded_router_mode:
@@ -215,7 +217,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             tasks = []
             for mongos in self.mongos:
                 tasks.append(executor.submit(mongos.setup))
-            wait(tasks)
+
+            # Wait for the setup of all nodes to complete
+            for task in as_completed(tasks):
+                task.result()
 
     def _all_mongo_d_s_t(self):
         """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""
@@ -268,7 +273,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             for mongos in self.mongos:
                 tasks.append(executor.submit(mongos.await_ready))
 
-            wait(tasks)
+            # Wait for all the nodes to be ready
+            for task in as_completed(tasks):
+                task.result()
 
         client = interface.build_client(self, self.auth_options)
 
