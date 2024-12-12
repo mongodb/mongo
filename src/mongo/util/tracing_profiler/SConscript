@@ -5,21 +5,12 @@ Import("env")
 env = env.Clone()
 env.CppUnitTest(
     target="tracing_profiler_test",
-    source=[
-        "profiler_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="tracing_profiler_bm",
-    source=[
-        "profiler_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -623,5 +623,33 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
         "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "abt_lower_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/abt:abt_lower_bm.cpp",
+    ],
+    deps = [
+        ":abt_unit_test_utils",
+        ":query_sbe_abt",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sbe_expression_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/expressions:sbe_expression_bm.cpp",
+    ],
+    deps = [
+        ":query_sbe_stages",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/pipeline:expression_bm_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
     ],
 )

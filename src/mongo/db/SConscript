@@ -312,13 +312,8 @@ env.Benchmark(
 
 env.Benchmark(
     target="operation_cpu_timer_bm",
-    source=[
-        "operation_cpu_timer_bm.cpp",
-    ],
-    LIBDEPS=[
-        "service_context_non_d",
-        "shard_role_api",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
@@ -367,12 +362,8 @@ env.Benchmark(
 
 env.Benchmark(
     target="namespace_string_bm",
-    source=[
-        "namespace_string_bm.cpp",
-    ],
-    LIBDEPS=[
-        "server_base",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

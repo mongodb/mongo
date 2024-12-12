@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -16,6 +16,7 @@ mongo_cc_library(
         "//src/mongo/util/tracing_profiler/internal:profiler_internal.cpp",
     ],
     hdrs = [
+        "profiler.h",
         "//src/mongo/util:fixed_string.h",
         "//src/mongo/util/tracing_profiler/internal:cycleclock.h",
         "//src/mongo/util/tracing_profiler/internal:profiler_internal.h",
@@ -23,5 +24,27 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "tracing_profiler_test",
+    srcs = [
+        "profiler_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":tracing_profiler",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "tracing_profiler_bm",
+    srcs = [
+        "profiler_bm.cpp",
+    ],
+    deps = [
+        ":tracing_profiler",
     ],
 )

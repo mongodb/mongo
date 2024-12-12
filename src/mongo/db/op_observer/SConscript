@@ -6,29 +6,8 @@ env = env.Clone()
 
 env.Benchmark(
     target="op_observer_bm",
-    source=[
-        "op_observer_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/auth_op_observer",
-        "$BUILD_DIR/mongo/db/auth/authserver",
-        "$BUILD_DIR/mongo/db/repl/primary_only_service",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_op_observer",
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter_op_observer",
-        "change_stream_pre_images_op_observer",
-        "fallback_op_observer",
-        "fcv_op_observer",
-        "find_and_modify_images_op_observer",
-        "op_observer",
-        "op_observer_impl",
-        "op_observer_util",
-        "operation_logger_impl",
-        "operation_logger_transaction_proxy",
-        "user_write_block_mode_op_observer",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

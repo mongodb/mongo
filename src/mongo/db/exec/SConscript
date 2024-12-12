@@ -23,12 +23,6 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="distinct_scan_bm",
-    source=[
-        "distinct_scan_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "query_shard_server_test_fixture",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

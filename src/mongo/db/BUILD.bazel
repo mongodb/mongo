@@ -1,5 +1,5 @@
 load("@poetry//:dependencies.bzl", "dependency")
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
 load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -4087,6 +4087,31 @@ mongo_cc_unit_test(
     deps = [
         ":prepare_conflict_tracker",
         "//src/mongo/util:tick_source_mock",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "namespace_string_bm",
+    srcs = [
+        "namespace_string_bm.cpp",
+        "//src/mongo/util/immutable:map.h",
+        "//src/mongo/util/immutable:unordered_map.h",
+        "//src/mongo/util/immutable/details:map.h",
+        "//src/mongo/util/immutable/details:memory_policy.h",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "operation_cpu_timer_bm",
+    srcs = [
+        "operation_cpu_timer_bm.cpp",
+    ],
+    deps = [
+        ":service_context_non_d",
+        ":shard_role_api",
     ],
 )
 
