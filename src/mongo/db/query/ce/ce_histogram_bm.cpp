@@ -70,7 +70,7 @@ struct HistogramEstimationBenchmarkConfiguration {
                 break;
             case kString:
                 sbeDataType = sbe::value::TypeTags::StringBig;
-                dataInterval = {8, 15};
+                dataInterval = {16, 32};
                 break;
             case kDouble:
                 sbeDataType = sbe::value::TypeTags::NumberDouble;
@@ -219,7 +219,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                                 ceHist,
                                                 true /*includeScalar*/,
                                                 ArrayRangeEstimationAlgo::kConjunctArrayCE,
-                                                false /*useE2EAPI*/,
+                                                configuration.useE2EAPI /*useE2EAPI*/,
                                                 seed));
         i = (i + 1) % queryIntervals.size();
     }
@@ -239,8 +239,9 @@ BENCHMARK(BM_RunHistogramEstimations)
     ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50'000},
-                   /*dataDistribution*/ {kUniform, kZipfian},
-                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan, kArray},
+                   /*dataDistribution*/ {kUniform},
+                   /*dataType*/
+                   {kInt, kStringSmall, kString, kBoolean, kNull, kNan, kArray},
                    /*queryType*/ {kPoint},
                    /*useE2EAPI*/ {0, 1}});
 
@@ -248,8 +249,8 @@ BENCHMARK(BM_RunHistogramEstimations)
     ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50'000},
-                   /*dataDistribution*/ {kUniform, kZipfian},
-                   /*dataType*/ {kInt, kString, kBoolean, kArray},
+                   /*dataDistribution*/ {kUniform},
+                   /*dataType*/ {kInt, kStringSmall, kString, kBoolean, kArray},
                    /*queryType*/ {kRange},
                    /*useE2EAPI*/ {0, 1}});
 

@@ -301,6 +301,12 @@ void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
         case sbe::value::TypeTags::bsonString:
             builder.append(fieldName, value::getStringView(sbeValue.getTag(), sbeValue.getValue()));
             break;
+        case sbe::value::TypeTags::Boolean:
+            builder.appendBool(fieldName, sbe::value::bitcastTo<bool>(sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::Null:
+            builder.appendNull(fieldName);
+            break;
         default:
             uassert(9370100, "Unexpected value type", false);
             break;
