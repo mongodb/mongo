@@ -56,38 +56,32 @@ TEST(HistogramPredicateEstimationTest, CanEstimateNonHistogrammableInterval) {
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$gte: false}}
         Interval interval(fromjson("{'': false, '': true}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$gte: null}}
         Interval interval(fromjson("{'': null, '':  null}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$lte: []}}
         Interval interval(fromjson("{'': [], '': []}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$gte: []}}
         Interval interval(fromjson("{'': [], '': {}}"), true, false);
-        ASSERT_FALSE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_FALSE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$exists: false}}
         Interval interval(fromjson("{'': null, '': null}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 }
 
@@ -100,22 +94,19 @@ TEST(HistogramPredicateEstimationTest, CanEstimateInestimableInterval) {
 
     {  // {a: {b: 1}}, we cannot estimate arbitrary object intervals
         Interval interval(fromjson("{'': {b: 1}, '': {b: 1}}"), true, true);
-        ASSERT_FALSE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_FALSE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$gte: {b: 1}}}, we cannot estimate arbitrary object intervals, and intervals spanning
        // multiple types.
         Interval interval(fromjson("{'': {b: 1}, '':  []}"), true, false);
-        ASSERT_FALSE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_FALSE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // The interval is not constructible from IndexBoundBuilder. We can estimate intervals
        // spanning multiple types if both bounds are estimable types.
         Interval interval(fromjson("{'': 10, '':  false}"), true, false);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 }
 
@@ -128,8 +119,7 @@ TEST(HistogramPredicateEstimationTest, CanEstimateSimpleInterval) {
 
     {  // {a: 4}
         Interval interval(fromjson("{'': 4, '': 4}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 }
 
@@ -142,27 +132,23 @@ TEST(HistogramPredicateEstimationTest, CanEstimateTypeBracketedInterval) {
 
     {  // {a: {$gte: 1}}
         Interval interval(fromjson("{'': 1, '': Infinity}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$gte: NaN}}
         Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // {a: {$gte: "abc"}}
         Interval interval(fromjson("{'': \"abc\", '': {}}"), true, false);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 
     {  // The interval is unexpected from IndexBoundBuilder but still estimable like [10,
        // Infinity].
         Interval interval(fromjson("{'': 10, '':  \"\"}"), true, false);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 }
 
@@ -177,8 +163,7 @@ TEST(HistogramPredicateEstimationTest, CanEstimateEmptyHistogram) {
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
     }
 }
 
@@ -198,8 +183,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanOnlyFalse) {
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(collSize,
                   HistogramEstimator::estimateCardinality(
@@ -208,8 +192,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanOnlyFalse) {
 
     {  // {a: {$eq: true}}
         Interval interval(fromjson("{'': true, '': true}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(mongo::cost_based_ranker::zeroCE,
                   HistogramEstimator::estimateCardinality(
@@ -233,8 +216,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanOnlyTrue) {
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(mongo::cost_based_ranker::zeroCE,
                   HistogramEstimator::estimateCardinality(
@@ -243,8 +225,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanOnlyTrue) {
 
     {  // {a: {$eq: true}}
         Interval interval(fromjson("{'': true, '': true}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(collSize,
                   HistogramEstimator::estimateCardinality(
@@ -276,8 +257,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMix) {
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(falseCnt,
                   HistogramEstimator::estimateCardinality(
@@ -286,8 +266,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMix) {
 
     {  // {a: {$eq: true}}
         Interval interval(fromjson("{'': true, '': true}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(trueCnt,
                   HistogramEstimator::estimateCardinality(
@@ -315,8 +294,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixDifferentB
 
     {  // {a: {$or: {{$eq: false}, {$eq: true}} }
         Interval interval(fromjson("{'': false, '': true}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(collSize,
                   HistogramEstimator::estimateCardinality(
@@ -325,8 +303,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixDifferentB
 
     {  // {a: {$or: {{$eq: true}, {$eq: false}} }
         Interval interval(fromjson("{'': true, '': false}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(collSize,
                   HistogramEstimator::estimateCardinality(
@@ -357,8 +334,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
 
     {  // {a: {$or: {{$eq: false}, {$eq: true}} }
         Interval interval(fromjson("{'': false, '': true}"), false, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(trueCnt,
                   HistogramEstimator::estimateCardinality(
@@ -367,8 +343,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
 
     {  // {a: {$or: {{$eq: false}, {$eq: true}} }
         Interval interval(fromjson("{'': false, '': true}"), true, false);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(falseCnt,
                   HistogramEstimator::estimateCardinality(
@@ -377,8 +352,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
 
     {  // {a: {$or: {{$eq: true}, {$eq: false}} }
         Interval interval(fromjson("{'': true, '': false}"), false, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(falseCnt,
                   HistogramEstimator::estimateCardinality(
@@ -387,8 +361,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
 
     {  // {a: {$or: {{$eq: true}, {$eq: false}} }
         Interval interval(fromjson("{'': true, '': false}"), true, false);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(trueCnt,
                   HistogramEstimator::estimateCardinality(
@@ -416,15 +389,16 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
 
     {  // [false, false)
         Interval interval(fromjson("{'': false, '': false}"), true, false);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(cost_based_ranker::zeroCE,
                   HistogramEstimator::estimateCardinality(
                       *ceHist, collSize, interval, true, ArrayRangeEstimationAlgo::kExactArrayCE));
     }
 }
 
-TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsEmptyArray) {
+DEATH_TEST(HistogramPredicateEstimationTest,
+           EstimateViaTypeCountsEmptyArray,
+           "Hit a MONGO_UNREACHABLE_TASSERT") {
 
     size_t size = 10;
     size_t numberOfBuckets = 10;
@@ -438,14 +412,19 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsEmptyArray) {
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
 
-    {  // {a: {$eq: []}}
+    {
+        // The interval could come from a find query like {a: {$eq: []}}. We are unable to estimate
+        // empty array because the CEHistogram does not record the counts of nested empty arrays.
+        // For example, a document matching the predicate like {a: [[]]} fails to be included in the
+        // estimate.
         Interval interval(fromjson("{'': [], '': []}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_FALSE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
-        ASSERT_EQ(collSize,
-                  HistogramEstimator::estimateCardinality(
-                      *ceHist, collSize, interval, true, ArrayRangeEstimationAlgo::kExactArrayCE));
+        ASSERT_THROWS_CODE(
+            HistogramEstimator::estimateCardinality(
+                *ceHist, collSize, interval, true, ArrayRangeEstimationAlgo::kExactArrayCE),
+            DBException,
+            8870500);
     }
 }
 
@@ -465,8 +444,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsNull) {
 
     {  // {a: {$eq: null}}
         Interval interval(fromjson("{'': null, '': null}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(collSize,
                   HistogramEstimator::estimateCardinality(
@@ -500,8 +478,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsNaN) {
 
     {  // {a: {$eq: NaN}}
         Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(nanCnt,
                   HistogramEstimator::estimateCardinality(
@@ -534,8 +511,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsAllString) {
         stats::SBEValue start = sbe::bson::convertFrom<false>(interval.start);
         stats::SBEValue end = sbe::bson::convertFrom<false>(interval.end);
 
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(size,
                   HistogramEstimator::estimateCardinality(
@@ -597,8 +573,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsMixTypes) {
 
     {  // {a: {$eq: true}}
         Interval interval(fromjson("{'': true, '': true}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(trueCnt,
                   HistogramEstimator::estimateCardinality(
@@ -607,8 +582,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsMixTypes) {
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(falseCnt,
                   HistogramEstimator::estimateCardinality(
@@ -617,8 +591,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsMixTypes) {
 
     {  // {a: {$eq: NaN}}
         Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(nanCnt,
                   HistogramEstimator::estimateCardinality(
@@ -627,8 +600,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsMixTypes) {
 
     {  // {$and: [{a: {$gte: ""}},{a: {$lt: {}}}]}
         Interval interval(fromjson("{'': \"\", '': {}}"), true, false);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 
         ASSERT_EQ(strCnt,
                   HistogramEstimator::estimateCardinality(
@@ -1100,8 +1072,7 @@ TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
     {  // check estimation for Boolean
         Interval interval(
             BSON("" << true << "" << true), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
             CardinalityEstimate(CardinalityType(5), EstimationSource::Code), /*estimatedCard */
             estimateIntervalCardinality(*ceHist,
@@ -1113,8 +1084,7 @@ TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
     {  // check estimation for Null
         Interval interval(BSON("" << BSONNULL << "" << BSONNULL), true /*startIncluded*/, true
                           /*endIncluded*/);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(5), EstimationSource::Code), /*estimatedCard*/
                   estimateIntervalCardinality(*ceHist,
                                               interval,
@@ -1125,8 +1095,7 @@ TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
     {  // check estimation for Timestamp
         Interval interval(
             BSON("" << startTs << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
             CardinalityEstimate(CardinalityType(25), EstimationSource::Code), /*estimatedCard*/
             estimateIntervalCardinality(*ceHist,
@@ -1138,8 +1107,7 @@ TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
     {  // check estimation for [Null, true]
         Interval interval(
             BSON("" << BSONNULL << "" << true), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
             CardinalityEstimate(CardinalityType(75), EstimationSource::Code), /*estimatedCard ,*/
             estimateIntervalCardinality(*ceHist,
@@ -1151,8 +1119,7 @@ TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
     {  // check estimation for [false, timestamp]
         Interval interval(
             BSON("" << false << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
             CardinalityEstimate(CardinalityType(50), EstimationSource::Code), /*estimatedCard ,*/
             estimateIntervalCardinality(*ceHist,
@@ -1193,8 +1160,7 @@ DEATH_TEST(HistogramPredicateEstimationTest,
                                           << "")),
                           true /*startIncluded*/,
                           true /*endIncluded*/);
-        ASSERT_FALSE(
-            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+        ASSERT_FALSE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_THROWS_CODE(estimateIntervalCardinality(*ceHist,
                                                        interval,
                                                        true /*includeScalar*/,
@@ -1232,7 +1198,7 @@ TEST(HistogramPredicateEstimationTest, MixedTypeIntervalEstimation) {
     {  // [MinKey, MaxKey]
         Interval interval(
             BSON("" << MINKEY << "" << MAXKEY), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(100), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
@@ -1242,7 +1208,7 @@ TEST(HistogramPredicateEstimationTest, MixedTypeIntervalEstimation) {
     {  // [MinKey, endTs]
         Interval interval(
             BSON("" << MINKEY << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(98), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
@@ -1252,7 +1218,7 @@ TEST(HistogramPredicateEstimationTest, MixedTypeIntervalEstimation) {
     {  // [0.0, MaxKey]
         Interval interval(
             BSON("" << 0.0 << "" << MAXKEY), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(94), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
@@ -1262,7 +1228,7 @@ TEST(HistogramPredicateEstimationTest, MixedTypeIntervalEstimation) {
     {  // [0.0, endTs]
         Interval interval(
             BSON("" << 0.0 << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval, true));
+        ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(92), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,

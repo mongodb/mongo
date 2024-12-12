@@ -53,30 +53,23 @@ CardinalityEstimate HistogramEstimator::estimateCardinality(
 }
 
 bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,
-                                             const mongo::Interval& interval,
-                                             bool includeScalar) {
-
+                                             const mongo::Interval& interval) {
+    bool startInclusive = interval.startInclusive;
+    bool endInclusive = interval.endInclusive;
     auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
     auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
     sbe::value::ValueGuard startGuard{startTag, startVal};
     sbe::value::ValueGuard endGuard{endTag, endVal};
 
-    // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they are estimable
-    // directly via either histograms or type counts.
-    bool viaHistogram =
-        (stats::sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal) &&
-         stats::canEstimateTypeViaHistogram(startTag));
+    // If the interval is not in the ascending order, then reverse it.
+    if (reversedInterval(startTag, startVal, endTag, endVal)) {
+        std::swap(startInclusive, endInclusive);
+        std::swap(startTag, endTag);
+        std::swap(startVal, endVal);
+    }
 
-    auto viaTypeCounts = stats::canEstimateIntervalViaTypeCounts(
-        startTag, startVal, interval.startInclusive, endTag, endVal, interval.endInclusive);
-
-    // For a mixed-type interval, if both bounds are of estimable types, we can divide the interval
-    // into multiple sub-intervals. The first and last sub-intervals can be estimated using either
-    // histograms or type counts, while the intermediate sub-intervals, which are fully bracketed,
-    // can be estimated using type counts.
-    auto viaBracketization = stats::canEstimateType(startTag) && stats::canEstimateType(endTag);
-
-    return viaHistogram || viaTypeCounts || viaBracketization;
+    return ::mongo::ce::canEstimateInterval(
+        hist.isArray(), startInclusive, startTag, startVal, endInclusive, endTag, endVal);
 }
 
 }  // namespace mongo::ce

@@ -380,7 +380,7 @@ CEResult CardinalityEstimator::histogramCE(const ComparisonMatchExpression* node
 
     const auto& interval = oilResult.getValue().intervals.front();
 
-    if (!ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true)) {
+    if (!ce::HistogramEstimator::canEstimateInterval(*histogram, interval)) {
         return CEResult(ErrorCodes::HistogramCEFailure,
                         str::stream{} << "encountered interval which is unestimatable: "
                                       << interval.toString(true));
@@ -539,7 +539,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node) {
         bool fallbackToHeuristicCE = false;
         if (localRankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
             localRankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-            if (ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true)) {
+            if (ce::HistogramEstimator::canEstimateInterval(*histogram, interval)) {
                 resultCard += ce::HistogramEstimator::estimateCardinality(
                     *histogram,
                     _inputCard,

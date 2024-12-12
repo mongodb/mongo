@@ -113,13 +113,6 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
                                                 ArrayRangeEstimationAlgo arrayRangeEstimationAlgo);
 
 /**
- * Checks if a given bound can be estimated via either histograms or type counts.
- */
-bool canEstimateBound(const stats::CEHistogram& ceHist,
-                      sbe::value::TypeTags tag,
-                      bool includeScalar);
-
-/**
  * Estimate the cardinality of a point query (e.g., {a: {$eq: val}}) via type counts. The value
  * 'val' has to be of specific type/value combination for which we are able to estimate using type
  * counts. Such types are:
@@ -147,5 +140,18 @@ boost::optional<EstimationResult> estimateCardinalityRangeViaTypeCounts(
     bool highInclusive,
     sbe::value::TypeTags tagHigh,
     sbe::value::Value valHigh);
+
+/**
+ * Checks if given SBEValue interval can be estimated.
+ *
+ * @param isArray indicates if the field contains array data.
+ */
+bool canEstimateInterval(bool isArray,
+                         bool startInclusive,
+                         sbe::value::TypeTags startTag,
+                         sbe::value::Value startVal,
+                         bool endInclusive,
+                         sbe::value::TypeTags endTag,
+                         sbe::value::Value endVal);
 
 }  // namespace mongo::ce

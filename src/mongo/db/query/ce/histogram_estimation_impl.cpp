@@ -468,28 +468,6 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
     return estimation;
 }
 
-bool canEstimateBound(const stats::CEHistogram& ceHist,
-                      const sbe::value::TypeTags tag,
-                      bool includeScalar) {
-    // if histogrammable, then it's estimable
-    if (stats::canEstimateTypeViaHistogram(tag)) {
-        return true;
-    }
-    // check if it's not one of the type-count-estimable types
-    if (includeScalar) {
-        if (tag != sbe::value::TypeTags::Boolean && tag != sbe::value::TypeTags::Array &&
-            tag != sbe::value::TypeTags::Null) {
-            return false;
-        }
-    }
-    if (ceHist.isArray()) {
-        if (tag != sbe::value::TypeTags::Null) {
-            return false;
-        }
-    }
-    return true;
-}
-
 /**
  * Estimates the cardinality of a given interval using either histograms or type counts.
  *
@@ -561,6 +539,43 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
                                EstimationSource::Histogram};
 }
 
+bool canEstimateInterval(bool isArray,
+                         bool startInclusive,
+                         sbe::value::TypeTags startTag,
+                         sbe::value::Value startVal,
+                         bool endInclusive,
+                         sbe::value::TypeTags endTag,
+                         sbe::value::Value endVal) {
+    tassert(9744900,
+            "The interval must be in ascending order",
+            !reversedInterval(startTag, startVal, endTag, endVal));
+
+    // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they are estimable
+    // directly via either histograms or type counts.
+    if (stats::sameTypeBracketInterval(startTag, endInclusive, endTag, endVal) &&
+        stats::canEstimateTypeViaHistogram(startTag)) {
+        return true;
+    }
+
+    // For fields with array data, we skip type count estimation and bracketization because we lack
+    // statistics for some types in arrays. For instance, scalar booleans are estimable with
+    // counters for true/false values, but these are unavailable in arrays.
+    if (isArray) {
+        return false;
+    }
+
+    auto viaTypeCounts = stats::canEstimateIntervalViaTypeCounts(
+        startTag, startVal, startInclusive, endTag, endVal, endInclusive);
+
+    // For a mixed-type interval, if both bounds are of estimable types, we can divide the interval
+    // into multiple sub-intervals. The first and last sub-intervals can be estimated using either
+    // histograms or type counts, while the intermediate sub-intervals, which are fully bracketed,
+    // can be estimated using type counts.
+    auto viaBracketization = stats::canEstimateType(startTag) && stats::canEstimateType(endTag);
+
+    return viaTypeCounts || viaBracketization;
+}
+
 CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,
                                                 const mongo::Interval& interval,
                                                 bool includeScalar,
@@ -585,14 +600,8 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
         std::swap(startVal, endVal);
     }
 
-    bool viaHistogram =
-        (stats::sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal) &&
-         stats::canEstimateTypeViaHistogram(startTag));
-    auto viaTypeCounts = stats::canEstimateIntervalViaTypeCounts(
-        startTag, startVal, interval.startInclusive, endTag, endVal, interval.endInclusive);
-    auto viaBracketization = stats::canEstimateType(startTag) && stats::canEstimateType(endTag);
-
-    if (viaHistogram || viaTypeCounts || viaBracketization) {
+    if (canEstimateInterval(
+            ceHist.isArray(), startInclusive, startTag, startVal, endInclusive, endTag, endVal)) {
         CardinalityEstimate ce{cost_based_ranker::zeroCE};
         for (const auto& interval : stats::bracketizeInterval(
                  startTag, startVal, startInclusive, endTag, endVal, endInclusive)) {

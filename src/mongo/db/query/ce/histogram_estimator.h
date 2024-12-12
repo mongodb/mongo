@@ -52,8 +52,7 @@ public:
      * Checks if given interval can be estimated.
      */
     static bool canEstimateInterval(const stats::CEHistogram& hist,
-                                    const mongo::Interval& interval,
-                                    bool includeScalar);
+                                    const mongo::Interval& interval);
 };
 
 }  // namespace mongo::ce
