@@ -205,7 +205,8 @@ void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDe
  */
 bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
                                       const CanonicalQuery& cq,
-                                      const DuplicateKeyErrorInfo& errorInfo);
+                                      const DuplicateKeyErrorInfo& errorInfo,
+                                      int retryAttempts);
 
 /*
  * Populates 'result' with the explain information for the write requests.

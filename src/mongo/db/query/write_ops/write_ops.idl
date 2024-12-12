@@ -644,3 +644,12 @@ commands:
                               buckets namespace."
                 type: optionalBool
                 stability: internal
+
+server_parameters:
+    upsertMaxRetryAttemptsOnDuplicateKeyError:
+        description: 'Maximum number of retry attempts upsert will make on a duplicate key error.'
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gUpsertMaxRetryAttemptsOnDuplicateKeyError
+        default: 100
+        redact: false

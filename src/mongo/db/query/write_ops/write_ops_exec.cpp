@@ -1484,9 +1484,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         request.setSampleId(sampleId);
     }
 
-    size_t numAttempts = 0;
+    int retryAttempts = 0;
     while (true) {
-        ++numAttempts;
+        ++retryAttempts;
 
         try {
             bool containsDotsAndDollarsField = false;
@@ -1508,14 +1508,14 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
             auto cq = uassertStatusOK(parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, request));
 
             if (!write_ops_exec::shouldRetryDuplicateKeyException(
-                    request, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
+                    request, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>(), retryAttempts)) {
                 throw;
             }
 
             logAndBackoff(4640402,
                           ::mongo::logv2::LogComponent::kWrite,
                           logv2::LogSeverity::Debug(1),
-                          numAttempts,
+                          retryAttempts,
                           "Caught DuplicateKey exception during upsert",
                           logAttrs(ns));
         }
@@ -2062,9 +2062,24 @@ bool matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
 
 bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
                                       const CanonicalQuery& cq,
-                                      const DuplicateKeyErrorInfo& errorInfo) {
+                                      const DuplicateKeyErrorInfo& errorInfo,
+                                      int retryAttempts) {
     // In order to be retryable, the update must be an upsert with multi:false.
     if (!updateRequest.isUpsert() || updateRequest.isMulti()) {
+        return false;
+    }
+
+    // There was a bug where an upsert sending a document into a partial/sparse unique index would
+    // retry indefinitely. To avoid this, cap the number of retries.
+    int upsertMaxRetryAttemptsOnDuplicateKeyError =
+        write_ops::gUpsertMaxRetryAttemptsOnDuplicateKeyError.load();
+    if (retryAttempts > upsertMaxRetryAttemptsOnDuplicateKeyError) {
+        LOGV2(9552300,
+              "Upsert hit max number of retries on duplicate key exception, as determined by "
+              "server parameter upsertMaxRetryAttemptsOnDuplicateKeyError. No further retry will "
+              "be attempted for this query.",
+              "upsertMaxRetryAttemptsOnDuplicateKeyError"_attr =
+                  upsertMaxRetryAttemptsOnDuplicateKeyError);
         return false;
     }
 
