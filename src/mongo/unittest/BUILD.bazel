@@ -127,7 +127,6 @@ mongo_cc_library(
     hdrs = [
         "integration_test.h",
     ],
-    tags = ["integration-tests"],
     deps = [
         "unittest",
         "//src/mongo/client:connection_string",

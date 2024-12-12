@@ -301,6 +301,7 @@ tasks:
           targets: >-
             install-benchmarks
             archive-benchmarks
+          bazel_build_tags: --bazel-build-tag=mongo_benchmark --bazel-build-tag=mongo_library
           compiling_for_test: true
       - command: s3.put
         params:
