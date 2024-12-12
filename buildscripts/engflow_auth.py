@@ -13,10 +13,7 @@ from datetime import datetime
 
 from retry import retry
 
-NORMALIZED_ARCH = {
-    "x86_64": "x64",
-    "aarch64": "arm64",
-}
+NORMALIZED_ARCH = {"x86_64": "x64", "aarch64": "arm64", "AMD64": "x64"}
 
 NORMALIZED_OS = {"Windows": "windows", "Darwin": "macos", "Linux": "linux"}
 
@@ -51,6 +48,8 @@ def install() -> str:
     binary_filename = "engflow_auth"
     binary_path = os.path.join(binary_directory, binary_filename)
     tag = get_release_tag()
+    if "windows" in tag:
+        binary_path += ".exe"
     if os.path.exists(binary_path):
         print(f"{binary_filename} already exists at {binary_path}, skipping download")
     else:
@@ -64,13 +63,15 @@ def install() -> str:
 
 
 def update_bazelrc(binary_path: str):
-    with open(f"{os.path.expanduser('~')}/.bazelrc", "a+") as bazelrc:
-        lines = []
+    lines = []
+    with open(f"{os.path.expanduser('~')}/.bazelrc", "r") as bazelrc:
         for line in bazelrc.readlines():
             if "--tls_client" in line or "--credential_helper" in line:
-                pass
+                continue
             lines.append(line)
-        lines.append(f"build --credential_helper={CLUSTER}={binary_path}")
+    lines.append(f"build --credential_helper={CLUSTER}={binary_path}")
+
+    with open(f"{os.path.expanduser('~')}/.bazelrc", "w") as bazelrc:
         bazelrc.writelines(lines)
 
 
