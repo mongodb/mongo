@@ -488,7 +488,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             }
             FailPoint* hangBeforeInterruptfailPoint =
                 globalFailPointRegistry().find("hangBeforeCheckingMongosShutdownInterrupt");
-            if (hangBeforeInterruptfailPoint) {
+            if (MONGO_unlikely(hangBeforeInterruptfailPoint->shouldFail())) {
                 hangBeforeInterruptfailPoint->setMode(FailPoint::Mode::off);
                 sleepsecs(3);
             }
