@@ -377,15 +377,12 @@ GlobalInitializerRegisterer sslManagerInitializer(
         if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
             theSSLManagerCoordinator = new SSLManagerCoordinator();
         }
-        return Status::OK();
     },
-    [](DeinitializerContext* context) {
+    [](DeinitializerContext*) {
         if (theSSLManagerCoordinator) {
             delete theSSLManagerCoordinator;
             theSSLManagerCoordinator = nullptr;
         }
-
-        return Status::OK();
     },
     {"EndStartupOptionHandling"},
     {});
@@ -1013,7 +1010,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     }
 
     // Add the extra certificates into the same certificate store as the certificate
-    addCertificatesToStore(certHolder->hCertStore, extraCertificates);
+    uassertStatusOK(addCertificatesToStore(certHolder->hCertStore, extraCertificates));
 
     return UniqueCertificateWithPrivateKey{std::move(certHolder), std::move(cryptProvider)};
 }
@@ -1502,10 +1499,10 @@ SSLConnectionInterface* SSLManagerWindows::accept(Socket* socket,
 }
 
 void SSLManagerWindows::_handshake(SSLConnectionWindows* conn, bool client) {
-    initSSLContext(conn->_cred,
-                   getSSLGlobalParams(),
-                   client ? SSLManagerInterface::ConnectionDirection::kOutgoing
-                          : SSLManagerInterface::ConnectionDirection::kIncoming);
+    uassertStatusOK(initSSLContext(conn->_cred,
+                                   getSSLGlobalParams(),
+                                   client ? SSLManagerInterface::ConnectionDirection::kOutgoing
+                                          : SSLManagerInterface::ConnectionDirection::kIncoming));
 
     while (true) {
         asio::error_code ec;

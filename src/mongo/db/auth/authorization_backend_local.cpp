@@ -758,20 +758,15 @@ Status AuthorizationBackendLocal::getRoleDescriptionsForDB(
                       << dbname.serializeWithoutTenantPrefix_UNSAFE()),
                  BSONObj(),
                  [&](const BSONObj& roleDoc) {
-                     try {
-                         BSONObjBuilder roleBuilder;
+                     BSONObjBuilder roleBuilder;
 
-                         auto subRoles = filterAndMapRole(
-                             &roleBuilder, roleDoc, option, true, dbname.tenantId());
-                         roleBuilder.append("isBuiltin", false);
-                         auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
-                         data.roles->insert(subRoles.cbegin(), subRoles.cend());
-                         serializeResolvedRoles(&roleBuilder, data, roleDoc);
-                         result->push_back(roleBuilder.obj());
-                         return Status::OK();
-                     } catch (const AssertionException& ex) {
-                         return ex.toStatus();
-                     }
+                     auto subRoles =
+                         filterAndMapRole(&roleBuilder, roleDoc, option, true, dbname.tenantId());
+                     roleBuilder.append("isBuiltin", false);
+                     auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
+                     data.roles->insert(subRoles.cbegin(), subRoles.cend());
+                     serializeResolvedRoles(&roleBuilder, data, roleDoc);
+                     result->push_back(roleBuilder.obj());
                  });
 }
 

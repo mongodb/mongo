@@ -290,7 +290,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
             // Other threads may be calling into the opObserver. Only assert if we are writing to
             // the target ns, otherwise skip these asserts.
             if (targetNss != nss) {
-                return Status::OK();
+                return;
             }
 
             applyOpCalled->store(true);
@@ -300,7 +300,6 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
             if (op.getOpType() == repl::OpTypeEnum::kInsert) {
                 ASSERT_BSONOBJ_EQ(op.getObject(), docs[0]);
             }
-            return Status::OK();
         };
 
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
@@ -311,25 +310,23 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
         // Other threads may be calling into the opObserver. Only assert if we are writing to
         // the target ns, otherwise skip these asserts.
         if (targetNss != coll->ns()) {
-            return Status::OK();
+            return;
         }
 
         applyOpCalled->store(true);
         checkOpCtx(opCtx);
         ASSERT_BSONOBJ_EQ(op.getObject(), doc);
-        return Status::OK();
     };
 
     _opObserver->onUpdateFn = [&](OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
         // Other threads may be calling into the opObserver. Only assert if we are writing to
         // the target ns, otherwise skip these asserts.
         if (targetNss != args.coll->ns()) {
-            return Status::OK();
+            return;
         }
 
         applyOpCalled->store(true);
         checkOpCtx(opCtx);
-        return Status::OK();
     };
 
     ASSERT_EQ(_applyOplogEntryOrGroupedInsertsWrapper(

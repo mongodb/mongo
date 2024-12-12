@@ -76,7 +76,6 @@ protected:
             ->setGlobalInitMethodForTest(
                 [this](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
                     _initCallCount++;
-                    return Status::OK();
                 });
     }
 

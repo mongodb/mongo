@@ -294,7 +294,7 @@ public:
                                        WinHttpReadData(request, buffer.data(), len, &len));
 
             ConstDataRange cdr(buffer.data(), len);
-            ret.writeAndAdvance(cdr);
+            uassertStatusOK(ret.writeAndAdvance(cdr));
         }
 
         DataBuilder headers(4096);
@@ -313,7 +313,7 @@ public:
                                                            &buffer[0],
                                                            &len,
                                                            WINHTTP_NO_HEADER_INDEX));
-            headers.writeAndAdvance(ConstDataRange(buffer.data(), len));
+            uassertStatusOK(headers.writeAndAdvance(ConstDataRange(buffer.data(), len)));
         }
 
         return HttpReply(statusCode, std::move(headers), std::move(ret));

@@ -97,8 +97,6 @@ protected:
                         shardRegistry()->getConfigShard()->getTargeter());
                     configTargeter->setConnectionStringReturnValue(configConnStr);
                     configTargeter->setFindHostReturnValue(configConnStr.getServers()[0]);
-
-                    return Status::OK();
                 });
 
         _dbDirectClient = std::make_unique<DBDirectClient>(operationContext());

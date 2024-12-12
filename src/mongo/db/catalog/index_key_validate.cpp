@@ -1040,10 +1040,9 @@ BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& index
 
 
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
-    "FilterAllowedIndexFieldNames", [](InitializerContext* service) {
+    "FilterAllowedIndexFieldNames", [](InitializerContext*) {
         if (filterAllowedIndexFieldNames)
             filterAllowedIndexFieldNames(allowedFieldNames);
-        return Status::OK();
     });
 
 }  // namespace index_key_validate

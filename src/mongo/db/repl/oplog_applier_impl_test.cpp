@@ -600,7 +600,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_EQUALS(nss, collNss);
-        return Status::OK();
     };
     auto entry = OplogEntry(op);
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
@@ -628,7 +627,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
         ASSERT_TRUE(collNss.tenantId());
         ASSERT_EQ(tid, collNss.tenantId().get());
         ASSERT_EQUALS(nss, collNss);
-        return Status::OK();
     };
 
     auto entry = makeCommandOplogEntry(nextOpTime(), nss, op, UUID::gen());
@@ -663,7 +661,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantRequireTenantIDFa
         ASSERT_TRUE(collNss.tenantId());
         ASSERT_EQ(tid, collNss.tenantId().get());
         ASSERT_EQUALS(nss, collNss);
-        return Status::OK();
     };
 
     auto entry = OplogEntry(op);
@@ -707,7 +704,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
         ASSERT_TRUE(collNss.tenantId());
         ASSERT_EQ(tid2, collNss.tenantId().get());
         ASSERT_EQUALS(nssTenant2, collNss);
-        return Status::OK();
     };
 
     ASSERT_TRUE(collectionExists(_opCtx.get(), nssTenant1));
@@ -3607,7 +3603,6 @@ TEST_F(OplogApplierImplTest,
             onInsertsCalled = true;
             ASSERT_FALSE(opCtx->writesAreReplicated());
             ASSERT_TRUE(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
-            return Status::OK();
         };
     createCollectionWithUuid(_opCtx.get(), nss);
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0));
