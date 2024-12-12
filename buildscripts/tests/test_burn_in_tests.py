@@ -335,7 +335,8 @@ class TestTaskInfo(unittest.TestCase):
 
 
 class TestCreateTaskList(unittest.TestCase):
-    def test_create_task_list_no_excludes(self):
+    @patch(ns("_process_tests_by_suite"))
+    def test_create_task_list_no_excludes(self, process_tests_by_suite_mock):
         variant = "variant name"
         evg_conf_mock = MagicMock()
         evg_conf_mock.get_variant.return_value.tasks = [
@@ -348,6 +349,7 @@ class TestCreateTaskList(unittest.TestCase):
             "suite 2": [f"test{i}.js" for i in range(1)],
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
+        process_tests_by_suite_mock.return_value = tests_by_suite
         exclude_tasks = []
 
         task_list = under_test.create_task_list(
@@ -359,7 +361,8 @@ class TestCreateTaskList(unittest.TestCase):
         self.assertIn("task 3", task_list)
         self.assertEqual(3, len(task_list))
 
-    def test_create_task_list_has_correct_task_info(self):
+    @patch(ns("_process_tests_by_suite"))
+    def test_create_task_list_has_correct_task_info(self, process_tests_by_suite_mock):
         variant = "variant name"
         evg_conf_mock = MagicMock()
         evg_conf_mock.get_variant.return_value.tasks = [
@@ -369,6 +372,7 @@ class TestCreateTaskList(unittest.TestCase):
         tests_by_suite = {
             "suite_1": [f"test{i}.js" for i in range(3)],
         }
+        process_tests_by_suite_mock.return_value = tests_by_suite
         exclude_tasks = []
 
         task_list = under_test.create_task_list(
@@ -381,7 +385,8 @@ class TestCreateTaskList(unittest.TestCase):
         for i in range(3):
             self.assertIn(f"test{i}.js", task_info.suites[0].tests)
 
-    def test_create_task_list_with_excludes(self):
+    @patch(ns("_process_tests_by_suite"))
+    def test_create_task_list_with_excludes(self, process_tests_by_suite_mock):
         variant = "variant name"
         evg_conf_mock = MagicMock()
         evg_conf_mock.get_variant.return_value.tasks = [
@@ -394,6 +399,7 @@ class TestCreateTaskList(unittest.TestCase):
             "suite 2": [f"test{i}.js" for i in range(1)],
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
+        process_tests_by_suite_mock.return_value = tests_by_suite
         exclude_tasks = ["task 2"]
 
         task_list = under_test.create_task_list(
@@ -405,12 +411,14 @@ class TestCreateTaskList(unittest.TestCase):
         self.assertIn("task 3", task_list)
         self.assertEqual(2, len(task_list))
 
-    def test_create_task_list_no_suites(self):
+    @patch(ns("_process_tests_by_suite"))
+    def test_create_task_list_no_suites(self, process_tests_by_suite_mock):
         variant = "variant name"
         evg_conf_mock = MagicMock()
-        suite_dict = {}
+        tests_by_suite = {}
+        process_tests_by_suite_mock.return_value = tests_by_suite
 
-        task_list = under_test.create_task_list(evg_conf_mock, variant, suite_dict, [])
+        task_list = under_test.create_task_list(evg_conf_mock, variant, tests_by_suite, [])
 
         self.assertEqual(task_list, {})
 
@@ -431,7 +439,7 @@ class TestCreateTestsByTask(unittest.TestCase):
         evg_conf_mock.get_variant.return_value = None
 
         with self.assertRaises(ValueError):
-            under_test.create_tests_by_task(variant, evg_conf_mock, set(), "install-dir/bin")
+            under_test.create_tests_by_task(variant, evg_conf_mock, set())
 
 
 class TestLocalFileChangeDetector(unittest.TestCase):

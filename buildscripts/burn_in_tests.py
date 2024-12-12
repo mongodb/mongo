@@ -37,7 +37,7 @@ from buildscripts.patch_builds.change_data import (
     find_changed_files_in_repos,
     generate_revision_map,
 )
-from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
+from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suite, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
 
 # pylint: enable=wrong-import-position
@@ -324,15 +324,39 @@ def create_task_list(
         and (task.is_run_tests_task or task.is_generate_resmoke_task)
     }
 
-    # Return the list of tasks to run for the specified suite.
-    task_list = {
-        task_name: TaskToBurnInInfo.from_task(task, tests_by_suite)
-        for task_name, task in all_variant_tasks.items()
-        if any(suite in tests_by_suite for suite in task.get_suite_names())
-    }
+    # Return the list of tasks to run.
+    task_list = {}
+    for task_name, task in all_variant_tasks.items():
+        tests_by_suite_for_task = _process_tests_by_suite(task, tests_by_suite)
+        if tests_by_suite_for_task:
+            task_list[task_name] = TaskToBurnInInfo.from_task(task, tests_by_suite_for_task)
 
     log.debug("Found task list", task_list=task_list)
     return task_list
+
+
+def _process_tests_by_suite(
+    task: VariantTask, tests_by_suite: Dict[str, List[str]]
+) -> Dict[str, List[str]]:
+    """Filter tests that should run under task according to build variant and task configuration."""
+    suite_to_run_options_map = task.combined_suite_to_resmoke_args_map
+    tests_by_suite_for_task = defaultdict(list)
+
+    for suite_name, tests_to_burn_in in tests_by_suite.items():
+        if suite_name not in suite_to_run_options_map:
+            continue
+
+        # otel is already configured once in `buildscripts/burn_in_tests.py run`
+        buildscripts.resmokelib.parser.set_run_options(
+            suite_to_run_options_map[suite_name], should_configure_otel=False
+        )
+        suite = get_suite(suite_name)
+
+        for test in tests_to_burn_in:
+            if test in suite.tests:
+                tests_by_suite_for_task[suite_name].append(test)
+
+    return tests_by_suite_for_task
 
 
 def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
@@ -381,7 +405,6 @@ def create_tests_by_task(
     build_variant: str,
     evg_conf: EvergreenProjectConfig,
     changed_tests: Set[str],
-    install_dir: Optional[str],
 ) -> Dict[str, TaskToBurnInInfo]:
     """
     Create a list of tests by task.
@@ -397,10 +420,7 @@ def create_tests_by_task(
         exclude_tests.append(f"{ENTERPRISE_MODULE_PATH}/**/*")
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
-    run_options = RUN_ALL_FEATURE_FLAG_TESTS
-    if install_dir is not None:
-        run_options = f"{run_options} --installDir={shlex.quote(install_dir)}"
-    buildscripts.resmokelib.parser.set_run_options(run_options)
+    buildscripts.resmokelib.parser.set_run_options(RUN_ALL_FEATURE_FLAG_TESTS)
 
     if changed_tests:
         return create_task_list_for_tests(
@@ -637,7 +657,6 @@ class BurnInOrchestrator:
         change_detector: FileChangeDetector,
         burn_in_executor: BurnInExecutor,
         evg_conf: EvergreenProjectConfig,
-        install_dir: Optional[str],
     ) -> None:
         """
         Create a new orchestrator.
@@ -649,7 +668,6 @@ class BurnInOrchestrator:
         self.change_detector = change_detector
         self.burn_in_executor = burn_in_executor
         self.evg_conf = evg_conf
-        self.install_dir = install_dir
 
     def burn_in(self, repos: List[Repo], build_variant: str) -> None:
         """
@@ -661,9 +679,7 @@ class BurnInOrchestrator:
         changed_tests = self.change_detector.find_changed_tests(repos)
         LOGGER.info("Found changed tests", files=changed_tests)
 
-        tests_by_task = create_tests_by_task(
-            build_variant, self.evg_conf, changed_tests, self.install_dir
-        )
+        tests_by_task = create_tests_by_task(build_variant, self.evg_conf, changed_tests)
         LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
         self.burn_in_executor.execute(tests_by_task)
@@ -729,12 +745,6 @@ def cli():
     help="The revision in the mongo repo that changes will be compared against if specified.",
 )
 @click.option(
-    "--install-dir",
-    "install_dir",
-    type=str,
-    help="Path to bin directory of a testable installation",
-)
-@click.option(
     "--evg-project-file",
     "evg_project_file",
     default=DEFAULT_EVG_PROJECT_FILE,
@@ -751,7 +761,6 @@ def run(
     resmoke_args: str,
     verbose: bool,
     origin_rev: Optional[str],
-    install_dir: Optional[str],
     use_yaml: bool,
     evg_project_file: Optional[str],
 ) -> None:
@@ -785,7 +794,6 @@ def run(
     :param resmoke_args: Arguments to pass through to resmoke.
     :param verbose: Log extra debug information.
     :param origin_rev: The revision that local changes will be compared against.
-    :param install_dir: Path to bin directory of a testable installation.
     :param use_yaml: Output discovered tasks in YAML. Tests will not be run.
     :param evg_project_file: Evergreen project config file.
     """
@@ -806,7 +814,7 @@ def run(
     elif no_exec:
         executor = NopBurnInExecutor()
 
-    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf, install_dir)
+    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf)
     burn_in_orchestrator.burn_in(repos, build_variant)
 
 

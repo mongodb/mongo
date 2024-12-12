@@ -199,7 +199,8 @@ tasks:
           multiversion_sanity_check_last_lts_old_new_new: last_lts
       - func: "generate resmoke tasks"
         vars:
-          run_no_feature_flag_tests: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
 
   - <<: *task_template
     name: resmoke_end2end_tests

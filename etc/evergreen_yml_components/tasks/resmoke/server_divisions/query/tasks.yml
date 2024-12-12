@@ -166,9 +166,10 @@ tasks:
           <<: *jstestfuzz_config_vars
           num_files: 20
           num_tasks: 20
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
           npm_command: agg-expr-fuzzer
-          run_no_feature_flag_tests: "true"
 
   - <<: *task_template
     name: aggregation_facet_unwind_passthrough
@@ -233,10 +234,11 @@ tasks:
           <<: *jstestfuzz_config_vars
           num_files: 20
           num_tasks: 20
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
           jstestfuzz_vars: --numPipelines=3000
           npm_command: agg-fuzzer
-          run_no_feature_flag_tests: "true"
 
   ## Like "aggregation_multiversion_fuzzer_gen", but it uses a pinned git revision for the
   ## "jstestfuzz" repo and it uses a fixed seed.
@@ -276,9 +278,10 @@ tasks:
           npm_command: agg-fuzzer
           suite: aggregation_multiversion_fuzzer
           use_large_distro: "true"
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
           jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
-          run_no_feature_flag_tests: "true"
 
   - <<: *task_template
     name: aggregation_one_shard_sharded_collections
@@ -556,7 +559,8 @@ tasks:
           change_streams_downgrade_last_lts_new_old_old_new: last_lts
       - func: "generate resmoke tasks"
         vars:
-          run_no_feature_flag_tests: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
 
   - <<: *task_template
     name: change_streams_mongos_sessions_passthrough
@@ -671,7 +675,8 @@ tasks:
           change_streams_last_lts_old_new_new: last_lts
       - func: "generate resmoke tasks"
         vars:
-          run_no_feature_flag_tests: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
 
   - <<: *task_template
     name: change_streams_per_shard_cursor_passthrough
@@ -716,7 +721,8 @@ tasks:
           change_streams_sharded_collections_passthrough_last_lts_new_old_old_new: last_lts
       - func: "generate resmoke tasks"
         vars:
-          run_no_feature_flag_tests: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
 
   - <<: *task_template
     name: change_streams_whole_cluster_passthrough
@@ -1388,8 +1394,9 @@ tasks:
           num_files: 10
           num_tasks: 40
           npm_command: update-fuzzer
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-          run_no_feature_flag_tests: "true"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
 
   ## jstestfuzz replication update generational fuzzer ##
   - <<: *jstestfuzz_template
@@ -1417,8 +1424,9 @@ tasks:
           num_files: 10
           num_tasks: 40
           npm_command: update-fuzzer
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-          run_no_feature_flag_tests: "true"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
 
   ## Like "update_fuzzer_replication_gen", but it uses a pinned git revision for the "jstestfuzz"
   ## repo and it uses a fixed seed.
@@ -1457,9 +1465,10 @@ tasks:
           npm_command: update-fuzzer
           suite: update_fuzzer_replication
           use_large_distro: "true"
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
           jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
-          run_no_feature_flag_tests: "true"
 
   # jstestfuzz standalone update time-series generational fuzzer ##
   - <<: *jstestfuzz_template

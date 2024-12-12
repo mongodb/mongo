@@ -109,14 +109,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --mongodSetParameter \"{'jsHeapLimitMB':10}\""
   fi
 
-  # Even though all feature flags may be enabled on a variant, often times we do not want to run
-  # feature flag tests because they will most likely fail. For example, during multiversion testing,
-  # all feature flags may be enabled on the latest version, but running feature flag specific tests on
-  # older versions (last-lts/last-continuous) will likely fail because those features most likely do not exist.
-  if [[ ${run_no_feature_flag_tests} == "true" ]]; then
-    extra_args="$extra_args --runNoFeatureFlagTests"
-  fi
-
   # Introduce JS_GC_ZEAL to be used specifically under mongod/mongos.
   if [[ "${build_variant}" = "enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg" && ! -z "${mongo_mozjs_options}" ]]; then
     extra_args="$extra_args --mozjsJsGcZeal='${mongo_mozjs_options}'"
