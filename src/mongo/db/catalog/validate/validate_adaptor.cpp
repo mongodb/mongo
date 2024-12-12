@@ -87,7 +87,6 @@
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -905,14 +904,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                         "recordId"_attr = record->id,
                         "reason"_attr = bucketStatus);
                     nNonCompliantDocuments++;
-                    if (TestingProctor::instance().isEnabled()) {
-                        // In testing this is a fatal error. Some time-series checks are vital to
-                        // test correctness, such as the time field being out-of-order for v: 2
-                        // buckets.
-                        results->addError(kTimeseriesValidationInconsistencyReason);
-                    } else {
-                        results->addWarning(kTimeseriesValidationInconsistencyReason);
-                    }
+                    results->addError(kTimeseriesValidationInconsistencyReason);
                 }
                 auto containsMixedSchemaDataResponse =
                     coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
