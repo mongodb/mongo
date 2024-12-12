@@ -372,6 +372,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     if (gWiredTigerEvictionDirtyMaxGB)
         ss << "eviction_dirty_trigger=" << static_cast<size_t>(gWiredTigerEvictionDirtyMaxGB * 1024)
            << "MB,";
+    if (gWiredTigerCheckpointCleanupPeriodSeconds)
+        ss << "checkpoint_cleanup=(wait="
+           << static_cast<size_t>(gWiredTigerCheckpointCleanupPeriodSeconds) << "),";
 
     ss << "config_base=false,";
     ss << "statistics=(fast),";

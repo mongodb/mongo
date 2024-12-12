@@ -60,6 +60,18 @@ server_parameters:
             gte: 0
         redact: false
 
+    wiredTigerCheckpointCleanupPeriodSeconds:
+      description: Time (in seconds) to spend waiting between checkpoint cleanups.
+      set_at: startup
+      cpp_vartype: 'std::int32_t'
+      cpp_varname: gWiredTigerCheckpointCleanupPeriodSeconds
+      # If the user doesn't set a default, let wiredtiger choose one.
+      default: 0
+      validator:
+        gte: 60
+        lte: 100000
+      redact: false
+
     # The "wiredTigerCursorCacheSize" parameter has the following meaning.
     #
     # wiredTigerCursorCacheSize == 0

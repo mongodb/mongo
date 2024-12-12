@@ -228,6 +228,11 @@ config_fuzzer_params = {
             "max": 60_000,
             "fuzz_at": ["startup"],
         },
+        "wiredTigerCheckpointCleanupPeriodSeconds": {
+            "min": 60,
+            "max": 600,  # This can be as high as 100k but we fuzz it to be small because we mostly perform 0 cleanups in testing.
+            "fuzz_at": ["startup"],
+        },
         "queryAnalysisWriterMaxMemoryUsageBytes": {
             "min": 1024 * 1024,
             "max": 1024 * 1024 * 100,
