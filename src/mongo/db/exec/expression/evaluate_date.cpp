@@ -667,151 +667,127 @@ Value evaluate(const ExpressionTsIncrement& expr, const Document& root, Variable
 namespace {
 
 // Common code shared between all the single-argument date extraction functions. It converts the
-// parameters of the function into their native C++ types. It returns false if at least one of the
-// parameters is Null, and throws an AssertionException if any of them is an invalid value.
-bool extractDateArg(const DateExpressionAcceptingTimeZone& expr,
-                    const Document& root,
-                    Variables* variables,
-                    Date_t& outDate,
-                    boost::optional<TimeZone>& timeZone) {
+// parameters of the function into their native C++ types, throwing an AssertionException if any of
+// them is an invalid value. It then invokes the provided lambda function on the computed date and
+// timezone.
+template <typename dateFuncFn>
+Value evaluateDateTimezoneArg(const DateExpressionAcceptingTimeZone& expr,
+                              const Document& root,
+                              Variables* variables,
+                              dateFuncFn dateFn) {
     tassert(9711503, "Missing date argument", expr.getDate() != nullptr);
     auto dateVal = expr.getDate()->evaluate(root, variables);
     if (dateVal.nullish()) {
-        return false;
+        return Value(BSONNULL);
     }
     auto date = dateVal.coerceToDate();
 
-    timeZone = expr.getParsedTimeZone();
-    if (!timeZone) {
-        timeZone = makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
-                                root,
-                                expr.getTimeZone(),
-                                variables);
+    if (expr.getParsedTimeZone()) {
+        return dateFn(date, *expr.getParsedTimeZone());
+    } else {
+        boost::optional<TimeZone> timeZone =
+            makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
+                         root,
+                         expr.getTimeZone(),
+                         variables);
         if (!timeZone) {
-            return false;
+            return Value(BSONNULL);
+        } else {
+            return dateFn(date, *timeZone);
         }
     }
-    outDate = date;
-    return true;
 }
-
 }  // namespace
 
 Value evaluate(const ExpressionDayOfMonth& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dateParts(date).dayOfMonth);
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dateParts(date).dayOfMonth);
+        });
 }
 
 Value evaluate(const ExpressionDayOfWeek& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dayOfWeek(date));
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dayOfWeek(date));
+        });
 }
 
 Value evaluate(const ExpressionDayOfYear& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dayOfYear(date));
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dayOfYear(date));
+        });
 }
 
 Value evaluate(const ExpressionHour& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dateParts(date).hour);
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dateParts(date).hour);
+        });
 }
 
 Value evaluate(const ExpressionMillisecond& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dateParts(date).millisecond);
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dateParts(date).millisecond);
+        });
 }
 
 Value evaluate(const ExpressionMinute& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dateParts(date).minute);
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dateParts(date).minute);
+        });
 }
 
 Value evaluate(const ExpressionMonth& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dateParts(date).month);
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dateParts(date).month);
+        });
 }
 
 Value evaluate(const ExpressionSecond& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dateParts(date).second);
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dateParts(date).second);
+        });
 }
 
 Value evaluate(const ExpressionWeek& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->week(date));
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.week(date));
+        });
 }
 
 Value evaluate(const ExpressionIsoWeekYear& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->isoYear(date));
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.isoYear(date));
+        });
 }
 
 Value evaluate(const ExpressionIsoDayOfWeek& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->isoDayOfWeek(date));
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.isoDayOfWeek(date));
+        });
 }
 
 Value evaluate(const ExpressionIsoWeek& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->isoWeek(date));
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.isoWeek(date));
+        });
 }
 
 Value evaluate(const ExpressionYear& expr, const Document& root, Variables* variables) {
-    Date_t date;
-    boost::optional<TimeZone> timeZone;
-    if (!extractDateArg(expr, root, variables, date, timeZone)) {
-        return Value(BSONNULL);
-    }
-    return Value(timeZone->dateParts(date).year);
+    return evaluateDateTimezoneArg(
+        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+            return Value(timeZone.dateParts(date).year);
+        });
 }
 
 

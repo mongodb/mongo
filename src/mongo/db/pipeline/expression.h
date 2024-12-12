@@ -846,7 +846,7 @@ public:
     StringData getOpName() const {
         return _opName;
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
 
@@ -1415,7 +1415,7 @@ public:
     const Expression* getOnError() const {
         return _children[_kOnError].get();
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
 
@@ -1497,7 +1497,7 @@ public:
     const Expression* getIsoDayOfWeek() const {
         return _children[_kIsoDayOfWeek].get();
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
 
@@ -1556,7 +1556,7 @@ public:
     const Expression* getIso8601() const {
         return _children[_kIso8601].get();
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
 
@@ -1628,7 +1628,7 @@ public:
     const Expression* getOnNull() const {
         return _children[_kOnNull].get();
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
 
@@ -1768,13 +1768,13 @@ public:
     const Expression* getStartOfWeek() const {
         return _children[_kStartOfWeek].get();
     }
-    boost::optional<TimeUnit> getParsedUnit() const {
+    const boost::optional<TimeUnit>& getParsedUnit() const {
         return _parsedUnit;
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
-    boost::optional<DayOfWeek> getParsedStartOfWeek() const {
+    const boost::optional<DayOfWeek>& getParsedStartOfWeek() const {
         return _parsedStartOfWeek;
     }
 
@@ -4218,10 +4218,10 @@ public:
     const Expression* getTimeZone() const {
         return _children[_kTimeZone].get();
     }
-    boost::optional<TimeUnit> getParsedUnit() const {
+    const boost::optional<TimeUnit>& getParsedUnit() const {
         return _parsedUnit;
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
     StringData getOpName() const {
@@ -4432,16 +4432,16 @@ public:
     const Expression* getStartOfWeek() const {
         return _children[_kStartOfWeek].get();
     }
-    boost::optional<TimeZone> getParsedTimeZone() const {
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
         return _parsedTimeZone;
     }
-    boost::optional<TimeUnit> getParsedUnit() const {
+    const boost::optional<TimeUnit>& getParsedUnit() const {
         return _parsedUnit;
     }
-    boost::optional<long long> getParsedBinSize() const {
+    const boost::optional<long long>& getParsedBinSize() const {
         return _parsedBinSize;
     }
-    boost::optional<DayOfWeek> getParsedStartOfWeek() const {
+    const boost::optional<DayOfWeek>& getParsedStartOfWeek() const {
         return _parsedStartOfWeek;
     }
 
