@@ -1820,7 +1820,9 @@ intrusive_ptr<ExpressionObject> ExpressionObject::parse(ExpressionContext* const
     for (auto&& elem : obj) {
         // Make sure this element has a valid field name. Use StringData here so that we can detect
         // if the field name contains a null byte.
-        FieldPath::uassertValidFieldName(elem.fieldNameStringData());
+        uassertStatusOKWithContext(
+            FieldPath::validateFieldName(elem.fieldNameStringData()),
+            "Consider using $getField or $setField for a field path with '.' or '$'.");
 
         auto fieldName = elem.fieldName();
         uassert(16406,

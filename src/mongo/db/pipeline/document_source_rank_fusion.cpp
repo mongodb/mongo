@@ -355,7 +355,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         rankFusionPipelineValidator(*pipeline);
 
         auto inputName = elem.fieldName();
-        FieldPath::uassertValidFieldName(inputName);
+        uassertStatusOKWithContext(
+            FieldPath::validateFieldName(inputName),
+            "$rankFusion pipeline names must follow the naming rules of field path expressions.");
         inputPipelines[inputName] = std::move(pipeline);
     }
 

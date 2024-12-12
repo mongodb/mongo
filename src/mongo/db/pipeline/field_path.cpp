@@ -96,28 +96,38 @@ FieldPath::FieldPath(std::string inputPath, bool precomputeHashes, bool validate
     for (size_t i = 0; i < pathLength; ++i) {
         const auto& fieldName = getFieldName(i);
         if (validateFieldNames) {
-            uassertValidFieldName(fieldName);
+            uassertStatusOKWithContext(
+                validateFieldName(fieldName),
+                "Consider using $getField or $setField for a field path with '.' or '$'.");
         }
         _fieldHash.push_back(precomputeHashes ? FieldNameHasher()(fieldName) : kHashUninitialized);
     }
 }
 
-void FieldPath::uassertValidFieldName(StringData fieldName) {
-    uassert(15998, "FieldPath field names may not be empty strings.", !fieldName.empty());
-
-    const auto dotsAndDollarsHint = " Consider using $getField or $setField.";
-    if (fieldName[0] == '$' && !kAllowedDollarPrefixedFields.count(fieldName)) {
-        uasserted(16410,
-                  str::stream() << "FieldPath field names may not start with '$'."
-                                << dotsAndDollarsHint);
+Status FieldPath::validateFieldName(StringData fieldName) {
+    if (fieldName.empty()) {
+        return Status(ErrorCodes::Error{15998}, "FieldPath field names may not be empty strings.");
     }
 
-    uassert(
-        16411, "FieldPath field names may not contain '\0'.", fieldName.find('\0') == string::npos);
+    if (fieldName[0] == '$' && !kAllowedDollarPrefixedFields.count(fieldName)) {
+        return Status(ErrorCodes::Error{16410},
+                      str::stream() << "FieldPath field names may not start with '$', given '"
+                                    << fieldName << "'.");
+    }
 
-    uassert(16412,
-            str::stream() << "FieldPath field names may not contain '.'." << dotsAndDollarsHint,
-            fieldName.find('.') == string::npos);
+    if (fieldName.find('\0') != string::npos) {
+        return Status(ErrorCodes::Error{16411},
+                      str::stream() << "FieldPath field names may not contain '\0', given '"
+                                    << fieldName << "'.");
+    }
+
+    if (fieldName.find('.') != string::npos) {
+        return Status(ErrorCodes::Error{16412},
+                      str::stream() << "FieldPath field names may not contain '.', given '"
+                                    << fieldName << "'.");
+    }
+
+    return Status::OK();
 }
 
 FieldPath FieldPath::concat(const FieldPath& tail) const {

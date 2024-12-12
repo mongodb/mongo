@@ -215,7 +215,7 @@ public:
                 uassert(6799703, "Key path is empty", !keyFieldRef.empty());
 
                 for (size_t i = 0; i < keyFieldRef.numParts(); ++i) {
-                    FieldPath::uassertValidFieldName(keyFieldRef.getPart(i));
+                    uassertStatusOK(FieldPath::validateFieldName(keyFieldRef.getPart(i)));
                 }
 
                 // Numerics
