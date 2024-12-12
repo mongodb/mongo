@@ -120,6 +120,10 @@ buildvariants:
       - name: .development_critical_single_variant .requires_large_host
         distros:
           - amazon2-arm64-latest-xlarge
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - amazon2-arm64-latest-xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:

@@ -233,6 +233,10 @@ buildvariants:
       - name: .clang_tidy
         distros:
           - rhel8.8-xxlarge
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
@@ -267,6 +271,10 @@ buildvariants:
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - rhel8.8-xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
         distros:
@@ -468,6 +476,10 @@ buildvariants:
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+      - name: .development_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+        distros:
+          - rhel8.8-xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
       - name: .release_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
         distros:
