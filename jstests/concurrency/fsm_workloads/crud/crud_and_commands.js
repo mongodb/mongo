@@ -3,6 +3,7 @@
  * collection-dropping operations.
  */
 import {includesErrorCode} from "jstests/libs/error_code_utils.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function() {
     const data = {numIds: 10, docValue: "mydoc"};
@@ -42,8 +43,7 @@ export const $config = (function() {
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
                     // automatically be retried when TestData.runInsideTransaction=true
-                    if (e.hasOwnProperty('errorLabels') &&
-                        e.errorLabels.includes('TransientTransactionError')) {
+                    if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     } else if (e.code == ErrorCodes.ConflictingOperationInProgress) {
                         // dropCollection in sharding can disrupt routing cache refreshes.
@@ -79,8 +79,7 @@ export const $config = (function() {
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
                     // automatically be retried when TestData.runInsideTransaction=true
-                    if (e.hasOwnProperty('errorLabels') &&
-                        e.errorLabels.includes('TransientTransactionError')) {
+                    if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     } else if (e.code === ErrorCodes.ConflictingOperationInProgress) {
                         // dropCollection in sharding can disrupt routing cache refreshes.
@@ -121,8 +120,7 @@ export const $config = (function() {
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
                     // automatically be retried when TestData.runInsideTransaction=true
-                    if (e.hasOwnProperty('errorLabels') &&
-                        e.errorLabels.includes('TransientTransactionError')) {
+                    if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     } else if (e.code == ErrorCodes.ConflictingOperationInProgress) {
                         // dropCollection in sharding can disrupt routing cache refreshes.
@@ -152,8 +150,7 @@ export const $config = (function() {
             } catch (e) {
                 // We propagate TransientTransactionErrors to allow the state function to
                 // automatically be retried when TestData.runInsideTransaction=true
-                if (e.hasOwnProperty('errorLabels') &&
-                    e.errorLabels.includes('TransientTransactionError')) {
+                if (TxnUtil.isTransientTransactionError(e)) {
                     throw e;
                 } else if (e.code == ErrorCodes.ConflictingOperationInProgress) {
                     if (TestData.runInsideTransaction) {

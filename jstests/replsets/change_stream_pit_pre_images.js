@@ -15,7 +15,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getPreImages, getPreImagesCollection} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 const testName = jsTestName();
 const replTest = new ReplSetTest({
@@ -86,7 +86,7 @@ for (const [collectionName, collectionOptions] of [
         const transactionOptions = {readConcern: {level: "majority"}, writeConcern: {w: 2}};
 
         // Issue commands in a single "applyOps" transaction.
-        TransactionsUtil.runInTransaction(testDB, () => {}, function(db, state) {
+        TxnUtil.runInTransaction(testDB, () => {}, function(db, state) {
             const coll = db[collectionName];
             assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));
             assert.commandWorked(coll.replaceOne({_id: 7}, {a: "Long string"}));
@@ -95,7 +95,7 @@ for (const [collectionName, collectionOptions] of [
 
         // Issue commands in a multiple-"applyOps" transaction.
         assert.commandWorked(coll.insert({_id: 8, a: 1}));
-        TransactionsUtil.runInTransaction(testDB, () => {}, function(db, state) {
+        TxnUtil.runInTransaction(testDB, () => {}, function(db, state) {
             const coll = db[collectionName];
             const largeString = "a".repeat(15 * 1024 * 1024);
             assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));

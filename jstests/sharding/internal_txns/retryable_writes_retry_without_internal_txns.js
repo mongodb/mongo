@@ -9,7 +9,7 @@ import {
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
@@ -137,7 +137,7 @@ let currentParentTxnNumber = NumberLong(35);
                 return true;
             } catch (e) {
                 assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
-                assert(TransactionsUtil.isTransientTransactionError(e));
+                assert(TxnUtil.isTransientTransactionError(e));
             }
             return false;
         });
@@ -216,7 +216,7 @@ let currentParentTxnNumber = NumberLong(35);
                 return true;
             } catch (e) {
                 assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
-                assert(TransactionsUtil.isTransientTransactionError(e));
+                assert(TxnUtil.isTransientTransactionError(e));
                 childTxnNumber2++;
             }
             return false;
@@ -288,7 +288,7 @@ let currentParentTxnNumber = NumberLong(35);
                 return true;
             } catch (e) {
                 assert(ErrorCodes.isRetriableError(e.code) || isNetworkError(e));
-                assert(TransactionsUtil.isTransientTransactionError(e));
+                assert(TxnUtil.isTransientTransactionError(e));
                 childTxnNumber1++;
             }
             return false;

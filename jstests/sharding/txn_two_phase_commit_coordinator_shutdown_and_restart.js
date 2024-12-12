@@ -17,6 +17,9 @@ TestData.skipCheckDBHashes = true;
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    runCommitThroughMongosInParallelThread
+} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const rs0_opts = {
     nodes: [{}, {}]
@@ -51,28 +54,6 @@ const lsid = {
 };
 let txnNumber = 0;
 
-// Build the following command as a string since we need to persist the lsid and the txnNumber
-// into the scope of the parallel shell.
-// assert.commandFailedWithCode(db.adminCommand({
-//     commitTransaction: 1,
-//     maxTimeMS: 2000 * 10,
-//     lsid: lsid,
-//     txnNumber: NumberLong(txnNumber),
-//     stmtId: NumberInt(0),
-//     autocommit: false,
-// }), ErrorCodes.MaxTimeMSExpired);
-const runCommitThroughMongosInParallelShellExpectTimeOut = function() {
-    const runCommitExpectTimeOutCode = "assert.commandFailedWithCode(db.adminCommand({" +
-        "commitTransaction: 1, maxTimeMS: 2000 * 10, " +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "})," +
-        "ErrorCodes.MaxTimeMSExpired);";
-    return startParallelShell(runCommitExpectTimeOutCode, st.s.port);
-};
-
 jsTest.log("Starting a cross-shard transaction");
 // Start a cross shard transaction through mongos.
 const updateDocumentOnShard0 = {
@@ -101,10 +82,13 @@ jsTest.log("Turn on hangBeforeWritingDecision failpoint");
 // The transaction on the participant will remain in prepare.
 let failPoint = configureFailPoint(coordinatorPrimaryConn, "hangBeforeWritingDecision");
 
-// Run commit through mongos in a parallel shell. This should timeout since we have set the
+// Run commit through mongos in a parallel thread. This should timeout since we have set the
 // failpoint.
-const commit = runCommitThroughMongosInParallelShellExpectTimeOut();
+const commitThread =
+    runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.MaxTimeMSExpired);
+commitThread.start();
 failPoint.wait();
+commitThread.join();
 
 jsTest.log("Stopping coordinator shard");
 // Stop the mongods on the coordinator shard using the SIGTERM signal. We must skip validation
@@ -150,6 +134,4 @@ assert.commandWorked(st.s.adminCommand({
     autocommit: false
 }));
 
-// TODO: SERVER-59686
-commit({checkExitSuccess: false});
 st.stop();

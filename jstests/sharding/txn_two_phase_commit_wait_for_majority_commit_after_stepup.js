@@ -13,6 +13,9 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {stopServerReplication, restartReplSetReplication} from "jstests/libs/write_concern_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    runCommitThroughMongosInParallelThread
+} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -39,18 +42,6 @@ let participant2 = st.shard2;
 
 let lsid = {id: UUID()};
 let txnNumber = 0;
-
-const runCommitThroughMongosInParallelShellExpectTimeOut = function() {
-    const runCommitExpectTimeOutCode = "assert.commandFailedWithCode(db.adminCommand({" +
-        "commitTransaction: 1, maxTimeMS: 1000 * 10, " +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "})," +
-        "ErrorCodes.MaxTimeMSExpired);";
-    return startParallelShell(runCommitExpectTimeOutCode, st.s.port);
-};
 
 const setUp = function() {
     // Create a sharded collection with a chunk on each shard:
@@ -98,7 +89,9 @@ let coordSecondary = coordinatorReplSetTest.getSecondary();
 
 // Make the commit coordination hang before writing the decision, and send commitTransaction.
 let failPoint = configureFailPoint(coordPrimary, "hangBeforeWritingDecision");
-let awaitResult = runCommitThroughMongosInParallelShellExpectTimeOut();
+let commitThread =
+    runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.MaxTimeMSExpired);
+commitThread.start();
 failPoint.wait();
 
 // Stop replication on all nodes in the coordinator replica set so that the write done on stepup
@@ -114,7 +107,7 @@ failPoint.off();
 
 // The router should retry commitTransaction against the primary and time out waiting to
 // access the coordinator catalog.
-awaitResult();
+commitThread.join();
 
 // Re-enable replication, so that the write done on stepup can become majority committed.
 restartReplSetReplication(coordinatorReplSetTest);

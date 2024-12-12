@@ -38,7 +38,7 @@ import {
     RetryTracker
 } from "jstests/libs/override_methods/retry_utils.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 // Truncates the 'print' output if it's too long to print.
 const kMaxPrintLength = 5000;
@@ -532,7 +532,7 @@ function abortTransaction(conn, lsid, txnNumber) {
     });
 
     // Transient transaction errors mean the transaction has aborted, so consider it a success.
-    if (TransactionsUtil.isTransientTransactionError(res)) {
+    if (TxnUtil.isTransientTransactionError(res)) {
         return;
     }
     assert.commandWorked(res);
@@ -586,7 +586,7 @@ function continueTransaction(dbName, cmdName, cmdObj) {
     // If this is the first time we are running this command, push it to the ops array.
     if (!isNested()) {
         // Make a copy so the command does not get changed by the test.
-        const objCopy = TransactionsUtil.deepCopyObject({}, cmdObj);
+        const objCopy = TxnUtil.deepCopyObject({}, cmdObj);
 
         // Empty transaction state that needs to be refreshed. The stmtId and startTransaction
         // fields shouldn't need to be refreshed.
@@ -624,7 +624,7 @@ function setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid) {
     // If sessions are explicitly disabled for this command, we skip overriding it to
     // use transactions.
     const driverSession = conn.getDB(dbName).getSession();
-    const commandSupportsTransaction = TransactionsUtil.commandSupportsTxn(dbName, cmdName, cmdObj);
+    const commandSupportsTransaction = TxnUtil.commandSupportsTxn(dbName, cmdName, cmdObj);
     const isSystemDotProfile = isNamespaceSystemDotProfile(cmdObj);
     const isNonTxnGetMore = isCommandNonTxnGetMore(cmdName, cmdObj);
 
@@ -957,7 +957,7 @@ function shouldRetryTxnOnStatus(cmdName, cmdObj, res) {
         return false;
     }
 
-    if (TransactionsUtil.isConflictingOperationInProgress(res)) {
+    if (TxnUtil.isConflictingOperationInProgress(res)) {
         // Other overrides, or session.js, may interfere, and retry an op which starts
         // a transaction if it reported a failure e.g., on a network error, but succeeded
         // server-side. Retry the transaction _again_, with a new txnNumber.
@@ -968,7 +968,7 @@ function shouldRetryTxnOnStatus(cmdName, cmdObj, res) {
 
     // Transient transaction errors should retry the entire transaction. A
     // TransientTransactionError on "abortTransaction" is considered a success.
-    if (TransactionsUtil.isTransientTransactionError(res) && cmdName !== "abortTransaction") {
+    if (TxnUtil.isTransientTransactionError(res) && cmdName !== "abortTransaction") {
         logError("Retrying on TransientTransactionError response");
         return true;
     }
@@ -988,7 +988,7 @@ function shouldRetryTxnOnStatus(cmdName, cmdObj, res) {
 
 function shouldRetryTxnOnException(cmdName, cmdObj, exception) {
     const logError = (msg) => logErrorFull(msg, cmdName, cmdObj, exception);
-    if (TransactionsUtil.isTransientTransactionError(exception) && cmdName !== "abortTransaction") {
+    if (TxnUtil.isTransientTransactionError(exception) && cmdName !== "abortTransaction") {
         logError("Retrying on TransientTransactionError exception for command");
         return true;
     }
@@ -1125,7 +1125,7 @@ function txnRunCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, ma
             }
             // Record non-transaction agg cursor IDs so subsequent getMores for this cursor
             // can also avoid being forced into an ongoing transaction.
-            if (isSuccess(res) && TransactionsUtil.commandIsNonTxnAggregation(cmdName, cmdObj)) {
+            if (isSuccess(res) && TxnUtil.commandIsNonTxnAggregation(cmdName, cmdObj)) {
                 nonTxnAggCursorSet[res.cursor.id] = true;
             }
             return res;

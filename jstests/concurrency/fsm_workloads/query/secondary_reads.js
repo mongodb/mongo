@@ -21,6 +21,7 @@
  * @tags: [requires_replication, uses_write_concern, incompatible_with_concurrency_simultaneous]
  */
 import {supportsCommittedReads} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function() {
     // Use the workload name as the collection name.
@@ -73,8 +74,7 @@ export const $config = (function() {
             } catch (e) {
                 // We propagate TransientTransactionErrors to allow the state function to
                 // automatically be retried when TestData.runInsideTransaction=true
-                if (e.hasOwnProperty('errorLabels') &&
-                    e.errorLabels.includes('TransientTransactionError')) {
+                if (TxnUtil.isTransientTransactionError(e)) {
                     throw e;
                 }
                 this.assertSecondaryReadOk(e);

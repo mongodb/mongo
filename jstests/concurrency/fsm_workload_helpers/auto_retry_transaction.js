@@ -1,6 +1,7 @@
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {includesErrorCode} from "jstests/libs/error_code_utils.js";
 import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnError} = (function() {
     /**
@@ -28,8 +29,7 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
     // Returns true if the transaction can be retried with a higher transaction number after the
     // given error.
     function shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession) {
-        if ((e.hasOwnProperty('errorLabels') &&
-             e.errorLabels.includes('TransientTransactionError'))) {
+        if (TxnUtil.isTransientTransactionError(e)) {
             return true;
         }
 

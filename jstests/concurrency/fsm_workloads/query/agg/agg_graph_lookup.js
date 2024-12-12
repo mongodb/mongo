@@ -10,7 +10,7 @@
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function() {
     const data = {numDocs: 1000};
@@ -44,7 +44,7 @@ export const $config = (function() {
 
                     arr = cursor.toArray();
                 } catch (e) {
-                    if (TransactionsUtil.isTransientTransactionError(e)) {
+                    if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     }
                     if (TestData.runningWithShardStepdowns) {

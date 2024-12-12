@@ -11,7 +11,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkDecisionIs,
-    checkDocumentDeleted
+    checkDocumentDeleted,
+    runCommitThroughMongosInParallelThread
 } from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
@@ -26,17 +27,6 @@ let participant2 = st.shard2;
 
 let lsid = {id: UUID()};
 let txnNumber = 0;
-
-const runCommitThroughMongosInParallelShellExpectSuccess = function() {
-    const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
-        "commitTransaction: 1," +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "}));";
-    return startParallelShell(runCommitExpectSuccessCode, st.s.port);
-};
 
 const setUp = function() {
     // Create a sharded collection with a chunk on each shard:
@@ -76,7 +66,8 @@ const testCommitProtocol = function() {
     const hangBeforeWaitingForDecisionWriteConcernFp = configureFailPoint(
         coordinatorPrimary, "hangBeforeWaitingForDecisionWriteConcern", {}, "alwaysOn");
 
-    let awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
+    let commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
+    commitThread.start();
 
     // Check that the coordinator wrote the decision.
     hangBeforeWaitingForDecisionWriteConcernFp.wait();
@@ -96,7 +87,7 @@ const testCommitProtocol = function() {
     // However after the hangBeforeWaitingForDecisionWriteConcern failpoint is disabled the primary
     // is expected to exit drain mode.
 
-    awaitResult();
+    commitThread.join();
 
     // Check that the coordinator deleted its persisted state.
     assert.soon(function() {

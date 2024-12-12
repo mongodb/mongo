@@ -12,6 +12,7 @@ import {
     doSnapshotFind,
     doSnapshotGetMore
 } from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function() {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, valueToBeInserted: 1, batchSize: 50};
@@ -58,8 +59,7 @@ export const $config = (function() {
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
                     // automatically be retried when TestData.runInsideTransaction=true
-                    if (e.hasOwnProperty('errorLabels') &&
-                        e.errorLabels.includes('TransientTransactionError')) {
+                    if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     }
                     // dropIndex can cause queries to throw if these queries yield.
@@ -77,8 +77,7 @@ export const $config = (function() {
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
                     // automatically be retried when TestData.runInsideTransaction=true
-                    if (e.hasOwnProperty('errorLabels') &&
-                        e.errorLabels.includes('TransientTransactionError')) {
+                    if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     }
                     // dropIndex can cause queries to throw if these queries yield.
@@ -96,8 +95,7 @@ export const $config = (function() {
             } catch (e) {
                 // We propagate TransientTransactionErrors to allow the state function to
                 // automatically be retried when TestData.runInsideTransaction=true
-                if (e.hasOwnProperty('errorLabels') &&
-                    e.errorLabels.includes('TransientTransactionError')) {
+                if (TxnUtil.isTransientTransactionError(e)) {
                     throw e;
                 }
                 // dropIndex can cause queries to throw if these queries yield.

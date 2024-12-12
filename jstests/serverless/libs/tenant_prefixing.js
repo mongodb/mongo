@@ -1,4 +1,4 @@
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 const kDenylistedDbNames = new Set(["config", "admin", "local"]);
 function isDenylistedDb(dbName) {
@@ -306,7 +306,7 @@ export function isCmdObjWithTenantId(cmdObj) {
  */
 export function createCmdObjWithTenantId(cmdObj, tenantId) {
     const cmdName = Object.keys(cmdObj)[0];
-    let cmdObjWithTenantId = TransactionsUtil.deepCopyObject({}, cmdObj);
+    let cmdObjWithTenantId = TxnUtil.deepCopyObject({}, cmdObj);
 
     if (isCmdObjWithTenantId(cmdObj)) {
         return cmdObjWithTenantId;

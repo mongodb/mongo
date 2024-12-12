@@ -11,6 +11,9 @@ import {
     getCoordinatorFailpoints,
     waitForFailpoint
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {
+    runCommitThroughMongosInParallelThread
+} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -24,29 +27,6 @@ let participant2 = st.shard2;
 
 let lsid = {id: UUID()};
 let txnNumber = 0;
-
-const runCommitThroughMongosInParallelShellExpectSuccess = function() {
-    const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
-        "commitTransaction: 1," +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "}));";
-    return startParallelShell(runCommitExpectSuccessCode, st.s.port);
-};
-
-const runCommitThroughMongosInParallelShellExpectAbort = function() {
-    const runCommitExpectSuccessCode = "assert.commandFailedWithCode(db.adminCommand({" +
-        "commitTransaction: 1," +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "})," +
-        "ErrorCodes.NoSuchTransaction);";
-    return startParallelShell(runCommitExpectSuccessCode, st.s.port);
-};
 
 const setUp = function() {
     // Create a sharded collection with a chunk on each shard:
@@ -110,12 +90,14 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
     }));
 
     // Run commitTransaction through a parallel shell.
-    let awaitResult;
+    let commitThread;
     if (shouldCommit) {
-        awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
+        commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     } else {
-        awaitResult = runCommitThroughMongosInParallelShellExpectAbort();
+        commitThread = runCommitThroughMongosInParallelThread(
+            lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
     }
+    commitThread.start();
 
     // Deliver killOp once the failpoint has been hit.
 
@@ -169,7 +151,7 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
     // If the commit coordination was not robust to killOp, then commitTransaction would fail
     // with an Interrupted error rather than fail with NoSuchTransaction or return success.
     jsTest.log("Wait for the commit coordination to complete.");
-    awaitResult();
+    commitThread.join();
 
     // If deleting the coordinator doc was not robust to killOp, the document would still exist.
     // Deletion is done asynchronously, so we might have to wait.

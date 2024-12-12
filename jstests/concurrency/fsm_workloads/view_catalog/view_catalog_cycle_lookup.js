@@ -13,7 +13,7 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
@@ -136,7 +136,7 @@ export const $config = (function() {
 
             // If we encountered some transaction failure propagate this upwards so it gets
             // automatically retried.
-            if (TransactionsUtil.isTransientTransactionError(res)) {
+            if (TxnUtil.isTransientTransactionError(res)) {
                 throw res;
             }
 

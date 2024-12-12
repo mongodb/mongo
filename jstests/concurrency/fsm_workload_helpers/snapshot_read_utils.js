@@ -3,7 +3,7 @@
  * spans a getmore.
  */
 import {abortTransaction} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 /**
  * Parses a cursor from cmdResult, if possible.
@@ -41,7 +41,7 @@ export function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) 
 
     // A transaction request can always fail with a transient transaction error, so only check the
     // specific error code if it is not labeled as transient.
-    if (!TransactionsUtil.isTransientTransactionError(res)) {
+    if (!TxnUtil.isTransientTransactionError(res)) {
         assert.commandWorkedOrFailedWithCode(res, findErrorCodes, () => `cmd: ${tojson(findCmd)}`);
     }
 
@@ -80,7 +80,7 @@ export function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTrans
 
     // A transaction request can always fail with a transient transaction error, so only check the
     // specific error code if it is not labeled as transient.
-    if (!TransactionsUtil.isTransientTransactionError(res)) {
+    if (!TxnUtil.isTransientTransactionError(res)) {
         assert.commandWorkedOrFailedWithCode(
             res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}`);
     }

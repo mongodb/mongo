@@ -2,7 +2,7 @@ import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export var fsm = (function() {
     const kIsRunningInsideTransaction = Symbol('isRunningInsideTransaction');
@@ -37,7 +37,7 @@ export var fsm = (function() {
             let overridePath = "jstests/libs/override_methods/";
             await import(overridePath + "check_for_operation_not_supported_in_transaction.js");
             await import("jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js");
-            await import("jstests/libs/transactions_util.js");
+            await import("jstests/libs/txns/txn_util.js");
         }
         var currentState = args.startState;
 
@@ -131,7 +131,7 @@ export var fsm = (function() {
                     // modified the thread-local state.
                     let data;
                     withTxnAndAutoRetry(args.db.getSession(), () => {
-                        data = TransactionsUtil.deepCopyObject({}, args.data);
+                        data = TxnUtil.deepCopyObject({}, args.data);
                         data[kIsRunningInsideTransaction] = true;
 
                         // The state function is given a Proxy object to the connection cache which

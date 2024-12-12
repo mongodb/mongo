@@ -9,7 +9,8 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkDecisionIs,
-    checkDocumentDeleted
+    checkDocumentDeleted,
+    runCommitThroughMongosInParallelThread
 } from 'jstests/sharding/libs/txn_two_phase_commit_util.js';
 
 const dbName = "test";
@@ -35,29 +36,6 @@ const checkParticipantListMatches = function(
                        .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
     assert.neq(null, coordDoc);
     assert.sameMembers(coordDoc.participants, expectedParticipantList);
-};
-
-const runCommitThroughMongosInParallelShellExpectSuccess = function() {
-    const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
-        "commitTransaction: 1," +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "}));";
-    return startParallelShell(runCommitExpectSuccessCode, st.s.port);
-};
-
-const runCommitThroughMongosInParallelShellExpectAbort = function() {
-    const runCommitExpectSuccessCode = "assert.commandFailedWithCode(db.adminCommand({" +
-        "commitTransaction: 1," +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "})," +
-        "ErrorCodes.NoSuchTransaction);";
-    return startParallelShell(runCommitExpectSuccessCode, st.s.port);
 };
 
 const startSimulatingNetworkFailures = function(connArray) {
@@ -173,12 +151,14 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
         configureFailPoint(coordinator, "hangBeforeWaitingForDecisionWriteConcern", {}, "alwaysOn");
 
     // Run commitTransaction through a parallel shell.
-    let awaitResult;
+    let commitThread;
     if (shouldCommit) {
-        awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
+        commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     } else {
-        awaitResult = runCommitThroughMongosInParallelShellExpectAbort();
+        commitThread = runCommitThroughMongosInParallelThread(
+            lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
     }
+    commitThread.start();
 
     // Check that the coordinator wrote the participant list.
     hangBeforeWaitingForParticipantListWriteConcernFp.wait();
@@ -192,7 +172,7 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
     hangBeforeWaitingForDecisionWriteConcernFp.off();
 
     // Check that the coordinator deleted its persisted state.
-    awaitResult();
+    commitThread.join();
     assert.soon(function() {
         return checkDocumentDeleted(coordinator, lsid, txnNumber);
     });

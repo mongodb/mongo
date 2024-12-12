@@ -17,8 +17,10 @@ import {
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {Thread} from "jstests/libs/parallelTester.js";
-import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {
+    runCommitThroughMongosInParallelThread
+} from 'jstests/sharding/libs/txn_two_phase_commit_util.js';
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -56,38 +58,6 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
     let participant0 = st.shard0;
     let participant1 = st.shard1;
     let participant2 = st.shard2;
-
-    const runCommitThroughMongosExpectSuccess = function(lsidUUID, txnNumber, mongosHost) {
-        const conn = new Mongo(mongosHost);
-        try {
-            assert.commandWorked(conn.adminCommand({
-                commitTransaction: 1,
-                lsid: {id: UUID(lsidUUID)},
-                txnNumber: NumberLong(txnNumber),
-                stmtId: NumberInt(0),
-                autocommit: false,
-            }));
-        } catch (err) {
-            if ((err.hasOwnProperty('errorLabels') &&
-                 err.errorLabels.includes('TransientTransactionError'))) {
-                quit(err.code);
-            } else {
-                throw err;
-            }
-        }
-    };
-
-    const runCommitThroughMongosExpectAbort = function(lsidUUID, txnNumber, mongosHost) {
-        const conn = new Mongo(mongosHost);
-        assert.commandFailedWithCode(conn.adminCommand({
-            commitTransaction: 1,
-            lsid: {id: UUID(lsidUUID)},
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false,
-        }),
-                                     ErrorCodes.NoSuchTransaction);
-    };
 
     const setUp = function() {
         // Create a sharded collection with a chunk on each shard:
@@ -156,15 +126,10 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
         // Run commitTransaction through a thread.
         let commitThread;
         if (expectAbortResponse) {
-            commitThread = new Thread(runCommitThroughMongosExpectAbort,
-                                      extractUUIDFromObject(lsid.id),
-                                      txnNumber,
-                                      st.s.host);
+            commitThread = runCommitThroughMongosInParallelThread(
+                lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
         } else {
-            commitThread = new Thread(runCommitThroughMongosExpectSuccess,
-                                      extractUUIDFromObject(lsid.id),
-                                      txnNumber,
-                                      st.s.host);
+            commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
         }
         commitThread.start();
 
@@ -214,7 +179,7 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
                 break;
             } catch (err) {
                 if (numIterations == maxIterations - 1 ||
-                    !(err.message.includes("[0] != [251] are not equal"))) {
+                    !TxnUtil.isTransientTransactionError(err)) {
                     throw err;
                 }
 

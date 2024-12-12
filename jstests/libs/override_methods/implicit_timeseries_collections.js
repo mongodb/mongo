@@ -21,7 +21,7 @@ import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {
     checkSbeFullFeatureFlagEnabled,
 } from "jstests/libs/query/sbe_util.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -412,7 +412,7 @@ function applyTimefieldProjectionToRepresentativeQuery(query) {
         bsonWoCompare(query["pipeline"][0], {"$project": {[timeFieldName]: 0}}) == 0) {
         return query;
     }
-    let transformedQuery = TransactionsUtil.deepCopyObject({}, query);
+    let transformedQuery = TxnUtil.deepCopyObject({}, query);
     transformedQuery["pipeline"].unshift({"$project": {[timeFieldName]: 0}});
     return transformedQuery;
 }
@@ -421,7 +421,7 @@ function removeTimefieldProjectionFromQuery(query) {
     if (!query || !query["pipeline"] || query["pipeline"].length === 0) {
         return query;
     }
-    let transformedQuery = TransactionsUtil.deepCopyObject({}, query);
+    let transformedQuery = TxnUtil.deepCopyObject({}, query);
     const firstStage = transformedQuery["pipeline"][0];
     if (bsonWoCompare(firstStage, {"$project": {[timeFieldName]: false, "_id": true}}) == 0) {
         transformedQuery["pipeline"].shift();

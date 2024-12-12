@@ -10,7 +10,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();
@@ -67,7 +67,7 @@ assert.soon(() => {
     // The error should not have a transient transaction error label. At this point the error must
     // have been TransactionTooLargeForCache. We do this check here to avoid having to check
     // exception types in the outermost catch, in case this assertion fires.
-    assert(!TransactionsUtil.isTransientTransactionError(result), result);
+    assert(!TxnUtil.isTransientTransactionError(result), result);
 
     jsTestLog("Iterations until TransactionTooLargeForCache occured: " + insertCount);
 

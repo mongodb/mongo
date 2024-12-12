@@ -4,6 +4,7 @@
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
 import {cleanupOnLastIteration} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 import {kSnapshotErrors} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 export const $config = (function() {
@@ -73,8 +74,7 @@ export const $config = (function() {
                     continue;
                 }
 
-                if ((e.hasOwnProperty('errorLabels') &&
-                     e.errorLabels.includes('TransientTransactionError')) ||
+                if (TxnUtil.isTransientTransactionError(e) ||
                     errorCode === ErrorCodes.ConflictingOperationInProgress) {
                     joinAndRetry = true;
                     continue;
@@ -150,8 +150,7 @@ export const $config = (function() {
                         break;
                     }
 
-                    if ((e.hasOwnProperty('errorLabels') &&
-                         e.errorLabels.includes('TransientTransactionError')) ||
+                    if (TxnUtil.isTransientTransactionError(e) ||
                         e.code === ErrorCodes.ConflictingOperationInProgress) {
                         shouldJoin = true;
                         continue;

@@ -6,7 +6,7 @@
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 // If the collection is being dropped, do not enable profiling since doing so would cause the
 // database to be re-created.
@@ -45,7 +45,7 @@ function runCommandAfterEnablingProfiler(
     if (commandName == "listCollections") {
         // Hide the system.profile collection from the listCollections result since its presence
         // can cause the assertions in some tests to fail.
-        commandObj = TransactionsUtil.deepCopyObject({}, commandObj);
+        commandObj = TxnUtil.deepCopyObject({}, commandObj);
         if (!commandObj.hasOwnProperty("filter")) {
             commandObj.filter = {};
         }

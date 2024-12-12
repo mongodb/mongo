@@ -15,7 +15,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getPreImagesCollection, preImagesForOps} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -142,8 +142,8 @@ function getCollections(db) {
     assert.commandWorked(otherColl.insert([{_id: 1, a: 1}]));
     let commitTimestamp;
     assertPreImagesWrittenForOps(testDB, function() {
-        const result = TransactionsUtil.runInTransaction(
-            testDB, getCollections, function(db, {coll, otherColl}) {
+        const result =
+            TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, otherColl}) {
                 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
                 assert.commandWorked(otherColl.updateOne({_id: 1}, {$inc: {a: 1}}));
                 assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
@@ -166,8 +166,8 @@ function getCollections(db) {
     const largeString = "b".repeat(stringSizeInBytes);
     assert.commandWorked(coll.insert([{_id: 3, a: 1}, {_id: 10}]));
     assertPreImagesWrittenForOps(testDB, function() {
-        const result = TransactionsUtil.runInTransaction(
-            testDB, getCollections, function(db, {coll, otherColl}) {
+        const result =
+            TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, otherColl}) {
                 assert.commandWorked(otherColl.insert({b: largeString}));
                 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
                 // We're expecting a split transaction here.
@@ -194,7 +194,7 @@ function getCollections(db) {
     // Verify that large pre-images are written correctly for a transaction.
     assert.commandWorked(coll.insert([{_id: 3, a: largeString}]));
     assertPreImagesWrittenForOps(testDB, function() {
-        TransactionsUtil.runInTransaction(testDB, getCollections, function(db, {coll, _}) {
+        TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, _}) {
             assert.commandWorked(coll.updateOne({_id: 1}, {$set: {b: largeString}}));
             assert.commandWorked(coll.deleteOne({_id: 3}));
             assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));

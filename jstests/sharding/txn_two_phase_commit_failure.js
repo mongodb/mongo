@@ -5,10 +5,12 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     flushRoutersAndRefreshShardMetadata,
     getCoordinatorFailpoints
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {runCommitThroughMongos} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -36,18 +38,6 @@ let coordinatorReplSetTest = st.rs0;
 let participant0 = st.shard0;
 let participant1 = st.shard1;
 let participant2 = st.shard2;
-
-const runCommitThroughMongosInParallelShellExpectAbort = function(errorText) {
-    const runCommitExpectCode = "assert.commandFailedWithCode(db.adminCommand({" +
-        "commitTransaction: 1," +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
-        "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "})," +
-        "ErrorCodes." + errorText + ");";
-    return startParallelShell(runCommitExpectCode, st.s.port);
-};
 
 const setUp = function() {
     // Create a sharded collection with a chunk on each shard:
@@ -78,7 +68,7 @@ const setUp = function() {
     }));
 };
 
-const testCommitProtocol = function(failpointData, expectError = "NoSuchTransaction") {
+const testCommitProtocol = function(failpointData, expectError = ErrorCodes.NoSuchTransaction) {
     jsTest.log("Testing commit protocol with failpointData: " + tojson(failpointData));
 
     txnNumber++;
@@ -92,10 +82,7 @@ const testCommitProtocol = function(failpointData, expectError = "NoSuchTransact
         data: failpointData.options ? failpointData.options : {},
     }));
 
-    // Run commitTransaction through a parallel shell.
-    let awaitResult = runCommitThroughMongosInParallelShellExpectAbort(expectError);
-
-    awaitResult();
+    runCommitThroughMongos(extractUUIDFromObject(lsid.id), txnNumber, st.s.host, expectError);
 
     // Check that the transaction aborted as expected.
     jsTest.log("Verify that the transaction was aborted on all shards.");
@@ -132,7 +119,7 @@ testCommitProtocol({
     numTimesShouldBeHit: 2,
     options: {command: "prepareTransaction", code: ErrorCodes.TransactionTooOld}
 },
-                   "TransactionTooOld");
+                   ErrorCodes.TransactionTooOld);
 
 // This is one of the non standard error codes from a transaction shard, it is retried by the
 // per-shard retry logic and it is eventually converted into

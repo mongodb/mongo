@@ -1,9 +1,8 @@
 import "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
-
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 Random.setRandomSeed();
 
@@ -61,7 +60,7 @@ export var {
             try {
                 func();
             } catch (e) {
-                if (TransactionsUtil.isTransientTransactionError(e)) {
+                if (TxnUtil.isTransientTransactionError(e)) {
                     if (cleanup)
                         cleanup();
                     return false;
@@ -91,7 +90,7 @@ export var {
                 currentTxnNumber = txnNum++;
                 func(currentTxnNumber);
             } catch (e) {
-                if (TransactionsUtil.isTransientTransactionError(e)) {
+                if (TxnUtil.isTransientTransactionError(e)) {
                     if (cleanup)
                         cleanup();
                     return false;
@@ -138,7 +137,7 @@ export var {
             try {
                 func();
             } catch (e) {
-                if (TransactionsUtil.isTransientTransactionError(e)) {
+                if (TxnUtil.isTransientTransactionError(e)) {
                     func();
                 } else {
                     throw e;

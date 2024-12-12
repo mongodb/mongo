@@ -25,7 +25,7 @@ import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
-import {TransactionsUtil} from "jstests/libs/transactions_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function() {
     const data = {
@@ -59,7 +59,7 @@ export const $config = (function() {
 
                     arr = cursor.toArray();
                 } catch (e) {
-                    if (TransactionsUtil.isTransientTransactionError(e)) {
+                    if (TxnUtil.isTransientTransactionError(e)) {
                         throw e;
                     }
                     if (TestData.runningWithShardStepdowns) {
