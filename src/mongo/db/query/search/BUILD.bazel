@@ -137,6 +137,16 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "search_index_command_testing_helper",
+    hdrs = [
+        "search_index_command_testing_helper.h",
+    ],
+    deps = [
+        "//src/mongo/executor:async_multicaster",
+    ],
+)
+
 # This target holds the shared logic for dispatching search index requests to a
 # mongot, whereas the search_index_process targets below hold the logic for
 # fetching collection metadata, either as a mongos router or mongod shard.
@@ -150,6 +160,7 @@ mongo_cc_library(
         "search_index_common.h",
     ],
     deps = [
+        "search_index_command_testing_helper",
         "search_index_options",
         "search_index_process_interface",
         "search_task_executors",

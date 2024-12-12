@@ -416,6 +416,12 @@ const internalCommandsMap = {
         testname: "_shardsvrAbortReshardCollection",
         command: {_shardsvrAbortReshardCollection: UUID(), userCanceled: true},
     },
+    _shardsvrRunSearchIndexCommand: {
+        // test only comand. Bc this command is included in test_only_commands_list.js, this will be
+        // skipped.
+        testname: "__shardsvrRunSearchIndexCommand",
+        command: {__shardsvrRunSearchIndexCommand: 1, hostAndPort: []},
+    },
     _shardsvrBeginMigrationBlockingOperation: {
         testname: "_shardsvrBeginMigrationBlockingOperation",
         command: {_shardsvrBeginMigrationBlockingOperation: ns, operationId: migrationOperationId},

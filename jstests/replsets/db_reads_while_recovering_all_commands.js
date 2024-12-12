@@ -116,6 +116,7 @@ const allCommands = {
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipantUnblock: {skip: isAnInternalCommand},
     _shardsvrRenameIndexMetadata: {skip: isPrimaryOnly},
+    _shardsvrRunSearchIndexCommand: {skip: isAnInternalCommand},
     _shardsvrDropDatabase: {skip: isPrimaryOnly},
     _shardsvrDropDatabaseParticipant: {skip: isPrimaryOnly},
     _shardsvrReshardCollection: {skip: isPrimaryOnly},
