@@ -68,12 +68,9 @@
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/dump_lock_manager.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/mongod_options_storage_gen.h"
-#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
@@ -110,7 +107,6 @@
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog.h"
-#include "mongo/db/session/session_killer.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/record_store.h"
@@ -118,8 +114,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/remote_command_request.h"
@@ -167,8 +161,6 @@ thread_local VersionedConfigType::Snapshot cachedRsConfig;
 
 }  // namespace
 
-MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
-MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
@@ -193,8 +185,6 @@ MONGO_FAIL_POINT_DEFINE(hangDuringAutomaticReconfig);
 MONGO_FAIL_POINT_DEFINE(ReconfigHangBeforeConfigValidationCheck);
 // Blocks after reconfig runs.
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfig);
-// Hang after grabbing the RSTL but before we start rejecting writes.
-MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 // Hang before making checks on the new config relative to the current one.
 MONGO_FAIL_POINT_DEFINE(hangBeforeNewConfigValidationChecks);
 // Throws during ReplicationCoordinator start up. The name of this failpoint is outdated since
@@ -244,18 +234,6 @@ void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const std::function<void()>
         lk->lock();
     }
     fn();
-}
-
-template <typename T>
-StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
-                                                   SharedSemiFuture<T>& f,
-                                                   Date_t deadline,
-                                                   ErrorCodes::Error error) {
-    try {
-        return opCtx->runWithDeadline(deadline, error, [&] { return f.getNoThrow(opCtx); });
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
 }
 
 constexpr StringData kQuiesceModeShutdownMessage =
@@ -579,19 +557,6 @@ boost::optional<Date_t> ReplicationCoordinatorImpl::getPriorityTakeover_forTest(
         return boost::none;
     }
     return _priorityTakeoverWhen;
-}
-
-boost::optional<Date_t> ReplicationCoordinatorImpl::getCatchupTakeover_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (!_catchupTakeoverCbh.isValid()) {
-        return boost::none;
-    }
-    return _catchupTakeoverWhen;
-}
-
-executor::TaskExecutor::CallbackHandle ReplicationCoordinatorImpl::getCatchupTakeoverCbh_forTest()
-    const {
-    return _catchupTakeoverCbh;
 }
 
 int64_t ReplicationCoordinatorImpl::getLastHorizonChange_forTest() const {
@@ -1731,52 +1696,6 @@ void ReplicationCoordinatorImpl::_setMyLastWrittenOpTimeAndWallTime(
     }
 }
 
-void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
-    WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
-    const auto opTime = opTimeAndWallTime.opTime;
-
-    // The last applied opTime should never advance beyond the global timestamp (i.e. the latest
-    // cluster time). Not enforced if the logical clock is disabled, e.g. for arbiters.
-    dassert(!VectorClock::get(getServiceContext())->isEnabled() ||
-            _externalState->getGlobalTimestamp(getServiceContext()) >= opTime.getTimestamp());
-
-    _topCoord->setMyLastAppliedOpTimeAndWallTime(
-        opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
-
-    // No need to wake up replication waiters because there should not be any replication waiters
-    // waiting on our own lastApplied.
-
-    // Update the storage engine's lastApplied snapshot before updating the stable timestamp on the
-    // storage engine. New transactions reading from the lastApplied snapshot should start before
-    // the oldest timestamp is advanced to avoid races. Additionally, update this snapshot before
-    // signaling optime waiters. This avoids a race that would allow optime waiters to open
-    // transactions on stale lastApplied values because they do not hold or reacquire the
-    // replication coordinator mutex when signaled.
-    _externalState->updateLastAppliedSnapshot(opTime);
-
-    // Signal anyone waiting on optime changes.
-    _lastAppliedOpTimeWaiterList.setValueIf(
-        lk,
-        [opTime](WithLock lk, const OpTime& waitOpTime, const SharedWaiterHandle& waiter) {
-            return waitOpTime <= opTime;
-        },
-        opTime);
-
-    if (opTime.isNull()) {
-        return;
-    }
-
-    // Advance the stable timestamp if necessary. Stable timestamps are used to determine the latest
-    // timestamp that it is safe to revert the database to, in the event of a rollback via the
-    // 'recover to timestamp' method.
-    invariant(opTime.getTimestamp().getInc() > 0,
-              str::stream() << "Impossible optime received: " << opTime.toString());
-    // If we are lagged behind the commit optime, set a new stable timestamp here.
-    if (opTime <= _topCoord->getLastCommittedOpTime()) {
-        _setStableTimestampForStorage(lk);
-    }
-}
-
 void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
     // On secondary it is not possible for lastDurable to be set beyond lastApplied, because
@@ -1986,7 +1905,7 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
 
             lock.unlock();
 
-            auto waitStatus = futureGetNoThrowWithDeadline(
+            auto waitStatus = _futureGetNoThrowWithDeadline(
                 opCtx, future, deadline.value_or(Date_t::max()), opCtx->getTimeoutError());
 
             if (!waitStatus.isOK()) {
@@ -2427,7 +2346,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
         return _startWaitingForReplication(lock, opTime, fixedWriteConcern);
     }();
 
-    auto status = futureGetNoThrowWithDeadline(opCtx, future, wTimeoutDate, timeoutError);
+    auto status = _futureGetNoThrowWithDeadline(opCtx, future, wTimeoutDate, timeoutError);
 
     // Mark the waiter given up if this waiter errors before the future is ready. This is so that
     // unsatisfied but abandoned waiters can be cleaned up lazily in the next _wakeReadyWaiters
@@ -2568,18 +2487,6 @@ ReplicationCoordinatorImpl::_startWaitingForReplication(WithLock wl,
     // lastDurable updates (but not on self's lastApplied updates, in which case use
     // _lastAppliedOpTimeWaiterList instead).
     return _replicationWaiterList.add(wl, opTime, writeConcern);
-}
-
-void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
-    auto isSteppingDown = [&]() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        // If true, we know that a stepdown is underway.
-        return (_topCoord->isSteppingDown());
-    };
-
-    while (!isSteppingDown()) {
-        sleepFor(Milliseconds{10});
-    }
 }
 
 void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
@@ -2793,7 +2700,7 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
                 "deadline"_attr = deadline.value(),
                 "currentTopologyVersionCounter"_attr = topologyVersion.getCounter());
     auto statusWithHello =
-        futureGetNoThrowWithDeadline(opCtx, future, deadline.value(), opCtx->getTimeoutError());
+        _futureGetNoThrowWithDeadline(opCtx, future, deadline.value(), opCtx->getTimeoutError());
     auto status = statusWithHello.getStatus();
 
     if (MONGO_unlikely(hangAfterWaitingForTopologyChangeTimesOut.shouldFail())) {
@@ -2924,433 +2831,6 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     return cbkResponse.data;
 }
 
-void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
-    AutoGetRstlForStepUpStepDown* arsc, ErrorCodes::Error reason) {
-    const OperationContext* rstlOpCtx = arsc->getOpCtx();
-    ServiceContext* serviceCtx = rstlOpCtx->getServiceContext();
-    invariant(serviceCtx);
-
-    for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
-        if (!client->canKillOperationInStepdown()) {
-            continue;
-        }
-
-        ClientLock lk(client);
-        OperationContext* toKill = client->getOperationContext();
-
-        // Don't kill step up/step down thread.
-        if (toKill && !toKill->isKillPending() && toKill->getOpID() != rstlOpCtx->getOpID()) {
-            auto locker = shard_role_details::getLocker(toKill);
-            bool alwaysInterrupt = toKill->shouldAlwaysInterruptAtStepDownOrUp();
-            bool globalLockConfict = locker->wasGlobalLockTakenInModeConflictingWithWrites();
-            bool isWaitingOnPrepareConflict =
-                PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict();
-            if (alwaysInterrupt || globalLockConfict || isWaitingOnPrepareConflict) {
-                serviceCtx->killOperation(lk, toKill, reason);
-                arsc->incrementTotalOpsKilled();
-                LOGV2(8562701,
-                      "Repl state change interrupted a thread.",
-                      "name"_attr = client->desc(),
-                      "alwaysInterrupt"_attr = alwaysInterrupt,
-                      "globalLockConflict"_attr = globalLockConfict,
-                      "isWaitingOnPrepareConflict"_attr = isWaitingOnPrepareConflict);
-            } else {
-                arsc->incrementTotalOpsRunning();
-            }
-        }
-    }
-}
-
-ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
-    ReplicationCoordinatorImpl* repl,
-    OperationContext* opCtx,
-    const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
-    Date_t deadline)
-    : _replCord(repl), _opCtx(opCtx), _stateTransition(stateTransition) {
-    invariant(_replCord && _opCtx);
-
-    // The state transition should never be rollback within this class.
-    invariant(_stateTransition != ReplicationCoordinator::OpsKillingStateTransitionEnum::kRollback);
-
-    if (_stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown)
-        _replCord->autoGetRstlEnterStepDown();
-    ScopeGuard callReplCoordExit([&] {
-        if (_stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown)
-            _replCord->autoGetRstlExitStepDown();
-    });
-    int rstlTimeout = fassertOnLockTimeoutForStepUpDown.load();
-    Date_t start{Date_t::now()};
-    if (rstlTimeout > 0 && deadline - start > Seconds(rstlTimeout)) {
-        deadline = start + Seconds(rstlTimeout);  // cap deadline
-    }
-
-    _rstlLock.emplace(_opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
-
-    ON_BLOCK_EXIT([&] { _stopAndWaitForKillOpThread(); });
-    _startKillOpThread();
-
-    // Wait for RSTL to be acquired.
-    _rstlLock->waitForLockUntil(deadline, [opCtx, rstlTimeout, start] {
-        if (rstlTimeout <= 0 || Date_t::now() - start < Seconds{rstlTimeout}) {
-            return;
-        }
-
-        // Dump all locks to identify which thread(s) are holding RSTL.
-        try {
-            dumpLockManager();
-        } catch (const DBException& e) {
-            // If there are too many locks, dumpLockManager may fail.
-            LOGV2_FATAL_CONTINUE(9222300, "Dumping locks failed", "error"_attr = e);
-        }
-
-        auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(
-            CurOp::get(opCtx)->getLockStatsBase());
-        BSONObjBuilder lockRep;
-        lockerInfo.stats.report(&lockRep);
-        LOGV2_FATAL(5675600,
-                    "Time out exceeded waiting for RSTL, stepUp/stepDown is not possible thus "
-                    "calling abort() to allow cluster to progress",
-                    "lockRep"_attr = lockRep.obj());
-    });
-    callReplCoordExit.dismiss();
-};
-
-ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::~AutoGetRstlForStepUpStepDown() {
-    if (_stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown)
-        _replCord->autoGetRstlExitStepDown();
-}
-
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_startKillOpThread() {
-    invariant(!_killOpThread);
-    _killOpThread = std::make_unique<stdx::thread>([this] { _killOpThreadFn(); });
-}
-
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
-    Client::initThread("RstlKillOpThread",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
-                       Client::noSession(),
-                       ClientOperationKillableByStepdown{false});
-
-    LOGV2(21343, "Starting to kill user operations");
-    auto uniqueOpCtx = cc().makeOperationContext();
-    OperationContext* opCtx = uniqueOpCtx.get();
-
-    // Set the reason for killing operations.
-    ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToReplStateChange;
-
-    while (true) {
-        // Reset the value before killing operations as we only want to track the number
-        // of operations that's running after step down.
-        _totalOpsRunning = 0;
-        _replCord->_killConflictingOpsOnStepUpAndStepDown(this, killReason);
-
-        // Destroy all stashed transaction resources, in order to release locks.
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions, killReason);
-
-        // Operations (like batch insert) that have currently yielded the global lock during step
-        // down can reacquire global lock in IX mode when this node steps back up after a brief
-        // network partition. And, this can lead to data inconsistency (see SERVER-27534). So,
-        // its important we mark operations killed at least once after enqueuing the RSTL lock in
-        // X mode for the first time. This ensures that no writing operations will continue
-        // after the node's term change.
-        {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
-            if (_stopKillingOps.wait_for(
-                    lock, Milliseconds(10).toSystemDuration(), [this] { return _killSignaled; })) {
-                LOGV2(21344, "Stopped killing user operations");
-                _replCord->updateAndLogStateTransitionMetrics(
-                    _stateTransition, getTotalOpsKilled(), getTotalOpsRunning());
-                _killSignaled = false;
-                return;
-            }
-        }
-    }
-}
-
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_stopAndWaitForKillOpThread() {
-    if (!(_killOpThread && _killOpThread->joinable()))
-        return;
-
-    {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
-        _killSignaled = true;
-        _stopKillingOps.notify_all();
-    }
-    _killOpThread->join();
-    _killOpThread.reset();
-}
-
-size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getTotalOpsKilled() const {
-    return _totalOpsKilled;
-}
-
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementTotalOpsKilled(size_t val) {
-    _totalOpsKilled += val;
-}
-
-size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getTotalOpsRunning() const {
-    return _totalOpsRunning;
-}
-
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementTotalOpsRunning(
-    size_t val) {
-    _totalOpsRunning += val;
-}
-
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlRelease() {
-    _rstlLock->release();
-}
-
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlReacquire() {
-    // Ensure that we are not holding the RSTL lock in any mode.
-    invariant(!shard_role_details::getLocker(_opCtx)->isRSTLLocked());
-
-    // Since we have released the RSTL lock at this point, there can be some conflicting
-    // operations sneaked in here. We need to kill those operations to acquire the RSTL lock.
-    // Also, its ok to start "RstlKillOpthread" thread before RSTL lock enqueue as we kill
-    // operations in a loop.
-    ON_BLOCK_EXIT([&] { _stopAndWaitForKillOpThread(); });
-    _startKillOpThread();
-    _rstlLock->reacquire();
-}
-
-const OperationContext* ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getOpCtx() const {
-    return _opCtx;
-}
-
-void ReplicationCoordinatorImpl::autoGetRstlEnterStepDown() {
-    stdx::lock_guard lk(_mutex);
-    // This makes us tell the 'hello' command we can't accept writes (though in fact we can,
-    // it is not valid to disable writes until we actually acquire the RSTL).
-    if (_stepDownPending++ == 0)
-        _fulfillTopologyChangePromise(lk);
-}
-
-void ReplicationCoordinatorImpl::autoGetRstlExitStepDown() {
-    stdx::lock_guard lk(_mutex);
-    // Once we release the RSTL, we announce either that we can accept writes or that we're now
-    // a real secondary.
-    invariant(_stepDownPending > 0);
-    if (--_stepDownPending == 0)
-        _fulfillTopologyChangePromise(lk);
-}
-
-
-void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
-                                          const bool force,
-                                          const Milliseconds& waitTime,
-                                          const Milliseconds& stepdownTime) {
-    const Date_t startTime = _replExecutor->now();
-    const Date_t stepDownUntil = startTime + stepdownTime;
-    const Date_t waitUntil = startTime + waitTime;
-
-    // Note this check is inherently racy - it's always possible for the node to stepdown from some
-    // other path before we acquire the global exclusive lock.  This check is just to try to save us
-    // from acquiring the global X lock unnecessarily.
-    uassert(ErrorCodes::NotWritablePrimary,
-            "not primary so can't step down",
-            getMemberState().primary());
-
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
-
-    // Using 'force' sets the default for the wait time to zero, which means the stepdown will
-    // fail if it does not acquire the lock immediately. In such a scenario, we use the
-    // stepDownUntil deadline instead.
-    auto deadline = force ? stepDownUntil : waitUntil;
-    AutoGetRstlForStepUpStepDown arsd(
-        this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
-
-    stepdownHangAfterGrabbingRSTL.pauseWhileSet();
-
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    opCtx->checkForInterrupt();
-
-    const long long termAtStart = _topCoord->getTerm();
-
-    // This will cause us to fail if we're already in the process of stepping down, or if we've
-    // already successfully stepped down via another path.
-    auto abortFn = uassertStatusOK(_topCoord->prepareForStepDownAttempt());
-
-    // Update _canAcceptNonLocalWrites from the TopologyCoordinator now that we're in the middle
-    // of a stepdown attempt.  This will prevent us from accepting writes so that if our stepdown
-    // attempt fails later we can release the RSTL and go to sleep to allow secondaries to
-    // catch up without allowing new writes in.
-    _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
-    invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
-
-    bool interruptedBeforeReacquireRSTL = false;
-
-    auto updateMemberState = [this, &lk](OperationContext* opCtx) {
-        invariant(lk.owns_lock());
-        invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
-
-        // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
-        _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
-        auto action = _updateMemberStateFromTopologyCoordinator(lk);
-
-        lk.unlock();
-
-        if (MONGO_unlikely(stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
-            LOGV2(21345,
-                  "stepping down from primary - "
-                  "stepdownHangBeforePerformingPostMemberStateUpdateActions fail point enabled. "
-                  "Blocking until fail point is disabled");
-            while (MONGO_unlikely(
-                stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
-                mongo::sleepsecs(1);
-                {
-                    stdx::lock_guard<stdx::mutex> lock(_mutex);
-                    if (_inShutdown) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        _performPostMemberStateUpdateAction(action);
-    };
-    ScopeGuard onExitGuard([&] {
-        if (interruptedBeforeReacquireRSTL) {
-            // We should only enter this branch when we get interrupted during reacquiring RSTL, so
-            // we should not holding the RSTL and _mutex. We need to create a new client and opCtx
-            // for the cleanup since the cleanup is a must do.
-            invariant(!lk.owns_lock());
-            invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive());
-            while (true) {
-                try {
-                    auto newClient = opCtx->getServiceContext()
-                                         ->getService(ClusterRole::ShardServer)
-                                         ->makeClient("StepdownCleaner");
-                    AlternativeClientRegion acr(newClient);
-                    auto newOpCtx = cc().makeOperationContext();
-                    // We wait RSTL at no timeout because we have to get it to update WriteAbility
-                    // and MemberState anyway. If it gets interrupted again, keep retrying.
-                    AutoGetRstlForStepUpStepDown arsdForCleanup(
-                        this,
-                        newOpCtx.get(),
-                        ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown,
-                        Date_t::max());
-                    lk.lock();
-                    abortFn();
-                    updateMemberState(newOpCtx.get());
-                    break;
-                } catch (const DBException& ex) {
-                    LOGV2(9080201,
-                          "Reacquiring RSTL on cleanup gets interrupted",
-                          "error"_attr = ex.toStatus());
-                }
-            }
-        } else {
-            abortFn();
-            updateMemberState(opCtx);
-        }
-    });
-
-    auto waitTimeout = std::min(waitTime, stepdownTime);
-
-    // Set up a waiter which will be signaled when we process a heartbeat or updatePosition
-    // and have a majority of nodes at our optime.
-    const WriteConcernOptions waiterWriteConcern(
-        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::NONE, waitTimeout);
-
-    // If attemptStepDown() succeeds, we are guaranteed that no concurrent step up or
-    // step down can happen afterwards. So, it's safe to release the mutex before
-    // yieldLocksForPreparedTransactions().
-    while (!_topCoord->tryToStartStepDown(
-        termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
-        // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
-        // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
-        arsd.rstlRelease();
-        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-
-        auto lastAppliedOpTime = _getMyLastAppliedOpTime(lk);
-        auto currentTerm = _topCoord->getTerm();
-        // If termAtStart != currentTerm, tryToStartStepDown would have thrown.
-        invariant(termAtStart == currentTerm);
-        // As we should not wait for secondaries to catch up if this node has not yet written in
-        // this term, invariant that the lastAppliedOpTime we will wait for has the same term as the
-        // current term. Also see TopologyCoordinator::isSafeToStepDown.
-        invariant(lastAppliedOpTime.getTerm() == currentTerm);
-
-        auto [future, waiter] =
-            _replicationWaiterList.add(lk, lastAppliedOpTime, waiterWriteConcern);
-        lk.unlock();
-
-        // Operations that can be interrupted through opCtx should be executed inside this try/catch
-        // block in case that the operation get interrupted, the stepdown thread doesn't hold RSTL
-        // and _mutex so we can safely reacquire those locks in the onExitGuard to do the cleanup.
-        try {
-            auto status = futureGetNoThrowWithDeadline(
-                opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
-
-            // Remove the waiter from the list if it times out before the future is ready.
-            // The replicationWaiterList does not support delayed removal with waiter->givenUp.
-            if (!status.isOK() && !future.isReady()) {
-                lk.lock();
-                invariant(waiter);
-                _replicationWaiterList.remove(lk, lastAppliedOpTime, waiter);
-                lk.unlock();
-            }
-
-            // We ignore the case where runWithDeadline returns timeoutError because in that case
-            // coming back around the loop and calling tryToStartStepDown again will cause
-            // tryToStartStepDown to return ExceededTimeLimit with the proper error message.
-            if (!status.isOK() && status.code() != ErrorCodes::ExceededTimeLimit) {
-                opCtx->checkForInterrupt();
-            }
-
-            // Since we have released the RSTL lock at this point, there can be some read
-            // operations sneaked in here, that might hold global lock in S mode or blocked on
-            // prepare conflict. We need to kill those operations to avoid 3-way deadlock
-            // between read, prepared transaction and step down thread. And, any write
-            // operations that gets sneaked in here will fail as we have updated
-            // _canAcceptNonLocalWrites to false after our first successful RSTL lock
-            // acquisition. So, we won't get into problems like SERVER-27534.
-            arsd.rstlReacquire();
-            lk.lock();
-        } catch (const DBException& ex) {
-            // We can get interrupted when reacquiring the RSTL. If that happens, the
-            // onExitGuard will create a new client and opCtx to perform the WriteAbility and
-            // MemberState cleanup after failed stepdown.
-            LOGV2(9080200, "Reacquiring RSTL gets interrupted", "error"_attr = ex.toStatus());
-            interruptedBeforeReacquireRSTL = true;
-            throw;
-        }
-    }
-
-    // Prepare for unconditional stepdown success!
-    // We need to release the mutex before yielding locks for prepared transactions, which might
-    // check out sessions, to avoid deadlocks with checked-out sessions accessing this mutex.
-    lk.unlock();
-
-    yieldLocksForPreparedTransactions(opCtx);
-    invalidateSessionsForStepdown(opCtx);
-
-    lk.lock();
-
-    // Clear the node's election candidate metrics since it is no longer primary.
-    ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
-
-    _topCoord->finishUnconditionalStepDown();
-
-    onExitGuard.dismiss();
-    updateMemberState(opCtx);
-
-    // Schedule work to (potentially) step back up once the stepdown period has ended.
-    _scheduleWorkAt(stepDownUntil, [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
-        _handleTimePassing(cbData);
-    });
-
-    // If election handoff is enabled, schedule a step-up immediately instead of waiting for the
-    // election timeout to expire.
-    if (!force && enableElectionHandoff.load()) {
-        _performElectionHandoff();
-    }
-}
 
 void ReplicationCoordinatorImpl::_performElectionHandoff() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -4956,142 +4436,6 @@ void ReplicationCoordinatorImpl::_updateWriteAbilityFromTopologyCoordinator(
     _readWriteAbility->setCanAcceptNonLocalWrites(lk, opCtx, canAcceptWrites);
 }
 
-ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock lk) {
-    // We want to respond to any waiting hellos even if our current and target state are the
-    // same as it is possible writes have been disabled during a stepDown but the primary has yet
-    // to transition to SECONDARY state.  We do not do so when _stepDownPending is true
-    // because in that case we have already said we cannot accept writes in the hello response
-    // and explictly incremented the toplogy version.
-    ON_BLOCK_EXIT([&] {
-        if (_rsConfig.unsafePeek().isInitialized() && !_stepDownPending) {
-            _fulfillTopologyChangePromise(lk);
-        }
-    });
-
-    const MemberState newState = _topCoord->getMemberState();
-
-    if (newState == _memberState) {
-        return kActionNone;
-    }
-
-    PostMemberStateUpdateAction result;
-    if (_memberState.primary() || newState.removed() || newState.rollback()) {
-        // Wake up any threads blocked in awaitReplication, close connections, etc.
-        _replicationWaiterList.setErrorAll(
-            lk,
-            {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
-
-        if (_memberState.primary()) {
-            // We may have already disallowed primary majority reads via failing a replication
-            // waiter in the previous line. However, it's possible we are stepping down here before
-            // we managed to create a waiter, so in that case we should explicitly indicate that we
-            // have stepped down.
-            _primaryMajorityReadsAvailability.onBecomeNonPrimary();
-        }
-
-        // Wake up the optime waiter that is waiting for primary catch-up to finish.
-        _lastAppliedOpTimeWaiterList.setErrorAll(
-            lk,
-            {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
-        // Wake up the optime waiter that is waiting for oplog to be written
-        _lastWrittenOpTimeWaiterList.setErrorAll(
-            lk,
-            {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
-
-        // _canAcceptNonLocalWrites should already be set.
-        invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
-
-        serverGlobalParams.validateFeaturesAsPrimary.store(false);
-        result = (newState.removed() || newState.rollback()) ? kActionRollbackOrRemoved
-                                                             : kActionSteppedDown;
-    } else {
-        result = kActionFollowerModeStateChange;
-    }
-
-    // Exit catchup mode if we're in it and enable replication producer and applier on stepdown.
-    if (_memberState.primary()) {
-        if (_catchupState) {
-            // _pendingTermUpdateDuringStepDown is set before stepping down due to hearing about a
-            // higher term, so that we can remember the term we heard and update our term as part of
-            // finishing stepdown. It is then unset toward the end of stepdown, after the function
-            // we are in is called. Thus we must be stepping down due to seeing a higher term if and
-            // only if _pendingTermUpdateDuringStepDown is set here.
-            if (_pendingTermUpdateDuringStepDown) {
-                _catchupState->abort(lk, PrimaryCatchUpConclusionReason::kFailedWithNewTerm);
-            } else {
-                _catchupState->abort(lk, PrimaryCatchUpConclusionReason::kFailedWithError);
-            }
-        }
-        _oplogSyncState = OplogSyncState::Running;
-        _externalState->startProducerIfStopped();
-    }
-
-    if (_memberState.secondary() && !newState.primary() && !newState.rollback()) {
-        // Switching out of SECONDARY, but not to PRIMARY or ROLLBACK. Note that ROLLBACK case is
-        // handled separately and requires RSTL lock held, see setFollowerModeRollback.
-        _readWriteAbility->setCanServeNonLocalReads_UNSAFE(0U);
-    } else if (!_memberState.primary() && newState.secondary()) {
-        // Switching into SECONDARY, but not from PRIMARY.
-        _readWriteAbility->setCanServeNonLocalReads_UNSAFE(1U);
-    }
-
-    if (newState.secondary() && result != kActionSteppedDown &&
-        _topCoord->isElectableNodeInSingleNodeReplicaSet()) {
-        // When transitioning from other follower states to SECONDARY, run for election on a
-        // single-node replica set.
-        result = kActionStartSingleNodeElection;
-    }
-
-    // If we are transitioning from secondary, cancel any scheduled takeovers.
-    if (_memberState.secondary()) {
-        _cancelCatchupTakeover(lk);
-        _cancelPriorityTakeover(lk);
-    }
-
-    // Ensure replication is running if we are no longer REMOVED.
-    if (_memberState.removed() && !newState.arbiter()) {
-        LOGV2(5268000, "Scheduling a task to begin or continue replication");
-        _scheduleWorkAt(_replExecutor->now(),
-                        [=, this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-                            _externalState->startThreads();
-                            auto opCtx = cc().makeOperationContext();
-                            _startDataReplication(opCtx.get());
-                        });
-    }
-
-
-    if (newState.primary()) {
-        // Since we are stepping up, we need to reset the primary majority read availability state
-        // to track availabiltity of those reads in our new term.
-        _primaryMajorityReadsAvailability.onBecomePrimary();
-    }
-
-    LOGV2(21358,
-          "Replica set state transition",
-          "newState"_attr = newState,
-          "oldState"_attr = _memberState);
-
-    // Initializes the featureCompatibilityVersion to the latest value, because arbiters do not
-    // receive the replicated version. This is to avoid bugs like SERVER-32639.
-    if (newState.arbiter()) {
-        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
-            "arbiter"_sd);
-    }
-
-    _memberState = newState;
-
-    _cancelAndRescheduleElectionTimeout(lk);
-
-    // Notifies waiters blocked in waitForMemberState().
-    // For testing only.
-    _memberStateChange.notify_all();
-
-    return result;
-}
-
 void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
     PostMemberStateUpdateAction action) {
     switch (action) {
@@ -5117,209 +4461,8 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
     }
 }
 
-void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) {
-    invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
-
-    auto ts = VectorClockMutable::get(getServiceContext())->tickClusterTime(1).asTimestamp();
-    _topCoord->processWinElection(ts);
-
-    // Get the term from the topology coordinator, which we use to generate the election ID.
-    // We intentionally wait until the end of this function to store the term in the
-    // atomic shadow variable.
-    auto electionIdTerm = _topCoord->getElectionIdTerm();
-
-    ON_BLOCK_EXIT([&] { _electionIdTermShadow.store(electionIdTerm); });
-
-    const PostMemberStateUpdateAction nextAction = _updateMemberStateFromTopologyCoordinator(lk);
-
-    invariant(nextAction == kActionFollowerModeStateChange,
-              str::stream() << "nextAction == " << static_cast<int>(nextAction));
-    invariant(_getMemberState(lk).primary());
-    // Clear the sync source.
-    _onFollowerModeStateChange();
-
-    // Notify all secondaries of the election win by cancelling all current heartbeats and sending
-    // new heartbeat requests to all nodes. We must cancel and start instead of restarting scheduled
-    // heartbeats because all heartbeats must be restarted upon election succeeding.
-    _cancelHeartbeats(lk);
-    _startHeartbeats(lk);
-
-    invariant(!_catchupState);
-    _catchupState = std::make_unique<CatchupState>(this);
-    _catchupState->start(lk);
-}
-
 void ReplicationCoordinatorImpl::_onFollowerModeStateChange() {
     _externalState->signalApplierToChooseNewSyncSource();
-}
-
-void ReplicationCoordinatorImpl::CatchupState::start(WithLock lk) {
-    LOGV2(21359, "Entering primary catch-up mode");
-
-    // Reset the number of catchup operations performed before starting catchup.
-    _numCatchUpOps = 0;
-
-    // No catchup in single node replica set.
-    if (_repl->_rsConfig.unsafePeek().getNumMembers() == 1) {
-        LOGV2(6015304, "Skipping primary catchup since we are the only node in the replica set.");
-        abort(lk, PrimaryCatchUpConclusionReason::kSkipped);
-        return;
-    }
-
-    auto catchupTimeout = _repl->_rsConfig.unsafePeek().getCatchUpTimeoutPeriod();
-
-    // When catchUpTimeoutMillis is 0, we skip doing catchup entirely.
-    if (catchupTimeout == ReplSetConfig::kCatchUpDisabled) {
-        LOGV2(21360, "Skipping primary catchup since the catchup timeout is 0");
-        abort(lk, PrimaryCatchUpConclusionReason::kSkipped);
-        return;
-    }
-
-    auto mutex = &_repl->_mutex;
-    auto timeoutCB = [this, mutex](const CallbackArgs& cbData) {
-        if (!cbData.status.isOK()) {
-            return;
-        }
-        stdx::lock_guard<stdx::mutex> lk(*mutex);
-        // Check whether the callback has been cancelled while holding mutex.
-        if (cbData.myHandle.isCanceled()) {
-            return;
-        }
-        LOGV2(21361, "Catchup timed out after becoming primary");
-        abort(lk, PrimaryCatchUpConclusionReason::kTimedOut);
-    };
-
-    // Deal with infinity and overflow - no timeout.
-    if (catchupTimeout == ReplSetConfig::kInfiniteCatchUpTimeout ||
-        Date_t::max() - _repl->_replExecutor->now() <= catchupTimeout) {
-        return;
-    }
-    // Schedule timeout callback.
-    auto timeoutDate = _repl->_replExecutor->now() + catchupTimeout;
-    auto status = _repl->_replExecutor->scheduleWorkAt(timeoutDate, std::move(timeoutCB));
-    if (!status.isOK()) {
-        LOGV2(21362, "Failed to schedule catchup timeout work");
-        abort(lk, PrimaryCatchUpConclusionReason::kFailedWithError);
-        return;
-    }
-    _timeoutCbh = status.getValue();
-}
-
-void ReplicationCoordinatorImpl::CatchupState::abort(WithLock lk,
-                                                     PrimaryCatchUpConclusionReason reason) {
-    invariant(_repl->_getMemberState(lk).primary());
-
-    ReplicationMetrics::get(getGlobalServiceContext())
-        .incrementNumCatchUpsConcludedForReason(reason);
-
-    LOGV2(21363, "Exited primary catch-up mode");
-    // Clean up its own members.
-    if (_timeoutCbh) {
-        _repl->_replExecutor->cancel(_timeoutCbh);
-    }
-    if (reason != PrimaryCatchUpConclusionReason::kSucceeded && _waiter) {
-        _repl->_lastAppliedOpTimeWaiterList.remove(lk, _targetOpTime, _waiter);
-        _waiter.reset();
-    }
-
-    // Enter primary drain mode.
-    _repl->_enterDrainMode(lk);
-    // Destroy the state itself.
-    _repl->_catchupState.reset();
-}
-
-void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate(WithLock lk) {
-    auto targetOpTime = _repl->_topCoord->latestKnownOpTimeSinceHeartbeatRestart();
-    // Haven't collected all heartbeat responses.
-    if (!targetOpTime) {
-        LOGV2_DEBUG(
-            6015305,
-            1,
-            "Not updating target optime for catchup, we haven't collected all heartbeat responses");
-        return;
-    }
-
-    // We've caught up.
-    const auto myLastApplied = _repl->_getMyLastAppliedOpTime(lk);
-    if (*targetOpTime <= myLastApplied) {
-        LOGV2(21364,
-              "Caught up to the latest optime known via heartbeats after becoming primary",
-              "targetOpTime"_attr = *targetOpTime,
-              "myLastApplied"_attr = myLastApplied);
-        // Report the number of ops applied during catchup in replSetGetStatus once the primary is
-        // caught up.
-        ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
-        abort(lk, PrimaryCatchUpConclusionReason::kAlreadyCaughtUp);
-        return;
-    }
-
-    // Reset the target optime if it has changed.
-    if (_waiter && _targetOpTime == *targetOpTime) {
-        return;
-    }
-
-    if (_waiter) {
-        _repl->_lastAppliedOpTimeWaiterList.remove(lk, _targetOpTime, _waiter);
-        _waiter.reset();
-    } else {
-        // Only increment the 'numCatchUps' election metric the first time we add a waiter, so that
-        // we only increment it once each time a primary has to catch up. If there is already an
-        // existing waiter, then the node is catching up and has already been counted.
-        ReplicationMetrics::get(getGlobalServiceContext()).incrementNumCatchUps();
-    }
-
-    _targetOpTime = *targetOpTime;
-
-    ReplicationMetrics::get(getGlobalServiceContext()).setTargetCatchupOpTime(_targetOpTime);
-
-    LOGV2(21365, "Heartbeats updated catchup target optime", "targetOpTime"_attr = _targetOpTime);
-    LOGV2(21366, "Latest known optime per replica set member");
-    auto opTimesPerMember = _repl->_topCoord->latestKnownOpTimeSinceHeartbeatRestartPerMember();
-    for (auto&& pair : opTimesPerMember) {
-        LOGV2(21367,
-              "Latest known optime",
-              "memberId"_attr = pair.first,
-              "latestKnownOpTime"_attr = (pair.second ? (*pair.second).toString() : "unknown"));
-    }
-
-    auto targetOpTimeCB = [this, &lk](Status status) {
-        // Double check the target time since stepdown may signal us too.
-        const auto myLastApplied = _repl->_getMyLastAppliedOpTime(lk);
-        if (_targetOpTime <= myLastApplied) {
-            LOGV2(21368,
-                  "Caught up to the latest known optime successfully after becoming primary",
-                  "targetOpTime"_attr = _targetOpTime,
-                  "myLastApplied"_attr = myLastApplied);
-            // Report the number of ops applied during catchup in replSetGetStatus once the primary
-            // is caught up.
-            ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
-            abort(lk, PrimaryCatchUpConclusionReason::kSucceeded);
-        }
-    };
-    auto pf = makePromiseFuture<void>();
-    _waiter = std::make_shared<Waiter>(std::move(pf.promise));
-    auto future = std::move(pf.future).onCompletion(targetOpTimeCB);
-    _repl->_lastAppliedOpTimeWaiterList.add(lk, _targetOpTime, _waiter);
-}
-
-void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps(WithLock, long numOps) {
-    _numCatchUpOps += numOps;
-}
-
-Status ReplicationCoordinatorImpl::abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_catchupState) {
-        _catchupState->abort(lk, reason);
-        return Status::OK();
-    }
-    return Status(ErrorCodes::IllegalOperation, "The node is not in catch-up mode.");
-}
-
-void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(long numOps) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_catchupState) {
-        _catchupState->incrementNumCatchUpOps(lk, numOps);
-    }
 }
 
 boost::optional<Timestamp> ReplicationCoordinatorImpl::getRecoveryTimestamp() {
@@ -6532,37 +5675,6 @@ CallbackFn ReplicationCoordinatorImpl::_wrapAsCallbackFn(const std::function<voi
 
         work();
     };
-}
-
-Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
-
-    auto reason = skipDryRun ? StartElectionReasonEnum::kStepUpRequestSkipDryRun
-                             : StartElectionReasonEnum::kStepUpRequest;
-    _startElectSelfIfEligibleV1(reason);
-
-    EventHandle finishEvent;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        // A null _electionState indicates that the election has already completed.
-        if (_electionState) {
-            finishEvent = _electionState->getElectionFinishedEvent(lk);
-        }
-    }
-    if (finishEvent.isValid()) {
-        LOGV2(6015303, "Waiting for in-progress election to complete before finishing stepup");
-        _replExecutor->waitForEvent(finishEvent);
-    }
-    {
-        // Step up is considered successful only if we are currently a primary and we are not in the
-        // process of stepping down. If we know we are going to step down, we should fail the
-        // replSetStepUp command so caller can retry if necessary.
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (!_getMemberState(lk).primary())
-            return Status(ErrorCodes::CommandFailed, "Election failed.");
-        else if (_topCoord->isSteppingDown())
-            return Status(ErrorCodes::CommandFailed, "Election failed due to concurrent stepdown.");
-    }
-    return Status::OK();
 }
 
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded(

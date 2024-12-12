@@ -1457,6 +1457,19 @@ private:
                                 bool isForceReconfig,
                                 int myIndex);
 
+    template <typename T>
+    static StatusOrStatusWith<T> _futureGetNoThrowWithDeadline(OperationContext* opCtx,
+                                                               SharedSemiFuture<T>& f,
+                                                               Date_t deadline,
+                                                               ErrorCodes::Error error) {
+        try {
+            return opCtx->runWithDeadline(deadline, error, [&] { return f.getNoThrow(opCtx); });
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
+
     /**
      * Changes _rsConfigState to newState, and notify any waiters.
      */
