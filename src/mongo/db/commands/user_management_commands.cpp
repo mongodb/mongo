@@ -95,6 +95,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_solution.h"
@@ -106,6 +107,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -117,6 +120,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
@@ -651,188 +655,237 @@ BSONArray vectorToBSON(const std::vector<T>& vec) {
 }
 
 MONGO_FAIL_POINT_DEFINE(umcTransaction);
+
+
 /**
- * Handler for performing transaction guarded updates to the auth collections.
- *
- * UMCTransaction::commit() must be called after setting up operations,
- * or the transaction will be aborted on scope exit.
+ * Generic API for a client that runs CRUD operations in a UMCTransaction's
+ * callback lambda. The replica set impl falls through to TransactionClient
+ * while the standalone uses its own client to issue the requested commands on
+ * itself.
  */
+class UMCTransactionClient {
+public:
+    UMCTransactionClient() = delete;
+
+    UMCTransactionClient(StringData cmdName) : _cmdName(cmdName) {}
+
+    virtual BatchedCommandResponse runCRUDOp(const BatchedCommandRequest& request,
+                                             std::vector<StmtId> stmtIds) = 0;
+
+protected:
+    std::string _cmdName;
+};
+
 class UMCTransaction {
 public:
-    static constexpr StringData kAdminDB = "admin"_sd;
-    static constexpr StringData kCommitTransaction = "commitTransaction"_sd;
-    static constexpr StringData kAbortTransaction = "abortTransaction"_sd;
+    UMCTransaction() = delete;
 
-    UMCTransaction(OperationContext* opCtx,
-                   StringData forCommand)
-        :  // Don't transactionalize on standalone.
-          _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()},
-          // Subclient used by transaction operations.
-          _client{opCtx->getServiceContext()
-                      ->getService(ClusterRole::ShardServer)
-                      ->makeClient(forCommand.toString())},
-          _sessionInfo{LogicalSessionFromClient(UUID::gen())} {
-        // Note: We allow the client to be killable. We only make an operation context on this
-        // client during runCommand, and that operation context is short-lived. If we get
-        // interrupted during that operation context's life, we will fail the transaction.
+    UMCTransaction(StringData cmdName) : _cmdName(cmdName) {}
 
-        _sessionInfo.setTxnNumber(0);
-        _sessionInfo.setStartTransaction(true);
-        _sessionInfo.setAutocommit(false);
+    virtual void run(OperationContext* opCtx,
+                     unique_function<Status(UMCTransactionClient&)> txnOpsCallback) = 0;
 
-        _vts = auth::ValidatedTenancyScope::get(opCtx);
-        const auto tenantId =
-            _vts && _vts->hasTenantId() ? boost::optional<TenantId>(_vts->tenantId()) : boost::none;
-        const auto serializationContext = _vts ? SerializationContext::stateCommandRequest(
-                                                     _vts->hasTenantId(), _vts->isFromAtlasProxy())
-                                               : SerializationContext::stateCommandRequest();
-        _dbName = DatabaseNameUtil::deserialize(tenantId, kAdminDB, serializationContext);
 
-        auto as = AuthorizationSession::get(_client.get());
-        if (as) {
-            as->grantInternalAuthorization();
-        }
+protected:
+    std::string _cmdName;
+};
 
-        AlternativeClientRegion clientRegion(_client);
-    }
-
-    ~UMCTransaction() {
-        if (_state == TransactionState::kStarted) {
-            abort().ignore();
-        }
-    }
-
-    StatusWith<std::uint32_t> insert(const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-        dassert(validNamespace(nss));
-        write_ops::InsertCommandRequest op(nss);
-        op.setDocuments(docs);
-        return doCrudOp(op.toBSON());
-    }
-
-    StatusWith<std::uint32_t> update(const NamespaceString& nss, BSONObj query, BSONObj update) {
-        dassert(validNamespace(nss));
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(query);
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-        entry.setMulti(true);
-        write_ops::UpdateCommandRequest op(nss);
-        op.setUpdates({entry});
-        return doCrudOp(op.toBSON());
-    }
-
-    StatusWith<std::uint32_t> remove(const NamespaceString& nss, BSONObj query) {
-        dassert(validNamespace(nss));
-        write_ops::DeleteOpEntry entry;
-        entry.setQ(query);
-        entry.setMulti(true);
-        write_ops::DeleteCommandRequest op(nss);
-        op.setDeletes({entry});
-        return doCrudOp(op.toBSON());
-    }
-
-    Status commit() {
-        auto fp = umcTransaction.scoped();
-        if (fp.isActive()) {
-            IDLParserContext ctx("umcTransaction");
-            auto delay = UMCTransactionFailPoint::parse(ctx, fp.getData()).getCommitDelayMS();
-            LOGV2(4993100,
-                  "Sleeping prior to committing UMC transaction",
-                  "duration"_attr = Milliseconds(delay));
-            sleepmillis(delay);
-        }
-        return commitOrAbort(kCommitTransaction);
-    }
-
-    Status abort() {
-        return commitOrAbort(kAbortTransaction);
-    }
-
+/**
+ * Wrapper class to handle "transactional" UMCs on standalones. Since transactions are
+ * not supported on standalones, this is simply a way to sequentially run all of the CRUD ops
+ * specified in txnOpsCallback with some retries built-in.
+ */
+class UMCTransactionStandalone : public UMCTransaction {
 private:
-    static bool validNamespace(const NamespaceString& nss) {
-        return (nss.isAdminDB());
-    }
+    class UMCTransactionClientStandalone : public UMCTransactionClient {
+    public:
+        static constexpr StringData kAdminDB = "admin"_sd;
 
-    StatusWith<std::uint32_t> doCrudOp(BSONObj op) try {
-        invariant(_state != TransactionState::kDone);
-
-        BSONObjBuilder body(op);
-        auto reply = runCommand(&body);
-        auto status = getStatusFromCommandResult(reply);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        if (_state == TransactionState::kInit) {
-            _state = TransactionState::kStarted;
-            _sessionInfo.setStartTransaction(boost::none);
-        }
-
-        BatchedCommandResponse response;
-        std::string errmsg;
-        if (!response.parseBSON(reply, &errmsg)) {
-            return {ErrorCodes::FailedToParse, errmsg};
-        }
-
-        return response.getN();
-    } catch (const AssertionException& ex) {
-        return ex.toStatus();
-    }
-
-    Status commitOrAbort(StringData cmd) {
-        invariant((cmd == kCommitTransaction) || (cmd == kAbortTransaction));
-        if (_state != TransactionState::kStarted) {
-            return {ErrorCodes::NoSuchTransaction, "UMC Transaction not running"};
-        }
-
-        if (_isReplSet) {
-            BSONObjBuilder cmdBuilder;
-            cmdBuilder.append(cmd, 1);
-            auto status = getStatusFromCommandResult(runCommand(&cmdBuilder));
-            if (!status.isOK()) {
-                return status;
+        explicit UMCTransactionClientStandalone(OperationContext* opCtx, StringData cmdName)
+            : UMCTransactionClient(cmdName),
+              _client(opCtx->getServiceContext()
+                          ->getService(ClusterRole::ShardServer)
+                          ->makeClient(cmdName.toString())),
+              _writeConcern(opCtx->getWriteConcern().toBSON().removeField(
+                  ReadWriteConcernProvenanceBase::kSourceFieldName)) {
+            _vts = auth::ValidatedTenancyScope::get(opCtx);
+            const auto tenantId = _vts && _vts->hasTenantId()
+                ? boost::optional<TenantId>(_vts->tenantId())
+                : boost::none;
+            const auto serializationContext = _vts
+                ? SerializationContext::stateCommandRequest(_vts->hasTenantId(),
+                                                            _vts->isFromAtlasProxy())
+                : SerializationContext::stateCommandRequest();
+            _dbName = DatabaseNameUtil::deserialize(tenantId, kAdminDB, serializationContext);
+            auto* as = AuthorizationSession::get(_client.get());
+            if (as) {
+                as->grantInternalAuthorization();
             }
         }
 
-        _state = TransactionState::kDone;
-        return Status::OK();
-    }
+        BatchedCommandResponse runCRUDOp(const BatchedCommandRequest& request,
+                                         std::vector<StmtId> stmtIds) final {
+            // Set a default apiVersion for all UMC commands and propagate the writeConcern
+            // from the parent opCtx provided at construction.
+            BSONObjBuilder cmdBuilder;
+            request.serialize(&cmdBuilder);
+            cmdBuilder.append("apiVersion", kOne);
+            cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
 
-    BSONObj runCommand(BSONObjBuilder* cmdBuilder) {
-        if (_isReplSet) {
-            // Append logical session (transaction) metadata.
-            _sessionInfo.serialize(cmdBuilder);
+            // Convert the command into a Message that can be sent directly to the shard
+            // ServiceEntryPoint's request handler.
+            auto requestMessage =
+                OpMsgRequestBuilder::create(_vts, DatabaseName::kAdmin, cmdBuilder.obj())
+                    .serialize();
+
+            auto* serviceContext = _client->getServiceContext();
+            auto* serviceEntryPoint =
+                serviceContext->getService(ClusterRole::ShardServer)->getServiceEntryPoint();
+
+            AlternativeClientRegion altClientRegion(_client);
+            auto subOpCtx = serviceContext->makeOperationContext(Client::getCurrent());
+            auth::ValidatedTenancyScope::set(subOpCtx.get(), _vts);
+            auto responseMessage =
+                serviceEntryPoint->handleRequest(subOpCtx.get(), requestMessage).get().response;
+
+            auto replyObj = rpc::makeReply(&responseMessage)->getCommandReply().getOwned();
+            uassertStatusOK(getStatusFromWriteCommandReply(replyObj));
+
+            BatchedCommandResponse response;
+            std::string errorMessage;
+            uassert(ErrorCodes::FailedToParse,
+                    errorMessage,
+                    response.parseBSON(replyObj, &errorMessage));
+
+            return response;
         }
 
-        // Set a default apiVersion for all UMC commands
-        cmdBuilder->append("apiVersion", kOne);
+    private:
+        ServiceContext::UniqueClient _client;
+        BSONObj _writeConcern;
+        DatabaseName _dbName;
+        boost::optional<auth::ValidatedTenancyScope> _vts;
+    };
 
-        auto svcCtx = _client->getServiceContext();
-        auto sep = svcCtx->getService(ClusterRole::ShardServer)->getServiceEntryPoint();
-        auto opMsgRequest = OpMsgRequestBuilder::create(_vts, _dbName, cmdBuilder->obj());
-        auto requestMessage = opMsgRequest.serialize();
+public:
+    UMCTransactionStandalone(StringData cmdName) : UMCTransaction(cmdName) {}
 
-        // Switch to our local client and create a short-lived opCtx for this transaction op.
-        AlternativeClientRegion clientRegion(_client);
-        auto subOpCtx = svcCtx->makeOperationContext(Client::getCurrent());
-        auth::ValidatedTenancyScope::set(subOpCtx.get(), _vts);
+    void run(OperationContext* opCtx,
+             unique_function<Status(UMCTransactionClient&)> txnOpsCallback) final {
+        // In practice this status never makes it to a return
+        // since its populated with the return from txnOpsCallback(),
+        // but guard against bit-rot by pre-populating a generic failure.
+        Status status(ErrorCodes::OperationFailed, "Operation was never attempted");
 
-        auto responseMessage = sep->handleRequest(subOpCtx.get(), requestMessage).get().response;
-        return rpc::makeReply(&responseMessage)->getCommandReply().getOwned();
+        // Be more patient with our test runner.
+        const int kMaxAttempts = getTestCommandsEnabled() ? 10 : 3;
+
+        for (int tries = kMaxAttempts; tries > 0; tries--) {
+            if (tries < kMaxAttempts) {
+                // Emit log on all but the first attempt.
+                LOGV2_DEBUG(5297200,
+                            4,
+                            "Retrying user management command transaction on standalone",
+                            "command"_attr = _cmdName,
+                            "reason"_attr = status);
+            }
+
+            // On standalones, simply run the callback inline without transactionalizing it.
+            UMCTransactionClientStandalone umcTxnClient(opCtx, _cmdName);
+            status = txnOpsCallback(umcTxnClient);
+
+            // If we receive Status::OK() or a non-retryable error, break out of the loop so
+            // we can assert on it being OK at the end of the method. Otherwise, allow the
+            // loop to reiterate without incident if the max retry limit hasn't been reached yet.
+            if (!shouldRetryTransaction(status)) {
+                break;
+            }
+        }
+
+        uassertStatusOK(status);
     }
 
 private:
-    enum class TransactionState {
-        kInit,
-        kStarted,
-        kDone,
+    bool shouldRetryTransaction(const Status& status) {
+        return (status == ErrorCodes::LockTimeout) || (status == ErrorCodes::SnapshotUnavailable);
+    }
+};
+
+/**
+ * Wrapper class to manage UMC transactions on replica sets. It hooks into the transaction API
+ * via SyncTransactionWithRetries.
+ */
+class UMCTransactionReplSet : public UMCTransaction {
+private:
+    class UMCTransactionClientReplSet : public UMCTransactionClient {
+    public:
+        explicit UMCTransactionClientReplSet(StringData cmdName,
+                                             const txn_api::TransactionClient& client)
+            : UMCTransactionClient(cmdName), _txnClient(client) {}
+        UMCTransactionClientReplSet(const txn_api::TransactionClient&&) = delete;
+
+        BatchedCommandResponse runCRUDOp(const BatchedCommandRequest& request,
+                                         std::vector<StmtId> stmtIds) final {
+            return _txnClient.runCRUDOpSync(request, stmtIds);
+        }
+
+    private:
+        const txn_api::TransactionClient& _txnClient;
     };
 
-    bool _isReplSet;
-    ServiceContext::UniqueClient _client;
-    DatabaseName _dbName;
-    OperationSessionInfoFromClient _sessionInfo;
-    TransactionState _state = TransactionState::kInit;
-    boost::optional<auth::ValidatedTenancyScope> _vts;
+public:
+    UMCTransactionReplSet(StringData cmdName) : UMCTransaction(cmdName) {}
+
+    void run(OperationContext* opCtx,
+             unique_function<Status(UMCTransactionClient&)> txnOpsCallback) final {
+        auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+        auto sleepAndCleanupExecutor = serverGlobalParams.clusterRole.has(ClusterRole::None)
+            ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx->getServiceContext())
+            : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+        // Constructing a SyncTransactionWithRetries causes it to store the write concern from the
+        // supplied OperationContext and then wait for that write concern when running/committing
+        // the transaction. If transaction successfully commits locally but fails due to a write
+        // concern error, it throws, which subsequently can cause the writeConcern error to be
+        // reported as a command-level error. That may not necessarily be true as the command's
+        // writes may have been applied successfully, but just not yet replicated to enough nodes as
+        // the requested write concern.
+
+        // To avoid this, we swap in {w: 1} to the OperationContext's write concern so that it never
+        // throws due to a failed write concern. Once the transaction completes, we will update the
+        // OperationContext's Client's ReplClientInfo decoration to the latest system OpTime,
+        // causing it to recognize that a write was performed which may need to be waited on for
+        // replication to satisfy the requested write concern.
+        auto originalWC = opCtx->getWriteConcern();
+        ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+        opCtx->setWriteConcern(WriteConcernOptions());
+        auto txn = txn_api::SyncTransactionWithRetries(
+            opCtx,
+            sleepAndCleanupExecutor,
+            TransactionParticipantResourceYielder::make("UMCTransaction"),
+            inlineExecutor);
+        const auto txnCallback = [this,
+                                  &txnOpsCallback](const txn_api::TransactionClient& txnClient,
+                                                   ExecutorPtr executor) {
+            UMCTransactionClientReplSet umcTxnClient(_cmdName, txnClient);
+            return SemiFuture<void>::makeReady(txnOpsCallback(umcTxnClient));
+        };
+
+        txn.run(opCtx, std::move(txnCallback));
+
+        // SyncTransactionWithRetries advances opCtx's Client's lastProxyWriteTimestamp but leaves
+        // its lastOpTime alone. Since all of the transaction's writes were conducted by a different
+        // Client, opCtx's Client's lastOpTime must be updated to indicate that this Client was
+        // responsible for some writes. Ideally, we would use the exact OpTime corresponding to the
+        // no-op write performed when the transaction was committed, but since that is not yet
+        // available, we set it to the latest opTime in the system right now. That opTime must be >=
+        // commitOpTime, ensuring that the calling Client will wait at least until commitOpTime has
+        // been replicated to enough nodes to satisfy its write concern.
+
+        // TODO SERVER-98338 Change this to use ReplClientInfo::setLastOp(opTime) once
+        // SyncTransactionWithRetries is able to report the OpTime of the transaction commit write.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    }
 };
 
 void uassertNoUnrecognizedActions(const std::vector<std::string>& unrecognizedActions) {
@@ -1774,70 +1827,43 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
     uassertStatusOK(status);
 }
 
-/**
- * Attempt to complete a transaction, retrying up to two times (3 total attempts).
- * Emit an audit entry prior to the first commit attempt,
- * but do not repeat the audit entry for retries.
- */
-using TxnOpsCallback = std::function<Status(UMCTransaction&)>;
-using TxnAuditCallback = std::function<void()>;
-
-bool shouldRetryTransaction(const Status& status) {
-    return (status == ErrorCodes::LockTimeout) || (status == ErrorCodes::SnapshotUnavailable);
+bool validNamespace(const NamespaceString& nss) {
+    return (nss.isAdminDB());
 }
 
-Status retryTransactionOps(OperationContext* opCtx,
-                           StringData forCommand,
-                           TxnOpsCallback ops,
-                           TxnAuditCallback audit) {
-    // In practice this status never makes it to a return
-    // since its populated with the return from ops(),
-    // but guard against bit-rot by pre-populating a generic failure.
-    Status status(ErrorCodes::OperationFailed, "Operation was never attempted");
+write_ops::UpdateCommandRequest buildUpdateRequest(const NamespaceString& nss,
+                                                   BSONObj query,
+                                                   BSONObj update) {
+    dassert(validNamespace(nss));
+    write_ops::UpdateOpEntry entry;
+    entry.setQ(query);
+    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+    entry.setMulti(true);
+    write_ops::UpdateCommandRequest op(nss);
+    op.setUpdates({entry});
+    return op;
+}
 
-    // Be more patient with our test runner which is likely to be
-    // doing aggressive reelections and failovers and replication shenanigans.
-    const int kMaxAttempts = getTestCommandsEnabled() ? 10 : 3;
+write_ops::DeleteCommandRequest buildDeleteRequest(const NamespaceString& nss, BSONObj query) {
+    dassert(validNamespace(nss));
+    write_ops::DeleteOpEntry entry;
+    entry.setQ(query);
+    entry.setMulti(true);
+    write_ops::DeleteCommandRequest op(nss);
+    op.setDeletes({entry});
+    return op;
+}
 
-    for (int tries = kMaxAttempts; tries > 0; --tries) {
-        if (tries < kMaxAttempts) {
-            // Emit log on all but the first attempt.
-            LOGV2_DEBUG(5297200,
-                        4,
-                        "Retrying user management command transaction",
-                        "command"_attr = forCommand,
-                        "reason"_attr = status);
-        }
-
-        UMCTransaction txn(opCtx, forCommand);
-        status = ops(txn);
-        if (!status.isOK()) {
-            if (!shouldRetryTransaction(status)) {
-                return status;
-            }
-            continue;
-        }
-
-        if (tries == kMaxAttempts) {
-            // Only emit audit on first attempt.
-            audit();
-        }
-
-        status = txn.commit();
-        if (status.isOK()) {
-            // Success, see ya later!
-            return status;
-        }
-
-        // Try to responsibly abort, but accept not being able to.
-        txn.abort().ignore();
-
-        if (!shouldRetryTransaction(status)) {
-            return status;
-        }
+void handleUmcTransactionFailpoint() {
+    auto fp = umcTransaction.scoped();
+    if (fp.isActive()) {
+        IDLParserContext ctx("umcTransaction");
+        auto delay = UMCTransactionFailPoint::parse(ctx, fp.getData()).getCommitDelayMS();
+        LOGV2(4993100,
+              "Sleeping prior to committing UMC transaction",
+              "duration"_attr = Milliseconds(delay));
+        sleepmillis(delay);
     }
-
-    return status;
 }
 
 MONGO_REGISTER_COMMAND(CmdUMCTyped<DropRoleCommand>).forShard();
@@ -1866,43 +1892,52 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
         }
     });
 
-    const auto dropRoleOps = [&](UMCTransaction& txn) -> Status {
-        // Remove this role from all users
-        auto swCount = txn.update(usersNSS(dbname.tenantId()),
-                                  BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
-                                  BSON("$pull" << BSON("roles" << roleName.toBSON())));
-        if (!swCount.isOK()) {
-            return useDefaultCode(swCount.getStatus(), ErrorCodes::UserModificationFailed)
-                .withContext(str::stream()
-                             << "Failed to remove role " << roleName << " from all users");
+    // Perform all update/delete operations on the users and roles collections in a transaction.
+    auto dropRoleTxnFn = [&roleName, &dbname](UMCTransactionClient& umcTxnClient) {
+        try {
+            // Remove this role from any user documents that include it.
+            const auto& updateUserDocsOp =
+                buildUpdateRequest(usersNSS(dbname.tenantId()),
+                                   BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
+                                   BSON("$pull" << BSON("roles" << roleName.toBSON())));
+            auto updateUserDocsStatus = umcTxnClient.runCRUDOp(updateUserDocsOp, {}).toStatus();
+            uassertStatusOK(useDefaultCode(updateUserDocsStatus, ErrorCodes::UserModificationFailed)
+                                .withContext(str::stream() << "Failed to remove role " << roleName
+                                                           << " from all users"));
+
+            // Remove this role from all other roles.
+            const auto& updateRoleDocsOp =
+                buildUpdateRequest(rolesNSS(dbname.tenantId()),
+                                   BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
+                                   BSON("$pull" << BSON("roles" << roleName.toBSON())));
+            auto updateRoleDocsStatus = umcTxnClient.runCRUDOp(updateRoleDocsOp, {}).toStatus();
+            uassertStatusOK(useDefaultCode(updateRoleDocsStatus, ErrorCodes::RoleModificationFailed)
+                                .withContext(str::stream() << "Failed to remove role " << roleName
+                                                           << " from all roles"));
+
+            // Finally, remove the actual role document
+            const auto& deleteRoleDocOp =
+                buildDeleteRequest(rolesNSS(dbname.tenantId()), roleName.toBSON());
+            auto deleteRoleDocStatus = umcTxnClient.runCRUDOp(deleteRoleDocOp, {}).toStatus();
+            uassertStatusOK(
+                useDefaultCode(deleteRoleDocStatus, ErrorCodes::RoleModificationFailed)
+                    .withContext(str::stream() << "Failed to remove role " << roleName));
+        } catch (const DBException& ex) {
+            return ex.toStatus();
         }
 
-        // Remove this role from all other roles
-        swCount = txn.update(rolesNSS(dbname.tenantId()),
-                             BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
-                             BSON("$pull" << BSON("roles" << roleName.toBSON())));
-        if (!swCount.isOK()) {
-            return useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
-                .withContext(str::stream()
-                             << "Failed to remove role " << roleName << " from all users");
-        }
-
-        // Finally, remove the actual role document
-        swCount = txn.remove(rolesNSS(dbname.tenantId()), roleName.toBSON());
-        if (!swCount.isOK()) {
-            return swCount.getStatus().withContext(str::stream()
-                                                   << "Failed to remove role " << roleName);
-        }
-
+        handleUmcTransactionFailpoint();
         return Status::OK();
     };
 
-
-    auto status = retryTransactionOps(opCtx, DropRoleCommand::kCommandName, dropRoleOps, [&] {
-        audit::logDropRole(client, roleName);
-    });
-    if (!status.isOK()) {
-        uassertStatusOK(status.withContext("Failed applying dropRole transaction"));
+    // Audit the dropRole attempt before the transaction runs.
+    audit::logDropRole(client, roleName);
+    if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+        UMCTransactionReplSet txn{"dropRole"};
+        txn.run(opCtx, std::move(dropRoleTxnFn));
+    } else {
+        UMCTransactionStandalone txn{"dropRole"};
+        txn.run(opCtx, std::move(dropRoleTxnFn));
     }
 }
 
@@ -1928,53 +1963,60 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
     });
 
     DropAllRolesFromDatabaseReply reply;
-    const auto dropRoleOps = [&](UMCTransaction& txn) -> Status {
+    auto dropAllRolesFromDBTxnFn = [&dbname, &reply](UMCTransactionClient& umcTxnClient) {
         auto roleMatch = BSON(AuthorizationManager::ROLE_DB_FIELD_NAME
                               << dbname.serializeWithoutTenantPrefix_UNSAFE());
         auto rolesMatch = BSON("roles" << roleMatch);
 
-        // Remove these roles from all users
-        auto swCount =
-            txn.update(usersNSS(dbname.tenantId()), rolesMatch, BSON("$pull" << rolesMatch));
-        if (!swCount.isOK()) {
-            return useDefaultCode(swCount.getStatus(), ErrorCodes::UserModificationFailed)
-                .withContext(str::stream()
-                             << "Failed to remove roles from \"" << dbname.toStringForErrorMsg()
-                             << "\" db from all users");
+        try {
+            // Remove this role from any user documents that include it.
+            const auto& updateUserDocsOp = buildUpdateRequest(
+                usersNSS(dbname.tenantId()), rolesMatch, BSON("$pull" << rolesMatch));
+            auto updateUserDocsStatus = umcTxnClient.runCRUDOp(updateUserDocsOp, {}).toStatus();
+            uassertStatusOK(useDefaultCode(updateUserDocsStatus, ErrorCodes::UserModificationFailed)
+                                .withContext(str::stream() << "Failed to remove roles from  \""
+                                                           << dbname.toStringForErrorMsg()
+                                                           << "\" db from all users"));
+
+            // Remove this role from all other roles.
+            const auto& updateRoleDocsOp = buildUpdateRequest(
+                rolesNSS(dbname.tenantId()),
+                BSON("roles" << BSON("roles.db" << dbname.serializeWithoutTenantPrefix_UNSAFE())),
+                BSON("$pull" << rolesMatch));
+            auto updateRoleDocsStatus = umcTxnClient.runCRUDOp(updateRoleDocsOp, {}).toStatus();
+            uassertStatusOK(useDefaultCode(updateRoleDocsStatus, ErrorCodes::RoleModificationFailed)
+                                .withContext(str::stream() << "Failed to remove roles from \""
+                                                           << dbname.toStringForErrorMsg()
+                                                           << "\" db from all roles"));
+
+            // Finally, remove the actual role documents
+            const auto& deleteRoleDocOp =
+                buildDeleteRequest(rolesNSS(dbname.tenantId()), roleMatch);
+            const auto& deleteRoleDocReply = umcTxnClient.runCRUDOp(deleteRoleDocOp, {});
+            auto deleteRoleDocStatus = deleteRoleDocReply.toStatus();
+            uassertStatusOK(
+                useDefaultCode(deleteRoleDocStatus, ErrorCodes::RoleModificationFailed)
+                    .withContext(str::stream()
+                                 << "Removed roles from \"" << dbname.toStringForErrorMsg()
+                                 << "\" db from all users and roles but failed to actually "
+                                    "delete those roles themselves"));
+            reply.setCount(deleteRoleDocReply.getN());
+        } catch (const DBException& ex) {
+            return ex.toStatus();
         }
 
-        // Remove these roles from all other roles
-        swCount = txn.update(rolesNSS(dbname.tenantId()),
-                             BSON("roles.db" << dbname.serializeWithoutTenantPrefix_UNSAFE()),
-                             BSON("$pull" << rolesMatch));
-        if (!swCount.isOK()) {
-            return useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
-                .withContext(str::stream()
-                             << "Failed to remove roles from \"" << dbname.toStringForErrorMsg()
-                             << "\" db from all roles");
-        }
-
-        // Finally, remove the actual role documents
-        swCount = txn.remove(rolesNSS(dbname.tenantId()), roleMatch);
-        if (!swCount.isOK()) {
-            return swCount.getStatus().withContext(
-                str::stream() << "Removed roles from \"" << dbname.toStringForErrorMsg()
-                              << "\" db "
-                                 " from all users and roles but failed to actually delete"
-                                 " those roles themselves");
-        }
-
-        reply.setCount(swCount.getValue());
+        handleUmcTransactionFailpoint();
         return Status::OK();
     };
 
-    auto status =
-        retryTransactionOps(opCtx, DropAllRolesFromDatabaseCommand::kCommandName, dropRoleOps, [&] {
-            audit::logDropAllRolesFromDatabase(opCtx->getClient(), dbname);
-        });
-    if (!status.isOK()) {
-        uassertStatusOK(
-            status.withContext("Failed applying dropAllRolesFromDatabase command transaction"));
+    // Audit the dropAllRolesFromDatabase attempt before the transaction runs.
+    audit::logDropAllRolesFromDatabase(opCtx->getClient(), dbname);
+    if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+        UMCTransactionReplSet txn{"dropAllRolesFromDatabase"};
+        txn.run(opCtx, std::move(dropAllRolesFromDBTxnFn));
+    } else {
+        UMCTransactionStandalone txn{"dropRole"};
+        txn.run(opCtx, std::move(dropAllRolesFromDBTxnFn));
     }
 
     return reply;
@@ -2431,4 +2473,5 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
 }
 
 }  // namespace
+
 }  // namespace mongo
