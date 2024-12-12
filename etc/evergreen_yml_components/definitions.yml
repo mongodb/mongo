@@ -3744,7 +3744,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
+      jstestfuzz_vars: --diffTestingMode optimization
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-expr-fuzzer
@@ -3804,7 +3804,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 5
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
+      jstestfuzz_vars: --diffTestingMode optimization
       npm_command: change-stream-fuzzer
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
