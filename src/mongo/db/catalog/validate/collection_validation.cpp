@@ -125,11 +125,11 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
         const IndexDescriptor* descriptor = entry->descriptor();
         const IndexAccessMethod* iam = entry->accessMethod();
 
-        LOGV2_OPTIONS(20295,
-                      {LogComponent::kIndex},
-                      "Validating internal structure",
-                      "index"_attr = descriptor->indexName(),
-                      logAttrs(validateState->nss()));
+        LOGV2_PROD_ONLY_OPTIONS(20295,
+                                {LogComponent::kIndex},
+                                "Validating internal structure",
+                                "index"_attr = descriptor->indexName(),
+                                logAttrs(validateState->nss()));
 
         auto indexResults = iam->validate(opCtx, *validateState);
 
@@ -158,11 +158,11 @@ void _validateIndexes(OperationContext* opCtx,
                                           ->findIndexByIdent(opCtx, indexIdent)
                                           ->indexName();
 
-        LOGV2_OPTIONS(20296,
-                      {LogComponent::kIndex},
-                      "Validating index consistency",
-                      "index"_attr = indexName,
-                      logAttrs(validateState->nss()));
+        LOGV2_PROD_ONLY_OPTIONS(20296,
+                                {LogComponent::kIndex},
+                                "Validating index consistency",
+                                "index"_attr = indexName,
+                                logAttrs(validateState->nss()));
 
         int64_t numTraversedKeys;
         indexValidator->traverseIndex(opCtx,
