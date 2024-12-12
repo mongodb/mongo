@@ -116,6 +116,18 @@ public:
         return _isUpdatePending.load();
     }
 
+    void createCollection(NamespaceString nss) {
+        _collections[nss] = true;
+    }
+
+    bool collectionExists(NamespaceString nss) {
+        return _collections.contains(nss);
+    }
+
+    void removeCollection(NamespaceString nss) {
+        _collections.erase(nss);
+    }
+
 private:
     Future<DbResponse> beginUpdates() {
         ASSERT_FALSE(_isUpdatePending.load());
@@ -168,6 +180,7 @@ private:
     const InternalSessionPool::Session _session{makeLogicalSessionIdForTest(), 42};
     AtomicWord<bool> _sessionIsCheckedOut{false};
     AtomicWord<bool> _migrationsAreBlocked{false};
+    std::map<NamespaceString, bool> _collections;
 };
 
 class MultiUpdateCoordinatorExternalStateForTest : public MultiUpdateCoordinatorExternalState {
@@ -205,6 +218,14 @@ public:
                          const NamespaceString& nss,
                          mongo::AggregateCommandRequest& request) const override {
         return _fakeState->isUpdatePending();
+    }
+
+    bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) const override {
+        return _fakeState->collectionExists(nss);
+    }
+
+    void createCollection(OperationContext* opCtx, const NamespaceString& nss) const override {
+        _fakeState->createCollection(nss);
     }
 
     InternalSessionPool::Session acquireSession() override {
@@ -253,6 +274,7 @@ protected:
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
     std::shared_ptr<ExternalStateFake> _externalState;
+    bool _testUpsert = false;
 
     void setUp() override {
         _externalState = std::make_shared<ExternalStateFake>();
@@ -292,6 +314,10 @@ protected:
                                    << "abc123");
         const BSONObj update = BSON("$set" << BSON("points" << 50));
         auto rawUpdate = BSON("q" << query << "u" << update << "multi" << true);
+        if (_testUpsert) {
+            rawUpdate.addField(BSON("upsert" << true).firstElement());
+            metadata.setIsUpsert(true);
+        }
         auto cmd = BSON("update"
                         << "coll"
                         << "updates" << BSON_ARRAY(rawUpdate));
@@ -727,6 +753,50 @@ TEST_F(MultiUpdateCoordinatorTest, CoordinatorWaitsForPendingUpdates) {
     fp->setMode(FailPoint::off);
     _externalState->completeUpdates(updateSuccessResponseBSONObj());
     ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MultiUpdateCoordinatorTest, CoordinatorPreCreatesCollectionForUpsert) {
+    _testUpsert = true;
+    auto [instance, hangBlockingMigrationsFp] =
+        createInstanceInPhase(Progress::kAfter, Phase::kBlockMigrations);
+
+    ASSERT_FALSE(_externalState->collectionExists(kNamespace));
+
+    hangBlockingMigrationsFp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    ASSERT_TRUE(_externalState->collectionExists(kNamespace));
+}
+
+TEST_F(MultiUpdateCoordinatorTest, CoordinatorDoesNotPreCreateCollectionForNonUpsert) {
+    _testUpsert = false;
+    auto [instance, hangBlockingMigrationsFp] =
+        createInstanceInPhase(Progress::kAfter, Phase::kBlockMigrations);
+
+    ASSERT_FALSE(_externalState->collectionExists(kNamespace));
+
+    hangBlockingMigrationsFp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    ASSERT_FALSE(_externalState->collectionExists(kNamespace));
+}
+
+TEST_F(MultiUpdateCoordinatorTest, CoordinatorFailsOnMissingCollectionPostMigrationBlockForUpsert) {
+    _testUpsert = true;
+
+    ASSERT_FALSE(_externalState->collectionExists(kNamespace));
+
+    auto fp = globalFailPointRegistry().find("hangAfterBlockingMigrations");
+    auto count = fp->setMode(FailPoint::alwaysOn);
+    auto instance = createInstance();
+
+    // Wait for migrations to be blocked and remove the collection again before continuing.
+    fp->waitForTimesEntered(count + 1);
+    ASSERT_TRUE(_externalState->collectionExists(kNamespace));
+    _externalState->removeCollection(kNamespace);
+    fp->setMode(FailPoint::off);
+
+    ASSERT_EQ(instance->getCompletionFuture().getNoThrow().getStatus(), ErrorCodes::CommandFailed);
 }
 
 DEATH_TEST_F(MultiUpdateCoordinatorTest, AbortReasonMustBeError, "!reason.isOK()") {
