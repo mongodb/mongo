@@ -3026,7 +3026,6 @@ tasks:
       num_tasks: 5
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-      jstestfuzz_vars: --numPipelines=3000
       npm_command: agg-expr-fuzzer
       name: aggregation_expression_multiversion_fuzzer
       require_multiversion: true
