@@ -362,6 +362,8 @@ last-continuous:
       ticket: SERVER-93874
     - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
       ticket: SERVER-97044
+    - test_file: jstests/sharding/analyze_shard_key/query_sampling_after_resharding.js
+      ticket: SERVER-96783
   suites: null
 last-lts:
   all:
@@ -771,4 +773,6 @@ last-lts:
       ticket: SERVER-97254
     - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
       ticket: SERVER-97044
+    - test_file: jstests/sharding/analyze_shard_key/query_sampling_after_resharding.js
+      ticket: SERVER-96783
   suites: null

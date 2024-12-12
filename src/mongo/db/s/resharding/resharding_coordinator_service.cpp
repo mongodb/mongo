@@ -94,6 +94,7 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection_gen.h"
@@ -551,6 +552,31 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
     assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
 }
 
+/*
+ * Updates the collection UUID of the QueryAnalyzerDocument for a collection being resharded if
+ * query sampling is enabled.
+ */
+void updateQueryAnalyzerMetadata(OperationContext* opCtx,
+                                 const ReshardingCoordinatorDocument& coordinatorDoc,
+                                 TxnNumber txnNumber) {
+
+    auto writeOp =
+        BSON("$set" << BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName
+                            << coordinatorDoc.getReshardingUUID()));
+
+    auto request = BatchedCommandRequest::buildUpdateOp(
+        NamespaceString::kConfigQueryAnalyzersNamespace,
+        BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName
+             << coordinatorDoc.getSourceUUID()),  // query
+        writeOp,
+        false,  // upsert
+        false   // multi
+    );
+
+    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, NamespaceString::kConfigQueryAnalyzersNamespace, request, txnNumber);
+}
+
 void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                                         const ReshardingCoordinatorDocument& coordinatorDoc,
                                         boost::optional<ChunkVersion> chunkVersion,
@@ -913,6 +939,10 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                                         newCollectionTimestamp,
                                                         reshardedCollectionPlacement,
                                                         txnNumber);
+
+            // Update the QueryAnalyzerDocument for the resharded collection with the new collection
+            // UUID.
+            updateQueryAnalyzerMetadata(opCtx, coordinatorDoc, txnNumber);
 
             // Delete all of the config.tags entries for the user collection namespace.
             const auto removeTagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
