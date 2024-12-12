@@ -112,6 +112,10 @@ private:
     template <UnionType T>
     CEResult indexUnionCard(const T* node);
 
+    // Cardinality of nodes that do not affect the number of documents - their output cardinality
+    // is the same as their input.
+    CEResult passThroughNodeCard(const QuerySolutionNode* node);
+
     CardinalityEstimate conjCard(size_t offset, CardinalityEstimate inputCard) {
         std::span selsToEstimate(std::span(_conjSels.begin() + offset, _conjSels.end()));
         SelectivityEstimate conjSel = conjExponentialBackoff(selsToEstimate);

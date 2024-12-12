@@ -157,6 +157,13 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             }
             break;
         }
+        case STAGE_PROJECTION_DEFAULT:
+        case STAGE_PROJECTION_COVERED:
+        case STAGE_PROJECTION_SIMPLE: {
+            const auto& inCE = childCEs[0];
+            nodeCost = projectionStartup * oneCE + projectionIncrement * inCE + childCosts[0];
+            break;
+        }
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9695102);
     }
@@ -227,5 +234,10 @@ const CostCoefficient CostEstimator::sortWithLimitIncrement =
 const CostCoefficient CostEstimator::sortedMergeStartup = minCC;
 const CostCoefficient CostEstimator::sortedMergeIncrement =
     CostCoefficient{CostCoefficientType{100.0_ms}};
+
+const CostCoefficient CostEstimator::projectionStartup =
+    CostCoefficient{CostCoefficientType{1103.4_ms}};
+const CostCoefficient CostEstimator::projectionIncrement =
+    CostCoefficient{CostCoefficientType{430.6_ms}};
 
 }  // namespace mongo::cost_based_ranker

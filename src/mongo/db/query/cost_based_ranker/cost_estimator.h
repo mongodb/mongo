@@ -98,6 +98,9 @@ private:
     static const CostCoefficient sortedMergeStartup;
     static const CostCoefficient sortedMergeIncrement;
 
+    static const CostCoefficient projectionStartup;
+    static const CostCoefficient projectionIncrement;
+
     EstimateMap& _estimateMap;
 };
 

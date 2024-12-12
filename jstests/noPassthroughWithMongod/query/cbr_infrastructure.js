@@ -28,9 +28,9 @@ coll1.drop();
 // Insert such data that some queries will do well with an {a: 1} index while
 // others with a {b: 1} index.
 assert.commandWorked(
-    coll.insertMany(Array.from({length: 5000}, (_, i) => ({a: 1, b: i, c: i % 7}))));
+    coll.insertMany(Array.from({length: 3000}, (_, i) => ({a: 1, b: i, c: i % 7, x: i % 5}))));
 assert.commandWorked(
-    coll.insertMany(Array.from({length: 5000}, (_, i) => ({a: i, b: 1, c: i % 3}))));
+    coll.insertMany(Array.from({length: 3000}, (_, i) => ({a: i, b: 1, c: i % 3, x: i % 9}))));
 
 coll.createIndexes([{a: 1}, {b: 1}, {c: 1, b: 1, a: 1}, {a: 1, b: 1}, {c: 1, a: 1}]);
 
@@ -106,18 +106,18 @@ function assertCbrExplain(plan) {
     }
 }
 
-function checkWinningPlan(query) {
+function checkWinningPlan({query = {}, project = {}, order = {}}) {
     const isRootedOr = (Object.keys(query).length == 1 && Object.keys(query)[0] === "$or");
 
     // Classic plan via multiplanning
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
-    const e0 = coll.find(query).explain("executionStats");
+    const e0 = coll.find(query, project).sort(order).explain("executionStats");
     const w0 = getWinningPlanFromExplain(e0);
     const r0 = getRejectedPlans(e0);
 
     // Classic plan via CBR
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
-    const e1 = coll.find(query).explain("executionStats");
+    const e1 = coll.find(query, project).sort(order).explain("executionStats");
     const w1 = getWinningPlanFromExplain(e1);
     const r1 = getRejectedPlans(e1);
 
@@ -161,11 +161,29 @@ function verifyHeuristicEstimateSource() {
 }
 
 try {
-    checkWinningPlan(q1);
-    checkWinningPlan(q2);
-    checkWinningPlan(q3);
-    checkWinningPlan(q4);
-    checkWinningPlan(q5);
+    const queries = [q1, q2, q3, q4, q5];
+    for (const q of queries) {
+        checkWinningPlan({query: q});
+        // Test variants of each query with different combinations of projection and sort fields.
+        // The tests permute which field is indexed, and whether the indexed fields are the same
+        // or different ones.
+        checkWinningPlan({query: q, project: {a: 1}});
+        checkWinningPlan({query: q, project: {x: 1}});
+        checkWinningPlan({query: q, project: {a: 1, _id: 0}});
+        checkWinningPlan({query: q, project: {x: 1, _id: 0}});
+        checkWinningPlan({query: q, project: {c: 0}});
+        checkWinningPlan({query: q, project: {a: 1, b: 1}});
+        checkWinningPlan({query: q, project: {a: 1, x: 1}});
+        checkWinningPlan({query: q, project: {b: {$add: ['$a', 1]}}});
+        checkWinningPlan({query: q, project: {a: 1}, order: {a: 1}});
+        checkWinningPlan({query: q, project: {a: 1}, order: {b: 1}});
+        checkWinningPlan({query: q, project: {x: 1}, order: {a: 1}});
+        checkWinningPlan({query: q, project: {a: 1}, order: {x: 1}});
+        checkWinningPlan({query: q, project: {x: 1}, order: {x: 1}});
+        checkWinningPlan({query: q, project: {a: 1}, order: {b: -1, x: -1}});
+        checkWinningPlan({query: q, project: {a: 1, b: 1}, order: {c: 1, b: 1, a: 1}});
+    }
+
     verifyCollectionCardinalityEstimate();
     verifyHeuristicEstimateSource();
 
@@ -187,10 +205,7 @@ try {
     assert.throwsWithCode(() => coll1.find({a: 1}).explain(), ErrorCodes.HistogramCEFailure);
 
     // Create a histogram on field "b".
-    // TODO SERVER-97814: Due to incompleteness of CBR 'analyze' must be run with multi-planning.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
     assert.commandWorked(coll1.runCommand({analyze: collName, key: "b"}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
 
     // Request histogam CE on a field that doesn't have a histogram
     assert.throwsWithCode(() => coll1.find({a: 1}).explain(), ErrorCodes.HistogramCEFailure);

@@ -1641,8 +1641,6 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
         return statusWithMultiPlanSolns.getStatus();
     }
 
-    // TODO SERVER-97529: This is a temporary stub implementation of CBR which arbitrarily picks
-    // the last of the enumerated plans.
     auto cbrMode = query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
     EstimateMap estimates;
     CardinalityEstimator cardEstimator(

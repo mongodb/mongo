@@ -89,9 +89,10 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             break;
         case STAGE_SORT_DEFAULT:
         case STAGE_SORT_SIMPLE:
-            tassert(9768401, "Sort nodes are not expected to have filters.", !node->filter);
-            ceRes = _inputCard;
-            isConjunctionBreaker = true;
+        case STAGE_PROJECTION_DEFAULT:
+        case STAGE_PROJECTION_COVERED:
+        case STAGE_PROJECTION_SIMPLE:
+            ceRes = passThroughNodeCard(node);
             break;
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9586709);
@@ -245,11 +246,25 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         est.filterCE = ceRes2.getValue();
     }
 
-    // Combine the selectivity of this node's filter with its child selectivities.
+    tassert(9768403,
+            "FetchNode must have direct or indirect children that somehow filter data.",
+            _conjSels.size() > 0);
+
+    // Combine the selectivity of this node's filter (if any) with its child selectivities.
     est.outCE = conjCard(0, _inputCard);
     CardinalityEstimate outCE{est.outCE};
     _qsnEstimates.emplace(node, std::move(est));
 
+    return outCE;
+}
+
+CEResult CardinalityEstimator::passThroughNodeCard(const QuerySolutionNode* node) {
+    tassert(9768401, "Pass-through nodes cannot have filters.", !node->filter);
+    tassert(9768402, "Pass-through nodes must have a single child.", node->children.size() == 1);
+    QSNEstimate est;
+    est.outCE = estimate(node->children[0].get()).getValue();
+    CardinalityEstimate outCE{est.outCE};
+    _qsnEstimates.emplace(node, std::move(est));
     return outCE;
 }
 
