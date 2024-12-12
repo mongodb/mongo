@@ -75,30 +75,48 @@ TEST(EncryptSchemaTest, KeyIDTypeInvalidTest) {
     ASSERT_THROWS(EncryptSchemaKeyId::parseFromBSON(elem), DBException);
 }
 
-DEATH_TEST(EncryptSchemaTest, KeyIDPointerToBSON, "invariant") {
+DEATH_TEST(EncryptSchemaTest, KeyIDPointerToBSON, "tassert") {
     BSONObjBuilder builder;
     EncryptSchemaKeyId pointerKeyID{"/pointer"};
+
     pointerKeyID.serializeToBSON("pointer", &builder);
     auto resultObj = builder.obj();
+    ASSERT_BSONOBJ_EQ(resultObj,
+                      BSON("pointer"
+                           << "/pointer"));
     BSONElement pointer = resultObj["pointer"];
     ASSERT(pointer);
     ASSERT_EQ(pointer.type(), BSONType::String);
-    EncryptSchemaKeyId pointerParsed = EncryptSchemaKeyId::parseFromBSON(pointer);
-    pointerParsed.uuids();
+
+    EncryptSchemaKeyId parsedPointer = EncryptSchemaKeyId::parseFromBSON(pointer);
+    ASSERT_EQ(parsedPointer.type(), EncryptSchemaKeyId::Type::kJSONPointer);
+    ASSERT_EQ(parsedPointer.jsonPointer().toString(), "/pointer");
+
+    // Attempt to access as UUIDs. We expect this to tassert since it is the wrong type.
+    parsedPointer.uuids();
 }
 
-DEATH_TEST(EncryptSchemaTest, KeyIDArrayToBSON, "invariant") {
+DEATH_TEST(EncryptSchemaTest, KeyIDArrayToBSON, "tassert") {
     BSONObjBuilder builder;
-    std::vector<UUID> vect{UUID::gen(), UUID::gen()};
-    EncryptSchemaKeyId vectKeyId{vect};
+    std::vector<UUID> uuidList{UUID::gen(), UUID::gen()};
+    EncryptSchemaKeyId vectKeyId{uuidList};
+
     vectKeyId.serializeToBSON("array", &builder);
     auto resultObj = builder.obj();
+    ASSERT_BSONOBJ_EQ(resultObj, BSON("array" << BSON_ARRAY(uuidList[0] << uuidList[1])));
     BSONElement array = resultObj["array"];
     ASSERT(array);
     ASSERT_EQ(array.type(), BSONType::Array);
     ASSERT_EQ(array.Array().size(), unsigned{2});
-    EncryptSchemaKeyId parsed = EncryptSchemaKeyId::parseFromBSON(array);
-    parsed.jsonPointer();
+
+    EncryptSchemaKeyId parsedArray = EncryptSchemaKeyId::parseFromBSON(array);
+    ASSERT_EQ(parsedArray.type(), EncryptSchemaKeyId::Type::kUUIDs);
+    std::vector<UUID> parsedUUIDs = parsedArray.uuids();
+    ASSERT_EQ(parsedUUIDs[0], uuidList[0]);
+    ASSERT_EQ(parsedUUIDs[1], uuidList[1]);
+
+    // Attempt to access as a jsonPointer. We expect this to tassert since this is the wrong type.
+    parsedArray.jsonPointer();
 }
 
 TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
