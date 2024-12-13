@@ -120,11 +120,6 @@ void ExecutionStatsController::incNumCommits(long long increment) {
     _globalStats->numCommits.fetchAndAddRelaxed(increment);
 }
 
-void ExecutionStatsController::incNumMeasurementsGroupCommitted(long long increment) {
-    _collectionStats->numMeasurementsGroupCommitted.fetchAndAddRelaxed(increment);
-    _globalStats->numMeasurementsGroupCommitted.fetchAndAddRelaxed(increment);
-}
-
 void ExecutionStatsController::incNumWaits(long long increment) {
     _collectionStats->numWaits.fetchAndAddRelaxed(increment);
     _globalStats->numWaits.fetchAndAddRelaxed(increment);
@@ -192,8 +187,6 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
 
     auto commits = stats.numCommits.load();
     builder.appendNumber("numCommits", commits);
-    builder.appendNumber("numMeasurementsGroupCommitted",
-                         stats.numMeasurementsGroupCommitted.load());
     builder.appendNumber("numWaits", stats.numWaits.load());
     auto measurementsCommitted = stats.numMeasurementsCommitted.load();
     builder.appendNumber("numMeasurementsCommitted", measurementsCommitted);
@@ -250,7 +243,6 @@ void addCollectionExecutionCounters(ExecutionStatsController& stats,
     stats.incNumCompressedBucketsConvertedToUnsorted(
         collStats.numCompressedBucketsConvertedToUnsorted.load());
     stats.incNumCommits(collStats.numCommits.load());
-    stats.incNumMeasurementsGroupCommitted(collStats.numMeasurementsGroupCommitted.load());
     stats.incNumWaits(collStats.numWaits.load());
     stats.incNumMeasurementsCommitted(collStats.numMeasurementsCommitted.load());
     stats.incNumBucketsReopened(collStats.numBucketsReopened.load());

@@ -777,13 +777,6 @@ void appendExecutionStats(const BucketCatalog& catalog,
     }
 }
 
-void reportMeasurementsGroupCommitted(BucketCatalog& catalog,
-                                      const UUID& collectionUUID,
-                                      int64_t count) {
-    auto stats = internal::getOrInitializeExecutionStats(catalog, collectionUUID);
-    stats.incNumMeasurementsGroupCommitted(count);
-}
-
 StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catalog,
                                                             const UUID& collectionUUID,
                                                             const StringDataComparator* comparator,

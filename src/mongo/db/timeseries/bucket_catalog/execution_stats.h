@@ -65,7 +65,6 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketsFrozen;
     AtomicWord<long long> numCompressedBucketsConvertedToUnsorted;
     AtomicWord<long long> numCommits;
-    AtomicWord<long long> numMeasurementsGroupCommitted;
     AtomicWord<long long> numWaits;
     AtomicWord<long long> numMeasurementsCommitted;
     AtomicWord<long long> numBucketsReopened;
@@ -105,7 +104,6 @@ public:
     void incNumBucketsFrozen(long long increment = 1);
     void incNumCompressedBucketsConvertedToUnsorted(long long increment = 1);
     void incNumCommits(long long increment = 1);
-    void incNumMeasurementsGroupCommitted(long long increment = 1);
     void incNumWaits(long long increment = 1);
     void incNumMeasurementsCommitted(long long increment = 1);
     void incNumBucketsReopened(long long increment = 1);

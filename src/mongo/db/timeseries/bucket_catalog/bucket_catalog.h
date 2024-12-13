@@ -388,15 +388,6 @@ void appendExecutionStats(const BucketCatalog& catalog,
                           BSONObjBuilder& builder);
 
 /**
- * Reports a number of measurements inserted that were committed by a different thread than the one
- * that initially staged them. These measurements are considered to have benefitted from "group
- * commit".
- */
-void reportMeasurementsGroupCommitted(BucketCatalog& catalog,
-                                      const UUID& collectionUUID,
-                                      int64_t count);
-
-/**
  * Returns a tuple of InsertContext 'insertContext', Date_t 'time', where insertContext contains
  * information needed to insert a measurement into the correct bucket and time refers to the
  * timeField value of the measurement we are inserting.

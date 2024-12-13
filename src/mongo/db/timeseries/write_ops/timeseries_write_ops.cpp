@@ -977,23 +977,10 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     std::vector<size_t> docsToRetry;
 
     UUID collectionUUID = *optUuid;
-    stdx::unordered_set<bucket_catalog::WriteBatch*> handledHere;
-    int64_t handledElsewhere = 0;
-    auto reportMeasurementsGuard =
-        ScopeGuard([&collectionUUID, &handledElsewhere, &request, opCtx]() {
-            if (handledElsewhere > 0) {
-                auto& bucketCatalog =
-                    bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-                bucket_catalog::reportMeasurementsGroupCommitted(
-                    bucketCatalog, collectionUUID, handledElsewhere);
-            }
-        });
-
     size_t itr = 0;
     for (; itr < batches.size(); ++itr) {
         auto& [batch, index] = batches[itr];
         if (bucket_catalog::claimWriteBatchCommitRights(*batch)) {
-            handledHere.insert(batch.get());
             auto stmtIds = isTimeseriesWriteRetryable(opCtx) ? std::move(bucketStmtIds[batch.get()])
                                                              : std::vector<StmtId>{};
             try {
@@ -1040,8 +1027,6 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
             if (!canContinue) {
                 break;
             }
-        } else if (!handledHere.contains(batch.get())) {
-            ++handledElsewhere;
         }
     }
 
