@@ -456,6 +456,7 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
     import pty
 
     parent_fd, child_fd = pty.openpty()  # provide tty
+    Globals.timeout_event.clear()
     bazel_proc = bazel_build_subproc_func(
         args=bazel_cmd,
         stdin=child_fd,
@@ -466,7 +467,6 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
 
     buffer = ""
     os.close(child_fd)
-    Globals.timeout_event.clear()
     Globals.last_sched_target_progress = ""
     Globals.sched_time_start = time.time()
     try:
@@ -501,6 +501,7 @@ def perform_tty_bazel_build(bazel_cmd: str) -> None:
 
 
 def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
+    Globals.timeout_event.clear()
     bazel_proc = bazel_build_subproc_func(
         args=bazel_cmd,
         stdout=subprocess.PIPE,
@@ -508,7 +509,7 @@ def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
         env={**os.environ.copy(), **Globals.bazel_env_variables},
         text=True,
     )
-    Globals.timeout_event.clear()
+
     Globals.last_sched_target_progress = ""
     Globals.sched_time_start = time.time()
 
