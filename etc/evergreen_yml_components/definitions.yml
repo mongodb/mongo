@@ -2851,6 +2851,15 @@ functions:
       env:
         PGO_PROFILE_URL: ${pgo_profile_url}
 
+  "BOLT":
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/functions/bolt.sh"
+      env:
+        BOLT: ${bolt}
+
   "process code coverage data": &process_code_coverage_data
     command: subprocess.exec
     params:

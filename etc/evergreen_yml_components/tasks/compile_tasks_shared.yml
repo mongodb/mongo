@@ -162,6 +162,7 @@ tasks:
             - "src/evergreen/run_python_script.sh"
             - "evergreen/macos_notary.py"
             - "mongodb-binaries.${ext|tgz}"
+      - func: "BOLT"
 
       - command: s3.put
         params:

@@ -439,6 +439,19 @@ buildvariants:
       - name: schedule_compile
       - name: package_supplementary_data
 
+  - name: schedule-compile-amazon2-arm64-bolt
+    display_name: "* Schedule Compile for Amazon Linux 2 arm64 BOLT"
+    expansions:
+      compile_variant: amazon2-arm64-compile-bolt
+      compile_task_name: archive_dist_test
+      binary_artifact_name: Binaries
+    modules: *modules
+    run_on:
+      - amazon2-arm64-latest-small
+    tasks:
+      - name: schedule_compile
+      - name: package_supplementary_data
+
   - name: schedule-compile-amazon2-arm64-mongocrypt-shlib
     display_name: "* Schedule mongo_crypt_v1.so Compile for Amazon Linux 2 arm64"
     expansions:

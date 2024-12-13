@@ -509,6 +509,12 @@ add_option(
 )
 
 add_option(
+    "bolt",
+    help="compile with bolt",
+    nargs=0,
+)
+
+add_option(
     "enable-http-client",
     choices=["auto", "on", "off"],
     default="auto",
