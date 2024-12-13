@@ -2,9 +2,6 @@
  * Tests 'deleteOne' command on sharded collections when specifying shard key.
  *
  * @tags: [
- *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
- *   # flag can be removed.
- *   multiversion_incompatible,
  * ]
  */
 

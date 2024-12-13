@@ -2,9 +2,6 @@
  * Test $collMod command on a sharded timeseries collection.
  *
  * @tags: [
- *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
- *   # flag can be removed.
- *   multiversion_incompatible,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -109,11 +106,9 @@ function runReadAfterWriteTest() {
         // If we are writing to time-series collections using the compressed format, the data fields
         // will be compressed. We need to decompress the buckets on the shard in order to inspect
         // the data._id field.
-        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-            buckets.forEach(bucket => {
-                TimeseriesTest.decompressBucket(bucket);
-            });
-        }
+        buckets.forEach(bucket => {
+            TimeseriesTest.decompressBucket(bucket);
+        });
 
         const _ids = [];
         buckets.forEach(bucket => {

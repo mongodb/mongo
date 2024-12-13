@@ -80,18 +80,8 @@ TimeseriesTest.run((insert) => {
         assert.eq("b".repeat(largeValueSize),
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
-        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-            assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-                   'expected first bucket to be compressed: ' + tojson(bucketDocs));
-        } else {
-            // Because the strings remain uncompressed, the bucket doesn't get compressed when
-            // closed due to size as it would not be any smaller.
-            assert.eq(1, coll.stats().timeseries.numUncompressedBuckets);
-            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                      bucketDocs[0].control.version,
-                      'expected first bucket to be uncompressed: ' + tojson(bucketDocs));
-        }
-
+        assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
+               'expected first bucket to be compressed: ' + tojson(bucketDocs));
         assert(!bucketDocs[0].control.hasOwnProperty("closed"),
                'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
 
@@ -108,9 +98,7 @@ TimeseriesTest.run((insert) => {
         assert.eq("a".repeat(largeValueSize),
                   bucketDocs[1].control.max.x,
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                      ? TimeseriesTest.BucketVersion.kCompressedSorted
-                      : TimeseriesTest.BucketVersion.kUncompressed,
+        assert.eq(TimeseriesTest.BucketVersion.kCompressedSorted,
                   bucketDocs[1].control.version,
                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
 

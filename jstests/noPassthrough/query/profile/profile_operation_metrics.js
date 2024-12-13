@@ -1376,13 +1376,9 @@ const operations = [
             assert.eq(profileDoc.docUnitsRead, 0, "docUnitsRead");
             assert.eq(profileDoc.idxEntryBytesRead, 0, "idxEntryBytesRead");
             assert.eq(profileDoc.idxEntryUnitsRead, 0, "idxEntryUnitsRead");
-            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                // This test inserts a single small measurement, so the compressed bucket is
-                // slightly larger than the uncompressed bucket.
-                assert.eq(profileDoc.docBytesWritten, 218, "docBytesWritten");
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 207, "docBytesWritten");
-            }
+            // This test inserts a single small measurement, so the compressed bucket is
+            // slightly larger than the uncompressed bucket.
+            assert.eq(profileDoc.docBytesWritten, 218, "docBytesWritten");
             assert.eq(profileDoc.docUnitsWritten, 2, "docUnitsWritten");
             assert.eq(profileDoc.idxEntryBytesWritten, 34, "idxEntryBytesWritten");
             assert.eq(profileDoc.idxEntryUnitsWritten, 3, "idxEntryUnitsWritten");
@@ -1401,13 +1397,9 @@ const operations = [
             assert.eq(profileDoc.docUnitsRead, 0, "docUnitsRead");
             assert.eq(profileDoc.idxEntryBytesRead, 0, "idxEntryBytesRead");
             assert.eq(profileDoc.idxEntryUnitsRead, 0, "idxEntryUnitsRead");
-            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                // This test inserts a single small measurement, so the compressed bucket is
-                // slightly larger than the uncompressed bucket.
-                assert.eq(profileDoc.docBytesWritten, 218, "docBytesWritten");
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 207, "docBytesWritten");
-            }
+            // This test inserts a single small measurement, so the compressed bucket is
+            // slightly larger than the uncompressed bucket.
+            assert.eq(profileDoc.docBytesWritten, 218, "docBytesWritten");
             assert.eq(profileDoc.docUnitsWritten, 2, "docUnitsWritten");
             assert.eq(profileDoc.idxEntryBytesWritten, 35, "idxEntryBytesWritten");
             assert.eq(profileDoc.idxEntryUnitsWritten, 3, "idxEntryUnitsWritten");
@@ -1422,15 +1414,10 @@ const operations = [
         },
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': true},
         profileAssert: (db, profileDoc) => {
-            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                // This test inserts a single small measurement, so the compressed bucket is
-                // slightly larger than the uncompressed bucket.
-                assert.eq(profileDoc.docBytesWritten, 18, "docBytesWritten");
-                assert.eq(profileDoc.docBytesRead, 218, "docBytesRead");
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 26, "docBytesWritten");
-                assert.eq(profileDoc.docBytesRead, 207, "docBytesRead");
-            }
+            // This test inserts a single small measurement, so the compressed bucket is
+            // slightly larger than the uncompressed bucket.
+            assert.eq(profileDoc.docBytesWritten, 18, "docBytesWritten");
+            assert.eq(profileDoc.docBytesRead, 218, "docBytesRead");
             assert.eq(profileDoc.docUnitsRead, 2, "docUnitsRead");
             assert.eq(profileDoc.idxEntryBytesRead, 0, "idxEntryBytesRead");
             assert.eq(profileDoc.idxEntryUnitsRead, 0, "idxEntryUnitsRead");
@@ -1448,14 +1435,8 @@ const operations = [
         },
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': false},
         profileAssert: (db, profileDoc) => {
-            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                assert.eq(profileDoc.docBytesRead, 218, "docBytesRead");
-                assert.eq(profileDoc.docBytesWritten, 18, "docBytesWritten");
-            } else {
-                assert.eq(profileDoc.docBytesRead, 207, "docBytesRead");
-                assert.eq(profileDoc.docBytesWritten, 26, "docBytesWritten");
-                assert.eq(profileDoc.docUnitsRead, 2, "docUnitsRead");
-            }
+            assert.eq(profileDoc.docBytesRead, 218, "docBytesRead");
+            assert.eq(profileDoc.docBytesWritten, 18, "docBytesWritten");
             assert.eq(profileDoc.idxEntryBytesRead, 0, "idxEntryBytesRead");
             assert.eq(profileDoc.idxEntryUnitsRead, 0, "idxEntryUnitsRead");
             assert.eq(profileDoc.docUnitsWritten, 1, "docUnitsWritten");
@@ -1471,11 +1452,7 @@ const operations = [
         },
         profileFilter: {op: 'query', 'command.find': 'ts'},
         profileAssert: (db, profileDoc) => {
-            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                assert.eq(profileDoc.docBytesRead, 472, "docBytesRead");
-            } else {
-                assert.eq(profileDoc.docBytesRead, 466, "docBytesRead");
-            }
+            assert.eq(profileDoc.docBytesRead, 472, "docBytesRead");
             assert.eq(profileDoc.docUnitsRead, 4, "docUnitsRead");
             assert.eq(profileDoc.idxEntryBytesRead, 0, "idxEntryBytesRead");
             assert.eq(profileDoc.idxEntryUnitsRead, 0, "idxEntryUnitsRead");

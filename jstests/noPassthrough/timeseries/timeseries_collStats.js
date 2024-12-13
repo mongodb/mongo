@@ -19,8 +19,6 @@ const conn = MongoRunner.runMongod({
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
-const alwaysUseCompressedBuckets =
-    TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB);
 
 assert.commandWorked(testDB.dropDatabase());
 
@@ -42,10 +40,6 @@ const clearCollection = function() {
     assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     expectedStats.bucketCount = 0;
-    if (!alwaysUseCompressedBuckets) {
-        expectedStats.numCompressedBuckets = 0;
-        expectedStats.numSubObjCompressionRestart = 0;
-    }
     expectedStats.numBucketInserts = 0;
     expectedStats.numBucketUpdates = 0;
     expectedStats.numBucketsOpenedDueToMetadata = 0;
@@ -183,9 +177,6 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-if (!alwaysUseCompressedBuckets) {
-    expectedStats.numCompressedBuckets++;
-}
 expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
@@ -206,10 +197,6 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += 1001;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-if (!alwaysUseCompressedBuckets) {
-    expectedStats.numCompressedBuckets++;
-    expectedStats.numSubObjCompressionRestart += 2;
-}
 expectedStats.numBucketQueriesFailed++;
 
 checkCollStats();

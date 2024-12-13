@@ -51,9 +51,7 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
         {"metadata": {"sensorId": 1, "type": "temperature"}, "timestamp": timestamp, "temp": 0});
 
     let bucketDoc = bucketsColl.find().toArray()[0];
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        TimeseriesTest.decompressBucket(bucketDoc);
-    }
+    TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
@@ -73,9 +71,7 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     db.runCommand({collMod: collName, timeseries: updatedBucketingParameterConfig});
 
     bucketDoc = bucketsColl.find().toArray()[0];
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        TimeseriesTest.decompressBucket(bucketDoc);
-    }
+    TimeseriesTest.decompressBucket(bucketDoc);
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
@@ -102,9 +98,7 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
         {"metadata": {"sensorId": 1, "type": "temperature"}, "timestamp": timestamp, "temp": 0});
 
     bucketDoc = bucketsColl.find().toArray()[0];
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        TimeseriesTest.decompressBucket(bucketDoc);
-    }
+    TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
@@ -126,9 +120,7 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     db.runCommand({collMod: collName, timeseries: originalBucketingParameterConfig});
 
     bucketDoc = bucketsColl.find().toArray()[0];
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        TimeseriesTest.decompressBucket(bucketDoc);
-    }
+    TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
@@ -149,9 +141,7 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     db.runCommand({collMod: collName, timeseries: updatedBucketingParameterConfig});
 
     bucketDoc = bucketsColl.find().toArray()[0];
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        TimeseriesTest.decompressBucket(bucketDoc);
-    }
+    TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);

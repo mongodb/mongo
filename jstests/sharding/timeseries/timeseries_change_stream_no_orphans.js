@@ -7,9 +7,6 @@
  *   - Test case 2: Broadcasted operations (from router) on orphaned documents
  *
  * @tags: [
- *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
- *   # flag can be removed.
- *   multiversion_incompatible,
  *   uses_change_streams,
  * ]
  */
@@ -144,11 +141,7 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     // the bucket.
     const actualBucket = st.shard0.getCollection(sysCollNS).findOne({meta: 0});
 
-    // If we are always using compressed buckets for time-series writes, we must de-compress the
-    // bucket to inspect its contents.
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-        TimeseriesTest.decompressBucket(actualBucket);
-    }
+    TimeseriesTest.decompressBucket(actualBucket);
 
     assert.eq(0, actualBucket.meta, actualBucket);
     assert.eq(4, actualBucket.control.min._id, actualBucket);
@@ -187,11 +180,7 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     assert.eq(null, mongosColl.findOne({_id: 4}), mongosColl.find().toArray());
     const shard0Bucket = st.shard0.getCollection(sysCollNS).findOne({meta: 0});
 
-    // If we are always using compressed buckets for time-series writes, we must de-compress the
-    // bucket to inspect its contents.
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-        TimeseriesTest.decompressBucket(shard0Bucket);
-    }
+    TimeseriesTest.decompressBucket(shard0Bucket);
 
     assert.eq(0, shard0Bucket.meta, shard0Bucket);
     assert.eq(4, shard0Bucket.control.min._id, shard0Bucket);
@@ -220,9 +209,7 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     assert.eq(null, mongosColl.findOne({_id: 6}), mongosColl.find().toArray());
     assert.eq(null, mongosColl.findOne({_id: 7}), mongosColl.find().toArray());
     const shard0Bucket = st.shard0.getCollection(sysCollNS).findOne({meta: 2});
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(st.shard0)) {
-        TimeseriesTest.decompressBucket(shard0Bucket);
-    }
+    TimeseriesTest.decompressBucket(shard0Bucket);
     assert.eq(2, shard0Bucket.meta, shard0Bucket);
     assert.eq(6, shard0Bucket.control.min._id, shard0Bucket);
     assert.eq(7, shard0Bucket.control.max._id, shard0Bucket);

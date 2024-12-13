@@ -2,9 +2,6 @@
  * Tests to validate that an orphan bucket is not updatable after a chunk migration.
  *
  * @tags: [
- *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
- *   # flag can be removed.
- *   multiversion_incompatible,
  * ]
  */
 

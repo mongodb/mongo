@@ -134,12 +134,10 @@ function setUpCollection(data) {
 
     // If we are always writing to time-series collections using the compressed format, replace the
     // compressed bucket with the decompressed bucket in the system.buckets collection.
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        const bucket = db.getCollection(bucketName);
-        const bucketDoc = bucket.find().toArray()[0];
-        TimeseriesTest.decompressBucket(bucketDoc);
-        bucket.replaceOne({_id: bucketDoc._id}, bucketDoc);
-    }
+    const bucket = db.getCollection(bucketName);
+    const bucketDoc = bucket.find().toArray()[0];
+    TimeseriesTest.decompressBucket(bucketDoc);
+    bucket.replaceOne({_id: bucketDoc._id}, bucketDoc);
 
     let result = assert.commandWorked(collection.validate());
     assert(result.valid, tojson(result));

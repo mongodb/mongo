@@ -130,9 +130,7 @@ const runTest = function(docsInsert, docsUpdateA, docsUpdateB) {
               ': bucket collection: ' + bucketsColl.getFullName() + ': ' + tojson(bucketDoc));
 
     // Check bucket.
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB)) {
-        TimeseriesTest.decompressBucket(bucketDoc);
-    }
+    TimeseriesTest.decompressBucket(bucketDoc);
     assert.eq(docs.length,
               Object.keys(bucketDoc.data[timeFieldName]).length,
               'invalid number of measurements in first bucket: ' + tojson(bucketDoc));

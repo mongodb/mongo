@@ -50,8 +50,7 @@
  * ]
  *
  * @tags: [
- *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
- *   # flag can be removed.
+ *   # TODO (SERVER-98385): Remove this tag.
  *   multiversion_incompatible,
  * ]
  */

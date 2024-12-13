@@ -2,9 +2,6 @@
  * Tests $sample pushdown on sharded time-series collections for a small collection size.
  *
  * @tags: [
- *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
- *   # flag can be removed.
- *   multiversion_incompatible,
  * ]
  */
 import {documentEq} from "jstests/aggregation/extras/utils.js";

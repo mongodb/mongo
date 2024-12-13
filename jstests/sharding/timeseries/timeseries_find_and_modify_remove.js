@@ -4,9 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
- *   # flag can be removed.
- *   multiversion_incompatible,
  *   # TODO SERVER-76583: Remove following two tags.
  *   does_not_support_retryable_writes,
  *   requires_non_retryable_writes,

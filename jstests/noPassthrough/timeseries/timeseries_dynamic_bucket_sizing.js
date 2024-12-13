@@ -42,8 +42,6 @@ replSet.initiate();
 
 const db = replSet.getPrimary().getDB(jsTestName());
 
-const alwaysUseCompressedBuckets = TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db);
-
 let coll = db.getCollection(collName + '1');
 coll.drop();
 assert.commandWorked(db.createCollection(
@@ -119,9 +117,6 @@ compressedBuckets = timeseriesStats.numCompressedBuckets;
 // due to cache pressure.
 assert.eq(bucketsClosedDueToSize, cardinalityForCachePressure, formatStatsLog(timeseriesStats));
 assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
-if (!alwaysUseCompressedBuckets) {
-    assert.eq(compressedBuckets, cardinalityForCachePressure, formatStatsLog(timeseriesStats));
-}
 
 // Create a new collection to test closing buckets due to cache pressure. Since the cardinality of
 // buckets is now high enough to make the cache derived maximum bucket size smaller than the
@@ -181,9 +176,5 @@ assert.eq(timeseriesStats.numBucketsClosedDueToMemoryThreshold, 0, formatStatsLo
 // should have been closed due to cache pressure.
 assert.eq(
     bucketsClosedDueToCachePressure, aboveCardinalityThreshold, formatStatsLog(timeseriesStats));
-
-if (!alwaysUseCompressedBuckets) {
-    assert.eq(compressedBuckets, aboveCardinalityThreshold, formatStatsLog(timeseriesStats));
-}
 
 replSet.stopSet();
