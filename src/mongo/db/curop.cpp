@@ -587,7 +587,7 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
 
 static constexpr size_t appendMaxElementSize = 50 * 1024;
 
-bool shouldOmitDiagnosticInformation(CurOp* curop) {
+bool CurOp::shouldCurOpStackOmitDiagnosticInformation(CurOp* curop) {
     do {
         if (curop->getShouldOmitDiagnosticInformation()) {
             return true;
@@ -619,7 +619,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
 
     // Do not log the slow query information if asked to omit it
-    if (shouldOmitDiagnosticInformation(this)) {
+    if (shouldCurOpStackOmitDiagnosticInformation(this)) {
         return false;
     }
 
