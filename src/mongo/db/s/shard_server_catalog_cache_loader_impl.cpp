@@ -791,8 +791,18 @@ ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetChunksSince(
             }
         }
 
-        // If there are no enqueued tasks, get the max persisted
-        return getPersistedMaxChunkVersion(opCtx, nss);
+        try {
+            // If there are no enqueued tasks, get the max persisted
+            return getPersistedMaxChunkVersion(opCtx, nss);
+        } catch (const ExceptionForCat<ErrorCategory::IDLParseError>& parseError) {
+            LOGV2_WARNING(9580700,
+                          "Clearing up corrupted cached collection metadata. "
+                          "The cache will be eventually repopulated by a full refresh.",
+                          "error"_attr = redact(parseError.toStatus()),
+                          logAttrs(nss));
+            uassertStatusOK(dropChunksAndDeleteCollectionsEntry(opCtx, nss));
+            return ChunkVersion::UNSHARDED();
+        }
     }();
 
     // Refresh the loader's metadata from the config server. The caller's request will
