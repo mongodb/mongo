@@ -88,6 +88,7 @@ Status storeTLSLogVersion(const std::string& loggedProtocols) {
 namespace {
 
 bool gImplicitDisableTLS10 = false;
+bool gImplicitDisableTLS11 = false;
 
 // storeSSLServerOptions depends on serverGlobalParams.clusterAuthMode
 // and IDL based storage actions, and therefore must run later.
@@ -169,6 +170,12 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
          */
         gImplicitDisableTLS10 = true;
         sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_0);
+#endif
+#if (MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
+    (OPENSSL_VERSION_NUMBER >= 0x1000106f) /* 1.0.1f */
+        // Disables TLS 1.1 as well for platforms which support TLS 1.2 and later.
+        gImplicitDisableTLS11 = true;
+        sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_1);
 #endif
     }
 
@@ -360,10 +367,16 @@ MONGO_STARTUP_OPTIONS_VALIDATE(SSLServerOptions)(InitializerContext*) {
 // it goes to the right place.
 MONGO_INITIALIZER_WITH_PREREQUISITES(ImplicitDisableTLS10Warning, ("ServerLogRedirection"))
 (InitializerContext*) {
-    if (gImplicitDisableTLS10) {
+
+    if (gImplicitDisableTLS11) {
+        LOGV2(97374,
+              "Automatically disabling TLS 1.0 and TLS 1.1, "
+              "to force-enable TLS 1.1 specify --sslDisabledProtocols 'TLS1_0'; "
+              "to force-enable TLS 1.0 specify --sslDisabledProtocols 'none'");
+    } else if (gImplicitDisableTLS10) {
         LOGV2(23285,
-              "Automatically disabling TLS 1.0, to force-enable TLS 1.0 "
-              "specify --sslDisabledProtocols 'none'");
+              "Automatically disabling TLS 1.0, "
+              "to force-enable TLS 1.0 specify --sslDisabledProtocols 'none'");
     }
 }
 

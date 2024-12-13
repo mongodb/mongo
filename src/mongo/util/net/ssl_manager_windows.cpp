@@ -1447,6 +1447,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
         } else if (protocol == SSLParams::Protocols::TLS1_2) {
             supportedProtocols &= ~(SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_2_SERVER);
         }
+        // SERVER-98279: support tls 1.3 for windows & apple
     }
 
     cred->grbitEnabledProtocols = supportedProtocols;
@@ -1993,6 +1994,7 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
                           << "QueryContextAttributes for connection info failed with" << ss);
     }
 
+    // SERVER-98279: support tls 1.3 for windows & apple
     switch (connInfo.dwProtocol) {
         case SP_PROT_TLS1_CLIENT:
         case SP_PROT_TLS1_SERVER:

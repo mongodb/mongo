@@ -71,7 +71,7 @@ std::vector<uint8_t> hexToVector(StringData hex) {
 Status storeSSLDisabledProtocols(const std::string& disabledProtocols,
                                  SSLDisabledProtocolsMode mode /* =kStandardFormat */) {
     if (disabledProtocols == "none") {
-        // Allow overriding the default behavior below of implicitly disabling TLS 1.0.
+        // Allow overriding the default behavior below of implicitly disabling TLS 1.0 and TLS 1.1.
         return Status::OK();
     }
 

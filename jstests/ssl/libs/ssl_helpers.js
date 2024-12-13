@@ -350,12 +350,13 @@ export function isOpenSSL3orGreater() {
 
 export function opensslVersionAsInt() {
     const opensslInfo = getBuildInfo().openssl;
-    if (!opensslInfo) {
-        return null;
+    if (!opensslInfo || !opensslInfo.compiled) {
+        // openssl undefined if apple or windows
+        return undefined;
     }
 
     const matches = opensslInfo.running.match(/OpenSSL\s+(\d+)\.(\d+)\.(\d+)([a-z]?)/);
-    assert.neq(matches, null);
+    assert.neq(matches, null, "cannot parse openSSL version from '" + opensslInfo.running + "'");
 
     let version = (matches[1] << 24) | (matches[2] << 16) | (matches[3] << 8);
 
@@ -387,4 +388,26 @@ export function copyCertificateFile(a, b) {
         return;
     }
     assert.eq(0, runProgram("cp", a, b));
+}
+
+export function clientSupportsTLS1_1() {
+    if (!sslProviderSupportsTLS1_1()) {
+        return false;
+    }
+    const opensslVersion = opensslVersionAsInt();
+    return (opensslVersion === undefined) ? true : (opensslVersion >= 0x100000C);  // 1.0.0l
+}
+
+export function clientSupportsTLS1_2() {
+    const opensslVersion = opensslVersionAsInt();
+    return (opensslVersion === undefined) ? true : (opensslVersion >= 0x1000106);  // 1.0.1f
+}
+
+export function clientSupportsTLS1_3() {
+    // SERVER-98279: support tls 1.3 for windows & apple
+    if (determineSSLProvider() === "apple" || determineSSLProvider() === "windows") {
+        return false;
+    }
+    const opensslVersion = opensslVersionAsInt();
+    return (opensslVersion === undefined) ? true : (opensslVersion >= 0x1010100);  // 1.1.1
 }
