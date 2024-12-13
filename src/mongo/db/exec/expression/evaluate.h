@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/pcre.h"
 
 namespace mongo {
 
@@ -96,6 +97,11 @@ ValueFlatUnorderedSet arrayToUnorderedSet(const Value& val, const ValueComparato
  */
 ValueUnorderedMap<std::vector<int>> arrayToIndexMap(const Value& val,
                                                     const ValueComparator& valueComparator);
+
+
+ExpressionRegex::PrecompiledRegex precompileRegex(const Value& regex,
+                                                  const Value& options,
+                                                  const std::string& opName);
 
 Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionDateFromString& expr, const Document& root, Variables* variables);
@@ -175,6 +181,10 @@ Value evaluate(const ExpressionSwitch& expr, const Document& root, Variables* va
 Value evaluate(const ExpressionBitAnd& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionBitOr& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionBitXor& expr, const Document& root, Variables* variables);
+
+Value evaluate(const ExpressionRegexFind& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables* variables);
 
 }  // namespace exec::expression
 }  // namespace mongo

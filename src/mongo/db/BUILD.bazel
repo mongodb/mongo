@@ -2363,6 +2363,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/expression:evaluate_date.cpp",
         "//src/mongo/db/exec/expression:evaluate_logical.cpp",
         "//src/mongo/db/exec/expression:evaluate_map_reduce.cpp",
+        "//src/mongo/db/exec/expression:evaluate_regex.cpp",
         "//src/mongo/db/exec/expression:evaluate_string.cpp",
         "//src/mongo/db/matcher:doc_validation_error.cpp",
         "//src/mongo/db/matcher:doc_validation_util.cpp",

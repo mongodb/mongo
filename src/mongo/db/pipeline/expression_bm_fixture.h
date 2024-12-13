@@ -273,6 +273,7 @@ public:
     void benchmarkStdDevSamp(benchmark::State& state);
     void benchmarkAvg(benchmark::State& state);
     void benchmarkSum(benchmark::State& state);
+    void benchmarkRegexMatch(benchmark::State& state);
 
 private:
     void testDateDiffExpression(long long startDate,
@@ -1019,6 +1020,9 @@ private:
                                                                                                 \
     BENCHMARK_F(Fixture, Sum)(benchmark::State & state) {                                       \
         benchmarkSum(state);                                                                    \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, RegexMatch)(benchmark::State & state) {                                \
+        benchmarkRegexMatch(state);                                                             \
     }
 
 

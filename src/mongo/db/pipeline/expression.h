@@ -36,7 +36,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cstddef>
@@ -50,9 +49,7 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -87,10 +84,7 @@
 
 namespace mongo {
 
-class BSONArrayBuilder;
 class BSONElement;
-class BSONObjBuilder;
-class DocumentSource;
 
 /**
  * You can specify a condition, evaluated during startup,
@@ -3953,72 +3947,25 @@ private:
 class ExpressionRegex : public Expression {
 public:
     /**
-     * Object to hold data that is required when calling 'execute()' or 'nextMatch()'.
+     * Struct to hold precompiled regex, validated pattern & options strings and number of captures
+     * when the expression has constant values for their 'regex' and 'options' fields
      */
-    struct RegexExecutionState {
-        /**
-         * The regex pattern, options, and captures buffer for the current execution context.
-         */
+    struct PrecompiledRegex {
         boost::optional<std::string> pattern;
         boost::optional<std::string> options;
-        std::vector<int> capturesBuffer;
-        int numCaptures = 0;
-
-        /**
-         * If 'regex' is constant, 'pcrePtr' will be shared between the active RegexExecutionState
-         * and '_initialExecStateForConstantRegex'. If not, then the active RegexExecutionState is
-         * the sole owner.
-         */
         std::shared_ptr<pcre::Regex> pcrePtr;
-
-        /**
-         * The input text and starting position for the current execution context.
-         */
-        boost::optional<std::string> input;
-        int startCodePointPos = 0;
-        int startBytePos = 0;
-
-        /**
-         * If either the text input or regex pattern is nullish, then we consider the operation as a
-         * whole nullish.
-         */
-        bool nullish() {
-            return !input || !pattern;
-        }
+        int numCaptures = 0;
     };
 
     /**
-     * Validates the structure of input passed in 'inputExpr'. If valid, generates an initial
-     * execution state. This returned object can later be used for calling execute() or nextMatch().
-     */
-    RegexExecutionState buildInitialState(const Document& root, Variables* variables) const;
-
-    /**
-     * Checks if there is a match for the input, options, and pattern of 'executionState'.
-     * Returns the pcre::MatchData yielded by that match operation.
-     * Will uassert for any errors other than `pcre::Errc::ERROR_NOMATCH`.
-     */
-    pcre::MatchData execute(RegexExecutionState* executionState) const;
-
-    /**
-     * Finds the next possible match for the given input and pattern that are part of
-     * 'executionState'. If there is a match, the function will return a 'Value' object
-     * encapsulating the matched string, the code point index of the matched string and a vector
-     * representing all the captured substrings. The function will also update the parameters
-     * 'startBytePos' and 'startCodePointPos' to the corresponding new indices. If there is no
-     * match, the function will return null 'Value' object.
-     */
-    Value nextMatch(RegexExecutionState* executionState) const;
-
-    /**
      * Optimizes '$regex*' expressions. If the expression has constant 'regex' and 'options' fields,
-     * then it can be optimized. Stores the optimized regex in '_initialExecStateForConstantRegex'
+     * then it can be optimized. Stores the optimized regex in '_precompiledRegex'
      * so that it can be reused during expression evaluation.
      */
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override;
 
     bool hasConstantRegex() const {
-        return _initialExecStateForConstantRegex.has_value();
+        return _precompiledRegex.has_value();
     }
 
     bool hasOptions() const {
@@ -4038,6 +3985,22 @@ public:
         return _opName;
     }
 
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getRegex() const {
+        return _children[_kRegex].get();
+    }
+
+    const Expression* getOptions() const {
+        return _children[_kOptions].get();
+    }
+
+    const auto& getPreCompiledRegex() const {
+        return _precompiledRegex;
+    }
+
     ExpressionRegex(ExpressionContext* const expCtx,
                     boost::intrusive_ptr<Expression> input,
                     boost::intrusive_ptr<Expression> regex,
@@ -4047,13 +4010,6 @@ public:
           _opName(opName) {}
 
 private:
-    void _extractInputField(RegexExecutionState* executionState, const Value& textInput) const;
-    void _extractRegexAndOptions(RegexExecutionState* executionState,
-                                 const Value& regexPattern,
-                                 const Value& regexOptions) const;
-
-    void _compile(RegexExecutionState* executionState) const;
-
     /**
      * Expressions which, when evaluated for a given document, produce the the regex pattern, the
      * regex option flags, and the input text to which the regex should be applied.
@@ -4067,7 +4023,7 @@ private:
      * and 'options' fields, allowing us to pre-compile the regex and re-use it across the
      * Expression's lifetime.
      */
-    boost::optional<RegexExecutionState> _initialExecStateForConstantRegex;
+    boost::optional<PrecompiledRegex> _precompiledRegex;
 
     /**
      * Name of the regex expression.
