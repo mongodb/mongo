@@ -16,7 +16,14 @@ const collName = "no_error_labels_outside_txn";
 const st = new ShardingTest({
     config: TestData.configShard ? undefined : 1,
     mongos: 1,
-    shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}
+    shards: {
+        rs0: {
+            nodes: [{}, {rsConfig: {priority: 0}}],
+            // ShardingTest use a higher lock timeout to avoid spurious failures but this test
+            // intentionally triggers a timeout, so use a lower value to avoid waiting excessively.
+            setParameter: {maxTransactionLockRequestTimeoutMillis: 100}
+        }
+    }
 });
 const primary = st.rs0.getPrimary();
 const secondary = st.rs0.getSecondary();

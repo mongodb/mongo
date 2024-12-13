@@ -403,19 +403,20 @@ class MongodLauncher(object):
         # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
         # complete first. It defaults to 900, or 15 minutes, which is prohibitively long for tests.
         # Setting it in the .yml file overrides this.
-        if (
-            "shardsvr" in mongod_options or "configsvr" in mongod_options
-        ) and "orphanCleanupDelaySecs" not in suite_set_parameters:
+        if "orphanCleanupDelaySecs" not in suite_set_parameters:
             suite_set_parameters["orphanCleanupDelaySecs"] = 1
+
+        # Increase the default config server command timeout to 5 minutes to avoid spurious
+        # failures on slow machines.
+        if "defaultConfigCommandTimeoutMS" not in suite_set_parameters:
+            suite_set_parameters["defaultConfigCommandTimeoutMS"] = 5 * 60 * 1000
 
         # receiveChunkWaitForRangeDeleterTimeoutMS controls the amount of time an incoming migration
         # will wait for an intersecting range with data in it to be cleared up before failing. The
         # default is 10 seconds, but in some slower variants this is not enough time for the range
         # deleter to finish so we increase it here to 90 seconds. Setting a value for this parameter
         # in the .yml file overrides this.
-        if (
-            "shardsvr" in mongod_options or "configsvr" in mongod_options
-        ) and "receiveChunkWaitForRangeDeleterTimeoutMS" not in suite_set_parameters:
+        if "receiveChunkWaitForRangeDeleterTimeoutMS" not in suite_set_parameters:
             suite_set_parameters["receiveChunkWaitForRangeDeleterTimeoutMS"] = 90000
 
         # The LogicalSessionCache does automatic background refreshes in the server. This is
@@ -488,6 +489,7 @@ class MongodLauncher(object):
         allowed_opts_without_vals = ["logappend", "directoryperdb", "wiredTigerDirectoryForIndexes"]
 
         # Ensure that config servers run with journaling enabled.
+        # TODO SERVER-97078: Ensure this works for auto bootstrapped config servers
         if "configsvr" in mongod_options:
             suite_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
             suite_set_parameters.setdefault(

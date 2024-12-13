@@ -25,8 +25,14 @@ var st = new ShardingTest({
     config: 3,
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
     other: {
-        mongosOptions:
-            {setParameter: {"failpoint.disableShardingUptimeReporting": "{mode: 'alwaysOn'}"}}
+        mongosOptions: {
+            setParameter: {
+                "failpoint.disableShardingUptimeReporting": "{mode: 'alwaysOn'}",
+                // ShardingTest use a high config command timeout to avoid spurious failures but
+                // this test intentionally triggers a timeout, so we restore the default value.
+                defaultConfigCommandTimeoutMS: 30000,
+            }
+        }
     }
 });
 

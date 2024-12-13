@@ -1042,6 +1042,10 @@ class MongosLauncher(object):
                 "searchIndexManagementHostAndPort"
             )
 
+        # Use a higher timeout finding a host to avoid spurious failures on slow machines.
+        if "defaultConfigCommandTimeoutMS" not in suite_set_parameters:
+            suite_set_parameters["defaultConfigCommandTimeoutMS"] = 5 * 60 * 1000
+
         # Set default log verbosity levels if none were specified.
         if "logComponentVerbosity" not in suite_set_parameters:
             suite_set_parameters["logComponentVerbosity"] = (

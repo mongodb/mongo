@@ -29,7 +29,6 @@ executor:
     enable_balancer: true
     mongod_options:
       set_parameters:
-        defaultConfigCommandTimeoutMS: 90000
         enableTestCommands: 1
         featureFlagRouterPort: 1
         orphanCleanupDelaySecs: 10

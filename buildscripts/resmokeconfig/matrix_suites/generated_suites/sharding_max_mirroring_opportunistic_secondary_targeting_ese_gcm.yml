@@ -22,10 +22,8 @@ executor:
           encryptionCipherMode: AES256-GCM
           encryptionKeyFile: src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
           setParameters:
-            defaultConfigCommandTimeoutMS: 90000
             mirrorReads: "{samplingRate: 1.0}"
           setParametersMongos:
-            defaultConfigCommandTimeoutMS: 90000
             opportunisticSecondaryTargeting: true
       nodb: ""
 matrix_suite: true

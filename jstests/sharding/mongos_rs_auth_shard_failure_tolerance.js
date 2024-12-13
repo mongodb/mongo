@@ -31,7 +31,14 @@ TestData.skipCheckMetadataConsistency = true;
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-var options = {rs: true, rsOptions: {nodes: 2}, keyFile: "jstests/libs/key1"};
+var options = {
+    rs: true,
+    rsOptions: {nodes: 2},
+    keyFile: "jstests/libs/key1",
+    // ShardingTest use a high config command timeout to avoid spurious failures but this test may
+    // require a timeout to complete, so we restore the default value to avoid failures.
+    mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}
+};
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});
 

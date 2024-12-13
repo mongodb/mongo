@@ -16,10 +16,6 @@ executor:
         TestData:
           enableEncryption: ""
           encryptionKeyFile: src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
-          setParameters:
-            defaultConfigCommandTimeoutMS: 90000
-          setParametersMongos:
-            defaultConfigCommandTimeoutMS: 90000
       nodb: ""
 matrix_suite: true
 selector:

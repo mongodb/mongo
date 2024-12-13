@@ -155,7 +155,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
-        defaultConfigCommandTimeoutMS: 90000
     shard_options:
       mongod_options:
         oplogSize: 1024
@@ -165,7 +164,6 @@ executor:
         roleGraphInvalidationIsFatal: 1
         queryAnalysisWriterIntervalSecs: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
-        defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
         balancerMigrationsThrottlingMs: 250

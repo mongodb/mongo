@@ -1466,8 +1466,10 @@ function appendSetParameterArgs(argArray) {
             }
 
             // Reduce the default value for `orphanCleanupDelaySecs` to 1 sec to speed up jstests.
-            if (!argArrayContainsSetParameterValue('orphanCleanupDelaySecs=')) {
-                argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=1']);
+            if (programMajorMinorVersion >= 360) {
+                if (!argArrayContainsSetParameterValue('orphanCleanupDelaySecs=')) {
+                    argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=1']);
+                }
             }
 
             // Increase the default value for `receiveChunkWaitForRangeDeleterTimeoutMS` to 90
@@ -1534,6 +1536,16 @@ function appendSetParameterArgs(argArray) {
                         argArray.push(...['--setParameter', setParamStr]);
                     }
                 }
+            }
+        }
+
+        // Increase the default config server command timeout to 5 minutes to avoid spurious
+        // failures on slow machines. New option in 7.3. Applies to both mongos and mongod and
+        // should not overwrite values passed via TestData, so we check after merging TestData
+        // setParameters into the arg array.
+        if (programMajorMinorVersion >= 730) {
+            if (!argArrayContainsSetParameterValue('defaultConfigCommandTimeoutMS=')) {
+                argArray.push(...['--setParameter', 'defaultConfigCommandTimeoutMS=300000']);
             }
         }
     }

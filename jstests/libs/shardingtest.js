@@ -1273,6 +1273,21 @@ export class ShardingTest {
             randomSeedAlreadySet = true;
         }
 
+        TestData.setParameters = TestData.setParameters || {};
+        let setDefaultTransactionLockTimeout = false;
+        if (TestData.setParameters.maxTransactionLockRequestTimeoutMillis === undefined) {
+            // Set a higher maxTransactionLockRequestTimeoutMillis. Tests written with ShardingTest
+            // are generally single threaded and often don't expect lock timeouts, so a higher
+            // timeout avoids spurious failures on slow machines.
+            //
+            // TODO SERVER-98408: Ideally this would be passed as a default setParameter to
+            // ReplSetTest, but the rules for passing default options to ReplSetTest via
+            // ShardingTest are finnicky and tests rely on the current behaviors. Once this is
+            // refactored, we should be able to avoid using TestData.
+            TestData.setParameters.maxTransactionLockRequestTimeoutMillis = 5 * 60 * 1000;
+            setDefaultTransactionLockTimeout = true;
+        }
+
         try {
             const clusterVersionInfo = this.getClusterVersionInfo();
 
@@ -1372,6 +1387,8 @@ export class ShardingTest {
                     rsDefaults = Object.merge(rsDefaults, otherParams["d" + i]);
                 }
 
+                // TODO SERVER-98408: Passing setParameter via rsDefaults will always override any
+                // setParameters passed via replSetTestOpts. Instead the options should be merged.
                 rsDefaults.setParameter = rsDefaults.setParameter || {};
 
                 if (typeof (rsDefaults.setParameter) === "string") {
@@ -1474,6 +1491,11 @@ export class ShardingTest {
             print("ShardingTest startup for all nodes took " + (new Date() - startTime) +
                   "ms with " + this.configRS.nodeList().length + " config server nodes and " +
                   totalNumShardNodes(this) + " total shard nodes.");
+
+            if (setDefaultTransactionLockTimeout) {
+                // Clean up TestData.setParameters to avoid affecting other tests.
+                delete TestData.setParameters.maxTransactionLockRequestTimeoutMillis;
+            }
 
             //
             // Initiate each shard replica set and wait for replication. Also initiate the config

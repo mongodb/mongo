@@ -32,7 +32,10 @@ var st = new ShardingTest({
         rs: true,
         // Disables elections to avoid secondaries becoming primaries after stepdowns. The test
         // relies on specific topology changes done explicitly.
-        rsOptions: {nodes: 2, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}}
+        rsOptions: {nodes: 2, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}},
+        // ShardingTest use a high config command timeout to avoid spurious failures but this test
+        // may require a timeout to complete, so we restore the default value to avoid failures.
+        mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}
     },
 });
 

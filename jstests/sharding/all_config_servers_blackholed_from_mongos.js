@@ -24,6 +24,9 @@ var st = new ShardingTest({
     mongos: 1,
     useBridge: true,
     bridgeOptions: {verbose: 'vvv'},
+    // ShardingTest use a high config command timeout to avoid spurious failures but this test
+    // intentionally triggers a timeout, so we restore the default value.
+    other: {mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}}
 });
 
 var testDB = st.s.getDB('BlackHoleDB');

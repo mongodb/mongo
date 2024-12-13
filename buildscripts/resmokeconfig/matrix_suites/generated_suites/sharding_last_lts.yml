@@ -15,10 +15,6 @@ executor:
       global_vars:
         TestData:
           mongosBinVersion: last-lts
-          setParameters:
-            defaultConfigCommandTimeoutMS: 90000
-          setParametersMongos:
-            defaultConfigCommandTimeoutMS: 90000
           useRandomBinVersionsWithinReplicaSet: last-lts
       nodb: ""
 matrix_suite: true
