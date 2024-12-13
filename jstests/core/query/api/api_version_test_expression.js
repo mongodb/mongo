@@ -15,7 +15,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
 
@@ -31,7 +30,7 @@ collForeign.drop();
 // tracked collection is fixed
 function useShardingCoordinatorForCreate() {
     return (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) &&
-        FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation");
+        TestData.implicitlyTrackUnshardedCollectionOnCreation;
 }
 
 for (let i = 0; i < 5; i++) {

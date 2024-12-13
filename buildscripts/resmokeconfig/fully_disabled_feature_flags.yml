@@ -15,4 +15,5 @@
 - featureFlagCreateCollectionInPreparedTransactions
 - featureFlagSearchInSbe
 - featureFlagEgressGrpcForSearch
+- featureFlagTrackUnshardedCollectionsUponCreation
 - featureFlagDualCatalogCache

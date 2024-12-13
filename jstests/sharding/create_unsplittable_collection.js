@@ -4,8 +4,7 @@
  * collection. Since we use the same coordinator, we both check the createUnsplittableCollection
  * works and that shardCollection won't generate unsplittable collection.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsUponCreation,
- *   multiversion_incompatible,
+ *   requires_fcv_81,
  *   assumes_balancer_off,
  * ]
  */
@@ -58,10 +57,10 @@ jsTest.log('Check that createCollection can create a tracked unsharded collectio
     const kDataColl = 'unsplittable_collection_on_create_collection';
     const kDataCollNss = kDbName + '.' + kDataColl;
 
-    assert.commandWorked(st.s.getDB(kDbName).createCollection(kDataColl));
+    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl}));
 
     // running the same request again will behave as no-op
-    assert.commandWorked(st.s.getDB(kDbName).createCollection(kDataColl));
+    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl}));
 
     let res = assert.commandWorked(
         st.getPrimaryShard(kDbName).getDB(kDbName).runCommand({listIndexes: kDataColl}));
@@ -74,27 +73,13 @@ jsTest.log('Check that createCollection can create a tracked unsharded collectio
     assert.eq(st.s.getCollection('config.chunks').countDocuments({uuid: col.uuid}), 1);
 }
 
-jsTest.log('When "capped" is true, the "size" field needs to be present.');
-{
-    const kDataColl = 'unsplittable_collection_on_create_collection_capped_size';
-
-    // Creating a collection that already exists with different options reports failure.
-    assert.commandFailedWithCode(st.s.getDB(kDbName).createCollection(kDataColl, {capped: true}),
-                                 ErrorCodes.InvalidOptions);
-
-    assert.commandFailedWithCode(
-        st.s.getDB(kDbName).createCollection(kDataColl, {capped: true, max: 10}),
-        ErrorCodes.InvalidOptions);
-}
-
 jsTest.log(
     "Check that by creating a valid unsharded collection, relevant events are logged on the CSRS");
 {
     // Create a non-sharded collection
     const kDataColl = 'unsplittable_collection_on_create_collection_capped_size_2';
     const kNs = kDbName + "." + kDataColl;
-    let kCollOptions = {capped: true, size: 5242880, max: 5000};
-    assert.commandWorked(st.s.getDB(kDbName).createCollection(kDataColl, kCollOptions));
+    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl}));
 
     // Verify that the create collection end event has been logged
     const startLogCount =
@@ -103,10 +88,6 @@ jsTest.log(
 
     const endLogCount = st.config.changelog.countDocuments({what: 'createCollection.end', ns: kNs});
     assert.gte(endLogCount, 1, "createCollection start event not found in changelog");
-
-    // Verify the options are reported
-    let doc = st.config.changelog.find({what: 'createCollection.start', ns: kNs}).toArray()[0];
-    assert.docEq(doc.details.options, kCollOptions);
 }
 
 jsTest.log('If a view already exists with same namespace fail with NamespaceExists');
@@ -115,8 +96,9 @@ jsTest.log('If a view already exists with same namespace fail with NamespaceExis
 
     assert.commandWorked(st.s.getDB(kDbName).createView(kDataColl, kDbName + '.simple_coll', []));
 
-    assert.commandFailedWithCode(st.s.getDB(kDbName).createCollection(kDataColl),
-                                 [ErrorCodes.NamespaceExists]);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl}),
+        [ErrorCodes.NamespaceExists]);
 }
 
 jsTest.log('Check that shardCollection won\'t generate an unsplittable collection');

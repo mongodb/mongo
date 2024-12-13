@@ -7,10 +7,9 @@
  *   is dropped.
  *
  * @tags: [
- *   requires_fcv_80,
+ *   requires_fcv_81,
  *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
- *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagSecurityToken,
  *   requires_persistence,
  * ]

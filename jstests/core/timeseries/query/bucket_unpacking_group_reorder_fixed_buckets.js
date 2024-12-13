@@ -120,6 +120,14 @@ function setUpSmallCollection({roundingParam, startingTime}) {
 // `requiresTimeseriesExtendedRangeSupport` flag may not be accurate on mongos.
 ///
 const isMongos = FixtureHelpers.isMongos(db);
+// Detect if jstests/libs/override_methods/implicitly_shard_accessed_collections.js is in
+// use
+const useImplicitSharding = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+// TODO (SERVER-94666) revisit conditions in which query-level rewrites can be applied, specifically
+// for untracked collections
+const isCollectionUntracked = !isMongos ||
+    (isMongos && !TestData.implicitlyTrackUnshardedCollectionOnCreation && !useImplicitSharding);
+
 const groupByDateTrunc_ExpectRewrite = [
     // Validate the rewrite occurs with a simple case, where the bucket boundary and 'unit' are the
     // same.
@@ -180,7 +188,7 @@ const groupByDateTrunc_ExpectRewrite = [
             accmin: 1,
             accmax: 7
         }],
-        rewriteExpected: !isMongos
+        rewriteExpected: isCollectionUntracked
     },
 
     // Validate the rewrite occurs with a timezone with the same hourly boundaries, and
@@ -200,7 +208,7 @@ const groupByDateTrunc_ExpectRewrite = [
             {_id: {"m": "MDB", t: ISODate("2022-09-29T16:00:00Z")}, accmin: 1, accmax: 6},
             {_id: {"m": "MDB", t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7}
         ],
-        rewriteExpected: !isMongos
+        rewriteExpected: isCollectionUntracked
     },
 
     // The 'unit' field in $dateTrunc is larger than 'week', but 'bucketMaxSpanSeconds' is less than

@@ -6,7 +6,8 @@ test_kind: js_test
 selector:
   roots:
     - jstests/aggregation/**/*.js
-    - jstests/libs/random_data_shard_suite_selftest.js
+    # TODO (SERVER-98123) re-introduce this test once the checkpoint is enabled.
+    # - jstests/libs/random_data_shard_suite_selftest.js
   exclude_files:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
@@ -100,11 +101,11 @@ selector:
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_profiling
-
     # The following tags are excluded specifically for this suite.
     - config_shard_incompatible
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
+    - assumes_no_track_upon_creation
 
 executor:
   archive:
@@ -118,6 +119,8 @@ executor:
         TestData:
           runningWithBalancer: true
           shardsAddedRemoved: true
+          # TODO (SERVER-98123) set this flag to true
+          implicitlyTrackUnshardedCollectionOnCreation: false
       eval:
         await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");

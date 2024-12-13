@@ -21,16 +21,13 @@ selector:
     # Uses hangAfterCollectionInserts failpoint not available on mongos.
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
-    # The test issues an implicit collection creation within a transaction,
-    # which may fail if the random shard is not the primary one.
-    - jstests/core/txns/concurrent_drops_and_creates.js
-
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     # Transactions are not allowed to operate on capped collections.
     - requires_capped
     # Prepare is not a command on mongos.
     - uses_prepare_transaction
+    - assumes_no_track_upon_creation
     - creates_unspittable_collections_on_specific_shards
 
 executor:
@@ -41,6 +38,9 @@ executor:
   config:
     shell_options:
       eval: "globalThis.testingReplication = true;"
+      global_vars:
+        TestData:
+          implicitlyTrackUnshardedCollectionOnCreation: true
   hooks:
     # We don't execute dbHash or oplog consistency checks since there is only a single replica set
     # node.

@@ -72,7 +72,6 @@ function runMoveChunkReplicaRecordIDsTest(collName, keyDoc, useBounds, splitChun
     ]));
     jsTestLog(
         `All documents in ${ns} before deletion: ${tojson(coll.find().showRecordId().toArray())}`);
-    jsTestLog(`Number of chunks for ${ns}: ${findChunksUtil.countChunksForNs(configDB, ns)}`);
     assert.commandWorked(coll.remove({name: {$in: ['Alice', 'Bob']}}));
     const docs = coll.find().showRecordId().toArray();
     assert.eq(2,

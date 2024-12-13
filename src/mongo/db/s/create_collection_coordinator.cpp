@@ -886,6 +886,17 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
     const bool isRequestForATimeseriesView =
         isTimeseries(request) && !originalNss.isTimeseriesBucketsCollection();
     if (isRequestForATimeseriesView && isBucketWithoutTheView(opCtx, *optTargetNss)) {
+        if (request.getDataShard()) {
+            // For a timeseries request, the bucket collection already exists and it's tracked but
+            // the view is missing locally. Setting the dataShard is therefore illegal as the view
+            // can only be created on the primary.
+            // Note that the dataShard is only used for testing and this error message is mainly
+            // useful for debugging purpuses only.
+            uasserted(
+                ErrorCodes::AlreadyInitialized,
+                "Cannot specify a data shard for an implicitly created view on an existing timeseries collection."_format(
+                    targetNss.toStringForErrorMsg(), request.getDataShard()->toString()));
+        }
         // For a timeseries request, the bucket collection already exists and it's tracked but the
         // view is missing locally. We need to create it. Proceed with the coordinator.
         return boost::none;
