@@ -53,7 +53,7 @@ struct Printer {
         auto out = fc.out();
 
         // Do not log any information if asked to omit it.
-        if (curOp.getShouldOmitDiagnosticInformation()) {
+        if (CurOp::shouldCurOpStackOmitDiagnosticInformation(&curOp)) {
             out = format_to(out, FMT_STRING("omitted"));
             return out;
         }

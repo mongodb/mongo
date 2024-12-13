@@ -1130,6 +1130,12 @@ public:
         return _shouldOmitDiagnosticInformation;
     }
 
+    /**
+     * Walks the whole CurOp stack starting at the given object, returning true of any CurOp should
+     * omit diagnostic info.
+     */
+    static bool shouldCurOpStackOmitDiagnosticInformation(CurOp*);
+
     boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const {
         return _queryShapeHash;
     }

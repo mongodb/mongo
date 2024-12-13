@@ -2,23 +2,17 @@
  * Test that tassert during find command execution will log diagnostics about the query.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    assertOnDiagnosticLogContents,
+    failAllInserts,
+    planExecutorAlwaysFails,
+    runWithFailpoint
+} from "jstests/libs/query/command_diagnostic_utils.js";
 
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 
 const collName = jsTestName();
 const outColl = collName + "_out";
-
-function runWithFailpoint(db, failpointName, failpointOpts, func) {
-    let fp;
-    try {
-        fp = configureFailPoint(db, failpointName, failpointOpts);
-        return func();
-    } finally {
-        if (fp) {
-            fp.off();
-        }
-    }
-}
 
 function setup(conn, targetDb) {
     const db = conn.getDB(targetDb);
@@ -26,26 +20,6 @@ function setup(conn, targetDb) {
     coll.drop();
     assert.commandWorked(coll.insert({a: 1, b: 1}));
     return {db, coll};
-}
-
-function checkDiagnosticLogContents({logFile, expectedDiagnosticInfo, description}) {
-    // By default, the log will not be printed to stdout if 'useLogFiles' is enabled.
-    const log = cat(logFile);
-    print("Log file contents", log);
-
-    // Assert the diagnostics were logged.
-    const logLines = log.split("\n");
-    assert.gt(logLines.length, 0, "no log lines");
-
-    const commandDiagnostics = logLines.find(function(logLine) {
-        return logLine.includes("ScopedDebugInfo") && logLine.includes("commandDiagnostics");
-    });
-    assert(commandDiagnostics, "no log line containing command diagnostics");
-
-    for (const diagnosticInfo of expectedDiagnosticInfo) {
-        assert(commandDiagnostics.includes(diagnosticInfo),
-               `${description}: missing '${diagnosticInfo}'`);
-    }
 }
 
 /**
@@ -92,8 +66,11 @@ function runTest({
         }
     });
 
-    checkDiagnosticLogContents(
-        {logFile: conn.fullOptions.logFile, expectedDiagnosticInfo, description});
+    assertOnDiagnosticLogContents({
+        description: description,
+        logFile: conn.fullOptions.logFile,
+        expectedDiagnosticInfo: expectedDiagnosticInfo
+    });
 
     // We expect a non-zero exit code due to tassert triggered.
     MongoRunner.stopMongod(conn, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
@@ -115,16 +92,6 @@ const commonQueryDiagnostics = [
     "planningTimeMicros:",
     'planSummary: \\"COLLSCAN\\"',
 ];
-const planExecutorAlwaysFails = {
-    failpointName: "planExecutorAlwaysFails",
-    failpointOpts: {'tassert': true},
-    errorCode: 9028201,
-};
-const failAllInserts = {
-    failpointName: "failAllInserts",
-    failpointOpts: {'tassert': true},
-    errorCode: 9276700,
-};
 const failAllUpdates = {
     failpointName: "failAllUpdates",
     failpointOpts: {'tassert': true},
@@ -387,7 +354,7 @@ runTest({
 
     // Get e.g. "2233240269355766922" from 'NumberLong("2233240269355766922")'.
     const cursorIdAsString = cursor.id.toString().split('"')[1];
-    checkDiagnosticLogContents({
+    assertOnDiagnosticLogContents({
         description,
         logFile: conn.fullOptions.logFile,
         expectedDiagnosticInfo: [
