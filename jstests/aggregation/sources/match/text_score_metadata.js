@@ -1,7 +1,7 @@
 /**
  * Tests that the "text score" metadata (previously known as 'textScore') is accessible by the
  * 'score' metadata field.
- * @tags: [featureFlagSearchHybridScoringPrerequisites, requires_fcv_81]
+ * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
 
 const kScoreMetadataArg = "score";

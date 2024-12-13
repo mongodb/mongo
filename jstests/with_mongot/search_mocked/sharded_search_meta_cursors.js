@@ -2,7 +2,7 @@
  * Test that if a mongod gets an aggregation command from a mongoS with a $search stage it will
  * return two cursors by default or when requiresSearchMetaCursor is explicitly true, and will
  * only return one cursor when requiresSearchMetaCursor is explicitly false.
- * @tags: [featureFlagSearchHybridScoringPrerequisites, requires_fcv_81]
+ * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
 
 import "jstests/libs/query/sbe_assert_error_override.js";

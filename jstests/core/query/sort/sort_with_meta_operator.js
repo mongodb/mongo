@@ -2,7 +2,7 @@
 // Note that sorting with 'searchScore' and 'vectorSearchScore' are separated out to use an
 // end_to_end mongot test.
 // This test was adjusted as we start to allow sorting by "searchScore".
-// @tags: [featureFlagSearchHybridScoringPrerequisites]
+// @tags: [featureFlagRankFusionFull, requires_fcv_81]
 
 const coll = db.sort_with_meta_operator;
 coll.drop();

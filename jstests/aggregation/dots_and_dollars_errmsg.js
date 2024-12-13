@@ -2,7 +2,7 @@
  * Tests that the dots and dollars hint encouraging users to use $getField/$setField is only
  * provided when that is a valid option.
  *
- * @tags: [ featureFlagSearchHybridScoringPrerequisites ]
+ * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 
 import {

@@ -1,6 +1,6 @@
 // Test that the $sort stage properly errors on invalid $meta.
 // This test was adjusted as we start to allow sorting by "searchScore".
-// @tags: [featureFlagSearchHybridScoringPrerequisites]
+// @tags: [featureFlagRankFusionFull, requires_fcv_81]
 
 var coll = db.sort_with_metadata;
 coll.drop();

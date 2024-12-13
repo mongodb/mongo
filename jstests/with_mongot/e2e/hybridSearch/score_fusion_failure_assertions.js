@@ -3,7 +3,7 @@
  * src/mongo/db/pipeline/document_source_score_fusion_test.cpp
  *
  * These will be picked up/ran by the js fuzzer suite.
- * @tags: [ featureFlagSearchHybridScoring ]
+ * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_81 ]
  */
 
 const collName = "search_score_fusion";

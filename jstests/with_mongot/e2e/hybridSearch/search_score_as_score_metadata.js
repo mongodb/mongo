@@ -2,7 +2,7 @@
  * Tests that the "search score" metadata (previously known as 'searchScore') in $search pipelines,
  * and that the "vector search score" metadata (previously known as 'vectorSearchScore') in
  * $vectorSearch pipelines are both accessible by the 'score' metadata field.
- * @tags: [ featureFlagSearchHybridScoringPrerequisites ]
+ * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

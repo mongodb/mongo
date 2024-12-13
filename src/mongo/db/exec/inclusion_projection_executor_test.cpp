@@ -860,7 +860,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMetaExpressions) {
     // Used to set 'score' metadata.
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
+        "featureFlagRankFusionFull", true);
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "

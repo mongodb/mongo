@@ -56,9 +56,8 @@ double testEvaluateSigmoid(double score) {
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfNoScoreField) {
-    RAIIServerParameterControllerForTest prerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest prerequisitesController("featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
         }
@@ -70,9 +69,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfNoScoreField) {
 }
 
 TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
-    RAIIServerParameterControllerForTest prerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest prerequisitesController("featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore"
@@ -87,9 +85,8 @@ TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
 }
 
 TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
-    RAIIServerParameterControllerForTest prerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest prerequisitesController("featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "expression",
@@ -102,9 +99,8 @@ TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
 }
 
 TEST_F(DocumentSourceScoreTest, CheckOnlyNormalizeFunctionSpecified) {
-    RAIIServerParameterControllerForTest prerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest prerequisitesController("featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "expression",
@@ -116,9 +112,8 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyNormalizeFunctionSpecified) {
 }
 
 TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
-    RAIIServerParameterControllerForTest prerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest prerequisitesController("featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -134,9 +129,8 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfWrongNormalizeFunctionType) {
-    RAIIServerParameterControllerForTest prerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest prerequisitesController("featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "expression",
@@ -151,8 +145,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfWrongNormalizeFunctionType) {
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfWrongWeightType) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "expression",
@@ -167,8 +161,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfWrongWeightType) {
 
 TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -191,8 +185,8 @@ TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
 
 TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -215,8 +209,8 @@ TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
 
 TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -239,8 +233,8 @@ TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -260,8 +254,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -280,8 +274,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfScoreInvalidExpression) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: { $ad: ['$myScore', '$otherScore'] },
@@ -299,8 +293,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreInvalidExpression) {
 
 TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: { $add: ['$myScore', '$otherScore'] },
@@ -323,8 +317,8 @@ TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
 
 TEST_F(DocumentSourceScoreTest, CheckNormFuncSigmoidScoreMetadataUpdated) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -351,8 +345,8 @@ TEST_F(DocumentSourceScoreTest, CheckNormFuncSigmoidScoreMetadataUpdated) {
 
 TEST_F(DocumentSourceScoreTest, CheckNormFuncSigmoidWeightScoreMetadataUpdated) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -380,8 +374,8 @@ TEST_F(DocumentSourceScoreTest, CheckNormFuncSigmoidWeightScoreMetadataUpdated) 
 
 TEST_F(DocumentSourceScoreTest, CheckWeightScoreMetadataUpdated) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -408,8 +402,8 @@ TEST_F(DocumentSourceScoreTest, CheckWeightScoreMetadataUpdated) {
 
 TEST_F(DocumentSourceScoreTest, ErrorsNormFuncSigmoidInvalidWeight) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -425,8 +419,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsNormFuncSigmoidInvalidWeight) {
 
 TEST_F(DocumentSourceScoreTest, ErrorsInvalidWeight) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -441,8 +435,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsInvalidWeight) {
 
 TEST_F(DocumentSourceScoreTest, ErrorsInvalidNormalizeFunction) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -458,8 +452,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsInvalidNormalizeFunction) {
 
 TEST_F(DocumentSourceScoreTest, CheckNormFuncNoneWeightScoreZeroMetadataUpdated) {
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
@@ -487,7 +481,7 @@ TEST_F(DocumentSourceScoreTest, CheckNormFuncNoneWeightScoreZeroMetadataUpdated)
 
 
 TEST_F(DocumentSourceScoreTest, QueryShapeDebugString) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
 
     SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
@@ -598,7 +592,7 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugString) {
 }
 
 TEST_F(DocumentSourceScoreTest, RepresentativeQueryShape) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
 
     SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
 

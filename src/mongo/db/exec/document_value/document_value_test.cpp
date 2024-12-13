@@ -977,7 +977,7 @@ TEST(MetaFields, FromBsonWithMetadataHandlesEmptyFieldName) {
 TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
     // Used to set 'score' metadata.
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
+        "featureFlagRankFusionFull", true);
     Document source = Document::fromBsonWithMetaData(
         BSON("a" << 1 << "$textScore" << 9.9 << "b" << 1 << "$randVal" << 42.0 << "c" << 1
                  << "$sortKey" << BSON("x" << 1) << "d" << 1 << "$dis" << 3.2 << "e" << 1 << "$pt"
@@ -1105,8 +1105,7 @@ TEST_F(SerializationTest, MetaSerializationSearchHighlightsNonArray) {
 
 TEST(MetaFields, ToAndFromBson) {
     // Used to set 'score' metadata.
-    RAIIServerParameterControllerForTest prerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
+    RAIIServerParameterControllerForTest prerequisitesController("featureFlagRankFusionFull", true);
     MutableDocument docBuilder;
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);

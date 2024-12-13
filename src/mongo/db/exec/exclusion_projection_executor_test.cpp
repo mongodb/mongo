@@ -363,7 +363,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
 TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     // Used to set 'score' metadata.
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
+        "featureFlagRankFusionFull", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "

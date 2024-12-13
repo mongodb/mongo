@@ -1,7 +1,7 @@
 /*
  * Tests hybrid search with the rank fusion using the $rankFusion stage and more than 2 input
  * pipelines.
- * @tags: [ featureFlagSearchHybridScoringPrerequisites ]
+ * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

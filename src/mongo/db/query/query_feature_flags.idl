@@ -107,13 +107,6 @@ feature_flags:
       default: true
       shouldBeFCVGated: false
 
-    featureFlagSearchHybridScoring:
-      description: "Feature flag to introduce MQL syntax to allow customizable scoring
-                    of multiple ranked pipelines."
-      cpp_varname: gFeatureFlagSearchHybridScoring
-      default: false
-      shouldBeFCVGated: true
-
     featureFlagAllowMergeOnNullishValues:
       description: "Feature flag to support null and missing values for 'on' fields in $merge."
       cpp_varname: gFeatureFlagAllowMergeOnNullishValues
@@ -131,14 +124,6 @@ feature_flags:
     featureFlagAccuratePercentiles:
       description: "Feature flag to enable accurate continuous and discrete $percentile accumulator/expression."
       cpp_varname: gFeatureFlagAccuratePercentiles
-      default: false
-      shouldBeFCVGated: true
-
-    featureFlagSearchHybridScoringPrerequisites:
-      description: "Feature flag to introduce $sigmoid and $minMaxScaler helpers, as well as permit
-                    $vectorSearch within $union and $lookup stages. (M1 and M2 of Vector search
-                    Hybrid Scoring)"
-      cpp_varname: gFeatureFlagSearchHybridScoringPrerequisites
       default: false
       shouldBeFCVGated: true
 
@@ -186,4 +171,25 @@ feature_flags:
       cpp_varname: gFeatureFlagLookupEncryptionSchemasFLE
       default: false
       shouldBeFCVGated: false
+
+    featureFlagRankFusionBasic:
+      description: "Feature flag to introduce the $rankFusion stage and the $sigmoid helper. (First
+                    milestone of Vector Search Hybrid Scoring)"
+      cpp_varname: gFeatureFlagRankFusionBasic
+      default: false
+      shouldBeFCVGated: false
+
+    featureFlagRankFusionFull:
+      description: "Feature flag to finish up $rankFusion features as well as introduce $score and
+                   $scoreDetails stages. (Second milestone of Vector Search Hybrid Scoring)"
+      cpp_varname: gFeatureFlagRankFusionFull
+      default: false
+      shouldBeFCVGated: true
+
+    featureFlagSearchHybridScoringFull:
+      description: "Feature flag to introduce $scoreFusion, the $minMaxScaler helper and finish up
+                   hybrid scoring features. (Final milestone of Vector Search Hybrid Scoring)"
+      cpp_varname: gFeatureFlagSearchHybridScoringFull
+      default: false
+      shouldBeFCVGated: true
 

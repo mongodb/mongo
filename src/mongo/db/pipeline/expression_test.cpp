@@ -3183,7 +3183,7 @@ TEST(ExpressionMetaTest, ExpressionMetaScoreFFNotEnabled) {
     APIParameters::get(expCtx.getOperationContext()).setAPIStrict(false);
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"score\"}");
-    // Should throw because 'featureFlagSearchHybridScoringPrerequisites' is not enabled.
+    // Should throw because 'featureFlagRankFusionFull' is not enabled.
     ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
                        AssertionException,
                        ErrorCodes::FailedToParse);
@@ -3349,7 +3349,7 @@ TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
 TEST(ExpressionMetaTest, ExpressionMetaScore) {
     // Used to set 'score' metadata.
     RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
+        "featureFlagRankFusionFull", true);
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{$meta: \"score\"}");
     auto expressionMeta =

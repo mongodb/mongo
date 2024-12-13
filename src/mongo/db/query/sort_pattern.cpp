@@ -63,7 +63,7 @@ bool isSupportedMetaSort(const boost::intrusive_ptr<ExpressionContext>& expCtx, 
     if (name == "searchScore"_sd || name == "vectorSearchScore"_sd || name == "score"_sd) {
         expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(
             "sorting by searchScore, vectorSearchScore, or score",
-            feature_flags::gFeatureFlagSearchHybridScoringPrerequisites);
+            feature_flags::gFeatureFlagRankFusionFull);
     }
     return kValidMetaSorts.contains(name);
 }

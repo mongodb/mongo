@@ -1,7 +1,7 @@
 /*
  * Test that if a mongos sends mongod a $search pipeline with an unknown field in the $search stage,
  * mongod will ignore the superfluous field.
- * @tags: [featureFlagSearchHybridScoringPrerequisites, requires_fcv_81]
+ * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
 
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

@@ -63,12 +63,11 @@
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(
-    rankFusion,
-    DocumentSourceRankFusion::LiteParsed::parse,
-    DocumentSourceRankFusion::createFromBson,
-    AllowedWithApiStrict::kNeverInVersion1,
-    feature_flags::gFeatureFlagSearchHybridScoringPrerequisites);
+REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(rankFusion,
+                                           DocumentSourceRankFusion::LiteParsed::parse,
+                                           DocumentSourceRankFusion::createFromBson,
+                                           AllowedWithApiStrict::kNeverInVersion1,
+                                           feature_flags::gFeatureFlagRankFusionFull);
 
 namespace {
 /**

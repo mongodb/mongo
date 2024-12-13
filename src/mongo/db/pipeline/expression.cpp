@@ -2420,11 +2420,10 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFF(ExpressionCon
     static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore};
     const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
     const bool hybridScoringFFEnabled =
-        feature_flags::gFeatureFlagSearchHybridScoringPrerequisites
-            .isEnabledUseLastLTSFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     uassert(ErrorCodes::FailedToParse,
-            "'featureFlagSearchHybridScoringPrerequisites' must be enabled to use "
+            "'featureFlagRankFusionFull' must be enabled to use "
             "this meta field",
             !usesHybridScoringProtectedField || hybridScoringFFEnabled);
 }
@@ -3937,7 +3936,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
                                       ExpressionSigmoid::parseExpressionSigmoid,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagSearchHybridScoringPrerequisites);
+                                      feature_flags::gFeatureFlagRankFusionFull);
 
 /* ----------------------- ExpressionSize ---------------------------- */
 

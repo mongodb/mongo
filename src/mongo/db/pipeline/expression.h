@@ -2457,7 +2457,7 @@ private:
     static void _assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* expCtx,
                                                         DocumentMetadataFields::MetaType type);
     /**
-     * Asserts that 'featureFlagSearchHybridScoringPrerequisites' feature flag is enabled, if the
+     * Asserts that 'featureFlagRankFusionFull' feature flag is enabled, if the
      * requested metadata field requires it.
      */
     static void _assertMetaFieldCompatibleWithHybridScoringFF(

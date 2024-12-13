@@ -2,7 +2,7 @@
  * Tests hybrid search with rank fusion using verbose syntax without the $rankFusion
  * stage. The collection used in this test includes no search score ties.
  *
- * @tags: [featureFlagSearchHybridScoringPrerequisites]
+ * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

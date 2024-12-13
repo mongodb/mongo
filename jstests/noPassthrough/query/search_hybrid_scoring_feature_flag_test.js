@@ -1,15 +1,16 @@
 /**
- * Test that checks a call to $rankFusion and $scoreFusion fail when search hybrid scoring feature
- * flags are turned off.
+ * Test that checks a call to $rankFusion, $scoreFusion and $score fail when search hybrid scoring
+ * feature flags are turned off.
  */
 
-// TODO SERVER-85426 Remove this test when 'featureFlagSearchHybridScoringPrerequisites' &
-// 'featureFlagSearchHybridScoring' are removed.
+// TODO SERVER-85426 Remove this test when 'featureFlagRankFusionBasic',
+// 'featureFlagRankFusionFull' and 'featureFlagSearchHybridScoringFull' are removed.
 {
     const conn = MongoRunner.runMongod({
         setParameter: {
-            featureFlagSearchHybridScoringPrerequisites: false,
-            featureFlagSearchHybridScoring: false
+            featureFlagRankFusionBasic: false,
+            featureFlagRankFusionFull: false,
+            featureFlagSearchHybridScoringFull: false,
         },
     });
     assert.neq(null, conn, 'failed to start mongod');
@@ -37,13 +38,13 @@
     MongoRunner.stopMongod(conn);
 }
 
-// Also, confirm that when the prerequisites flag is set to true, but the main hybrid search flag is
-// set to false, $score & $scoreFusion are still disabled.
+// Confirm that when only the rankFusion flag is set to true, $score & $scoreFusion are disabled.
 {
     const conn = MongoRunner.runMongod({
         setParameter: {
-            featureFlagSearchHybridScoringPrerequisites: true,
-            featureFlagSearchHybridScoring: false
+            featureFlagRankFusionBasic: true,
+            featureFlagRankFusionFull: false,
+            featureFlagSearchHybridScoringFull: false
         },
     });
     assert.neq(null, conn, 'failed to start mongod');
@@ -52,6 +53,25 @@
     assert.commandFailedWithCode(
         testDB.runCommand({aggregate: 1, pipeline: [{$score: {}}], cursor: {}}),
         ErrorCodes.QueryFeatureNotAllowed);
+
+    assert.commandFailedWithCode(
+        testDB.runCommand({aggregate: 1, pipeline: [{$scoreFusion: {}}], cursor: {}}),
+        ErrorCodes.QueryFeatureNotAllowed);
+
+    MongoRunner.stopMongod(conn);
+}
+
+// Confirm that when only the main hybrid search flag is disabled, $scoreFusion is still disabled.
+{
+    const conn = MongoRunner.runMongod({
+        setParameter: {
+            featureFlagRankFusionBasic: true,
+            featureFlagRankFusionFull: true,
+            featureFlagSearchHybridScoringFull: false
+        },
+    });
+    assert.neq(null, conn, 'failed to start mongod');
+    const testDB = conn.getDB('test');
 
     assert.commandFailedWithCode(
         testDB.runCommand({aggregate: 1, pipeline: [{$scoreFusion: {}}], cursor: {}}),

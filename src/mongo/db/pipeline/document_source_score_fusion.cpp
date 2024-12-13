@@ -51,7 +51,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
                                            DocumentSourceScoreFusion::LiteParsed::parse,
                                            DocumentSourceScoreFusion::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
-                                           feature_flags::gFeatureFlagSearchHybridScoring);
+                                           feature_flags::gFeatureFlagSearchHybridScoringFull);
 
 namespace {
 

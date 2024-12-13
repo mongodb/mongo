@@ -6,7 +6,7 @@
  * Also, this test should only run in single-node environments because a $sort after a $vectorSearch
  * in a sharded cluster will end up with the $vectorSearch on mongod and $sort on mongos.
  *
- * @tags: [featureFlagSearchHybridScoringPrerequisites, assumes_against_mongod_not_mongos]
+ * @tags: [featureFlagRankFusionFull, requires_fcv_81, assumes_against_mongod_not_mongos]
  */
 
 import {getIndexOfStageOnSingleNode} from "jstests/libs/query/analyze_plan.js";

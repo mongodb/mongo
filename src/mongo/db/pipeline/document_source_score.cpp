@@ -91,11 +91,12 @@ intrusive_ptr<Expression> buildMetadataExpression(const intrusive_ptr<Expression
 
 intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            "$score is not allowed in the current configuration. You may need to enable the "
-            "correponding feature flag",
-            feature_flags::gFeatureFlagSearchHybridScoring.isEnabledUseLatestFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    uassert(
+        ErrorCodes::QueryFeatureNotAllowed,
+        "$score is not allowed in the current configuration. You may need to enable the "
+        "correponding feature flag",
+        feature_flags::gFeatureFlagSearchHybridScoringFull.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "

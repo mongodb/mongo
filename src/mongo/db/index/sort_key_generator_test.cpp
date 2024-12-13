@@ -263,8 +263,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForGeoDistanceSort) {
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
                                                       << "searchScore")),
                                      nullptr);
@@ -274,8 +273,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForVectorSearchScoreSort) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
                                                       << "vectorSearchScore")),
                                      nullptr);

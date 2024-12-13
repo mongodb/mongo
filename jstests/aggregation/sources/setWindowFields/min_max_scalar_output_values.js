@@ -1,6 +1,6 @@
 /**
  * Test that $minMaxScalar window function output values are as expected.
- * @tags: [featureFlagSearchHybridScoring, requires_fcv_81]
+ * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
  */
 
 const coll = db[jsTestName()];
@@ -42,9 +42,9 @@ function validateTestCase(testCase) {
     for (let result of results) {
         assert(result.relativeXValue.toFixed(2) ==
                        testCase.docIdToOutputFieldValue[result._id].toFixed(2),
-                   `'relativeXValue' of '${result.relativeXValue.toFixed(2)}' does not match 
-                    expected value of '${testCase.docIdToOutputFieldValue[result._id].toFixed(2)}' 
-                    for doc '_id': '${result._id}', for test with setWindowFieldsArgs = 
+                   `'relativeXValue' of '${result.relativeXValue.toFixed(2)}' does not match
+                    expected value of '${testCase.docIdToOutputFieldValue[result._id].toFixed(2)}'
+                    for doc '_id': '${result._id}', for test with setWindowFieldsArgs =
                    '${JSON.stringify(testCase.setWindowFieldsArgs)}'`);
     }
 }

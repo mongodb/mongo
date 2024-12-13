@@ -1,6 +1,6 @@
 /**
  * Test that $minMaxScalar window function expression parsing works.
- * @tags: [featureFlagSearchHybridScoring, requires_fcv_81]
+ * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
  */
 
 const coll = db[jsTestName()];

@@ -1,7 +1,7 @@
 /**
  * Tests hybrid search syntax that isn't supported in API Version 1.
  *
- * @tags: [featureFlagSearchHybridScoringPrerequisites, uses_api_parameters, requires_fcv_81]
+ * @tags: [featureFlagRankFusionFull, uses_api_parameters, requires_fcv_81]
  */
 
 import {APIVersionHelpers} from "jstests/libs/api_version_helpers.js";

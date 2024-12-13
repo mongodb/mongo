@@ -409,9 +409,8 @@ public:
     }
 
     void setScore(double score) {
-        if (feature_flags::gFeatureFlagSearchHybridScoringPrerequisites
-                .isEnabledUseLastLTSFCVWhenUninitialized(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             _setCommon(MetaType::kScore);
             _holder->score = score;
         }

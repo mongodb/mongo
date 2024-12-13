@@ -1,6 +1,6 @@
 /**
  * Tests the validation of using "searchScore" and "vectorSearchScore" metadata fields.
- * @tags: [featureFlagSearchHybridScoringPrerequisites]
+ * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {

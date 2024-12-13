@@ -1,7 +1,7 @@
 /*
  * Tests applying weights to $rankFusion. Uses the same input pipelines as ranked_fusion_test.js,
  * but with different weighting to produce different result ordering.
- * @tags: [ featureFlagSearchHybridScoringPrerequisites ]
+ * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
