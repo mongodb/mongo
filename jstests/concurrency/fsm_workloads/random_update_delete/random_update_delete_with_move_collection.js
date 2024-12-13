@@ -39,6 +39,14 @@ const $baseConfig = {
             });
         }
 
+        // Increase yielding so that moveCollection more often commits in the middle of a
+        // multi-write.
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}));
+            this.internalQueryExecYieldIterationsDefault = res.was;
+        });
+
         // The runner will implicitly shard the collection if we are in a sharded cluster, so
         // unshard it.
         assert.commandWorked(db.adminCommand({unshardCollection: `${db}.${collName}`}));
@@ -55,6 +63,13 @@ const $baseConfig = {
                     setParameter: 1,
                     reshardingMinimumOperationDurationMillis:
                         this.originalReshardingMinimumOperationDurationMillis
+                }));
+            });
+
+            cluster.executeOnMongodNodes((db) => {
+                const res = assert.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    internalQueryExecYieldIterations: this.internalQueryExecYieldIterationsDefault
                 }));
             });
         }

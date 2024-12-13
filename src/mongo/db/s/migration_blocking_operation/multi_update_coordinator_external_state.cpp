@@ -32,7 +32,6 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/request_types/migration_blocking_operation_gen.h"
@@ -109,26 +108,6 @@ bool MultiUpdateCoordinatorExternalStateImpl::isUpdatePending(
             auto resultArr = responseBuilder.obj()["cursor"]["firstBatch"].Array();
             return (!resultArr.empty());
         });
-}
-
-bool MultiUpdateCoordinatorExternalStateImpl::collectionExists(OperationContext* opCtx,
-                                                               const NamespaceString& nss) const {
-
-    try {
-        auto acquisition = acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
-        return acquisition.exists();
-    } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-        // CommandNotSupportedOnView will be thrown if the nss is for a timeseries collection.
-        return true;
-    }
-}
-
-
-void MultiUpdateCoordinatorExternalStateImpl::createCollection(OperationContext* opCtx,
-                                                               const NamespaceString& nss) const {
-    cluster::createCollectionWithRouterLoop(opCtx, nss);
 }
 
 

@@ -260,9 +260,17 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
 
 bool shouldCoordinateMultiUpdate(OperationContext* opCtx,
                                  PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
-                                 bool isMultiWrite) {
+                                 bool isMultiWrite,
+                                 bool isUpsert) {
     if (!isMultiWrite || !pauseMigrations.isEnabled()) {
         // If this is not a multi write or if the cluster parameter is off, the op is not relevant.
+        return false;
+    }
+
+    if (isUpsert) {
+        // The full shard key must be specified for an upsert, so we will only ever target a single
+        // shard. This prevents chunk migrations from being a problem, since the whole operation
+        // will execute either before or after the migration occurs.
         return false;
     }
 
@@ -470,17 +478,17 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             writeItem.getOpType() == BatchedCommandRequest::BatchType_Update ||
             writeItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
 
-            auto isMultiWrite = [&] {
+            auto [isMultiWrite, isUpsert] = [&] {
                 if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
                     auto updateReq = writeItem.getUpdateRef();
-                    return updateReq.getMulti();
+                    return std::make_tuple(updateReq.getMulti(), updateReq.getUpsert());
                 } else {
                     auto deleteReq = writeItem.getDeleteRef();
-                    return deleteReq.getMulti();
+                    return std::make_tuple(deleteReq.getMulti(), false);
                 }
             }();
 
-            if (shouldCoordinateMultiUpdate(opCtx, pauseMigrations, isMultiWrite)) {
+            if (shouldCoordinateMultiUpdate(opCtx, pauseMigrations, isMultiWrite, isUpsert)) {
                 // Multi writes blocking migrations should be in their own batch.
                 if (!batchMap.empty()) {
                     writeOp.resetWriteToReady(opCtx);

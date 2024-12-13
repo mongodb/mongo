@@ -78,13 +78,6 @@ public:
             metadata.setUpdateCommand(request().getCommand());
             metadata.setNss(ns());
 
-            if (metadata.getUpdateCommand().hasField("updates")) {
-                auto updates = request().getCommand().getField("updates").Array();
-                // Each coordinated multi write in a bulk write is sent individually.
-                invariant(updates.size() == 1);
-                metadata.setIsUpsert(updates.front().Obj().getBoolField("upsert"));
-            }
-
             auto coordinatorDoc = MultiUpdateCoordinatorDocument();
             coordinatorDoc.setMetadata(metadata);
 

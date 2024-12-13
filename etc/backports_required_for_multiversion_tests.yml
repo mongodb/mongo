@@ -180,7 +180,7 @@ last-continuous:
     - test_file: jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
       ticket: SERVER-90818
     - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
-      ticket: SERVER-97297
+      ticket: SERVER-90157
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
       ticket: SERVER-90833
     - test_file: jstests/core/query/find/finda.js

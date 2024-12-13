@@ -60,7 +60,6 @@ MONGO_FAIL_POINT_DEFINE(hangDuringMultiUpdateCoordinatorRun);
 MONGO_FAIL_POINT_DEFINE(hangDuringMultiUpdateCoordinatorPendingUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAfterMultiUpdateCoordinatorSendsUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAfterAbortingMultiUpdateCoordinators);
-MONGO_FAIL_POINT_DEFINE(hangAfterBlockingMigrations);
 using Phase = MultiUpdateCoordinatorPhaseEnum;
 
 primary_only_service_helpers::PauseDuringPhaseTransitionFailPoint<MultiUpdateCoordinatorPhaseEnum>
@@ -252,23 +251,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_doBlockMigrationsPhase() {
             return;
         }
         auto opCtx = factory.makeOperationContext(&cc());
-
-        // Pre-create the collection if it does not already exist. This is done to prevent a
-        // deadlock between a multi update with upsert: true and the MultiUpdateCoordinator when
-        // trying to acquire a DDL lock for implicit collection creation.
-        if (_updateWouldImplicitlyCreateCollection(opCtx.get())) {
-            _externalState->createCollection(opCtx.get(), _metadata.getNss());
-        }
-
         _externalState->startBlockingMigrations(opCtx.get(), _metadata.getNss(), _metadata.getId());
-        hangAfterBlockingMigrations.pauseWhileSet();
-
-        // Ensure that the collection still exists after the DDL lock has been acquired through
-        // startBlockMigrations().
-        if (_updateWouldImplicitlyCreateCollection(opCtx.get())) {
-            uasserted(ErrorCodes::CommandFailed, "Collection was dropped while performing update.");
-        }
-
         LOGV2(9554705,
               "MultiUpdateCoordinator began request for migrations to be blocked",
               "id"_attr = _metadata.getId());
@@ -443,11 +426,6 @@ bool MultiUpdateCoordinatorInstance::_updatesPossiblyRunningFromPreviousTerm() c
 
 bool MultiUpdateCoordinatorInstance::_currentlySteppingDown() const {
     return _cancelState->isSteppingDown() || (**_taskExecutor)->isShuttingDown();
-}
-
-bool MultiUpdateCoordinatorInstance::_updateWouldImplicitlyCreateCollection(
-    OperationContext* opCtx) const {
-    return _metadata.getIsUpsert() && !_externalState->collectionExists(opCtx, _metadata.getNss());
 }
 
 void MultiUpdateCoordinatorInstance::_initializeRun(

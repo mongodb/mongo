@@ -280,22 +280,6 @@ export function randomUpdateDelete($config, $super) {
             }
             db[collName].update(q, {$set: mods});
         });
-
-        // Increase yielding so that there is more interleaving between operations.
-        cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}));
-            this.internalQueryExecYieldIterationsDefault = res.was;
-        });
-    };
-
-    $config.teardown = function(db, collName, cluster) {
-        cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryExecYieldIterations: this.internalQueryExecYieldIterationsDefault
-            }));
-        });
     };
 
     $config.states.init = function init(db, collName, connCache) {

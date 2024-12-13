@@ -49,9 +49,6 @@ public:
     virtual bool isUpdatePending(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  AggregateCommandRequest& request) const = 0;
-    virtual bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) const = 0;
-    virtual void createCollection(OperationContext* opCtx, const NamespaceString& nss) const = 0;
-
     virtual InternalSessionPool::Session acquireSession() = 0;
     virtual void releaseSession(InternalSessionPool::Session session) = 0;
 
@@ -73,9 +70,6 @@ public:
     bool isUpdatePending(OperationContext* opCtx,
                          const NamespaceString& nss,
                          AggregateCommandRequest& request) const override;
-    bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) const override;
-    void createCollection(OperationContext* opCtx, const NamespaceString& nss) const override;
-
     InternalSessionPool::Session acquireSession() override;
     void releaseSession(InternalSessionPool::Session session) override;
 
