@@ -286,9 +286,6 @@ functions:
           $SYSPY -mvenv venv
           source venv/bin/activate
           pip3 install find_libpython==0.4.0
-          # FIXME-WT-13704: installing swig to accommodate for macos14 not having swig by default, will be removed once swig
-          # is installed on this distro.
-          pip3 install swig==4.2.1
           SYSPYLIB=`find_libpython`
           SYSPYINCDEF=
 
@@ -374,17 +371,29 @@ functions:
         set -o verbose
         echo "Starting 'make wiredtiger' step"
         ${PREPARE_PATH}
+
+        if ! command -v swig >/dev/null 2>&1; then
+            echo "SWIG is not installed. Skipping check ..."
+        else
+            SWIG_VERSION=$(swig -version | awk '/SWIG Version/ {print $3}')
+
+            if [[ "$(printf '%s\n' "4.0.0" "$SWIG_VERSION" | sort -V | head -n1)" == "4.0.0" ]]; then
+                echo "SWIG version $SWIG_VERSION is 4.0 or later."
+            else
+                echo "SWIG version $SWIG_VERSION is earlier than 4.0. Installing a newer version ..."
+                python3 -mvenv venv
+                source venv/bin/activate
+                pip3 install swig==4.2.1
+                swig -version
+            fi
+        fi
+
         if [ "$OS" = "Windows_NT" ]; then
           # Use the Windows powershell script to execute Ninja build (can't execute directly in a cygwin environment).
           powershell.exe '.\test\evergreen\build_windows.ps1 -build 1'
         else
           # Compiling with CMake generated Ninja file.
           cd cmake_build
-          # FIXME-WT-13704: using virtual env to accommodate for macos14 not having swig by default, will be removed once swig
-          # is installed on this distro.
-          if [[ "${build_variant|}" =~ "macos-14-arm64" ]]; then
-            source ../venv/bin/activate
-          fi
           if [ "${cmake_generator|Ninja}" = "Ninja" ]; then
             ninja -j ${num_jobs} 2>&1
           else
@@ -3749,6 +3758,22 @@ tasks:
             # Keep repeating the model test for 60 minutes
             ./model_test -l 2000-3000 -t 3600
 
+  - name: model-test-long-random-config
+    tags: ["model_checking"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/model/tools"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            # Keep repeating the model test for 60 minutes
+            ./model_test -l 100-200 -g -t 3600
+
   - name: model-test-long-with-coverage
     tags: ["model_checking"]
     commands:
@@ -5238,6 +5263,8 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: model-test-long-with-coverage
       batchtime: 1440 # once a day
+    - name: model-test-long-random-config
+      batchtime: 1440 # once a day
     - name: csuite-long-running
       batchtime: 1440 # once a day
     - name: live-restore-long
@@ -5316,8 +5343,6 @@ buildvariants:
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: static-wt-build-test
-    - name: linux-directio
-      distros: ubuntu2004-build
     - name: format-smoke-test
     - name: ".data-validation-stress-test"
     - name: catch2-test
@@ -5639,6 +5664,8 @@ buildvariants:
     - name: model-test-long
       batchtime: 1440 # once a day
     - name: model-test-long-with-coverage
+      batchtime: 1440 # once a day
+    - name: model-test-long-random-config
       batchtime: 1440 # once a day
     - name: model-unit-test
     - name: s3-tiered-storage-extensions-test

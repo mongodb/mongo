@@ -763,34 +763,41 @@ static int
 dump_record(
   WT_CURSOR *cursor, const char *key, bool reverse, bool search_near, bool json, uint64_t window)
 {
+    WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_SESSION *session;
+    WT_SESSION_IMPL *session_impl;
     uint64_t n, total_window;
     int (*bck)(WT_CURSOR *);
     int (*fwd)(WT_CURSOR *);
     int exact;
-    const char *current_key;
     bool once;
 
     session = cursor->session;
+    session_impl = (WT_SESSION_IMPL *)session;
     once = false;
     exact = 0;
+    WT_RET(__wt_scr_alloc(session_impl, 0, &tmp));
 
-    WT_ASSERT((WT_SESSION_IMPL *)session, key != NULL);
+    WT_ASSERT(session_impl, key != NULL);
 
-    current_key = key;
-    cursor->set_key(cursor, current_key);
+    WT_ERR(__wt_buf_setstr(session_impl, tmp, ""));
+    if (json) {
+        WT_ERR(__wt_buf_fmt(session_impl, tmp, "\"key0\" : \"%s\"", key));
+        key = (char *)tmp->data;
+    }
+    cursor->set_key(cursor, key);
     ret = cursor->search_near(cursor, &exact);
 
     if (ret != 0)
-        return (util_cerr(cursor, "search_near", ret));
+        WT_ERR(util_cerr(cursor, "search_near", ret));
 
     /* Unable to find the exact key specified. */
     if (exact != 0 && !search_near)
-        return (WT_NOTFOUND);
+        WT_ERR(WT_NOTFOUND);
 
     if (window == 0)
-        WT_RET(print_record(cursor, json));
+        WT_ERR(print_record(cursor, json));
     else {
         fwd = (reverse) ? cursor->prev : cursor->next;
         bck = (reverse) ? cursor->next : cursor->prev;
@@ -803,7 +810,7 @@ dump_record(
                     fwd(cursor);
                     break;
                 }
-                return (util_cerr(cursor, "cursor", ret));
+                WT_ERR(util_cerr(cursor, "cursor", ret));
             }
         }
 
@@ -816,22 +823,23 @@ dump_record(
         for (n = 0; n < total_window; n++) {
             if (json && once) {
                 if (fputc(',', fp) == EOF)
-                    return (util_err(session, EIO, NULL));
+                    WT_ERR(util_err(session, EIO, NULL));
             }
-            WT_RET(print_record(cursor, json));
+            WT_ERR(print_record(cursor, json));
             if ((ret = fwd(cursor)) != 0) {
                 if (ret == WT_NOTFOUND)
                     break;
-                return (util_cerr(cursor, "cursor", ret));
+                WT_ERR(util_cerr(cursor, "cursor", ret));
             }
             once = true;
         }
     }
 
     if (json && once && fprintf(fp, "\n") < 0)
-        return (util_err(session, EIO, NULL));
-
-    return (0);
+        WT_ERR(util_err(session, EIO, NULL));
+err:
+    __wt_scr_free(session_impl, &tmp);
+    return (ret);
 }
 
 /*

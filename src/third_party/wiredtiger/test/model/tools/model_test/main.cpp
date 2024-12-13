@@ -609,6 +609,7 @@ usage(const char *progname)
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -C CONFIG  specify WiredTiger's connection configuration\n");
     fprintf(stderr, "  -G CONFIG  specify the workload generator's configuration\n");
+    fprintf(stderr, "  -g         generate random timing stress configuration\n");
     fprintf(stderr, "  -h HOME    specify the database directory\n");
     fprintf(stderr, "  -I n       run the test for at least this many iterations\n");
     fprintf(stderr, "  -i FILE    load the generator's configuration from the file\n");
@@ -639,6 +640,7 @@ main(int argc, char *argv[])
     uint64_t min_runtime_s = 0;
     bool preserve = false;
     bool print_only = false;
+    bool generate_timing_stress_configurations = false;
     const char *progname = argv[0];
     bool reduce = true;
 
@@ -654,13 +656,16 @@ main(int argc, char *argv[])
         int ch;
 
         __wt_optwt = 1;
-        while ((ch = __wt_getopt(progname, argc, argv, "C:G:h:I:i:l:M:npRS:T:t:w:?")) != EOF)
+        while ((ch = __wt_getopt(progname, argc, argv, "C:G:h:I:i:l:M:gnpRS:T:t:w:?")) != EOF)
             switch (ch) {
             case 'C':
                 conn_config = model::join(conn_config, __wt_optarg);
                 break;
             case 'G':
                 update_spec(spec, conn_config, table_config, __wt_optarg);
+                break;
+            case 'g':
+                generate_timing_stress_configurations = true;
                 break;
             case 'h':
                 home = __wt_optarg;
@@ -775,6 +780,7 @@ main(int argc, char *argv[])
         uint64_t next_seed = base_seed;
         for (uint64_t iteration = 1;; iteration++) {
             uint64_t seed = next_seed;
+            std::string wt_conn_config = conn_config;
             next_seed = model::random::next_seed(next_seed);
 
             std::cout << "Iteration " << iteration << ", seed 0x" << std::hex << seed << std::dec
@@ -789,12 +795,19 @@ main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
+            /* Generate random timing stress configurations and add it to the WiredTiger config. */
+            if (generate_timing_stress_configurations) {
+                std::string rand_env_config;
+                rand_env_config = model::kv_workload_generator::generate_configurations(seed);
+                wt_conn_config = model::join(wt_conn_config, rand_env_config);
+            }
+
             /* Add the connection and table configurations to the workload. */
             if (!table_config.empty())
                 workload->prepend(std::move(model::operation::wt_config("table", table_config)));
-            if (!conn_config.empty())
+            if (!wt_conn_config.empty())
                 workload->prepend(
-                  std::move(model::operation::wt_config("connection", conn_config)));
+                  std::move(model::operation::wt_config("connection", wt_conn_config)));
 
             /* If we only want to print the workload, then do so. */
             if (print_only) {
