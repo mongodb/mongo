@@ -1,0 +1,28 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+mongo_cc_library(
+    name = "tracing",
+    srcs = [
+        "trace_initialization.cpp",
+    ],
+    hdrs = [
+        "trace_initialization.h",
+    ],
+    deps = [
+        "//src/mongo/base:system_error",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/third_party/opentelemetry-cpp/api",
+                "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
+                "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
+                "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+                "//src/third_party/opentelemetry-proto:resource_proto_cc",
+                "//src/third_party/opentelemetry-proto:trace_proto_cc",
+                "//src/third_party/protobuf",
+            ],
+            "//conditions:default": [],
+        },
+    ),
+)

@@ -2059,6 +2059,135 @@
         ]
       },
       "scope": "required"
+    },
+    {
+      "supplier": {
+        "name": "Organization: github"
+      },
+      "name": "opentelemetry-cpp",
+      "version": "1.17",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Networking & Observability"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/open-telemetry/opentelemetry-cpp/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/opentelemetry-cpp/scripts/import.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "bc384adb-9013-4a4f-a248-d1d0f240aec2",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/opentelemetry-cpp"
+          }
+        ]
+      },
+      "scope": "excluded"
+    },
+    {
+      "supplier": {
+        "name": "Organization: github"
+      },
+      "name": "opentelemetry-proto",
+      "version": "1.3.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Networking & Observability"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/open-telemetry/opentelemetry-proto"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/opentelemetry-proto/scripts/import.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "bc384adb-9013-4a4f-a248-d1d0f240aec2",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/opentelemetry-proto"
+          }
+        ]
+      },
+      "scope": "excluded"
+    },
+    {
+      "supplier": {
+        "name": "Organization: github"
+      },
+      "name": "nlohmann-json",
+      "version": "3.11.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/nlohmann/json@3.11.3",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Networking & Observability"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/open-telemetry/opentelemetry-proto"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/nlohmann-json/scripts/import.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "bc384adb-9013-4a4f-a248-d1d0f240aec2",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/nlohmann-json"
+          }
+        ]
+      },
+      "scope": "excluded"
     }
   ],
   "dependencies": [

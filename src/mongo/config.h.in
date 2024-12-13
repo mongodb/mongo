@@ -121,3 +121,6 @@
 
 // Defined if the build includes stream processing module
 @mongo_config_streams@
+
+// Defined if the build includes OpenTelemetry
+@mongo_config_otel@

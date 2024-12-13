@@ -219,6 +219,20 @@ build_grpc = rule(
 )
 
 # =========
+# otel
+# =========
+
+build_otel_provider = provider(
+    doc = """Enable building otel and protobuf compiler. This has no effect on non-linux operating systems.""",
+    fields = ["enabled"],
+)
+
+build_otel = rule(
+    implementation = lambda ctx: build_otel_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # sanitize
 # =========
 

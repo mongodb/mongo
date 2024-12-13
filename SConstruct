@@ -1582,6 +1582,13 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    "ENABLE_OTEL_BUILD",
+    help="Set the boolean (auto, on/off true/false 1/0) to enable building otel and protobuf compiler.",
+    converter=functools.partial(bool_var_converter, var="ENABLE_OTEL_BUILD"),
+    default="0",
+)
+
+env_vars.Add(
     "GDB",
     help="Configures the path to the 'gdb' debugger binary.",
 )

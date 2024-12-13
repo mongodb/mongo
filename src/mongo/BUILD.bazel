@@ -19,6 +19,11 @@ generate_config_header(
         },
         "//conditions:default": {},
     }) | select({
+        "//bazel/config:build_otel_enabled": {
+            "MONGO_CONFIG_OTEL": "1",
+        },
+        "//conditions:default": {},
+    }) | select({
         "//bazel/config:tcmalloc_google_enabled": {
             "MONGO_CONFIG_TCMALLOC_GOOGLE": "1",
         },

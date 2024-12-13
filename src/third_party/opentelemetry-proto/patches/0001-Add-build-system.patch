@@ -1,0 +1,161 @@
+From d9e048280be2e89fc8cf5bed20c445e9dc152b65 Mon Sep 17 00:00:00 2001
+From: Didier Nadeau <didier.nadeau@mongodb.com>
+Date: Wed, 11 Dec 2024 20:50:35 +0000
+Subject: [PATCH] Add build system
+
+---
+ .../opentelemetry-proto/dist/BUILD            | 78 +++++++++++++++++++
+ .../opentelemetry-proto/dist/otel_rules.bzl   | 56 +++++++++++++
+ 2 files changed, 134 insertions(+)
+ create mode 100644 src/third_party/opentelemetry-proto/dist/BUILD
+ create mode 100644 src/third_party/opentelemetry-proto/dist/otel_rules.bzl
+
+diff --git a/src/third_party/opentelemetry-proto/dist/BUILD b/src/third_party/opentelemetry-proto/dist/BUILD
+new file mode 100644
+index 00000000000..8afdd5438fd
+--- /dev/null
++++ b/src/third_party/opentelemetry-proto/dist/BUILD
+@@ -0,0 +1,78 @@
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_proto_library", "mongo_proto_library")
++load("//src/third_party/opentelemetry-proto:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH", "mongo_cc_proto_lib")
++
++package(default_visibility = ["//visibility:public"])
++
++mongo_proto_library(
++    name = "common_proto",
++    srcs = [
++        "opentelemetry/proto/common/v1/common.proto",
++    ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
++)
++
++mongo_cc_proto_lib(
++    name = "common_proto_cc",
++    srcs = [
++        "opentelemetry/proto/common/v1/dummy_file.cpp",
++    ],
++    deps = [":common_proto"],
++)
++
++mongo_proto_library(
++    name = "resource_proto",
++    srcs = [
++        "opentelemetry/proto/resource/v1/resource.proto",
++    ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
++    deps = [
++        ":common_proto",
++    ],
++)
++
++mongo_cc_proto_lib(
++    name = "resource_proto_cc",
++    srcs = [
++        "opentelemetry/proto/resource/v1/dummy_file.cpp",
++    ],
++    deps = [":resource_proto"],
++)
++
++mongo_proto_library(
++    name = "trace_proto",
++    srcs = [
++        "opentelemetry/proto/trace/v1/trace.proto",
++    ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
++    deps = [
++        ":common_proto",
++        ":resource_proto",
++    ],
++)
++
++mongo_cc_proto_lib(
++    name = "trace_proto_cc",
++    srcs = [
++        "opentelemetry/proto/trace/v1/dummy_file.cpp",
++    ],
++    deps = [":trace_proto"],
++)
++
++mongo_proto_library(
++    name = "trace_service_proto",
++    srcs = [
++        "opentelemetry/proto/collector/trace/v1/trace_service.proto",
++    ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
++    deps = [
++        ":trace_proto",
++    ],
++)
++
++mongo_cc_proto_lib(
++    name = "trace_service_proto_cc",
++    srcs = [
++        "opentelemetry/proto/collector/trace/v1/dummy_file.cpp",
++    ],
++    deps = [":trace_service_proto"],
++)
+diff --git a/src/third_party/opentelemetry-proto/dist/otel_rules.bzl b/src/third_party/opentelemetry-proto/dist/otel_rules.bzl
+new file mode 100644
+index 00000000000..31feebb9fb7
+--- /dev/null
++++ b/src/third_party/opentelemetry-proto/dist/otel_rules.bzl
+@@ -0,0 +1,56 @@
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_proto_library")
++
++OTEL_COPTS = [
++    "-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING",
++] + select({
++    "//bazel/config:gcc_or_clang": [
++        "-Wno-sign-compare",
++        "-Wno-comment",
++        "-Wno-implicit-fallthrough",
++    ],
++    "//conditions:default": [],
++}) + select({
++    "//bazel/config:compiler_type_gcc": [
++        "-Wno-stringop-overread",  # false positive: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98465#c30
++        "-Wno-stringop-overflow",
++        "-Wno-attributes",
++        #"-Wno-class-memaccess",
++        #"-Wno-overloaded-virtual",
++        "-Wno-error",
++    ],
++    "//bazel/config:compiler_type_msvc": [
++        "/wd4334",  # '<<': result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
++        "/wd4116",  # unnamed type definition in parentheses
++        "/wd4146",  # unary minus operator applied to unsigned type, result still unsigned
++        "/wd4715",  # not all control paths return a value
++        "/wd4200",  # nonstandard extension used: zero-sized array in struct/union
++        "/wd4312",  # 'reinterpret_cast': conversion from 'unsigned int' to 'void *' of greater size
++        "/wd4090",  # 'function': different 'const' qualifiers
++    ],
++    "//conditions:default": [],
++})
++
++OTEL_TARGET_COMPATIBLE_WITH = select({
++    "//bazel/config:build_otel_enabled": [],
++    "//conditions:default": ["@platforms//:incompatible"],
++})
++
++def mongo_cc_proto_lib(
++        name,
++        srcs,
++        deps):
++    proto_cc_name = name + "_raw_proto"
++    mongo_cc_proto_library(
++        name = proto_cc_name,
++        deps = deps,
++    )
++
++    mongo_cc_library(
++        name = name,
++        srcs = srcs,
++        cc_deps = [":" + proto_cc_name],
++        copts = OTEL_COPTS,
++        deps = [
++            "//src/third_party/protobuf",
++        ],
++    )
+-- 
+2.34.1
+

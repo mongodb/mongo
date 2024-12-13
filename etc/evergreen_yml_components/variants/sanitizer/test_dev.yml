@@ -89,6 +89,7 @@ variables:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --enable-http-client=on
       --link-model=dynamic
+      ENABLE_OTEL_BUILD=1
       --modules=
     num_scons_link_jobs_available: 0.99
 

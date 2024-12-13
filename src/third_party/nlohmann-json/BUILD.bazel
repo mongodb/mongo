@@ -1,0 +1,86 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+JSON_COPTS = select({
+    "//bazel/config:gcc_or_clang": [
+        "-Wno-sign-compare",
+        "-Wno-comment",
+        "-Wno-implicit-fallthrough",
+        "-Wno-unused-result",
+    ],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:compiler_type_gcc": [
+        "-Wno-stringop-overread",  # false positive: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98465#c30
+        "-Wno-stringop-overflow",
+        "-Wno-attributes",
+        "-Wno-error",
+    ],
+    "//bazel/config:compiler_type_msvc": [
+        "/wd4334",  # '<<': result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
+        "/wd4116",  # unnamed type definition in parentheses
+        "/wd4146",  # unary minus operator applied to unsigned type, result still unsigned
+        "/wd4715",  # not all control paths return a value
+        "/wd4200",  # nonstandard extension used: zero-sized array in struct/union
+        "/wd4312",  # 'reinterpret_cast': conversion from 'unsigned int' to 'void *' of greater size
+        "/wd4090",  # 'function': different 'const' qualifiers
+    ],
+    "//conditions:default": [],
+})
+
+mongo_cc_library(
+    name = "json",
+    hdrs = [
+        "include/nlohmann/adl_serializer.hpp",
+        "include/nlohmann/byte_container_with_subtype.hpp",
+        "include/nlohmann/detail/abi_macros.hpp",
+        "include/nlohmann/detail/conversions/from_json.hpp",
+        "include/nlohmann/detail/conversions/to_chars.hpp",
+        "include/nlohmann/detail/conversions/to_json.hpp",
+        "include/nlohmann/detail/exceptions.hpp",
+        "include/nlohmann/detail/hash.hpp",
+        "include/nlohmann/detail/input/binary_reader.hpp",
+        "include/nlohmann/detail/input/input_adapters.hpp",
+        "include/nlohmann/detail/input/json_sax.hpp",
+        "include/nlohmann/detail/input/lexer.hpp",
+        "include/nlohmann/detail/input/parser.hpp",
+        "include/nlohmann/detail/input/position_t.hpp",
+        "include/nlohmann/detail/iterators/internal_iterator.hpp",
+        "include/nlohmann/detail/iterators/iter_impl.hpp",
+        "include/nlohmann/detail/iterators/iteration_proxy.hpp",
+        "include/nlohmann/detail/iterators/iterator_traits.hpp",
+        "include/nlohmann/detail/iterators/json_reverse_iterator.hpp",
+        "include/nlohmann/detail/iterators/primitive_iterator.hpp",
+        "include/nlohmann/detail/json_custom_base_class.hpp",
+        "include/nlohmann/detail/json_pointer.hpp",
+        "include/nlohmann/detail/json_ref.hpp",
+        "include/nlohmann/detail/macro_scope.hpp",
+        "include/nlohmann/detail/macro_unscope.hpp",
+        "include/nlohmann/detail/meta/call_std/begin.hpp",
+        "include/nlohmann/detail/meta/call_std/end.hpp",
+        "include/nlohmann/detail/meta/cpp_future.hpp",
+        "include/nlohmann/detail/meta/detected.hpp",
+        "include/nlohmann/detail/meta/identity_tag.hpp",
+        "include/nlohmann/detail/meta/is_sax.hpp",
+        "include/nlohmann/detail/meta/std_fs.hpp",
+        "include/nlohmann/detail/meta/type_traits.hpp",
+        "include/nlohmann/detail/meta/void_t.hpp",
+        "include/nlohmann/detail/output/binary_writer.hpp",
+        "include/nlohmann/detail/output/output_adapters.hpp",
+        "include/nlohmann/detail/output/serializer.hpp",
+        "include/nlohmann/detail/string_concat.hpp",
+        "include/nlohmann/detail/string_escape.hpp",
+        "include/nlohmann/detail/value_t.hpp",
+        "include/nlohmann/json.hpp",
+        "include/nlohmann/json_fwd.hpp",
+        "include/nlohmann/ordered_map.hpp",
+        "include/nlohmann/thirdparty/hedley/hedley.hpp",
+        "include/nlohmann/thirdparty/hedley/hedley_undef.hpp",
+    ],
+    copts = JSON_COPTS,
+    includes = ["include"],
+    local_defines = [
+        "_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING",
+    ],
+    visibility = ["//visibility:public"],
+    alwayslink = True,
+)

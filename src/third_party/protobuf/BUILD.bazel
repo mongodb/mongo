@@ -4,8 +4,9 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files(glob(["*"]))
 
-GRPC_TARGET_COMPATIBLE_WITH = select({
+PROTOBUF_TARGET_COMPATIBLE_WITH = select({
     "//bazel/config:build_grpc_enabled": [],
+    "//bazel/config:build_otel_enabled": [],
     "//conditions:default": ["@platforms//:incompatible"],
 })
 
@@ -311,7 +312,7 @@ mongo_cc_library(
         "dist/third_party/utf8_range/utf8_validity.h",
     ],
     includes = ["dist/third_party/utf8_range"],
-    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = PROTOBUF_TARGET_COMPATIBLE_WITH,
     deps = [
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_debugging_internal",
@@ -417,7 +418,7 @@ mongo_cc_library(
     includes = [
         "dist/src",
     ],
-    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = PROTOBUF_TARGET_COMPATIBLE_WITH,
     deps = [
         ":utf8_validity",
         "//src/third_party/abseil-cpp:absl_base",
@@ -559,7 +560,7 @@ mongo_cc_library(
     includes = [
         "dist/src",
     ],
-    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = PROTOBUF_TARGET_COMPATIBLE_WITH,
     deps = [
         "protobuf",
         "//src/third_party/abseil-cpp:absl_base",
@@ -574,7 +575,7 @@ mongo_cc_binary(
     includes = [
         "dist/src",
     ],
-    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = PROTOBUF_TARGET_COMPATIBLE_WITH,
     deps = [
         "protobuf",
         "protoc",

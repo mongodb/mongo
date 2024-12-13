@@ -53,6 +53,7 @@ build --flag_alias=use_wiredtiger=//bazel/config:use_wiredtiger
 build --flag_alias=use_glibcxx_debug=//bazel/config:use_glibcxx_debug
 build --flag_alias=use_tracing_profiler=//bazel/config:use_tracing_profiler
 build --flag_alias=build_grpc=//bazel/config:build_grpc
+build --flag_alias=build_otel=//bazel/config:build_otel
 build --flag_alias=use_libcxx=//bazel/config:use_libcxx
 build --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations
 build --flag_alias=shared_archive=//bazel/config:shared_archive

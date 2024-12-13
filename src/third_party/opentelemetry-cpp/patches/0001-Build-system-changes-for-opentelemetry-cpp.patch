@@ -1,0 +1,2055 @@
+From 090ef9e6af79b24469aedc563a50649f4b8b2a0d Mon Sep 17 00:00:00 2001
+From: Didier Nadeau <didier.nadeau@mongodb.com>
+Date: Wed, 11 Dec 2024 20:30:58 +0000
+Subject: [PATCH] Build system changes for opentelemetry-cpp
+
+---
+ src/third_party/opentelemetry-cpp/dist/BUILD  |   1 +
+ .../opentelemetry-cpp/dist/api/BUILD          |  11 +-
+ .../dist/exporters/otlp/BUILD                 | 665 ++----------------
+ .../exporters/otlp/otlp_environment.h         |   2 +-
+ .../exporters/otlp/otlp_file_client.h         |   2 +-
+ .../exporters/otlp/otlp_file_exporter.h       |   6 +-
+ .../otlp/otlp_file_exporter_factory.h         |   2 +-
+ .../exporters/otlp/otlp_http_client.h         |   2 +-
+ .../exporters/otlp/otlp_http_exporter.h       |   6 +-
+ .../otlp/otlp_http_exporter_factory.h         |  29 +-
+ .../otlp/otlp_populate_attribute_utils.h      |   4 +-
+ .../exporters/otlp/otlp_recordable.h          |   6 +-
+ .../exporters/otlp/otlp_recordable_utils.h    |  14 +-
+ .../otlp/src/otlp_recordable_utils.cc         |  68 --
+ .../opentelemetry-cpp/dist/ext/BUILD          |   7 +-
+ .../dist/ext/src/http/client/curl/BUILD       |  22 +-
+ .../src/http/client/curl/http_client_curl.cc  |   2 +-
+ .../http/client/curl/http_operation_curl.cc   |   2 +-
+ .../opentelemetry-cpp/dist/otel_rules.bzl     |  44 ++
+ .../opentelemetry-cpp/dist/sdk/BUILD          |   6 +-
+ .../sdk/common/attributemap_hash.h            |   2 +-
+ .../sdk/common/circular_buffer.h              |   4 +-
+ .../sdk/common/global_log_handler.h           |   2 +-
+ .../instrumentation_library.h                 |   2 +-
+ .../instrumentation_scope.h                   |   2 +-
+ .../opentelemetry/sdk/resource/resource.h     |   2 +-
+ .../sdk/resource/resource_detector.h          |   2 +-
+ .../sdk/trace/batch_span_processor.h          |  10 +-
+ .../sdk/trace/batch_span_processor_factory.h  |   6 +-
+ .../opentelemetry/sdk/trace/exporter.h        |   4 +-
+ .../sdk/trace/multi_recordable.h              |   4 +-
+ .../sdk/trace/multi_span_processor.h          |   4 +-
+ .../sdk/trace/random_id_generator.h           |   2 +-
+ .../sdk/trace/random_id_generator_factory.h   |   2 +-
+ .../opentelemetry/sdk/trace/recordable.h      |   4 +-
+ .../sdk/trace/samplers/always_off.h           |   2 +-
+ .../sdk/trace/samplers/always_off_factory.h   |   2 +-
+ .../sdk/trace/samplers/always_on.h            |   2 +-
+ .../sdk/trace/samplers/always_on_factory.h    |   2 +-
+ .../opentelemetry/sdk/trace/samplers/parent.h |   2 +-
+ .../sdk/trace/samplers/parent_factory.h       |   2 +-
+ .../sdk/trace/samplers/trace_id_ratio.h       |   2 +-
+ .../trace/samplers/trace_id_ratio_factory.h   |   2 +-
+ .../sdk/trace/simple_processor.h              |   8 +-
+ .../sdk/trace/simple_processor_factory.h      |   4 +-
+ .../opentelemetry/sdk/trace/span_data.h       |   8 +-
+ .../include/opentelemetry/sdk/trace/tracer.h  |  12 +-
+ .../opentelemetry/sdk/trace/tracer_context.h  |  12 +-
+ .../sdk/trace/tracer_context_factory.h        |  10 +-
+ .../opentelemetry/sdk/trace/tracer_provider.h |  16 +-
+ .../sdk/trace/tracer_provider_factory.h       |  12 +-
+ .../sdk/include/opentelemetry/sdk_config.h    |   2 +-
+ .../dist/sdk/src/common/BUILD                 |  37 +-
+ .../dist/sdk/src/common/platform/BUILD        |  12 +-
+ .../dist/sdk/src/resource/BUILD               |  12 +-
+ .../dist/sdk/src/trace/BUILD                  |  16 +-
+ .../dist/sdk/src/trace/span.h                 |   4 +-
+ 57 files changed, 281 insertions(+), 853 deletions(-)
+ create mode 100644 src/third_party/opentelemetry-cpp/dist/BUILD
+ create mode 100644 src/third_party/opentelemetry-cpp/dist/otel_rules.bzl
+
+diff --git a/src/third_party/opentelemetry-cpp/dist/BUILD b/src/third_party/opentelemetry-cpp/dist/BUILD
+new file mode 100644
+index 00000000000..ffd0fb0cdc5
+--- /dev/null
++++ b/src/third_party/opentelemetry-cpp/dist/BUILD
+@@ -0,0 +1 @@
++package(default_visibility = ["//visibility:public"])
+diff --git a/src/third_party/opentelemetry-cpp/dist/api/BUILD b/src/third_party/opentelemetry-cpp/dist/api/BUILD
+index dfc7d3c6450..dbc3b1d452e 100644
+--- a/src/third_party/opentelemetry-cpp/dist/api/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/api/BUILD
+@@ -1,7 +1,9 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+ load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_COPTS", "OTEL_TARGET_COMPATIBLE_WITH")
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+@@ -20,9 +22,10 @@ string_flag(
+     values = CPP_STDLIBS,
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "api",
+     hdrs = glob(["include/**/*.h"]),
++    copts = OTEL_COPTS,
+     defines = ["HAVE_ABSEIL"] + select({
+         ":set_cxx_stdlib_none": [],
+         ### automatic selection
+@@ -41,10 +44,10 @@ cc_library(
+     }),
+     strip_include_prefix = "include",
+     tags = ["api"],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "@com_google_absl//absl/base",
+-        "@com_google_absl//absl/strings",
+-        "@com_google_absl//absl/types:variant",
++        "//src/third_party/abseil-cpp:absl_base",
++        "//src/third_party/abseil-cpp:absl_strings",
+     ],
+ )
+ 
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+index a2dd8f8c650..b3ddd1924b8 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+@@ -1,24 +1,21 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
+-package(default_visibility = ["//visibility:public"])
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_COPTS", "OTEL_TARGET_COMPATIBLE_WITH")
+ 
+-load("//bazel:otel_cc_benchmark.bzl", "otel_cc_benchmark")
++package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "otlp_recordable",
+     srcs = [
+         "src/otlp_environment.cc",
+-        "src/otlp_log_recordable.cc",
+-        "src/otlp_metric_utils.cc",
+         "src/otlp_populate_attribute_utils.cc",
+         "src/otlp_recordable.cc",
+         "src/otlp_recordable_utils.cc",
+     ],
+     hdrs = [
+         "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_log_recordable.h",
+-        "include/opentelemetry/exporters/otlp/otlp_metric_utils.h",
+         "include/opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h",
+         "include/opentelemetry/exporters/otlp/otlp_preferred_temporality.h",
+         "include/opentelemetry/exporters/otlp/otlp_recordable.h",
+@@ -26,82 +23,21 @@ cc_library(
+         "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+     ],
++    copts = OTEL_COPTS,
+     strip_include_prefix = "include",
+     tags = ["otlp"],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//sdk/src/logs",
+-        "//sdk/src/resource",
+-        "//sdk/src/trace",
+-        "@com_github_opentelemetry_proto//:logs_service_proto_cc",
+-        "@com_github_opentelemetry_proto//:metrics_service_proto_cc",
+-        "@com_github_opentelemetry_proto//:trace_service_proto_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_grpc_client",
+-    srcs = [
+-        "src/otlp_grpc_client.cc",
+-        "src/otlp_grpc_utils.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_client.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_client_options.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_utils.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_grpc",
+-    ],
+-    deps = [
+-        "//ext:headers",
+-        "//sdk/src/common:global_log_handler",
+-        "@com_github_grpc_grpc//:grpc++",
+-        "@com_github_opentelemetry_proto//:common_proto_cc",
+-        "@com_github_opentelemetry_proto//:logs_service_grpc_cc",
+-        "@com_github_opentelemetry_proto//:metrics_service_grpc_cc",
+-        "@com_github_opentelemetry_proto//:trace_service_grpc_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_grpc_exporter",
+-    srcs = [
+-        "src/otlp_grpc_exporter.cc",
+-        "src/otlp_grpc_exporter_factory.cc",
+-        "src/otlp_grpc_exporter_options.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_client_options.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_exporter.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_utils.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_grpc",
+-    ],
+-    deps = [
+-        ":otlp_recordable",
+-        ":otlp_grpc_client",
+-        "//ext:headers",
+-        "//sdk/src/trace",
+-
+-        # For gRPC
+-        "@com_github_opentelemetry_proto//:trace_service_grpc_cc",
++        "//src/third_party/opentelemetry-cpp/sdk/src/resource",
++        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
++        "//src/third_party/opentelemetry-proto:common_proto_cc",
++        "//src/third_party/opentelemetry-proto:resource_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_service_proto_cc",
+     ],
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "otlp_http_client",
+     srcs = [
+         "src/otlp_http.cc",
+@@ -116,9 +52,9 @@ cc_library(
+     ],
+     copts = [
+         "-DCURL_STATICLIB",
+-    ],
++    ] + OTEL_COPTS,
+     linkopts = select({
+-        "//bazel:windows": [
++        "@platforms//os:windows": [
+             "-DEFAULTLIB:advapi32.lib",
+             "-DEFAULTLIB:crypt32.lib",
+         ],
+@@ -128,20 +64,20 @@ cc_library(
+     tags = [
+         "otlp",
+         "otlp_http",
+-        "otlp_http_log",
+     ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//ext/src/http/client/curl:http_client_curl",
+-        "//sdk:headers",
+-        "//sdk/src/common:base64",
+-        "@com_github_opentelemetry_proto//:common_proto_cc",
+-        "@com_google_absl//absl/strings",
+-        "@github_nlohmann_json//:json",
++        "//src/third_party/abseil-cpp:absl_strings",
++        "//src/third_party/nlohmann-json:json",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/ext/src/http/client/curl:http_client_curl",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:base64",
++        "//src/third_party/opentelemetry-proto:common_proto_cc",
+     ],
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "otlp_http_exporter",
+     srcs = [
+         "src/otlp_http_exporter.cc",
+@@ -156,20 +92,25 @@ cc_library(
+         "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+     ],
++    copts = OTEL_COPTS,
+     strip_include_prefix = "include",
+     tags = [
+         "otlp",
+         "otlp_http",
+     ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+         ":otlp_http_client",
+         ":otlp_recordable",
+-        "//sdk/src/trace",
+-        "@com_github_opentelemetry_proto//:trace_service_proto_cc",
++        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
++        "//src/third_party/opentelemetry-proto:common_proto_cc",
++        "//src/third_party/opentelemetry-proto:resource_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_service_proto_cc",
+     ],
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "otlp_file_client",
+     srcs = [
+         "src/otlp_file_client.cc",
+@@ -181,22 +122,24 @@ cc_library(
+         "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+     ],
++    copts = OTEL_COPTS,
+     strip_include_prefix = "include",
+     tags = [
+         "otlp",
+         "otlp_file",
+     ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//sdk:headers",
+-        "//sdk/src/common:base64",
+-        "@com_github_opentelemetry_proto//:common_proto_cc",
+-        "@com_google_absl//absl/strings",
+-        "@github_nlohmann_json//:json",
++        "//src/third_party/abseil-cpp:absl_strings",
++        "//src/third_party/nlohmann-json:json",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:base64",
++        "//src/third_party/opentelemetry-proto:common_proto_cc",
+     ],
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "otlp_file_exporter",
+     srcs = [
+         "src/otlp_file_exporter.cc",
+@@ -211,532 +154,20 @@ cc_library(
+         "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+     ],
++    copts = OTEL_COPTS,
+     strip_include_prefix = "include",
+     tags = [
+         "otlp",
+         "otlp_file",
+     ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+         ":otlp_file_client",
+         ":otlp_recordable",
+-        "//sdk/src/trace",
+-        "@com_github_opentelemetry_proto//:trace_service_proto_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_grpc_metric_exporter",
+-    srcs = [
+-        "src/otlp_grpc_metric_exporter.cc",
+-        "src/otlp_grpc_metric_exporter_factory.cc",
+-        "src/otlp_grpc_metric_exporter_options.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_client_options.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_metric_exporter.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_metric_exporter_factory.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_metric_exporter_options.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_grpc_metric",
+-    ],
+-    deps = [
+-        ":otlp_recordable",
+-        ":otlp_grpc_client",
+-        "//ext:headers",
+-        "//sdk/src/metrics",
+-
+-        # For gRPC
+-        "@com_github_opentelemetry_proto//:metrics_service_grpc_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_http_metric_exporter",
+-    srcs = [
+-        "src/otlp_http_metric_exporter.cc",
+-        "src/otlp_http_metric_exporter_factory.cc",
+-        "src/otlp_http_metric_exporter_options.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_http_metric_exporter.h",
+-        "include/opentelemetry/exporters/otlp/otlp_http_metric_exporter_factory.h",
+-        "include/opentelemetry/exporters/otlp/otlp_http_metric_exporter_options.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_http_metric",
+-    ],
+-    deps = [
+-        ":otlp_http_client",
+-        ":otlp_recordable",
+-        "//sdk/src/metrics",
+-        "@com_github_opentelemetry_proto//:metrics_service_proto_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_file_metric_exporter",
+-    srcs = [
+-        "src/otlp_file_metric_exporter.cc",
+-        "src/otlp_file_metric_exporter_factory.cc",
+-        "src/otlp_file_metric_exporter_options.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_file_metric_exporter.h",
+-        "include/opentelemetry/exporters/otlp/otlp_file_metric_exporter_factory.h",
+-        "include/opentelemetry/exporters/otlp/otlp_file_metric_exporter_options.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_file_metric",
+-    ],
+-    deps = [
+-        ":otlp_file_client",
+-        ":otlp_recordable",
+-        "//sdk/src/metrics",
+-        "@com_github_opentelemetry_proto//:metrics_service_proto_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_http_log_record_exporter",
+-    srcs = [
+-        "src/otlp_http_log_record_exporter.cc",
+-        "src/otlp_http_log_record_exporter_factory.cc",
+-        "src/otlp_http_log_record_exporter_options.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_http_log_record_exporter.h",
+-        "include/opentelemetry/exporters/otlp/otlp_http_log_record_exporter_factory.h",
+-        "include/opentelemetry/exporters/otlp/otlp_http_log_record_exporter_options.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_http_log",
+-    ],
+-    deps = [
+-        ":otlp_http_client",
+-        ":otlp_recordable",
+-        "//sdk/src/logs",
+-        "@com_github_opentelemetry_proto//:logs_service_proto_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_file_log_record_exporter",
+-    srcs = [
+-        "src/otlp_file_log_record_exporter.cc",
+-        "src/otlp_file_log_record_exporter_factory.cc",
+-        "src/otlp_file_log_record_exporter_options.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_file_log_record_exporter.h",
+-        "include/opentelemetry/exporters/otlp/otlp_file_log_record_exporter_factory.h",
+-        "include/opentelemetry/exporters/otlp/otlp_file_log_record_exporter_options.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_file_log",
+-    ],
+-    deps = [
+-        ":otlp_file_client",
+-        ":otlp_recordable",
+-        "//sdk/src/logs",
+-        "@com_github_opentelemetry_proto//:logs_service_proto_cc",
+-    ],
+-)
+-
+-cc_library(
+-    name = "otlp_grpc_log_record_exporter",
+-    srcs = [
+-        "src/otlp_grpc_log_record_exporter.cc",
+-        "src/otlp_grpc_log_record_exporter_factory.cc",
+-        "src/otlp_grpc_log_record_exporter_options.cc",
+-    ],
+-    hdrs = [
+-        "include/opentelemetry/exporters/otlp/otlp_environment.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_client_options.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_log_record_exporter.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_log_record_exporter_factory.h",
+-        "include/opentelemetry/exporters/otlp/otlp_grpc_log_record_exporter_options.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+-        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+-    ],
+-    strip_include_prefix = "include",
+-    tags = [
+-        "otlp",
+-        "otlp_grpc_log",
+-    ],
+-    deps = [
+-        ":otlp_recordable",
+-        ":otlp_grpc_client",
+-        "//ext:headers",
+-        "//sdk/src/logs",
+-        # For gRPC
+-        "@com_github_opentelemetry_proto//:logs_service_grpc_cc",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_recordable_test",
+-    srcs = ["test/otlp_recordable_test.cc"],
+-    tags = [
+-        "otlp",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_recordable",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_log_recordable_test",
+-    srcs = [
+-        "test/otlp_log_recordable_test.cc",
+-        "test/otlp_metrics_serialization_test.cc",
+-    ],
+-    tags = [
+-        "otlp",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_recordable",
+-        "@com_github_opentelemetry_proto//:logs_service_proto_cc",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_file_client_test",
+-    srcs = ["test/otlp_file_client_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_file",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_file_client",
+-        ":otlp_file_exporter",
+-        ":otlp_recordable",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_grpc_exporter_test",
+-    srcs = ["test/otlp_grpc_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_grpc",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_grpc_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_grpc_exporter_factory_test",
+-    srcs = ["test/otlp_grpc_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_grpc",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_grpc_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_http_exporter_test",
+-    srcs = ["test/otlp_http_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_http",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_http_exporter",
+-        "//api",
+-        "//test_common/src/http/client/nosend:http_client_nosend",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_http_exporter_factory_test",
+-    srcs = ["test/otlp_http_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_http",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_http_exporter",
+-        "//api",
+-        "//test_common/src/http/client/nosend:http_client_nosend",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_file_exporter_test",
+-    srcs = ["test/otlp_file_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_file",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_file_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_file_exporter_factory_test",
+-    srcs = ["test/otlp_file_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_file",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_file_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_http_log_record_exporter_test",
+-    srcs = ["test/otlp_http_log_record_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_http_log",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_http_log_record_exporter",
+-        "//api",
+-        "//test_common/src/http/client/nosend:http_client_nosend",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_http_log_record_exporter_factory_test",
+-    srcs = ["test/otlp_http_log_record_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_http_log",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_http_log_record_exporter",
+-        "//api",
+-        "//test_common/src/http/client/nosend:http_client_nosend",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_file_log_record_exporter_test",
+-    srcs = ["test/otlp_file_log_record_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_file_log",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_file_log_record_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_file_log_record_exporter_factory_test",
+-    srcs = ["test/otlp_file_log_record_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_file_log",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_file_log_record_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_grpc_log_record_exporter_test",
+-    srcs = ["test/otlp_grpc_log_record_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_grpc_log",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_grpc_exporter",
+-        ":otlp_grpc_log_record_exporter",
+-        "//api",
+-        "//sdk/src/logs",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_grpc_log_record_exporter_factory_test",
+-    srcs = ["test/otlp_grpc_log_record_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_grpc_log",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_grpc_log_record_exporter",
+-        "//api",
+-        "//sdk/src/logs",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_grpc_metric_exporter_test",
+-    srcs = ["test/otlp_grpc_metric_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_grpc_metric",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_grpc_metric_exporter",
+-        "//api",
+-        "//sdk/src/metrics",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_grpc_metric_exporter_factory_test",
+-    srcs = ["test/otlp_grpc_metric_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_grpc_metric",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_grpc_metric_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_http_metric_exporter_test",
+-    srcs = ["test/otlp_http_metric_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_http_metric",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_http_metric_exporter",
+-        "//api",
+-        "//test_common/src/http/client/nosend:http_client_nosend",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_http_metric_exporter_factory_test",
+-    srcs = ["test/otlp_http_metric_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_http_metric",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_http_metric_exporter",
+-        "//api",
+-        "//test_common/src/http/client/nosend:http_client_nosend",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_file_metric_exporter_test",
+-    srcs = ["test/otlp_file_metric_exporter_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_file_metric",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_file_metric_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "otlp_file_metric_exporter_factory_test",
+-    srcs = ["test/otlp_file_metric_exporter_factory_test.cc"],
+-    tags = [
+-        "otlp",
+-        "otlp_file_metric",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_file_metric_exporter",
+-        "//api",
+-        "@com_google_googletest//:gtest_main",
+-    ],
+-)
+-
+-otel_cc_benchmark(
+-    name = "otlp_grpc_exporter_benchmark",
+-    srcs = ["test/otlp_grpc_exporter_benchmark.cc"],
+-    tags = [
+-        "benchmark",
+-        "otlp",
+-        "otlp_grpc",
+-        "test",
+-    ],
+-    deps = [
+-        ":otlp_grpc_exporter",
+-        "//examples/common/foo_library:common_foo_library",
++        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
++        "//src/third_party/opentelemetry-proto:common_proto_cc",
++        "//src/third_party/opentelemetry-proto:resource_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_service_proto_cc",
+     ],
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_environment.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_environment.h
+index 180523b5b8c..74a222a9d0c 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_environment.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_environment.h
+@@ -9,7 +9,7 @@
+ #include <map>
+ #include <string>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/version/version.h"
++#include "opentelemetry/sdk/version/version.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_client.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_client.h
+index f573bb6572f..e377b140b6b 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_client.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_client.h
+@@ -8,7 +8,7 @@
+ 
+ #include "opentelemetry/exporters/otlp/otlp_file_client_options.h"
+ #include "opentelemetry/nostd/shared_ptr.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
++#include "opentelemetry/sdk/common/exporter_utils.h"
+ #include "opentelemetry/version.h"
+ 
+ // forward declare google::protobuf::Message
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter.h
+index f76be753bc4..b49dcef77f8 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter.h
+@@ -9,9 +9,9 @@
+ #include "opentelemetry/exporters/otlp/otlp_file_client.h"
+ #include "opentelemetry/exporters/otlp/otlp_file_exporter_options.h"
+ #include "opentelemetry/nostd/span.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/common/exporter_utils.h"
++#include "opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter_factory.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter_factory.h
+index 8bf8eea7bb8..bf4ba3288fb 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_file_exporter_factory.h
+@@ -6,7 +6,7 @@
+ #include <memory>
+ 
+ #include "opentelemetry/exporters/otlp/otlp_file_exporter_options.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/exporter.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_client.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_client.h
+index ae1ba349b29..3753704bb37 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_client.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_client.h
+@@ -19,7 +19,7 @@
+ #include "opentelemetry/ext/http/client/http_client.h"
+ #include "opentelemetry/nostd/string_view.h"
+ #include "opentelemetry/nostd/variant.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
++#include "opentelemetry/sdk/common/exporter_utils.h"
+ #include "opentelemetry/version.h"
+ 
+ // forward declare google::protobuf::Message
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter.h
+index 1abd4d69f75..38f1d9e306f 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter.h
+@@ -9,9 +9,9 @@
+ #include "opentelemetry/exporters/otlp/otlp_http_client.h"
+ #include "opentelemetry/exporters/otlp/otlp_http_exporter_options.h"
+ #include "opentelemetry/nostd/span.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/common/exporter_utils.h"
++#include "opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter_factory.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter_factory.h
+index d3bed60ef28..70eed9df9e2 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_http_exporter_factory.h
+@@ -6,31 +6,28 @@
+ #include <memory>
+ 
+ #include "opentelemetry/exporters/otlp/otlp_http_exporter_options.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/exporter.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+-namespace exporter
+-{
+-namespace otlp
+-{
++namespace exporter {
++namespace otlp {
+ 
+ /**
+  * Factory class for OtlpHttpExporter.
+  */
+-class OPENTELEMETRY_EXPORT OtlpHttpExporterFactory
+-{
++class OPENTELEMETRY_EXPORT OtlpHttpExporterFactory {
+ public:
+-  /**
+-   * Create an OtlpHttpExporter using all default options.
+-   */
+-  static std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> Create();
++    /**
++     * Create an OtlpHttpExporter using all default options.
++     */
++    static std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> Create();
+ 
+-  /**
+-   * Create an OtlpHttpExporter using the given options.
+-   */
+-  static std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> Create(
+-      const OtlpHttpExporterOptions &options);
++    /**
++     * Create an OtlpHttpExporter using the given options.
++     */
++    static std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> Create(
++        const OtlpHttpExporterOptions& options);
+ };
+ 
+ }  // namespace otlp
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h
+index 2aeb6da094a..499aa3685f7 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h
+@@ -5,8 +5,8 @@
+ 
+ #include "opentelemetry/common/attribute_value.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/common/attribute_utils.h"
++#include "opentelemetry/sdk/resource/resource.h"
+ #include "opentelemetry/version.h"
+ 
+ namespace opentelemetry
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable.h
+index 9622ce4313a..173fbfc82f0 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable.h
+@@ -18,9 +18,9 @@
+ #include "opentelemetry/common/key_value_iterable.h"
+ #include "opentelemetry/common/timestamp.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
++#include "opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_id.h"
+ #include "opentelemetry/trace/span_metadata.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable_utils.h b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable_utils.h
+index ad0bab898cc..3123c45b244 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable_utils.h
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/include/opentelemetry/exporters/otlp/otlp_recordable_utils.h
+@@ -6,8 +6,7 @@
+ #include <memory>
+ 
+ #include "opentelemetry/nostd/span.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/logs/recordable.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/version.h"
+ 
+ namespace opentelemetry
+@@ -17,13 +16,6 @@ namespace proto
+ namespace collector
+ {
+ 
+-namespace logs
+-{
+-namespace v1
+-{
+-class ExportLogsServiceRequest;
+-}
+-}  // namespace logs
+ namespace trace
+ {
+ namespace v1
+@@ -50,10 +42,6 @@ public:
+   static void PopulateRequest(
+       const nostd::span<std::unique_ptr<opentelemetry::sdk::trace::Recordable>> &spans,
+       proto::collector::trace::v1::ExportTraceServiceRequest *request) noexcept;
+-
+-  static void PopulateRequest(
+-      const nostd::span<std::unique_ptr<opentelemetry::sdk::logs::Recordable>> &logs,
+-      proto::collector::logs::v1::ExportLogsServiceRequest *request) noexcept;
+ };
+ }  // namespace otlp
+ }  // namespace exporter
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/src/otlp_recordable_utils.cc b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/src/otlp_recordable_utils.cc
+index a0461cbafc2..59fdf58e22f 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/src/otlp_recordable_utils.cc
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/src/otlp_recordable_utils.cc
+@@ -9,24 +9,20 @@
+ #include <utility>
+ #include <vector>
+ 
+-#include "opentelemetry/exporters/otlp/otlp_log_recordable.h"
+ #include "opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h"
+ #include "opentelemetry/exporters/otlp/otlp_recordable.h"
+ #include "opentelemetry/exporters/otlp/otlp_recordable_utils.h"
+ #include "opentelemetry/nostd/span.h"
+ #include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
+ #include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/logs/recordable.h"
+ #include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+ #include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
+ #include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+ 
+ // clang-format off
+ #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h"  // IWYU pragma: keep
+-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+ #include "src/third_party/opentelemetry-proto/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+ #include "src/third_party/opentelemetry-proto/opentelemetry/proto/common/v1/common.pb.h"
+-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/logs/v1/logs.pb.h"
+ #include "src/third_party/opentelemetry-proto/opentelemetry/proto/resource/v1/resource.pb.h"
+ #include "src/third_party/opentelemetry-proto/opentelemetry/proto/trace/v1/trace.pb.h"
+ #include "opentelemetry/exporters/otlp/protobuf_include_suffix.h"  // IWYU pragma: keep
+@@ -120,70 +116,6 @@ void OtlpRecordableUtils::PopulateRequest(
+   }
+ }
+ 
+-void OtlpRecordableUtils::PopulateRequest(
+-    const opentelemetry::nostd::span<std::unique_ptr<opentelemetry::sdk::logs::Recordable>> &logs,
+-    proto::collector::logs::v1::ExportLogsServiceRequest *request) noexcept
+-{
+-  if (nullptr == request)
+-  {
+-    return;
+-  }
+-
+-  using logs_index_by_instrumentation_type =
+-      std::unordered_map<const opentelemetry::sdk::instrumentationscope::InstrumentationScope *,
+-                         std::list<std::unique_ptr<OtlpLogRecordable>>,
+-                         InstrumentationScopePointerHasher, InstrumentationScopePointerEqual>;
+-  std::unordered_map<const opentelemetry::sdk::resource::Resource *,
+-                     logs_index_by_instrumentation_type>
+-      logs_index_by_resource;
+-
+-  for (auto &recordable : logs)
+-  {
+-    auto rec =
+-        std::unique_ptr<OtlpLogRecordable>(static_cast<OtlpLogRecordable *>(recordable.release()));
+-    auto instrumentation = &rec->GetInstrumentationScope();
+-    auto resource        = &rec->GetResource();
+-
+-    logs_index_by_resource[resource][instrumentation].emplace_back(std::move(rec));
+-  }
+-
+-  for (auto &input_resource_log : logs_index_by_resource)
+-  {
+-    auto output_resource_log = request->add_resource_logs();
+-    for (auto &input_scope_log : input_resource_log.second)
+-    {
+-      auto output_scope_log = output_resource_log->add_scope_logs();
+-      for (auto &input_log_record : input_scope_log.second)
+-      {
+-        if (!output_resource_log->has_resource())
+-        {
+-          OtlpPopulateAttributeUtils::PopulateAttribute(output_resource_log->mutable_resource(),
+-                                                        *input_resource_log.first);
+-          output_resource_log->set_schema_url(input_resource_log.first->GetSchemaURL());
+-        }
+-
+-        if (!output_scope_log->has_scope())
+-        {
+-          auto proto_scope = output_scope_log->mutable_scope();
+-          if (proto_scope != nullptr)
+-          {
+-            proto_scope->set_name(input_scope_log.first->GetName());
+-            proto_scope->set_version(input_scope_log.first->GetVersion());
+-
+-            for (auto &scope_attribute : input_scope_log.first->GetAttributes())
+-            {
+-              OtlpPopulateAttributeUtils::PopulateAttribute(
+-                  proto_scope->add_attributes(), scope_attribute.first, scope_attribute.second);
+-            }
+-          }
+-          output_scope_log->set_schema_url(input_scope_log.first->GetSchemaURL());
+-        }
+-
+-        *output_scope_log->add_log_records() = std::move(input_log_record->log_record());
+-      }
+-    }
+-  }
+-}
+ }  // namespace otlp
+ }  // namespace exporter
+ OPENTELEMETRY_END_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/ext/BUILD b/src/third_party/opentelemetry-cpp/dist/ext/BUILD
+index b19ae921e56..e7044669725 100644
+--- a/src/third_party/opentelemetry-cpp/dist/ext/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/ext/BUILD
+@@ -1,10 +1,15 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_COPTS", "OTEL_TARGET_COMPATIBLE_WITH")
++
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "headers",
+     hdrs = glob(["include/**/*.h"]),
++    copts = OTEL_COPTS,
+     strip_include_prefix = "include",
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD
+index de5a5aeb2cd..cf8d6827c11 100644
+--- a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD
+@@ -1,9 +1,12 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_COPTS", "OTEL_TARGET_COMPATIBLE_WITH")
++
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "http_client_curl",
+     srcs = [
+         "http_client_curl.cc",
+@@ -12,10 +15,10 @@ cc_library(
+     ],
+     copts = [
+         "-DWITH_CURL",
+-    ],
++    ] + OTEL_COPTS,
+     include_prefix = "src/http/client/curl",
+     linkopts = select({
+-        "//bazel:windows": [
++        "@platforms//os:windows": [
+             "-DEFAULTLIB:advapi32.lib",
+             "-DEFAULTLIB:crypt32.lib",
+             "-DEFAULTLIB:Normaliz.lib",
+@@ -23,12 +26,13 @@ cc_library(
+         ],
+         "//conditions:default": [],
+     }),
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//ext:headers",
+-        "//sdk:headers",
+-        "//sdk/src/common:random",
+-        "@curl",
+-        "@zlib",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/ext:headers",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:random",
++        # "//src/third_party/opentelemetry-cpp:curl",
++        "//src/third_party/zlib",
+     ],
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_client_curl.cc b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_client_curl.cc
+index 22f20fb0e08..0762cd1128b 100644
+--- a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_client_curl.cc
++++ b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_client_curl.cc
+@@ -22,7 +22,7 @@
+ #include "opentelemetry/ext/http/common/url_parser.h"
+ #include "opentelemetry/nostd/shared_ptr.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "opentelemetry/version.h"
++#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+ 
+ #ifdef ENABLE_OTLP_COMPRESSION_PREVIEW
+ #  include <zlib.h>
+diff --git a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_operation_curl.cc b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_operation_curl.cc
+index 4fe0f493828..66275aec14b 100644
+--- a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_operation_curl.cc
++++ b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/http_operation_curl.cc
+@@ -23,7 +23,7 @@
+ #include "opentelemetry/ext/http/client/curl/http_operation_curl.h"
+ #include "opentelemetry/ext/http/client/http_client.h"
+ #include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
+-#include "opentelemetry/version.h"
++#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+ 
+ // CURL_VERSION_BITS was added in CURL 7.43.0
+ #ifndef CURL_VERSION_BITS
+diff --git a/src/third_party/opentelemetry-cpp/dist/otel_rules.bzl b/src/third_party/opentelemetry-cpp/dist/otel_rules.bzl
+new file mode 100644
+index 00000000000..7eed9aed421
+--- /dev/null
++++ b/src/third_party/opentelemetry-cpp/dist/otel_rules.bzl
+@@ -0,0 +1,44 @@
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_proto_library")
++
++OTEL_COPTS = [
++    "-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING",
++] + select({
++    "//bazel/config:gcc_or_clang": [
++        "-Wno-sign-compare",
++        "-Wno-comment",
++        "-Wno-implicit-fallthrough",
++        "-Wno-unused-result",
++    ],
++    "//conditions:default": [],
++}) + select({
++    "//bazel/config:compiler_type_gcc": [
++        "-Wno-stringop-overread",  # false positive: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98465#c30
++        "-Wno-stringop-overflow",
++        "-Wno-attributes",
++        #"-Wno-class-memaccess",
++        #"-Wno-overloaded-virtual",
++        "-Wno-error",
++    ],
++    "//bazel/config:compiler_type_msvc": [
++        "/wd4334",  # '<<': result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
++        "/wd4116",  # unnamed type definition in parentheses
++        "/wd4146",  # unary minus operator applied to unsigned type, result still unsigned
++        "/wd4715",  # not all control paths return a value
++        "/wd4200",  # nonstandard extension used: zero-sized array in struct/union
++        "/wd4312",  # 'reinterpret_cast': conversion from 'unsigned int' to 'void *' of greater size
++        "/wd4090",  # 'function': different 'const' qualifiers
++    ],
++    "//conditions:default": [],
++})
++
++OTEL_TARGET_COMPATIBLE_WITH = select({
++    "//bazel/config:build_otel_enabled": [],
++    "//conditions:default": ["@platforms//:incompatible"],
++})
++
++def mongo_cc_proto_lib(name, deps):
++    proto_cc_name = name + "_raw_proto"
++    mongo_cc_proto_library(name = proto_cc_name, deps = deps)
++
++    cc_dep = ":" + proto_cc_name
++    mongo_cc_library(name = name, cc_deps = [cc_dep], copts = OTEL_COPTS, target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH)
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/BUILD b/src/third_party/opentelemetry-cpp/dist/sdk/BUILD
+index b19ae921e56..bdeaaba3b7c 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/BUILD
+@@ -1,10 +1,14 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
++
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "headers",
+     hdrs = glob(["include/**/*.h"]),
+     strip_include_prefix = "include",
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/attributemap_hash.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/attributemap_hash.h
+index fc2776b34b3..39df29b2789 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/attributemap_hash.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/attributemap_hash.h
+@@ -15,7 +15,7 @@
+ #include "opentelemetry/nostd/function_ref.h"
+ #include "opentelemetry/nostd/string_view.h"
+ #include "opentelemetry/nostd/variant.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
++#include "opentelemetry/sdk/common/attribute_utils.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/circular_buffer.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/circular_buffer.h
+index 6005eee7d59..a35498ecea0 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/circular_buffer.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/circular_buffer.h
+@@ -11,8 +11,8 @@
+ #include <memory>
+ 
+ #include "opentelemetry/nostd/span.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/atomic_unique_ptr.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/circular_buffer_range.h"
++#include "opentelemetry/sdk/common/atomic_unique_ptr.h"
++#include "opentelemetry/sdk/common/circular_buffer_range.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/global_log_handler.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/global_log_handler.h
+index 681e6c62ba3..59a08e08a60 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/global_log_handler.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/common/global_log_handler.h
+@@ -8,7 +8,7 @@
+ #include <utility>
+ 
+ #include "opentelemetry/nostd/shared_ptr.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
++#include "opentelemetry/sdk/common/attribute_utils.h"
+ #include "opentelemetry/version.h"
+ 
+ #define OTEL_INTERNAL_LOG_LEVEL_NONE 0
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationlibrary/instrumentation_library.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationlibrary/instrumentation_library.h
+index e73be2b16e6..52f58c6f4e3 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationlibrary/instrumentation_library.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationlibrary/instrumentation_library.h
+@@ -3,7 +3,7 @@
+ 
+ #pragma once
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
++#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h
+index 7304605a6f0..1bf0facaa68 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h
+@@ -11,7 +11,7 @@
+ #include "opentelemetry/nostd/type_traits.h"
+ #include "opentelemetry/nostd/unique_ptr.h"
+ #include "opentelemetry/nostd/variant.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
++#include "opentelemetry/sdk/common/attribute_utils.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource.h
+index 1c77ad922c0..d578491d782 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource.h
+@@ -5,7 +5,7 @@
+ 
+ #include <string>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
++#include "opentelemetry/sdk/common/attribute_utils.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource_detector.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource_detector.h
+index d454f75d058..dcbd8748477 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource_detector.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/resource/resource_detector.h
+@@ -3,7 +3,7 @@
+ 
+ #pragma once
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/resource/resource.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor.h
+index 30791e7e959..e069a461e68 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor.h
+@@ -12,11 +12,11 @@
+ #include <mutex>
+ #include <thread>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/circular_buffer.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/batch_span_processor_options.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/common/circular_buffer.h"
++#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
++#include "opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/version.h"
+ 
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor_factory.h
+index 8e62e85d998..bfec277b1d2 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/batch_span_processor_factory.h
+@@ -5,9 +5,9 @@
+ 
+ #include <memory>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/batch_span_processor_options.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
++#include "opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/processor.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/exporter.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/exporter.h
+index c5b337a88c0..8f207e89f2b 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/exporter.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/exporter.h
+@@ -7,8 +7,8 @@
+ #include <memory>
+ 
+ #include "opentelemetry/nostd/span.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/common/exporter_utils.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_recordable.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_recordable.h
+index 97d59c0a2db..e8ad3ea39c7 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_recordable.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_recordable.h
+@@ -6,8 +6,8 @@
+ #include <map>
+ 
+ #include "opentelemetry/common/timestamp.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_span_processor.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_span_processor.h
+index d0471195e0e..094c5b3e24c 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_span_processor.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/multi_span_processor.h
+@@ -8,8 +8,8 @@
+ #include <mutex>
+ #include <vector>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/multi_recordable.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/multi_recordable.h"
++#include "opentelemetry/sdk/trace/processor.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator.h
+index 5ace1b78303..01e460563d0 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator.h
+@@ -3,7 +3,7 @@
+ 
+ #pragma once
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
++#include "opentelemetry/sdk/trace/id_generator.h"
+ #include "opentelemetry/trace/span_id.h"
+ #include "opentelemetry/trace/trace_id.h"
+ #include "opentelemetry/version.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator_factory.h
+index 48b5edc1404..a1915d3136f 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/random_id_generator_factory.h
+@@ -5,7 +5,7 @@
+ 
+ #include <memory>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
++#include "opentelemetry/sdk/trace/id_generator.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/recordable.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/recordable.h
+index 7fba5cb52e6..5918b801331 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/recordable.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/recordable.h
+@@ -8,8 +8,8 @@
+ #include "opentelemetry/common/attribute_value.h"
+ #include "opentelemetry/common/timestamp.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/empty_attributes.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
++#include "opentelemetry/sdk/common/empty_attributes.h"
++#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_id.h"
+ #include "opentelemetry/trace/span_metadata.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off.h
+index 13d05c645b3..a857086d23f 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off.h
+@@ -4,7 +4,7 @@
+ #pragma once
+ 
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_metadata.h"
+ #include "opentelemetry/trace/trace_id.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off_factory.h
+index 3a51291c1bc..af676dead9b 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_off_factory.h
+@@ -5,7 +5,7 @@
+ 
+ #include <memory>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on.h
+index fab42c972bd..6b983008c7e 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on.h
+@@ -4,7 +4,7 @@
+ #pragma once
+ 
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_metadata.h"
+ #include "opentelemetry/trace/trace_id.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on_factory.h
+index 115392c7d21..80b38f8456a 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/always_on_factory.h
+@@ -5,7 +5,7 @@
+ 
+ #include <memory>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent.h
+index ee8cae38d37..e44e9fa320b 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent.h
+@@ -8,7 +8,7 @@
+ 
+ #include "opentelemetry/common/key_value_iterable.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_metadata.h"
+ #include "opentelemetry/trace/trace_id.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent_factory.h
+index 331beccd1c8..d5cf598311d 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/parent_factory.h
+@@ -5,7 +5,7 @@
+ 
+ #include <memory>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio.h
+index 98f54981beb..f1b895139f7 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio.h
+@@ -7,7 +7,7 @@
+ #include <string>
+ 
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/trace/span_metadata.h"
+ #include "opentelemetry/trace/trace_id.h"
+ #include "opentelemetry/version.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio_factory.h
+index 5ac4e3af43d..de6d98906b9 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio_factory.h
+@@ -5,7 +5,7 @@
+ 
+ #include <memory>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/sampler.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor.h
+index c0b78051873..ce6d378b794 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor.h
+@@ -11,10 +11,10 @@
+ 
+ #include "opentelemetry/common/spin_lock_mutex.h"
+ #include "opentelemetry/nostd/span.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/common/exporter_utils.h"
++#include "opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/version.h"
+ 
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor_factory.h
+index 0ba81670a31..2ae40c2f7bd 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/simple_processor_factory.h
+@@ -5,8 +5,8 @@
+ 
+ #include <memory>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/exporter.h"
++#include "opentelemetry/sdk/trace/processor.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/span_data.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/span_data.h
+index a76a52f84fe..2bd8b2112bb 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/span_data.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/span_data.h
+@@ -15,10 +15,10 @@
+ #include "opentelemetry/common/key_value_iterable_view.h"
+ #include "opentelemetry/common/timestamp.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/common/attribute_utils.h"
++#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
++#include "opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/trace/recordable.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_id.h"
+ #include "opentelemetry/trace/span_metadata.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer.h
+index d7f90417bad..f738203b4f2 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer.h
+@@ -8,12 +8,12 @@
+ #include "opentelemetry/common/key_value_iterable.h"
+ #include "opentelemetry/nostd/shared_ptr.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_context.h"
++#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
++#include "opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/trace/id_generator.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/tracer_context.h"
+ #include "opentelemetry/trace/span.h"
+ #include "opentelemetry/trace/span_context_kv_iterable.h"
+ #include "opentelemetry/trace/span_startoptions.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context.h
+index c612ef79978..e1b2cb25d27 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context.h
+@@ -7,12 +7,12 @@
+ #include <memory>
+ #include <vector>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/random_id_generator.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/always_on.h"
++#include "opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/trace/id_generator.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/random_id_generator.h"
++#include "opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/samplers/always_on.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context_factory.h
+index 765b8786684..4954fd7c3fa 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_context_factory.h
+@@ -6,11 +6,11 @@
+ #include <memory>
+ #include <vector>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_context.h"
++#include "opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/trace/id_generator.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/tracer_context.h"
+ #include "opentelemetry/version.h"
+ 
+ OPENTELEMETRY_BEGIN_NAMESPACE
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider.h
+index c74d3f37a62..44d58405584 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider.h
+@@ -9,14 +9,14 @@
+ 
+ #include "opentelemetry/nostd/shared_ptr.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/random_id_generator.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/always_on.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_context.h"
++#include "opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/trace/id_generator.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/random_id_generator.h"
++#include "opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/samplers/always_on.h"
++#include "opentelemetry/sdk/trace/tracer.h"
++#include "opentelemetry/sdk/trace/tracer_context.h"
+ #include "opentelemetry/trace/tracer.h"
+ #include "opentelemetry/trace/tracer_provider.h"
+ #include "opentelemetry/version.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider_factory.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider_factory.h
+index 05e54a761c2..ed451a8c995 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider_factory.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk/trace/tracer_provider_factory.h
+@@ -6,12 +6,12 @@
+ #include <memory>
+ #include <vector>
+ 
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_context.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_provider.h"
++#include "opentelemetry/sdk/resource/resource.h"
++#include "opentelemetry/sdk/trace/id_generator.h"
++#include "opentelemetry/sdk/trace/processor.h"
++#include "opentelemetry/sdk/trace/sampler.h"
++#include "opentelemetry/sdk/trace/tracer_context.h"
++#include "opentelemetry/sdk/trace/tracer_provider.h"
+ #include "opentelemetry/trace/tracer_provider.h"
+ #include "opentelemetry/version.h"
+ 
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk_config.h b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk_config.h
+index 20d0d233ed3..280ccaa993c 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk_config.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/include/opentelemetry/sdk_config.h
+@@ -4,4 +4,4 @@
+ #pragma once
+ 
+ #include "opentelemetry/config.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
++#include "opentelemetry/sdk/common/global_log_handler.h"
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/src/common/BUILD b/src/third_party/opentelemetry-cpp/dist/sdk/src/common/BUILD
+index 9c424cac6b4..12ecccff412 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/src/common/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/src/common/BUILD
+@@ -1,9 +1,12 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
++
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "random",
+     srcs = [
+         "random.cc",
+@@ -13,45 +16,49 @@ cc_library(
+         "random.h",
+     ],
+     include_prefix = "src/common",
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//sdk:headers",
+-        "//sdk/src/common/platform:fork",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common/platform:fork",
+     ],
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "base64",
+     srcs = [
+         "base64.cc",
+     ],
+     include_prefix = "src/common",
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//sdk:headers",
+-        "//sdk/src/common/platform:fork",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common/platform:fork",
+     ],
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "env_variables",
+     srcs = [
+         "env_variables.cc",
+     ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//sdk:headers",
+-        "//sdk/src/common:global_log_handler",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
+     ],
+ )
+ 
+-cc_library(
++mongo_cc_library(
+     name = "global_log_handler",
+     srcs = [
+         "global_log_handler.cc",
+     ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//sdk:headers",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
+     ],
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/src/common/platform/BUILD b/src/third_party/opentelemetry-cpp/dist/sdk/src/common/platform/BUILD
+index f089ebf7182..b81a8399025 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/src/common/platform/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/src/common/platform/BUILD
+@@ -1,12 +1,15 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
++
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "fork",
+     srcs = select({
+-        "//bazel:windows": ["fork_windows.cc"],
++        "@platforms//os:windows": ["fork_windows.cc"],
+         "//conditions:default": ["fork_unix.cc"],
+     }),
+     hdrs = [
+@@ -14,10 +17,11 @@ cc_library(
+     ],
+     include_prefix = "src/common/platform",
+     linkopts = select({
+-        "//bazel:windows": [],
++        "@platforms//os:windows": [],
+         "//conditions:default": ["-pthread"],
+     }),
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
++        "//src/third_party/opentelemetry-cpp/api",
+     ],
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/src/resource/BUILD b/src/third_party/opentelemetry-cpp/dist/sdk/src/resource/BUILD
+index 6cff52723ad..5a4979409bc 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/src/resource/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/src/resource/BUILD
+@@ -1,16 +1,20 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
++
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "resource",
+     srcs = glob(["**/*.cc"]),
+     hdrs = glob(["**/*.h"]),
+     include_prefix = "src/resource",
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//sdk:headers",
+-        "//sdk/src/common:env_variables",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:env_variables",
+     ],
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/BUILD b/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/BUILD
+index df99eb1520d..9672332a222 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/BUILD
+@@ -1,18 +1,22 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+ 
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
++
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++mongo_cc_library(
+     name = "trace",
+     srcs = glob(["**/*.cc"]),
+     hdrs = glob(["**/*.h"]),
+     include_prefix = "src/trace",
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+-        "//api",
+-        "//sdk:headers",
+-        "//sdk/src/common:global_log_handler",
+-        "//sdk/src/common:random",
+-        "//sdk/src/resource",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:random",
++        "//src/third_party/opentelemetry-cpp/sdk/src/resource",
+     ],
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/span.h b/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/span.h
+index e4db3213fe0..5e0ff2c5701 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/span.h
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/src/trace/span.h
+@@ -10,8 +10,8 @@
+ #include "opentelemetry/common/key_value_iterable.h"
+ #include "opentelemetry/common/timestamp.h"
+ #include "opentelemetry/nostd/string_view.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
+-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer.h"
++#include "opentelemetry/sdk/trace/recordable.h"
++#include "opentelemetry/sdk/trace/tracer.h"
+ #include "opentelemetry/trace/span.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_context_kv_iterable.h"
+-- 
+2.34.1
+

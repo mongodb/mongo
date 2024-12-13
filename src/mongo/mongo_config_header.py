@@ -438,6 +438,7 @@ def get_config_header_substs():
         ("@mongo_config_tcmalloc_google@", "MONGO_CONFIG_TCMALLOC_GOOGLE"),
         ("@mongo_config_tcmalloc_gperf@", "MONGO_CONFIG_TCMALLOC_GPERF"),
         ("@mongo_config_streams@", "MONGO_CONFIG_STREAMS"),
+        ("@mongo_config_otel@", "MONGO_CONFIG_OTEL"),
     )
     return config_header_substs
 
