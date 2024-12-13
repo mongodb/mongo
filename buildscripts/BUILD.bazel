@@ -57,4 +57,17 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "engflow_auth_script",
+    srcs = ["engflow_auth.py"],
+    main = "engflow_auth.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+    ],
+)
+
 exports_files(["cheetah_source_generator.py"])
