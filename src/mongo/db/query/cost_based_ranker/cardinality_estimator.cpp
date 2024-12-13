@@ -318,76 +318,96 @@ CEResult CardinalityEstimator::indexUnionCard(const T* node) {
     return outCE;
 }
 
-StatusWith<OrderedIntervalList> expressionToOIL(const ComparisonMatchExpression* node) {
+// Estimate the CE of a conjunction of expressions in 'nodes'. This function assumes that:
+// * 'nodes' contains only ComparisonMatchExpressions.
+// * 'path' corresponds to the path of all MatchExpressions in 'nodes'.
+// It works by building an OrderedIntervalList representing the bounds that would be generated for a
+// hypothetical index on 'path' for the conjunction of expressions in 'nodes' and then invoking
+// histogram estimation for the resulting OIL.
+CEResult CardinalityEstimator::estimateConjWithHistogram(
+    StringData path, const std::vector<const MatchExpression*>& nodes) {
+    // Note: We are assuming that the field is non-multikey when building this interval.
+    // TODO SERVER-98374: Once CBR has catalog information, bail out of histogram estimation here if
+    // 'path' is multikey.
+    IndexEntry fakeIndex(BSON(path << "1") /* keyPattern */,
+                         INDEX_BTREE,
+                         IndexDescriptor::IndexVersion::kV2,
+                         false /* multikey */,
+                         {} /* multikeyPaths */,
+                         {} /* multikeyPathSet */,
+                         false /* sparse */,
+                         false /* unique */,
+                         CoreIndexInfo::Identifier("idx"),
+                         nullptr /* filterExpression */,
+                         BSONObj::kEmptyObject /* infoObj */,
+                         nullptr /* collatorInterface */,
+                         nullptr /* wildcardProjection */);
     OrderedIntervalList oil;
-    // Generate a fake catalog index object representing a single non-multikey field. We don't
-    // care whether the field is actually multikey or not because both cases will generate the
-    // same bounds for a ComparisonMatchExpression.
-    static IndexEntry fakeIndex(BSONObj::kEmptyObject /* keyPattern */,
-                                INDEX_BTREE,
-                                IndexDescriptor::IndexVersion::kV2,
-                                false /* multikey */,
-                                {} /* multikeyPaths */,
-                                {} /* multikeyPathSet */,
-                                false /* sparse */,
-                                false /* unique */,
-                                CoreIndexInfo::Identifier("idx"),
-                                nullptr /* filterExpression */,
-                                BSONObj::kEmptyObject /* infoObj */,
-                                nullptr /* collatorInterface */,
-                                nullptr /* wildcardProjection */);
+    IndexBoundsBuilder::allValuesForField(fakeIndex.keyPattern.firstElement(), &oil);
     IndexBoundsBuilder::BoundsTightness tightness;
-    IndexBoundsBuilder::translate(
-        node, node->getData(), fakeIndex, &oil, &tightness, nullptr /* ietBuilder */);
 
-    // We expect a simple comparison MatchExpression to generate exact bounds.
+    // For each node, translate to OIL and accumulate their intersection.
+    for (auto&& expr : nodes) {
+        IndexBoundsBuilder::translateAndIntersect(
+            expr, fakeIndex.keyPattern.firstElement(), fakeIndex, &oil, &tightness, nullptr);
+    }
+
     if (!(tightness == IndexBoundsBuilder::EXACT ||
           tightness == IndexBoundsBuilder::EXACT_MAYBE_COVERED)) {
         return Status(
             ErrorCodes::HistogramCEFailure,
             str::stream{}
                 << "encountered unimplemented case where index bounds tightness are non-exact: "
-                << oil.toString(true));
-    }
-    if (oil.intervals.size() > 1) {
-        return Status(
-            ErrorCodes::HistogramCEFailure,
-            str::stream{}
-                << "encountered unimplemented case where index bounds have multiple intervals: "
                 << oil.toString(false));
     }
-
-    return StatusWith(std::move(oil));
+    return estimate(&oil, true);
 }
 
-CEResult CardinalityEstimator::histogramCE(const ComparisonMatchExpression* node) {
-    auto histogram = _collStats.getHistogram(std::string(node->path()));
+CEResult CardinalityEstimator::tryHistogramAnd(const AndMatchExpression* node) {
+    // Set of unique paths references under 'node'
+    StringDataSet paths;
+    // Map from path to set of MatchExpression* referencing that path
+    std::unordered_multimap<StringData,  // NOLINT
+                            const MatchExpression*,
+                            StringMapHasher,
+                            StringMapEq>
+        exprsByPath;
 
-    if (!histogram) {
-        return CEResult(ErrorCodes::HistogramCEFailure,
-                        str::stream{} << "no histogram found for path: " << node->path());
+    // Iterate over the children of this AndMatchExpression and perform the following:
+    // 1. Verify all children of this AndMatchExpression are ComparisonMatchExpressions and thus can
+    // be converted to index bounds.
+    // 2. Keep track of unique paths.
+    // 3. Keep track of mapping from path to children which reference that path.
+    for (size_t i = 0; i < node->numChildren(); ++i) {
+        const auto child = node->getChild(i);
+        if (dynamic_cast<const ComparisonMatchExpression*>(child) == nullptr) {
+            return CEResult(ErrorCodes::HistogramCEFailure,
+                            str::stream{} << "encountered child of AndMatchExpression that was not "
+                                             "sargable (ComparisonMatchExpression): "
+                                          << child->toString());
+        }
+        paths.insert(child->path());
+        exprsByPath.insert({child->path(), child});
     }
 
-    auto oilResult = expressionToOIL(node);
+    size_t selOffset = _conjSels.size();
 
-    if (!oilResult.isOK()) {
-        return CEResult(ErrorCodes::HistogramCEFailure, oilResult.getStatus().reason());
+    for (auto&& path : paths) {
+        // Set of expressions referencing the current path
+        std::vector<const MatchExpression*> nodesForPath;
+        auto [start, end] = exprsByPath.equal_range(path);
+        std::transform(start, end, std::back_inserter(nodesForPath), [](const auto& element) {
+            return element.second;
+        });
+        // Estimate conjunction of all expressions for the current path
+        auto ceRes = estimateConjWithHistogram(path, nodesForPath);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
+        _conjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
-
-    if (oilResult.getValue().intervals.size() == 0) {
-        return zeroCE;
-    }
-
-    const auto& interval = oilResult.getValue().intervals.front();
-
-    if (!ce::HistogramEstimator::canEstimateInterval(*histogram, interval)) {
-        return CEResult(ErrorCodes::HistogramCEFailure,
-                        str::stream{} << "encountered interval which is unestimatable: "
-                                      << interval.toString(true));
-    }
-
-    return ce::HistogramEstimator::estimateCardinality(
-        *histogram, _inputCard, interval, true, ce::ArrayRangeEstimationAlgo::kExactArrayCE);
+    // Combine CE's for the estimates of all paths under 'node'.
+    return conjCard(selOffset, _inputCard);
 }
 
 /*
@@ -401,7 +421,7 @@ CEResult CardinalityEstimator::estimate(const ComparisonMatchExpression* node) {
     // interval and estimating that.
     if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
         _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-        auto ceRes = histogramCE(node);
+        auto ceRes = estimateConjWithHistogram(node->path(), {node});
         if (ceRes.isOK() || strict) {
             return ceRes;
         }
@@ -425,6 +445,20 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     // Find with an empty query "coll.find({})" generates a AndMatchExpression without children.
     if (node->numChildren() == 0) {
         return _inputCard;
+    }
+
+    // Try to use histograms to estimate all children of this AndMatchExpression.
+    // TODO: Suppose we have an AND with some predicates on 'a' that can answered with a
+    // histogram and some predicates on 'b' that can't. Should we still try to use histogram for
+    // 'a'? The code as written will not.
+    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE) {
+        return tryHistogramAnd(node);
+    } else if (_rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        auto ceRes = tryHistogramAnd(node);
+        if (ceRes.isOK()) {
+            return ceRes.getValue();
+        }
+        // Fallback to alternate AndMatchExpression estimation.
     }
 
     // Ignore selectivities pushed by other operators up to this point.
@@ -515,13 +549,13 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     return res;
 }
 
-CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node) {
+CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool forceHistogram) {
     auto localRankerMode = _rankerMode;
-    const bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE;
+    const bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE || forceHistogram;
     const stats::CEHistogram* histogram = nullptr;
 
     if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE || forceHistogram) {
         histogram = _collStats.getHistogram(node->name);
         if (!histogram) {
             if (strict) {

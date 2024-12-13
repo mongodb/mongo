@@ -24,7 +24,7 @@ coll.drop();
 let docs = [];
 for (let i = 0; i < 100; i++) {
     for (let j = 0; j < i; j++) {
-        docs.push({a: j, b: i % 3});
+        docs.push({a: j, b: i % 5, c: i % 7});
     }
 }
 assert.commandWorked(coll.insertMany(docs));
@@ -34,12 +34,30 @@ coll.createIndex({a: 1});
 // Generate histograms for field 'a' and 'b'
 assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
+assert.commandWorked(coll.runCommand({analyze: collName, key: "c"}));
+
+// Round the given number to the nearest 0.1
+function round(num) {
+    return Math.round(num * 10) / 10;
+}
+
+// Compare two cardinality estimates with approximate equality. This is done so that our tests can
+// be robust to floating point rounding differences but detect large changes in estimation
+// indicating a real change in estimation behavior.
+function ceEqual(lhs, rhs) {
+    return Math.abs(round(lhs) - round(rhs)) < 0.1;
+}
 
 // Run a find command with the given filter and verify that every plan uses a histogram estimate.
-function assertQueryUsesHistograms(query) {
+function assertQueryUsesHistograms({query, expectedCE}) {
     const explain = coll.find(query).explain();
     [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach(plan => {
         assert.eq(plan.estimatesMetadata.ceSource, "Histogram", plan);
+        assert(plan.hasOwnProperty("cardinalityEstimate"));
+        const gotCE = plan.cardinalityEstimate;
+        assert.gt(gotCE, 1);
+        assert(ceEqual(gotCE, expectedCE),
+               `Got CE: ${gotCE} and expected CE: ${expectedCE} for query: ${tojson(query)}`);
     });
 }
 
@@ -48,13 +66,23 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
     const testCases = [
         // IndexScan should use histogram
-        {a: 5},
-        {a: {$gt: 5}},
-        {a: {$lt: 5}},
+        {query: {a: 5}, expectedCE: 94},
+        {query: {a: {$gt: 5}}, expectedCE: 4371},
+        {query: {a: {$lt: 5}}, expectedCE: 485},
         // CollScan with sargable filter should use histogram
-        {b: 5},
-        {b: {$gt: 5}},
-        {b: {$lt: 5}},
+        {query: {b: 4}, expectedCE: 1030},
+        {query: {b: {$gt: 3}}, expectedCE: 1030},
+        {query: {b: {$lt: 3}}, expectedCE: 2910},
+        // Conjunctions
+        {query: {b: {$gte: 1, $lt: 3}}, expectedCE: 1960},
+        {query: {a: 5, b: {$gte: 1, $lt: 3}}, expectedCE: 59.1},
+        // TODO: Support $not estimatation using histogram
+        // {query: {b: {$gt: 5, $ne: 6}}, expectedCE: ...}
+        {query: {b: {$gte: 1, $lte: 3}, c: {$gt: 0, $lt: 5}}, expectedCE: 2158.8},
+        {
+            query: {$and: [{b: {$gte: 1}}, {c: {$gt: 0}}, {b: {$lte: 3}}, {c: {$lt: 5}}]},
+            expectedCE: 2158.8,
+        },
     ];
     testCases.forEach(tc => assertQueryUsesHistograms(tc));
 } finally {
