@@ -188,6 +188,11 @@ assertCreateCollection(db, coll.getName());
 // collection.
 assert.commandWorked(coll.insert({_id: "fullDocument is lookup 2"}));
 
+// If this test is running with secondary read preference, it's necessary for the insert
+// to propagate to all secondary nodes and be available for majority reads before we can
+// assume looking up the document will succeed.
+FixtureHelpers.awaitLastOpCommitted(db);
+
 // After a collection has been dropped and re-created, verify a change stream can be created with
 // 'fullDocument: updateLookup' using a resume token from before the collection was dropped.
 cursor = cst.startWatchingChanges({
