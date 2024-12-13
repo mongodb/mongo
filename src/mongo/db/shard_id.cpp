@@ -46,6 +46,12 @@ Status ShardId::validate(const ShardId& value) {
     return Status::OK();
 }
 
+bool ShardId::isShardURL() const {
+    // Regular expression for pattern <shard_name>/host:port,host:port, ...
+    std::regex shardUrlPattern(R"([^/]+/([^:]+:\d+)(,[^:]+:\d+)*)");
+    return std::regex_match(_shardId, shardUrlPattern);
+}
+
 int ShardId::compare(const ShardId& other) const {
     return _shardId.compare(other._shardId);
 }

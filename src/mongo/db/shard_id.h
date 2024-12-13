@@ -30,7 +30,9 @@
 #pragma once
 
 #include <cstring>
+#include <iostream>
 #include <ostream>
+#include <regex>
 #include <string>
 #include <utility>
 
@@ -74,6 +76,11 @@ public:
      */
     bool isValid() const;
     static Status validate(const ShardId& value);
+
+    /**
+     *  Returns true if _shardId is a shard url.
+     */
+    bool isShardURL() const;
 
     /**
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in

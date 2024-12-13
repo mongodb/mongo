@@ -108,5 +108,23 @@ TEST(ShardId, Equals) {
     ASSERT(sa != "bbb");
 }
 
+TEST(ShardId, isShardURL) {
+    ShardId url("shardName/ip-10-122-13-136:20043");
+    ShardId urlWithoutPort("shardName/ip-10-122-13-136");
+    ShardId emptyUrl("");
+    ShardId urlWithoutName("/ip-10-122-13-136:20043");
+    ShardId urlOnlyPort("/:20043");
+    ShardId localhost("shardName/localhost:3000");
+    ShardId multipleHosts(
+        "shardName/ip-10-122-13-136:20043,ip-10-122-13-136:20042,ip-11-122-33-156:20100");
+    ASSERT(url.isShardURL() == true);
+    ASSERT(urlWithoutPort.isShardURL() == false);
+    ASSERT(emptyUrl.isShardURL() == false);
+    ASSERT(urlWithoutName.isShardURL() == false);
+    ASSERT(urlOnlyPort.isShardURL() == false);
+    ASSERT(localhost.isShardURL() == true);
+    ASSERT(multipleHosts.isShardURL() == true);
+}
+
 }  // namespace
 }  // namespace mongo

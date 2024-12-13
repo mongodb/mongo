@@ -12,11 +12,12 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
-import {getShardNames} from "jstests/sharding/libs/sharding_util.js";
+import {getShardHosts, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
 // This test requires at least two shards.
 const shardNames = getShardNames(db);
-if (shardNames.length < 2) {
+const shardHosts = getShardHosts(db);
+if (shardNames.length < 2 || shardHosts.length < 2) {
     jsTestLog("This test requires at least two shards.");
     quit();
 }
@@ -114,6 +115,17 @@ const testShardDistribution = (mongos) => {
         ]
     }),
                                  ErrorCodes.ShardNotFound);
+
+    jsTestLog(
+        "reshardCollection cmd should fail when the shardId in shardDistribution is a shard url.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        forceRedistribution: true,
+        shardDistribution: [{shard: shardHosts[0], min: {newKey: MinKey}, max: {newKey: MaxKey}}]
+    }),
+                                 ErrorCodes.ShardNotFound);
+
     mongos.getDB(dbName)[collName].drop();
 
     /**

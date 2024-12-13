@@ -1,5 +1,6 @@
 /**
- * Tests for basic functionality of the move collection feature.
+ * Tests for basic functionality of the move collection feature. Also tests reshardCollection on
+ * unsplittible collection.
  *
  * @tags: [
  *  requires_fcv_80,
@@ -12,10 +13,10 @@
  * ]
  */
 
-import {getPrimaryShardNameForDB, getShardNames} from "jstests/sharding/libs/sharding_util.js";
+import {getPrimaryShardNameForDB, getShards} from "jstests/sharding/libs/sharding_util.js";
 
-const shardNames = getShardNames(db);
-if (shardNames.length < 2) {
+const shards = getShards(db);
+if (shards.length < 2) {
     jsTestLog("This test requires at least two shards.");
     quit();
 }
@@ -24,10 +25,13 @@ const collName = jsTestName();
 const dbName = db.getName();
 const ns = dbName + '.' + collName;
 
-let shard0 = shardNames[0];
-let shard1 = shardNames[1];
+let shard0 = shards[0];
+let shard1 = shards[1];
 
-let cmdObj = {moveCollection: ns, toShard: shard0};
+let shardName0 = shard0._id;
+let shardName1 = shard1._id;
+
+let cmdObj = {moveCollection: ns, toShard: shardName0};
 
 jsTestLog("Fail if collection is not tracked.");
 assert.commandFailedWithCode(db.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
@@ -59,13 +63,18 @@ assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: unsplittableCollNs,
     key: {_id: 1},
     forceRedistribution: true,
-    shardDistribution: [{shard: shardNames[1], min: {_id: MinKey}, max: {_id: MaxKey}}]
+    shardDistribution: [{shard: shardName1, min: {_id: MinKey}, max: {_id: MaxKey}}]
 }),
                              [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
 
+// Should fail to move to a shard with url instead of shard name
+assert.commandFailedWithCode(
+    db.adminCommand({moveCollection: unsplittableCollNs, toShard: shard0.host}),
+    ErrorCodes.ShardNotFound);
+
 const configDb = db.getSiblingDB('config');
 const primaryShard = getPrimaryShardNameForDB(db);
-const nonPrimaryShard = (shard0 == primaryShard) ? shard1 : shard0;
+const nonPrimaryShard = (shardName0 == primaryShard) ? shardName1 : shardName0;
 
 jsTestLog("Move to non-primary shard (" + nonPrimaryShard + ")");
 assert.commandWorked(

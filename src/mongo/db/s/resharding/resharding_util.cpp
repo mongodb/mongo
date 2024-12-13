@@ -443,6 +443,9 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
         uassert(ErrorCodes::InvalidOptions,
                 "ShardKeyRange max should follow shard key's keyPattern",
                 (!shard.getMax().has_value()) || keyPattern.isShardKey(*shard.getMax()));
+        uassert(ErrorCodes::ShardNotFound,
+                "Shard URL cannot be used for shard name",
+                !shard.getShard().isShardURL());
         if (hasMinMax && !(*hasMinMax)) {
             uassert(ErrorCodes::InvalidOptions,
                     "Non-explicit shardDistribution should have unique shardIds",

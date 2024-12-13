@@ -2,8 +2,16 @@
  * Helpers for creating and accessing sharding metadata.
  */
 
+export function getShards(db) {
+    return db.adminCommand({listShards: 1}).shards;
+}
+
 export function getShardNames(db) {
-    return db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
+    return getShards(db).map(shard => shard._id);
+}
+
+export function getShardHosts(db) {
+    return getShards(db).map(shard => shard.host);
 }
 
 /**
