@@ -1,8 +1,5 @@
 version: 1.0.0
 filters:
-  - "rsm*":
-    approvers:
-      - 10gen/server-networking-and-observability
   - "bit_update_mixed_fcv.js":
     approvers:
       - 10gen/query-execution-write-exec
