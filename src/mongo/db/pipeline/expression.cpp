@@ -52,12 +52,10 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/api_parameters.h"
@@ -77,7 +75,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
@@ -86,7 +83,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/text.h"
@@ -2469,62 +2465,7 @@ Value ExpressionMeta::serialize(const SerializationOptions& options) const {
 }
 
 Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const {
-    const auto& metadata = root.metadata();
-    switch (_metaType) {
-        case MetaType::kScore:
-            return metadata.hasScore() ? Value(metadata.getScore()) : Value();
-        case MetaType::kVectorSearchScore:
-            return metadata.hasVectorSearchScore() ? Value(metadata.getVectorSearchScore())
-                                                   : Value();
-        case MetaType::kTextScore:
-            return metadata.hasTextScore() ? Value(metadata.getTextScore()) : Value();
-        case MetaType::kRandVal:
-            return metadata.hasRandVal() ? Value(metadata.getRandVal()) : Value();
-        case MetaType::kSearchScore:
-            return metadata.hasSearchScore() ? Value(metadata.getSearchScore()) : Value();
-        case MetaType::kSearchHighlights:
-            return metadata.hasSearchHighlights() ? Value(metadata.getSearchHighlights()) : Value();
-        case MetaType::kGeoNearDist:
-            return metadata.hasGeoNearDistance() ? Value(metadata.getGeoNearDistance()) : Value();
-        case MetaType::kGeoNearPoint:
-            return metadata.hasGeoNearPoint() ? Value(metadata.getGeoNearPoint()) : Value();
-        case MetaType::kRecordId: {
-            // Be sure that a RecordId can be represented by a long long.
-            static_assert(RecordId::kMinRepr >= std::numeric_limits<long long>::min());
-            static_assert(RecordId::kMaxRepr <= std::numeric_limits<long long>::max());
-            if (!metadata.hasRecordId()) {
-                return Value();
-            }
-
-            BSONObjBuilder builder;
-            metadata.getRecordId().serializeToken("", &builder);
-            return Value(builder.done().firstElement());
-        }
-        case MetaType::kIndexKey:
-            return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();
-        case MetaType::kSortKey:
-            return metadata.hasSortKey()
-                ? Value(DocumentMetadataFields::serializeSortKey(metadata.isSingleElementKey(),
-                                                                 metadata.getSortKey()))
-                : Value();
-        case MetaType::kSearchScoreDetails:
-            return metadata.hasSearchScoreDetails() ? Value(metadata.getSearchScoreDetails())
-                                                    : Value();
-        case MetaType::kSearchSequenceToken:
-            return metadata.hasSearchSequenceToken() ? Value(metadata.getSearchSequenceToken())
-                                                     : Value();
-        case MetaType::kTimeseriesBucketMinTime:
-            return metadata.hasTimeseriesBucketMinTime()
-                ? Value(metadata.getTimeseriesBucketMinTime())
-                : Value();
-        case MetaType::kTimeseriesBucketMaxTime:
-            return metadata.hasTimeseriesBucketMaxTime()
-                ? Value(metadata.getTimeseriesBucketMaxTime())
-                : Value();
-        default:
-            MONGO_UNREACHABLE;
-    }
-    MONGO_UNREACHABLE;
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 /* ----------------------- ExpressionMod ---------------------------- */
@@ -4555,8 +4496,7 @@ const char* ExpressionTrunc::getOpName() const {
 /* ------------------------- ExpressionType ----------------------------- */
 
 Value ExpressionType::evaluate(const Document& root, Variables* variables) const {
-    Value val(_children[0]->evaluate(root, variables));
-    return Value(StringData(typeName(val.getType())));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 REGISTER_STABLE_EXPRESSION(type, ExpressionType::parse);

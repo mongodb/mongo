@@ -35,11 +35,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression_test_api_version.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -107,7 +107,7 @@ Value ExpressionTestApiVersion::serialize(const SerializationOptions& options) c
 }
 
 Value ExpressionTestApiVersion::evaluate(const Document& root, Variables* variables) const {
-    return Value(1);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 }  // namespace mongo

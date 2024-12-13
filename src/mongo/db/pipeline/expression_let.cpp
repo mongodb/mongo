@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/util/intrusive_counter.h"
@@ -193,13 +194,7 @@ Value ExpressionLet::serialize(const SerializationOptions& options) const {
 }
 
 Value ExpressionLet::evaluate(const Document& root, Variables* variables) const {
-    for (const auto& item : _variables) {
-        // It is guaranteed at parse-time that these expressions don't use the variable ids we
-        // are setting
-        variables->setValue(item.first, item.second.expression->evaluate(root, variables));
-    }
-
-    return _children[_kSubExpression]->evaluate(root, variables);
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 }  // namespace mongo

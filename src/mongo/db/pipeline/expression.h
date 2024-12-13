@@ -2245,6 +2245,10 @@ public:
         return _variables;
     }
 
+    const Expression* getSubExpression() const {
+        return _children[_kSubExpression].get();
+    }
+
 private:
     ExpressionLet(ExpressionContext* expCtx,
                   VariableMap&& vars,

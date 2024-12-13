@@ -186,5 +186,10 @@ Value evaluate(const ExpressionRegexFind& expr, const Document& root, Variables*
 Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables* variables);
 
+Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionType& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionLet& expr, const Document& root, Variables* variables);
+
 }  // namespace exec::expression
 }  // namespace mongo
