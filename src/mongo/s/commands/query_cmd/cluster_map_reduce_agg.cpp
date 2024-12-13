@@ -285,7 +285,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 "mapReduce on a view is not supported",
                 e.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
 
-        e.addContext("MapReduce internal error xxx");
+        e.addContext("MapReduce internal error");
         throw;
     }
     auto aggResults = tempResults.done();
