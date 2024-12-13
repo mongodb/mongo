@@ -22,32 +22,35 @@
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-if (FixtureHelpers.isMongos(db)) {
-    const shards = db.getSiblingDB('config').shards.find().toArray();
+const dbName = jsTestName();
+const testDB = db.getSiblingDB(dbName);
+
+if (FixtureHelpers.isMongos(testDB)) {
+    const shards = testDB.getSiblingDB('config').shards.find().toArray();
     const shardName0 = shards.map(doc => doc._id)[0];
-    const dbName = db.getName();
-    db.getSiblingDB(dbName).dropDatabase();
-    assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: shardName0}));
+    testDB.dropDatabase();
+    assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: shardName0}));
 }
 
 // Create unindexed collection
-const coll = db.timeseries_internal_bounded_sort_extended_range;
-const buckets = db['system.buckets.' + coll.getName()];
+const coll = testDB.timeseries_internal_bounded_sort_extended_range;
+const buckets = testDB['system.buckets.' + coll.getName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 't'}}));
+assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: 't'}}));
 
 // Create collection indexed on time
-const collIndexed = db.timeseries_internal_bounded_sort_extended_range_with_index;
-const bucketsIndexed = db['system.buckets.' + collIndexed.getName()];
+const collIndexed = testDB.timeseries_internal_bounded_sort_extended_range_with_index;
+const bucketsIndexed = testDB['system.buckets.' + collIndexed.getName()];
 collIndexed.drop();
-assert.commandWorked(db.createCollection(collIndexed.getName(), {timeseries: {timeField: 't'}}));
+assert.commandWorked(
+    testDB.createCollection(collIndexed.getName(), {timeseries: {timeField: 't'}}));
 assert.commandWorked(collIndexed.createIndex({'t': 1}));
 
 jsTestLog(collIndexed.getIndexes());
 jsTestLog(bucketsIndexed.getIndexes());
 
 function numShards() {
-    return db.getSiblingDB('config').shards.count();
+    return testDB.getSiblingDB('config').shards.count();
 }
 for (const collection of [buckets, bucketsIndexed]) {
     if (FixtureHelpers.isSharded(collection) && numShards() >= 2) {
@@ -55,7 +58,7 @@ for (const collection of [buckets, bucketsIndexed]) {
         // but all the extended-range data is on a non-primary shard. This means view resolution is
         // unaware of the extended-range data, because that happens on the primary shard.
 
-        const shards = db.getSiblingDB('config').shards.find().toArray();
+        const shards = testDB.getSiblingDB('config').shards.find().toArray();
         const [shardName0, shardName1] = shards.map(doc => doc._id);
 
         const collName = collection.getFullName();
