@@ -221,7 +221,6 @@ SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolic
                                             sbeYieldPolicy,
                                             0 /* nodeId */,
                                             sbe::ScanCallbacks{},
-                                            false /* lowPriority */,
                                             true /* useRandomCursor */);
 
     stage = sbe::makeS<sbe::LimitSkipStage>(

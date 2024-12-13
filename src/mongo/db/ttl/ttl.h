@@ -39,7 +39,6 @@
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/background.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
@@ -110,15 +109,10 @@ private:
      * Once it is confirmed there are no more expired documents on an index, the index will not be
      * visited again for the remainder of the sub-pass.
      *
-     * The 'collSubpassHistory' tracks the number of consecutive subpasses on a collection that
-     * completed with more expired documents remaining. It is used to determine when a collection's
-     * TTL deletes should be raised from 'low' to 'normal' priority to prevent TTL deletes from
-     * falling behind on TTL inserts.
      *
      * Returns true if there are more expired documents to delete. False otherwise.
      */
-    bool _doTTLSubPass(OperationContext* opCtx,
-                       stdx::unordered_map<UUID, long long, UUID::Hash>& collSubpassHistory);
+    bool _doTTLSubPass(OperationContext* opCtx);
 
     /**
      * Given a TTL index, attempts to delete all expired documents through the index until

@@ -37,7 +37,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
@@ -54,25 +53,13 @@ static int kTickets = 32;
 static int kThreadMin = 16;
 static int kThreadMax = 1024;
 
-// For a given benchmark, specifies the AdmissionContext::Priority of ticket admissions
-enum class AdmissionsPriority {
-    // All admissions must be AdmissionContext::Priority::kNormal.
-    kNormal,
-    // Admissions may vary between AdmissionContext::Priority::kNormal and
-    // AdmissionContext::Priority::kLow.
-    kNormalAndLow,
-    // All admissions must be AdmissionContext::Priority::kLow.
-    kLow,
-};
-
-template <typename TicketHolderImpl>
 class TicketHolderFixture {
 public:
     std::unique_ptr<TicketHolder> ticketHolder;
 
     TicketHolderFixture(int threads, ServiceContext* serviceContext) {
         ticketHolder =
-            std::make_unique<TicketHolderImpl>(serviceContext, kTickets, true /* track peakUsed */);
+            std::make_unique<TicketHolder>(serviceContext, kTickets, true /* track peakUsed */);
     }
 };
 
@@ -81,9 +68,8 @@ static stdx::mutex isReadyMutex;
 static stdx::condition_variable isReadyCv;
 static bool isReady = false;
 
-template <class TicketHolderImpl, AdmissionsPriority admissionsPriority>
 void BM_acquireAndRelease(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> ticketHolder;
+    static std::unique_ptr<TicketHolderFixture> ticketHolder;
     static ServiceContext::UniqueServiceContext serviceContext;
     static constexpr auto resolution = Microseconds{100};
     static LatencyPercentileDistribution resultingDistribution(resolution);
@@ -96,8 +82,8 @@ void BM_acquireAndRelease(benchmark::State& state) {
             serviceContext = ServiceContext::make(std::make_unique<SystemClockSource>(),
                                                   std::make_unique<SystemClockSource>(),
                                                   std::make_unique<TickSourceMock<Microseconds>>());
-            ticketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
+            ticketHolder =
+                std::make_unique<TicketHolderFixture>(state.threads, serviceContext.get());
             isReady = true;
             isReadyCv.notify_all();
         } else {
@@ -110,23 +96,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
         str::stream() << "test client for thread " << state.thread_index);
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 
-    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
-    admissionPriority.emplace(opCtx.get(), [&] {
-        switch (admissionsPriority) {
-            case AdmissionsPriority::kNormal:
-                return AdmissionContext::Priority::kNormal;
-            case AdmissionsPriority::kLow:
-                return AdmissionContext::Priority::kLow;
-            case AdmissionsPriority::kNormalAndLow: {
-                return (state.thread_index % 2) == 0 ? AdmissionContext::Priority::kNormal
-                                                     : AdmissionContext::Priority::kLow;
-            }
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }());
-
-    TicketHolderFixture<TicketHolderImpl>* fixture = ticketHolder.get();
+    TicketHolderFixture* fixture = ticketHolder.get();
     // We build the latency distribution locally in order to avoid synchronizing with other threads.
     // All of them will be merged at the end instead.
     LatencyPercentileDistribution localDistribution{resolution};
@@ -156,7 +126,6 @@ void BM_acquireAndRelease(benchmark::State& state) {
     // Merge all latency distributions in order to get the full view of all threads.
     {
         stdx::unique_lock lk(isReadyMutex);
-        admissionPriority.reset();
         opCtx.reset();
         client.reset();
         resultingDistribution = resultingDistribution.mergeWith(localDistribution);
@@ -183,9 +152,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
     }
 }
 
-// The 'AdmissionsPriority' has no effect on TicketHolder performance because the
-// TicketHolder treaats all operations the same, regardless of their specified priority.
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, TicketHolder, AdmissionsPriority::kNormal)
+BENCHMARK(BM_acquireAndRelease)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
     ->Threads(128)

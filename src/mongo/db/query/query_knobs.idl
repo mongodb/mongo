@@ -1346,22 +1346,6 @@ server_parameters:
       gt: 0
     redact: false
 
-  deprioritizeUnboundedUserCollectionScans:
-   description: "Unbounded user collection scans are executed with low storage admission priority"
-   set_at: [ startup, runtime ]
-   cpp_varname: gDeprioritizeUnboundedUserCollectionScans
-   cpp_vartype: AtomicWord<bool>
-   default: true
-   redact: false
-
-  deprioritizeUnboundedUserIndexScans:
-   description: "Unbounded user index scans are executed with low storage admission priority"
-   set_at: [ startup, runtime ]
-   cpp_varname: gDeprioritizeUnboundedUserIndexScans
-   cpp_vartype: AtomicWord<bool>
-   default: true
-   redact: false
-
   internalQueryDocumentSourceWriterBatchExtraReservedBytes:
     description: "Space to reserve in document source writer batches for miscellaneous metadata"
     set_at: [ startup, runtime ]

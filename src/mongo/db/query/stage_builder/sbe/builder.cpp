@@ -1202,7 +1202,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
                                                 std::move(highKey),
                                                 ixScanReqs,
                                                 csn->nodeId(),
-                                                false /* lowPriority */,
                                                 isPointInterval);
 
     if (!csn->iets.empty()) {
@@ -4979,8 +4978,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSearch(const Quer
                                         makeNewKeyFunc(key_string::Discriminator::kExclusiveBefore),
                                         makeNewKeyFunc(key_string::Discriminator::kExclusiveAfter),
                                         ixScanReqs,
-                                        sn->nodeId(),
-                                        false /* lowPriority */);
+                                        sn->nodeId());
 
     // Join the idx scan stage with fetch stage.
     auto [outStage, outputDocSlot, _, topLevelFieldSlots] =

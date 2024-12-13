@@ -3033,12 +3033,6 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     const boost::optional<RecordId>& resumeAfterRecordId) {
     // Collection scan and insert into index.
 
-    // The collection scan phase of an index build is marked as low priority in order to reduce
-    // impact on user operations. Other steps of the index builds such as the draining phase have
-    // normal priority because index builds are required to eventually catch-up with concurrent
-    // writers. Otherwise we risk never finishing the index build.
-    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(opCtx,
-                                                                AdmissionContext::Priority::kLow);
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);
 
@@ -3075,12 +3069,6 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    // The collection scan phase of an index build is marked as low priority in order to reduce
-    // impact on user operations. Other steps of the index builds such as the draining phase have
-    // normal priority because index builds are required to eventually catch-up with concurrent
-    // writers. Otherwise we risk never finishing the index build.
-    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(opCtx,
-                                                                AdmissionContext::Priority::kLow);
     {
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX);

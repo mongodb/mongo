@@ -96,7 +96,6 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                         std::unique_ptr<key_string::Value> highKey,
                                         const PlanStageReqs& reqs,
                                         PlanNodeId planNodeId,
-                                        bool lowPriority,
                                         bool isPointInterval);
 
 std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderState& state,
@@ -107,8 +106,7 @@ std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderS
                                                                    SbExpr lowKeyExpr,
                                                                    SbExpr highKeyExpr,
                                                                    const PlanStageReqs& reqs,
-                                                                   PlanNodeId planNodeId,
-                                                                   bool lowPriority);
+                                                                   PlanNodeId planNodeId);
 
 /**
  * Constructs low/high key values from the given index 'bounds' if they can be represented either as

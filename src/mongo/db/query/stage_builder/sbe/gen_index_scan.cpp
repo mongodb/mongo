@@ -578,8 +578,7 @@ std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScanImpl(
     SbExpr highKeyExpr,
     const PlanStageReqs& reqs,
     PlanNodeId nodeId,
-    bool forward,
-    bool lowPriority) {
+    bool forward) {
     SbBuilder b(state, nodeId);
 
     tassert(7856101,
@@ -603,8 +602,7 @@ std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScanImpl(
                               std::move(lowKeyExpr),
                               std::move(highKeyExpr),
                               indexKeysToInclude,
-                              indexInfoTypeMask,
-                              lowPriority);
+                              indexInfoTypeMask);
 
     auto outputs = buildPlanStageSlots(state, reqs, indexName, recordIdSlot, indexInfoSlots);
 
@@ -624,7 +622,6 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
                                             std::unique_ptr<key_string::Value> highKey,
                                             const PlanStageReqs& reqs,
                                             PlanNodeId nodeId,
-                                            bool lowPriority,
                                             bool isPointInterval) {
     SbBuilder b(state, nodeId);
 
@@ -656,8 +653,7 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
                                                                 highKeyExpr.clone(),
                                                                 reqs,
                                                                 nodeId,
-                                                                forward,
-                                                                lowPriority);
+                                                                forward);
 
     // If low and high keys are provided in the runtime environment, then we need to create
     // a cfilter stage on top of project in order to be sure that the single interval
@@ -826,7 +822,6 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                         std::unique_ptr<key_string::Value> highKey,
                                         const PlanStageReqs& reqs,
                                         PlanNodeId nodeId,
-                                        bool lowPriority,
                                         bool isPointInterval) {
     PlanStageReqs ixScanReqs = computeReqsForIndexScan(reqs, keyPattern);
 
@@ -840,7 +835,6 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                                     std::move(highKey),
                                                     ixScanReqs,
                                                     nodeId,
-                                                    lowPriority,
                                                     isPointInterval);
 
     auto [finalStage, finalOutputs] = setResultAndAdditionalFieldSlots(
@@ -857,8 +851,7 @@ std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderS
                                                                    SbExpr lowKeyExpr,
                                                                    SbExpr highKeyExpr,
                                                                    const PlanStageReqs& reqs,
-                                                                   PlanNodeId nodeId,
-                                                                   bool lowPriority) {
+                                                                   PlanNodeId nodeId) {
     PlanStageReqs ixScanReqs = computeReqsForIndexScan(reqs, keyPattern);
 
     auto [stage, outputs] = generateSingleIntervalIndexScanImpl(state,
@@ -869,8 +862,7 @@ std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderS
                                                                 std::move(highKeyExpr),
                                                                 ixScanReqs,
                                                                 nodeId,
-                                                                forward,
-                                                                lowPriority);
+                                                                forward);
 
     return setResultAndAdditionalFieldSlots(
         std::move(stage), std::move(outputs), keyPattern, reqs, state, nodeId);
@@ -917,7 +909,6 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& stat
                                                         std::move(highKey),
                                                         reqs,
                                                         ixn->nodeId(),
-                                                        ixn->lowPriority,
                                                         isPointInterval);
     } else if (intervals.size() > 1) {
         // If we were able to decompose multi-interval index bounds into a number of single-interval
@@ -1074,7 +1065,6 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
                 nullptr,
                 reqs,
                 ixn->nodeId(),
-                false /* lowPriority */,
                 intervalsRequired == IntervalsRequired::EqualityInterval /* isPointInterval */);
         tassert(6484702,
                 "lowKey and highKey runtime environment slots must be present",

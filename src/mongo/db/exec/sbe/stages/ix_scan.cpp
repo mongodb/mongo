@@ -70,7 +70,6 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
                                        value::SlotVector vars,
                                        PlanYieldPolicy* yieldPolicy,
                                        PlanNodeId nodeId,
-                                       bool lowPriority,
                                        bool participateInTrialRunTracking)
     : PlanStage(stageType,
                 yieldPolicy,
@@ -86,8 +85,7 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
       _snapshotIdSlot(snapshotIdSlot),
       _indexIdentSlot(indexIdentSlot),
       _indexKeysToInclude(indexKeysToInclude),
-      _vars(std::move(vars)),
-      _lowPriority(lowPriority) {
+      _vars(std::move(vars)) {
     invariant(_indexKeysToInclude.count() == _vars.size());
 }
 
@@ -237,15 +235,9 @@ void IndexScanStageBase::doDetachFromOperationContext() {
     if (_cursor) {
         _cursor->detachFromOperationContext();
     }
-    _priority.reset();
 }
 
 void IndexScanStageBase::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_lowPriority && _open && gDeprioritizeUnboundedUserIndexScans.load() &&
-        _opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket(_opCtx)) {
-        _priority.emplace(opCtx, AdmissionContext::Priority::kLow);
-    }
     if (_cursor) {
         _cursor->reattachToOperationContext(opCtx);
     }
@@ -288,12 +280,6 @@ void IndexScanStageBase::trackIndexRead() {
 PlanState IndexScanStageBase::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_lowPriority && !_priority && gDeprioritizeUnboundedUserIndexScans.load() &&
-        _opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket(_opCtx)) {
-        _priority.emplace(_opCtx, AdmissionContext::Priority::kLow);
-    }
-
     // We are about to get next record from a storage cursor so do not bother saving our internal
     // state in case it yields as the state will be completely overwritten after the call.
     disableSlotAccess();
@@ -313,7 +299,6 @@ PlanState IndexScanStageBase::getNext() {
                 _nextKeyString = _cursor->nextKeyValueView();
                 break;
             case ScanState::kFinished:
-                _priority.reset();
                 return trackPlanState(PlanState::IS_EOF);
         }
     } while (!validateKey(_nextKeyString));
@@ -417,10 +402,6 @@ void IndexScanStageBase::debugPrintImpl(std::vector<DebugPrinter::Block>& blocks
         DebugPrinter::addIdentifier(blocks, DebugPrinter::kNoneKeyword);
     }
 
-    if (_lowPriority) {
-        DebugPrinter::addKeyword(blocks, "lowPriority");
-    }
-
     blocks.emplace_back(DebugPrinter::Block("[`"));
     size_t varIndex = 0;
     for (size_t keyIndex = 0; keyIndex < _indexKeysToInclude.size(); ++keyIndex) {
@@ -474,7 +455,6 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            std::unique_ptr<EExpression> seekKeyHigh,
                                            PlanYieldPolicy* yieldPolicy,
                                            PlanNodeId nodeId,
-                                           bool lowPriority,
                                            bool participateInTrialRunTracking)
     : IndexScanStageBase(seekKeyLow ? "ixseek"_sd : "ixscan"_sd,
                          collUuid,
@@ -489,7 +469,6 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                          std::move(vars),
                          yieldPolicy,
                          nodeId,
-                         lowPriority,
                          participateInTrialRunTracking),
       _seekKeyLow(std::move(seekKeyLow)),
       _seekKeyHigh(std::move(seekKeyHigh)) {
@@ -513,7 +492,6 @@ std::unique_ptr<PlanStage> SimpleIndexScanStage::clone() const {
                                                   _seekKeyHigh ? _seekKeyHigh->clone() : nullptr,
                                                   _yieldPolicy,
                                                   _commonStats.nodeId,
-                                                  _lowPriority,
                                                   participateInTrialRunTracking());
 }
 

@@ -53,7 +53,6 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_query_impl.h"
@@ -78,7 +77,6 @@
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -271,26 +269,6 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
     }
 
     return me->path() == repl::OpTime::kTimestampFieldName;
-}
-
-/**
- * Sets the lowPriority parameter on the given index scan node.
- */
-void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
-                                    const FindCommandRequest& findCommand) {
-    auto sort = findCommand.getSort();
-    if (findCommand.getLimit() &&
-        (sort.isEmpty() || sort[query_request_helper::kNaturalSortField])) {
-        // There is a limit with either no sort or the natural sort.
-        return;
-    }
-
-    auto indexScan = checked_cast<IndexScanNode*>(solnRoot);
-    if (!indexScan->bounds.isUnbounded()) {
-        return;
-    }
-
-    indexScan->lowPriority = true;
 }
 
 // True if the element type is affected by a collator (i.e. it is or contains a String).
@@ -2113,8 +2091,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const Inde
         QueryPlannerCommon::reverseScans(isn.get());
         isn->direction = -1;
     }
-
-    deprioritizeUnboundedIndexScan(isn.get(), query.getFindCommandRequest());
 
     unique_ptr<MatchExpression> filter = query.getPrimaryMatchExpression()->clone();
 

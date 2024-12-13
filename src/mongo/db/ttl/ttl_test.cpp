@@ -106,7 +106,7 @@ protected:
     bool doTTLSubPassForTest(OperationContext* opCtx) {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
 
-        return ttlMonitor->_doTTLSubPass(opCtx, _collSubpassHistoryPlaceHolder);
+        return ttlMonitor->_doTTLSubPass(opCtx);
     }
 
     long long getTTLPasses() {
@@ -147,13 +147,6 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-
-    // In a given TTL Pass, there may be multiple subpasses. Between subpasses, collection delete
-    // history is tracked for collections who have remaining TTL deletes a subpass. The
-    // history is strictly for TTL delete priority purposes in a contended system. It does not
-    // impact behavior in an uncontended, isolated system such as this test suite. This is used
-    // strictly as a placeholder in order to test subpass behavior.
-    stdx::unordered_map<UUID, long long, UUID::Hash> _collSubpassHistoryPlaceHolder;
 };
 
 namespace {
@@ -398,8 +391,6 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     client.createCollection(nss);
     createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
 
-    // enough to require more than ttlCollLowPrioritySubpassLimit passes and exercise
-    // the Priority::kNormal case
     client.insertExpiredDocs(nss, "foo", 50000);
     ASSERT_EQ(client.count(nss), 50000);
 
@@ -466,8 +457,6 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     auto fromMigrate = false;
     indexBuildsCoord->createIndex(opCtx(), collection->uuid(), spec, indexConstraints, fromMigrate);
 
-    // enough to require more than ttlCollLowPrioritySubpassLimit passes and exercise
-    // the Priority::kNormal case
     client.insertExpiredDocs(nss, "foo", 100);
     ASSERT_EQ(client.count(nss), 100);
 
@@ -505,8 +494,6 @@ TEST_F(TTLTest, TTLPassCollectionInvalidExpiration) {
     auto fromMigrate = false;
     indexBuildsCoord->createIndex(opCtx(), collection->uuid(), spec, indexConstraints, fromMigrate);
 
-    // enough to require more than ttlCollLowPrioritySubpassLimit passes and exercise
-    // the Priority::kNormal case
     client.insertExpiredDocs(nss, "foo", 100);
     ASSERT_EQ(client.count(nss), 100);
 

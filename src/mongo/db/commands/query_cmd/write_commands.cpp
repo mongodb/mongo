@@ -318,12 +318,6 @@ public:
                 }
             }
 
-            boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> priority;
-            if (request().getNamespace() == NamespaceString::kConfigSampledQueriesNamespace ||
-                request().getNamespace() == NamespaceString::kConfigSampledQueriesDiffNamespace) {
-                priority.emplace(opCtx, AdmissionContext::Priority::kLow);
-            }
-
             if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
                     const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
                     return fpNss == request().getNamespace();

@@ -222,7 +222,6 @@ public:
               PlanNodeId nodeId,
               ScanCallbacks scanCallbacks,
               // Optional arguments:
-              bool lowPriority = false,
               bool useRandomCursor = false,
               bool participateInTrialRunTracking = true,
               bool includeScanStartRecordId = true,
@@ -234,7 +233,6 @@ public:
     ScanStage(const std::shared_ptr<ScanStageState>& state,
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
-              bool lowPriority,
               bool participateInTrialRunTracking,
               bool includeScanStartRecordId,
               bool includeScanEndRecordId);
@@ -353,10 +351,6 @@ private:
 
     // Tells whether this is the first getNext() call of the scan or after restarting.
     bool _firstGetNext{false};
-
-    // Whether the scan should have low storage admission priority.
-    bool _lowPriority;
-    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> _priority;
 
     ScanStats _specificStats;
 

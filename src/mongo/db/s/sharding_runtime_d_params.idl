@@ -85,17 +85,6 @@ server_parameters:
         default: 20
         redact: false
 
-    rangeDeleterHighPriority:
-        description:
-            "By default, this parameter is set to 'false' meaning that range deletions have a
-            lower priority than user operations. Setting this parameter to true prioritizes
-            range deletions over user operations."
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: rangeDeleterHighPriority
-        default: false
-        redact: false
-
     receiveChunkWaitForRangeDeleterTimeoutMS:
         description: >-
           Maximum amount of time for which the start of a new chunk migration request may be deferred,

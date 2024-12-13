@@ -800,31 +800,6 @@ bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
         !index.sparse && CollatorInterface::collatorsMatch(collator, index.collator);
 }
 
-/**
- * Sets the lowPriority parameter on the given node if it is an unbounded collection scan.
- */
-void deprioritizeUnboundedCollectionScan(QuerySolutionNode* solnRoot,
-                                         const FindCommandRequest& findCommand) {
-    if (solnRoot->getType() != StageType::STAGE_COLLSCAN) {
-        return;
-    }
-
-    auto sort = findCommand.getSort();
-    if (findCommand.getLimit() &&
-        (sort.isEmpty() || sort[query_request_helper::kNaturalSortField])) {
-        // There is a limit with either no sort or the natural sort.
-        return;
-    }
-
-    auto collScan = checked_cast<CollectionScanNode*>(solnRoot);
-    if (collScan->minRecord || collScan->maxRecord) {
-        // This scan is not unbounded.
-        return;
-    }
-
-    collScan->lowPriority = true;
-}
-
 bool isShardedCollScan(QuerySolutionNode* solnRoot) {
     return solnRoot->getType() == StageType::STAGE_SHARDING_FILTER &&
         solnRoot->children.size() == 1 &&
@@ -1336,8 +1311,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     analyzeGeo(params, solnRoot.get());
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
-
-    deprioritizeUnboundedCollectionScan(solnRoot.get(), findCommand);
 
     // solnRoot finds all our results.  Let's see what transformations we must perform to the
     // data.

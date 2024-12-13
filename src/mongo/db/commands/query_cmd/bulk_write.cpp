@@ -769,12 +769,6 @@ bool handleGroupedInserts(OperationContext* opCtx,
         }
     }
 
-    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> priority;
-    if (nsString == NamespaceString::kConfigSampledQueriesNamespace ||
-        nsString == NamespaceString::kConfigSampledQueriesDiffNamespace) {
-        priority.emplace(opCtx, AdmissionContext::Priority::kLow);
-    }
-
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     size_t bytesInBatch = 0;

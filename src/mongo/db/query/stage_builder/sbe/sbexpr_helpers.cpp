@@ -384,8 +384,7 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
     const SbScanBounds& scanBounds,
     const SbIndexInfoSlots& indexInfoSlots,
     sbe::ScanCallbacks scanCallbacks,
-    boost::optional<SbSlot> oplogTsSlot,
-    bool lowPriority) {
+    boost::optional<SbSlot> oplogTsSlot) {
     auto resultSlot = SbSlot{_state.slotId()};
     auto recordIdSlot = SbSlot{_state.slotId()};
 
@@ -414,7 +413,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
                                                 _state.yieldPolicy,
                                                 _nodeId,
                                                 std::move(scanCallbacks),
-                                                lowPriority,
                                                 false /* useRandomCursor */,
                                                 true /* participateInTrialRunTracking */,
                                                 scanBounds.includeScanStartRecordId,
@@ -433,8 +431,7 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeSimpl
     SbExpr lowKeyExpr,
     SbExpr highKeyExpr,
     sbe::IndexKeysInclusionSet indexKeysToInclude,
-    SbIndexInfoType indexInfoTypeMask,
-    bool lowPriority) {
+    SbIndexInfoType indexInfoTypeMask) {
     SbSlot recordIdSlot = SbSlot{_state.slotId()};
     const size_t numIndexKeys = indexKeysToInclude.count();
 
@@ -459,8 +456,7 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeSimpl
                                                        lower(lowKeyExpr, &varTypes),
                                                        lower(highKeyExpr, &varTypes),
                                                        _state.yieldPolicy,
-                                                       _nodeId,
-                                                       lowPriority);
+                                                       _nodeId);
 
     return {std::move(stage), recordIdSlot, std::move(indexKeySlots), std::move(indexInfoSlots)};
 }

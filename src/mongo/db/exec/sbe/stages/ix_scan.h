@@ -100,7 +100,6 @@ public:
                        value::SlotVector vars,
                        PlanYieldPolicy* yieldPolicy,
                        PlanNodeId planNodeId,
-                       bool lowPriority = false,
                        bool participateInTrialRunTracking = true);
 
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
@@ -200,9 +199,6 @@ protected:
     bool _uniqueIndex{false};
     ScanState _scanState = ScanState::kNeedSeek;
     IndexScanStats _specificStats;
-
-    bool _lowPriority;
-    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> _priority;
 };
 
 /**
@@ -238,7 +234,6 @@ public:
                          std::unique_ptr<EExpression> seekKeyHigh,
                          PlanYieldPolicy* yieldPolicy,
                          PlanNodeId planNodeId,
-                         bool lowPriority = false,
                          bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const override;

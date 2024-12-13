@@ -417,8 +417,7 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
                                                                     SbScanBounds{},
                                                                     SbIndexInfoSlots{},
                                                                     std::move(callbacks),
-                                                                    oplogTsSlot,
-                                                                    csn->lowPriority);
+                                                                    oplogTsSlot);
 
     if (isResumingTailableScan || csn->resumeAfterRecordId) {
         stage = combineResumeRecordIdTreeWithScan(state,

@@ -250,12 +250,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    if (_params.lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
-        opCtx()->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx())->shouldWaitForTicket(opCtx())) {
-        _priority.emplace(opCtx(), AdmissionContext::Priority::kLow);
-    }
-
     boost::optional<Record> record;
     const bool needToMakeCursor = !_cursor;
     const auto& collPtr = collectionPtr();
@@ -578,11 +572,6 @@ void CollectionScan::doDetachFromOperationContext() {
 }
 
 void CollectionScan::doReattachToOperationContext() {
-    if (_params.lowPriority && gDeprioritizeUnboundedUserCollectionScans.load() &&
-        opCtx()->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx())->shouldWaitForTicket(opCtx())) {
-        _priority.emplace(opCtx(), AdmissionContext::Priority::kLow);
-    }
     if (_cursor)
         _cursor->reattachToOperationContext(opCtx());
 }

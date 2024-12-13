@@ -88,7 +88,6 @@ ScanStage::ScanStage(UUID collUuid,
                      PlanNodeId nodeId,
                      ScanCallbacks scanCallbacks,
                      // Optional arguments:
-                     bool lowPriority,
                      bool useRandomCursor,
                      bool participateInTrialRunTracking,
                      bool includeScanStartRecordId,
@@ -116,8 +115,7 @@ ScanStage::ScanStage(UUID collUuid,
                                               scanCallbacks,
                                               useRandomCursor)),
       _includeScanStartRecordId(includeScanStartRecordId),
-      _includeScanEndRecordId(includeScanEndRecordId),
-      _lowPriority(lowPriority) {
+      _includeScanEndRecordId(includeScanEndRecordId) {
     invariant(!seekRecordIdSlot || forward);
     // We cannot use a random cursor if we are seeking or requesting a reverse scan.
     invariant(!useRandomCursor || (!seekRecordIdSlot && forward));
@@ -129,7 +127,6 @@ ScanStage::ScanStage(UUID collUuid,
 ScanStage::ScanStage(const std::shared_ptr<ScanStageState>& state,
                      PlanYieldPolicy* yieldPolicy,
                      PlanNodeId nodeId,
-                     bool lowPriority,
                      bool participateInTrialRunTracking,
                      bool includeScanStartRecordId,
                      bool includeScanEndRecordId)
@@ -140,14 +137,12 @@ ScanStage::ScanStage(const std::shared_ptr<ScanStageState>& state,
                 TrialRunTrackingType::TrackReads),
       _state(state),
       _includeScanStartRecordId(includeScanStartRecordId),
-      _includeScanEndRecordId(includeScanEndRecordId),
-      _lowPriority(lowPriority) {}  // ScanStage constructor for clone()
+      _includeScanEndRecordId(includeScanEndRecordId) {}  // ScanStage constructor for clone()
 
 std::unique_ptr<PlanStage> ScanStage::clone() const {
     return std::make_unique<ScanStage>(_state,
                                        _yieldPolicy,
                                        _commonStats.nodeId,
-                                       _lowPriority,
                                        participateInTrialRunTracking(),
                                        _includeScanStartRecordId,
                                        _includeScanEndRecordId);
@@ -334,15 +329,9 @@ void ScanStage::doDetachFromOperationContext() {
     if (auto cursor = getActiveCursor()) {
         cursor->detachFromOperationContext();
     }
-    _priority.reset();
 }
 
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_lowPriority && _open && gDeprioritizeUnboundedUserCollectionScans.load() &&
-        opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx)->shouldWaitForTicket(opCtx)) {
-        _priority.emplace(opCtx, AdmissionContext::Priority::kLow);
-    }
     if (auto cursor = getActiveCursor()) {
         cursor->reattachToOperationContext(opCtx);
     }
@@ -454,12 +443,6 @@ PlanState ScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    if (_lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
-        _opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket(_opCtx)) {
-        _priority.emplace(_opCtx, AdmissionContext::Priority::kLow);
-    }
-
     // We are about to call next() on a storage cursor so do not bother saving our internal state in
     // case it yields as the state will be completely overwritten after the next() call.
     disableSlotAccess();
@@ -556,7 +539,6 @@ PlanState ScanStage::getNext() {
             auto [tag, val] = sbe::value::makeCopyRecordId(RecordId());
             _recordIdAccessor.reset(true, tag, val);
         }
-        _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -569,7 +551,6 @@ PlanState ScanStage::getNext() {
                                                                 _indexKeyAccessor,
                                                                 _coll.getPtr(),
                                                                 *nextRecord)) {
-        _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -668,7 +649,6 @@ void ScanStage::close() {
     _cursor.reset();
     _randomCursor.reset();
     _coll.reset();
-    _priority.reset();
     _open = false;
 }
 
@@ -777,10 +757,6 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
 
     if (_state->useRandomCursor) {
         DebugPrinter::addKeyword(ret, "random");
-    }
-
-    if (_lowPriority) {
-        DebugPrinter::addKeyword(ret, "lowPriority");
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));

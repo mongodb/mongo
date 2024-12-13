@@ -65,8 +65,6 @@ const expectedParamDefaults = {
     allowDiskUseByDefault: true,
     internalQueryMaxSpoolMemoryUsageBytes: 100 * 1024 * 1024,
     internalQueryMaxSpoolDiskUsageBytes: 10 * 100 * 1024 * 1024,
-    deprioritizeUnboundedUserCollectionScans: true,
-    deprioritizeUnboundedUserIndexScans: true,
     internalQueryDocumentSourceWriterBatchExtraReservedBytes: 0,
     internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: false,
     internalQueryCollectOptimizerMetrics: false,
@@ -292,11 +290,6 @@ assertSetParameterFails("internalQueryMaxSpoolMemoryUsageBytes", 0);
 assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 100);
 assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 1);
 assertSetParameterFails("internalQueryMaxSpoolDiskUsageBytes", 0);
-
-assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", true);
-assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", false);
-assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", true);
-assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", false);
 
 assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 10);
 assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes",

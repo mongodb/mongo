@@ -118,7 +118,6 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.resumeAfterRecordId = csn->resumeAfterRecordId;
                 params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
                 params.boundInclusion = csn->boundInclusion;
-                params.lowPriority = csn->lowPriority;
                 return std::make_unique<CollectionScan>(
                     expCtx, _collection, params, _ws, csn->filter.get());
             }
@@ -142,8 +141,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                                        ixn->index.identifier.catalogName,
                                        ixn->index.keyPattern,
                                        ixn->index.multikeyPaths,
-                                       ixn->index.multikey,
-                                       ixn->lowPriority};
+                                       ixn->index.multikey};
                 params.bounds = ixn->bounds;
                 params.direction = ixn->direction;
                 params.addKeyMetadata = ixn->addKeyMetadata;

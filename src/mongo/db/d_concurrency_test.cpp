@@ -93,7 +93,6 @@ const auto kMaxClockJitterMillis = Milliseconds(0);
  * acquisitions to numTickets. The opCtx must live as long as the UseReaderWriterGlobalThrottling
  * instance.
  */
-template <class TicketHolderImpl>
 class UseReaderWriterGlobalThrottling {
 public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
@@ -156,9 +155,9 @@ public:
         }
     }
 
-    template <class TicketHolderImpl, class F>
+    template <class F>
     void runWithThrottling(int numTickets, F&& f) {
-        UseReaderWriterGlobalThrottling<TicketHolderImpl> throttle(getServiceContext(), numTickets);
+        UseReaderWriterGlobalThrottling throttle(getServiceContext(), numTickets);
         f();
     }
 };
@@ -1527,7 +1526,7 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
     };
 
     int numTickets = 1;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
@@ -1550,7 +1549,7 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
@@ -1591,7 +1590,7 @@ TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, LockerWithReleasedTicketCanBeUnlocked) {
@@ -1617,7 +1616,7 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToKill) {
 
     // Limit the locker to 0 tickets at a time.
     int numTickets = 0;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToDeadline) {
@@ -1635,7 +1634,7 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToDeadline) {
 
     // Limit the locker to 0 tickets at a time.
     int numTickets = 0;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlocked1) {
@@ -1650,7 +1649,7 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlo
     };
 
     int numTickets = 0;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlocked2) {
@@ -1667,7 +1666,7 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlo
     };
 
     int numTickets = 0;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, TicketAcquireWithMaxDeadlineRespectsUninterruptibleLockGuard) {
@@ -1701,7 +1700,7 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireWithMaxDeadlineRespectsUninterrupti
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
@@ -1740,7 +1739,7 @@ TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture,
@@ -1781,7 +1780,7 @@ TEST_F(DConcurrencyTestFixture,
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<TicketHolder>(numTickets, runTest);
+    runWithThrottling(numTickets, runTest);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextThrowsEvenWhenUncontested) {

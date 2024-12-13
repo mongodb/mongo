@@ -35,7 +35,6 @@
 namespace mongo {
 
 namespace {
-static constexpr StringData kLowString = "low"_sd;
 static constexpr StringData kNormalString = "normal"_sd;
 static constexpr StringData kExemptString = "exempt"_sd;
 }  // namespace
@@ -113,8 +112,6 @@ ScopedAdmissionPriorityBase::~ScopedAdmissionPriorityBase() {
 
 StringData toString(AdmissionContext::Priority priority) {
     switch (priority) {
-        case AdmissionContext::Priority::kLow:
-            return kLowString;
         case AdmissionContext::Priority::kNormal:
             return kNormalString;
         case AdmissionContext::Priority::kExempt:
