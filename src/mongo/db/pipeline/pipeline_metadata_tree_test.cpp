@@ -357,7 +357,7 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
                                   {}),
                               makeVector<Stage<TestThing>>(Stage(TestThing{"2"}, {}, {}))),
                           {}),
-                      {}),
+                      makeVector<Stage<TestThing>>(Stage(TestThing{"2"}, {}, {}))),
                   {}),
               {}));
 
@@ -460,8 +460,16 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
     // zip() function, since we will throw if the top of the stack (which is the branch being
     // actively walked) has a typeid which does not match the typeid of the previous stage.
     auto tookTypeInfoOrThrow = [&previousStack](auto* stage, auto* source) {
-        for ([[maybe_unused]] auto&& child : stage->additionalChildren)
+        for ([[maybe_unused]] auto&& child : stage->additionalChildren) {
+            // If we have a lookup source without a pipeline, we should not pop from the previous
+            // stack. This is because the additional child for the lookup case is actually an NoOp
+            // stage, since we don't have a pipeline stage that generates the output.
+            if (auto* lookupSource = dynamic_cast<DocumentSourceLookUp*>(source); lookupSource &&
+                lookupSource->hasLocalFieldForeignFieldJoin() && !lookupSource->hasPipeline()) {
+                continue;
+            }
             previousStack.pop();
+        }
         if (!stage->principalChild)
             previousStack.push(nullptr);
         if (auto typeInfo = stage->contents.typeInfo;
