@@ -31,7 +31,7 @@ let ContinuousStepdown;
 "use strict";
 
 load("jstests/libs/parallelTester.js");  // Thread and CountDownLatch
-load("jstests/replsets/rslib.js");       // reconfig
+load("jstests/replsets/rslib.js");       // reconfig and reconnect
 
 /**
  * Helper class to manage the Thread instance that will continuously step down the primary
@@ -220,7 +220,7 @@ ContinuousStepdown.configure = function(stepdownOptions,
          * Overrides stopSet to terminate the failover thread.
          */
         this.stopSet = function() {
-            this.stopContinuousFailover({waitForPrimary: false});
+            this.stopContinuousFailover({waitForPrimary: true});
             _originalStopSetFn.apply(this, arguments);
         };
 
@@ -281,7 +281,8 @@ ContinuousStepdown.configure = function(stepdownOptions,
          * Blocking method, which tells the thread running continuousPrimaryStepdownFn to stop
          * and waits for it to terminate.
          *
-         * If waitForPrimary is true, blocks until a new primary has been elected.
+         * If waitForPrimary is true, blocks until a new primary has been elected and reestablishes
+         * all connections.
          */
         this.stopContinuousFailover = function({waitForPrimary: waitForPrimary = false} = {}) {
             if (!_stepdownThread.hasStarted()) {
@@ -292,6 +293,7 @@ ContinuousStepdown.configure = function(stepdownOptions,
 
             if (waitForPrimary) {
                 this.getPrimary();
+                this.nodes.forEach(node => reconnect(node));
             }
         };
     };
