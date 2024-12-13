@@ -24,14 +24,6 @@ if ssl_provider == "openssl":
 
 env.Benchmark(
     target="crypto_bm",
-    source=[
-        "crypto_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/server_base",
-        "fle_crypto",
-        "sha_block",
-    ],
-    CONSOLIDATED_TARGET="first_half_bm",
+    source=[],
+    LIBDEPS=[],
 )

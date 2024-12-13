@@ -57,16 +57,6 @@ if not has_option("noshell") and jsEngine != "none":
 
 env.CppUnitTest(
     target="shell_test",
-    source=[
-        "kms_test.cpp" if get_option("ssl") == "on" else [],
-        "shell_options_test.cpp",
-        "shell_utils_test.cpp",
-        "program_runner_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/signal_handlers",
-        "kms" if get_option("ssl") == "on" else [],
-        "shell_options_register",
-        "shell_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -200,6 +200,57 @@ mongo_cc_library(
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "rpc_integration_test",
+    srcs = [
+        "op_legacy_integration_test.cpp",
+        "op_msg_integration_test.cpp",
+    ],
+    deps = [
+        ":message",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rpc_test",
+    srcs = [
+        "get_status_from_command_result_test.cpp",
+        "metadata_test.cpp",
+        "object_check_test.cpp",
+        "op_msg_test.cpp",
+        "op_msg_test.h",
+        "reply_builder_test.cpp",
+        "rewrite_state_change_errors_test.cpp",
+        "//src/mongo/rpc/metadata:client_metadata_test.cpp",
+        "//src/mongo/rpc/metadata:egress_metadata_hook_list_test.cpp",
+        "//src/mongo/rpc/metadata:oplog_query_metadata_test.cpp",
+        "//src/mongo/rpc/metadata:repl_set_metadata_test.cpp",
+        "//src/mongo/rpc/metadata:security_token_metadata_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":client_metadata",
+        ":metadata",
+        ":rewrite_state_change_errors",
+        ":rpc",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/third_party/wiredtiger:wiredtiger_checksum",
     ],
 )
 

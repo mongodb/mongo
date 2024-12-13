@@ -18,16 +18,6 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="idl_parser_bm",
-    source=[
-        "idl_parser_bm.cpp",
-        "idl_parser_bm_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/query/query_request",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
-        "$BUILD_DIR/mongo/rpc/message",
-        "idl_parser",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

@@ -1,6 +1,6 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@poetry//:dependencies.bzl", "dependency")
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -517,4 +517,33 @@ mongo_cc_binary(
         "mongo_main",
         "//src/mongo/db:server_base",
     ],
+)
+
+# mongo_cc_unit_test does not support a select() in its deps field.
+# Wrap them in this intermediate library to complete linking.
+mongo_cc_library(
+    name = "shell_test_dependencies",
+    srcs = [],
+    deps = [
+        ":shell_options_register",
+        ":shell_utils",
+        "//src/mongo/util:signal_handlers",
+    ] + select({
+        "//bazel/config:ssl_enabled": [":kms"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "shell_test",
+    srcs = [
+        "program_runner_test.cpp",
+        "shell_options_test.cpp",
+        "shell_utils_test.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": ["kms_test.cpp"],
+        "//conditions:default": [],
+    }),
+    tags = ["mongo_unittest_third_group"],
+    deps = ["shell_test_dependencies"],
 )

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -451,5 +451,19 @@ mongo_cc_unit_test(
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/net:openssl_init",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "crypto_bm",
+    srcs = [
+        "crypto_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        ":fle_crypto",
+        ":sha_block",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:lock_manager",
     ],
 )

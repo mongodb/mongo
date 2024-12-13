@@ -7,15 +7,8 @@ env = env.Clone()
 
 env.Benchmark(
     target="oplog_entry_bm",
-    source=[
-        "oplog_entry_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "apply_ops_command_info",
-        "oplog_entry",
-    ],
-    CONSOLIDATED_TARGET="repl_bm",
+    source=[],
+    LIBDEPS=[],
 )
 
 if wiredtiger:
@@ -101,123 +94,30 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="oplog_application_bm",
-    source=[
-        "oplog_application_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/catalog/catalog_impl",
-        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
-        "$BUILD_DIR/mongo/db/op_observer/operation_logger_impl",
-        "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
-        "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
-        "$BUILD_DIR/mongo/db/storage/storage_control",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger",
-        "$BUILD_DIR/mongo/transport/session_manager",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "$BUILD_DIR/mongo/util/periodic_runner_factory",
-        "repl_coordinator_impl",
-        "repl_coordinator_interface",
-        "replication_consistency_markers_impl",
-        "replication_recovery",
-        "replmocks",
-        "storage_interface_impl",
-    ],
-    CONSOLIDATED_TARGET="repl_bm",
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="oplog_applier_utils_bm",
-    source=[
-        "oplog_applier_utils_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
-        "oplog_application",
-    ],
-    CONSOLIDATED_TARGET="repl_bm",
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="replication_consistency_markers_impl_bm",
-    source=[
-        "replication_consistency_markers_impl_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/auth_op_observer",
-        "$BUILD_DIR/mongo/db/auth/authserver",
-        "$BUILD_DIR/mongo/db/op_observer/change_stream_pre_images_op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/fallback_op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/fcv_op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/find_and_modify_images_op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
-        "$BUILD_DIR/mongo/db/op_observer/operation_logger_impl",
-        "$BUILD_DIR/mongo/db/op_observer/operation_logger_transaction_proxy",
-        "$BUILD_DIR/mongo/db/op_observer/user_write_block_mode_op_observer",
-        "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_op_observer",
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter_op_observer",
-        "primary_only_service",
-        "replication_consistency_markers_impl",
-        "replmocks",
-        "storage_interface_impl",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="oplog_write_bm",
-    source=[
-        "oplog_write_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/catalog/catalog_impl",
-        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
-        "$BUILD_DIR/mongo/db/op_observer/operation_logger_impl",
-        "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
-        "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
-        "$BUILD_DIR/mongo/db/storage/storage_control",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger",
-        "$BUILD_DIR/mongo/transport/session_manager",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "$BUILD_DIR/mongo/util/periodic_runner_factory",
-        "repl_coordinator_impl",
-        "repl_coordinator_interface",
-        "repl_server_parameters",
-        "replication_consistency_markers_impl",
-        "replication_recovery",
-        "replmocks",
-        "storage_interface_impl",
-    ],
-    CONSOLIDATED_TARGET="repl_bm",
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="replication_waiter_list_bm",
-    source=[
-        "replication_waiter_list_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "repl_coordinator_impl",
-        "repl_coordinator_test_fixture",
-    ],
-    CONSOLIDATED_TARGET="repl_bm",
+    source=[],
+    LIBDEPS=[],
 )

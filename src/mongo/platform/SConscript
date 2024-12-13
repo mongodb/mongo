@@ -16,11 +16,8 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="endian_bm",
-    source=[
-        "endian_bm.cpp",
-    ],
+    source=[],
     LIBDEPS=[],
-    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 if get_option("link-model") == "dynamic":
@@ -47,13 +44,6 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="rwmutex_bm",
-    source=[
-        "rwmutex_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/util/processinfo",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

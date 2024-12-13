@@ -6,28 +6,12 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="logv2_test",
-    source=[
-        "logv2_component_test.cpp",
-        "logv2_test.cpp",
-        "log_severity_suppressor_test.cpp",
-        "redaction_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/security_token",
-        "$BUILD_DIR/mongo/db/commands/core",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="logv2_bm",
-    source=[
-        "logv2_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-    CONSOLIDATED_TARGET="first_half_bm",
+    source=[],
+    LIBDEPS=[],
 )
