@@ -31,6 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/index_bounds.h"
 
 namespace mongo::ce {
 
@@ -52,6 +53,18 @@ public:
      */
     virtual std::vector<CardinalityEstimate> estimateCardinality(
         const std::vector<MatchExpression*>& expr) const = 0;
+
+    /**
+     * Estimates the number of keys scanned for the given IndexBounds.
+     */
+    virtual CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const = 0;
+
+    /**
+     * Estimates the number of RIDs matched the given IndexBounds. 'expr' can be nullptr to indicate
+     * only estimate the index bounds.
+     */
+    virtual CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
+                                             const MatchExpression* expr) const = 0;
 };
 
 }  // namespace mongo::ce

@@ -84,6 +84,23 @@ public:
     std::vector<CardinalityEstimate> estimateCardinality(
         const std::vector<MatchExpression*>& expr) const override;
 
+    /**
+     * Estimates the number of keys scanned for the given IndexBounds. This function extracts all
+     * index keys of a document in '_sample' and calculates the number of index keys scanned by
+     * evaluating the index keys against the given IndexBounds.
+     */
+    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override;
+
+    /**
+     * Estimate the number of RIDs which 'bounds' will return. Similar to 'estimateKeysScanned(..)',
+     * this function evaluates index keys against the IndexBounds to determine the document
+     * corresponding to that key matches the IndexBounds. If 'expr' is provided, the filter is
+     * evaluated against the documents whose keys fall into the index bounds. This is used to
+     * estimate a IndexScanNode with a residual filter.
+     */
+    CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
+                                     const MatchExpression* expr) const override;
+
     /*
      * Generates a sample using a random cursor. The caller can call this function to draw a sample
      * of 'sampleSize'. If it's a re-sample request, the old sample will be freed and replaced by
@@ -119,7 +136,48 @@ protected:
         return _collectionCard.cardinality().v();
     }
 
+    /*
+     * The sample size is calculated based on the confidence level and margin of error(MoE)
+     * required.  n = Z^2 / W^2
+     * where Z is the z-score for the confidence interval and
+     * W is the width of the confidence interval, W = 2 * MoE.
+     */
     static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError);
+
+    /**
+     * This helper generates all index keys from the given BSONObj for a hypothetical index on the
+     * fields referenced in 'bounds'. The keys will have empty field names.
+     */
+    static std::vector<BSONObj> getIndexKeys(const IndexBounds& bounds, const BSONObj& doc);
+
+    /**
+     * This helper checks if an element is within the given Interval.
+     */
+    static bool matches(const Interval& interval, BSONElement val);
+
+    /**
+     * This helper checks if an element is within any of the list of Interval.
+     */
+    static bool matches(const OrderedIntervalList& oil, BSONElement val);
+
+    /**
+     * This helper checks if an index key falls into the index bounds by checking each of the
+     * element/field in the index key.
+     */
+    bool doesKeyMatchBounds(const IndexBounds& bounds, const BSONObj& key) const;
+
+    /**
+     * This helper calculates the number of index keys fall into 'bounds'. 'skipDuplicateMatches' is
+     * used when the helper is used to check if a document matches the bounds.
+     */
+    size_t numberKeysMatch(const IndexBounds& bounds,
+                           const BSONObj& doc,
+                           bool skipDuplicateMatches = false) const;
+
+    /**
+     * This helper checks if a document matches the given bounds.
+     */
+    bool doesDocumentMatchBounds(const IndexBounds& bounds, const BSONObj& doc) const;
 
     // The sample is stored in memory for estimating the cardinality of all predicates of one query
     // request. The sample will be freed on destruction of the SamplingEstimator instance or when a

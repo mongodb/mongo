@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/sampling_estimator_impl.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -72,6 +73,14 @@ public:
         return SamplingEstimatorImpl::getCollCard();
     }
 
+    static bool matches(const OrderedIntervalList& oil, BSONElement val) {
+        return SamplingEstimatorImpl::matches(oil, val);
+    }
+
+    static std::vector<BSONObj> getIndexKeys(const IndexBounds& bounds, const BSONObj& doc) {
+        return SamplingEstimatorImpl::getIndexKeys(bounds, doc);
+    }
+
     // Help function to compute the margin of error for the given sample size. The z parameter
     // corresponds to the confidence %.
     double marginOfError(double z) {
@@ -86,7 +95,8 @@ public:
         double collCard = getCollCard();
 
         double minCard = std::max(card - moe * collCard, 0.0);
-        double maxCard = std::min(card + moe * collCard, collCard);
+        // maxCard could be greater than collCard if we're estimating the index keys scanned.
+        double maxCard = card + moe * collCard;
 
         CardinalityEstimate expectedEstimateMin(mongo::cost_based_ranker::CardinalityType{minCard},
                                                 mongo::cost_based_ranker::EstimationSource::Code);
@@ -141,7 +151,9 @@ public:
     std::vector<BSONObj> createDocuments(int num) {
         std::vector<BSONObj> docs;
         for (int i = 0; i < num; i++) {
-            BSONObj obj = BSON("_id" << i << "a" << i % 100 << "b" << i % 10);
+            BSONObj obj = BSON("_id" << i << "a" << i % 100 << "b" << i % 10 << "arr"
+                                     << BSON_ARRAY(10 << 20 << 30 << 40 << 50) << "nil" << BSONNULL
+                                     << "obj" << BSON("nil" << BSONNULL));
             docs.push_back(obj);
         }
         return docs;
@@ -425,6 +437,222 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
 
     for (size_t i = 0; i < estimates.size(); i++) {
         samplingEstimator.assertEstimateInConfidenceInterval(estimates[i], expectedSel[i] * card);
+    }
+}
+
+TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
+    const size_t card = 4000;
+    insertDocuments(kTestNss, createDocuments(card));
+    const size_t sampleSize = 400;
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        makeCardinalityEstimate(card));
+
+    // Test IndexBounds with single field.
+    OrderedIntervalList list("a");
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 10 << "" << 20), BoundInclusion::kIncludeEndKeyOnly));
+    IndexBounds boundsA;
+    boundsA.fields.push_back(list);
+    auto ce = samplingEstimator.estimateRIDs(boundsA, nullptr);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 0.2 * card);
+
+    // Test IndexBounds with multiple fields.
+    OrderedIntervalList listA("a");
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 10 << "" << 20), BoundInclusion::kIncludeEndKeyOnly));
+
+    OrderedIntervalList listB("b");
+    listB.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 5), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds boundsAB;
+    boundsAB.fields.push_back(listA);
+    boundsAB.fields.push_back(listB);
+    ce = samplingEstimator.estimateRIDs(boundsAB, nullptr);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 0.5 * 0.2 * card);
+
+    // Test "allValues" IndexBounds.
+    OrderedIntervalList listNil("nil");
+    listNil.intervals.push_back(IndexBoundsBuilder::allValues());
+    IndexBounds allValuesBounds;
+    allValuesBounds.fields.push_back(listNil);
+    ce = samplingEstimator.estimateRIDs(allValuesBounds, nullptr);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
+
+    // Test null value.
+    listNil.intervals.clear();
+    listNil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
+    IndexBounds nullPointBounds;
+    nullPointBounds.fields.push_back(listNil);
+    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
+
+    // Test missing dotted path field.
+    nullPointBounds.fields[0].name = "obj.missing";
+    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr);
+    // In terms of a non-sparse index, documents that have missing field are still indexed by a null
+    // key.
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
+
+    // Test dotted path field with null value.
+    nullPointBounds.fields[0].name = "obj.nil";
+    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
+}
+
+TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
+    const size_t card = 5000;
+    insertDocuments(kTestNss, createDocuments(card));
+    const size_t sampleSize = 500;
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        makeCardinalityEstimate(card));
+
+    // Test IndexBounds with single field.
+    OrderedIntervalList list("arr");
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 30), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds boundsA;
+    boundsA.fields.push_back(list);
+    auto ce = samplingEstimator.estimateKeysScanned(boundsA);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 3 * card);
+
+    // Test IndexBounds with multiple fields.
+    OrderedIntervalList listA("a");
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 10 << "" << 20), BoundInclusion::kIncludeEndKeyOnly));
+
+    OrderedIntervalList listArr("arr");
+    listArr.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 30), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds boundsAArr;
+    boundsAArr.fields.push_back(listA);
+    boundsAArr.fields.push_back(listArr);
+    ce = samplingEstimator.estimateKeysScanned(boundsAArr);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 3 * 0.2 * card);
+}
+
+TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression) {
+    const size_t card = 4000;
+    insertDocuments(kTestNss, createDocuments(card));
+    const size_t sampleSize = 400;
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        makeCardinalityEstimate(card));
+
+    auto operand1 = BSON("$lt" << 20);
+    LTMatchExpression lt("a"_sd, operand1["$lt"]);
+
+    OrderedIntervalList list("b");
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 5), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds boundsB;
+    boundsB.fields.push_back(list);
+
+    auto ce = samplingEstimator.estimateRIDs(boundsB, &lt);
+    samplingEstimator.assertEstimateInConfidenceInterval(ce, 0.5 * 0.2 * card);
+}
+
+TEST_F(SamplingEstimatorTest, MatchElementAgainstIntervals) {
+    OrderedIntervalList list("val");
+    // Test matching against one single interval.
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 5), BoundInclusion::kIncludeBothStartAndEndKeys));
+    ASSERT_FALSE(SamplingEstimatorForTesting::matches(list, BSON("val" << -1).firstElement()));
+    ASSERT_TRUE(SamplingEstimatorForTesting::matches(list, BSON("val" << 3).firstElement()));
+
+    // Test matching against multiple intervals.
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 6 << "" << 10), BoundInclusion::kIncludeStartKeyOnly));
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 10 << "" << 15), BoundInclusion::kIncludeEndKeyOnly));
+    ASSERT_FALSE(SamplingEstimatorForTesting::matches(list, BSON("val" << 10).firstElement()));
+    // Field names should not be compared.
+    ASSERT_TRUE(SamplingEstimatorForTesting::matches(list, BSON("other" << 15).firstElement()));
+
+    // Test empty and NULL field.
+    list.intervals.clear();
+    list.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
+    ASSERT_FALSE(SamplingEstimatorForTesting::matches(list,
+                                                      BSON("val"
+                                                           << "")
+                                                          .firstElement()));
+    ASSERT_TRUE(SamplingEstimatorForTesting::matches(list, BSON("val" << BSONNULL).firstElement()));
+
+    list.intervals.push_back(IndexBoundsBuilder::allValues());
+    ASSERT_TRUE(SamplingEstimatorForTesting::matches(list,
+                                                     BSON("val"
+                                                          << "")
+                                                         .firstElement()));
+}
+
+TEST_F(SamplingEstimatorTest, IndexKeysGenerationTest) {
+    IndexBounds bounds;
+    // The only interesting information of 'bound' is the field name.
+    bounds.fields.push_back(OrderedIntervalList("val"));
+    bounds.fields.push_back(OrderedIntervalList("val2"));
+
+    auto obj = BSON("val" << 5 << "val2"
+                          << "string");
+    auto indexKeys = SamplingEstimatorForTesting::getIndexKeys(bounds, obj);
+    ASSERT_EQUALS(indexKeys.size(), 1);
+    ASSERT_BSONOBJ_EQ(indexKeys[0],
+                      BSON("" << 5 << ""
+                              << "string"));
+
+    // Test multi-key key generation.
+    obj = BSON("val" << 5 << "val2" << BSON_ARRAY(10 << "str" << BSONNULL));
+    indexKeys = SamplingEstimatorForTesting::getIndexKeys(bounds, obj);
+    ASSERT_EQUALS(indexKeys.size(), 3);
+    // Note that the index keys generated are already sorted.
+    auto expectedKeys = std::vector<BSONObj>{BSON("" << 5 << "" << BSONNULL),
+                                             BSON("" << 5 << "" << 10),
+                                             BSON("" << 5 << ""
+                                                     << "str")};
+    for (size_t i = 0; i < indexKeys.size(); i++) {
+        ASSERT_BSONOBJ_EQ(indexKeys[i], expectedKeys[i]);
     }
 }
 }  // namespace mongo::ce

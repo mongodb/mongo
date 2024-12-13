@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
@@ -44,6 +45,10 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::ce {
+
+using CardinalityType = mongo::cost_based_ranker::CardinalityType;
+using EstimationSource = mongo::cost_based_ranker::EstimationSource;
+
 std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeCanonicalQuery(
     const NamespaceString& nss, OperationContext* opCtx, size_t sampleSize) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
@@ -81,12 +86,108 @@ double getZScore(SamplingConfidenceIntervalEnum confidenceInterval) {
 }
 }  // namespace
 
-/*
- * The sample size is calculated based on the confidence level and margin of error(MoE) required.
- * n = Z^2 / W^2
- * where Z is the z-score for the confidence interval and
- * W is the width of the confidence interval, W = 2 * MoE.
- */
+std::vector<BSONObj> SamplingEstimatorImpl::getIndexKeys(const IndexBounds& bounds,
+                                                         const BSONObj& doc) {
+    std::vector<const char*> fieldNames;
+    for (size_t i = 0; i < bounds.fields.size(); ++i) {
+        fieldNames.push_back(bounds.fields[i].name.c_str());
+    }
+    std::vector<BSONElement> keysElements{fieldNames.size(), BSONElement{}};
+
+    auto bTreeKeyGenerator =
+        std::make_unique<BtreeKeyGenerator>(fieldNames,
+                                            keysElements,
+                                            false /*isSparse*/,
+                                            key_string::Version::kLatestVersion,
+                                            Ordering::allAscending());
+
+    MultikeyPaths multikeyPaths;
+    SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
+    KeyStringSet keyStrings;
+
+    bTreeKeyGenerator->getKeys(pooledBufferBuilder,
+                               doc,
+                               false /*skipMultikey*/,
+                               &keyStrings,
+                               &multikeyPaths,
+                               nullptr /*collator*/,
+                               boost::none);
+
+    // This function converts an index key to a BSONObj in order to compare with the IndexBounds.
+    auto keyStringToBson = [](const key_string::Value& keyString) {
+        BSONObjBuilder bob;
+        auto keyStringObj = key_string::toBson(keyString, Ordering::make(BSONObj()));
+        for (auto&& keyStringElem : keyStringObj) {
+            bob.append(keyStringElem);
+        }
+        return bob.obj();
+    };
+
+    std::vector<BSONObj> indexKeys;
+    for (auto&& keyString : keyStrings) {
+        indexKeys.push_back(keyStringToBson(keyString));
+    }
+    return indexKeys;
+}
+
+bool SamplingEstimatorImpl::matches(const Interval& interval, BSONElement val) {
+    int startCmp = val.woCompare(interval.start, 0 /*ignoreFieldNames*/);
+    if (startCmp == 0) {
+        return interval.startInclusive;
+    } else if (startCmp < 0) {
+        return false;
+    }
+    int endCmp = val.woCompare(interval.end, 0 /*ignoreFieldNames*/);
+    if (endCmp == 0) {
+        return interval.endInclusive;
+    } else if (endCmp > 0) {
+        return false;
+    }
+    return true;
+}
+
+bool SamplingEstimatorImpl::matches(const OrderedIntervalList& oil, BSONElement val) {
+    for (auto&& interval : oil.intervals) {
+        if (matches(interval, val)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SamplingEstimatorImpl::doesKeyMatchBounds(const IndexBounds& bounds,
+                                               const BSONObj& key) const {
+    BSONObjIterator it(key);
+    for (auto&& oil : bounds.fields) {
+        if (!matches(oil, *it)) {
+            return false;
+        }
+        ++it;
+    }
+    return true;
+}
+
+size_t SamplingEstimatorImpl::numberKeysMatch(const IndexBounds& bounds,
+                                              const BSONObj& doc,
+                                              bool skipDuplicateMatches) const {
+    const auto keys = getIndexKeys(bounds, doc);
+    size_t count = 0;
+    for (auto&& key : keys) {
+        if (doesKeyMatchBounds(bounds, key)) {
+            count++;
+            if (skipDuplicateMatches) {
+                return count;
+            }
+        }
+    }
+    return count;
+}
+
+bool SamplingEstimatorImpl::doesDocumentMatchBounds(const IndexBounds& bounds,
+                                                    const BSONObj& doc) const {
+    return numberKeysMatch(bounds, doc, true /* skipDuplicateMatches */) > 0;
+}
+
 size_t SamplingEstimatorImpl::calculateSampleSize(SamplingConfidenceIntervalEnum ci,
                                                   double marginOfError) {
     uassert(9406301, "Margin of error should be larger than 0.", marginOfError > 0);
@@ -200,9 +301,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
         }
     }
     double estimate = (cnt * getCollCard()) / _sampleSize;
-    CardinalityEstimate ce(mongo::cost_based_ranker::CardinalityType{estimate},
-                           mongo::cost_based_ranker::EstimationSource::Sampling);
-    return ce;
+    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
 }
 
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
@@ -213,6 +312,33 @@ std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
     }
 
     return estimates;
+}
+
+CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds& bounds) const {
+    if (bounds.isSimpleRange) {
+        MONGO_UNIMPLEMENTED_TASSERT(9811500);
+    }
+    size_t count = 0;
+    for (auto&& doc : _sample) {
+        count += numberKeysMatch(bounds, doc);
+    }
+    double estimate = (count * getCollCard()) / _sampleSize;
+    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
+}
+
+CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bounds,
+                                                        const MatchExpression* expr) const {
+    size_t count = 0;
+    for (auto&& doc : _sample) {
+        if (doesDocumentMatchBounds(bounds, doc)) {
+            // If 'expr' is null, we are simply estimating the cardinality by IndexBounds.
+            if (expr == nullptr || expr->matchesBSON(doc, nullptr)) {
+                count++;
+            }
+        }
+    }
+    double estimate = (count * getCollCard()) / _sampleSize;
+    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
 }
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
