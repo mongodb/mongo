@@ -374,6 +374,7 @@ mongo_cc_library(
     hdrs = [
         "accumulation_statement.h",
         "accumulator_for_bucket_auto.h",
+        "accumulator_helpers.h",
         "accumulator_js_reduce.h",
         "accumulator_multi.h",
         "accumulator_percentile.h",

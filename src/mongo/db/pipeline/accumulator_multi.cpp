@@ -73,6 +73,52 @@ REGISTER_ACCUMULATOR(top, (AccumulatorTopBottomN<TopBottomSense::kTop, true>::pa
 REGISTER_ACCUMULATOR(bottom,
                      (AccumulatorTopBottomN<TopBottomSense::kBottom, true>::parseTopBottomN));
 
+namespace {
+
+template <typename AccumulatorState>
+Value evaluateAccumulatorN(const ExpressionFromAccumulatorN<AccumulatorState>& expr,
+                           const Document& root,
+                           Variables* variables) {
+    AccumulatorState accum(expr.getExpressionContext());
+
+    // Evaluate and initialize 'n'.
+    accum.startNewGroup(expr.getN()->evaluate(root, variables));
+
+    // Verify that '_output' produces an array and pass each element to 'process'.
+    auto output = expr.getOutput()->evaluate(root, variables);
+    uassert(5788200, "Input must be an array", output.isArray());
+    for (const auto& item : output.getArray()) {
+        accum.process(item, false);
+    }
+    return accum.getValue(false);
+}
+
+}  // namespace
+
+template <>
+Value ExpressionFromAccumulatorN<AccumulatorMinN>::evaluate(const Document& root,
+                                                            Variables* variables) const {
+    return evaluateAccumulatorN(*this, root, variables);
+}
+
+template <>
+Value ExpressionFromAccumulatorN<AccumulatorMaxN>::evaluate(const Document& root,
+                                                            Variables* variables) const {
+    return evaluateAccumulatorN(*this, root, variables);
+}
+
+template <>
+Value ExpressionFromAccumulatorN<AccumulatorFirstN>::evaluate(const Document& root,
+                                                              Variables* variables) const {
+    return evaluateAccumulatorN(*this, root, variables);
+}
+
+template <>
+Value ExpressionFromAccumulatorN<AccumulatorLastN>::evaluate(const Document& root,
+                                                             Variables* variables) const {
+    return evaluateAccumulatorN(*this, root, variables);
+}
+
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx, internalQueryTopNAccumulatorBytes.load()) {}
 

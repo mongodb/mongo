@@ -636,28 +636,7 @@ public:
         expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        AccumulatorState accum(this->getExpressionContext());
-        const auto n = this->_children.size();
-        // If a single array arg is given, loop through it passing each member to the accumulator.
-        // If a single, non-array arg is given, pass it directly to the accumulator.
-        if (n == 1) {
-            Value singleVal = this->_children[0]->evaluate(root, variables);
-            if (singleVal.getType() == Array) {
-                for (const Value& val : singleVal.getArray()) {
-                    accum.process(val, false);
-                }
-            } else {
-                accum.process(singleVal, false);
-            }
-        } else {
-            // If multiple arguments are given, pass all arguments to the accumulator.
-            for (auto&& argument : this->_children) {
-                accum.process(argument->evaluate(root, variables), false);
-            }
-        }
-        return accum.getValue(false);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     ExpressionNary::Associativity getAssociativity() const final {
         // Return false if a single argument is given to avoid a single array argument being treated
@@ -704,20 +683,7 @@ public:
         return Value(DOC(getOpName() << md.freeze()));
     }
 
-    Value evaluate(const Document& root, Variables* variables) const override {
-        AccumulatorN accum(this->getExpressionContext());
-
-        // Evaluate and initialize 'n'.
-        accum.startNewGroup(_n->evaluate(root, variables));
-
-        // Verify that '_output' produces an array and pass each element to 'process'.
-        auto output = _output->evaluate(root, variables);
-        uassert(5788200, "Input must be an array", output.isArray());
-        for (const auto& item : output.getArray()) {
-            accum.process(item, false);
-        }
-        return accum.getValue(false);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -727,6 +693,13 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getN() const {
+        return _n.get();
+    }
+
+    const Expression* getOutput() const {
+        return _output.get();
+    }
 
 private:
     boost::intrusive_ptr<Expression> _n;

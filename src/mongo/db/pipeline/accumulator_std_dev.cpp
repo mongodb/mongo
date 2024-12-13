@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_helpers.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
@@ -47,6 +48,18 @@
 
 namespace mongo {
 using boost::intrusive_ptr;
+
+template <>
+Value ExpressionFromAccumulator<AccumulatorStdDevPop>::evaluate(const Document& root,
+                                                                Variables* variables) const {
+    return evaluateAccumulator(*this, root, variables);
+}
+
+template <>
+Value ExpressionFromAccumulator<AccumulatorStdDevSamp>::evaluate(const Document& root,
+                                                                 Variables* variables) const {
+    return evaluateAccumulator(*this, root, variables);
+}
 
 REGISTER_ACCUMULATOR(stdDevPop, genericParseSingleExpressionAccumulator<AccumulatorStdDevPop>);
 REGISTER_ACCUMULATOR(stdDevSamp, genericParseSingleExpressionAccumulator<AccumulatorStdDevSamp>);

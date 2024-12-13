@@ -58,6 +58,66 @@ REGISTER_STABLE_EXPRESSION(percentile, AccumulatorPercentile::parseExpression);
 REGISTER_ACCUMULATOR(median, AccumulatorMedian::parseArgs);
 REGISTER_STABLE_EXPRESSION(median, AccumulatorMedian::parseExpression);
 
+namespace {
+
+template <typename TAccumulator>
+Value evaluateAccumulatorQuantile(const ExpressionFromAccumulatorQuantile<TAccumulator>& expr,
+                                  const Document& root,
+                                  Variables* variables) {
+    auto input = expr.getInput()->evaluate(root, variables);
+    if (input.numeric()) {
+        // On a scalar value, all percentiles are the same for all methods.
+        return TAccumulator::formatFinalValue(
+            expr.getPs().size(), std::vector<double>(expr.getPs().size(), input.coerceToDouble()));
+    }
+
+    if (input.isArray() && input.getArrayLength() > 0) {
+        if (expr.getMethod() != PercentileMethodEnum::kContinuous) {
+            // On small datasets, which are likely to be the inputs for the expression, creating
+            // t-digests is inefficient, so instead we use DiscretePercentile algo directly for
+            // both "discrete" and "approximate" methods.
+            std::vector<double> samples;
+            samples.reserve(input.getArrayLength());
+            for (const auto& item : input.getArray()) {
+                if (item.numeric()) {
+                    samples.push_back(item.coerceToDouble());
+                }
+            }
+            DiscretePercentile dp;
+            dp.incorporate(samples);
+            return TAccumulator::formatFinalValue(expr.getPs().size(),
+                                                  dp.computePercentiles(expr.getPs()));
+        } else {
+            // Delegate to the accumulator. Note: it would be more efficient to use the
+            // percentile algorithms directly rather than an accumulator, as it would reduce
+            // heap alloc, virtual calls and avoid unnecessary for expressions memory tracking.
+            // This path currently cannot be executed as we only support discrete percentiles.
+            TAccumulator accum(expr.getExpressionContext(), expr.getPs(), expr.getMethod());
+            for (const auto& item : input.getArray()) {
+                accum.process(item, false /* merging */);
+            }
+            return accum.getValue(false /* toBeMerged */);
+        }
+    }
+
+    // No numeric values have been found for the expression to process.
+    return TAccumulator::formatFinalValue(expr.getPs().size(), {});
+}
+
+}  // namespace
+
+template <>
+Value ExpressionFromAccumulatorQuantile<AccumulatorPercentile>::evaluate(
+    const Document& root, Variables* variables) const {
+    return evaluateAccumulatorQuantile(*this, root, variables);
+}
+
+template <>
+Value ExpressionFromAccumulatorQuantile<AccumulatorMedian>::evaluate(const Document& root,
+                                                                     Variables* variables) const {
+    return evaluateAccumulatorQuantile(*this, root, variables);
+}
+
 Status AccumulatorPercentile::validatePercentileMethod(StringData method) {
     if (feature_flags::gFeatureFlagAccuratePercentiles.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -117,7 +177,7 @@ std::vector<double> parseP(ExpressionContext* const expCtx,
             constExpr);
     Value pVals = constExpr->getValue();
 
-    auto msg =
+    constexpr StringData msg =
         "The $percentile 'p' field must be an array of numbers from [0.0, 1.0], but found: "_sd;
     if (!pVals.isArray() || pVals.getArrayLength() == 0) {
         uasserted(7750301, str::stream() << msg << pVals.toString());

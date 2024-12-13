@@ -73,45 +73,7 @@ public:
         return Value(DOC(getOpName() << md.freeze()));
     }
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        auto input = _input->evaluate(root, variables);
-        if (input.numeric()) {
-            // On a scalar value, all percentiles are the same for all methods.
-            return TAccumulator::formatFinalValue(
-                _ps.size(), std::vector<double>(_ps.size(), input.coerceToDouble()));
-        }
-
-        if (input.isArray() && input.getArrayLength() > 0) {
-            if (_method != PercentileMethodEnum::kContinuous) {
-                // On small datasets, which are likely to be the inputs for the expression, creating
-                // t-digests is inefficient, so instead we use DiscretePercentile algo directly for
-                // both "discrete" and "approximate" methods.
-                std::vector<double> samples;
-                samples.reserve(input.getArrayLength());
-                for (const auto& item : input.getArray()) {
-                    if (item.numeric()) {
-                        samples.push_back(item.coerceToDouble());
-                    }
-                }
-                DiscretePercentile dp;
-                dp.incorporate(samples);
-                return TAccumulator::formatFinalValue(_ps.size(), dp.computePercentiles(_ps));
-            } else {
-                // Delegate to the accumulator. Note: it would be more efficient to use the
-                // percentile algorithms directly rather than an accumulator, as it would reduce
-                // heap alloc, virtual calls and avoid unnecessary for expressions memory tracking.
-                // This path currently cannot be executed as we only support discrete percentiles.
-                TAccumulator accum(this->getExpressionContext(), _ps, _method);
-                for (const auto& item : input.getArray()) {
-                    accum.process(item, false /* merging */);
-                }
-                return accum.getValue(false /* toBeMerged */);
-            }
-        }
-
-        // No numeric values have been found for the expression to process.
-        return TAccumulator::formatFinalValue(_ps.size(), {});
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -121,6 +83,17 @@ public:
         return visitor->visit(this);
     }
 
+    const std::vector<double>& getPs() const {
+        return _ps;
+    }
+
+    const Expression* getInput() const {
+        return _input.get();
+    }
+
+    PercentileMethodEnum getMethod() const {
+        return _method;
+    }
 
 private:
     std::vector<double> _ps;
