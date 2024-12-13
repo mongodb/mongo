@@ -155,18 +155,6 @@ env.BazelProgram(
     target="mongotrafficreader",
     source=[],
     LIBDEPS=[],
-    AIB_COMPONENT="mongotrafficreader",
-    AIB_COMPONENTS_EXTRA=[
-        "core",
-        "default",
-        "devcore",
-        "dist",
-        "dist-test",
-        "integration-tests",
-        "serverless",
-        "serverless-test",
-        "servers",
-    ],
 )
 
 if env.TargetOSIs("windows"):
