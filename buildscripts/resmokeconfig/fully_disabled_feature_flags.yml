@@ -16,4 +16,3 @@
 - featureFlagSearchInSbe
 - featureFlagEgressGrpcForSearch
 - featureFlagTrackUnshardedCollectionsUponCreation
-- featureFlagDualCatalogCache
