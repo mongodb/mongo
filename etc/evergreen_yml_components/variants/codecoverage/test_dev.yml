@@ -102,6 +102,8 @@ buildvariants:
         distros:
           - rhel93-large
       - name: bazel_coverage
+        distros:
+          - rhel93-large
       # jstests
       - name: jsCore
       - name: fle2

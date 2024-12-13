@@ -1133,13 +1133,13 @@ tasks:
           # It might be optimized by doing a query upfront, which uses minimal analysis:
           #   targets=$(bazel query 'kind(".*_test", //src/...)')
           #   bazel test $targets
-          # TODO(SERVER-97069): Change to //src/... when unit tests are compatible with bazel sandboxing
           target: >-
-            //src/mongo/platform:visibility1_test
+            //src/mongo/...
           args: >-
             --test_output=all
             --config=local
             --combined_report=lcov
+            --build_tag_filters=mongo_unittest
 
   - name: monitor_build_status
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
