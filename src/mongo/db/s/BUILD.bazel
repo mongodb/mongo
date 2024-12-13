@@ -353,6 +353,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "remove_shard_commit_coordinator_document_gen",
+    src = "remove_shard_commit_coordinator_document.idl",
+    deps = [
+        ":sharding_ddl_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "reshard_collection_coordinator_document_gen",
     src = "reshard_collection_coordinator_document.idl",
     deps = [
@@ -1118,6 +1127,8 @@ mongo_cc_library(
         "refine_collection_shard_key_coordinator.cpp",
         "refine_collection_shard_key_coordinator_document_gen",
         "refresh_query_analyzer_configuration_cmd.cpp",
+        "remove_shard_commit_coordinator.cpp",
+        "remove_shard_commit_coordinator_document_gen",
         "rename_collection_coordinator.cpp",
         "rename_collection_participant_service.cpp",
         "reshard_collection_coordinator.cpp",
@@ -1262,6 +1273,7 @@ mongo_cc_library(
         "drop_database_coordinator.h",
         "move_primary_coordinator.h",
         "refine_collection_shard_key_coordinator.h",
+        "remove_shard_commit_coordinator.h",
         "rename_collection_coordinator.h",
         "rename_collection_participant_service.h",
         "reshard_collection_coordinator.h",

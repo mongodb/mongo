@@ -61,6 +61,7 @@
 #include "mongo/db/s/move_primary_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
+#include "mongo/db/s/remove_shard_commit_coordinator.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
@@ -125,6 +126,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
                 service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateDatabase:
             return std::make_shared<CreateDatabaseCoordinator>(service, std::move(initialState));
+        case DDLCoordinatorTypeEnum::kRemoveShardCommit:
+            return std::make_shared<RemoveShardCommitCoordinator>(service, std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

@@ -60,6 +60,7 @@ enums:
             kConvertToCapped: "convertToCapped"
             kUntrackUnsplittableCollection: "untrackUnsplittableCollection"
             kCreateDatabase: "createDatabase"
+            kRemoveShardCommit: "removeShardCommit"
 
 types:
     ForwardableOperationMetadata:
