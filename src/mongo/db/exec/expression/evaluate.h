@@ -191,5 +191,10 @@ Value evaluate(const ExpressionType& expr, const Document& root, Variables* vari
 Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionLet& expr, const Document& root, Variables* variables);
 
+Value evaluate(const ExpressionToHashedIndexKey& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalKeyStringValue& expr,
+               const Document& root,
+               Variables* variables);
+
 }  // namespace exec::expression
 }  // namespace mongo

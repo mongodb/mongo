@@ -65,13 +65,11 @@
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/hasher.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_parser_gen.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -6054,13 +6052,7 @@ boost::intrusive_ptr<Expression> ExpressionToHashedIndexKey::parse(ExpressionCon
 }
 
 Value ExpressionToHashedIndexKey::evaluate(const Document& root, Variables* variables) const {
-    Value inpVal(_children[0]->evaluate(root, variables));
-    if (inpVal.missing()) {
-        inpVal = Value(BSONNULL);
-    }
-
-    return Value(BSONElementHasher::hash64(BSON("" << inpVal).firstElement(),
-                                           BSONElementHasher::DEFAULT_HASH_SEED));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 Value ExpressionToHashedIndexKey::serialize(const SerializationOptions& options) const {
@@ -6700,38 +6692,7 @@ Value ExpressionInternalKeyStringValue::serialize(const SerializationOptions& op
 }
 
 Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables* variables) const {
-    const Value input = _children[_kInput]->evaluate(root, variables);
-    auto inputBson = input.wrap("");
-
-    std::unique_ptr<CollatorInterface> collator = nullptr;
-    if (_children[_kCollation]) {
-        const Value collation = _children[_kCollation]->evaluate(root, variables);
-        uassert(8281503,
-                str::stream() << "Collation spec must be an object, not "
-                              << typeName(collation.getType()),
-                collation.isObject());
-        auto collationBson = collation.getDocument().toBson();
-
-        auto collatorFactory = CollatorFactoryInterface::get(
-            getExpressionContext()->getOperationContext()->getServiceContext());
-        collator = uassertStatusOKWithContext(collatorFactory->makeFromBSON(collationBson),
-                                              "Invalid collation spec");
-    }
-
-    key_string::HeapBuilder ksBuilder(key_string::Version::V1);
-    if (collator) {
-        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](StringData str) {
-            return collator->getComparisonString(str);
-        });
-    } else {
-        ksBuilder.appendBSONElement(inputBson.firstElement());
-    }
-    auto ksValue = ksBuilder.release();
-
-    // The result omits the typebits so that the numeric value of different types have the same
-    // binary representation.
-    return Value(
-        BSONBinData{ksValue.getBuffer(), static_cast<int>(ksValue.getSize()), BinDataGeneral});
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 /* --------------------------------- Parenthesis --------------------------------------------- */

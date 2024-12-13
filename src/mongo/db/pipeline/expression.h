@@ -4766,6 +4766,14 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getCollation() const {
+        return _children[_kCollation].get();
+    }
+
 private:
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kCollation = 1;
