@@ -80,6 +80,7 @@ class GenerateFuzzConfig(Subcommand):
         user_param = utils.dump_yaml({})
         set_parameters = mongo_fuzzer_configs.fuzz_mongos_set_parameters(self._seed, user_param)
         set_parameters = utils.load_yaml(set_parameters)
+        set_parameters["enableTestCommands"] = True
         conf = {"setParameter": set_parameters}
         if self._template_path is not None:
             try:
