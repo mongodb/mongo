@@ -257,8 +257,22 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     // Cost and cardinality of the stage.
     if (querySolutionNode && estimates.contains(querySolutionNode)) {
         const auto& est = estimates.at(querySolutionNode);
-        bob->append("cardinalityEstimate", est.outCE.toDouble());
         bob->append("costEstimate", est.cost.toDouble());
+        bob->append("cardinalityEstimate", est.outCE.toDouble());
+        // 'filterCE' is only distinct from 'outCE' for index scans, so we should only print in that
+        // case to avoid showing redundant information and confusing explain readers.
+        if (est.filterCE.has_value() && querySolutionNode->getType() == STAGE_IXSCAN) {
+            bob->append("filterNumKeysEstimate", est.filterCE->toDouble());
+        }
+        // Display 'inCE' as 'numKeys' for index scan and 'numDocs' for collection scan.
+        if (est.inCE.has_value()) {
+            double ce = est.inCE->toDouble();
+            if (querySolutionNode->getType() == STAGE_IXSCAN) {
+                bob->append("numKeysEstimate", ce);
+            } else {
+                bob->append("numDocsEstimate", ce);
+            }
+        }
         BSONObjBuilder metadataBob(bob->subobjStart("estimatesMetadata"));
         metadataBob.append("ceSource", toStringData(est.outCE.source()));
         metadataBob.done();

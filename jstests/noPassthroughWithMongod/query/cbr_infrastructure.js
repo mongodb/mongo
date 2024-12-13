@@ -97,12 +97,17 @@ const q5 = {
 };
 
 function assertCbrExplain(plan) {
-    assert(plan.hasOwnProperty("cardinalityEstimate"));
-    assert.gt(plan.cardinalityEstimate, 0);
-    assert(plan.hasOwnProperty("costEstimate"));
-    assert.gt(plan.costEstimate, 0);
+    assert(plan.hasOwnProperty("cardinalityEstimate"), plan);
+    assert.gt(plan.cardinalityEstimate, 0, plan);
+    assert(plan.hasOwnProperty("costEstimate"), plan);
+    assert.gt(plan.costEstimate, 0, plan);
     if (plan.hasOwnProperty("inputStage")) {
         assertCbrExplain(plan.inputStage);
+    } else if (plan.hasOwnProperty("inputStages")) {
+        plan.inputStages.forEach(p => assertCbrExplain(p));
+    } else {
+        assert(plan.hasOwnProperty("numKeysEstimate") || plan.hasOwnProperty("numDocsEstimate"),
+               plan);
     }
 }
 
@@ -147,6 +152,7 @@ function verifyCollectionCardinalityEstimate() {
     const e1 = coll.find({}).explain();
     const w1 = getWinningPlanFromExplain(e1);
     assert(isCollscan(db, w1));
+    assertCbrExplain(w1);
     assert.eq(w1.cardinalityEstimate, card);
 }
 
@@ -157,7 +163,30 @@ function verifyHeuristicEstimateSource() {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
     const e1 = coll.find({a: 1}).explain();
     const w1 = getWinningPlanFromExplain(e1);
+    assertCbrExplain(w1);
     assert.eq(w1.estimatesMetadata.ceSource, "Heuristics", w1);
+}
+
+function verifyIndexScanEstimates() {
+    coll.drop();
+    assert.commandWorked(coll.insert({a: 1}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
+    // This query produces an index scan with a filter and thus show have a 'filterNumKeysEstimate'
+    // field.
+    const e1 = coll.find({a: {$mod: [5, 0]}}).explain();
+    const w1 = getWinningPlanFromExplain(e1);
+    assertCbrExplain(w1);
+    assert(w1.inputStage.hasOwnProperty("filter"), w1);
+    assert(w1.inputStage.hasOwnProperty("filterNumKeysEstimate"), w1);
+
+    // This query produces an index scan without a filter and shouldn't have a
+    // 'filterNumKeysEstimate' field.
+    const e2 = coll.find({a: {$gt: 5}}).explain();
+    const w2 = getWinningPlanFromExplain(e2);
+    assertCbrExplain(w2);
+    assert(!w2.inputStage.hasOwnProperty("filter"), w2);
+    assert(!w2.inputStage.hasOwnProperty("filterNumKeysEstimate"), w2);
 }
 
 try {
@@ -186,6 +215,7 @@ try {
 
     verifyCollectionCardinalityEstimate();
     verifyHeuristicEstimateSource();
+    verifyIndexScanEstimates();
 
     /**
      * Test strict and automatic CE modes.
