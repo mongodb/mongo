@@ -5,7 +5,6 @@ load(
     "mongo_cc_grpc_library",
     "mongo_cc_library",
     "mongo_cc_proto_library",
-    "mongo_cc_unit_test",
     "mongo_proto_library",
 )
 
@@ -185,47 +184,44 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_unit_test(
-    name = "grpc_transport_layer_test",
-    srcs = [
-        "channel_pool_test.cpp",
-        "client_cache_test.cpp",
-        "grpc_client_test.cpp",
-        "grpc_session_test.cpp",
-        "grpc_transport_layer_test.cpp",
-        "mock_client_test.cpp",
-        "mock_server_stream_test.cpp",
-        "mock_stub_test.cpp",
-        "reactor_test.cpp",
-        "server_test.cpp",
-        "service_test.cpp",
-        "//src/mongo/transport:reactor_test_fixture.h",
-        "//src/mongo/transport:session_workflow_test_util.h",
-        "//src/mongo/transport:transport_layer_manager_grpc_test.cpp",
-    ],
-    tags = ["mongo_unittest_first_group"],
-    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
-    deps = [
-        ":grpc_transport_layer",
-        ":grpc_transport_mock",
-        "//src/mongo:base",
-        "//src/mongo/db:service_context_non_d",
-        "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db:wire_version",
-        "//src/mongo/rpc:message",
-        "//src/mongo/transport:service_executor",
-        "//src/mongo/transport:session_manager",
-        "//src/mongo/transport:transport_layer",
-        "//src/mongo/transport:transport_layer_common",
-        "//src/mongo/transport:transport_layer_manager",
-        "//src/mongo/transport:transport_layer_mock",
-        "//src/mongo/util:clock_source_mock",
-        "//src/mongo/util:periodic_runner_factory",
-        "//src/third_party/grpc:grpc++_reflection",
-        "//src/third_party/protobuf",
-    ],
-)
+# Note: These are not fully migrateable yet, but we'll leave them for future
+# reference in case you're working on grpc-related issues.
 
+# mongo_cc_binary(
+#     name = "grpc_transport_layer_test",
+#     srcs = [
+#         "channel_pool_test.cpp",
+#         "client_cache_test.cpp",
+#         "grpc_client_test.cpp",
+#         "grpc_session_test.cpp",
+#         "grpc_transport_layer_test.cpp",
+#         "mock_client_test.cpp",
+#         "mock_server_stream_test.cpp",
+#         "mock_stub_test.cpp",
+#         "server_test.cpp",
+#         "service_test.cpp",
+#         "//src/mongo/transport:mock_session.h",
+#         "//src/mongo/transport:session_workflow_test_util.h",
+#     ],
+#     deps = [
+#         "//src/mongo:base",
+#         "//src/mongo/db:service_context_non_d",
+#         "//src/mongo/db:service_context_test_fixture",
+#         "//src/mongo/db:wire_version",
+#         "//src/mongo/rpc:message",
+#         "//src/mongo/transport:service_executor",
+#         "//src/mongo/util:clock_source_mock",
+#         "//src/mongo/util:periodic_runner_factory",
+#         "//src/third_party/grpc:grpc++_reflection",
+#         ":grpc_transport_layer",
+#         ":grpc_transport_mock",
+#
+#         # extra
+#         "//src/mongo/unittest",
+#         "//src/mongo/unittest:unittest_main",
+#     ],
+# )
+#
 # cc_test(
 #     name = "grpc_core_test",
 #     srcs = [

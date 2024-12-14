@@ -256,39 +256,23 @@ mongo_cc_unit_test(
     ],
 )
 
-mongo_cc_unit_test(
-    name = "scripting_mozjs_test",
-    srcs = [
-        "//src/mongo/scripting/mozjs:asan_handles_test.cpp",
-        "//src/mongo/scripting/mozjs:module_loader_test.cpp",
-    ],
-    copts = select({
-        "@platforms//os:windows": [
-            # See the /Zc:preprocessor comment in third_party/mozjs/SConscript
-            "/Zc:preprocessor",
-            "/wd5104",
-            "/wd5105",
-        ],
-        "//conditions:default": [
-            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
-            "-Wno-unknown-warning-option",
-            "-Wno-class-memaccess",
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
-            #                     after Mozjs Update.
-            "-Wno-deprecated",
-        ],
-    }),
-    local_defines = select({
-        "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
-        "//conditions:default": [],
-    }),
-    tags = ["mongo_unittest_fourth_group"],
-    target_compatible_with = select({
-        "//bazel/config:js_engine_mozjs": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        ":bson_template_evaluator",
-        ":scripting",
-    ],
-)
+# Note: These are not fully migrateable yet, but we'll leave them for future
+# reference in case you're working on scripting-related issues.
+
+#mongo_cc_test(
+#    name = "scripting_mozjs_test",
+#    srcs = [
+#        "//src/mongo/scripting/mozjs:asan_handles_test.cpp",
+#        "//src/mongo/scripting/mozjs:module_loader_test.cpp",
+#    ],
+#    target_compatible_with = select({
+#        "//bazel/config:js_engine_mozjs": [],
+#        "//conditions:default": ["@platforms//:incompatible"],
+#    }),
+#    deps = [
+#        ":bson_template_evaluator",
+#        ":scripting",
+#        "//src/mongo/unittest",
+#        "//src/mongo/unittest:unittest_main",
+#    ],
+#)
