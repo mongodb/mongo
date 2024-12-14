@@ -1,53 +1,12 @@
 # -*- mode: python -*-
 
-Import(
-    [
-        "env",
-        "get_option",
-        "jsEngine",
-        "serverJs",
-    ]
-)
+Import("env", "jsEngine")
 
 if jsEngine:
-    scriptingEnv = env.Clone()
-
-    scriptingEnv.Append(
-        CXXFLAGS=[
-            # See the /Zc:preprocessor comment in third_party/mozjs/SConscript
-            "/Zc:preprocessor",
-            "/wd5104",
-            "/wd5105",
-        ]
-        if scriptingEnv.TargetOSIs("windows")
-        else [
-            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
-            "-Wno-unknown-warning-option",
-            "-Wno-class-memaccess",
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
-            #                     after Mozjs Update.
-            "-Wno-deprecated",
-        ],
-    )
-    scriptingEnv.InjectMozJS()
-
-    if get_option("spider-monkey-dbg") == "on":
-        scriptingEnv.Prepend(
-            CPPDEFINES=[
-                "MONGO_SPIDERMONKEY_DBG",
-            ]
-        )
-
-    scriptingEnv.CppUnitTest(
+    env.CppUnitTest(
         target="scripting_mozjs_test",
-        source=[
-            "mozjs/asan_handles_test.cpp",
-            "mozjs/module_loader_test.cpp",
-        ],
-        LIBDEPS=[
-            "bson_template_evaluator",
-            "scripting",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
 env.CppUnitTest(
