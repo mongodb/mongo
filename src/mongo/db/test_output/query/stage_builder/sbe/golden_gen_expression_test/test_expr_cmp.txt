@@ -1,0 +1,56 @@
+# Golden test output of GoldenGenExpressionTest/TestExprCmp
+ExpressionCompareEQ
+
+    let [
+        l2.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l2.0) == 0) ?: (exists(l2.0) && typeMatch(l2.0, -65))) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprCmp
+ExpressionCompareNE
+
+    let [
+        l4.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l4.0) != 0) ?: (true != (exists(l4.0) && typeMatch(l4.0, -65)))) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprCmp
+ExpressionCompareGT
+
+    let [
+        l6.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l6.0) > 0) ?: (true > (exists(l6.0) && typeMatch(l6.0, -65)))) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprCmp
+ExpressionCompareGTE
+
+    let [
+        l8.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l8.0) >= 0) ?: (true >= (exists(l8.0) && typeMatch(l8.0, -65)))) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprCmp
+ExpressionCompareLT
+
+    let [
+        l10.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l10.0) < 0) ?: (true < (exists(l10.0) && typeMatch(l10.0, -65)))) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprCmp
+ExpressionCompareLTE
+
+    let [
+        l12.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l12.0) <= 0) ?: (true <= (exists(l12.0) && typeMatch(l12.0, -65)))) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprCmp
+ExpressionCompareCMP
+
+    let [
+        l14.0 = getField(s1, "bar") 
+    ] 
+    in ((9.25L <=> l14.0) ?: (true <=> (exists(l14.0) && typeMatch(l14.0, -65)))) 
+

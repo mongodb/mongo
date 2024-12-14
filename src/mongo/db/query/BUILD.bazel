@@ -804,6 +804,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/stage_builder/sbe/tests:and_sorted_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:expression_const_eval_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:gen_accumulator_test.cpp",
+        "//src/mongo/db/query/stage_builder/sbe/tests:gen_expression_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:gen_lookup_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:gen_window_function_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test.cpp",
