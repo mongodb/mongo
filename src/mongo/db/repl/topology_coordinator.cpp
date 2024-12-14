@@ -380,20 +380,46 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
                        "Sync source candidate is eligible",
                        "syncSourceCandidate"_attr = syncSourceCandidate);
 
-            // Do not update 'closestIndex' if the candidate is not the closest node we've seen.
-            auto syncSourceCandidatePing = _getPing(syncSourceCandidate);
-            auto closestPing = _getPing(closestNode);
-            if (syncSourceCandidatePing > closestPing) {
-                LOGV2_INFO(3873114,
-                           "Cannot select sync source with higher latency than the best "
-                           "candidate",
+            // If the difference between the closest ping and candidate ping is within the
+            // changeSyncSourceThreshold, then we consider them to be within the same data center.
+            auto syncSourceCandidatePing =
+                durationCount<Milliseconds>(_getPing(syncSourceCandidate));
+            auto closestPing = durationCount<Milliseconds>(_getPing(closestNode));
+            const auto isWithinPingThreshold = abs(syncSourceCandidatePing - closestPing) <=
+                changeSyncSourceThresholdMillis.load();
+
+            // We want to choose the closest node sync source, with preference for the primary.
+            // So if the two nodes are in the same data center and one of them is the current
+            // primary, we will choose the primary. Otherwise, we choose the closest node.
+            const auto closerCandidate =
+                (syncSourceCandidatePing > closestPing) ? closestIndex : candidateIndex;
+            const auto isAnyCandidatePrimary = _memberData[closestIndex].getState().primary() ||
+                _memberData[candidateIndex].getState().primary();
+
+            // Nodes are within the same data center and one of them is the current primary.
+            // Choose the primary.
+            if (isWithinPingThreshold && isAnyCandidatePrimary) {
+                LOGV2_INFO(9649500,
+                           "Candidate sync source pings are within a threshold, indicating they "
+                           "are in the same data center. Prefer to select primary as sync source",
                            "syncSourceCandidate"_attr = syncSourceCandidate,
                            "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
                            "closestNode"_attr = closestNode,
-                           "closestPing"_attr = closestPing);
+                           "closestPing"_attr = closestPing,
+                           "selectedNode"_attr = _currentPrimaryIndex);
+                closestIndex = _currentPrimaryIndex;
                 continue;
             }
-            closestIndex = candidateIndex;
+            // Nodes are not within the same data center or neither of them is the current primary.
+            // Choose the closer node.
+            LOGV2_INFO(9649501,
+                       "Select sync source with lowest latency",
+                       "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
+                       "closestNode"_attr = closestNode,
+                       "closestPing"_attr = closestPing,
+                       "selectedNode"_attr = closerCandidate);
+            closestIndex = closerCandidate;
         }
         if (closestIndex != -1)
             break;  // no need for second attempt
