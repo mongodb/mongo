@@ -86,7 +86,7 @@ def generate_test_execution_aliases(env, test):
         with open(os.path.join(env.Dir("#").abspath, sources_list)) as f:
             for s in f.readlines():
                 if s.strip().endswith(".cpp"):
-                    sources.append(env.File(s.strip()))
+                    sources.append(env.File(s.strip().replace("//", "#").replace(":", "/")))
     except KeyError:
         sources = test.sources
 
