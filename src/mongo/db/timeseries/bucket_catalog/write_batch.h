@@ -80,12 +80,8 @@ struct Sizes {
 /**
  * The basic unit of work for a bucket. Each insert will return a shared_ptr to a WriteBatch.
  * When a writer is finished with all their insertions, they should then take steps to ensure
- * each batch they wrote into is committed. To ensure a batch is committed, a writer should
- * first attempt to claimWriteBatchCommitRights(). If successful, the writer can proceed to commit
- * (or abort) the batch via BucketCatalog::prepareCommit and BucketCatalog::finish. If unsuccessful,
- * it means another writer is in the process of committing. The writer can proceed to do other
- * work (like commit another batch), and when they have no other work to do, they can wait for
- * this batch to be committed by executing the blocking operation getWriteBatchResult().
+ * each batch they wrote into is committed. A writer commits (or aborts) the batch via
+ * BucketCatalog::prepareCommit and BucketCatalog::finish.
  *
  * The order of members of this struct have been optimized for memory alignment, and therefore
  * a low memory footprint. Take extra care if modifying the order or adding or removing fields.
@@ -116,8 +112,6 @@ struct WriteBatch {
     bool openedDueToMetadata =
         false;  // If true, bucket has been opened due to the inserted measurement having different
     // metadata than available buckets.
-
-    AtomicWord<bool> commitRights{false};
 
     const OperationId opId;
 
@@ -171,13 +165,6 @@ void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc);
  * Returns whether the batch has already been committed or aborted.
  */
 bool isWriteBatchFinished(const WriteBatch& batch);
-
-/**
- * Attempts to claim the right to commit a batch. If it returns true, rights are
- * granted. If it returns false, rights are revoked, and the caller should get the result
- * of the batch with getWriteBatchResult(). Non-blocking.
- */
-bool claimWriteBatchCommitRights(WriteBatch& batch);
 
 /**
  * Retrieves the result of the write batch commit. Should be called by any interested party

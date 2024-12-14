@@ -51,6 +51,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/unordered_set.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -655,10 +656,7 @@ void rebuildOptionsWithGranularityFromConfigServer(OperationContext* opCtx,
     }
 }
 
-// Waits for all batches to either commit or abort. This function will attempt to acquire commit
-// rights to any batch to mark it as aborted. If another thread alreay have commit rights we will
-// instead wait for the promise when the commit is either successful or failed. Marked as 'noexcept'
-// as we need to safely be able to call this function during exception handling.
+// Gets commit or error results from processed batches. Aborts unprocessed batches upon errors.
 template <typename ErrorGenerator>
 void getTimeseriesBatchResultsBase(OperationContext* opCtx,
                                    const TimeseriesBatches& batches,
@@ -674,6 +672,7 @@ void getTimeseriesBatchResultsBase(OperationContext* opCtx,
         lastError = errors->back();
     }
     invariant(indexOfLastProcessedBatch == (int64_t)batches.size() || lastError);
+    stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
 
     for (int64_t itr = 0, size = batches.size(); itr < size; ++itr) {
         const auto& [batch, index] = batches[itr];
@@ -683,12 +682,12 @@ void getTimeseriesBatchResultsBase(OperationContext* opCtx,
 
         // If there are any unprocessed batches, we mark them as error with the last known
         // error.
-        if (itr > indexOfLastProcessedBatch &&
-            bucket_catalog::claimWriteBatchCommitRights(*batch)) {
+        if (itr > indexOfLastProcessedBatch && !processedBatches.contains(batch.get())) {
             auto& bucketCatalog =
                 bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
             abort(bucketCatalog, batch, lastError->getStatus());
             errors->emplace_back(start + index, lastError->getStatus());
+            processedBatches.insert(batch.get());
             continue;
         }
 
@@ -978,9 +977,11 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
 
     UUID collectionUUID = *optUuid;
     size_t itr = 0;
+    stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
     for (; itr < batches.size(); ++itr) {
         auto& [batch, index] = batches[itr];
-        if (bucket_catalog::claimWriteBatchCommitRights(*batch)) {
+        if (!processedBatches.contains(batch.get())) {
+            processedBatches.insert(batch.get());
             auto stmtIds = isTimeseriesWriteRetryable(opCtx) ? std::move(bucketStmtIds[batch.get()])
                                                              : std::vector<StmtId>{};
             try {

@@ -52,6 +52,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo::timeseries {
 
@@ -114,12 +115,14 @@ StatusWith<timeseries::bucket_catalog::InsertResult> attemptInsertIntoBucket(
 template <typename T, typename Fn>
 std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
 determineBatchesToCommit(T& batches, Fn&& extractElem) {
+    stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
     std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
         batchesToCommit;
     for (auto& elem : batches) {
         std::shared_ptr<timeseries::bucket_catalog::WriteBatch>& batch = extractElem(elem);
-        if (timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch)) {
+        if (!processedBatches.contains(batch.get())) {
             batchesToCommit.push_back(batch);
+            processedBatches.insert(batch.get());
         }
     }
 
