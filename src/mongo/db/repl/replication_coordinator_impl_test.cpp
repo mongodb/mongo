@@ -8685,7 +8685,7 @@ TEST_F(ReplCoordTest, ShouldChooseNearestNodeAsSyncSourceWhenSecondaryAndChainin
     hbResp.setDurableOpTimeAndWallTime({lastAppliedOpTime, now});
 
     // Set the primary's ping to be longer than the other secondary's ping.
-    const auto primaryPing = Milliseconds(15);
+    const auto primaryPing = Milliseconds(10);
     const auto nearestNodePing = Milliseconds(5);
 
     // We must send two heartbeats per node, so that we satisfy the 2N requirement before choosing a
