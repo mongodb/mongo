@@ -107,22 +107,20 @@ modules:
 ###
 # Same in every DSI project
 pre:
-  - func: "f_other_pre_ops"
   - func: "f_dsi_pre_run"
 post:
   - func: "f_dsi_post_run"
-  - func: "f_other_post_ops"
+  - func: "f_pgo_post_ops"
 timeout:
   - func: "f_dsi_timeout"
-  - func: "f_other_timeout"
 ###
 
 functions:
-  f_other_post_ops:
+  f_pgo_post_ops:
     - command: shell.exec
       params:
         script: |
-          cp ./build/Artifacts/DSIArtifacts/WorkloadOutput/reports/ycsb_100read/mongod.0/pre_post_task_output/default.profdata.tgz ./default.profdata.tgz || true
+          cp ./build/Artifacts/DSIArtifacts/WorkloadOutput/reports/ycsb_100read/mongod.0/pre_post_task_output/default.profdata.tgz ./default.profdata.tgz 2>/dev/null || true
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -133,29 +131,7 @@ functions:
         permissions: public-read
         content_type: application/x-gzip
         display_name: PGO profile data - Execution ${execution}
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          # removes files from the (local) scons cache when it's over a
-          # threshold, to the $prune_ratio percentage. Ideally override
-          # these default values in the distro config in evergreen.
-
-          if [ -d "${scons_cache_path}" ]; then
-              /opt/mongodbtoolchain/v4/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
-          fi
-  f_other_pre_ops:
-    - command: shell.exec
-      params:
-        silent: true
-        script: |
-          for PS in mongo{,d,s,import,export,dump,restore,stat,files,top,bridge} resmoke.py python{,2} lldb _test; do
-              pkill -9 "$PS"
-          done
-  f_other_timeout:
-    # Can't be empty so just `echo`.
-    - command: shell.exec
-      params: {script: "echo"}
+        optional: true
 
   ###
   # Package the supplementary DSI data (mongo tools, feature flag list,
