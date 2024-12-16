@@ -1834,8 +1834,8 @@ def _mongo_cc_binary_and_program(
     )
 
     exec_properties |= select({
-        "//bazel/config:link_timeout_8min_enabled": {
-            "cpp_link.timeout": "300",
+        "//bazel/config:link_timeout_enabled": {
+            "cpp_link.timeout": "600",
         },
         "//conditions:default": {},
     })
@@ -2305,10 +2305,12 @@ def mongo_proto_library(
         srcs,
         tags = [],
         **kwargs):
+    features = kwargs.pop("features", [])
     proto_library(
         name = name,
         srcs = srcs,
         tags = tags + ["gen_source"],
+        features = features + MONGO_GLOBAL_FEATURES,
         **kwargs
     )
 
