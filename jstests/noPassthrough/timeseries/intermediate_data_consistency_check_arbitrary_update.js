@@ -3,7 +3,6 @@
  * performing an arbitrary update on a bucket.
  *
  * @tags: [
- *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   featureFlagTimeseriesUpdatesSupport,
  *   requires_fcv_80,
  * ]

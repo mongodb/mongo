@@ -55,14 +55,6 @@ export var TimeseriesTest = class {
         }
     }
 
-    /**
-     * Returns whether time-series always use compressed buckets are enabled.
-     * TODO SERVER-70605 remove this helper.
-     */
-    static timeseriesAlwaysUseCompressedBucketsEnabled(conn) {
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesAlwaysUseCompressedBuckets");
-    }
-
     // TODO SERVER-68058 remove this helper.
     static arbitraryUpdatesEnabled(conn) {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesUpdatesSupport");

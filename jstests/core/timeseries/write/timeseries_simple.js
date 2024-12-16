@@ -106,10 +106,7 @@ TimeseriesTest.run((insert) => {
     const bucketDocs = bucketsColl.find().toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
     const bucketDoc = bucketDocs[0];
-
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        TimeseriesTest.decompressBucket(bucketDoc);
-    }
+    TimeseriesTest.decompressBucket(bucketDoc);
 
     jsTestLog('Bucket collection document: ' + tojson(bucketDoc));
     assert.docEq(expectedBucketDoc.control.min,

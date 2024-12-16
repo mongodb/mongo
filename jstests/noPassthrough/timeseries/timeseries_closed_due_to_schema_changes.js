@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   requires_fcv_80,
  * ]
  */

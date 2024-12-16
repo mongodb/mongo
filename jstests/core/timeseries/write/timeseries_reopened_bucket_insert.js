@@ -212,10 +212,6 @@ const checkIfBucketReopened = function(
 })();
 
 (function expectToReopenCompressedBuckets() {
-    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        return;
-    }
-
     jsTestLog("Entering expectToReopenCompressedBuckets...");
     resetCollection();
 

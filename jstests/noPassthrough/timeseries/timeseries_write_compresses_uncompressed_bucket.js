@@ -2,7 +2,6 @@
  * Tests that an uncompressed time-series bucket gets compressed upon being written to.
  *
  * @tags: [
- *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   requires_fcv_80,
  * ]
  */

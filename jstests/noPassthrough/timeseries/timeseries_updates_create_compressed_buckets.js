@@ -1,10 +1,8 @@
 /**
- * Tests that an update on a time-series collection keeps the buckets compressed on disk when the
- * feature flag TimeseriesAlwaysUseCompressedBuckets is enabled.
+ * Tests that an update on a time-series collection keeps the buckets compressed on disk.
  *
  * @tags: [
  *   requires_timeseries,
- *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   requires_fcv_80,
  * ]
  */

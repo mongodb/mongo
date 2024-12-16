@@ -30,10 +30,6 @@ let coll;
 let bucketsColl;
 
 function assertBucketsAreCompressed(db, bucketsColl) {
-    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        return;
-    }
-
     const bucketDocs = bucketsColl.find().toArray();
     bucketDocs.forEach(bucketDoc => {
         assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
@@ -72,14 +68,8 @@ function prepareCompressedBucket() {
               `Expected first bucket to end at ${bucketMaxCount - 1}. ${tojson(bucketDocs)}`);
     assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
            `Expected first bucket to be compressed. ${tojson(bucketDocs)}`);
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-               `Expected second bucket to be compressed. ${tojson(bucketDocs)}`);
-    } else {
-        assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                  bucketDocs[1].control.version,
-                  `Expected second bucket not to be compressed. ${tojson(bucketDocs)}`);
-    }
+    assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+           `Expected second bucket to be compressed. ${tojson(bucketDocs)}`);
     assert.eq(bucketMaxCount,
               bucketDocs[1].control.min.f,
               `Expected second bucket to start at ${bucketMaxCount}. ${tojson(bucketDocs)}`);

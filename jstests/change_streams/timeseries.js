@@ -302,41 +302,39 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TSBucketingParametersUnchanged"
     };
 }
 
-if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-    // Check for compressed bucket changes when using always compressed buckets.
-    expectedChanges[5] = {
-        "operationType": "insert",
-        "fullDocument": {
-            "control": {
-                "count": 1,
-                "max": {"_id": 1, "ts": ISODate("1970-01-01T00:00:01Z")},
-                "min": {
-                    "_id": 1,
-                    "ts": ISODate("1970-01-01T00:00:00Z"),
-                },
-                "version": TimeseriesTest.BucketVersion.kCompressedSorted,
+// Check for compressed bucket changes when using always compressed buckets.
+expectedChanges[5] = {
+    "operationType": "insert",
+    "fullDocument": {
+        "control": {
+            "count": 1,
+            "max": {"_id": 1, "ts": ISODate("1970-01-01T00:00:01Z")},
+            "min": {
+                "_id": 1,
+                "ts": ISODate("1970-01-01T00:00:00Z"),
             },
-            "data": {"ts": BinData(7, "CQDoAwAAAAAAAAA="), "_id": BinData(7, "AQAAAAAAAADwPwA=")},
-            "meta": {"a": 1},
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
         },
-        "ns": {"db": dbName, "coll": bucketsCollName}
+        "data": {"ts": BinData(7, "CQDoAwAAAAAAAAA="), "_id": BinData(7, "AQAAAAAAAADwPwA=")},
+        "meta": {"a": 1},
+    },
+    "ns": {"db": dbName, "coll": bucketsCollName}
 
-    };
-    expectedChanges[6] = {
-        "operationType": "update",
-        "updateDescription": {
-            "updatedFields": {
-                "control.count": 2,
-                "data.ts": {"o": 10, "d": BinData(0, "gA4AAAAAAAAAAA==")},
-                "data._id": {"o": 10, "d": BinData(0, "kA4AAAAAAAAAAA==")}
-            },
-            "removedFields": [],
-            "truncatedArrays": [],
-            "disambiguatedPaths": {}
+};
+expectedChanges[6] = {
+    "operationType": "update",
+    "updateDescription": {
+        "updatedFields": {
+            "control.count": 2,
+            "data.ts": {"o": 10, "d": BinData(0, "gA4AAAAAAAAAAA==")},
+            "data._id": {"o": 10, "d": BinData(0, "kA4AAAAAAAAAAA==")}
         },
-        "ns": {"db": dbName, "coll": bucketsCollName}
-    };
-}
+        "removedFields": [],
+        "truncatedArrays": [],
+        "disambiguatedPaths": {}
+    },
+    "ns": {"db": dbName, "coll": bucketsCollName}
+};
 
 cst.assertNextChangesEqual({cursor: curWithEvents, expectedChanges});
 

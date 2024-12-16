@@ -119,14 +119,8 @@ TimeseriesTest.run((insert) => {
                 docTimes[numDocs - 1],
                 bucketDocs[1].control.max[timeFieldName],
                 'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
-            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-            } else {
-                assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                          bucketDocs[1].control.version,
-                          'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-            }
+            assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
         } else {
             // In suites running moveCollection in the background, it is possible to hit the issue
             // described by SERVER-89349 which will result in more bucket documents being created.
@@ -136,14 +130,8 @@ TimeseriesTest.run((insert) => {
                 let bucketRangeMillis =
                     bucketDoc.control.max[timeFieldName] - bucketDoc.control.min[timeFieldName];
                 assert.gte(1000 * 60 * 60, bucketRangeMillis);
-                if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                    assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
-                           'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-                } else {
-                    assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                              bucketDoc.control.version,
-                              'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-                }
+                assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
+                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
             });
         }
     };

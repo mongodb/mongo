@@ -3,7 +3,6 @@
  * retried and will not try writing to the same corrupt bucket.
  *
  * @tags: [
- *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   requires_fcv_80,
  * ]
  */

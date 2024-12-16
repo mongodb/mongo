@@ -94,14 +94,8 @@ TimeseriesTest.run((insert) => {
             assert.eq(numDocs - 1,
                       bucketDocs[1].control.max.x,
                       'invalid control.max for x in second bucket: ' + tojson(bucketDocs));
-            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-            } else {
-                assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                          bucketDocs[1].control.version,
-                          'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-            }
+            assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
             assert(!bucketDocs[1].control.hasOwnProperty("closed"),
                    'unexpected control.closed in second bucket: ' + tojson(bucketDocs));
         } else {
@@ -126,10 +120,8 @@ TimeseriesTest.run((insert) => {
                 assert.lte(bucketMaxX - currMin,
                            bucketMaxCount,
                            'Too high x range in bucket: ' + tojson(doc));
-                if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-                    assert(TimeseriesTest.isBucketCompressed(doc.control.version),
-                           'unexpected control.version in bucket: ' + tojson(doc));
-                }
+                assert(TimeseriesTest.isBucketCompressed(doc.control.version),
+                       'unexpected control.version in bucket: ' + tojson(doc));
                 assert(!doc.control.hasOwnProperty("closed"),
                        'unexpected control.closed in bucket: ' + tojson(doc));
                 currMin = bucketMaxId + 1;

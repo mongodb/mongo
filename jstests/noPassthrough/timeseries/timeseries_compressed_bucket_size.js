@@ -9,7 +9,6 @@
  *   requires_collstats,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   requires_fcv_80,
  * ]
  */

@@ -222,23 +222,15 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(bucketsColl.insert({
         _id: oid,
         control: {
-            version: TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? TimeseriesTest.BucketVersion.kCompressedSorted
-                : TimeseriesTest.BucketVersion.kUncompressed,
+            version: TimeseriesTest.BucketVersion.kCompressedSorted,
             min: {time: timestamp, "_id": oid, "a": 1},
             max: {time: timestamp, "_id": oid, "a": 1},
             count: 1
         },
         data: {
-            "time": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? BinData(7, "CQDANfZWjgEAAAA=")
-                : {"0": timestamp},
-            "_id": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? BinData(7, "BwBl+ZcYR0I69Frq/GcA")
-                : {"0": oid},
-            "a": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? BinData(7, "AQAAAAAAAADwPwA=")
-                : {"0": 1},
+            "time": BinData(7, "CQDANfZWjgEAAAA="),
+            "_id": BinData(7, "BwBl+ZcYR0I69Frq/GcA"),
+            "a": BinData(7, "AQAAAAAAAADwPwA="),
         }
     }));
 

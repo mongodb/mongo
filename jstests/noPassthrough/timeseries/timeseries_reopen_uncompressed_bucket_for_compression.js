@@ -20,15 +20,6 @@ const time2_first = ISODate("2024-02-29T07:55:50.212Z");
 
 let collCount = 0;
 
-const checkAllBucketsUncompressed = function(coll) {
-    jsTestLog("Confirm all buckets are uncompressed.");
-    var docs = coll.find().toArray();
-    for (let i = 0; i < docs.length; ++i) {
-        jsTestLog(docs[i]);
-        assert.eq(docs[i].control.version, TimeseriesTest.BucketVersion.kUncompressed);
-    }
-};
-
 const checkAllBucketsCompressed = function(coll) {
     jsTestLog("Confirm all buckets are compressed.");
     var docs = coll.find().toArray();
@@ -102,15 +93,9 @@ const runTest = function(isCorrupted = false) {
     const stats = assert.commandWorked(coll.stats());
     jsTestLog(stats.timeseries);
     if (isCorrupted) {
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-            assert.eq(0, stats.timeseries['numBucketsReopened']);
-            assert.eq(0, stats.timeseries['numBucketUpdates']);
-            assert.eq(1, stats.timeseries['numBucketsFrozen']);
-        } else {
-            assert.eq(1, stats.timeseries['numBucketsReopened']);
-            assert.eq(1, stats.timeseries['numBucketUpdates']);
-            assert.eq(0, stats.timeseries['numBucketsFrozen']);
-        }
+        assert.eq(0, stats.timeseries['numBucketsReopened']);
+        assert.eq(0, stats.timeseries['numBucketUpdates']);
+        assert.eq(1, stats.timeseries['numBucketsFrozen']);
     } else {
         assert.eq(1, stats.timeseries['numBucketsReopened']);
         assert.eq(1, stats.timeseries['numBucketUpdates']);
@@ -119,11 +104,7 @@ const runTest = function(isCorrupted = false) {
     assert.eq(1, stats.timeseries['numCommits']);
 
     if (isCorrupted) {
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-            assert.eq(bucketsColl.find().itcount(), 2);
-        } else {
-            assert.eq(bucketsColl.find().itcount(), 1);
-        }
+        assert.eq(bucketsColl.find().itcount(), 2);
         jsTestLog(
             "Remove corrupted bucket to prevent the validate post-hook from seeing it after the test.");
         assert.commandWorked(bucketsColl.remove({_id: ObjectId("65a6eb806ffc9fa4280ecac4")}));
@@ -131,11 +112,7 @@ const runTest = function(isCorrupted = false) {
         assert.eq(bucketsColl.find().itcount(), 1);
     }
 
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-        checkAllBucketsCompressed(bucketsColl);
-    } else {
-        checkAllBucketsUncompressed(bucketsColl);
-    }
+    checkAllBucketsCompressed(bucketsColl);
 };
 
 runTest();

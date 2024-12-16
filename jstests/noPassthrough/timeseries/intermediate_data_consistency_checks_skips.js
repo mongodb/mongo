@@ -3,7 +3,6 @@
  * values for certain fields) are handled correctly in the time-series intermediate data check
  * (specifically, that we do not unexpectedly fail the test).
  * @tags: [
- *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
  *   requires_fcv_80,
  * ]
  */
