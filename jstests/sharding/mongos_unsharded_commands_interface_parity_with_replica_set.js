@@ -23,35 +23,40 @@
  *
  * Boolean field, used to skip writeConcern tests for commands that do not support writeConcern.
  *
- * 4) testCases
+ * 5) testCases
  *
  * Array defining each of the cases to be tested for each command.
  *
  *     testCase fields:
  *
- *     4.1) shortDescription
+ *     5.1) shortDescription
  *
  *     Offers a short description of the case that is being tested.
  *
- *     4.2) skipSetup
+ *     5.2) skipSetup
  *
  *     Boolean field, used to skip setup for the testCase.
  *
- *     4.3) command
+ *     5.3) command
  *
  *     The command that is going to be executed.
  *
- *     4.4) expectedError
+ *     5.4) modifyCommandResult
+ *
+ *     This function takes in the command response and modifies it
+ *     to allow for insertion or removal of key value pairs in the response.
+ *
+ *     5.5) expectedError
  *
  *     Field indicating the error code that is expected to be returned by the command.
  *     The testCases that are expected to fail are responses from the replica
  *     set or the shard and not parser errors.
  *
- *     4.5) testCaseSetup
+ *     5.6) testCaseSetup
  *
  *     The testCaseSetup function is called before executing each testCase.
  *
- *     4.6) testCaseDoesNotSupportWriteConcern
+ *     5.7) testCaseDoesNotSupportWriteConcern
  *
  *     Boolean field, used to skip a writeConcern testCase that belongs to a test that accepts
  *     writeConcern.
@@ -86,6 +91,12 @@ function joinFilteringMetadataRefresh(db, collName, mongoConfig) {
     }
 }
 
+function removeTimestamp(res) {
+    if (res.hasOwnProperty("readTimestamp")) {
+        delete res["readTimestamp"];
+    }
+}
+
 const tests = [
 
     {
@@ -102,6 +113,7 @@ const tests = [
             {
                 shortDescription: "Runs validate expecting an error.",
                 command: {validate: "x"},
+                modifyCommandResult: removeTimestamp,
                 skipSetup: true,
                 expectedError: ErrorCodes.NamespaceNotFound,
             },
@@ -112,15 +124,18 @@ const tests = [
                     joinFilteringMetadataRefresh(db, "x", mongoConfig);
                 },
                 command: {validate: "x"},
+                modifyCommandResult: removeTimestamp,
                 skipSetup: true,
             },
             {
                 shortDescription: "Runs validate without optional fields.",
                 command: {validate: "x"},
+                modifyCommandResult: removeTimestamp,
             },
             {
                 shortDescription: "Runs validate with full: true.",
                 command: {validate: "x", full: true},
+                modifyCommandResult: removeTimestamp,
             },
         ]
     },
@@ -401,7 +416,10 @@ function collModParityTests(db) {
 function runAndAssertTestCaseWithForcedWriteConcern(testCase, testFixture) {
     testFixture.stopReplication(testFixture.mongoConfig);
     testCase.command.writeConcern = {w: "majority", wtimeout: 1};
-    const result = testFixture.db.runCommand(testCase.command);
+    let result = testFixture.db.runCommand(testCase.command);
+    if (testCase.modifyCommandResult) {
+        testCase.modifyCommandResult(result);
+    }
     assertWriteConcernError(result);
     assert.commandWorkedIgnoringWriteConcernErrors(result);
     testFixture.restartReplication(testFixture.mongoConfig);
@@ -409,7 +427,10 @@ function runAndAssertTestCaseWithForcedWriteConcern(testCase, testFixture) {
 }
 
 function runAndAssertTestCase(testCase, db) {
-    const result = db.runCommand(testCase.command);
+    let result = db.runCommand(testCase.command);
+    if (testCase.modifyCommandResult) {
+        testCase.modifyCommandResult(result);
+    }
     if (testCase.expectedError) {
         assert.commandFailedWithCode(result, testCase.expectedError);
     } else {
