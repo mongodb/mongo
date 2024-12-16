@@ -45,6 +45,7 @@ def get_release_tag():
 
 def install() -> str:
     binary_directory = os.path.expanduser("~/.local/bin")
+    os.makedirs(binary_directory, exist_ok=True)
     binary_filename = "engflow_auth"
     binary_path = os.path.join(binary_directory, binary_filename)
     tag = get_release_tag()
@@ -64,14 +65,16 @@ def install() -> str:
 
 def update_bazelrc(binary_path: str):
     lines = []
-    with open(f"{os.path.expanduser('~')}/.bazelrc", "r") as bazelrc:
-        for line in bazelrc.readlines():
-            if "--tls_client" in line or "--credential_helper" in line:
-                continue
-            lines.append(line)
+    bazelrc_path = f"{os.path.expanduser('~')}/.bazelrc"
+    if os.path.exists(bazelrc_path):
+        with open(bazelrc_path, "r") as bazelrc:
+            for line in bazelrc.readlines():
+                if "--tls_client" in line or "--credential_helper" in line:
+                    continue
+                lines.append(line)
     lines.append(f"build --credential_helper={CLUSTER}={binary_path}")
 
-    with open(f"{os.path.expanduser('~')}/.bazelrc", "w") as bazelrc:
+    with open(bazelrc_path, "w+") as bazelrc:
         bazelrc.writelines(lines)
 
 
