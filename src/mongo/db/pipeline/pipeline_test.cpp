@@ -4531,6 +4531,71 @@ TEST(PipelineOptimizationTest, CoalesceAdjacentExclusionProjectionsNestedSecond)
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
+TEST(PipelineOptimizationTest, internalListCollectionsAbsorbsMatchOnDb) {
+    std::string inputPipe =
+        "["
+        " {$_internalListCollections: {}},"
+        " {$match: {db: 'testDb', a: 10}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$_internalListCollections: {match: {db: {$eq: 'testDb'}}}},"
+        " {$match: {a: {$eq: 10}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$_internalListCollections: {}},"
+        " {$match: {db: {$eq: 'testDb'}}},"
+        " {$match: {a: {$eq: 10}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(
+        inputPipe, outputPipe, serializedPipe, kAdminCollectionlessNss);
+}
+
+TEST(PipelineOptimizationTest, internalListCollectionsAbsorbsSeveralMatchesOnDb) {
+    std::string inputPipe =
+        "["
+        " {$_internalListCollections: {}},"
+        " {$match: {db: {$gt: 0}}},"
+        " {$match: {a: 10}},"
+        " {$match: {db: {$ne: 5}}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$_internalListCollections: {match: {$and: [{db: {$gt: 0}}, {db: {$not: {$eq: "
+        "5}}}]}}},"
+        " {$match: {a: {$eq: 10}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$_internalListCollections: {}},"
+        " {$match: {$and: [{db: {$gt: 0}}, {db: {$not: {$eq: 5}}}]}},"
+        " {$match: {a: {$eq: 10}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(
+        inputPipe, outputPipe, serializedPipe, kAdminCollectionlessNss);
+}
+
+TEST(PipelineOptimizationTest, internalAllCollectionStatsDoesNotAbsorbMatchNotOnDb) {
+    std::string inputPipe =
+        "["
+        " {$_internalListCollections: {}},"
+        " {$match: {a: 10}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$_internalListCollections: {}},"
+        " {$match: {a: {$eq: 10}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$_internalListCollections: {}},"
+        " {$match: {a: 10}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(
+        inputPipe, outputPipe, serializedPipe, kAdminCollectionlessNss);
+}
+
 }  // namespace Local
 
 namespace Sharded {

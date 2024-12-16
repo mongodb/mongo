@@ -48,6 +48,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -115,7 +116,13 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final{};
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+        // Since this DocumentSource is serialized to more than one stage, the single-stage has no
+        // way to return the right answer, therefore we should not use it.
+        MONGO_UNREACHABLE_TASSERT(9741504);
+    }
+
+    void serializeToArray(std::vector<Value>& array, const SerializationOptions& opts) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,
@@ -141,11 +148,18 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     GetNextResult doGetNext() final;
 
     void _buildCollectionsToReplyForDb(const DatabaseName& db,
                                        std::vector<BSONObj>& collectionsToReply);
+
+    // A $match stage can be absorbed in order to avoid unnecessarily computing the databases
+    // that do not match that predicate.
+    boost::intrusive_ptr<DocumentSourceMatch> _absorbedMatch;
 
     boost::optional<std::vector<DatabaseName>> _databases;
     std::vector<BSONObj> _collectionsToReply;

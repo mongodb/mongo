@@ -21,6 +21,7 @@ const kDb1 = "db1_agg_list_cluster_catalog";
 const kDb2 = "db2_agg_list_cluster_catalog";
 const kNotExistent = 'notExistent_agg_list_cluster_catalog';
 const kSpecsList = ["shards", "tracked", "balancingConfiguration"];
+const adminDB = db.getSiblingDB("admin");
 
 // Test all the combination of specs. Every spec can be true or false. The total number of
 // combinations will be 2^n where n is number of specs.
@@ -110,7 +111,7 @@ function verifyAgainstListCollections(listCollectionResult, stageResult, specs) 
     listCollectionResult
         .forEach(
             (expectedResult) => {
-                let nss = expectedResult.dbName + "." + expectedResult.name;
+                let nss = expectedResult.db + "." + expectedResult.name;
                 let nssStageResult = getStageResultForNss(stageResult, nss);
                 // Temporary namespaces might disappear between the list collection request and the
                 // aggregation request. Ignore this case.
@@ -118,54 +119,49 @@ function verifyAgainstListCollections(listCollectionResult, stageResult, specs) 
                     return;
                 }
                 // The result must be present.
-                assert.neq(nssStageResult,
-            undefined,
-            `The namespace ${
-                nss} was found in listCollections but not in the $listClusterCatalog. Result ${
-                tojson(stageResult)}`);
+                assert.neq(nssStageResult, undefined, `The namespace ${
+                    nss} was found in listCollections but not in the $listClusterCatalog. Result ${
+                    tojson(stageResult)}`);
                 // The result must match the entire list collection result + some few extra fields.
-                expectedResult.db = expectedResult.dbName;
                 expectedResult.ns = nss;
                 verify(expectedResult, nssStageResult, specs);
             });
 }
 
-function setupUserCollections(db, dbName) {
-    // drop previous incaranations of the database left by previous runs of the same core test.
-    db.getSiblingDB(dbName).dropDatabase();
+function setupUserCollections(dbTest) {
+    // Drop previous incaranations of the database left by previous runs of the same core test.
+    dbTest.dropDatabase();
 
-    const kViewCollName = "view";
-    const kTimeseriesCollName = "timeseries";
-    const collList = ["coll1", "coll2", kTimeseriesCollName, kViewCollName];
-
-    // Create all the collections
-    collList.forEach((collName) => {
-        if (collName == kTimeseriesCollName) {
-            assert.commandWorked(db.getSiblingDB(dbName).createCollection(
-                collName, {timeseries: {metaField: "meta", timeField: "timestamp"}}));
-        } else if (collName == kViewCollName) {
-            assert.commandWorked(db.getSiblingDB(dbName).createCollection(
-                collName, {viewOn: "coll1", pipeline: []}));
-        } else {
-            db.getSiblingDB(dbName).createCollection(collName);
-        }
-    });
+    // Create 4 collections of different types:
+    //    - 'coll1'      : standard collection
+    //    - 'coll2'      : standard collection
+    //    - 'view'       : a view on 'coll1' with an empty pipeline
+    //    - 'timeseries' : a timeseries collection
+    assert.commandWorked(dbTest.createCollection("coll1"));
+    assert.commandWorked(dbTest.createCollection("coll2"));
+    assert.commandWorked(dbTest.createCollection("view", {viewOn: "coll1", pipeline: []}));
+    assert.commandWorked(dbTest.createCollection(
+        "timeseries", {timeseries: {metaField: "meta", timeField: "timestamp"}}));
 }
 
 function runListCollectionsOnDbs(db, dbNames) {
     let result = [];
     dbNames.forEach((dbName) => {
-        let dbResult = db.getSiblingDB(dbName).runCommand({listCollections: 1}).cursor.firstBatch;
+        let dbResult = db.getSiblingDB(dbName).getCollectionInfos();
         dbResult.forEach((collectionInfo) => {
             // Attach the dbName as extra information to calculate the full ns during the
             // verification step.
-            collectionInfo.dbName = dbName;
+            collectionInfo.db = dbName;
             result.push(collectionInfo);
         });
     });
 
     return result;
 }
+
+// Setting up collections:
+setupUserCollections(db.getSiblingDB(kDb1));
+setupUserCollections(db.getSiblingDB(kDb2));
 
 jsTest.log("The stage must run collectionless.");
 {
@@ -183,27 +179,17 @@ jsTest.log("The stage must take an object.");
 
 jsTest.log("The stage must return the collection for the specified user db.");
 {
-    setupUserCollections(db, kDb1);
-
     let listCollectionResult = runListCollectionsOnDbs(db, [kDb1]);
+    let stageResult = db.getSiblingDB(kDb1).aggregate([{$listClusterCatalog: {}}]).toArray();
 
-    let stageResult = assert
-                          .commandWorked(db.getSiblingDB(kDb1).runCommand(
-                              {aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}))
-                          .cursor.firstBatch;
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
 
 jsTest.log("The stage must return the collection for the specified user db: Using a second db.");
 {
-    setupUserCollections(db, kDb2);
-
     let listCollectionResult = runListCollectionsOnDbs(db, [kDb2]);
+    let stageResult = db.getSiblingDB(kDb2).aggregate([{$listClusterCatalog: {}}]).toArray();
 
-    let stageResult = assert
-                          .commandWorked(db.getSiblingDB(kDb2).runCommand(
-                              {aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}))
-                          .cursor.firstBatch;
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
 
@@ -221,9 +207,8 @@ jsTest.log("The stage must return an empty result if the user database doesn't e
 jsTest.log("The stage must return every database if run against the admin db.");
 {
     let listCollectionResult = runListCollectionsOnDbs(db, [kDb1, kDb2]);
+    let stageResult = adminDB.aggregate([{$listClusterCatalog: {}}]).toArray();
 
-    let dbAdmin = db.getSiblingDB("admin");
-    let stageResult = dbAdmin.aggregate([{$listClusterCatalog: {}}], {cursor: {}}).toArray();
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
 
@@ -231,13 +216,12 @@ jsTest.log("The stage must work under any combination of specs.");
 {
     // Get the listCollections result.
     let listCollectionResult = runListCollectionsOnDbs(db, [kDb1, kDb2]);
-    let dbAdmin = db.getSiblingDB("admin");
 
     // Test all the combination of specs.
     let allSpecs = generateSpecCombinations(kSpecsList);
     allSpecs.forEach((specs) => {
         jsTest.log("Verify the stage reports the correct result for specs " + tojson(specs));
-        let stageResult = dbAdmin.aggregate([{$listClusterCatalog: specs}], {cursor: {}}).toArray();
+        let stageResult = adminDB.aggregate([{$listClusterCatalog: specs}]).toArray();
         verifyAgainstListCollections(listCollectionResult, stageResult, specs);
     });
 }

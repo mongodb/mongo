@@ -1,5 +1,11 @@
 // Tests that reads on views are supported in transactions.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+// @tags: [
+//     uses_transactions,
+//     uses_snapshot_read_concern,
+//     # This test doesn't work when collections are implicitly sharded upon drop because a view
+//     # can't be sharded.
+//     assumes_no_implicit_collection_creation_after_drop
+// ]
 
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 

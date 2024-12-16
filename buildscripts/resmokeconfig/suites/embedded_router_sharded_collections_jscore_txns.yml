@@ -15,9 +15,6 @@ selector:
     # Uses hangAfterCollectionInserts failpoint not available on mongos.
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
-    # View tests aren't expected to work when collections are implicitly sharded.
-    - jstests/core/txns/view_reads_in_transaction.js
-
     # These workloads explicitly create collections inside multi-document transactions. These are
     # non-idempotent operations, and the implicit collection sharding logic upon collection access
     # results in premature collection creation, causing the workloads to fail.

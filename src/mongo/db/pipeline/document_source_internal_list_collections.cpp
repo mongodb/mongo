@@ -117,24 +117,83 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalListCollections::createFromB
     return make_intrusive<DocumentSourceInternalListCollections>(pExpCtx);
 }
 
+Pipeline::SourceContainer::iterator DocumentSourceInternalListCollections::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    tassert(9741503, "The given iterator must be this object.", *itr == this);
+
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
+    auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
+    if (!nextMatch) {
+        return std::next(itr);
+    }
+
+    // Get the portion of the $match that is dependent on 'db'. This will be the second attribute of
+    // `splitMatch`.
+    auto [matchNotRelatedToDb, matchRelatedToDb] = std::move(*nextMatch).splitSourceBy({"db"}, {});
+
+    // Remove the original $match. We'll reintroduce the independent part of $match later.
+    container->erase(std::next(itr));
+
+    // Absorb the part of $match that is dependant on 'db'
+    if (matchRelatedToDb) {
+        if (!_absorbedMatch) {
+            _absorbedMatch = std::move(matchRelatedToDb);
+        } else {
+            // We have already absorbed a $match. We need to join it.
+            _absorbedMatch->joinMatchWith(std::move(matchRelatedToDb), "$and"_sd);
+        }
+    }
+
+    // Put the independent part of the $match back on the pipeline.
+    if (matchNotRelatedToDb) {
+        container->insert(std::next(itr), std::move(matchNotRelatedToDb));
+        return std::next(itr);
+    } else {
+        // There may be further optimization between this stage and the new neighbor, so we return
+        // an iterator pointing to ourself.
+        return itr;
+    }
+}
+
 const char* DocumentSourceInternalListCollections::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-Value DocumentSourceInternalListCollections::serialize(const SerializationOptions& opts) const {
-    return Value(Document{{getSourceName(), BSONObj()}});
+void DocumentSourceInternalListCollections::serializeToArray(
+    std::vector<Value>& array, const SerializationOptions& opts) const {
+    auto explain = opts.verbosity;
+    if (explain) {
+        BSONObjBuilder bob;
+        if (_absorbedMatch) {
+            bob.append("match", _absorbedMatch->getQuery());
+        }
+        array.push_back(Value(Document{{getSourceName(), bob.obj()}}));
+    } else {
+        array.push_back(Value(Document{{getSourceName(), BSONObj()}}));
+        if (_absorbedMatch) {
+            _absorbedMatch->serializeToArray(array);
+        }
+    }
 }
 
 void DocumentSourceInternalListCollections::_buildCollectionsToReplyForDb(
     const DatabaseName& db, std::vector<BSONObj>& collectionsToReply) {
     tassert(9525807, "The vector 'collectionsToReply' must be empty", collectionsToReply.empty());
 
-    const auto& collectionsList = pExpCtx->getMongoProcessInterface()->runListCollections(
-        pExpCtx->getOperationContext(), _databases->back(), true /* addPrimaryShard */);
-    collectionsToReply.reserve(collectionsList.size());
+    const auto& dbNameStr = DatabaseNameUtil::serialize(db, SerializationContext::stateDefault());
 
-    const auto& dbNameStr =
-        DatabaseNameUtil::serialize(_databases->back(), SerializationContext::stateDefault());
+    // Avoid computing a database that doesn't match the absorbed filter on the 'db' field.
+    if (_absorbedMatch &&
+        !_absorbedMatch->getMatchExpression()->matchesBSON(BSON("db" << dbNameStr))) {
+        return;
+    }
+
+    const auto& collectionsList = pExpCtx->getMongoProcessInterface()->runListCollections(
+        pExpCtx->getOperationContext(), db, true /* addPrimaryShard */);
+    collectionsToReply.reserve(collectionsList.size());
 
     for (const auto& collObj : collectionsList) {
         BSONObjBuilder builder;
@@ -156,7 +215,8 @@ void DocumentSourceInternalListCollections::_buildCollectionsToReplyForDb(
             }
         }
 
-        collectionsToReply.emplace_back(builder.obj());
+        const auto obj = builder.obj();
+        collectionsToReply.push_back(obj.getOwned());
     }
 }
 

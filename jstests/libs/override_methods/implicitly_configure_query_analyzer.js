@@ -72,8 +72,8 @@ DB.prototype.createCollection = function() {
 
     // Attempt to enable sharding on database and collection if not already done;
     // only shard some of the time, so that query sampling is also tested on unsharded collections.
-    // But capped collections can't be sharded, so don't try to shard those.
-    if (Math.random() < kShardProbability && !arguments[1].capped) {
+    // But capped collections and views can't be sharded, so don't try to shard those.
+    if (Math.random() < kShardProbability && !arguments[1].capped && !arguments[1].viewOn) {
         if (arguments[1].timeseries && arguments[1].timeseries.timeField) {
             const timeField = arguments[1]["timeseries"]["timeField"];
             ShardingOverrideCommon.shardCollectionWithSpec({

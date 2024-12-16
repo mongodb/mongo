@@ -15,9 +15,6 @@ selector:
     # Uses hangAfterCollectionInserts failpoint not available on mongos.
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
-    # View tests aren't expected to work when collections are implicitly sharded.
-    - jstests/core/txns/view_reads_in_transaction.js
-
     # Does not use the transactions shell helpers so afterClusterTime read concern is incorrectly
     # attached to statements in a transaction beyond the first one.
     - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
