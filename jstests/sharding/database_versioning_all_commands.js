@@ -36,12 +36,6 @@ function getNewDbName(dbName) {
 
 function assertMatchingDatabaseVersion(conn, dbName, dbVersion) {
     let res = conn.adminCommand({getDatabaseVersion: dbName});
-    // TODO (SERVER-81967): Remove once 8.0 becomes last LTS.
-    if (!res.ok && res.code === ErrorCodes.CommandNotFound) {
-        res = assert.commandWorked(conn.adminCommand({getShardVersion: dbName}));
-        assert.eq(dbVersion, res.version);
-        return;
-    }
     assert.commandWorked(res);
     assert.eq(dbVersion, res.dbVersion);
 }

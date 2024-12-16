@@ -24,10 +24,10 @@ function assertDbVersionAssigned(mongos, dbName) {
     assert.eq(1, dbEntry.version.lastMod);
 
     // Check that the catalog cache on the mongos contains the same dbVersion.
-    const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+    const cachedDbEntry = mongos.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(cachedDbEntry);
-    assert.eq(dbEntry.version.uuid, cachedDbEntry.version.uuid);
-    assert.eq(dbEntry.version.lastMod, cachedDbEntry.version.lastMod);
+    assert.eq(dbEntry.version.uuid, cachedDbEntry.dbVersion.uuid);
+    assert.eq(dbEntry.version.lastMod, cachedDbEntry.dbVersion.lastMod);
 
     cleanUp(mongos, dbName);
 
@@ -43,9 +43,9 @@ function assertDbVersionNotAssigned(mongos, dbName) {
     assert.eq(null, dbEntry.version);
 
     // Check that the catalog cache on the mongos *does not* contain a dbVersion.
-    const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+    const cachedDbEntry = mongos.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(cachedDbEntry);
-    assert.eq(null, cachedDbEntry.version);
+    assert.eq(null, cachedDbEntry.dbVersion);
 
     cleanUp(mongos, dbName);
 
