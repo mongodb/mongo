@@ -269,6 +269,7 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
                                 const std::shared_ptr<WriteBatch>& batch,
                                 uint16_t numPreviouslyCommittedMeasurements,
                                 size_t expectedBatchSize) {
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(ns)));
     ASSERT_EQ(batch->measurements.size(), expectedBatchSize);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, numPreviouslyCommittedMeasurements);
@@ -545,15 +546,19 @@ void BucketCatalogTest::_testUseAlternateBucketSkipsConflictingBucket(
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
+    // The first insert should be able to take commit rights
     auto result1 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch1));
 
-    // A subsequent insert into the same bucket should land in the same batch.
+    // A subsequent insert into the same bucket should land in the same batch, but not be able to
+    // claim commit rights
     auto result2 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_EQ(batch1, batch2);
+    ASSERT(!claimWriteBatchCommitRights(*batch2));
 
     // The batch hasn't actually been committed yet.
     ASSERT(!isWriteBatchFinished(*batch1));
@@ -579,6 +584,7 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
     auto result =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     auto bucketId = batch->bucketId;
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, bucketId));
@@ -641,11 +647,13 @@ TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
+    ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
     finish(*_bucketCatalog, batch1, {});
 
+    ASSERT(claimWriteBatchCommitRights(*batch2));
     ASSERT_OK(prepareCommit(temporaryBucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT_EQ(batch2->measurements.size(), 1);
     ASSERT_EQ(batch2->numPreviouslyCommittedMeasurements, 0);
@@ -792,6 +800,7 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
     auto result1 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
@@ -807,6 +816,17 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
 
     // Verify the second batch still commits one doc, and that the first batch only commited one.
     _commit(_ns1, batch2, 1);
+}
+
+DEATH_TEST_F(BucketCatalogTest, CannotCommitWithoutRights, "invariant") {
+    auto result =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
+    auto& batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
+
+    // BucketCatalog::prepareCommit uses dassert, so it will only invariant in debug mode. Ensure we
+    // die here in non-debug mode as well.
+    invariant(kDebugBuild);
 }
 
 TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
@@ -881,6 +901,7 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
     auto result1 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
@@ -891,6 +912,7 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(batch1, batch2);
 
+    ASSERT(claimWriteBatchCommitRights(*batch2));
     abort(*_bucketCatalog, batch2, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch2));
     ASSERT_EQ(getWriteBatchResult(*batch2).getStatus(), ErrorCodes::TimeseriesBucketCleared);
@@ -904,6 +926,7 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
     auto result =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
 
     clear(*_bucketCatalog, _uuid1);
 
@@ -914,6 +937,7 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
     result =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
@@ -935,6 +959,7 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     auto result =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
@@ -951,6 +976,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     auto result1 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
@@ -966,6 +992,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     clearBucketState(_bucketCatalog->bucketStateRegistry, batch1->bucketId);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
+    ASSERT(claimWriteBatchCommitRights(*batch2));
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT(isWriteBatchFinished(*batch2));
     ASSERT_EQ(getWriteBatchResult(*batch2).getStatus(), ErrorCodes::TimeseriesBucketCleared);
@@ -982,6 +1009,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_NE(batch2, batch3);
     ASSERT_NE(batch1->bucketId, batch3->bucketId);
     // Clean up this batch
+    ASSERT(claimWriteBatchCommitRights(*batch3));
     abort(*_bucketCatalog, batch3, {ErrorCodes::TimeseriesBucketCleared, ""});
 
     // Make sure we can finish the cleanly prepared batch.
@@ -994,6 +1022,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
     auto result =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch));
@@ -1053,6 +1082,9 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
                                     BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
 
+    ASSERT(claimWriteBatchCommitRights(*batch1));
+    ASSERT(claimWriteBatchCommitRights(*batch2));
+
     // Batch 2 will not be able to commit until batch 1 has finished.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
 
@@ -1092,6 +1124,10 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
 
     ASSERT_EQ(batch1->bucketId, batch2->bucketId);
     ASSERT_EQ(batch1->bucketId, batch3->bucketId);
+
+    ASSERT(claimWriteBatchCommitRights(*batch1));
+    ASSERT(claimWriteBatchCommitRights(*batch2));
+    ASSERT(claimWriteBatchCommitRights(*batch3));
 
     // Batch 2 will not be able to commit until batch 1 has finished.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
@@ -1137,6 +1173,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
 
     // Batch 1 and 2 use the same bucket.
     ASSERT_EQ(batch1->bucketId, batch2->bucketId);
+    ASSERT(claimWriteBatchCommitRights(*batch1));
+    ASSERT(claimWriteBatchCommitRights(*batch2));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
 
     // Batch 1 will be in a prepared state now. Abort the second batch so that bucket 1 will be
@@ -1167,6 +1205,7 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 2 is the first batch to commit the time field.
+    ASSERT(claimWriteBatchCommitRights(*batch2));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT_EQ(batch2->newFieldNamesToBeInserted.size(), 1);
     ASSERT_EQ(batch2->newFieldNamesToBeInserted.begin()->first, _timeField);
@@ -1174,6 +1213,7 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
 
     // Batch 1 was the first batch to insert the time field, but by commit time it was already
     // committed by batch 2.
+    ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT(batch1->newFieldNamesToBeInserted.empty());
     finish(*_bucketCatalog, batch1, {});
@@ -1410,6 +1450,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
 
@@ -1456,6 +1497,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
 
@@ -1508,6 +1550,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
     ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
 
@@ -1560,6 +1603,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
 
@@ -1620,6 +1664,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
 
@@ -1676,6 +1721,7 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
                                        BSON(_timeField << Date_t::now() << _metaField << meta++));
         ASSERT_OK(result.getStatus());
         auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+        ASSERT(claimWriteBatchCommitRights(*batch));
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
         finish(*_bucketCatalog, batch, {});
 
@@ -1747,6 +1793,7 @@ TEST_F(BucketCatalogTest, ExpireBucketsForDroppedCollections) {
                                        BSON(_timeField << Date_t::now() << _metaField << meta++));
         ASSERT_OK(result.getStatus());
         auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+        ASSERT(claimWriteBatchCommitRights(*batch));
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
         finish(*_bucketCatalog, batch, {});
 
@@ -1845,6 +1892,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
         ASSERT(batch);
         bucketId = batch->bucketId;
+        ASSERT(claimWriteBatchCommitRights(*batch));
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
         ASSERT_EQ(batch->measurements.size(), 1);
         finish(*_bucketCatalog, batch, {});
@@ -1898,6 +1946,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
         ASSERT_NE(batch->bucketId, bucketId);
         ASSERT(batch);
+        ASSERT(claimWriteBatchCommitRights(*batch));
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
         ASSERT_EQ(batch->measurements.size(), 1);
         finish(*_bucketCatalog, batch, {});
@@ -1933,6 +1982,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
     auto bucketId = batch->bucketId;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
     finish(*_bucketCatalog, batch, {});
@@ -1949,6 +1999,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     batch = get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
     ASSERT_NE(batch->bucketId, bucketId);
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
     finish(*_bucketCatalog, batch, {});
@@ -1972,6 +2023,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedUncompressedBucket) {
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
     auto oldBucketId = batch->bucketId;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
     finish(*_bucketCatalog, batch, {});
@@ -2007,6 +2059,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedUncompressedBucket) {
     batch = get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
     ASSERT_EQ(batch->bucketId.oid, bucketDoc["_id"].OID());
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
     finish(*_bucketCatalog, batch, {});
@@ -2047,6 +2100,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
     auto oldBucketId = batch->bucketId;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
     finish(*_bucketCatalog, batch, {});
@@ -2129,6 +2183,7 @@ TEST_F(BucketCatalogTest, ReopeningConflictsWithPreparedBatch) {
     ASSERT_OK(result1.getStatus());
     auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(batch1);
+    ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1);
 
@@ -2143,6 +2198,7 @@ TEST_F(BucketCatalogTest, ReopeningConflictsWithPreparedBatch) {
     ASSERT_OK(result2.getStatus());
     auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT(batch2);
+    ASSERT(claimWriteBatchCommitRights(*batch2));
     abort(*_bucketCatalog, batch2, {ErrorCodes::WriteConflict, "foo"});
 
     // A subsequent attempt to reopen a bucket should conflict and yield a InsertWaiter.
@@ -2182,6 +2238,7 @@ TEST_F(BucketCatalogTest, PreparingBatchConflictsWithQueryBasedReopening) {
     ASSERT_OK(result2.getStatus());
     auto batch = get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT(batch);
+    ASSERT(claimWriteBatchCommitRights(*batch));
 
     // Ensure it blocks until we resolve the reopening request.
     auto task = RunBackgroundTaskAndWaitForFailpoint{
@@ -2477,6 +2534,7 @@ TEST_F(BucketCatalogTest, WriteConflictIfDirectWriteOnPreparedBucket) {
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
     ASSERT_OK(result.getStatus());
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
 
     // A direct write on a prepared bucket will throw a write conflict.

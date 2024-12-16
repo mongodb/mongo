@@ -247,6 +247,7 @@ TEST_F(TimeseriesWriteOpsTest, CommitTimeseriesBucketNoCollection) {
         NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "dne");
 
     write_ops::InsertCommandRequest insertCmdReq(nss.makeTimeseriesBucketsNamespace());
+    ASSERT(timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch));
 
     ASSERT_THROWS_CODE(
         timeseries::write_ops::details::commitTimeseriesBucket(

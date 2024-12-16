@@ -795,6 +795,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
                                      0,
                                      stats,
                                      StringData{bucket.timeField.data(), bucket.timeField.size()});
+    ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*this, batch, nullptr));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));
 
