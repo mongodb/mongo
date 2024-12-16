@@ -71,6 +71,7 @@ public:
     void setEncryptedTags(std::pair<StringData, int> fieldvalue, std::vector<PrfBlock> tags) {
         _encryptedFields.insert(fieldvalue.first);
         _tags[fieldvalue] = tags;
+        _exprTags[fieldvalue.second] = tags;
     }
 
     void addEncryptedField(StringData field) {
@@ -84,7 +85,11 @@ protected:
     }
 
     bool isPayload(const Value& v) const override {
-        return true;
+        // Consider it a payload if either 1) we have configured encrypted fields but no tags set (a
+        // shortcut for tests that aren't bothering with tag generation) or 2) we have tags for this
+        // value.
+        return (!_encryptedFields.empty() && _exprTags.empty()) ||
+            (v.numeric() && _exprTags.contains(v.coerceToInt()));
     }
 
     std::vector<PrfBlock> generateTags(BSONValue payload) const override {
@@ -95,13 +100,19 @@ protected:
                              return _tags.find({p.fieldNameStringData(), p.Int()})->second;
                          },
                          [&](std::reference_wrapper<Value> v) {
-                             return std::vector<PrfBlock>{};
+                             ASSERT(v.get().numeric());  // Only accept numbers as mock FFPs.
+                             ASSERT(_exprTags.find(v.get().coerceToInt()) != _exprTags.end());
+                             return _exprTags.find(v.get().coerceToInt())->second;
                          }},
                      payload);
     }
 
 private:
     TagMap _tags;
+    // Key the tags for agg expressions based on values only, since we don't have access to the
+    // field name.
+    std::map<int, std::vector<PrfBlock>> _exprTags;
+
     std::set<StringData> _encryptedFields;
 };
 
@@ -113,7 +124,36 @@ protected:
     MockEqualityPredicate _predicate;
 };
 
-TEST_F(EqualityPredicateRewriteTest, Equality_NoFFP) {
+std::unique_ptr<Expression> makeEqAggExpr(
+    ExpressionContext* const expCtx,
+    StringData path,
+    Value value,
+    ExpressionCompare::CmpOp comparisonType = ExpressionCompare::EQ) {
+    auto valExpr = make_intrusive<ExpressionConstant>(expCtx, value);
+    auto fieldpath = ExpressionFieldPath::createPathFromString(
+        expCtx, path.toString(), expCtx->variablesParseState);
+    std::vector<boost::intrusive_ptr<Expression>> children = {std::move(fieldpath),
+                                                              std::move(valExpr)};
+    return std::make_unique<ExpressionCompare>(expCtx, comparisonType, std::move(children));
+}
+
+std::unique_ptr<Expression> makeInAggExpr(ExpressionContext* const expCtx,
+                                          StringData path,
+                                          std::vector<Value> values) {
+    std::vector<boost::intrusive_ptr<Expression>> valExprs;
+    for (auto& value : values) {
+        auto valExpr = make_intrusive<ExpressionConstant>(expCtx, value);
+        valExprs.emplace_back(std::move(valExpr));
+    }
+    auto valArray = make_intrusive<ExpressionArray>(expCtx, std::move(valExprs));
+    auto fieldpath = ExpressionFieldPath::createPathFromString(
+        expCtx, path.toString(), expCtx->variablesParseState);
+    std::vector<boost::intrusive_ptr<Expression>> children{std::move(fieldpath),
+                                                           std::move(valArray)};
+    return std::make_unique<ExpressionIn>(expCtx, std::move(children));
+}
+
+TEST_F(EqualityPredicateRewriteTest, Equality_NoFFP_Match) {
     std::unique_ptr<MatchExpression> input =
         std::make_unique<EqualityMatchExpression>("ssn"_sd, Value(5));
     auto expected = EqualityMatchExpression("ssn"_sd, Value(5));
@@ -123,7 +163,16 @@ TEST_F(EqualityPredicateRewriteTest, Equality_NoFFP) {
     ASSERT(input->equivalent(&expected));
 }
 
-TEST_F(EqualityPredicateRewriteTest, In_NoFFP) {
+TEST_F(EqualityPredicateRewriteTest, Equality_NoFFP_Expr) {
+    std::unique_ptr<Expression> input =
+        makeEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value(5));
+    ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
+
+    input = makeEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value(5), ExpressionCompare::NE);
+    ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
+}
+
+TEST_F(EqualityPredicateRewriteTest, In_NoFFP_Match) {
     auto input = makeInExpr("name",
                             BSON_ARRAY("harry"
                                        << "ron"
@@ -138,7 +187,14 @@ TEST_F(EqualityPredicateRewriteTest, In_NoFFP) {
     ASSERT(input->equivalent(expected.get()));
 }
 
-TEST_F(EqualityPredicateRewriteTest, Equality_Basic) {
+TEST_F(EqualityPredicateRewriteTest, In_NoFFP_Expr) {
+    auto input = makeInAggExpr(_mock.getExpressionContext(),
+                               "name",
+                               {Value("harry"_sd), Value("ron"_sd), Value("hermione"_sd)});
+    ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
+}
+
+TEST_F(EqualityPredicateRewriteTest, Equality_Basic_Match) {
     auto input = EqualityMatchExpression("ssn"_sd, Value(5));
     std::vector<PrfBlock> tags = {{1}, {2}, {3}};
 
@@ -147,7 +203,48 @@ TEST_F(EqualityPredicateRewriteTest, Equality_Basic) {
     assertRewriteToTags(_predicate, &input, toBSONArray(std::move(tags)));
 }
 
-TEST_F(EqualityPredicateRewriteTest, In_Basic) {
+TEST_F(EqualityPredicateRewriteTest, Equality_Basic_Expr) {
+    auto input = makeEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value(5));
+    std::vector<PrfBlock> tags = {{1}, {2}};
+
+    _predicate.setEncryptedTags({"ssn", 5}, tags);
+
+    auto actual = _predicate.rewrite(input.get());
+    auto actualBson = actual->serialize().getDocument().toBson();
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$or": [
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                },
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                }
+            ]
+        })",
+        actualBson);
+
+    // Test the NE operator as well. The rewritten predicate should be the same as the equality
+    // predicate, but negated.
+    input = makeEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value(5), ExpressionCompare::NE);
+    auto neActual = _predicate.rewrite(input.get())->serialize().getDocument();
+    ASSERT(!neActual.getField("$not").missing() && neActual["$not"].isArray());
+    ASSERT_EQ(neActual["$not"].getArrayLength(), 1);
+    ASSERT_BSONOBJ_EQ(neActual["$not"][0].getDocument().toBson(), actualBson);
+}
+
+TEST_F(EqualityPredicateRewriteTest, In_Basic_Match) {
     auto input = makeInExpr("ssn", BSON_ARRAY(2 << 4 << 6));
 
     _predicate.setEncryptedTags({"0", 2}, {{1}, {2}});
@@ -157,7 +254,55 @@ TEST_F(EqualityPredicateRewriteTest, In_Basic) {
     assertRewriteToTags(_predicate, input.get(), toBSONArray({{1}, {2}, {3}, {5}, {99}, {100}}));
 }
 
-TEST_F(EqualityPredicateRewriteTest, In_NotAllFFPs) {
+TEST_F(EqualityPredicateRewriteTest, In_Basic_Expr) {
+    auto input = makeInAggExpr(_mock.getExpressionContext(), "ssn", {Value(2), Value(4)});
+
+    _predicate.setEncryptedTags({"0", 2}, {{1}, {2}});
+    _predicate.setEncryptedTags({"1", 4}, {{5}, {3}});
+
+    auto actual = _predicate.rewrite(input.get());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$or": [
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                },
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                },
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"BQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                },
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                }
+            ]
+        })",
+        actual->serialize().getDocument().toBson());
+}
+
+TEST_F(EqualityPredicateRewriteTest, In_NotAllFFPs_Match) {
     auto input = makeInExpr("ssn", BSON_ARRAY(2 << 4 << 6));
 
     _predicate.setEncryptedTags({"0", 2}, {{1}, {2}});
@@ -167,6 +312,15 @@ TEST_F(EqualityPredicateRewriteTest, In_NotAllFFPs) {
         assertRewriteToTags(_predicate, input.get(), toBSONArray({{1}, {2}, {3}, {5}})),
         AssertionException,
         6329400);
+}
+
+TEST_F(EqualityPredicateRewriteTest, In_NotAllFFPs_Expr) {
+    auto input = makeInAggExpr(_mock.getExpressionContext(), "ssn", {Value(2), Value(4), Value(6)});
+
+    _predicate.setEncryptedTags({"0", 2}, {{1}, {2}});
+    _predicate.setEncryptedTags({"1", 4}, {{5}, {3}});
+
+    ASSERT_THROWS_CODE(_predicate.rewrite(input.get()), AssertionException, 6334102);
 }
 
 BSONObj generateFFP(StringData path, int value) {
@@ -188,16 +342,13 @@ std::unique_ptr<MatchExpression> generateEqualityWithFFP(StringData path, BSONOb
     return std::make_unique<EqualityMatchExpression>(path, ffp.firstElement());
 }
 
-std::unique_ptr<Expression> generateEqualityWithFFP(ExpressionContext* const expCtx,
-                                                    StringData path,
-                                                    int value) {
+std::unique_ptr<Expression> generateEqualityWithFFP(
+    ExpressionContext* const expCtx,
+    StringData path,
+    int value,
+    ExpressionCompare::CmpOp comparisonType = ExpressionCompare::EQ) {
     auto ffp = Value(generateFFP(path, value).firstElement());
-    auto ffpExpr = make_intrusive<ExpressionConstant>(expCtx, ffp);
-    auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
-    std::vector<boost::intrusive_ptr<Expression>> children = {std::move(fieldpath),
-                                                              std::move(ffpExpr)};
-    return std::make_unique<ExpressionCompare>(expCtx, ExpressionCompare::EQ, std::move(children));
+    return makeEqAggExpr(expCtx, path, ffp, comparisonType);
 }
 
 std::unique_ptr<MatchExpression> generateDisjunctionWithFFP(StringData path,
@@ -213,18 +364,11 @@ std::unique_ptr<MatchExpression> generateDisjunctionWithFFP(StringData path,
 std::unique_ptr<Expression> generateDisjunctionWithFFP(ExpressionContext* const expCtx,
                                                        StringData path,
                                                        std::initializer_list<int> values) {
-    std::vector<boost::intrusive_ptr<Expression>> ffps;
+    std::vector<Value> ffps;
     for (auto& value : values) {
-        auto ffp = make_intrusive<ExpressionConstant>(
-            expCtx, Value(generateFFP(path, value).firstElement()));
-        ffps.emplace_back(std::move(ffp));
+        ffps.emplace_back(Value(generateFFP(path, value).firstElement()));
     }
-    auto ffpArray = make_intrusive<ExpressionArray>(expCtx, std::move(ffps));
-    auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
-    std::vector<boost::intrusive_ptr<Expression>> children{std::move(fieldpath),
-                                                           std::move(ffpArray)};
-    return std::make_unique<ExpressionIn>(expCtx, std::move(children));
+    return makeInAggExpr(expCtx, path, ffps);
 }
 
 class EqualityPredicateCollScanRewriteTest : public EncryptedPredicateRewriteTest {
@@ -284,6 +428,17 @@ TEST_F(EqualityPredicateCollScanRewriteTest, Eq_Expr) {
     })");
     ASSERT(result);
     ASSERT_BSONOBJ_EQ(result->serialize().getDocument().toBson(), expected);
+
+    // Test the NE operator as well. The rewritten predicate should be the same as the equality
+    // predicate, but negated.
+    input = generateEqualityWithFFP(expCtx, "ssn", 1, ExpressionCompare::NE);
+    auto neResult = _predicate.rewrite(input.get());
+    ASSERT(neResult);
+
+    auto neResultDoc = neResult->serialize().getDocument();
+    ASSERT(!neResultDoc.getField("$not").missing() && neResultDoc["$not"].isArray());
+    ASSERT_EQ(neResultDoc["$not"].getArrayLength(), 1);
+    ASSERT_BSONOBJ_EQ(neResultDoc["$not"][0].getDocument().toBson(), expected);
 }
 
 TEST_F(EqualityPredicateCollScanRewriteTest, In_Match) {
