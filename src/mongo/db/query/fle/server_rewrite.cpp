@@ -147,24 +147,27 @@ BSONObj rewriteEncryptedFilterV2(FLETagQueryInterface* queryImpl,
     return filter;
 }
 
+namespace {
+NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encryptInfo,
+                                              const NamespaceString& nss) {
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
+    return NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection()->toString());
+}
+}  // namespace
 
 class RewriteBase {
 public:
     RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
                 const NamespaceString& nss,
                 const EncryptionInformation& encryptInfo)
-        : expCtx(expCtx), dbName(nss.dbName()) {
-        auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
-        esc = efc.getEscCollection()->toString();
-    }
+        : expCtx(expCtx), nssEsc(getAndValidateEscNsFromSchema(encryptInfo, nss)) {}
+
     virtual ~RewriteBase(){};
 
-    virtual void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc){};
-
+    virtual void doRewrite(FLETagQueryInterface* queryImpl){};
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    std::string esc;
-    DatabaseName dbName;
+    const NamespaceString nssEsc;
 };
 
 // This class handles rewriting of an entire pipeline.
@@ -177,7 +180,7 @@ public:
 
     ~PipelineRewrite() override{};
 
-    void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
+    void doRewrite(FLETagQueryInterface* queryImpl) final {
         auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc);
         for (auto&& source : pipeline->getSources()) {
             if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
@@ -206,7 +209,7 @@ public:
 
     ~FilterRewrite() override{};
 
-    void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
+    void doRewrite(FLETagQueryInterface* queryImpl) final {
         rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
     }
 
@@ -227,11 +230,9 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     // if breaks us off of the current optctx readconcern and other settings
     //
     if (!opCtx->inMultiDocumentTransaction()) {
-        NamespaceString nssEsc(
-            NamespaceStringUtil::deserialize(sharedBlock->dbName, sharedBlock->esc));
         FLETagNoTXNQuery queryInterface(opCtx);
 
-        sharedBlock->doRewrite(&queryInterface, nssEsc);
+        sharedBlock->doRewrite(&queryInterface);
         return;
     }
 
@@ -239,14 +240,11 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     auto service = opCtx->getService();
     auto swCommitResult = txn->runNoThrow(
         opCtx, [service, sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
-            NamespaceString nssEsc(
-                NamespaceStringUtil::deserialize(sharedBlock->dbName, sharedBlock->esc));
-
             // Construct FLE rewriter from the transaction client and encryptionInformation.
             auto queryInterface = FLEQueryInterfaceImpl(txnClient, service);
 
             // Rewrite the MatchExpression.
-            sharedBlock->doRewrite(&queryInterface, nssEsc);
+            sharedBlock->doRewrite(&queryInterface);
 
             return SemiFuture<void>::makeReady();
         });
