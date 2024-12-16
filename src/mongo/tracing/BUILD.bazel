@@ -1,5 +1,7 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
+package(default_visibility = ["//visibility:public"])
+
 mongo_cc_library(
     name = "tracing",
     srcs = [

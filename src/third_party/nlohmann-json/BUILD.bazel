@@ -1,5 +1,7 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
+package(default_visibility = ["//visibility:public"])
+
 JSON_COPTS = select({
     "//bazel/config:gcc_or_clang": [
         "-Wno-sign-compare",
