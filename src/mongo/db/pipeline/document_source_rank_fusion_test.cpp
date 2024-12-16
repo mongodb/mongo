@@ -2424,5 +2424,407 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameContainsDot) {
                        AssertionException,
                        16412);
 }
+
+TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchDistance: [
+                        {
+                            $geoNear: {
+                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
+                                maxDistance: 2,
+                                query: { category: "Parks" },
+                                spherical: true
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 2,
+                    matchDistance: 3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx);
+    const auto pipeline = Pipeline::create(desugaredList, expCtx);
+
+    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson(opts));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "HASH<author>": {
+                            "$eq": "?string"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "HASH<author>": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "?null",
+                        "HASH<docs>": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$HASH<docs>",
+                        "includeArrayIndex": "HASH<matchAuthor_rank>"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "HASH<matchAuthor_score>": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        "?number",
+                                        {
+                                            "$add": [
+                                                "$HASH<matchAuthor_rank>",
+                                                "?number"
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "?number"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "HASH<pipeline_test>",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": "?object",
+                                    "distanceField": "HASH<dist>.HASH<calculated>",
+                                    "maxDistance": "?number",
+                                    "query": {
+                                        "HASH<category>": {
+                                            "$eq": "?string"
+                                        }
+                                    },
+                                    "spherical": "?bool"
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": "?null",
+                                    "HASH<docs>": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$HASH<docs>",
+                                    "includeArrayIndex": "HASH<matchDistance_rank>"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "HASH<matchDistance_score>": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    "?number",
+                                                    {
+                                                        "$add": [
+                                                            "$HASH<matchDistance_rank>",
+                                                            "?number"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "?number"
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$HASH<docs>.HASH<_id>",
+                        "HASH<docs>": {
+                            "$first": "$HASH<docs>"
+                        },
+                        "HASH<matchAuthor_score>": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$HASH<matchAuthor_score>",
+                                    "?number"
+                                ]
+                            }
+                        },
+                        "HASH<matchDistance_score>": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$HASH<matchDistance_score>",
+                                    "?number"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "HASH<score>": {
+                            "$add": [
+                                "$HASH<matchAuthor_score>",
+                                "$HASH<matchDistance_score>"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "HASH<score>": -1,
+                        "HASH<_id>": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$HASH<docs>"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: { author: 1 } }
+                    ],
+                    matchDistance: [
+                        {
+                            $geoNear: {
+                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
+                                maxDistance: 2,
+                                query: { category: "Parks" },
+                                spherical: true
+                            }
+                        }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 2,
+                    matchDistance: 3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx);
+    const auto pipeline = Pipeline::create(desugaredList, expCtx);
+
+    SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson(opts));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": {
+                            "$eq": "?"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "matchAuthor_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        1,
+                                        {
+                                            "$add": [
+                                                "$matchAuthor_rank",
+                                                1
+                                            ]
+                                        }
+                                    ]
+                                },
+                                1
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": {
+                                        "$const": {
+                                            "?": "?"
+                                        }
+                                    },
+                                    "distanceField": "dist.calculated",
+                                    "maxDistance": 1,
+                                    "query": {
+                                        "category": {
+                                            "$eq": "?"
+                                        }
+                                    },
+                                    "spherical": true
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "matchDistance_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchDistance_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    1,
+                                                    {
+                                                        "$add": [
+                                                            "$matchDistance_rank",
+                                                            1
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            1
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchAuthor_score",
+                                    1
+                                ]
+                            }
+                        },
+                        "matchDistance_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchDistance_score",
+                                    1
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchAuthor_score",
+                                "$matchDistance_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+
+
+    // Ensure the representative query shape is reparseable.
+    ASSERT_DOES_NOT_THROW(Pipeline::parseFromArray(asOneObj.firstElement(), expCtx));
+}
 }  // namespace
 }  // namespace mongo

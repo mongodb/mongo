@@ -10,6 +10,8 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_pipeline_stages";
 const coll = testDb[collName];
@@ -27,6 +29,11 @@ const unstablePipelines = [
     [{$lookup: {from: "coll2", pipeline: [{$indexStats: {}}]}}],
     [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],
 ];
+
+// TODO SERVER-94570 $rankFusion can always be included when it's enabled by default.
+if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'RankFusionFull')) {
+    unstablePipelines.push([{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}]);
+}
 
 function assertAggregateFailsWithAPIStrict(pipeline) {
     assert.commandFailedWithCode(testDb.runCommand({
