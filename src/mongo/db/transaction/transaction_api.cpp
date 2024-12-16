@@ -49,7 +49,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/api_parameters_gen.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -57,19 +56,14 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/operation_time_tracker.h"
-#include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/transaction/internal_transaction_metrics.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/inline_executor.h"
@@ -81,18 +75,15 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
@@ -102,105 +93,9 @@ MONGO_FAIL_POINT_DEFINE(overrideTransactionApiMaxRetriesToThree);
 namespace mongo {
 using namespace fmt::literals;
 
-const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 namespace txn_api {
 
-namespace {
-
-void runFutureInline(executor::InlineExecutor* inlineExecutor, Notification<void>& mayReturn) {
-    inlineExecutor->run([&]() { return !!mayReturn; });
-}
-
-}  // namespace
-
-SyncTransactionWithRetries::SyncTransactionWithRetries(
-    OperationContext* opCtx,
-    std::shared_ptr<executor::TaskExecutor> sleepAndCleanupExecutor,
-    std::unique_ptr<ResourceYielder> resourceYielder,
-    std::shared_ptr<executor::InlineExecutor> inlineExecutor,
-    std::unique_ptr<TransactionClient> txnClient)
-    : _resourceYielder(std::move(resourceYielder)),
-      _inlineExecutor(inlineExecutor),
-      _sleepExec(inlineExecutor->getSleepableExecutor(sleepAndCleanupExecutor)),
-      _cleanupExecutor(sleepAndCleanupExecutor),
-      _txn(std::make_shared<details::TransactionWithRetries>(
-          opCtx,
-          _sleepExec,
-          opCtx->getCancellationToken(),
-          txnClient
-              ? std::move(txnClient)
-              : std::make_unique<details::SEPTransactionClient>(
-                    opCtx,
-                    inlineExecutor,
-                    _sleepExec,
-                    _cleanupExecutor,
-                    std::make_unique<details::DefaultSEPTransactionClientBehaviors>(opCtx)))) {
-    // Callers should always provide a yielder when using the API with a session checked out,
-    // otherwise commands run by the API won't be able to check out that session.
-    invariant(!OperationContextSession::get(opCtx) || _resourceYielder);
-}
-
-StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext* opCtx,
-                                                                Callback callback) noexcept {
-    // Pre transaction processing, which must happen inline because it uses the caller's opCtx.
-    auto yieldStatus = _resourceYielder ? _resourceYielder->yieldNoThrow(opCtx) : Status::OK();
-    if (!yieldStatus.isOK()) {
-        return yieldStatus;
-    }
-
-    Notification<void> mayReturn;
-    auto txnFuture = _txn->run(std::move(callback))
-                         .unsafeToInlineFuture()
-                         .tapAll([&](auto&&) { mayReturn.set(); })
-                         .semi();
-
-    runFutureInline(_inlineExecutor.get(), mayReturn);
-
-    auto txnResult = txnFuture.getNoThrow(opCtx);
-
-    // Post transaction processing, which must also happen inline.
-    OperationTimeTracker::get(opCtx)->updateOperationTime(_txn->getOperationTime());
-    repl::ReplClientInfo::forClient(opCtx->getClient())
-        .setLastProxyWriteTimestampForward(_txn->getOperationTime().asTimestamp());
-
-    if (_txn->needsCleanup()) {
-        // Schedule cleanup on an out of line executor so it runs even if the transaction was
-        // cancelled. Attempt to wait for cleanup so it appears synchronous for most callers, but
-        // allow interruptions so we return immediately if the opCtx has been cancelled.
-        //
-        // Also schedule after getting the transaction's operation time so the best effort abort
-        // can't unnecessarily advance it.
-        ExecutorFuture<void>(_cleanupExecutor)
-            .then([txn = _txn, inlineExecutor = _inlineExecutor]() mutable {
-                Notification<void> mayReturnFromCleanup;
-                auto cleanUpFuture = txn->cleanUp().unsafeToInlineFuture().tapAll(
-                    [&](auto&&) { mayReturnFromCleanup.set(); });
-                runFutureInline(inlineExecutor.get(), mayReturnFromCleanup);
-                return cleanUpFuture;
-            })
-            .getNoThrow(opCtx)
-            .ignore();
-    }
-
-    auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
-
-    if (!txnResult.isOK()) {
-        if (auto interruptStatus = opCtx->checkForInterruptNoAssert(); !interruptStatus.isOK()) {
-            // The caller was interrupted during the transaction, so if the transaction failed,
-            // return the caller's interruption code instead. The transaction uses a
-            // CancelableOperationContext inherited from the caller's opCtx, but that type can only
-            // kill with an Interrupted error, so this is meant as a workaround to preserve the
-            // presumably more meaningful error the caller was interrupted with.
-            return interruptStatus;
-        }
-        return txnResult;
-    } else if (!unyieldStatus.isOK()) {
-        return unyieldStatus;
-    }
-
-    return txnResult;
-}
 
 namespace details {
 
@@ -297,418 +192,6 @@ std::string execContextToString(Transaction::ExecutionContext execContext) {
     MONGO_UNREACHABLE;
 }
 
-std::string errorHandlingStepToString(Transaction::ErrorHandlingStep nextStep) {
-    switch (nextStep) {
-        case Transaction::ErrorHandlingStep::kDoNotRetry:
-            return "do not retry";
-        case Transaction::ErrorHandlingStep::kAbortAndDoNotRetry:
-            return "abort and do not retry";
-        case Transaction::ErrorHandlingStep::kRetryTransaction:
-            return "retry transaction";
-        case Transaction::ErrorHandlingStep::kRetryCommit:
-            return "retry commit";
-    }
-    MONGO_UNREACHABLE;
-}
-
-void logNextStep(Transaction::ErrorHandlingStep nextStep,
-                 const BSONObj& txnInfo,
-                 int attempts,
-                 const StatusWith<CommitResult>& swResult,
-                 StringData errorHandler) {
-    // DynamicAttributes doesn't allow rvalues, so make some local variables.
-    auto nextStepString = errorHandlingStepToString(nextStep);
-    std::string redactedError, redactedCommitError, redactedCommitWCError;
-
-    logv2::DynamicAttributes attr;
-    attr.add("nextStep", nextStepString);
-    attr.add("txnInfo", txnInfo);
-    attr.add("attempts", attempts);
-    if (!swResult.isOK()) {
-        redactedError = redact(swResult.getStatus());
-        attr.add("error", redactedError);
-    } else {
-        redactedCommitError = redact(swResult.getValue().cmdStatus);
-        attr.add("commitError", redactedCommitError);
-        redactedCommitWCError = redact(swResult.getValue().wcError.toStatus());
-        attr.add("commitWCError", redactedCommitWCError);
-    }
-    attr.add("errorHandler", errorHandler);
-
-    LOGV2(5918600, "Chose internal transaction error handling step", attr);
-}
-
-SemiFuture<CommitResult> TransactionWithRetries::run(Callback callback) noexcept {
-    InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())->incrementStarted();
-    _internalTxn->setCallback(std::move(callback));
-
-    return AsyncTry([this, bodyAttempts = 0]() mutable {
-               bodyAttempts++;
-               return _runBodyHandleErrors(bodyAttempts).then([this] {
-                   return _runCommitWithRetries();
-               });
-           })
-        .until([](StatusOrStatusWith<CommitResult> txnStatus) {
-            // Commit retries should be handled within _runCommitWithRetries().
-            invariant(txnStatus != ErrorCodes::TransactionAPIMustRetryCommit);
-
-            return txnStatus.isOK() || txnStatus != ErrorCodes::TransactionAPIMustRetryTransaction;
-        })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(_executor, _token)
-        // Safe to inline because the continuation only holds state.
-        .unsafeToInlineFuture()
-        .tapAll([anchor = shared_from_this()](auto&&) {})
-        .semi();
-}
-
-ExecutorFuture<void> TransactionWithRetries::_runBodyHandleErrors(int bodyAttempts) {
-    return _internalTxn->runCallback().thenRunOn(_executor).onError(
-        [this, bodyAttempts](Status bodyStatus) {
-            auto nextStep = _internalTxn->handleError(bodyStatus, bodyAttempts);
-            logNextStep(
-                nextStep, _internalTxn->reportStateForLog(), bodyAttempts, bodyStatus, "runBody");
-
-            if (nextStep == Transaction::ErrorHandlingStep::kDoNotRetry) {
-                iassert(bodyStatus);
-            } else if (nextStep == Transaction::ErrorHandlingStep::kAbortAndDoNotRetry) {
-                _internalTxn->primeForCleanup();
-                iassert(bodyStatus);
-            } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
-                return _bestEffortAbort().then([this, bodyStatus] {
-                    InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
-                        ->incrementRetriedTransactions();
-                    _internalTxn->primeForTransactionRetry();
-                    iassert(Status(ErrorCodes::TransactionAPIMustRetryTransaction,
-                                   str::stream() << "Must retry body loop on internal body error: "
-                                                 << bodyStatus));
-                });
-            }
-            MONGO_UNREACHABLE;
-        });
-}
-
-ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitHandleErrors(int commitAttempts) {
-    return _internalTxn->commit().thenRunOn(_executor).onCompletion(
-        [this, commitAttempts](StatusWith<CommitResult> swCommitResult) {
-            if (swCommitResult.isOK() && swCommitResult.getValue().getEffectiveStatus().isOK()) {
-                InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
-                    ->incrementSucceeded();
-                // Commit succeeded so return to the caller.
-                return ExecutorFuture<CommitResult>(_executor, swCommitResult);
-            }
-
-            auto nextStep = _internalTxn->handleError(swCommitResult, commitAttempts);
-            logNextStep(nextStep,
-                        _internalTxn->reportStateForLog(),
-                        commitAttempts,
-                        swCommitResult,
-                        "runCommit");
-
-            if (nextStep == Transaction::ErrorHandlingStep::kDoNotRetry) {
-                return ExecutorFuture<CommitResult>(_executor, swCommitResult);
-            } else if (nextStep == Transaction::ErrorHandlingStep::kAbortAndDoNotRetry) {
-                MONGO_UNREACHABLE;
-            } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
-                InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
-                    ->incrementRetriedTransactions();
-                _internalTxn->primeForTransactionRetry();
-                iassert(Status(ErrorCodes::TransactionAPIMustRetryTransaction,
-                               str::stream() << "Must retry body loop on commit error: "
-                                             << swCommitResult.getStatus()));
-            } else if (nextStep == Transaction::ErrorHandlingStep::kRetryCommit) {
-                InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
-                    ->incrementRetriedCommits();
-                _internalTxn->primeForCommitRetry();
-                iassert(Status(ErrorCodes::TransactionAPIMustRetryCommit,
-                               str::stream() << "Must retry commit loop on internal commit error: "
-                                             << swCommitResult.getStatus()));
-            }
-            MONGO_UNREACHABLE;
-        });
-}
-
-ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitWithRetries() {
-    return AsyncTry([this, commitAttempts = 0]() mutable {
-               commitAttempts++;
-               return _runCommitHandleErrors(commitAttempts);
-           })
-        .until([](StatusWith<CommitResult> swResult) {
-            return swResult.isOK() || swResult != ErrorCodes::TransactionAPIMustRetryCommit;
-        })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(_executor, _token);
-}
-
-ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
-    return _internalTxn->abort().thenRunOn(_executor).onError([this](Status abortStatus) {
-        LOGV2(5875900,
-              "Unable to abort internal transaction",
-              "reason"_attr = redact(abortStatus),
-              "txnInfo"_attr = _internalTxn->reportStateForLog());
-    });
-}
-
-// Sets the appropriate options on the given client and operation context for running internal
-// commands.
-void primeInternalClient(Client* client) {
-    auto as = AuthorizationSession::get(client);
-    if (as) {
-        as->grantInternalAuthorization();
-    }
-}
-
-Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
-    OperationContext* opCtx, const Message& request) const {
-    return _service->getServiceEntryPoint()->handleRequest(opCtx, request);
-}
-
-ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& dbName,
-                                                          BSONObj cmdObj) const {
-    invariant(_hooks, "Transaction metadata hooks must be injected before a command can be run");
-
-    BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
-    _hooks->runRequestHook(&cmdBuilder);
-
-    auto client = _behaviors->getService()->makeClient("SEP-internal-txn-client");
-
-    AlternativeClientRegion clientRegion(client);
-
-    // Note that _token is only cancelled once the caller of the transaction no longer cares about
-    // its result, so CancelableOperationContexts only being interrupted by ErrorCodes::Interrupted
-    // shouldn't impact any upstream retry logic.
-    auto opCtxFactory =
-        CancelableOperationContextFactory(_hooks->getTokenForCommand(), _cancelExecutor);
-
-    auto cancellableOpCtx = opCtxFactory.makeOperationContext(&cc());
-
-    primeInternalClient(&cc());
-
-    auto vts = [&]() {
-        auto tenantId = dbName.tenantId();
-        return tenantId
-            ? auth::ValidatedTenancyScopeFactory::create(
-                  *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{})
-            : auth::ValidatedTenancyScope::kNotRequired;
-    }();
-    auto opMsgRequest = OpMsgRequestBuilder::create(vts, dbName, cmdBuilder.obj());
-    auto requestMessage = opMsgRequest.serialize();
-    return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
-        .thenRunOn(_executor)
-        .then([this](DbResponse dbResponse) {
-            // NOTE: The API uses this method to run commit and abort, so be careful about adding
-            // new logic here to ensure it cannot interfere with error handling for either command.
-            auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
-            _hooks->runReplyHook(reply);
-            return reply;
-        });
-}
-
-BSONObj SEPTransactionClient::runCommandSync(const DatabaseName& dbName, BSONObj cmdObj) const {
-    Notification<void> mayReturn;
-
-    auto result =
-        _runCommand(dbName, cmdObj).unsafeToInlineFuture().tapAll([&](auto&&) { mayReturn.set(); });
-
-    runFutureInline(_inlineExecutor.get(), mayReturn);
-
-    return std::move(result).get();
-}
-
-SemiFuture<BSONObj> SEPTransactionClient::runCommand(const DatabaseName& dbName,
-                                                     BSONObj cmdObj) const {
-    return _runCommand(dbName, cmdObj).semi();
-}
-
-ExecutorFuture<BSONObj> SEPTransactionClient::_runCommandChecked(const DatabaseName& dbName,
-                                                                 BSONObj cmdObj) const {
-    return _runCommand(dbName, cmdObj).then([](BSONObj reply) {
-        uassertStatusOK(getStatusFromCommandResult(reply));
-        return reply;
-    });
-}
-
-SemiFuture<BSONObj> SEPTransactionClient::runCommandChecked(const DatabaseName& dbName,
-                                                            BSONObj cmdObj) const {
-    return _runCommandChecked(dbName, cmdObj).semi();
-}
-
-BSONObj SEPTransactionClient::runCommandCheckedSync(const DatabaseName& dbName,
-                                                    BSONObj cmdObj) const {
-    Notification<void> mayReturn;
-    auto result = _runCommandChecked(dbName, cmdObj).unsafeToInlineFuture().tapAll([&](auto&&) {
-        mayReturn.set();
-    });
-    runFutureInline(_inlineExecutor.get(), mayReturn);
-
-    return std::move(result).get();
-}
-
-ExecutorFuture<BatchedCommandResponse> SEPTransactionClient::_runCRUDOp(
-    const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const {
-    invariant(!stmtIds.size() || (cmd.sizeWriteOps() == stmtIds.size()),
-              fmt::format("If stmtIds are specified, they must match the number of write ops. "
-                          "Found {} stmtId(s) and {} write op(s).",
-                          stmtIds.size(),
-                          cmd.sizeWriteOps()));
-
-    BSONObjBuilder cmdBob(cmd.toBSON());
-    if (stmtIds.size()) {
-        cmdBob.append(write_ops::WriteCommandRequestBase::kStmtIdsFieldName, stmtIds);
-    }
-
-    return runCommand(cmd.getNS().dbName(), cmdBob.obj())
-        .thenRunOn(_executor)
-        .then([](BSONObj reply) {
-            uassertStatusOK(getStatusFromWriteCommandReply(reply));
-
-            BatchedCommandResponse response;
-            std::string errmsg;
-            if (!response.parseBSON(reply, &errmsg)) {
-                uasserted(ErrorCodes::FailedToParse, errmsg);
-            }
-            return response;
-        });
-}
-
-SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
-    const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const {
-    return _runCRUDOp(cmd, stmtIds).semi();
-}
-
-BatchedCommandResponse SEPTransactionClient::runCRUDOpSync(const BatchedCommandRequest& cmd,
-                                                           std::vector<StmtId> stmtIds) const {
-    Notification<void> mayReturn;
-
-    auto result =
-        _runCRUDOp(cmd, stmtIds)
-            .unsafeToInlineFuture()
-            // Use tap and tapError instead of tapAll since tapAll is not move-only type friendly
-            .tap([&](auto&&) { mayReturn.set(); })
-            .tapError([&](auto&&) { mayReturn.set(); });
-
-    runFutureInline(_inlineExecutor.get(), mayReturn);
-
-    return std::move(result).get();
-}
-
-ExecutorFuture<BulkWriteCommandReply> SEPTransactionClient::_runCRUDOp(
-    const BulkWriteCommandRequest& cmd) const {
-    BSONObjBuilder cmdBob(cmd.toBSON());
-    // BulkWrite can only execute on admin DB.
-    return runCommand(DatabaseName::kAdmin, cmdBob.obj())
-        .thenRunOn(_executor)
-        .then([](BSONObj reply) {
-            uassertStatusOK(getStatusFromCommandResult(reply));
-
-            IDLParserContext ctx("BulkWriteCommandReply");
-            auto response = BulkWriteCommandReply::parse(ctx, reply);
-
-            // TODO (SERVER-80794): Support iterating through the cursor for internal transactions.
-            uassert(7934200,
-                    "bulkWrite requires multiple batches to fetch all responses but it is "
-                    "currently not supported in internal transactions",
-                    response.getCursor().getId() == 0);
-            for (auto&& replyItem : response.getCursor().getFirstBatch()) {
-                uassertStatusOK(replyItem.getStatus());
-            }
-
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(reply));
-
-            return response;
-        });
-}
-
-SemiFuture<BulkWriteCommandReply> SEPTransactionClient::runCRUDOp(
-    const BulkWriteCommandRequest& cmd) const {
-    return _runCRUDOp(cmd).semi();
-}
-
-BulkWriteCommandReply SEPTransactionClient::runCRUDOpSync(
-    const BulkWriteCommandRequest& cmd) const {
-
-    Notification<void> mayReturn;
-
-    auto result =
-        _runCRUDOp(cmd)
-            .unsafeToInlineFuture()
-            // Use tap and tapError instead of tapAll since tapAll is not move-only type friendly
-            .tap([&](auto&&) { mayReturn.set(); })
-            .tapError([&](auto&&) { mayReturn.set(); });
-
-    runFutureInline(_inlineExecutor.get(), mayReturn);
-
-    return std::move(result).get();
-}
-
-ExecutorFuture<std::vector<BSONObj>> SEPTransactionClient::_exhaustiveFind(
-    const FindCommandRequest& cmd) const {
-    return runCommand(cmd.getDbName(), cmd.toBSON())
-        .thenRunOn(_executor)
-        .then([this, batchSize = cmd.getBatchSize(), tenantId = cmd.getDbName().tenantId()](
-                  BSONObj reply) {
-            auto cursorResponse = std::make_shared<CursorResponse>(
-                uassertStatusOK(CursorResponse::parseFromBSON(reply, nullptr, tenantId)));
-            auto response = std::make_shared<std::vector<BSONObj>>();
-            return AsyncTry([this,
-                             tenantId,
-                             batchSize = batchSize,
-                             cursorResponse = std::move(cursorResponse),
-                             response]() mutable {
-                       auto releasedBatch = cursorResponse->releaseBatch();
-                       response->insert(
-                           response->end(), releasedBatch.begin(), releasedBatch.end());
-
-                       // If we've fetched all the documents, we can return the response vector
-                       // wrapped in an OK status.
-                       if (!cursorResponse->getCursorId()) {
-                           return SemiFuture<void>(Status::OK());
-                       }
-
-                       GetMoreCommandRequest getMoreRequest(
-                           cursorResponse->getCursorId(),
-                           cursorResponse->getNSS().coll().toString());
-                       getMoreRequest.setBatchSize(batchSize);
-
-                       return runCommand(cursorResponse->getNSS().dbName(), getMoreRequest.toBSON())
-                           .thenRunOn(_executor)
-                           .then([response, cursorResponse, tenantId](BSONObj reply) {
-                               // We keep the state of cursorResponse to be able to check the
-                               // cursorId in the next iteration.
-                               *cursorResponse = uassertStatusOK(
-                                   CursorResponse::parseFromBSON(reply, nullptr, tenantId));
-                               uasserted(ErrorCodes::InternalTransactionsExhaustiveFindHasMore,
-                                         "More documents to fetch");
-                           })
-                           .semi();
-                   })
-                .until([&](Status result) {
-                    // We stop execution if there is either no more documents to fetch or there was
-                    // an error upon fetching more documents.
-                    return result != ErrorCodes::InternalTransactionsExhaustiveFindHasMore;
-                })
-                // It's fine to use an uncancelable token here because the getMore commands in the
-                // AsyncTry will inherit the real token.
-                .on(_executor, CancellationToken::uncancelable())
-                .then([response = std::move(response)] { return std::move(*response); });
-        });
-}
-
-SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
-    const FindCommandRequest& cmd) const {
-    return _exhaustiveFind(cmd).semi();
-}
-
-std::vector<BSONObj> SEPTransactionClient::exhaustiveFindSync(const FindCommandRequest& cmd) const {
-    Notification<void> mayReturn;
-
-    auto result =
-        _exhaustiveFind(cmd).unsafeToInlineFuture().tapAll([&](auto&&) { mayReturn.set(); });
-
-    runFutureInline(_inlineExecutor.get(), mayReturn);
-
-    return std::move(result).get();
-}
 
 SemiFuture<CommitResult> Transaction::commit() {
     return _commitOrAbort(DatabaseName::kAdmin, CommitTransaction::kCommandName)
@@ -912,19 +395,6 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
     return ErrorHandlingStep::kAbortAndDoNotRetry;
 }
 
-bool TransactionWithRetries::needsCleanup() {
-    return _internalTxn->needsCleanup();
-}
-
-SemiFuture<void> TransactionWithRetries::cleanUp() {
-    tassert(7567600, "Unnecessarily cleaning up transaction", _internalTxn->needsCleanup());
-
-    return _bestEffortAbort()
-        // Safe to inline because the continuation only holds state.
-        .unsafeToInlineFuture()
-        .tapAll([anchor = shared_from_this()](auto&&) {})
-        .semi();
-}
 
 void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
     if (isInternalSessionForRetryableWrite(*_sessionInfo.getSessionId())) {
