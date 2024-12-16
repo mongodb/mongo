@@ -4964,9 +4964,6 @@ export const authCommandsLib = {
             ],
             "queryType": "insert",
         },
-          skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagFLE2ProtocolVersion2;
-          },
           testcases: [
               {
                   runOnDb: adminDbName,

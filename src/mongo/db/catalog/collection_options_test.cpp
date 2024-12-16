@@ -513,7 +513,7 @@ TEST(FLECollectionOptions, ConflictingPrefixes) {
 }
 
 TEST(FLECollectionOptions, DuplicateQueryTypes) {
-    ASSERT_STATUS_CODE(6338404, CollectionOptions::parse(fromjson(R"({
+    ASSERT_STATUS_CODE(9783414, CollectionOptions::parse(fromjson(R"({
     encryptedFields: {
         "fields": [
             {

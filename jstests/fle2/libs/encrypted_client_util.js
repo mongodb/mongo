@@ -602,3 +602,19 @@ export function assertIsUnindexedEncryptedField(value) {
     assert(value.hex().startsWith("10"),
            "Expected subtype 16 but found the wrong type: " + value.hex());
 }
+
+/**
+ * Runs the callback function and returns whether or not it threw a query analysis error, and
+ * if expectedErrorStr is given, if the error message contains it.
+ * The exception logged but not rethrown.
+ */
+export function codeFailsInQueryAnalysisWithError(callback, expectedErrorStr) {
+    try {
+        callback();
+        return false;
+    } catch (e) {
+        jsTestLog(`Test callback threw error: ${tojson(e)}`);
+        return (e.message.indexOf("Client Side Field Level Encryption Error") !== -1) &&
+            (!expectedErrorStr || (e.message.indexOf(expectedErrorStr) !== -1));
+    }
+}

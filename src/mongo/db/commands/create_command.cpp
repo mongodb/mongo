@@ -358,6 +358,25 @@ public:
                         "type rangePreview, as it is deprecated",
                         !hasQueryType(cmd.getEncryptedFields().get(),
                                       QueryTypeEnum::RangePreviewDeprecated));
+
+                if (!gFeatureFlagQETextSearchPreview.isEnabledUseLastLTSFCVWhenUninitialized(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    uassert(9783415,
+                            "Cannot create a collection with an encrypted field with query type "
+                            "substringPreview unless featureFlagQETextSearchPreview is enabled",
+                            !hasQueryType(cmd.getEncryptedFields().get(),
+                                          QueryTypeEnum::SubstringPreview));
+                    uassert(9783416,
+                            "Cannot create a collection with an encrypted field with query type "
+                            "suffixPreview unless featureFlagQETextSearchPreview is enabled",
+                            !hasQueryType(cmd.getEncryptedFields().get(),
+                                          QueryTypeEnum::SuffixPreview));
+                    uassert(9783417,
+                            "Cannot create a collection with an encrypted field with query type "
+                            "prefixPreview unless featureFlagQETextSearchPreview is enabled",
+                            !hasQueryType(cmd.getEncryptedFields().get(),
+                                          QueryTypeEnum::PrefixPreview));
+                }
             }
 
             if (auto timeseries = cmd.getTimeseries()) {
