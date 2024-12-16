@@ -1281,11 +1281,6 @@ def generate(env: SCons.Environment.Environment) -> None:
                 for feature in enterprise_features.split(",")
             ]
 
-    # TODO SERVER-97028
-    # remove when ssl disabled builds are fixed
-    if env.GetOption("ssl") == "off":
-        bazel_internal_flags += ["--keep_going"]
-
     if env.GetOption("gcov") is not None:
         bazel_internal_flags += ["--collect_code_coverage"]
 
