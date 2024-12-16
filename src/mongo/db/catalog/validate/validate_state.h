@@ -78,7 +78,7 @@ public:
         return _nss;
     }
 
-    bool shouldEnforceFastCount(OperationContext* opCtx) const;
+    bool shouldEnforceFastCount() const;
 
     BSONValidateModeEnum getBSONValidateMode() const {
         return isBSONConformanceValidation() ? BSONValidateModeEnum::kFull
