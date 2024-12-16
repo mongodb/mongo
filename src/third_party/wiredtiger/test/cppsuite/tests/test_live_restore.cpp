@@ -68,7 +68,8 @@ public:
         _collections.emplace_back(uri);
         // TODO: Is it possible to validate that the data we get from a collection is the same as
         // the data we saved to it? To check for bugs in filename logic in the file system?
-        session->create(session.get(), uri.c_str(), DEFAULT_FRAMEWORK_SCHEMA.c_str());
+        testutil_check(
+          session->create(session.get(), uri.c_str(), DEFAULT_FRAMEWORK_SCHEMA.c_str()));
         scoped_cursor cursor = session.open_scoped_cursor(uri.c_str());
         WT_IGNORE_RET(cursor->next(cursor.get()));
     }
@@ -128,11 +129,10 @@ read(scoped_session &session)
 {
     auto cursor = session.open_scoped_cursor(db.get_random_collection(), "next_random=true");
     auto ret = cursor->next(cursor.get());
-    if (ret == WT_NOTFOUND) {
+    if (ret == WT_NOTFOUND)
         logger::log_msg(LOG_WARN, "Reading in a collection with no keys");
-    } else if (ret != 0) {
+    else if (ret != 0)
         testutil_assert(ret == 0);
-    }
 }
 
 // Truncate from a random key to the end of the file and then call compact. This should
@@ -141,10 +141,19 @@ void
 trigger_fs_truncate(scoped_session &session)
 {
     // Truncate from a random key all the way to the end of the collection and then call compact
+
+    int ret;
     const std::string coll_name = db.get_random_collection();
     scoped_cursor rnd_cursor = session.open_scoped_cursor(coll_name, "next_random=true");
-    session->truncate(session.get(), coll_name.c_str(), rnd_cursor.get(), nullptr, nullptr);
-    session->compact(session.get(), coll_name.c_str(), nullptr);
+    ret = rnd_cursor->next(rnd_cursor.get());
+
+    testutil_check_error_ok(ret, WT_NOTFOUND);
+    if (ret == WT_NOTFOUND)
+        // We've tried to truncate an empty collection. Nothing to do.
+        return;
+
+    testutil_check(session->truncate(session.get(), NULL, rnd_cursor.get(), nullptr, nullptr));
+    testutil_check(session->compact(session.get(), coll_name.c_str(), nullptr));
 }
 
 std::string
@@ -191,7 +200,7 @@ remove(scoped_session &session, scoped_cursor &cursor, std::string &coll)
     }
     testutil_assert(ret == 0);
     const char *tmp_key;
-    ran_cursor->get_key(ran_cursor.get(), &tmp_key);
+    testutil_check(ran_cursor->get_key(ran_cursor.get(), &tmp_key));
     cursor->set_key(cursor.get(), tmp_key);
     testutil_check(cursor->remove(cursor.get()));
 }
@@ -316,16 +325,15 @@ main(int argc, char *argv[])
     testutil_recreate_dir("WT_TEST");
 
     /* Create connection. */
-    if (fresh_start) {
+    if (fresh_start)
         connection_manager::instance().create(conn_config, DEFAULT_DIR);
-    } else {
+    else
         connection_manager::instance().reopen(conn_config, DEFAULT_DIR);
-    }
+
     auto crud_session = connection_manager::instance().create_session();
 
-    if (!fresh_start) {
+    if (!fresh_start)
         configure_database(crud_session);
-    }
 
     do_random_crud(crud_session, fresh_start);
 

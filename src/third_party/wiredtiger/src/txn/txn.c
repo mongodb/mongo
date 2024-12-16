@@ -1219,10 +1219,13 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
           txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]));
 
     /*
-     * Aborted updates can exist in the update chain of our transaction. Generally this will occur
-     * due to a reserved update. As such we should skip over these updates.
+     * Aborted updates can exist in the update chain of our transaction due to reserved update. All
+     * the prepared updates on a key by a transaction will be resolved during the resolution of the
+     * first operation on that key. Hence the update chain could contain the prepared updates by
+     * another transaction when the transaction tries to resolve the subsequent operations on the
+     * same key.
      */
-    for (; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = upd->next)
+    for (; upd != NULL && upd->txnid != txn->id; upd = upd->next)
         ;
     head_upd = upd;
 

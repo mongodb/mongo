@@ -383,6 +383,7 @@ TORTIOUS
 TRET
 TRYLOCK
 TSAN
+TSC
 TSO
 TSan
 TW
@@ -1318,6 +1319,7 @@ testext
 testutil
 th
 tid
+timeslice
 timespec
 tinfo
 tlb
@@ -1343,6 +1345,7 @@ truncations
 trylock
 tryrdlock
 trywrlock
+tsc
 tupdate
 tw
 txn

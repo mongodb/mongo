@@ -80,6 +80,162 @@ __endian_check(void)
     return (EINVAL);
 }
 
+#if defined(__amd64) || defined(__aarch64__)
+
+/*
+ * __reset_thread_tick --
+ *     Reset the OS thread timeslice to raise the probability of uninterrupted run afterwards.
+ */
+static void
+__reset_thread_tick(void)
+{
+    /*!!!
+     * The "OS scheduler timeslice" refers to the fixed amount of CPU time allocated to a process
+     * or thread before the operating system's scheduler may preempt it to allow another process
+     * to run.
+     *
+     * A timeslice typically ranges from a few milliseconds to tens of milliseconds, depending on
+     * the operating system and its configuration.
+     *
+     * When the timeslice for a process expires, the scheduler performs a context switch, switching
+     * to another ready-to-run process. A context switch can also occur for other reasons like
+     * CPU interrupts before the timeslice expires.
+     *
+     * When a thread starts execution, it receives a fresh timeslice, increasing the likelihood of
+     * running uninterrupted for its duration.
+     *
+     * Potential ways to reset the timeslice are:
+     *
+     * - yield()
+     *   - What it does:
+     *     - yield() explicitly tells the operating system's scheduler that the current thread
+     *       is willing to relinquish the CPU before its timeslice has expired.
+     *     - The thread is moved from the "running" state to the "ready" state, allowing other
+     *       threads of equal or higher priority to execute.
+     *     - If no other threads are ready to run, the scheduler may reschedule the same thread,
+     *       allowing it to continue with its remaining timeslice.
+     *   - Impact on timeslice:
+     *     - The remaining portion of the thread's current timeslice is usually preserved.
+     *       When the thread is rescheduled, it continues with the leftover time.
+     *     - In some schedulers (e.g., Linux's Completely Fair Scheduler), yielding might
+     *       slightly adjust the thread's virtual runtime, but it doesn't fully reset or
+     *       replenish the timeslice.
+     * - sleep()
+     *   - What it does:
+     *     - sleep makes a thread pause execution for a specified duration and transitions it into
+     *       a "waiting state".
+     *   - Impact on timeslice:
+     *     - The thread's timeslice is typically discarded when it enters the sleep state.
+     *       Upon waking up, the thread competes with other threads for CPU time as if it were
+     *       newly scheduled, with a fresh timeslice being assigned according to the
+     *       scheduling algorithm.
+     *
+     * This behavior is quite consistent across operating systems like Linux, MacOS, and Windows:
+     *
+     * - yield() does *not reset* the timeslice; it merely pauses execution voluntarily and
+     *   retains the remaining time.
+     * - sleep() discards the current timeslice, and the thread starts fresh after waking up.
+     */
+    __wt_sleep(0, 10);
+}
+
+/*
+ * __get_epoch_and_tsc --
+ *     Get the current time and TSC ticks before and after the call to __wt_epoch. Returns the
+ *     duration of the call in TSC ticks.
+ */
+static uint64_t
+__get_epoch_and_tsc(struct timespec *clock1, uint64_t *tsc1, uint64_t *tsc2)
+{
+    *tsc1 = __wt_rdtsc();
+    __wt_epoch(NULL, clock1);
+    *tsc2 = __wt_rdtsc();
+    return (*tsc2 - *tsc1);
+}
+
+/*
+ * __compare_uint64 --
+ *     uint64_t comparison function.
+ */
+static int
+__compare_uint64(const void *a, const void *b)
+{
+    return (int)(*(uint64_t *)a - *(uint64_t *)b);
+}
+
+/*
+ * __get_epoch_call_ticks --
+ *     Returns how many ticks it takes to call __wt_epoch at best and on average.
+ */
+static void
+__get_epoch_call_ticks(uint64_t *epoch_ticks_min, uint64_t *epoch_ticks_avg)
+{
+#define EPOCH_CALL_CALIBRATE_SAMPLES 50
+    uint64_t duration[EPOCH_CALL_CALIBRATE_SAMPLES];
+
+    __reset_thread_tick();
+    for (int i = 0; i < EPOCH_CALL_CALIBRATE_SAMPLES; ++i) {
+        struct timespec clock1;
+        uint64_t tsc1, tsc2;
+        duration[i] = __get_epoch_and_tsc(&clock1, &tsc1, &tsc2);
+    }
+    __wt_qsort(duration, EPOCH_CALL_CALIBRATE_SAMPLES, sizeof(uint64_t), __compare_uint64);
+
+    /*
+     * Use 30% percentile (median) for "average". Also, on some platforms the clock rate is so slow
+     * that TSC difference can be 0, so add a little bit for some lee-way.
+     */
+    *epoch_ticks_avg = duration[EPOCH_CALL_CALIBRATE_SAMPLES / 3] + 1;
+
+    /* Throw away first few results as outliers for the "best". */
+    *epoch_ticks_min = duration[2];
+}
+
+/*
+ * __get_epoch_and_ticks --
+ *     Gets the current time as wall clock and TSC ticks. Uses multiple attempts to make sure that
+ *     there's a limited time between the two.
+ *
+ * Returns:
+ *
+ * - true if it managed to get a good result; false upon failure.
+ *
+ * - clock_time: the wall clock time.
+ *
+ * - tsc_time: CPU TSC time.
+ */
+static bool
+__get_epoch_and_ticks(struct timespec *clock_time, uint64_t *tsc_time, uint64_t epoch_ticks_min,
+  uint64_t epoch_ticks_avg)
+{
+    uint64_t ticks_best = epoch_ticks_avg + 1; /* Not interested in anything worse than average. */
+#define GET_EPOCH_MAX_ATTEMPTS 200
+    for (int i = 0; i < GET_EPOCH_MAX_ATTEMPTS; ++i) {
+        struct timespec clock1;
+        uint64_t tsc1, tsc2;
+        uint64_t duration = __get_epoch_and_tsc(&clock1, &tsc1, &tsc2);
+
+        /* If it took the minimum time, we're happy with the result - return it straight away. */
+        if (duration <= epoch_ticks_min) {
+            *clock_time = clock1;
+            *tsc_time = tsc1;
+            return (true);
+        }
+
+        if (duration < ticks_best) {
+            /* Remember the best result. */
+            *clock_time = clock1;
+            *tsc_time = tsc1;
+            ticks_best = duration;
+        }
+    }
+
+    /* Return true if we have a good enough result. */
+    return (ticks_best <= epoch_ticks_avg);
+}
+
+#define CLOCK_CALIBRATE_USEC 10000 /* Number of microseconds for clock calibration. */
+
 /*
  * __global_calibrate_ticks --
  *     Calibrate a ratio from rdtsc ticks to nanoseconds.
@@ -88,56 +244,77 @@ static void
 __global_calibrate_ticks(void)
 {
     /*
+     * Here we aim to get two time measurements from __wt_epoch and rdtsc that are obtained nearly
+     * simultaneously. To ensure these probes are taken almost at the same time, we first determine
+     * minimum and median invocation time for __wt_epoch in __get_epoch_call_ticks. This is later
+     * used in __get_epoch_and_ticks.
+     *
+     * We read the clock via __wt_epoch and rdtsc twice to obtain the start and end times, invoking
+     * __wt_sleep in between. This measures the duration between invocations using each method and
+     * calculates their ratio. This strategy is accurate only if __wt_epoch and rdtsc are measured
+     * roughly simultaneously.
+     *
+     * To achieve "good" measurements, __get_epoch_and_ticks reads the time using rdtsc before and
+     * after invoking __wt_epoch. If the difference between these rdtsc readings is larger than the
+     * previously calibrated median, it suggests a scheduling event occurred, causing the probes not
+     * to be simultaneous. We repeat this process until rdtsc and __wt_epoch are invoked roughly
+     * simultaneously. Finally, we subtract the difference between the "good" measures for each
+     * timing strategy and obtain their ratio.
+     */
+    uint64_t epoch_ticks_min, epoch_ticks_avg, tsc_start, tsc_stop;
+    struct timespec clock_start, clock_stop;
+
+    __get_epoch_call_ticks(&epoch_ticks_min, &epoch_ticks_avg);
+
+    if (!__get_epoch_and_ticks(&clock_start, &tsc_start, epoch_ticks_min, epoch_ticks_avg))
+        return;
+
+    __wt_sleep(0, CLOCK_CALIBRATE_USEC);
+
+    if (!__get_epoch_and_ticks(&clock_stop, &tsc_stop, epoch_ticks_min, epoch_ticks_avg))
+        return;
+
+    uint64_t diff_nsec = WT_TIMEDIFF_NS(clock_stop, clock_start);
+    uint64_t diff_tsc = tsc_stop - tsc_start;
+
+#define CLOCK_MIN_DIFF_NSEC 10
+#define CLOCK_MIN_DIFF_TSC 10
+
+    /*
+     * Further improvement: check that diff_tsc is "much" (100-1000 times) bigger than
+     * epoch_ticks_avg and run additional cycles if needed.
+     */
+
+    if (diff_nsec < CLOCK_MIN_DIFF_NSEC || diff_tsc < CLOCK_MIN_DIFF_TSC)
+        /* Too short to be meaningful or not enough granularity. */
+        return;
+
+    double ratio = (double)diff_tsc / (double)diff_nsec;
+    if (ratio <= DBL_EPSILON)
+        /* Too small to be meaningful. */
+        return;
+
+    __wt_process.tsc_nsec_ratio = ratio;
+    __wt_process.use_epochtime = false;
+}
+
+#endif
+
+/*
+ * __global_setup_clock --
+ *     Set up variables for __wt_clock().
+ */
+static void
+__global_setup_clock(void)
+{
+    /*
      * Default to using __wt_epoch until we have a good value for the ratio.
      */
     __wt_process.tsc_nsec_ratio = WT_TSC_DEFAULT_RATIO;
     __wt_process.use_epochtime = true;
 
 #if defined(__amd64) || defined(__aarch64__)
-    {
-        struct timespec start, stop;
-        double ratio;
-        uint64_t diff_nsec, diff_tsc, min_nsec, min_tsc;
-        uint64_t tries, tsc_start, tsc_stop;
-        volatile uint64_t i;
-
-        /*
-         * Run this calibration loop a few times to make sure we get a reading that does not have a
-         * potential scheduling shift in it. The inner loop is CPU intensive but a scheduling change
-         * in the middle could throw off calculations. Take the minimum amount of time and compute
-         * the ratio.
-         */
-        min_nsec = min_tsc = UINT64_MAX;
-        for (tries = 0; tries < 3; ++tries) {
-            /* This needs to be CPU intensive and large enough. */
-            __wt_epoch(NULL, &start);
-            tsc_start = __wt_rdtsc();
-            for (i = 0; i < 100 * WT_MILLION; i++)
-                ;
-            tsc_stop = __wt_rdtsc();
-            __wt_epoch(NULL, &stop);
-            diff_nsec = WT_TIMEDIFF_NS(stop, start);
-            diff_tsc = tsc_stop - tsc_start;
-
-            /* If the clock didn't tick over, we don't have a sample. */
-            if (diff_nsec == 0 || diff_tsc == 0)
-                continue;
-            min_nsec = WT_MIN(min_nsec, diff_nsec);
-            min_tsc = WT_MIN(min_tsc, diff_tsc);
-        }
-
-        /*
-         * Only use rdtsc if we got a good reading. One reason this might fail is that the system's
-         * clock granularity is not fine-grained enough.
-         */
-        if (min_nsec != UINT64_MAX) {
-            ratio = (double)min_tsc / (double)min_nsec;
-            if (ratio > DBL_EPSILON) {
-                __wt_process.tsc_nsec_ratio = ratio;
-                __wt_process.use_epochtime = false;
-            }
-        }
-    }
+    __global_calibrate_ticks();
 #endif
 }
 
@@ -164,7 +341,7 @@ __global_once(void)
     __wt_process.checksum = wiredtiger_crc32c_func();
     __wt_process.checksum_with_seed = wiredtiger_crc32c_with_seed_func();
 
-    __global_calibrate_ticks();
+    __global_setup_clock();
 
     /* Run-time configuration. */
 #ifdef WT_STANDALONE_BUILD
