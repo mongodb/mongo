@@ -313,11 +313,9 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                   str::stream() << "Expected 1 insertion of document with _id '" << docId
                                 << "', but found " << output.result.getValue().getN() << ".");
     } else {
-        auto op = batch->generateCompressedDiff
-            ? write_ops_utils::makeTimeseriesCompressedDiffUpdateOp(
-                  opCtx, batch, nss, std::move(stmtIds))
-            : write_ops_utils::makeTimeseriesUpdateOp(
-                  opCtx, batch, nss, metadata, std::move(stmtIds));
+        auto op = write_ops_utils::makeTimeseriesCompressedDiffUpdateOp(
+            opCtx, batch, nss, std::move(stmtIds));
+
         auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
 
         if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
@@ -1158,12 +1156,6 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
 
     mongo::write_ops::InsertCommandReply insertReply;
     auto& baseReply = insertReply.getWriteCommandReplyBase();
-
-    // Prevent FCV upgrade/downgrade while performing a time-series write. There are several feature
-    // flag checks in the layers below and they expect a consistent reading of the FCV to take the
-    // correct write path.
-    // TODO SERVER-70605: remove this FixedFCVRegion.
-    FixedFCVRegion fixedFcv(opCtx);
 
     if (request.getOrdered()) {
         baseReply.setN(performOrderedTimeseriesWrites(

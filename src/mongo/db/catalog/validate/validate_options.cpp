@@ -29,30 +29,7 @@
 
 #include "mongo/db/catalog/validate/validate_options.h"
 
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/util/testing_proctor.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 namespace mongo::CollectionValidation {
-
-namespace {
-
-bool canEnforceTimeseriesAlwaysCompressed() {
-    // Test-only check to ensure time-series buckets are always compressed.
-    if (TestingProctor::instance().isEnabled() &&
-        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return true;
-    } else {
-        LOGV2_WARNING(7735102, "Not enforcing that time-series buckets are always compressed");
-        return false;
-    }
-}
-
-}  // namespace
 
 ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      RepairMode repairMode,

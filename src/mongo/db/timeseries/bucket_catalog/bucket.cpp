@@ -62,9 +62,7 @@ Bucket::Bucket(TrackingContexts& trackingContexts,
                StringData tf,
                Date_t mt,
                BucketStateRegistry& bsr)
-    : usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
-      minTime(mt),
+    : minTime(mt),
       lastChecked(getCurrentEraAndIncrementBucketCount(bsr)),
       bucketStateRegistry(bsr),
       bucketId(bId),
@@ -156,7 +154,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts& trackingContexts,
         const int32_t elementSize =
             elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
 
-        if (!bucket.usingAlwaysCompressedBuckets || elementSize > largeMeasurementThreshold) {
+        if (elementSize > largeMeasurementThreshold) {
             sizesToBeAdded.uncommittedMeasurementEstimate += elementSize;
         }
     }

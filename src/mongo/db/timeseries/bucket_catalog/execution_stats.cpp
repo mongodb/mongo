@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 
@@ -214,11 +213,6 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketQueriesFailed", stats.numBucketQueriesFailed.load());
     builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
     builder.appendNumber("numDuplicateBucketsReopened", stats.numDuplicateBucketsReopened.load());
-
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
-    }
 }
 
 void addCollectionExecutionCounters(ExecutionStatsController& stats,

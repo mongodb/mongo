@@ -55,8 +55,7 @@ namespace mongo::timeseries::write_ops_utils {
 
 /**
  * Holds the bucket document used for writing to disk. The uncompressed bucket document is always
- * set. If the 'gTimeseriesAlwaysUseCompressedBuckets' feature flag is enabled then the compressed
- * bucket document is also set unless compression fails.
+ * set. The compressed bucket document is also set unless compression fails.
  */
 struct BucketDocument {
     BSONObj uncompressedBucket;

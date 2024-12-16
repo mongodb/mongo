@@ -178,8 +178,6 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
     NamespaceString ns = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_util_test", "MakeNewCompressedBucketFromWriteBatch");
 
@@ -223,8 +221,6 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
     NamespaceString ns = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_util_test", "MakeNewCompressedBucketFromWriteBatchWithMeta");
 
@@ -347,8 +343,6 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
  * measurements cause a bucket to upgraded to a v3 bucket.
  */
 TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
     NamespaceString ns = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_util_test", "MakeTimeseriesCompressedDiffUpdateOp");
 
@@ -413,8 +407,6 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
  * measurements cause a bucket to upgraded to a v3 bucket.
  */
 TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
     NamespaceString ns = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_util_test", "MakeTimeseriesCompressedDiffUpdateOpWithMeta");
 

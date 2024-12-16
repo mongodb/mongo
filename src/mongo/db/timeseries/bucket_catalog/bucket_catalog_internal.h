@@ -442,10 +442,6 @@ void closeOpenBucket(BucketCatalog& catalog,
 /**
  * Close an archived bucket, setting the state appropriately and removing it from the catalog.
  */
-void closeArchivedBucket(BucketCatalog& catalog,
-                         const BucketId& bucketId,
-                         StringData timeField,
-                         ExecutionStatsController& stats,
-                         ClosedBuckets& closedBuckets);
+void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId);
 
 }  // namespace mongo::timeseries::bucket_catalog::internal

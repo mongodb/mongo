@@ -775,48 +775,6 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     ASSERT(getBucketState(bucketStateRegistry, bucketId) == boost::none);
 }
 
-TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState) {
-    // ClosedBuckets are not generated when using the always compressed feature.
-    RAIIServerParameterControllerForTest featureFlagController{
-        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
-
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.foo");
-    auto& bucket = createBucket(info1, date);
-    auto bucketId = bucket.bucketId;
-
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
-
-    auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
-    TrackingContexts trackingContexts;
-    auto batch =
-        std::make_shared<WriteBatch>(trackingContexts,
-                                     bucketId,
-                                     info1.key,
-                                     0,
-                                     stats,
-                                     StringData{bucket.timeField.data(), bucket.timeField.size()});
-    ASSERT(claimWriteBatchCommitRights(*batch));
-    ASSERT_OK(prepareCommit(*this, batch, nullptr));
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));
-
-    {
-        // Fool the system by marking the bucket for closure, then finish the batch so it detects
-        // this and closes the bucket.
-        bucket.rolloverAction = RolloverAction::kHardClose;
-        CommitInfo commitInfo{};
-        auto closedBucket = finish(*this, batch, commitInfo);
-        ASSERT(closedBucket.has_value());
-        ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
-
-        // Bucket should now be in pending compression state represented by direct write.
-        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
-    }
-
-    // Destructing the 'ClosedBucket' struct should report it compressed should remove it from the
-    // catalog.
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
-}
-
 TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
     auto bucketId = BucketId{uuid1, OID(), 0};
     directWriteStart(bucketStateRegistry, bucketId);

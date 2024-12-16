@@ -110,11 +110,6 @@ public:
     // True if the bucket already exists and was reopened.
     bool isReopened = false;
 
-    // Whether the bucket was created while the always used compressed buckets feature flag was
-    // enabled.
-    // TODO SERVER-70605: remove this boolean.
-    const bool usingAlwaysCompressedBuckets;
-
     // For always compressed, the total compressed size in bytes of the bucket's BSON serialization,
     // not including measurements to be inserted until a WriteBatch is committed. With the feature
     // flag off, the total uncompressed size in bytes of the bucket's BSON serialization, including

@@ -253,10 +253,6 @@ write_ops_utils::BucketDocument makeNewDocument(const OID& bucketId,
     }
 
     write_ops_utils::BucketDocument bucketDoc{builder.obj()};
-    if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return bucketDoc;
-    }
 
     const bool validateCompression = gValidateTimeseriesCompression.load();
     auto compressed = timeseries::compressBucket(
@@ -440,13 +436,8 @@ void makeWriteRequest(OperationContext* opCtx,
             makeTimeseriesInsertOp(batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
         return;
     }
-    if (batch->generateCompressedDiff) {
-        updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
-            opCtx, batch, bucketsNs, std::move(stmtIds[batch.get()])));
-    } else {
-        updateOps->push_back(makeTimeseriesUpdateOp(
-            opCtx, batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
-    }
+    updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
+        opCtx, batch, bucketsNs, std::move(stmtIds[batch.get()])));
 }
 
 mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOp(
@@ -458,29 +449,22 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOp(
 
     BSONObj bucketToInsert;
     BucketDocument bucketDoc;
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        std::vector<details::Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
+    std::vector<details::Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
 
-        // Insert measurements, and appropriate skips, into all column builders.
-        for (const auto& measurement : sortedMeasurements) {
-            batch->measurementMap.insertOne(measurement.dataFields);
-        }
-        int32_t compressedSizeDelta;
-        auto intermediates = batch->measurementMap.intermediate(compressedSizeDelta);
-        batch->sizes.uncommittedVerifiedSize = compressedSizeDelta;
-        bucketToInsert =
-            makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
+    // Insert measurements, and appropriate skips, into all column builders.
+    for (const auto& measurement : sortedMeasurements) {
+        batch->measurementMap.insertOne(measurement.dataFields);
+    }
+    int32_t compressedSizeDelta;
+    auto intermediates = batch->measurementMap.intermediate(compressedSizeDelta);
+    batch->sizes.uncommittedVerifiedSize = compressedSizeDelta;
+    bucketToInsert = makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
 
-        // Extra verification that the insert op decompresses to the same values put in.
-        if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
-            auto verifierFunction =
-                makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesInsert);
-            verifierFunction(bucketToInsert, BSONObj());
-        }
-    } else {
-        bucketDoc = makeNewDocumentForWrite(bucketsNs, batch, metadata);
-        bucketToInsert = bucketDoc.uncompressedBucket;
+    // Extra verification that the insert op decompresses to the same values put in.
+    if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
+        auto verifierFunction =
+            makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesInsert);
+        verifierFunction(bucketToInsert, BSONObj());
     }
 
     mongo::write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
@@ -494,8 +478,6 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
-    invariant(!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     mongo::write_ops::UpdateCommandRequest op(
         bucketsNs, {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
@@ -598,13 +580,9 @@ makeModificationOp(const OID& bucketId,
                                                        *timeseriesOptions,
                                                        coll->getDefaultCollator(),
                                                        currentMinTime);
-    BSONObj bucketToReplace = bucketDoc.uncompressedBucket;
-    invariant(bucketDoc.compressedBucket ||
-              !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    if (bucketDoc.compressedBucket) {
-        bucketToReplace = *bucketDoc.compressedBucket;
-    }
+
+    invariant(bucketDoc.compressedBucket);
+    BSONObj bucketToReplace = *bucketDoc.compressedBucket;
 
     mongo::write_ops::UpdateModification u(bucketToReplace);
     mongo::write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
@@ -618,9 +596,6 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     const NamespaceString& bucketsNs,
     std::vector<StmtId>&& stmtIds) {
     using namespace details;
-    invariant(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
 
     bool changedToUnsorted = false;
     std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);

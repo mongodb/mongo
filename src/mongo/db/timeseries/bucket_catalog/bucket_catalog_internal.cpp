@@ -51,7 +51,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -506,20 +505,11 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
         catalog.bucketStateRegistry);
 
     const bool isCompressed = isCompressedBucket(bucketDoc);
-    const bool usingAlwaysCompressed =
-        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     bucket->isReopened = true;
 
     // Initialize the remaining member variables from the bucket document.
     bucket->size = bucketDoc.objsize();
-
-    if (isCompressed && !usingAlwaysCompressed) {
-        // Re-opening compressed buckets is only supported when the always use compressed buckets
-        // feature flag is enabled.
-        return {ErrorCodes::BadValue, "Bucket is compressed and cannot be reopened"};
-    }
 
     // Populate the top-level data field names.
     const BSONObj& dataObj = bucketDoc.getObjectField(kBucketDataFieldName);
@@ -568,7 +558,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     bucket->numMeasurements = numMeasurements;
     bucket->numCommittedMeasurements = numMeasurements;
 
-    if (isCompressed && usingAlwaysCompressed) {
+    if (isCompressed) {
         // Initialize BSONColumnBuilders from the compressed bucket data fields.
         try {
             bucket->measurementMap.initBuilders(dataObj, bucket->numCommittedMeasurements);
@@ -884,21 +874,12 @@ void removeBucket(BucketCatalog& catalog,
     switch (mode) {
         case RemovalMode::kClose: {
             auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            if (bucket.usingAlwaysCompressedBuckets) {
-                // When removing a closed bucket, the BucketStateRegistry may contain state for this
-                // bucket due to an untracked ongoing direct write (such as TTL delete).
-                if (state.has_value()) {
-                    invariant(holds_alternative<DirectWriteCounter>(state.value()),
-                              bucketStateToString(*state));
-                    invariant(get<DirectWriteCounter>(state.value()) < 0,
-                              bucketStateToString(*state));
-                }
-            } else {
-                // Ensure that we are in a state of pending compression (represented by a negative
-                // direct write counter).
-                invariant(state.has_value());
-                invariant(holds_alternative<DirectWriteCounter>(state.value()));
-                invariant(get<DirectWriteCounter>(state.value()) < 0);
+            // When removing a closed bucket, the BucketStateRegistry may contain state for this
+            // bucket due to an untracked ongoing direct write (such as TTL delete).
+            if (state.has_value()) {
+                invariant(holds_alternative<DirectWriteCounter>(state.value()),
+                          bucketStateToString(*state));
+                invariant(get<DirectWriteCounter>(state.value()) < 0, bucketStateToString(*state));
             }
             break;
         }
@@ -934,6 +915,7 @@ void archiveBucket(BucketCatalog& catalog,
         }
         // Always increase ref-count when archiving
         ++refCount;
+
         // If we have an archived bucket, we still want to account for it in numberOfActiveBuckets
         // so we will increase it here since removeBucket decrements the count.
         stats.incNumActiveBuckets();
@@ -1175,7 +1157,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
             timeField = {tf.data(), tf.size()};
         }
 
-        closeArchivedBucket(catalog, bucketId, timeField, stats, closedBuckets);
+        closeArchivedBucket(catalog, bucketId);
 
         if (timeFieldIt != stripe.collectionTimeFields.end()) {
             int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
@@ -1183,6 +1165,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
                 stripe.collectionTimeFields.erase(timeFieldIt);
             }
         }
+
         stripe.archivedBuckets.erase(it);
 
         stats.decNumActiveBuckets();
@@ -1493,31 +1476,11 @@ void closeOpenBucket(BucketCatalog& catalog,
                      Bucket& bucket,
                      ExecutionStatsController& stats,
                      ClosedBuckets& closedBuckets) {
-    // Skip creating a ClosedBucket when the bucket is already compressed.
-    if (bucket.usingAlwaysCompressedBuckets) {
-        // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+    // Remove the bucket from the bucket state registry.
+    stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
-        removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kClose);
-        return;
-    }
-
-    bool error = false;
-    try {
-        closedBuckets.emplace_back(&catalog.bucketStateRegistry,
-                                   bucket.bucketId,
-                                   std::string{bucket.timeField.data(), bucket.timeField.size()},
-                                   bucket.numMeasurements,
-                                   stats);
-    } catch (...) {
-        error = true;
-    }
-    removeBucket(catalog,
-                 stripe,
-                 stripeLock,
-                 bucket,
-                 stats,
-                 error ? RemovalMode::kAbort : RemovalMode::kClose);
+    removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kClose);
+    return;
 }
 
 void closeOpenBucket(BucketCatalog& catalog,
@@ -1526,52 +1489,16 @@ void closeOpenBucket(BucketCatalog& catalog,
                      Bucket& bucket,
                      ExecutionStatsController& stats,
                      boost::optional<ClosedBucket>& closedBucket) {
-    // Skip creating a ClosedBucket when the bucket is already compressed.
-    if (bucket.usingAlwaysCompressedBuckets) {
-        // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+    // Remove the bucket from the bucket state registry.
+    stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
-        removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kClose);
-        return;
-    }
-
-    bool error = false;
-    try {
-        closedBucket =
-            boost::in_place(&catalog.bucketStateRegistry,
-                            bucket.bucketId,
-                            std::string{bucket.timeField.data(), bucket.timeField.size()},
-                            bucket.numMeasurements,
-                            stats);
-    } catch (...) {
-        closedBucket = boost::none;
-        error = true;
-    }
-    removeBucket(catalog,
-                 stripe,
-                 stripeLock,
-                 bucket,
-                 stats,
-                 error ? RemovalMode::kAbort : RemovalMode::kClose);
+    removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kClose);
+    return;
 }
 
-void closeArchivedBucket(BucketCatalog& catalog,
-                         const BucketId& bucketId,
-                         StringData timeField,
-                         ExecutionStatsController& stats,
-                         ClosedBuckets& closedBuckets) {
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
-        return;
-    }
-
-    try {
-        closedBuckets.emplace_back(
-            &catalog.bucketStateRegistry, bucketId, timeField.toString(), boost::none, stats);
-    } catch (...) {
-    }
+void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId) {
+    // Remove the bucket from the bucket state registry.
+    stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
 }
 
 }  // namespace mongo::timeseries::bucket_catalog::internal

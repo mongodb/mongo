@@ -244,9 +244,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                             }};
                     }
 
-                    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                        !suitableBucket.isEmpty() &&
+                    if (!suitableBucket.isEmpty() &&
                         !timeseries::isCompressedBucket(suitableBucket)) {
                         uncompressedBucketId = extractBucketId(bucketCatalog,
                                                                options,
@@ -342,13 +340,8 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                                                  comparator,
                                                  boost::none);
 
-    invariant(bucketDoc.compressedBucket ||
-              !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    if (bucketDoc.compressedBucket) {
-        return *bucketDoc.compressedBucket;
-    }
-    return bucketDoc.uncompressedBucket;
+    invariant(bucketDoc.compressedBucket);
+    return *bucketDoc.compressedBucket;
 }
 
 void getOpTimeAndElectionId(OperationContext* opCtx,
