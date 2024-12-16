@@ -484,9 +484,8 @@ void DocumentSourceOut::waitWhileFailPointEnabled() {
         pExpCtx->getOperationContext(),
         "hangWhileBuildingDocumentSourceOutBatch",
         []() {
-            LOGV2(
-                20902,
-                "Hanging aggregation due to  'hangWhileBuildingDocumentSourceOutBatch' failpoint");
+            LOGV2(20902,
+                  "Hanging aggregation due to 'hangWhileBuildingDocumentSourceOutBatch' failpoint");
         });
 }
 

@@ -256,16 +256,6 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
-boost::optional<mongo::DatabaseVersion> CommonProcessInterface::refreshAndGetDatabaseVersion(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const DatabaseName& dbName) const {
-
-    const auto catalogCache = Grid::get(expCtx->getOperationContext())->catalogCache();
-    catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
-    auto db = catalogCache->getDatabase(expCtx->getOperationContext(), dbName);
-
-    return db.isOK() ? boost::make_optional(db.getValue()->getVersion()) : boost::none;
-}
-
 std::vector<FieldPath> CommonProcessInterface::shardKeyToDocumentKeyFields(
     const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) {
     std::vector<FieldPath> result;

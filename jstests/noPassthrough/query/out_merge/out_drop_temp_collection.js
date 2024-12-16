@@ -1,13 +1,5 @@
 /**
  * Test the behavior of a dropDatabase command during an aggregation containing $out.
- *
- * @tags: [
- *   assumes_unsharded_collection,
- *   do_not_wrap_aggregations_in_facets,
- *   assumes_read_concern_unchanged,
- *   requires_replication,
- *   requires_sharding,
- * ]
  */
 
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
@@ -39,12 +31,21 @@ function runTest(st, testDb, portNum) {
 
         const aggDone = startParallelShell(() => {
             const targetDB = db.getSiblingDB("out_drop_temp");
-            // There are a number of possible error codes depending on configuration and index build
-            // options.
-            assert.commandFailed(targetDB.runCommand(
-                {aggregate: "out_source_coll", pipeline: [{$out: "out_target_coll"}], cursor: {}}));
-            const collList = assert.commandWorked(targetDB.runCommand({listCollections: 1}));
-            assert.eq(collList.cursor.firstBatch.length, 0);
+            const res = targetDB.runCommand(
+                {aggregate: "out_source_coll", pipeline: [{$out: "out_target_coll"}], cursor: {}});
+
+            // When the dropDatabase and $out happen concurrently, the result must be the same as if
+            // they happened serially: $out then drop (result is non-existant collection) or, drop
+            // then $out (result is empty collection). On replSets we get the former and sharded
+            // clusters we get the latter, but both behaviors are acceptable.
+            if (!res.ok) {
+                // There are a number of possible error codes depending on configuration and index
+                // build options.
+                const collList = assert.commandWorked(targetDB.runCommand({listCollections: 1}));
+                assert.eq(collList.cursor.firstBatch.length, 0);
+            } else {
+                assert.eq(targetDB["out_target_coll"].countDocuments({}), 0);
+            }
         }, portNum);
 
         waitForCurOpByFailPointNoNS(testDb, failpointName);
@@ -66,11 +67,5 @@ const conn = MongoRunner.runMongod({});
 runTest(null, conn.getDB("out_drop_temp"), conn.port);
 MongoRunner.stopMongod(conn);
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
-// TODO SERVER-87422 enable this test with this feature flag.
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponMoveCollection") ||
-    FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
-    st.stop();
-    quit();
-}
 runTest(st, st.s.getDB("out_drop_temp"), st.s.port);
 st.stop();

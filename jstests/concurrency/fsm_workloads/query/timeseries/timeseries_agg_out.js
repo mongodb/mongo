@@ -62,8 +62,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.NamespaceExists,
             // $out can't be executed while there is a move primary in progress
             ErrorCodes.MovePrimaryInProgress,
-            // TODO SERVER-87422 potentially remove this error since there are no concurrent drops
-            ErrorCodes.NamespaceNotFound,
             // This error is returned if output collection doesn't exist when $out first fetches
             // collection options, but then created by another thread before $out finished
             // timeseries options validation.

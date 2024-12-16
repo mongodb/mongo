@@ -98,12 +98,6 @@ public:
     BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
                                       ExplainOptions::Verbosity verbosity) override;
 
-    boost::optional<mongo::DatabaseVersion> refreshAndGetDatabaseVersion(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const DatabaseName& dbName) const final {
-        return boost::none;  // Nothing is sharded here.
-    }
-
     void checkRoutingInfoEpochOrThrow(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,

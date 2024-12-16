@@ -616,15 +616,6 @@ public:
         const std::set<FieldPath>& fieldPaths) const = 0;
 
     /**
-     * Refreshes the CatalogCache entry for the database 'dbName', and returns the DatabaseVersion
-     * associated with that database, if any. It returns boost::none when failed to get a database
-     * by that name.
-     */
-    virtual boost::optional<mongo::DatabaseVersion> refreshAndGetDatabaseVersion(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const DatabaseName& dbName) const = 0;
-
-    /**
      * Consults the CatalogCache to determine if this node has routing information for the
      * collection given by 'nss' which reports the same epoch as given by
      * 'targetCollectionPlacementVersion'. Major and minor versions in
