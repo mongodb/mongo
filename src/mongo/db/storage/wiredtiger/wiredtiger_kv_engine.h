@@ -598,7 +598,11 @@ private:
     void _openWiredTiger(const std::string& path, const std::string& wtOpenConfig);
 
     Status _salvageIfNeeded(const char* uri);
-    void _ensureIdentPath(StringData ident);
+
+    // Guarantees that the necessary directories exist in case the ident lives in a subdirectory of
+    // the database (i.e. because of --directoryPerDb). The caller should hold the lock until
+    // whatever they were doing with the ident has been persisted to disk.
+    [[nodiscard]] stdx::unique_lock<stdx::mutex> _ensureIdentPath(StringData ident);
 
     /**
      * Recreates a WiredTiger ident from the provided URI by dropping and recreating the ident.
@@ -645,6 +649,10 @@ private:
      */
     std::pair<JournalListener*, boost::optional<JournalListener::Token>>
     _getJournalListenerWithToken(OperationContext* opCtx, UseJournalListener useListener);
+
+    // Removes empty directories associated with ident (or subdirectories, when startPos is set).
+    // Returns true if directories were removed (or there weren't any to remove).
+    bool _removeIdentDirectoryIfEmpty(StringData ident, size_t startPos = 0);
 
     mutable stdx::mutex _oldestActiveTransactionTimestampCallbackMutex;
     StorageEngine::OldestActiveTransactionTimestampCallback
@@ -735,5 +743,9 @@ private:
 
     // Tracks the time since the last _waitUntilDurableSession reset().
     Timer _timeSinceLastDurabilitySessionReset;
+
+    // Prevents a database's directory from being deleted concurrently with creation (necessary for
+    // --directoryPerDb).
+    stdx::mutex _directoryModificationMutex;
 };
 }  // namespace mongo

@@ -856,5 +856,101 @@ DEATH_TEST_F(WiredTigerKVEngineTest, WaitUntilDurableMustBeOutOfUnitOfWork, "inv
     opCtx->getServiceContext()->getStorageEngine()->waitUntilDurable(opCtx.get());
 }
 
+class WiredTigerKVEngineDirectoryTest : public WiredTigerKVEngineTest {
+public:
+    void setUp() override {
+        WiredTigerKVEngineTest::setUp();
+        _opCtx = _makeOperationContext();
+    }
+
+protected:
+    // Creates the given ident, returning the path to it.
+    StatusWith<boost::filesystem::path> createIdent(StringData ns, StringData ident) {
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
+        CollectionOptions defaultCollectionOptions;
+        Status stat = _helper.getWiredTigerKVEngine()->createRecordStore(
+            nss, ident, defaultCollectionOptions);
+        if (!stat.isOK()) {
+            return stat;
+        }
+        boost::optional<boost::filesystem::path> path =
+            _helper.getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
+        ASSERT_TRUE(path.has_value());
+        return *path;
+    }
+
+    Status removeIdent(StringData ident) {
+        return _helper.getWiredTigerKVEngine()->dropIdent(
+            shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+TEST_F(WiredTigerKVEngineDirectoryTest, TopLevelIdentsDontRemoveDirectories) {
+    std::string ident = "ident-without-directory";
+    StatusWith<boost::filesystem::path> path = createIdent("name.space", ident);
+    ASSERT_OK(path);
+    ASSERT_TRUE(boost::filesystem::exists(path.getValue().parent_path()));
+
+    // Since this ident isn't in a directory, we'd better not delete it's parent (i.e. the dbpath).
+    ASSERT_OK(removeIdent(ident));
+    ASSERT_TRUE(boost::filesystem::exists(path.getValue().parent_path()));
+}
+
+TEST_F(WiredTigerKVEngineDirectoryTest, RemovingLastIdentPromptsDirectoryRemoval) {
+    std::string apple = "fruit/apple";
+    StatusWith<boost::filesystem::path> applePath = createIdent("fruit.apple", apple);
+    ASSERT_OK(applePath);
+    boost::filesystem::path fruitDir = applePath.getValue().parent_path();
+
+    // Same directory.
+    std::string orange = "fruit/orange";
+    StatusWith<boost::filesystem::path> orangePath = createIdent("fruit.orange", orange);
+    ASSERT_OK(orangePath);
+    ASSERT_EQ(fruitDir, orangePath.getValue().parent_path());
+
+    // Different directory.
+    std::string potato = "veg/potato";
+    StatusWith<boost::filesystem::path> potatoPath = createIdent("veg.potato", potato);
+    ASSERT_OK(potatoPath);
+    ASSERT_NE(fruitDir, potatoPath.getValue().parent_path());
+
+    // Not the last ident, so directory still exists.
+    ASSERT_OK(removeIdent(apple));
+    ASSERT_TRUE(boost::filesystem::exists(fruitDir));
+
+    // Remove a different directory, doesn't touch the original one.
+    ASSERT_OK(removeIdent(potato));
+    ASSERT_FALSE(boost::filesystem::exists(potatoPath.getValue().parent_path()));
+    ASSERT_TRUE(boost::filesystem::exists(fruitDir));
+
+    // Now its gone.
+    ASSERT_OK(removeIdent(orange));
+    ASSERT_FALSE(boost::filesystem::exists(fruitDir));
+}
+
+TEST_F(WiredTigerKVEngineDirectoryTest, HandlesNestedDirectories) {
+    std::string ident = "lots/and/lots/of/directories";
+    StatusWith<boost::filesystem::path> path = createIdent("name.space", ident);
+    ASSERT_OK(path);
+    ASSERT_TRUE(boost::filesystem::exists(path.getValue()));
+
+    ASSERT_OK(removeIdent(ident));
+    // directories
+    ASSERT_FALSE(boost::filesystem::exists(path.getValue()));
+    // of
+    ASSERT_FALSE(boost::filesystem::exists(path.getValue().parent_path()));
+    // lots
+    ASSERT_FALSE(boost::filesystem::exists(path.getValue().parent_path().parent_path()));
+    // and
+    ASSERT_FALSE(
+        boost::filesystem::exists(path.getValue().parent_path().parent_path().parent_path()));
+    // lots
+    ASSERT_FALSE(boost::filesystem::exists(
+        path.getValue().parent_path().parent_path().parent_path().parent_path()));
+}
+
 }  // namespace
 }  // namespace mongo
