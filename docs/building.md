@@ -44,7 +44,7 @@ which python3 # This should point to the python in python3-venv
 # required python dependencies to build and test.
 buildscripts/poetry_sync.sh
 
-python3 buildscripts/scons.py --build-profile=opt
+python3 buildscripts/scons.py --build-profile=opt GDB_INDEX=0
 ninja -f opt.ninja -j 200 install-devcore
 ```
 
