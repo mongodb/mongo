@@ -110,6 +110,7 @@ private:
     bool _shouldUnblockMigrations() const;
     bool _updatesPossiblyRunningFromPreviousTerm() const;
     bool _currentlySteppingDown() const;
+    bool _updateWouldImplicitlyCreateCollection(OperationContext* opCtx) const;
 
     void _initializeRun(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                         const CancellationToken& stepdownToken);

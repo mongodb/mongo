@@ -61,14 +61,6 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
                 this.originalReshardingMinimumOperationDurationMillis = res.was;
             });
         }
-
-        // Increase yielding so that reshardCollection more often commits in the middle of a
-        // multi-write.
-        cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}));
-            this.internalQueryExecYieldIterationsDefault = res.was;
-        });
     };
 
     $config.teardown = function(db, collName, cluster) {
@@ -80,13 +72,6 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
                     setParameter: 1,
                     reshardingMinimumOperationDurationMillis:
                         this.originalReshardingMinimumOperationDurationMillis
-                }));
-            });
-
-            cluster.executeOnMongodNodes((db) => {
-                const res = assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    internalQueryExecYieldIterations: this.internalQueryExecYieldIterationsDefault
                 }));
             });
         }

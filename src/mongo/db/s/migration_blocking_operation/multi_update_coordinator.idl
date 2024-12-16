@@ -64,6 +64,10 @@ structs:
                 cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection being updated."
+            isUpsert: 
+                type: bool 
+                description: "Indicates a multi update with upsert: true."
+                default: false
 
     MultiUpdateCoordinatorMutableFields:
         description: Contains mutable fields for a MultiUpdateCoordinator.
