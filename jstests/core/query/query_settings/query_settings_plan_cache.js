@@ -5,6 +5,10 @@
 //   # Index filters are not replicated and therefore won't be applied on secondaries.
 //   assumes_read_preference_unchanged,
 //   assumes_read_concern_unchanged,
+//   # SBE plan cache key includes information about the collection. If a balancer operation
+//   # happens between where we compute a cache key using explain(), and where we look it up using
+//   # $planCacheStats, the two operations will use different cache keys and the test will fail.
+//   assumes_balancer_off,
 //   # Query settings commands can not be run on the shards directly.
 //   directly_against_shardsvrs_incompatible,
 //   # Index filter commands do not accept security token.
