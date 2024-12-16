@@ -100,5 +100,7 @@ parallelShell();
 // Node0 could have gone through a rollback after reconnecting with the Node1, the
 // new primary. Make sure all secondaries are out of a recovering state before
 // attempting to shutdown the replica set.
-rst.awaitSecondaryNodes();
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {appendOplogNote: 1, data: {msg: "dummy write to the new primary"}}));
+rst.awaitReplication();
 rst.stopSet();

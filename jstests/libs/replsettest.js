@@ -498,6 +498,7 @@ export class ReplSetTest {
         timeout = timeout || this.timeoutMS;
         retryIntervalMS = retryIntervalMS || 200;
         let awaitingSecondaries;
+        print("AwaitSecondaryNodes: Waiting for the secondary nodes has started.");
         try {
             assert.soonNoExcept(() => {
                 awaitingSecondaries = [];
@@ -526,6 +527,7 @@ export class ReplSetTest {
         if (waitForNewlyAddedRemoval && jsTest.options().enableTestCommands) {
             this.waitForAllNewlyAddedRemovals();
         }
+        print("AwaitSecondaryNodes: Completed successfully.");
     }
 
     /**
