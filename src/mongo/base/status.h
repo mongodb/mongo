@@ -59,7 +59,7 @@ namespace mongo {
  * determine an error's cause. It further clarifies the error with a textual
  * description, and code-specific extra info (a subclass of ErrorExtraInfo).
  */
-class MONGO_WARN_UNUSED_RESULT_CLASS Status {
+class [[nodiscard]] Status {
 public:
     /** This is the best way to construct an OK status. */
     static Status OK() {

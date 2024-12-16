@@ -134,7 +134,7 @@ public:
     static void set(ServiceContext* service,
                     std::unique_ptr<ReplicationCoordinator> replCoordinator);
 
-    struct MONGO_WARN_UNUSED_RESULT_CLASS StatusAndDuration {
+    struct [[nodiscard]] StatusAndDuration {
     public:
         Status status;
         Milliseconds duration;

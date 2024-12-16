@@ -859,7 +859,7 @@ private:
 };
 
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS FutureImpl {
+class [[nodiscard]] FutureImpl {
 public:
     using value_type = T;
 
@@ -1410,7 +1410,7 @@ private:
 };
 
 template <>
-class MONGO_WARN_UNUSED_RESULT_CLASS FutureImpl<void> : public FutureImpl<FakeVoid> {
+class [[nodiscard]] FutureImpl<void> : public FutureImpl<FakeVoid> {
     using Base = FutureImpl<FakeVoid>;
 
 public:

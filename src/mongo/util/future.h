@@ -70,7 +70,7 @@ namespace mongo {
  *   - Anything taking a T argument will receive no arguments.
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS SemiFuture {
+class [[nodiscard]] SemiFuture {
     using Impl = future_details::FutureImpl<T>;
     using T_unless_void = std::conditional_t<std::is_void_v<T>, future_details::FakeVoid, T>;
 
@@ -311,7 +311,7 @@ SemiFuture(StatusWith<T>) -> SemiFuture<T>;
  * All comments on SemiFuture<T> apply to Future<T> as well.
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS Future : private SemiFuture<T> {
+class [[nodiscard]] Future : private SemiFuture<T> {
     using Impl = typename SemiFuture<T>::Impl;
     using T_unless_void = typename SemiFuture<T>::T_unless_void;
 
@@ -626,7 +626,7 @@ Future(StatusWith<T>) -> Future<T>;
  * because they will propagate out BrokenPromise if the executor refuses work.
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS ExecutorFuture : private SemiFuture<T> {
+class [[nodiscard]] ExecutorFuture : private SemiFuture<T> {
     using Impl = typename SemiFuture<T>::Impl;
     using T_unless_void = typename SemiFuture<T>::T_unless_void;
 
@@ -1045,7 +1045,7 @@ private:
  * A SharedSemiFuture may be passed between threads, but only one thread may use it at a time.
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS SharedSemiFuture {
+class [[nodiscard]] SharedSemiFuture {
     using Impl = future_details::SharedStateHolder<T>;
     using T_unless_void = std::conditional_t<std::is_void_v<T>, future_details::FakeVoid, T>;
 

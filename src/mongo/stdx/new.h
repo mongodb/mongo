@@ -64,7 +64,7 @@ using std::hardware_destructive_interference_size;
 using std::launder;
 #else
 template <typename T>
-MONGO_WARN_UNUSED_RESULT_FUNCTION constexpr T* launder(T* p) noexcept {
+[[nodiscard]] constexpr T* launder(T* p) noexcept {
     return p;
 }
 #endif  // launder

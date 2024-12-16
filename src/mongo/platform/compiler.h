@@ -187,14 +187,6 @@
     MONGO_COMPILER_IF_GNUC([[gnu::noinline]])
 
 /**
- * Alias for standard attribute `[[nodiscard]]`.
- * https://en.cppreference.com/w/cpp/language/attributes/nodiscard
- * TODO(SERVER-98127) Replace these with `[[nodiscard]]` when MSVC build is clean.
- */
-#define MONGO_WARN_UNUSED_RESULT_FUNCTION MONGO_COMPILER_IF_GNUC([[nodiscard]])
-#define MONGO_WARN_UNUSED_RESULT_CLASS MONGO_COMPILER_IF_GNUC([[nodiscard]])
-
-/**
  * Tells the compiler that the function always returns a non-null value, potentially allowing
  * additional optimizations at call sites.
  */

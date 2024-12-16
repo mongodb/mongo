@@ -78,7 +78,7 @@ using StatusOrStatusWith = std::conditional_t<std::is_void_v<T>, Status, StatusW
  * }
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS StatusWith {
+class [[nodiscard]] StatusWith {
 private:
     MONGO_STATIC_ASSERT_MSG(!isStatusOrStatusWith<T>,
                             "StatusWith<Status> and StatusWith<StatusWith<T>> are banned.");
