@@ -364,7 +364,6 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
                 return;
             }
             auto opCtx = client->makeOperationContext();
-            _flushDiffs(opCtx.get());
             try {
                 _flushDiffs(opCtx.get());
             } catch (const DBException& e) {
