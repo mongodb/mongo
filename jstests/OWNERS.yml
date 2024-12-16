@@ -30,3 +30,6 @@ filters:
   - "*refine_collection_shard_key*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "*dbcheck*":
+    approvers:
+      - 10gen/server-dbcheck

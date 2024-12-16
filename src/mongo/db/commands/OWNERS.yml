@@ -56,8 +56,7 @@ filters:
       - 10gen/query-integration-observability
   - "dbcheck*":
     approvers:
-      - 10gen/server-replication
-      - 10gen/server-rss-sydney
+      - 10gen/server-dbcheck
   - "feature_compatibility*":
     approvers:
       - 10gen/server-replication
