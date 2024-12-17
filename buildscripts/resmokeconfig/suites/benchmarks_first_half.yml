@@ -9,6 +9,7 @@ selector:
     # Note: This list is manually curated based on https://docs.google.com/spreadsheets/d/1yK0JIM9fN6CS-KlnOl7BcdsWd5qdJtlILo9e3BCB8QQ/edit#gid=0
     # It will NOT automagically get updated if new benchmark-related tests are added.
     - build/install/bin/first_half_bm*
+    - build/install/bin/lock_manager_bm*
     - build/install/bin/path_lower_bm*
     - build/install/bin/abt_lower_bm*
     - build/install/bin/string_bm*
@@ -20,7 +21,8 @@ selector:
   exclude_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
     # These benchmarks are being run as part of the benchmarks_sharding.yml test suite.
-    - build/install/bin/sharding_bm*
+    - build/install/bin/chunk_manager_refresh_bm*
+    - build/install/bin/sharding_write_router_bm*
     # These benchmarks are being run as part of the benchmarks_bsoncolumn.yml test suite.
     - build/install/bin/bsoncolumn_bm*
     # Hash table benchmark is really slow, don't run on evergreen

@@ -356,15 +356,8 @@ env.Benchmark(
 
 env.Benchmark(
     target="collection_acquisition_bm",
-    source=[
-        "collection_acquisition_bm.cpp",
-    ],
-    LIBDEPS=[
-        "repl/replmocks",
-        "service_context_d_test_fixture",
-        "shard_role",
-        "shard_role_api",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

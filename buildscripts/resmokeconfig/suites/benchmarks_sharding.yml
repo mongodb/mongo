@@ -5,7 +5,8 @@ selector:
   include_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
     - build/**/system_resource_canary_bm*
-    - build/install/bin/sharding_bm*
+    - build/install/bin/chunk_manager_refresh_bm*
+    - build/install/bin/sharding_write_router_bm*
 
 executor:
   config: {}

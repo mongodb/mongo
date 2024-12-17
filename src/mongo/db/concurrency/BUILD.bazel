@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -244,5 +244,17 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "lock_manager_bm",
+    srcs = [
+        "lock_manager_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        ":lock_manager",
+        "//src/mongo/db:service_context_non_d",
     ],
 )

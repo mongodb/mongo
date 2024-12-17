@@ -19,14 +19,8 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="lock_manager_bm",
-    source=[
-        "lock_manager_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "lock_manager",
-    ],
-    CONSOLIDATED_TARGET="first_half_bm",
+    source=[],
+    LIBDEPS=[],
 )
 
 env.PrettyPrinterTest(target="lock_gdb_test.py")
