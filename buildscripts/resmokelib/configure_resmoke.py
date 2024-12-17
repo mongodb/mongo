@@ -478,20 +478,34 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
         value = mongot_version.replace("-", ".").split(".")
         # Mongot versions are formatted X.Y.Z where X is the API version, Y updates for functionality changes,
         # and Z updates for patches (bug fixes).
-        mongot_major_version = value[0]
-        mongot_minor_version = value[1]
-        mongot_patch_version = value[2]
+        mongot_major_version = eval(value[0])
+        mongot_minor_version = eval(value[1])
+        mongot_patch_version = eval(value[2])
 
         # Excludes tags for the next API version, the next 5 feature releases, and the next 10 patches.
-        mongot_excluded_versions.append(f"requires_mongot_{eval(mongot_major_version) + 1}")
-        for i in range(1, 6):
-            mongot_excluded_versions.append(
-                f"requires_mongot_{mongot_major_version}_{eval(mongot_minor_version) + i}"
-            )
-        for i in range(1, 11):
-            mongot_excluded_versions.append(
-                f"requires_mongot_{mongot_major_version}_{mongot_minor_version}_{eval(mongot_patch_version) + i}"
-            )
+        # e.g. If the current version is 1.43.2, 1.43.{3-11}, 1.{44-48}.{0-9}, 2.{0-4}.{0-9} are all excluded.
+        for i in range(0, 2):
+            for j in range(0, 5):
+                for k in range(0, 10):
+                    major = i
+                    minor = j
+                    patch = k
+
+                    major += mongot_major_version
+                    # Minor and patch numbers should start from zero unless their parent is the same as input (equal to 0).
+                    if i == 0:
+                        minor += mongot_minor_version
+                        if j == 0:
+                            patch += mongot_patch_version
+
+                    # Ensure we don't append the current version.
+                    if (
+                        major == mongot_major_version
+                        and minor == mongot_minor_version
+                        and patch == mongot_patch_version
+                    ):
+                        continue
+                    mongot_excluded_versions.append(f"requires_mongot_{major}_{minor}_{patch}")
         return mongot_excluded_versions
 
     if _config.MONGOT_EXECUTABLE and os.path.exists(_config.MONGOT_EXECUTABLE):
