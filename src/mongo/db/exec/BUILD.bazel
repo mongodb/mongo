@@ -174,7 +174,6 @@ mongo_cc_unit_test(
     name = "db_exec_test",
     srcs = [
         "add_fields_projection_executor_test.cpp",
-        "bucket_unpacker_test.cpp",
         "distinct_scan_test.cpp",
         "exclusion_projection_executor_test.cpp",
         "find_projection_executor_test.cpp",
@@ -194,6 +193,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value:document_value_test.cpp",
         "//src/mongo/db/exec/document_value:document_value_test_util_self_test.cpp",
         "//src/mongo/db/exec/document_value:value_comparator_test.cpp",
+        "//src/mongo/db/exec/timeseries:bucket_unpacker_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [

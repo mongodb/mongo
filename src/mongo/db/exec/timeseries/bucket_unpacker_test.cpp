@@ -52,6 +52,7 @@
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
@@ -107,6 +108,10 @@ public:
 
     void assertGetNext(BucketUnpacker& unpacker, const Document& expected) {
         ASSERT_DOCUMENT_EQ(unpacker.getNext(), expected);
+    }
+
+    void assertGetNextBson(BucketUnpacker& unpacker, BSONObj expected) {
+        ASSERT_BSONOBJ_EQ(unpacker.getNextBson(), expected);
     }
 
     std::pair<BSONObj, StringData> buildUncompressedBucketForMeasurementCount(int num) {
@@ -954,6 +959,147 @@ TEST_F(BucketUnpackerTest, ExtractSingleMeasurementSparse) {
     ASSERT_DOCUMENT_EQ(next, expected);
 }
 
+TEST_F(BucketUnpackerTest, SimpleGetNextBson) {
+    // We use array representation for '_id', 'time', and 'a' but can't use array representation for
+    // 'b' since it doesn't exist for the first document.
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: [1,2], "
+        "time: [Date(1), Date(2)], "
+        "a:[1,2], b:{'1':1}}}");
+
+    // The compressed bucket is now a v2 bucket.
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+
+    auto bson0 = fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}");
+    auto bson1 = fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}");
+
+    for (auto& bucket : {bucket, *compressedBucket}) {
+        std::set<std::string> fields{
+            "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+        auto unpacker = makeBucketUnpacker(std::move(fields),
+                                           BucketSpec::Behavior::kInclude,
+                                           std::move(bucket),
+                                           kUserDefinedMetaName.toString());
+
+        ASSERT_EQ(unpacker.numberOfMeasurements(), 2);
+        ASSERT_TRUE(unpacker.hasNext());
+        assertGetNextBson(unpacker, bson0);
+        ASSERT_TRUE(unpacker.hasNext());
+        assertGetNextBson(unpacker, bson1);
+        ASSERT_FALSE(unpacker.hasNext());
+    }
+}
+
+TEST_F(BucketUnpackerTest, SimpleGetNextBsonOnUncompressedBucket) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    // We use array representation for '_id', 'time', and 'a' but can't use array representation for
+    // 'b' since it doesn't exist for the first document.
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: [1,2], "
+        "time: [Date(1), Date(2)], "
+        "a:[1,2], b:{'1':1}}}");
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(bucket),
+                                       kUserDefinedMetaName.toString());
+
+    auto bson0 = fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}");
+    auto bson1 = fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}");
+
+    ASSERT_EQ(unpacker.numberOfMeasurements(), 2);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNextBson(unpacker, bson0);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNextBson(unpacker, bson1);
+
+    ASSERT_FALSE(unpacker.hasNext());
+}
+
+DEATH_TEST_REGEX_F(BucketUnpackerTest, GetNextBsonWhenExhausted, "Tripwire assertion.*7026801") {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: [1], "
+        "time: [Date(1)], "
+        "a:[1]}}");
+
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(*compressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    auto bson0 = fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}");
+
+    ASSERT_EQ(unpacker.numberOfMeasurements(), 1);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNextBson(unpacker, bson0);
+
+    ASSERT_FALSE(unpacker.hasNext());
+    ASSERT_THROWS_CODE(unpacker.getNextBson(), AssertionException, 7026801);
+}
+
+
+DEATH_TEST_REGEX_F(BucketUnpackerTest,
+                   GetNextBsonWhenMinTimeAsMetadataSet,
+                   "Tripwire assertion.*7026802") {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: [1], "
+        "time: [Date(1)], "
+        "a:[1]}}");
+
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(*compressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    unpacker.setIncludeMinTimeAsMetadata();
+
+    ASSERT_TRUE(unpacker.hasNext());
+    ASSERT_THROWS_CODE(unpacker.getNextBson(), AssertionException, 7026802);
+}
+
+DEATH_TEST_REGEX_F(BucketUnpackerTest,
+                   GetNextBsonWhenMaxTimeAsMetadataSet,
+                   "Tripwire assertion.*7026802") {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: [1], "
+        "time: [Date(1)], "
+        "a:[1]}}");
+
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(*compressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    unpacker.setIncludeMaxTimeAsMetadata();
+
+    ASSERT_TRUE(unpacker.hasNext());
+    ASSERT_THROWS_CODE(unpacker.getNextBson(), AssertionException, 7026802);
+}
+
 TEST_F(BucketUnpackerTest, ComputeMeasurementCountLowerBoundsAreCorrect) {
     // Test the case when the target size hits a table entry which represents the lower bound of an
     // interval.
@@ -961,6 +1107,16 @@ TEST_F(BucketUnpackerTest, ComputeMeasurementCountLowerBoundsAreCorrect) {
         int bucketCount = std::pow(10, i);
         auto [bucket, timeField] = buildUncompressedBucketForMeasurementCount(bucketCount);
         ASSERT_EQ(bucketCount, BucketUnpacker::computeMeasurementCount(bucket, timeField));
+
+        auto compressedBucket =
+            timeseries::compressBucket(bucket, timeField, {}, false).compressedBucket;
+        ASSERT_EQ(bucketCount,
+                  BucketUnpacker::computeMeasurementCount(*compressedBucket, timeField));
+
+        // Remove the count field.
+        auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, 0);
+        ASSERT_EQ(bucketCount,
+                  BucketUnpacker::computeMeasurementCount(modifiedCompressedBucket, timeField));
     }
 }
 
@@ -991,6 +1147,44 @@ TEST_F(BucketUnpackerTest, ComputeMeasurementCountInLargerIntervals) {
     testMeasurementCount(2222);
     testMeasurementCount(11111);
     testMeasurementCount(449998);
+}
+
+TEST_F(BucketUnpackerTest, GetNextWithMetadataFields) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    // The value for 'b' cannot use array representation (like '_id') since it doesn't have a value
+    // for the first document.
+    auto bucket = fromjson(
+        "{control: {'version': 1, 'min': {'time' : Date(1)}, 'max': {'time' : Date(2)}}, meta: "
+        "{'m1': 999, 'm2': 9999}, hello:{'h1': 0, 'h2': 1}, data: {_id: [1,2], "
+        "time: [Date(1), Date(2)], "
+        "a:[1,2], b:{'1':1}}}");
+
+    auto spec = BucketSpec{kUserDefinedTimeName.toString(),
+                           kUserDefinedMetaName.toString(),
+                           std::move(fields),
+                           BucketSpec::Behavior::kInclude};
+
+    BucketUnpacker unpacker{std::move(spec)};
+
+    unpacker.addComputedMetaProjFields({"hello"_sd});
+    unpacker.setIncludeMaxTimeAsMetadata();
+    unpacker.setIncludeMinTimeAsMetadata();
+
+    // Reset bucket to update _computedMetaProjections, _minTime, and _maxTime.
+    unpacker.reset(std::move(bucket));
+
+    auto doc0 = Document{fromjson(
+        "{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1,  hello: {h1: 0, h2: 1}}")};
+    ASSERT_TRUE(unpacker.hasNext());
+    auto document = unpacker.getNext();
+    ASSERT_DOCUMENT_EQ(doc0, document);
+
+    Date_t minDate = Date_t::fromMillisSinceEpoch(1);
+    Date_t maxDate = Date_t::fromMillisSinceEpoch(2);
+    ASSERT_EQ(document.metadata().getTimeseriesBucketMinTime(), minDate);
+    ASSERT_EQ(document.metadata().getTimeseriesBucketMaxTime(), maxDate);
 }
 
 TEST_F(BucketUnpackerTest, TamperedCompressedCountLess) {
