@@ -1263,9 +1263,10 @@ private:
      * Fills a HelloResponse with the appropriate replication related fields. horizonString
      * should be passed in if hasValidConfig is true.
      */
-    std::shared_ptr<HelloResponse> _makeHelloResponse(boost::optional<StringData> horizonString,
-                                                      WithLock,
-                                                      const bool hasValidConfig) const;
+    std::shared_ptr<HelloResponse> _makeHelloResponse(
+        const boost::optional<std::string>& horizonString,
+        WithLock lock,
+        const bool hasValidConfig) const;
 
     /**
      * Creates a semi-future for HelloResponse. horizonString should be passed in if and only if
@@ -1274,14 +1275,14 @@ private:
     virtual SharedSemiFuture<SharedHelloResponse> _getHelloResponseFuture(
         WithLock,
         const SplitHorizon::Parameters& horizonParams,
-        boost::optional<StringData> horizonString,
+        const boost::optional<std::string>& horizonString,
         boost::optional<TopologyVersion> clientTopologyVersion);
 
     /**
      * Returns the horizon string by parsing horizonParams if the node is a valid member of the
      * replica set. Otherwise, return boost::none.
      */
-    boost::optional<StringData> _getHorizonString(
+    boost::optional<std::string> _getHorizonString(
         WithLock, const SplitHorizon::Parameters& horizonParams) const;
 
     /**

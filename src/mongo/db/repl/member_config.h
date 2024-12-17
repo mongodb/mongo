@@ -119,7 +119,7 @@ public:
      * Gets the horizon name for which the parameters (captured during the first `isMaster`)
      * correspond.
      */
-    StringData determineHorizon(const SplitHorizon::Parameters& params) const {
+    std::string determineHorizon(const SplitHorizon::Parameters& params) const {
         return _splitHorizon.determineHorizon(params);
     }
 

@@ -91,7 +91,7 @@ public:
      * Gets the horizon name for which the parameters (captured during the first `isMaster`)
      * correspond.
      */
-    StringData determineHorizon(const Parameters& horizonParameters) const;
+    std::string determineHorizon(const Parameters& horizonParameters) const;
 
     const HostAndPort& getHostAndPort(StringData horizon) const {
         invariant(!_forwardMapping.empty());
