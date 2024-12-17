@@ -6699,13 +6699,92 @@ if env.get("__NINJA_NO") != "1":
 
         t = target[0]
         suffix = getattr(t.attributes, "aib_effective_suffix", t.get_suffix())
-        bazel_node = env.File(
-            t.abspath.replace(
-                f"{env.Dir('#').abspath}/{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path
-            )
+
+        proj_path = env.Dir("#src").abspath.replace("\\", "/")
+        build_path = env.Dir("$BUILD_DIR").abspath.replace("\\", "/")
+        bazel_path = os.path.join(env.Dir("#").abspath, env["BAZEL_OUT_DIR"] + "/src").replace(
+            "\\", "/"
         )
 
-        prog_output = env.BazelAutoInstallSingleTarget(bazel_node, suffix, bazel_node)
+        new_path = t.abspath.replace("\\", "/").replace(proj_path, build_path)
+        new_path = new_path.replace(build_path, bazel_path)
+
+        bazel_node = env.File(new_path)
+
+        debug_files = []
+        debug_suffix = ""
+        # This was copied from separate_debug.py
+        if env.TargetOSIs("darwin"):
+            # There isn't a lot of great documentation about the structure of dSYM bundles.
+            # For general bundles, see:
+            #
+            # https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html
+            #
+            # But we expect to find two files in the bundle. An
+            # Info.plist file under Contents, and a file with the same
+            # name as the target under Contents/Resources/DWARF.
+
+            target0 = bazel_node
+            dsym_dir_name = target0.name + ".dSYM"
+            dsym_dir = env.Dir(dsym_dir_name, directory=target0.get_dir())
+
+            dwarf_sym_with_debug = os.path.join(
+                dsym_dir.abspath, f"Contents/Resources/DWARF/{target0.name}_shared_with_debug.dylib"
+            )
+
+            # this handles shared libs or program binaries
+            if os.path.exists(dwarf_sym_with_debug):
+                dwarf_sym_name = f"{target0.name}.dylib"
+            else:
+                dwarf_sym_with_debug = os.path.join(
+                    dsym_dir.abspath, f"Contents/Resources/DWARF/{target0.name}_with_debug"
+                )
+                dwarf_sym_name = f"{target0.name}"
+
+            plist_file = env.File("Contents/Info.plist", directory=dsym_dir)
+            setattr(plist_file.attributes, "aib_effective_suffix", ".dSYM")
+            setattr(
+                plist_file.attributes,
+                "aib_additional_directory",
+                "{}/Contents".format(dsym_dir_name),
+            )
+
+            dwarf_dir = env.Dir("Contents/Resources/DWARF", directory=dsym_dir)
+
+            dwarf_file = env.File(dwarf_sym_with_debug, directory=dwarf_dir)
+            setattr(dwarf_file.attributes, "aib_effective_suffix", ".dSYM")
+            setattr(
+                dwarf_file.attributes,
+                "aib_additional_directory",
+                "{}/Contents/Resources/DWARF".format(dsym_dir_name),
+            )
+            setattr(dwarf_file.attributes, "aib_new_name", dwarf_sym_name)
+
+            debug_files.extend([plist_file, dwarf_file])
+            debug_suffix = ".dSYM"
+
+        elif env.TargetOSIs("posix"):
+            debug_suffix = env.subst("$SEPDBG_SUFFIX")
+            debug_file = env.File(f"{os.path.splitext(bazel_node.abspath)[0]}{debug_suffix}")
+            debug_files.append(debug_file)
+        elif env.TargetOSIs("windows"):
+            debug_suffix = ".pdb"
+            debug_file = env.File(f"{os.path.splitext(bazel_node.abspath)[0]}{debug_suffix}")
+            debug_files.append(debug_file)
+        else:
+            pass
+
+        for debug_file in debug_files:
+            setattr(debug_file.attributes, "debug_file_for", bazel_node)
+        setattr(bazel_node.attributes, "separate_debug_files", debug_files)
+
+        installed_prog = env.BazelAutoInstallSingleTarget(bazel_node, suffix, bazel_node)
+
+        installed_debugs = []
+        for debug_file in debug_files:
+            installed_debugs.append(
+                env.BazelAutoInstallSingleTarget(debug_file, debug_suffix, debug_file)
+            )
 
         libs = []
         debugs = []
@@ -6732,9 +6811,13 @@ if env.get("__NINJA_NO") != "1":
                         )[0]
                     )
 
-            env.Depends(prog_output[0], libs)
-            if len(prog_output) == 2:
-                env.Depends(prog_output[1], debugs)
+        env.Depends(installed_prog, libs)
+
+        for installed_debug_file in installed_debugs:
+            env.Depends(installed_debug_file, debugs)
+
+        setattr(t.attributes, "AIB_INSTALLED_FILES", installed_prog)
+
         return target, source
 
     builder = env["BUILDERS"]["BazelProgram"]

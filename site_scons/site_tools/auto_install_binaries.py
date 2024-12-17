@@ -397,7 +397,12 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
         aib_additional_directory = getattr(s.attributes, "aib_additional_directory", None)
         if aib_additional_directory is not None:
             target_for_source = env.Dir(aib_additional_directory, directory=target_for_source)
-        new_installed_files = env.Install(target=target_for_source, source=s)
+        aib_new_name = getattr(s.attributes, "aib_new_name", None)
+        if aib_new_name is not None:
+            install_file = env.File(aib_new_name, target_for_source)
+            new_installed_files = env.InstallAs(install_file, s)
+        else:
+            new_installed_files = env.Install(target=target_for_source, source=s)
         setattr(s.attributes, INSTALLED_FILES, new_installed_files)
         setattr(new_installed_files[0].attributes, "AIB_INSTALL_FROM", s)
         installed_files.extend(new_installed_files)
@@ -447,6 +452,9 @@ def auto_install_emitter(target, source, env):
             t = env.File(t)
 
         if env.get("AIB_IGNORE", False):
+            continue
+
+        if t.has_builder() and t.get_builder().get_name(env) == "BazelProgram":
             continue
 
         # There is no API for determining if an Entry is operating in

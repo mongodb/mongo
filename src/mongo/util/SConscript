@@ -35,7 +35,6 @@ env.SConscript(
     must_exist=1,
     dirs=[
         "concurrency",
-        "cryptd",
         "immutable",
         "net",
         "options_parser",
@@ -342,14 +341,9 @@ env.Benchmark(
     CONSOLIDATED_TARGET="first_half_bm",
 )
 
-pretty_printer_test_program = env.Program(
+pretty_printer_test_program = env.BazelProgram(
     target="pretty_printer_test_program",
-    source=[
-        "pretty_printer_test_program.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
+    source=[],
     AIB_COMPONENT="pretty-printer-tests",
     AIB_COMPONENTS_EXTRA=["dist-test"],
 )

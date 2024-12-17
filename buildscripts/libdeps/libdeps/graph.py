@@ -72,7 +72,6 @@ class DependsReportTypes(Enum):
     EFFICIENCY = auto()
     BAZEL_CONV_CANDIDATES = auto()
     BAZEL_ORDER = auto()
-    BAZEL_ORDER_CORE = auto()
 
 
 class LinterTypes(Enum):
