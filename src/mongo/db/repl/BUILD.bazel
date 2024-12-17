@@ -2672,6 +2672,7 @@ mongo_cc_benchmark(
     srcs = [
         "replication_consistency_markers_impl_bm.cpp",
     ],
+    tags = ["repl_bm"],
     deps = [
         ":primary_only_service",
         ":replication_consistency_markers_impl",

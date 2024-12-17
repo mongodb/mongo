@@ -6098,6 +6098,20 @@ if "SANITIZER_RUNTIME_LIBS" in env:
         AIB_COMPONENTS_EXTRA=["dist-test"],
     )
 
+for benchmark_tag in env.get_bazel_benchmark_tags():
+    env.AddPackageNameAlias(
+        component=benchmark_tag,
+        role="runtime",
+        name=benchmark_tag,
+    )
+
+    env.AutoInstall(
+        ".",
+        f"$BUILD_ROOT/{benchmark_tag}.txt",
+        AIB_COMPONENT=benchmark_tag,
+        AIB_ROLE="runtime",
+    )
+
 env["RPATH_ESCAPED_DOLLAR_ORIGIN"] = "\\$$$$ORIGIN"
 
 

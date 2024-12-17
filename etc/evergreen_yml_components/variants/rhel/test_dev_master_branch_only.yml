@@ -380,7 +380,7 @@ buildvariants:
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-medium
+      - rhel8.8-large
     expansions:
       compile_flags: >-
         --ssl

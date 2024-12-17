@@ -127,7 +127,7 @@ buildvariants:
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - windows-2022-large # To accommodate OOD issues noted in BF-31698
+      - windows-2022-xxlarge # To accommodate OOD issues noted in BF-31698
     expansions:
       additional_package_targets: >-
         archive-mongocryptd

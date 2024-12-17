@@ -9,6 +9,7 @@ env.Benchmark(
     target="oplog_entry_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="repl_bm",
 )
 
 if wiredtiger:
@@ -96,28 +97,33 @@ env.Benchmark(
     target="oplog_application_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="repl_bm",
 )
 
 env.Benchmark(
     target="oplog_applier_utils_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="repl_bm",
 )
 
 env.Benchmark(
     target="replication_consistency_markers_impl_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="repl_bm",
 )
 
 env.Benchmark(
     target="oplog_write_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="repl_bm",
 )
 
 env.Benchmark(
     target="replication_waiter_list_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="repl_bm",
 )

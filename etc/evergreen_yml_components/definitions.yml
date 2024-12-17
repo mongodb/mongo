@@ -215,6 +215,14 @@ functions:
     - *f_expansions_write
     - *generate_evergreen_bazelrc
 
+  "consolidate benchmark lists":
+    command: subprocess.exec
+    params:
+      display_name: "consolidate benchmark lists"
+      binary: bash
+      args:
+        - "src/evergreen/consolidate_benchmark_txt.sh"
+
   "adjust venv": &adjust_venv
     command: subprocess.exec
     display_name: "adjust venv"

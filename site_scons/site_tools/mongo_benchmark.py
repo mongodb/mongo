@@ -23,11 +23,27 @@
 Pseudo-builders for building and registering benchmarks.
 """
 
+from collections import defaultdict
+
 from site_scons.mongo import insort_wrapper
+
+BAZEL_BENCHMARK_TAGS = defaultdict(list)
+BAZEL_BENCHMARK_TAGS["repl_bm"] = []
+BAZEL_BENCHMARK_TAGS["query_bm"] = []
+BAZEL_BENCHMARK_TAGS["bsoncolumn_bm"] = []
+BAZEL_BENCHMARK_TAGS["first_half_bm"] = []
+BAZEL_BENCHMARK_TAGS["second_half_bm"] = []
+BAZEL_BENCHMARK_TAGS["query_nond_bm"] = []
+BAZEL_BENCHMARK_TAGS["wt_storage_bm"] = []
+BAZEL_BENCHMARK_TAGS["sharding_bm"] = []
 
 
 def exists(env):
     return True
+
+
+def get_bazel_benchmark_tags(env):
+    return BAZEL_BENCHMARK_TAGS
 
 
 def build_benchmark(env, target, source, **kwargs):
@@ -61,22 +77,38 @@ def build_benchmark(env, target, source, **kwargs):
         env.GetOption("consolidated-test-bins") == "on"
         and "CONSOLIDATED_TARGET" in kwargs
         and kwargs["CONSOLIDATED_TARGET"]
+        and "BAZEL_BENCHMARK_TAG" not in kwargs
     ):
         kwargs["AIB_COMPONENTS_EXTRA"] = ["benchmarks"]
         return bmEnv.AddToConsolidatedTarget(
             target, source, kwargs, "$BENCHMARK_ALIAS", "$BENCHMARK_LIST"
         )
+
+    if "BAZEL_BENCHMARK_TAG" in kwargs:
+        kwargs["AIB_COMPONENT"] = kwargs["BAZEL_BENCHMARK_TAG"]
+        kwargs["AIB_COMPONENTS_EXTRA"] = []
     if not source:
         result = bmEnv.BazelProgram(target, source, **kwargs)
     else:
         result = bmEnv.Program(target, source, **kwargs)
-    bmEnv.RegisterTest("$BENCHMARK_LIST", result[0])
-    bmEnv.Alias("$BENCHMARK_ALIAS", result)
+
+    if "BAZEL_BENCHMARK_TAG" in kwargs:
+        tag = kwargs["BAZEL_BENCHMARK_TAG"]
+        BAZEL_BENCHMARK_TAGS[tag] += [target]
+        bmEnv.RegisterTest(f"$BUILD_ROOT/{tag}.txt", result[0])
+        bmEnv.Alias(f"install-{tag}", result)
+    else:
+        bmEnv.RegisterTest("$BENCHMARK_LIST", result[0])
+        bmEnv.Alias("$BENCHMARK_ALIAS", result)
 
     return result
 
 
 def generate(env):
+    for tag in BAZEL_BENCHMARK_TAGS:
+        env.TestList(f"$BUILD_ROOT/{tag}.txt", source=[])
+        env.Alias(f"install-{tag}", f"$BUILD_ROOT/{tag}.txt")
     env.TestList("$BENCHMARK_LIST", source=[])
     env.AddMethod(build_benchmark, "Benchmark")
     env.Alias("$BENCHMARK_ALIAS", "$BENCHMARK_LIST")
+    env.AddMethod(get_bazel_benchmark_tags, "get_bazel_benchmark_tags")

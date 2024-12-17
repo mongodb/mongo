@@ -116,10 +116,38 @@ tasks:
     tags: ["assigned_to_jira_team_server_repl", "experimental", "benchmarks"]
     commands:
       - func: "do benchmark setup"
+      - func: "get engflow creds"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-repl_bm
+            archive-repl_bm
+          bazel_build_tags: --bazel-build-tag=repl_bm
+          compiling_for_test: true
+      # scons compile resets install_dir
+      - command: expansions.update
+        display_name: "expansions fix install_dir"
+        params:
+          updates:
+            - key: install_dir
+              value: build/install/bin
+      - func: "f_expansions_write"
+      - func: "consolidate benchmark lists"
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_replication
+          install_dir: build/install/bin
           resmoke_jobs_max: 1
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/repl_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/repl_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Benchmarks
 
   - <<: *gen_task_template
     name: bulk_write_causally_consistent_jscore_passthrough_gen

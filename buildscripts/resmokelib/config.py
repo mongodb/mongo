@@ -678,6 +678,16 @@ SPLIT_UNITTESTS_LISTS = [
     f"build/{test_group}_quarter_unittests.txt"
     for test_group in ["first", "second", "third", "fourth"]
 ]
+BENCHMARK_SUITE_TEST_LISTS = [
+    "build/repl_bm.txt",
+    "build/query_bm.txt",
+    "build/bsoncolumn_bm.txt",
+    "build/first_half_bm.txt",
+    "build/second_half_bm.txt",
+    "build/query_nond_bm.txt",
+    "build/wt_storage_bm.txt",
+    "build/sharding_bm.txt",
+]
 # External files or executables, used as suite selectors, that are created during the build and
 # therefore might not be available when creating a test membership map.
 EXTERNAL_SUITE_SELECTORS = (
@@ -688,6 +698,7 @@ EXTERNAL_SUITE_SELECTORS = (
     DEFAULT_LIBFUZZER_TEST_LIST,
     DEFAULT_PRETTY_PRINTER_TEST_LIST,
     *SPLIT_UNITTESTS_LISTS,
+    *BENCHMARK_SUITE_TEST_LISTS,
 )
 
 # Where to look for logging and suite configuration files
