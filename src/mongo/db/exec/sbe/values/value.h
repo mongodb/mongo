@@ -267,6 +267,10 @@ inline constexpr bool isArray(TypeTags tag) noexcept {
         tag == TypeTags::bsonArray;
 }
 
+inline constexpr bool isContainer(TypeTags tag) noexcept {
+    return isObject(tag) || isArray(tag) || tag == TypeTags::MultiMap;
+}
+
 inline constexpr bool isInList(TypeTags tag) noexcept {
     return tag == TypeTags::inList;
 }

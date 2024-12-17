@@ -98,6 +98,18 @@ std::pair<value::TypeTags, value::Value> makeNestedObject(size_t depth,
     return makeNestedObject(depth - 1, oVal, topObj);
 }
 
+std::pair<value::TypeTags, value::Value> makeNestedMultiMap(size_t depth,
+                                                            value::Value map,
+                                                            value::Value topMap) {
+    if (depth < 1) {
+        return {value::TypeTags::MultiMap, topMap};
+    }
+    auto [mTag, mVal] = value::makeNewMultiMap();
+    value::getMultiMapView(map)->insert(
+        {value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(depth)}, {mTag, mVal});
+    return makeNestedMultiMap(depth - 1, mVal, topMap);
+}
+
 TEST(WriteValueToStream, ShortBSONBinDataTest) {
     auto bsonString =
         BSON("binData" << BSONBinData(kStringShort, strlen(kStringShort), BinDataGeneral));
@@ -189,7 +201,6 @@ TEST(WriteValueToStream, BigArrayTest) {
     auto expectedArray = R"(["a", "a", "a", "a", "a", "a", "a", "a", "a", "a", ...])";
     ASSERT_EQUALS(expectedArray, oss.str());
 }
-
 
 TEST(WriteValueToStream, NestedArrayTest) {
     auto [aTag, aVal] = value::makeNewArray();
@@ -428,6 +439,61 @@ TEST(WriteValueToStream, TimezoneTest) {
     auto expectedString = "TimeZone(UTC)";
     ASSERT_EQUALS(expectedString, oss.str());
     value::releaseValue(value.first, value.second);
+}
+
+TEST(WriteValueToStream, LongMultiMapTest) {
+    auto [mapTag, mapVal] = value::makeNewMultiMap();
+    value::ValueGuard mapGuard{mapTag, mapVal};
+    auto [sTag, sVal] = value::makeNewString("a");
+    value::ValueGuard sGuard{sTag, sVal};
+    auto testMap = value::getMultiMapView(mapVal);
+    for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
+        testMap->insert({sTag, sVal}, {sTag, sVal});
+    }
+    std::ostringstream oss;
+    writeToStream(oss, {mapTag, mapVal});
+    auto expectedArray =
+        R"([{k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, {k : "a", v : "a"}, ...])";
+    ASSERT_EQUALS(expectedArray, oss.str());
+}
+
+TEST(WriteValueToStream, NestedMultiMapTest) {
+    auto [mTag, mVal] = value::makeNewMultiMap();
+    auto [tag, val] =
+        makeNestedMultiMap(PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1, mVal, mVal);
+    value::ValueGuard guard{tag, val};
+    std::ostringstream oss;
+    writeToStream(oss, {tag, val});
+    auto expectedArray =
+        "[{k : 11, v : [{k : 10, v : [{k : 9, v : [{k : 8, v : [{k : 7, v : [{k : 6, v : [{k : 5, "
+        "v : [{k : 4, v : [{k : 3, v : [{k : 2, v : [...]}]}]}]}]}]}]}]}]}]}]";
+    ASSERT_EQUALS(expectedArray, oss.str());
+}
+
+TEST(WriteValueToStream, LongKeyString) {
+    key_string::Builder builder{key_string::Version::V1};
+    builder.appendString(kStringLong);
+    const std::pair<value::TypeTags, value::Value> value =
+        value::makeKeyString(builder.getValueCopy());
+    std::ostringstream oss;
+    writeToStream(oss, value);
+    auto expectedString =
+        "KS("
+        "3C74686973206973206120737570657220647570657220647570657220647570657220647570657220647570"
+        "657220647570657220647570657220647570657220647570657220647570657220647570...)";
+    ASSERT_EQUALS(expectedString, oss.str());
+}
+
+TEST(WriteValueToStream, LongRecordId) {
+    const std::pair<value::TypeTags, value::Value> value =
+        value::makeNewRecordId(kStringLong, static_cast<int32_t>(strlen(kStringLong)));
+    std::ostringstream oss;
+    writeToStream(oss, value);
+    auto expectedString =
+        "RecordId("
+        "7468697320697320612073757065722064757065722064757065722064757065722064757065722064757065"
+        "722064757065722064757065722064757065722064757065722064757065722064757065...)";
+    ASSERT_EQUALS(expectedString, oss.str());
 }
 
 }  // namespace mongo::sbe

@@ -68,7 +68,7 @@ class ValuePrinter {
 
 public:
     void writeTagToStream(TypeTags tag);
-    void writeStringDataToStream(StringData sd, bool isJavaScript = false);
+    void writeStringDataToStream(StringData sd, bool addQuotes = true);
     void writeArrayToStream(TypeTags tag, Value val, size_t depth = 1);
     void writeSortedArraySetToStream(TypeTags tag, Value val, size_t depth = 1);
     void writeObjectToStream(TypeTags tag, Value val, size_t depth = 1);
