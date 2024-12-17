@@ -53,6 +53,7 @@ selector:
     - jstests/aggregation/bugs/groupMissing.js
     - jstests/aggregation/sources/graphLookup/variables.js
     - jstests/aggregation/accumulators/accumulator_js_size_limits.js
+    - jstests/aggregation/explain_per_stage_exec_stats.js
     - jstests/aggregation/query_limits_test.js
     - jstests/aggregation/sources/geonear/geonear_hint.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
