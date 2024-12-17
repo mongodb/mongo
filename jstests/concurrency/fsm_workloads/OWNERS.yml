@@ -8,10 +8,10 @@ filters:
       - 10gen/server-storage-execution
   - "timeseries_agg*":
     approvers:
-      - 10gen/query-integration
+      - 10gen/query-integration-timeseries
   - "timeseries_deletes_and_inserts.js":
     approvers:
-      - 10gen/query-integration
+      - 10gen/query-integration-timeseries
   - "crud/crud_clustered_collection.js":
     approvers:
       - 10gen/server-storage-execution

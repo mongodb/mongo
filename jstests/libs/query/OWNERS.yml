@@ -14,10 +14,10 @@ filters:
       - 10gen/query-execution-change-streams
   - "geo*.js":
     approvers:
-      - 10gen/query-integration
+      - 10gen/query-integration-geo
   - "group_to_distinct_scan_utils.js":
     approvers:
-      - 10gen/query-integration
+      - 10gen/query-integration-analytic-extensions
   - "query_settings*.js":
     approvers:
       - 10gen/query-execution-query-settings
