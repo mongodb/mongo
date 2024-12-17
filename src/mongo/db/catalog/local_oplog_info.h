@@ -58,7 +58,6 @@ public:
     RecordStore* getRecordStore() const;
     void setRecordStore(RecordStore* rs);
     void resetRecordStore();
-    Microseconds getTotalOplogSlotDurationMicros() const;
 
     /**
      * Sets the global Timestamp to be 'newTime'.
@@ -76,12 +75,6 @@ private:
     // the global exclusive lock to set the pointer to null when the RecordStore instance is
     // destroyed. See "oplogCheckCloseDatabase".
     RecordStore* _rs = nullptr;
-
-    // Stores the total time an operation spends with an uncommitted oplog slot held open. Indicator
-    // that an operation is holding back replication by causing oplog holes to remain open for
-    // unusual amounts of time.
-    AtomicWord<int64_t> _totalOplogSlotDurationMicros;
-
 
     // Synchronizes the section where a new Timestamp is generated and when it is registered in the
     // storage engine.
