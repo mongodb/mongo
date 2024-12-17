@@ -20,124 +20,32 @@ if shouldBuildGRPC(env):
         ],
     )
 
-tlEnv = env.Clone()
-tlEnv.InjectThirdParty(libraries=["asio"])
-
-if shouldBuildGRPC(tlEnv):
-    tlEnv.InjectThirdParty(libraries=["grpc"])
-
-tlEnv.CppUnitTest(
+env.CppUnitTest(
     target="transport_test",
-    source=[
-        "asio/asio_transport_layer_test.cpp",
-        "asio/asio_utils_test.cpp",
-        "hello_metrics_test.cpp",
-        "message_compressor_manager_test.cpp",
-        "message_compressor_registry_test.cpp",
-        "service_executor_test.cpp",
-        "max_conns_override_test.cpp",
-        "session_manager_test.cpp",
-        "session_manager_common_test.cpp" if env.TargetOSIs("linux") else [],
-        "session_workflow_test.cpp",
-        "transport_layer_manager_test.cpp",
-        "transport_layer_manager_grpc_test.cpp" if shouldBuildGRPC(tlEnv) else [],
-        "proxy_protocol_header_parser_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/dbmessage",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/rpc/message",
-        "$BUILD_DIR/mongo/rpc/rpc",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "$BUILD_DIR/mongo/util/periodic_runner_factory" if shouldBuildGRPC(tlEnv) else [],
-        "$BUILD_DIR/third_party/asio-master/asio",
-        "$BUILD_DIR/third_party/grpc/grpc++_reflection" if shouldBuildGRPC(tlEnv) else [],
-        "$BUILD_DIR/third_party/protobuf/protobuf" if shouldBuildGRPC(tlEnv) else [],
-        "message_compressor",
-        "message_compressor_options_server",
-        "service_executor",
-        "session_manager",
-        "transport_layer",
-        "transport_layer_common",
-        "transport_layer_manager",
-        "transport_layer_mock",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
-tlEnvTest = tlEnv.Clone()
-tlEnvTest.Append(
-    # TODO(SERVER-54659): Work around casted nullptrs in
-    # asio/impl/connect.hpp, which has an open PR upstream
-    # https://github.com/chriskohlhoff/asio/pull/882, and will
-    # hopefully arrive in a future released version to which we will
-    # upgrade per SERVER-54569.
-    CCFLAGS=[]
-    if env.TargetOSIs("windows")
-    else [
-        "-Wno-nonnull",
-    ],
-)
-
-tlEnvTest.CppIntegrationTest(
+env.CppIntegrationTest(
     target="transport_integration_test",
-    source=[
-        "asio/asio_transport_layer_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/async_client",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/mongo/util/version_impl",
-        "$BUILD_DIR/third_party/asio-master/asio",
-        "transport_layer_egress_init",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="service_executor_bm",
-    source=[
-        "service_executor_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "service_executor",
-        "transport_layer_mock",
-    ],
-    CONSOLIDATED_TARGET="second_half_bm",
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="session_workflow_bm",
-    source=[
-        "session_workflow_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "service_executor",
-        "session_manager",
-        "transport_layer_manager",
-        "transport_layer_mock",
-    ],
-    CONSOLIDATED_TARGET="second_half_bm",
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="message_compressor_bm",
-    source=[
-        "message_compressor_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/rpc/message",
-        "message_compressor",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
