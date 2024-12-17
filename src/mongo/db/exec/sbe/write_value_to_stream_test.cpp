@@ -475,6 +475,7 @@ TEST(WriteValueToStream, LongKeyString) {
     builder.appendString(kStringLong);
     const std::pair<value::TypeTags, value::Value> value =
         value::makeKeyString(builder.getValueCopy());
+    value::ValueGuard guard{value};
     std::ostringstream oss;
     writeToStream(oss, value);
     auto expectedString =
@@ -487,6 +488,7 @@ TEST(WriteValueToStream, LongKeyString) {
 TEST(WriteValueToStream, LongRecordId) {
     const std::pair<value::TypeTags, value::Value> value =
         value::makeNewRecordId(kStringLong, static_cast<int32_t>(strlen(kStringLong)));
+    value::ValueGuard guard{value};
     std::ostringstream oss;
     writeToStream(oss, value);
     auto expectedString =
