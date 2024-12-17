@@ -453,12 +453,17 @@ export class QuerySettingsIndexHintsTests {
             this._db.runCommand(explainCmd),
             `Failed running ${tojson(explainCmd)} before setting query settings`);
         const queryPlansWithoutQuerySettings = getAllQueryPlans(explainWithoutQuerySettings);
+        const changeStreamIgnoreFields = ["t", "ts", "minRecord"];
         this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
             const explainWithQuerySettings = assert.commandWorked(
                 this._db.runCommand(explainCmd),
                 `Failed running ${tojson(explainCmd)} after setting query settings`);
             const queryPlansWithQuerySettings = getAllQueryPlans(explainWithQuerySettings);
-            assert(anyEq(queryPlansWithoutQuerySettings, queryPlansWithQuerySettings),
+            assert(anyEq(queryPlansWithoutQuerySettings,
+                         queryPlansWithQuerySettings,
+                         false /* verbose */,
+                         undefined /* valueComparator - will use bsonWoCompare */,
+                         changeStreamIgnoreFields),
                    "Expected the query without query settings and the one with query settings to " +
                        "have identical plans: " + tojson(queryPlansWithoutQuerySettings) +
                        " != " + tojson(queryPlansWithQuerySettings));

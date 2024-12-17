@@ -2,7 +2,7 @@
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
-//   requires_fcv_80,
+//   requires_fcv_81,
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
 // ]
@@ -136,4 +136,13 @@ testRejection({
     queryPrime: qsutils.makeAggregateQueryInstance({pipeline: buildPipeline(12345), cursor: {}}),
     unrelatedQuery:
         qsutils.makeAggregateQueryInstance({pipeline: buildPipeline("string"), cursor: {}}),
+});
+
+testRejection({
+    query: qsutils.makeAggregateQueryInstance(
+        {pipeline: [{$changeStream: {}}, {$match: {operationType: "insert"}}]}),
+    queryPrime: qsutils.makeAggregateQueryInstance(
+        {pipeline: [{$changeStream: {}}, {$match: {operationType: "delete"}}]}),
+    unrelatedQuery: qsutils.makeAggregateQueryInstance(
+        {pipeline: [{$changeStream: {}}, {$match: {"fullDocument.string": "value"}}]}),
 });
