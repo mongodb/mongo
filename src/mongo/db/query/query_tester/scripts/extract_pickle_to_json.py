@@ -20,9 +20,8 @@ args = utils.parse_args_common(
 output_prefix = args.output_prefix
 
 # Validate directories and change to feature-extractor directory
-mongo_repo_root, feature_extractor_dir = utils.validate_and_change_directory(
-    args.mongo_repo_root, args.feature_extractor_dir
-)
+mongo_repo_root = utils.validate_directory(args.mongo_repo_root)
+feature_extractor_dir = utils.validate_and_change_directory(args.feature_extractor_dir)
 
 # Convert pickle file with aggregated dataframes to JSON
 pickle_to_json_command = ["bin/venv", "pickle_to_json.py", output_prefix]

@@ -55,7 +55,7 @@ def move_file(src: str, dest: str) -> None:
         print_and_exit(f"Error moving file {src} to {dest}: {e}")
 
 
-def parse_args_common(desc: str, tester_filepath: bool = False) -> argparse.Namespace:
+def parse_args_common(desc: str, fail_filepath: bool = False) -> argparse.Namespace:
     """Helper function to parse common arguments, with optional additional arguments."""
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument(
@@ -65,9 +65,9 @@ def parse_args_common(desc: str, tester_filepath: bool = False) -> argparse.Name
         "feature_extractor_dir", type=str, help="Path to the feature-extractor directory"
     )
     parser.add_argument("output_prefix", type=str, help="Prefix for output files")
-    if tester_filepath:
+    if fail_filepath:
         parser.add_argument(
-            "tester_filepath", type=str, help="Path to the tester file without '.fail' extension"
+            "fail_filepath", type=Path, help="Path to the tester file with '.fail' extension"
         )
     return parser.parse_args()
 
@@ -78,19 +78,14 @@ def print_and_exit(msg: str) -> None:
     sys.exit(1)
 
 
-def validate_and_change_directory(
-    mongo_repo_root: str, feature_extractor_dir: str
-) -> Tuple[Path, Path]:
-    """Validates MongoDB repository root and feature-extractor directory, changing to feature-extractor directory."""
-
-    # Validate Mongo repo root
-    mongo_repo_root_path = validate_directory(mongo_repo_root)
+def validate_and_change_directory(feature_extractor_dir: str) -> Tuple[Path, Path]:
+    """Validates and changes to feature-extractor directory."""
 
     # Validate feature-extractor directory and change to it
     feature_extractor_path = validate_directory(feature_extractor_dir)
     os.chdir(os.path.expanduser(feature_extractor_path))
 
-    return mongo_repo_root_path, feature_extractor_path
+    return feature_extractor_path
 
 
 def validate_directory(dirpath: str) -> Path:
@@ -101,11 +96,7 @@ def validate_directory(dirpath: str) -> Path:
     return path
 
 
-def validate_tester_filepath(mongo_repo_root: str, tester_filepath: str) -> Path:
+def validate_fail_filepath(fail_filepath: Path) -> None:
     """Validates the tester file path format and existence."""
-    if tester_filepath.endswith(".fail"):
-        print_and_exit(f"Error: tester_filepath should not include .fail: {tester_filepath}")
-    fail_filepath = Path(f"{mongo_repo_root}/{tester_filepath}.fail")
-    if not fail_filepath.is_file():
-        print_and_exit(f"Error: tester filepath does not exist: {fail_filepath}")
-    return fail_filepath
+    if not str(fail_filepath).endswith(".fail"):
+        print_and_exit(f"Error: fail_filepath should end in .fail: {fail_filepath}")

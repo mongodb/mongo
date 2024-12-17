@@ -68,25 +68,44 @@ static const auto kTestNumRegex =
  * https://github.com/10gen/feature-extractor, but the ones that we care about are either Operator,
  * Pipeline, Plan, or Index features.
  */
-static const auto kFeatureTypes = std::vector<std::string>{// Operator Features
+static const auto kFeatureTypes = std::vector<std::string>{/* Operator Features */
                                                            "ConstantOperator",
                                                            "Operator",
-                                                           // Pipeline Features
+
+                                                           /* Pipeline Features */
                                                            "MatchTopOperator",
                                                            "PipelineFirstStage",
                                                            "PipelineStage",
-                                                           "PipelineStageConstantArgument",
-                                                           "PipelineStageRelationship",
+                                                           // PipelineStage
+                                                           // PipelineStageConstantArgument
+                                                           // PipelineStageRelationship
                                                            "PipelineVariableReference",
-                                                           // Plan Features
+
+                                                           /* Plan Features */
                                                            "PlanStage",
-                                                           "PlanStageRelationship",
+                                                           // PlanStageRelationship
+                                                           // PlanStageQuality
+                                                           "PlannerProperty",
+                                                           "RejectedPlan",
+                                                           // RejectedPlans
+                                                           // RejectedPlanCount
                                                            "SBEStage",
-                                                           "SlotBasedPlan"
-                                                           // Index Features
-                                                           "IndexProperty"};
+                                                           "SlotBasedPlan",
+
+                                                           /* Lookup Features */
+                                                           "Lookup",
+                                                           // LookupStrategy
+                                                           // LookupIndexesUsed
+
+                                                           /* Index Features */
+                                                           "IndexProperty",
+
+                                                           /* Errors */
+                                                           "AnyError",
+                                                           "SpecificError"};
 
 bool matchesPrefix(const std::string& key) {
+    // Check if the key starts with any of the valid prefixes.
     return std::any_of(kFeatureTypes.begin(),
                        kFeatureTypes.end(),
                        [&key](const std::string& prefix) { return key.starts_with(prefix); });
@@ -149,7 +168,7 @@ void displayFailingQueryFeatures(const std::filesystem::path& queryFeaturesFile)
         for (const auto& feature : featureSet.Obj()) {
             // Only count features that are not null and begin with an allowed prefix.
             if (const auto fieldName = feature.fieldName();
-                matchesPrefix(fieldName) && !feature.isNull()) {
+                !feature.isNull() && matchesPrefix(fieldName)) {
                 featureCounts[fieldName]++;
             }
         }

@@ -325,7 +325,7 @@ void QueryFile::printAndExtractFailedQueries(const std::set<size_t>& failedQuery
     const auto pyCmd = std::stringstream{}
         << "python3 src/mongo/db/query/query_tester/scripts/extract_failed_test_to_pickle.py "
         << getMongoRepoRoot() << " " << kFeatureExtractorDir << " " << kTmpFailureFile << " "
-        << std::filesystem::path{failPath}.replace_extension().string();
+        << std::filesystem::path{failPath}.string();
     if (const auto swRes = shellExec(pyCmd.str(), kShellTimeout, kShellMaxLen, true);
         swRes.isOK()) {
         // Clean up temp .fail file containing failed queries on success.
@@ -338,7 +338,7 @@ void QueryFile::printAndExtractFailedQueries(const std::set<size_t>& failedQuery
                       << " to pickle. To manually retry, run `python3 "
                          "src/mongo/db/query/query_tester/scripts/extract_failed_test_to_pickle.py "
                          "<mongo_repo_root> <feature_extractor_dir> <output_prefix> <path to .fail "
-                         "file without extension>` from the mongo repo root.");
+                         "file>` from the mongo repo root.");
     }
 }
 

@@ -13,29 +13,26 @@ This script facilitates the analysis of failed queries by converting them into a
 that can be further analyzed or processed within the QueryTester framework.
 """
 
-import os
 import subprocess
-from pathlib import Path
 
 import utils
 
 # Parse and validate arguments
 args = utils.parse_args_common(
     "Extract features from QueryTester .fail files into an aggregate pickle file.",
-    tester_filepath=True,
+    fail_filepath=True,
 )
 output_prefix = args.output_prefix
-tester_filepath = args.tester_filepath
+fail_filepath = args.fail_filepath
 
 # Validate directories and change to feature-extractor directory
-mongo_repo_root, feature_extractor_dir = utils.validate_and_change_directory(
-    args.mongo_repo_root, args.feature_extractor_dir
-)
-# Define fail_filepath based on tester_filepath and mongo_repo_root
-fail_filepath = utils.validate_tester_filepath(mongo_repo_root, tester_filepath)
+feature_extractor_dir = utils.validate_and_change_directory(args.feature_extractor_dir)
+
+# Validate fail_filepath
+utils.validate_fail_filepath(fail_filepath)
 
 # Run extraction with mongosh
-pkl_file, json_file = utils.construct_filenames(output_prefix, Path(tester_filepath).stem)
+pkl_file, json_file = utils.construct_filenames(output_prefix, fail_filepath.stem)
 bash_command = (
     f"cat {fail_filepath} | python extract_from_test.py | mongosh --nodb --quiet > {json_file}"
 )
@@ -45,8 +42,16 @@ subprocess.run(bash_command, shell=True, text=True, check=True)
 db, coll = utils.extract_db_and_coll(fail_filepath)
 
 # Convert JSON into DataFrame, passing in the relevant DB and COLL.
-os.environ["MONGODB_URI"] = utils.MONGODB_URI
-cmd = ["bin/venv", "extract_features_to_dataframe.py", db, coll]
+cmd = [
+    "bin/venv",
+    "extract_features_to_dataframe.py",
+    "--uri",
+    utils.MONGODB_URI,
+    "--db",
+    db,
+    "--coll",
+    coll,
+]
 with open(json_file, encoding="utf-8") as json_input:
     with open(pkl_file, "ab") as pkl_output:
         subprocess.run(cmd, stdin=json_input, stdout=pkl_output, check=True)
