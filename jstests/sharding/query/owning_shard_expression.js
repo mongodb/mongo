@@ -65,23 +65,13 @@ function assertOwningShardExpressionResults(shardVersion, expectedResult) {
 
 // Asserts that $_internalOwningShard expression fails when routing information is stale.
 function assertOwningShardExpressionFailure(shardVersion) {
-    let expectedErrorCodes = [ErrorCodes.ShardCannotRefreshDueToLocksHeld];
-
-    // TODO SERVER-78379: Remove once 8.0 becomes last-lts. If fcv is lower than 7.1,
-    // $_internalOwningShard can throw StaleConfig when routing information is stale.
-    const fcvResult = assert.commandWorked(
-        st.shard0.getDB(db).adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
-    if (MongoRunner.compareBinVersions(fcvResult.featureCompatibilityVersion.version, "7.1") < 0) {
-        expectedErrorCodes.push(ErrorCodes.StaleConfig);
-    }
-
     const projectionStage = buildProjectionStageWithOwningShardExpression(shardVersion);
     assert.commandFailedWithCode(db.runCommand({
         aggregate: sourceColl.getName(),
         pipeline: [projectionStage, {$sort: {"indexData._id": 1}}],
         cursor: {}
     }),
-                                 expectedErrorCodes);
+                                 ErrorCodes.ShardCannotRefreshDueToLocksHeld);
 
     // Assert the expression fails while executing on the mongos.
     assert.commandFailedWithCode(db.runCommand({
