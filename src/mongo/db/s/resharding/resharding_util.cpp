@@ -502,6 +502,10 @@ bool isMoveCollection(const boost::optional<ProvenanceEnum>& provenance) {
          provenance.get() == ProvenanceEnum::kBalancerMoveCollection);
 }
 
+bool isUnshardCollection(const boost::optional<ProvenanceEnum>& provenance) {
+    return provenance && provenance.get() == ProvenanceEnum::kUnshardCollection;
+}
+
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName) {
     return std::make_shared<ThreadPool>([&] {
         ThreadPool::Options options;
