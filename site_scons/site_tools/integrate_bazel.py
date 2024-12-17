@@ -626,6 +626,8 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
 
     if env.GetOption("coverity-build"):
         print(f"BAZEL_COMMAND: {' '.join(bazel_cmd)}")
+        Globals.bazel_build_success = True
+        Globals.bazel_build_exitcode = 0
         return
 
     print("Starting bazel build thread...")
