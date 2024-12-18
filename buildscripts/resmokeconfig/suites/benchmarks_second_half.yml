@@ -54,6 +54,8 @@ selector:
     - build/install/bin/tracking_allocator_bm*
     # These benchmarks are being run as part of the benchmarks_sorter.yml test suite.
     - build/install/bin/sorter_checksum_calculator_bm*
+    # These benchmarks are being run as part of the benchmarks_audit.yml test suite.
+    - build/install/bin/audit_bm*
 
 executor:
   config: {}

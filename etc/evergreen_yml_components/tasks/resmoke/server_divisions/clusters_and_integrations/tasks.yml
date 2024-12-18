@@ -1427,6 +1427,17 @@ tasks:
         vars:
           suite: ssl_x509
 
+  - <<: *benchmark_template
+    name: benchmarks_security
+    tags:
+      ["assigned_to_jira_team_server_security", "experimental", "benchmarks"]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_audit
+          resmoke_jobs_max: 1
+
   ################################################
   #          Cluster Scalability tasks           #
   ################################################
