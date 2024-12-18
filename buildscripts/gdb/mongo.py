@@ -17,10 +17,14 @@ if not gdb:
 
 
 def detect_toolchain(progspace):
-    # LLVM's readelf is significantly faster than GNU's.
-    readelf_bin = "/opt/mongodbtoolchain/v4/bin/llvm-readelf"
-    if not os.path.exists(readelf_bin):
-        readelf_bin = "readelf"
+    readelf_bin = "readelf"
+    for path in [
+        "/opt/mongodbtoolchain/v5/bin/llvm-readelf",
+        "/opt/mongodbtoolchain/v4/bin/llvm-readelf",  # TODO(SERVER-97447): Remove.
+    ]:
+        if os.path.exists(path):
+            readelf_bin = path
+            break
 
     gcc_version_regex = re.compile(r".*\]\s*GCC: \(GNU\) (\d+\.\d+\.\d+)\s*$")
     clang_version_regex = re.compile(r".*\]\s*MongoDB clang version (\d+\.\d+\.\d+).*")
@@ -50,10 +54,17 @@ def detect_toolchain(progspace):
     # default is v4 if we can't find a version
     toolchain_ver = None
     if gcc_version:
-        if int(gcc_version.split(".")[0]) == 8:
-            toolchain_ver = "v3"
-        elif int(gcc_version.split(".")[0]) == 11:
-            toolchain_ver = "v4"
+        toolchain_ver = {
+            "8": "v3",
+            "11": "v4",
+            "14": "v5",
+        }.get(gcc_version.split(".")[0])
+    elif clang_version:
+        toolchain_ver = {
+            "19": "v5",
+        }.get(clang_version.split(".")[0])
+        if int(clang_version.split(".")[0]) == 19:
+            toolchain_ver = "v5"
 
     if not toolchain_ver:
         toolchain_ver = "v4"
@@ -899,6 +910,25 @@ class MongoDBJavaScriptStack(gdb.Command):
 
         return None
 
+    # Returns the current JS scope above the currently selected frame, or throws a GDB exception if
+    # it cannot be found.
+    @staticmethod
+    def get_js_scope():
+        # GDB needs to be switched to a frame that will allow it to actually know about the
+        # mongo::mozjs namespace. We can't know ahead of time which frame will guarantee
+        # finding the namespace, so we check all of them and stop at the first one that works.
+        # The bottom of the stack notably never works, so we start one frame above.
+        frame = gdb.selected_frame().older()
+        last_error = None
+        while frame:
+            frame.select()
+            frame = frame.older()
+            try:
+                return gdb.parse_and_eval("mongo::mozjs::currentJSScope")
+            except gdb.error as err:
+                last_error = err
+        raise last_error
+
     @staticmethod
     def javascript_stack():
         """GDB in-process python supplement."""
@@ -909,12 +939,6 @@ class MongoDBJavaScriptStack(gdb.Command):
                     print("Ignoring invalid thread %d in javascript_stack" % thread.num)
                     continue
                 thread.switch()
-
-                # Switch frames so gdb actually knows about the mongo::mozjs namespace. It doesn't
-                # actually matter which frame so long as it isn't the top of the stack. This also
-                # enables gdb to know about the mongo::mozjs::currentJSScope thread-local variable
-                # when using gdb.parse_and_eval().
-                gdb.selected_frame().older().select()
             except gdb.error as err:
                 print("Ignoring GDB error '%s' in javascript_stack" % str(err))
                 continue
@@ -926,7 +950,7 @@ class MongoDBJavaScriptStack(gdb.Command):
                 # }
                 # if (!scope || scope->_inOp == 0) { continue; }
                 # print(scope->buildStackString()->c_str());
-                atomic_scope = gdb.parse_and_eval("mongo::mozjs::currentJSScope")
+                atomic_scope = MongoDBJavaScriptStack.get_js_scope()
                 ptr = MongoDBJavaScriptStack.atomic_get_ptr(atomic_scope)
                 if not ptr:
                     continue
