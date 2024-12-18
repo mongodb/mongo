@@ -57,28 +57,11 @@ function assertQuerySampling(dbName, collName, isActive, st) {
     const conn = st.s;
     const mongosDB = conn.getDB(dbName);
 
-    // Make sure that the resharded UUID has been propagated to the query analyzer on each mongod.
-    // Otherwise, the find query below will be discarded due to the collection UUID mismatch.
+    // Make sure that we wait for active sampling. Otherwise, the find query below will be discarded
+    // due to either the collection UUID mismatch or a lack of tokens in the mongos.
     if (isActive) {
         let collUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
-        assert.soon(() => {
-            let isCollUuidUpdated = true;
-
-            st.forEachConnection(conn => {
-                const currentOp = assert
-                                      .commandWorked(conn.adminCommand(
-                                          {currentOp: true, desc: "query analyzer", ns: ns}))
-                                      .inprog;
-
-                currentOp.forEach(op => {
-                    if (bsonWoCompare(collUuid, op.collUuid) != 0) {
-                        isCollUuidUpdated = false;
-                    }
-                });
-            });
-
-            return isCollUuidUpdated;
-        });
+        QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {st});
     }
 
     assert.commandWorked(mongosDB.runCommand({find: collName, filter: {x: 0, comment: uuid}}));
