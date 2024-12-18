@@ -154,10 +154,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/owners/** @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/golden_data_test_framework.md @10gen/query-optimization-golden-test @svc-auto-approve-bot
 
-# The following patterns are parsed from ./etc/OWNERS.yml
-/etc/**/third_party_components.yml @10gen/server-security @svc-auto-approve-bot
-/etc/**/system_perf.yml @10gen/devprod-performance-analysis @10gen/devprod-performance-infrastructure @10gen/performance @svc-auto-approve-bot
-
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
 /etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/**/* @10gen/query @svc-auto-approve-bot
 
