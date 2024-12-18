@@ -60,6 +60,41 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
     "rhel8-debug-aubsan-all-feature-flags": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
+    "enterprise-rhel-8-64-bit-dynamic-debug-mode": [
+        {"task": "aggregation_one_shard_sharded_collections", "factor": 0.25},
+        {"task": "aggregation_sharded_collections_causally_consistent_passthrough", "factor": 0.25},
+        {"task": "aggregation_sharded_collections_passthrough", "factor": 0.25},
+        {
+            "task": "aggregation_unsplittable_collections_on_random_shard_passthrough",
+            "factor": 0.25,
+        },
+        {
+            "task": "aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions",
+            "factor": 0.25,
+        },
+        {"task": "embedded_router_jscore_passthrough_with_config_shard", "factor": 0.25},
+        {"task": "embedded_router_sharded_collections_jscore_passthrough", "factor": 0.25},
+        {"task": "fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
+        {"task": "fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
+        {"task": "fle2_sharding", "factor": 0.25},
+        {"task": "fle2_sharding_high_cardinality", "factor": 0.25},
+        {"task": "sharded_causally_consistent_jscore_passthrough", "factor": 0.25},
+        {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
+        {"task": "sharded_collections_causally_consistent_jscore_txns_passthrough", "factor": 0.25},
+        {"task": "sharded_collections_jscore_passthrough", "factor": 0.25},
+        {"task": "sharded_collections_jscore_passthrough_with_auto_bootstrap", "factor": 0.25},
+        {"task": "sharded_collections_jscore_passthrough_with_config_transitions", "factor": 0.25},
+        {"task": "sharded_multi_stmt_txn_jscore_passthrough", "factor": 0.25},
+        {"task": "sharding_api_version_jscore_passthrough", "factor": 0.25},
+        {"task": "sharding_jscore_passthrough", "factor": 0.25},
+        {"task": "sharding_jscore_passthrough_with_auto_bootstrap", "factor": 0.25},
+        {"task": "sharding_jscore_passthrough_with_balancer", "factor": 0.25},
+        {"task": "sharding_jscore_passthrough_with_config_transitions", "factor": 0.25},
+        {
+            "task": "unsplittable_collections_created_on_any_shard_jscore_passthrough",
+            "factor": 0.25,
+        },
+    ],
     "enterprise-windows-all-feature-flags-required": [{"task": "noPassthrough", "factor": 0.5}],
     "enterprise-windows-all-feature-flags-non-essential": [
         {"task": "noPassthrough", "factor": 0.5}
