@@ -4,41 +4,9 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="mongotmock_core",
-    source=[
-        "mongotmock_buildinfo.cpp",
-        "mongotmock_commands.cpp",
-        "mongotmock_ismaster.cpp",
-        "mongotmock_options_init.cpp",
-        "mongotmock_state.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/api_parameters",
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/auth/authserver",
-        "$BUILD_DIR/mongo/db/commands/buildinfo_common",
-        "$BUILD_DIR/mongo/db/commands/core",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/search/search_index_common",
-        "$BUILD_DIR/mongo/db/server_options_servers",
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/util/version_impl",
-    ],
-)
-
-mongotmock = env.Program(
+mongotmock = env.BazelProgram(
     target="mongotmock",
-    source=[
-        "mongotmock_main_shim.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/plan_executor",
-        "$BUILD_DIR/mongo/util/cryptd/mongocryptd_core",
-        "mongotmock_core",
-    ],
+    source=[],
     AIB_COMPONENT="mongotmock",
     AIB_COMPONENTS_EXTRA=["dist-test"],
 )

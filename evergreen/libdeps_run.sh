@@ -11,7 +11,6 @@ GRAPH_FILE=$(find build -name "libdeps.graphml")
 python buildscripts/libdeps/analyzer_unittests.py
 python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE > results.txt
 python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE --lint= --bazel-order > bazel_order.txt
-python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE --lint= --bazel-order-core > bazel_order_core.txt
 gzip $GRAPH_FILE
 mv $GRAPH_FILE.gz .
 targets_converted=$(grep "Targets Converted:" bazel_order.txt | cut -d":" -f 2)

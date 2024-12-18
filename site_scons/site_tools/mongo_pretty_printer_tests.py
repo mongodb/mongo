@@ -51,6 +51,9 @@ def build_pretty_printer_test(env, target, **kwargs):
     if env.GetOption("ninja") != "disabled":
         return []
 
+    if env.GetOption("link-model") == "dynamic-sdk":
+        return []
+
     gdb_bin = None
     if env.get("GDB"):
         gdb_bin = env.get("GDB")

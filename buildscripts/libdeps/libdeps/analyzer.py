@@ -710,54 +710,6 @@ class BazelOrder(Analyzer):
         report[DependsReportTypes.BAZEL_ORDER.name] = self.run()
 
 
-class BazelOrderCore(Analyzer):
-    """Generate a topo sort order to covnert bazel targets."""
-
-    def __init__(self, dependency_graph):
-        """Store graph and strip the nodes."""
-        super().__init__(dependency_graph)
-
-    @schema_check(schema_version=1)
-    def run(self):
-        """Let networkx generate the list for us."""
-        order = []
-
-        mongod_graph = networkx.subgraph(
-            self._dependency_graph,
-            networkx.descendants(self._dependency_graph, "mongo/db/mongod") | {"mongo/db/mongod"},
-        )
-        mongos_graph = networkx.subgraph(
-            self._dependency_graph,
-            networkx.descendants(self._dependency_graph, "mongo/s/mongos") | {"mongo/s/mongos"},
-        )
-        mongo_graph = networkx.subgraph(
-            self._dependency_graph,
-            networkx.descendants(self._dependency_graph, "mongo/shell/mongo")
-            | {"mongo/shell/mongo"},
-        )
-
-        for node in networkx.lexicographical_topological_sort(
-            networkx.compose_all(
-                [
-                    networkx.reverse_view(mongod_graph),
-                    networkx.reverse_view(mongos_graph),
-                    networkx.reverse_view(mongo_graph),
-                ]
-            )
-        ):
-            node_type = self._dependents_graph.nodes()[node].get(NodeProps.bin_type.name, "Unknown")
-            if node_type != "ThinTarget":
-                order.append({"type": node_type, "name": node})
-        return order
-
-    def report(self, report):
-        """Add the symbol dependents list to the report."""
-
-        if DependsReportTypes.BAZEL_ORDER_CORE.name not in report:
-            report[DependsReportTypes.BAZEL_ORDER_CORE.name] = {}
-        report[DependsReportTypes.BAZEL_ORDER_CORE.name] = self.run()
-
-
 class Efficiency(Analyzer):
     """Find efficiency of each public dependency originating from each node in a given set."""
 
@@ -1230,12 +1182,6 @@ class GaPrettyPrinter(GaPrinter):
         if DependsReportTypes.BAZEL_ORDER.name in results:
             _bazel_order_print(
                 results, DependsReportTypes.BAZEL_ORDER.name, "Bazel Target Conversion Order"
-            )
-        if DependsReportTypes.BAZEL_ORDER_CORE.name in results:
-            _bazel_order_print(
-                results,
-                DependsReportTypes.BAZEL_ORDER_CORE.name,
-                "Bazel Core Target Conversion Order",
             )
 
         if LinterTypes.EFFICIENCY_LINT.name in results:
