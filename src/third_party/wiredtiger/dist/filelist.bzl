@@ -202,7 +202,6 @@ WT_FILELIST_X86_HOST = ['src/checksum/x86/crc32-x86-alt.c', 'src/checksum/x86/cr
 WT_FILELIST_ZSERIES_HOST = ['src/checksum/zseries/crc32-s390x.c', 'src/checksum/zseries/crc32le-vx.S']
 
 WT_FILELIST_POSIX_HOST = ['src/live_restore/live_restore_fs.c',
- 'src/live_restore/live_restore_server.c',
  'src/os_posix/os_dir.c',
  'src/os_posix/os_dlopen.c',
  'src/os_posix/os_fallocate.c',

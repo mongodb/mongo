@@ -1021,13 +1021,22 @@ wiredtiger_open_tiered_storage_configuration = [
 wiredtiger_open_live_restore_configuration = [
     Config('live_restore', '', r'''Live restore configuration options. These options control the
     behavior of WiredTiger when live restoring from a backup.''', type='category', subconfig = [
+        Config('debug', '', r'''
+            configure debug specific behavior on live restore. Generally only used for internal
+            testing purposes.''',
+            type='category', subconfig=[
+            Config('fill_holes_on_close', 'false', r'''
+                Copy all missing data from the source to the directory on file close.
+                This can result in very slow file closes.''',
+                type='boolean'),
+        ], undoc=True),
         Config('enabled', 'false', r'''whether live restore is enabled or not.''', type='boolean'),
         Config('path', '', r'''the path to the backup that will be restored from.'''),
         Config('threads_max', '8', r'''
             maximum number of threads WiredTiger will start to migrate data from the backup to the
             running WiredTiger database. Each worker thread uses a session handle from the
             configured session_max''',
-            min=0, max=12)
+            min=1, max=12)
     ])
 ]
 

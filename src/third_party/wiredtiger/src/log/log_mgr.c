@@ -224,7 +224,7 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
     enabled = cval.val != 0;
 
     if (enabled) {
-        WT_ASSERT_ALWAYS(session, !F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS),
+        WT_ASSERT_ALWAYS(session, !F_ISSET(conn, WT_CONN_LIVE_RESTORE),
           "FIXME-WT-13792 logging is not currently supported with live restore.");
     }
 

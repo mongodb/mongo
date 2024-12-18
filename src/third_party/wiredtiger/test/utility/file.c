@@ -417,6 +417,18 @@ testutil_copy(const char *source, const char *dest)
     testutil_copy_ext(source, dest, NULL);
 }
 
+/*
+ * testutil_move --
+ *     Move a file or folder.
+ */
+void
+testutil_move(const char *source, const char *dest)
+{
+    testutil_remove(dest);
+    testutil_copy(source, dest);
+    testutil_remove(source);
+}
+
 /* Default options for the file copy function. */
 static const WT_FILE_COPY_OPTS default_copy_opts = {0};
 

@@ -555,6 +555,7 @@ void testutil_lazyfs_setup(WT_LAZY_FS *, const char *);
 void testutil_mkdir(const char *);
 void testutil_mkdir_ext(const char *, const WT_MKDIR_OPTS *);
 void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int, uint8_t);
+void testutil_move(const char *source, const char *dest);
 uint64_t testutil_pareto(uint64_t, uint64_t, u_int);
 void testutil_parse_begin_opt(int, char *const *, const char *, TEST_OPTS *);
 void testutil_parse_end_opt(TEST_OPTS *);

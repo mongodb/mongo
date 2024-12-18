@@ -114,7 +114,6 @@ src/history/hs_cursor.c
 src/history/hs_rec.c
 src/history/hs_verify.c
 src/live_restore/live_restore_fs.c       POSIX_HOST
-src/live_restore/live_restore_server.c       POSIX_HOST
 src/log/log.c
 src/log/log_auto.c
 src/log/log_cursor.c

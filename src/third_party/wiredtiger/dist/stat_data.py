@@ -109,10 +109,6 @@ class EvictStat(Stat):
     prefix = 'cache'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, EvictStat.prefix, desc, flags)
-class LiveRestoreStat(Stat):
-    prefix = 'live-restore'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LiveRestoreStat.prefix, desc, flags)
 class LockStat(Stat):
     prefix = 'lock'
     def __init__(self, name, desc, flags=''):
@@ -524,12 +520,6 @@ conn_stats = [
     DhandleStat('dh_sweep_skip_ckpt', 'connection sweeps skipped due to checkpoint gathering handles'),
     DhandleStat('dh_sweep_tod', 'connection sweep time-of-death sets'),
     DhandleStat('dh_sweeps', 'connection sweeps'),
-
-    ##########################################
-    # Live Restore statistics
-    ##########################################
-    LiveRestoreStat('live_restore_queue_length', 'the number of files remaining for live restore completion', 'no_clear,no_scale'),
-    LiveRestoreStat('live_restore_state', 'live restore state', 'no_clear,no_scale'),
 
     ##########################################
     # Locking statistics

@@ -31,6 +31,7 @@
  *	The SWIG interface file defining the wiredtiger python API.
  */
 %include <pybuffer.i>
+%include <cstring.i>
 
 %define DOCSTRING
 "Python wrappers around the WiredTiger C API
@@ -605,6 +606,7 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %exception __wt_connection::is_new;
 %exception __wt_connection::search_near;
 %exception __wt_session::get_rollback_reason;
+%exception __wt_session::get_last_error;
 %exception __wt_session::strerror;
 %exception __wt_cursor::_set_key;
 %exception __wt_cursor::_set_key_str;
@@ -1264,6 +1266,7 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 
 /* Convert 'int *' to output args for wiredtiger_version */
 %apply int *OUTPUT { int * };
+%cstring_output_allocate(char **, );
 
 %rename(Cursor) __wt_cursor;
 %rename(Modify) __wt_modify;
