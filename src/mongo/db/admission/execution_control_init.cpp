@@ -42,6 +42,8 @@ namespace mongo {
 namespace admission {
 
 void initializeExecutionControl(ServiceContext* svcCtx) {
+    auto const readMaxQueueDepth = gReadMaxQueueDepth.load();
+    auto const writeMaxQueueDepth = gWriteMaxQueueDepth.load();
     auto readTransactions = gConcurrentReadTransactions.load();
     auto writeTransactions = gConcurrentWriteTransactions.load();
     static constexpr auto DEFAULT_TICKETS_VALUE = 128;
@@ -76,8 +78,10 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
     };
 
     std::unique_ptr<TicketHolderManager> ticketHolderManager = makeTicketHolderManager(
-        std::make_unique<TicketHolder>(svcCtx, readTransactions, usingThroughputProbing),
-        std::make_unique<TicketHolder>(svcCtx, writeTransactions, usingThroughputProbing));
+        std::make_unique<TicketHolder>(
+            svcCtx, readTransactions, usingThroughputProbing, readMaxQueueDepth),
+        std::make_unique<TicketHolder>(
+            svcCtx, writeTransactions, usingThroughputProbing, writeMaxQueueDepth));
 
     TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
 

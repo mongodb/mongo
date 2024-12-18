@@ -54,17 +54,68 @@ TicketHolderManager::TicketHolderManager(std::unique_ptr<TicketHolder> readTicke
     : _readTicketHolder(std::move(readTicketHolder)),
       _writeTicketHolder(std::move(writeTicketHolder)) {}
 
+Status TicketHolderManager::updateWriteMaxQueueDepth(std::int32_t newWriteMaxQueueDepth) {
+    if (auto const client = Client::getCurrent()) {
+        auto const ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
+        if (!ticketHolderManager) {
+            constexpr auto& message =
+                "Attempting to modify write max queue depth on an instance without a "
+                "storage engine";
+            LOGV2_WARNING(7323604, message);
+            return Status(ErrorCodes::IllegalOperation, message);
+        }
+
+        auto const writer = ticketHolderManager->_writeTicketHolder.get();
+        if (writer) {
+            writer->setMaxQueueDepth(newWriteMaxQueueDepth);
+            return Status::OK();
+        }
+        constexpr auto& message =
+            "Attempting to update write max queue depth before the "
+            "write TicketHolder is initialized";
+        LOGV2_WARNING(6754203, message);
+        return Status(ErrorCodes::IllegalOperation, message);
+    }
+
+    return Status::OK();
+}
+
+Status TicketHolderManager::updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth) {
+    if (auto const client = Client::getCurrent()) {
+        auto const ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
+        if (!ticketHolderManager) {
+            constexpr auto& message =
+                "Attempting to modify read max queue depth on an instance without a "
+                "storage engine";
+            LOGV2_WARNING(7323605, message);
+            return Status(ErrorCodes::IllegalOperation, message);
+        }
+
+        auto const reader = ticketHolderManager->_readTicketHolder.get();
+        if (reader) {
+            reader->setMaxQueueDepth(newReadMaxQueueDepth);
+            return Status::OK();
+        }
+        constexpr auto& message =
+            "Attempting to update read max queue depth before the "
+            "write TicketHolder is initialized";
+        LOGV2_WARNING(6754204, message);
+        return Status(ErrorCodes::IllegalOperation, message);
+    }
+
+    return Status::OK();
+}
+
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& newWriteTransactions) {
     if (auto client = Client::getCurrent()) {
         auto opCtx = client->getOperationContext();
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         if (!ticketHolderManager) {
-            LOGV2_WARNING(7323602,
-                          "Attempting to modify write transactions limit on an instance without a "
-                          "storage engine");
-            return Status(ErrorCodes::IllegalOperation,
-                          "Attempting to modify write transactions limit on an instance without a "
-                          "storage engine");
+            constexpr auto& message =
+                "Attempting to modify write transactions limit on an instance without a "
+                "storage engine";
+            LOGV2_WARNING(7323602, message);
+            return Status(ErrorCodes::IllegalOperation, message);
         }
 
         if (!ticketHolderManager->supportsRuntimeSizeAdjustment()) {
@@ -81,12 +132,11 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
             writer->resize(opCtx, newWriteTransactions, Date_t::max());
             return Status::OK();
         }
-        LOGV2_WARNING(6754202,
-                      "Attempting to update concurrent write transactions limit before the "
-                      "write TicketHolder is initialized");
-        return Status(ErrorCodes::IllegalOperation,
-                      "Attempting to update concurrent write transactions limit before the "
-                      "write TicketHolder is initialized");
+        constexpr auto& message =
+            "Attempting to update concurrent write transactions limit before the "
+            "write TicketHolder is initialized";
+        LOGV2_WARNING(6754202, message);
+        return Status(ErrorCodes::IllegalOperation, message);
     }
     return Status::OK();
 };
@@ -96,12 +146,11 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newR
         auto opCtx = client->getOperationContext();
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         if (!ticketHolderManager) {
-            LOGV2_WARNING(7323601,
-                          "Attempting to modify read transactions limit on an instance without a "
-                          "storage engine");
-            return Status(ErrorCodes::IllegalOperation,
-                          "Attempting to modify read transactions limit on an instance without a "
-                          "storage engine");
+            constexpr auto& message =
+                "Attempting to modify read transactions limit on an instance without a "
+                "storage engine";
+            LOGV2_WARNING(7323601, message);
+            return Status(ErrorCodes::IllegalOperation, message);
         }
 
         if (!ticketHolderManager->supportsRuntimeSizeAdjustment()) {
@@ -118,12 +167,11 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newR
             return Status::OK();
         }
 
-        LOGV2_WARNING(6754201,
-                      "Attempting to update concurrent read transactions limit before the read "
-                      "TicketHolder is initialized");
-        return Status(ErrorCodes::IllegalOperation,
-                      "Attempting to update concurrent read transactions limit before the read "
-                      "TicketHolder is initialized");
+        constexpr auto& message =
+            "Attempting to update concurrent read transactions limit before the read "
+            "TicketHolder is initialized";
+        LOGV2_WARNING(6754201, message);
+        return Status(ErrorCodes::IllegalOperation, message);
     }
     return Status::OK();
 }

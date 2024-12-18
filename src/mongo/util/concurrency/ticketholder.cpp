@@ -43,14 +43,14 @@ namespace mongo {
 TicketHolder::TicketHolder(ServiceContext* serviceContext,
                            int numTickets,
                            bool trackPeakUsed,
-                           ResizePolicy resizePolicy,
-                           int32_t maxQueueDepth)
+                           std::int32_t maxQueueDepth,
+                           ResizePolicy resizePolicy)
     : _trackPeakUsed(trackPeakUsed),
       _resizePolicy(resizePolicy),
       _serviceContext(serviceContext),
       _tickets(numTickets),
-      _outof(numTickets),
-      _maxQueueDepth(maxQueueDepth) {}
+      _maxQueueDepth(maxQueueDepth),
+      _outof(numTickets) {}
 
 bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) {
     stdx::lock_guard<stdx::mutex> lk(_resizeMutex);
@@ -87,6 +87,10 @@ bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadl
             return true;
     }
     MONGO_UNREACHABLE;
+}
+
+void TicketHolder::setMaxQueueDepth(int32_t size) {
+    _maxQueueDepth.store(size);
 }
 
 void TicketHolder::_immediateResize(WithLock, int32_t newSize) {
@@ -178,6 +182,15 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
         return std::min(until, Date_t::now() + Milliseconds{baseIntervalMs + offset});
     };
 
+    bool hasStartedWaiting = false;
+
+    // Since uassert throws, we use raii to substract the waiter count
+    ON_BLOCK_EXIT([&] {
+        if (hasStartedWaiting) {
+            _waiterCount.fetchAndSubtract(1);
+        }
+    });
+
     while (true) {
         if (boost::optional<Ticket> maybeTicket = _tryAcquireNormalPriorityTicket(admCtx);
             maybeTicket) {
@@ -185,18 +198,16 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
         }
 
         Date_t deadline = nextDeadline();
-        {
+
+        if (!hasStartedWaiting) {
             const auto previousWaiterCount = _waiterCount.fetchAndAdd(1);
-
-            // Since uassert throws, we use raii to substract the waiter count
-            ON_BLOCK_EXIT([&] { _waiterCount.fetchAndSubtract(1); });
-
+            hasStartedWaiting = true;
             uassert(ErrorCodes::AdmissionQueueOverflow,
                     "MongoDB is overloaded and cannot accept new operations. Try again later.",
-                    previousWaiterCount < _maxQueueDepth);
-
-            _tickets.waitUntil(0, deadline);
+                    previousWaiterCount < _maxQueueDepth.loadRelaxed());
         }
+
+        _tickets.waitUntil(0, deadline);
 
         if (interruptible) {
             opCtx->checkForInterrupt();

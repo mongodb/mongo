@@ -129,7 +129,10 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
       _migrationId{migrationId},
       _writeConcern{writeConcern},
       _isParallelFetchingSupported{parallelFetchingSupported},
-      _secondaryThrottleTicket(outerOpCtx->getServiceContext(), 1, false /* trackPeakUsed */),
+      _secondaryThrottleTicket(outerOpCtx->getServiceContext(),
+                               1,
+                               false /* trackPeakUsed */,
+                               TicketHolder::kDefaultMaxQueueDepth),
       _bufferSizeTracker(maxBufferedSizeBytesPerThread) {
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe() &&

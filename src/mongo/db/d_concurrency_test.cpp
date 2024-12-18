@@ -29,6 +29,7 @@
 
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/server_options.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -98,9 +99,10 @@ public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
         const bool trackPeakUsed = false;
+        constexpr auto maxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
         auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
-            std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed),
-            std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed));
+            std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
+            std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth));
         admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
     }
 

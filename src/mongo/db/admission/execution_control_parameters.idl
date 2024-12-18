@@ -81,6 +81,32 @@ server_parameters:
       callback: "admission::TicketHolderManager::validateConcurrentReadTransactions"
     redact: false
 
+  storageEngineReadMaxQueueDepth:
+    description: >-
+        Controls the maximum number of read transactions waiting in queue for a thread to be free.
+        Setting this number to 0 will not allow any transaction above the max conccurency amount.
+        Reducing this value will only affect new enqueued read transactions
+    set_at: [ startup, runtime ]
+    cpp_vartype: Atomic<std::int32_t>
+    cpp_varname: gReadMaxQueueDepth
+    on_update: "admission::TicketHolderManager::updateReadMaxQueueDepth"
+    default: { expr: 'TicketHolder::kDefaultMaxQueueDepth' }
+    validator: { gte: 0 }
+    redact: false
+
+  storageEngineWriteMaxQueueDepth:
+    description: >-
+        Controls the maximum number of write transactions waiting in queue for a thread to be free.
+        Setting this number to 0 will not allow any transaction above the max conccurency amount.
+        Reducing this value will only affect new enqueued write transactions
+    set_at: [ startup, runtime ]
+    cpp_vartype: Atomic<std::int32_t>
+    cpp_varname: gWriteMaxQueueDepth
+    on_update: "admission::TicketHolderManager::updateWriteMaxQueueDepth"
+    default: { expr: 'TicketHolder::kDefaultMaxQueueDepth' }
+    validator: { gte: 0 }
+    redact: false
+
   storageEngineConcurrencyAdjustmentAlgorithm:
     description: >-
       The algorithm to be used for adjusting the number of concurrent storage engine transactions.

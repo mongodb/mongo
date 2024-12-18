@@ -60,6 +60,11 @@ public:
     void resizeTicketPool(OperationContext* opCtx, int32_t newSize);
 
     /**
+     * Adjusts the max queue depth for ingress admission control to 'newMaxQueueDepth'.
+     */
+    void setMaxQueueDepth(std::int32_t newMaxQueueDepth);
+
+    /**
      * Reports the ingress admission control metrics.
      */
     void appendStats(BSONObjBuilder& b) const;
@@ -69,6 +74,12 @@ public:
      * size changes.
      */
     static Status onUpdateTicketPoolSize(int newValue);
+
+    /**
+     * Called automatically when the value of the server parameter that controls the max queue
+     * depth changes.
+     */
+    static Status onUpdateMaxQueueDepth(std::int32_t newMaxQueueDepth);
 
     /**
      * Initialize the IngressAdmissionController after the ServiceContext is constructed. This will

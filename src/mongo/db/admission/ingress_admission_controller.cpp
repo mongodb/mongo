@@ -52,6 +52,7 @@ void IngressAdmissionController::init() {
     _ticketHolder = std::make_unique<TicketHolder>(&getIngressAdmissionController.owner(*this),
                                                    gIngressAdmissionControllerTicketPoolSize.load(),
                                                    false,
+                                                   gIngressAdmissionControllerMaxQueueDepth.load(),
                                                    TicketHolder::ResizePolicy::kImmediate);
 }
 
@@ -74,6 +75,10 @@ void IngressAdmissionController::resizeTicketPool(OperationContext* opCtx, int32
     uassert(8611200, "Failed to resize ticket pool", _ticketHolder->resize(opCtx, newSize));
 }
 
+void IngressAdmissionController::setMaxQueueDepth(std::int32_t newMaxQueueDepth) {
+    _ticketHolder->setMaxQueueDepth(newMaxQueueDepth);
+}
+
 void IngressAdmissionController::appendStats(BSONObjBuilder& b) const {
     _ticketHolder->appendStats(b);
 }
@@ -90,4 +95,12 @@ Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try 
     return ex.toStatus();
 }
 
+Status IngressAdmissionController::onUpdateMaxQueueDepth(std::int32_t newMaxQueueDepth) {
+    if (auto const client = Client::getCurrent()) {
+        getIngressAdmissionController(client->getServiceContext())
+            .setMaxQueueDepth(newMaxQueueDepth);
+    }
+
+    return Status::OK();
+}
 }  // namespace mongo

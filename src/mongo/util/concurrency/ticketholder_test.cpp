@@ -112,6 +112,7 @@ public:
         return std::make_unique<TicketHolder>(getServiceContext(),
                                               initialNumTickets,
                                               false /* trackPeakUsed */,
+                                              TicketHolder::kDefaultMaxQueueDepth,
                                               TicketHolder::ResizePolicy::kImmediate);
     }
 
@@ -221,7 +222,8 @@ struct TicketHolderTest::MockAdmission {
 };
 
 TEST_F(TicketHolderTest, BasicTimeout) {
-    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    auto holder = std::make_unique<TicketHolder>(
+        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
@@ -251,7 +253,8 @@ TEST_F(TicketHolderTest, BasicTimeout) {
  * number of tickets available(), used(), and outof().
  */
 TEST_F(TicketHolderTest, ResizeStats) {
-    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    auto holder = std::make_unique<TicketHolder>(
+        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
     auto tickSource = getTickSource();
     Stats stats(holder.get());
@@ -318,7 +321,8 @@ TEST_F(TicketHolderTest, ResizeStats) {
 }
 
 TEST_F(TicketHolderTest, Interruption) {
-    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    auto holder = std::make_unique<TicketHolder>(
+        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
 
     ASSERT_TRUE(holder->resize(opCtx, 0));
@@ -341,8 +345,8 @@ TEST_F(TicketHolderTest, Interruption) {
 }
 
 TEST_F(TicketHolderTest, InterruptResize) {
-    auto ticketHolder =
-        std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    auto ticketHolder = std::make_unique<TicketHolder>(
+        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
 
     _opCtx->markKilled(ErrorCodes::ClientMarkedKilled);
     ASSERT_THROWS_CODE(
@@ -350,7 +354,8 @@ TEST_F(TicketHolderTest, InterruptResize) {
 }
 
 TEST_F(TicketHolderTest, PriorityBookkeeping) {
-    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    auto holder = std::make_unique<TicketHolder>(
+        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
     MockAdmissionContext admCtx{};
     ScopedAdmissionPriorityBase initialPriority{opCtx, admCtx, AdmissionContext::Priority::kNormal};
@@ -386,8 +391,10 @@ TEST_F(TicketHolderTest, HighlyConcurrentAcquireReleaseTicket) {
 
     Hotel hotel{numRooms};
     OperationContext* opCtx = _opCtx.get();
-    auto holder =
-        std::make_unique<TicketHolder>(getServiceContext(), numRooms, false /* trackPeakUsed */);
+    auto holder = std::make_unique<TicketHolder>(getServiceContext(),
+                                                 numRooms,
+                                                 false /* trackPeakUsed */,
+                                                 TicketHolder::kDefaultMaxQueueDepth);
 
     for (size_t i = 0; i < numThreads; ++i) {
         threads.emplace_back([&, numCheckIns]() {
@@ -692,8 +699,8 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax0) {
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  initialNumTickets,
                                                  false /* trackPeakUsed */,
-                                                 TicketHolder::ResizePolicy::kImmediate,
-                                                 maxNumberOfWaiters);
+                                                 maxNumberOfWaiters,
+                                                 TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
     std::array<MockAdmissionContext, 6> admCtxs;
@@ -726,8 +733,8 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  initialNumTickets,
                                                  false /* trackPeakUsed */,
-                                                 TicketHolder::ResizePolicy::kImmediate,
-                                                 maxNumberOfWaiters);
+                                                 maxNumberOfWaiters,
+                                                 TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
     std::array<MockAdmissionContext, 5> admCtxs;
@@ -783,6 +790,77 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
     ASSERT_EQ(holder->outof(), 4);
 }
 
+TEST_F(TicketHolderImmediateResizeTest, WaitQueueMaxChange) {
+    constexpr int initialNumTickets = 4;
+    auto holder = std::make_unique<TicketHolder>(getServiceContext(),
+                                                 initialNumTickets,
+                                                 false /* trackPeakUsed */,
+                                                 TicketHolder::kDefaultMaxQueueDepth,
+                                                 TicketHolder::ResizePolicy::kImmediate);
+
+    // acquire 4 tickets
+    std::array<MockAdmissionContext, 5> admCtxs;
+    std::array<boost::optional<Ticket>, 4> tickets;
+    for (int i = 0; i < 4; ++i) {
+        tickets[i] = holder->waitForTicket(_opCtx.get(), &admCtxs[i + 1]);
+    }
+
+    // ensure 4 are now in-use and 0 are left available
+    ASSERT_EQ(holder->used(), 4);
+    ASSERT_EQ(holder->available(), 0);
+    ASSERT_EQ(holder->outof(), 4);
+
+
+    // We aquire a ticket in another thread.
+    // Since no ticket available, it will cause a blocking wait on that thread.
+    MockAdmission releaseWaiterAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
+    Future<Ticket> ticketFuture = spawn([&]() {
+        return holder->waitForTicket(releaseWaiterAdmission.opCtx.get(),
+                                     &releaseWaiterAdmission.admCtx);
+    });
+
+    // We wait until ticketFuture is actually waiting for the ticket or until timeout exceeded
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        waitUntilCanceled(*_opCtx, [&] { return holder->waiting_forTest() == 1; });
+    });
+
+    // Change the max queue depth to one. Since one is already waiting, the next acquisition attempt
+    // will throw
+    holder->setMaxQueueDepth(1);
+
+    // Since the maximum amount of ticket is one, and one is already waiting, it will throw
+    ASSERT_THROWS(holder->waitForTicketUntil(_opCtx.get(), &admCtxs[0], getNextDeadline()),
+                  ExceptionFor<ErrorCodes::AdmissionQueueOverflow>);
+
+
+    // The max queue depth has no effect on existing waiters
+    holder->setMaxQueueDepth(0);
+
+    // Releasing the tickets, resuming the waiter
+    tickets = {};
+
+    // The fifth ticket is getting aquired after waiting
+    boost::optional<Ticket> ticket;
+    _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        // We can get a ticket when one is available
+        ticket = std::move(ticketFuture).get(_opCtx.get());
+    });
+
+    // ensure 3 are now available and 1 are in-use
+    // The one in use was the waiting ticket
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->available(), 3);
+    ASSERT_EQ(holder->outof(), 4);
+
+    // Releasing the fifth ticket
+    ticket.reset();
+
+    // ensure 4 are now available and 0 are in-use
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 4);
+    ASSERT_EQ(holder->outof(), 4);
+}
+
 // For the following test, we need a real source of tick
 class TicketHolderTestTick : public TicketHolderTest {
 public:
@@ -796,6 +874,7 @@ TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  initialNumTickets,
                                                  false /* trackPeakUsed */,
+                                                 TicketHolder::kDefaultMaxQueueDepth,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
 

@@ -58,8 +58,10 @@ public:
     std::unique_ptr<TicketHolder> ticketHolder;
 
     TicketHolderFixture(int threads, ServiceContext* serviceContext) {
-        ticketHolder =
-            std::make_unique<TicketHolder>(serviceContext, kTickets, true /* track peakUsed */);
+        ticketHolder = std::make_unique<TicketHolder>(serviceContext,
+                                                      kTickets,
+                                                      true /* track peakUsed */,
+                                                      TicketHolder::kDefaultMaxQueueDepth);
     }
 };
 

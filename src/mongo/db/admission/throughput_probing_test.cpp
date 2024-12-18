@@ -113,8 +113,10 @@ protected:
     }
 
     ServiceContext* _svcCtx{getServiceContext()};
-    TicketHolder _readTicketHolder{_svcCtx, 0, true /* trackPeakUsed */};
-    TicketHolder _writeTicketHolder{_svcCtx, 0, true /* trackPeakUsed */};
+    TicketHolder _readTicketHolder{
+        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
+    TicketHolder _writeTicketHolder{
+        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
     std::unique_ptr<ThroughputProbing> _throughputProbing;
 
     class StatsTester {

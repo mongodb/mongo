@@ -60,6 +60,8 @@ public:
 
     virtual ~TicketHolderManager(){};
 
+    static Status updateWriteMaxQueueDepth(std::int32_t newWriteMaxQueueDepth);
+    static Status updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth);
     static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
     static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
     static Status validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,

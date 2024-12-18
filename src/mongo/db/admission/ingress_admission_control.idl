@@ -54,3 +54,16 @@ server_parameters:
     default: { expr: 'static_cast<int>(DEFAULT_MAX_CONN)' }
     validator: { gte: 0 }
     redact: false
+  ingressAdmissionControllerMaxQueueDepth:
+    description: >-
+        Controls the maximum number of operations waiting for admission in the ingress admission control.
+        Setting this parameter will not apply to operations that are already waiting for a ticket.
+    set_at: [ startup, runtime ]
+    cpp_varname: gIngressAdmissionControllerMaxQueueDepth
+    cpp_vartype: Atomic<std::int32_t>
+    on_update: IngressAdmissionController::onUpdateMaxQueueDepth
+    # Setting the max queue depth equal to the max connections default means it is
+    # effectively infinite. See maxIncomingConnections in server_options_general.idl
+    default: { expr: 'TicketHolder::kDefaultMaxQueueDepth' }
+    validator: { gte: 0 }
+    redact: false

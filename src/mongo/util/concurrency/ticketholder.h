@@ -71,11 +71,17 @@ public:
      */
     enum class ResizePolicy { kGradual = 0, kImmediate };
 
+    /**
+     * The default value for maxQueueDepth. It it set to the default max connection amount, which is
+     * practically infinite for the purpose of the ticket holder.
+     */
+    static constexpr auto kDefaultMaxQueueDepth = static_cast<std::int32_t>(DEFAULT_MAX_CONN);
+
     TicketHolder(ServiceContext* serviceContext,
                  int numTickets,
                  bool trackPeakUsed,
-                 ResizePolicy resizePolicy = ResizePolicy::kGradual,
-                 int32_t maxQueueDepth = std::numeric_limits<int32_t>::max());
+                 std::int32_t maxQueueDepth,
+                 ResizePolicy resizePolicy = ResizePolicy::kGradual);
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
@@ -84,6 +90,12 @@ public:
      * otherwise.
      */
     bool resize(OperationContext* opCtx, int32_t newSize, Date_t deadline = Date_t::max());
+
+    /**
+     * Adjusts the maximum number of threads waiting for a ticket. Will not affect threads already
+     * waiting
+     */
+    void setMaxQueueDepth(int32_t newSize);
 
     /**
      * Attempts to acquire a ticket without blocking. Returns a ticket if one is available,
@@ -240,10 +252,10 @@ private:
     // at a time. Reading _outof does not require holding the lock.
     stdx::mutex _resizeMutex;
     BasicWaitableAtomic<int32_t> _tickets;
+    Atomic<int32_t> _maxQueueDepth;
     Atomic<int32_t> _waiterCount{0};
-    AtomicWord<int32_t> _outof;
-    AtomicWord<int32_t> _peakUsed;
-    int32_t _maxQueueDepth;
+    Atomic<int32_t> _outof;
+    Atomic<int32_t> _peakUsed;
 };
 
 /**

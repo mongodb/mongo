@@ -45,11 +45,14 @@ void ThroughputProbing::setup() {
     Simulation::setup();
 
     const auto initialTickets = admission::throughput_probing::gInitialConcurrency;
+    constexpr auto initialMaxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
     Milliseconds probingInterval{gStorageEngineConcurrencyAdjustmentIntervalMillis};
 
     constexpr bool trackPeakUsed = true;
-    _readTicketHolder = std::make_unique<TicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
-    _writeTicketHolder = std::make_unique<TicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
+    _readTicketHolder = std::make_unique<TicketHolder>(
+        svcCtx(), initialTickets, trackPeakUsed, initialMaxQueueDepth);
+    _writeTicketHolder = std::make_unique<TicketHolder>(
+        svcCtx(), initialTickets, trackPeakUsed, initialMaxQueueDepth);
 
     _runner = [svcCtx = svcCtx()] {
         auto runner = std::make_unique<MockPeriodicRunner>();
