@@ -1200,7 +1200,7 @@ config_setting(
 
 build_otel(
     name = "build_otel",
-    build_setting_default = False,
+    build_setting_default = True,
 )
 
 config_setting(
