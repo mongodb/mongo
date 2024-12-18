@@ -1,9 +1,21 @@
 {
     "version": "0.2",
     "language": "en",
+    "languageSettings": [
+        {
+            "languageId": [
+                "starlark"
+            ],
+            "dictionaries": [
+                "python"
+            ],
+            "allowCompoundWords": true // Bazel often omits separators between words
+        }
+    ],
     "words": [
         "absl",
         "AGCFR",
+        "bazel",
         "bson",
         "bsonobj",
         "bufbuilder",
@@ -20,6 +32,7 @@
         "fromjson",
         "FTDC",
         "fullfillable",
+        "hdrs",
         "idents",
         "interruptible",
         "invokable",
@@ -48,6 +61,8 @@
         "sharded",
         "shardsvr",
         "sizeStorer",
+        "srcs",
+        "starlark",
         "stdx",
         "stmts",
         "subarray",

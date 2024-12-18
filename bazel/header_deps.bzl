@@ -47,5 +47,5 @@ create_link_deps = rule(
         "target_name": attr.string(),
         "link_deps": attr.label_list(providers = [CcInfo]),
     },
-    doc = "create a psuedo target to query link deps for",
+    doc = "create a pseudo target to query link deps for",
 )
