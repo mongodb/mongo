@@ -97,6 +97,19 @@ TEST_F(DocumentSourceGeoNearTest, FailToParseIfRequiredNearIsMissing) {
                        5860400);
 }
 
+TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeWithoutDistanceField) {
+    auto stageObj = fromjson("{$geoNear: {near: [0, 0]}}");
+    auto geoNear = DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx());
+    std::vector<Value> serialized;
+    geoNear->optimize();
+    geoNear->serializeToArray(serialized);
+    ASSERT_EQ(serialized.size(), 1u);
+    auto expectedSerialization = Value{Document{
+        {"$geoNear",
+         Value{Document{{"near", std::vector<Value>{Value{0}, Value{0}}}, {"spherical", false}}}}}};
+    ASSERT_VALUE_EQ(expectedSerialization, serialized[0]);
+}
+
 TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
     auto stageObj =
         fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 'a.b', query: {}}}");

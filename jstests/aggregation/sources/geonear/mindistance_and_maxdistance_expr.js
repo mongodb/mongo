@@ -117,7 +117,16 @@ const far = {
             {$lookup: {
                     from: coll.getName(),
                     let: {val: "$" + minOrMax},
-                    pipeline: [{$geoNear: {near: origin.pt ,distanceField: "dist", spherical:(geoType === "2dsphere"), [minOrMax]: "$$val"}},{$project: {_id: 0, dist: 0}}],
+                    pipeline: [{
+                        $geoNear: {
+                            near: origin.pt,
+                            distanceField: "dist",
+                            spherical:(geoType === "2dsphere"),
+                            [minOrMax]: "$$val"}
+                        },
+                        {
+                            $project: {_id: 0, dist: 0}
+                        }],
                     as: "output"
             }},{$sort : {_id: 1}}];
 

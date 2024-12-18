@@ -1,5 +1,6 @@
 /**
  * This tests 1% of all points using $near and $nearSphere.
+ * @tags: [requires_fcv_81]
  */
 
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
