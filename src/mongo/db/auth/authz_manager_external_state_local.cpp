@@ -707,6 +707,37 @@ constexpr auto kOpInsert = "i"_sd;
 constexpr auto kOpUpdate = "u"_sd;
 constexpr auto kOpDelete = "d"_sd;
 
+using InvalidateFn = std::function<void(OperationContext*, AuthorizationManager*)>;
+
+/**
+ * When we are currently in a WriteUnitOfWork, invalidation of the user cache must wait until
+ * after the operation causing the invalidation commits. This is because if in a different thread,
+ * the cache is read after invalidation but before the related commit occurs, the cache will be
+ * populated with stale data until the next invalidation.
+ */
+void invalidateUserCacheOnCommit(OperationContext* opCtx, InvalidateFn invalidate) {
+    auto unit = opCtx->recoveryUnit();
+    if (unit) {
+        auto state = unit->getState();
+        if (state == RecoveryUnit::State::kInactiveInUnitOfWork ||
+            state == RecoveryUnit::State::kActive) {
+            LOGV2_DEBUG(
+                9349700,
+                5,
+                "In WriteUnitOfWork, deferring user cache invalidation to onCommit handler");
+            unit->onCommit([invalidate = std::move(invalidate)](boost::optional<Timestamp>) {
+                LOGV2_DEBUG(9349701, 3, "Invalidating user cache in onCommit handler");
+                if (auto opCtx = cc().getOperationContext()) {
+                    invalidate(opCtx, AuthorizationManager::get(opCtx->getServiceContext()));
+                }
+            });
+            return;
+        }
+    }
+    LOGV2_DEBUG(9349702, 3, "Not in WriteUnitOfWork, invalidating user cache immediately");
+    invalidate(opCtx, AuthorizationManager::get(opCtx->getServiceContext()));
+}
+
 void _invalidateUserCache(OperationContext* opCtx,
                           AuthorizationManagerImpl* authzManager,
                           StringData op,
@@ -727,13 +758,18 @@ void _invalidateUserCache(OperationContext* opCtx,
                                      str::stream() << "_id entries for user documents must be of "
                                                       "the form <dbname>.<username>.  Found: "
                                                    << id));
-            authzManager->invalidateUserCache(opCtx);
+
+            invalidateUserCacheOnCommit(
+                opCtx, [](auto* opCtx, auto* am) { am->invalidateUserCache(opCtx); });
             return;
         }
         UserName userName(id.substr(splitPoint + 1), id.substr(0, splitPoint));
-        authzManager->invalidateUserByName(opCtx, userName);
+        invalidateUserCacheOnCommit(opCtx, [userName = std::move(userName)](auto* opCtx, auto* am) {
+            am->invalidateUserByName(opCtx, userName);
+        });
     } else {
-        authzManager->invalidateUserCache(opCtx);
+        invalidateUserCacheOnCommit(opCtx,
+                                    [](auto* opCtx, auto* am) { am->invalidateUserCache(opCtx); });
     }
 }
 }  // namespace

@@ -40,7 +40,7 @@ class OperationContext;
 
 class RecoveryUnitNoop : public RecoveryUnit {
 public:
-    void beginUnitOfWork(OperationContext* opCtx) final {}
+    void beginUnitOfWork(OperationContext* opCtx) override {}
 
     bool waitUntilDurable(OperationContext* opCtx) override {
         return true;
@@ -59,15 +59,15 @@ public:
     }
 
 private:
-    void doCommitUnitOfWork() final {
+    void doAbandonSnapshot() override {}
+
+    void doCommitUnitOfWork() override {
         _executeCommitHandlers(boost::none);
     }
 
-    void doAbortUnitOfWork() final {
+    void doAbortUnitOfWork() override {
         _executeRollbackHandlers();
     }
-
-    virtual void doAbandonSnapshot() {}
 
     std::vector<std::unique_ptr<Change>> _changes;
 };
