@@ -58,7 +58,7 @@ py_binary(
 )
 
 py_binary(
-    name = "engflow_auth_script",
+    name = "engflow_auth",
     srcs = ["engflow_auth.py"],
     main = "engflow_auth.py",
     visibility = ["//visibility:public"],

@@ -66,6 +66,7 @@ def install() -> str:
 def update_bazelrc(binary_path: str):
     lines = []
     bazelrc_path = f"{os.path.expanduser('~')}/.bazelrc"
+    print(f"Updating {bazelrc_path}")
     if os.path.exists(bazelrc_path):
         with open(bazelrc_path, "r") as bazelrc:
             for line in bazelrc.readlines():
