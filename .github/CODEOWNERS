@@ -1146,7 +1146,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/cluster_server_parameter_cmds.idl @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/connection_status.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/create_indexes* @10gen/server-index-builds @svc-auto-approve-bot
-/src/mongo/db/commands/**/fle2_* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/fsync* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/commands/**/user_management_commands* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/search_* @10gen/query-integration-search @svc-auto-approve-bot
@@ -1182,6 +1181,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/dbhash* @10gen/server-rss-sydney @svc-auto-approve-bot
 /src/mongo/db/commands/**/server_status* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/commands/**/sysprofile* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/commands/**/fle* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/commands/query_cmd/OWNERS.yml
 /src/mongo/db/commands/query_cmd/**/* @10gen/query @svc-auto-approve-bot

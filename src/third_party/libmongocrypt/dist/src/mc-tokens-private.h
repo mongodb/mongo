@@ -73,6 +73,47 @@
  * Server-side:
  *      AnchorPaddingTokenKey    = HMAC(AnchorPaddingTokenRoot, 1)
  *      AnchorPaddingTokenValue  = HMAC(AnchorPaddingTokenRoot, 2)
+ * ----------------------------------------------------------------------------
+ * Added in Text Search:
+ *
+ * EDCTextExactToken = HMAC(EDCToken, 1)
+ * EDCTextSubstringToken = HMAC(EDCToken, 2)
+ * EDCTextSuffixToken = HMAC(EDCToken, 3)
+ * EDCTextPrefixToken = HMAC(EDCToken, 4)
+ *
+ * ESCTextExactToken = HMAC(ESCToken, 1)
+ * ESCTextSubstringToken = HMAC(ESCToken, 2)
+ * ESCTextSuffixToken = HMAC(ESCToken, 3)
+ * ESCTextPrefixToken = HMAC(ESCToken, 4)
+ *
+ * ServerTextExactToken = HMAC(ServerTokenDerivationLevel1Token, 1)
+ * ServerTextSubstringToken = HMAC(ServerTokenDerivationLevel1Token, 2)
+ * ServerTextSuffixToken = HMAC(ServerTokenDerivationLevel1Token, 3)
+ * ServerTextPrefixToken = HMAC(ServerTokenDerivationLevel1Token, 4)
+ *
+ * EDCTextExactDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(EDCTextExactToken, v), u)
+ * EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(EDCTextSubstringToken, v), u)
+ * EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(EDCTextSuffixToken, v), u)
+ * EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(EDCTextPrefixToken, v), u)
+ *
+ * ESCTextExactDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(ESCTextExactToken, v), u)
+ * ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(ESCTextSubstringToken, v), u)
+ * ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(ESCTextSuffixToken, v), u)
+ * ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(ESCTextPrefixToken, v), u)
+ *
+ * ServerTextExactDerivedFromDataToken = HMAC(ServerTextExactToken, v)
+ * ServerTextSubstringDerivedFromDataToken = HMAC(ServerTextSubstringToken, v)
+ * ServerTextSuffixDerivedFromDataToken = HMAC(ServerTextSuffixToken, v)
+ * ServerTextPrefixDerivedFromDataToken = HMAC(ServerTextPrefixToken, v)
+ *
  * ======================== End: FLE 2 Token Reference ========================
  */
 
@@ -90,9 +131,9 @@
     /* Destructor */                                                                                                   \
     extern void BSON_CONCAT(Prefix, _destroy)(T * t);                                                                  \
     /* Constructor for server to shallow copy tokens from raw buffer */                                                \
-    extern T *BSON_CONCAT(Prefix, _new_from_buffer)(_mongocrypt_buffer_t * buf);                                       \
+    extern T *BSON_CONCAT(Prefix, _new_from_buffer)(const _mongocrypt_buffer_t *buf);                                  \
     /* Constructor for server to deep copy tokens from raw buffer */                                                   \
-    extern T *BSON_CONCAT(Prefix, _new_from_buffer_copy)(_mongocrypt_buffer_t * buf);                                  \
+    extern T *BSON_CONCAT(Prefix, _new_from_buffer_copy)(const _mongocrypt_buffer_t *buf);                             \
     /* Constructor. Parameter list given as variadic args */                                                           \
     extern T *BSON_CONCAT(Prefix, _new)(_mongocrypt_crypto_t * crypto, __VA_ARGS__, mongocrypt_status_t * status)
 
@@ -137,6 +178,71 @@ DECL_TOKEN_TYPE(mc_ServerZerosEncryptionToken, const mc_ServerDerivedFromDataTok
 DECL_TOKEN_TYPE(mc_AnchorPaddingTokenRoot, const mc_ESCToken_t *ESCToken);
 DECL_TOKEN_TYPE(mc_AnchorPaddingKeyToken, const mc_AnchorPaddingTokenRoot_t *anchorPaddingToken);
 DECL_TOKEN_TYPE(mc_AnchorPaddingValueToken, const mc_AnchorPaddingTokenRoot_t *anchorPaddingToken);
+
+DECL_TOKEN_TYPE(mc_EDCTextExactToken, const mc_EDCToken_t *edcToken);
+DECL_TOKEN_TYPE(mc_EDCTextSubstringToken, const mc_EDCToken_t *edcToken);
+DECL_TOKEN_TYPE(mc_EDCTextSuffixToken, const mc_EDCToken_t *edcToken);
+DECL_TOKEN_TYPE(mc_EDCTextPrefixToken, const mc_EDCToken_t *edcToken);
+
+DECL_TOKEN_TYPE(mc_ESCTextExactToken, const mc_ESCToken_t *escToken);
+DECL_TOKEN_TYPE(mc_ESCTextSubstringToken, const mc_ESCToken_t *escToken);
+DECL_TOKEN_TYPE(mc_ESCTextSuffixToken, const mc_ESCToken_t *escToken);
+DECL_TOKEN_TYPE(mc_ESCTextPrefixToken, const mc_ESCToken_t *escToken);
+
+DECL_TOKEN_TYPE(mc_ServerTextExactToken, const mc_ServerTokenDerivationLevel1Token_t *serverTokenDerivationLevel1Token);
+DECL_TOKEN_TYPE(mc_ServerTextSubstringToken,
+                const mc_ServerTokenDerivationLevel1Token_t *serverTokenDerivationLevel1Token);
+DECL_TOKEN_TYPE(mc_ServerTextSuffixToken,
+                const mc_ServerTokenDerivationLevel1Token_t *serverTokenDerivationLevel1Token);
+DECL_TOKEN_TYPE(mc_ServerTextPrefixToken,
+                const mc_ServerTokenDerivationLevel1Token_t *serverTokenDerivationLevel1Token);
+
+DECL_TOKEN_TYPE(mc_EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                const mc_EDCTextExactToken_t *edcTextExactToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+DECL_TOKEN_TYPE(mc_EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
+                const mc_EDCTextSubstringToken_t *edcTextSubstringToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+DECL_TOKEN_TYPE(mc_EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                const mc_EDCTextSuffixToken_t *edcTextSuffixToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+DECL_TOKEN_TYPE(mc_EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                const mc_EDCTextPrefixToken_t *edcTextPrefixToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+
+DECL_TOKEN_TYPE(mc_ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                const mc_ESCTextExactToken_t *escTextExactToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+DECL_TOKEN_TYPE(mc_ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
+                const mc_ESCTextSubstringToken_t *escTextSubstringToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+DECL_TOKEN_TYPE(mc_ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                const mc_ESCTextSuffixToken_t *escTextSuffixToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+DECL_TOKEN_TYPE(mc_ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                const mc_ESCTextPrefixToken_t *escTextPrefixToken,
+                const _mongocrypt_buffer_t *v,
+                uint64_t u);
+
+DECL_TOKEN_TYPE(mc_ServerTextExactDerivedFromDataToken,
+                const mc_ServerTextExactToken_t *serverTextExactToken,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_ServerTextSubstringDerivedFromDataToken,
+                const mc_ServerTextSubstringToken_t *serverTextSubstringToken,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_ServerTextSuffixDerivedFromDataToken,
+                const mc_ServerTextSuffixToken_t *serverTextSuffixToken,
+                const _mongocrypt_buffer_t *v);
+DECL_TOKEN_TYPE(mc_ServerTextPrefixDerivedFromDataToken,
+                const mc_ServerTextPrefixToken_t *serverTextPrefixToken,
+                const _mongocrypt_buffer_t *v);
 
 #undef DECL_TOKEN_TYPE
 #undef DECL_TOKEN_TYPE_1

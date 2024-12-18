@@ -346,32 +346,26 @@ ConstDataRange toCDR(BSONElement element) {
 
 ESCDerivedFromDataToken FleCrudTest::getTestESCDataToken(BSONObj obj) {
     auto element = obj.firstElement();
-    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
-        _keyVault.getIndexKeyById(indexKeyId).key);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1token);
-    return FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken,
-                                                                             toCDR(element));
+    auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
+    auto escToken = ESCToken::deriveFrom(c1token);
+    return ESCDerivedFromDataToken::deriveFrom(escToken, toCDR(element));
 }
 
 EDCDerivedFromDataToken FleCrudTest::getTestEDCDataToken(BSONObj obj) {
     auto element = obj.firstElement();
-    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
-        _keyVault.getIndexKeyById(indexKeyId).key);
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(c1token);
-    return FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken,
-                                                                             toCDR(element));
+    auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
+    auto edcToken = EDCToken::deriveFrom(c1token);
+    return EDCDerivedFromDataToken::deriveFrom(edcToken, toCDR(element));
 }
 
 ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(BSONElement element) {
-    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
-        _keyVault.getIndexKeyById(indexKeyId).key);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1token);
-    auto escDataToken =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, toCDR(element));
-    auto escContentionToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, 0);
+    auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
+    auto escToken = ESCToken::deriveFrom(c1token);
+    auto escDataToken = ESCDerivedFromDataToken::deriveFrom(escToken, toCDR(element));
+    auto escContentionToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, 0);
 
-    return FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escContentionToken);
+    return ESCTwiceDerivedTagToken::deriveFrom(escContentionToken);
 }
 
 ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(BSONObj obj) {
@@ -385,16 +379,14 @@ ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(StringData name, StringData
 
     UUID keyId = fieldNameToUUID(name);
 
-    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
-        _keyVault.getIndexKeyById(keyId).key);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1token);
+    auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(keyId).key);
+    auto escToken = ESCToken::deriveFrom(c1token);
 
-    auto escDataToken =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, toCDR(element));
-    auto escContentionToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, 0);
+    auto escDataToken = ESCDerivedFromDataToken::deriveFrom(escToken, toCDR(element));
+    auto escContentionToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, 0);
 
-    return FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escContentionToken);
+    return ESCTwiceDerivedTagToken::deriveFrom(escContentionToken);
 }
 
 void FleCrudTest::assertECOCDocumentCountByField(StringData fieldName, uint64_t expect) {

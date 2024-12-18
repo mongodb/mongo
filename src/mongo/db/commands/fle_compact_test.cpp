@@ -345,27 +345,21 @@ void FleCompactTest::assertESCNullAnchorDocument(BSONObj obj,
 FleCompactTest::ESCTestTokens FleCompactTest::getTestESCTokens(BSONObj obj) {
     auto element = obj.firstElement();
     auto indexKeyId = fieldNameToUUID(element.fieldNameStringData());
-    auto c1token = FLELevel1TokenGenerator::generateCollectionsLevel1Token(
-        _keyVault.getIndexKeyById(indexKeyId).key);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1token);
+    auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
+    auto escToken = ESCToken::deriveFrom(c1token);
     auto eltCdr = ConstDataRange(element.value(), element.value() + element.valuesize());
-    auto escDataToken =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, eltCdr);
+    auto escDataToken = ESCDerivedFromDataToken::deriveFrom(escToken, eltCdr);
 
     FleCompactTest::ESCTestTokens tokens;
 
-    tokens.contentionDerived = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, 0);
-    tokens.twiceDerivedValue =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(tokens.contentionDerived);
-    tokens.twiceDerivedTag =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(tokens.contentionDerived);
+    tokens.contentionDerived =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, 0);
+    tokens.twiceDerivedValue = ESCTwiceDerivedValueToken::deriveFrom(tokens.contentionDerived);
+    tokens.twiceDerivedTag = ESCTwiceDerivedTagToken::deriveFrom(tokens.contentionDerived);
 
-    tokens.anchorPaddingRoot = FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(escToken);
-    tokens.anchorPaddingKey =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(tokens.anchorPaddingRoot);
-    tokens.anchorPaddingValue =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(tokens.anchorPaddingRoot);
+    tokens.anchorPaddingRoot = AnchorPaddingRootToken::deriveFrom(escToken);
+    tokens.anchorPaddingKey = AnchorPaddingKeyToken::deriveFrom(tokens.anchorPaddingRoot);
+    tokens.anchorPaddingValue = AnchorPaddingValueToken::deriveFrom(tokens.anchorPaddingRoot);
 
     return tokens;
 }

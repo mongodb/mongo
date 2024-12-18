@@ -414,7 +414,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
             "getQueryableEncryptionCountInfo returned an invalid position for the next anchor",
             countInfo.count > 0);
 
-    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(ecocDoc.esc);
+    auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(ecocDoc.esc);
     auto latestCpos = emuBinaryResult.cpos.value();
 
     auto anchorDoc = ESCCollection::generateAnchorDocument(
@@ -459,10 +459,9 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
     }
 
     // Compact 4.g, Calculate S_1,d := F_s^esc_f,d(1), S_2,d := F_s^esc_f,d(2)
-    const auto anchorPaddingKeyToken =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(anchorPaddingRootToken);
+    const auto anchorPaddingKeyToken = AnchorPaddingKeyToken::deriveFrom(anchorPaddingRootToken);
     const auto anchorPaddingValueToken =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(anchorPaddingRootToken);
+        AnchorPaddingValueToken::deriveFrom(anchorPaddingRootToken);
     // Compact 4.h, Calculate a := AnchorBinaryHops(AnchorPaddingTokenKey,
     // AnchorPaddingTokenValue)
     // Use a call to getQueryableEncryptionCountInfo to get count info in one roundtrip rather than
@@ -511,15 +510,13 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
 
 namespace {
 auto generateCompactionTokenPair(const ESCDerivedFromDataTokenAndContentionFactorToken& rootToken) {
-    return std::make_tuple(
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(rootToken),
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(rootToken));
+    return std::make_tuple(ESCTwiceDerivedTagToken::deriveFrom(rootToken),
+                           ESCTwiceDerivedValueToken::deriveFrom(rootToken));
 }
 
 auto generateCompactionTokenPair(const AnchorPaddingRootToken& rootToken) {
-    return std::make_tuple(
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(rootToken),
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(rootToken));
+    return std::make_tuple(AnchorPaddingKeyToken::deriveFrom(rootToken),
+                           AnchorPaddingValueToken::deriveFrom(rootToken));
 }
 
 template <typename Generator, typename T>

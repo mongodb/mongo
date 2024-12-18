@@ -245,9 +245,8 @@ TEST(FLETokens, TestVectors) {
     FLECounter counter = 1234567890;
 
     // Level 1
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto serverTokenDerivationToken =
-        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(getIndexKey());
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto serverTokenDerivationToken = ServerTokenDerivationLevel1Token::deriveFrom(getIndexKey());
 
     ASSERT_EQUALS(CollectionsLevel1Token(decodePrf(
                       "BD53ACAC665EDD01E0CA30CB648B2B8F4967544047FD4E7D12B1A9BF07339928"_sd)),
@@ -259,100 +258,213 @@ TEST(FLETokens, TestVectors) {
 
     ASSERT_EQUALS(ServerDataEncryptionLevel1Token(decodePrf(
                       "EB9A73F7912D86A4297E81D2F675AF742874E4057E3A890FEC651A23EEE3F3EC"_sd)),
-                  FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey()));
+                  ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey()));
 
     // Level 2
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
     ASSERT_EQUALS(
         EDCToken(decodePrf("82B0AB0F8F1D31AEB6F4DBC915EF17CBA2FE21E36EC436984EB63BECEC173831"_sd)),
         edcToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
     ASSERT_EQUALS(
         ESCToken(decodePrf("279C575B52B73677EEF07D9C1126EBDF08C35369570A9B75E44A9AFDCCA96B6D"_sd)),
         escToken);
     ASSERT_EQUALS(
         ECOCToken(decodePrf("9E837ED3926CB8ED680E0E7DCB2A481A3E398BE7851FA1CE4D738FA5E67FFCC9"_sd)),
-        FLECollectionTokenGenerator::generateECOCToken(collectionToken));
+        ECOCToken::deriveFrom(collectionToken));
 
-    auto serverDataToken = FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
-        serverTokenDerivationToken, sampleValue);
+    auto serverDataToken =
+        ServerDerivedFromDataToken::deriveFrom(serverTokenDerivationToken, sampleValue);
     ASSERT_EQUALS(ServerDerivedFromDataToken(decodePrf(
                       "EDBC92F3BFE4CCB3F088FED8D42379A83F26DC37F2B6D513D4F568A6F32C8C80"_sd)),
                   serverDataToken);
 
     // Level 3
-    auto edcDataToken =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, sampleValue);
+    auto edcDataToken = EDCDerivedFromDataToken::deriveFrom(edcToken, sampleValue);
     ASSERT_EQUALS(EDCDerivedFromDataToken(decodePrf(
                       "CEA098AA664E578D4E9CE05B50ADD15DF2F0316CD5CCB08E720C61D8C7580E2A"_sd)),
                   edcDataToken);
 
-    auto escDataToken =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, sampleValue);
+    auto escDataToken = ESCDerivedFromDataToken::deriveFrom(escToken, sampleValue);
     ASSERT_EQUALS(ESCDerivedFromDataToken(decodePrf(
                       "DE6A1AC292BC62094C33E94647B044B9B10514317B75F4128DDA2E0FB686704F"_sd)),
                   escDataToken);
 
     ASSERT_EQUALS(ServerCountAndContentionFactorEncryptionToken(decodePrf(
                       "2F30DBCC06B722B60BC1FF018FC28D5FAEE2F222496BE34A264EF3267E811DA0"_sd)),
-                  FLEServerMetadataEncryptionTokenGenerator::
-                      generateServerCountAndContentionFactorEncryptionToken(serverDataToken));
+                  ServerCountAndContentionFactorEncryptionToken::deriveFrom(serverDataToken));
 
     ASSERT_EQUALS(ServerZerosEncryptionToken(decodePrf(
                       "986F23F132FF7F14F748AC69373CFC982AD0AD4BAD25BE92008B83AB43E96029"_sd)),
-                  FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
-                      serverDataToken));
+                  ServerZerosEncryptionToken::deriveFrom(serverDataToken));
 
     // Level 4
-    auto edcDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDataToken, counter);
+    auto edcDataCounterToken =
+        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDataToken, counter);
     ASSERT_EQUALS(EDCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "D8CC38AE6A64BD1BF195A2D35734C13AF2B1729AD1052A81BE00BF29C67A696E"_sd)),
                   edcDataCounterToken);
 
 
-    auto escDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, counter);
+    auto escDataCounterToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, counter);
     ASSERT_EQUALS(ESCDerivedFromDataTokenAndContentionFactorToken(decodePrf(
                       "8AAF04CBA6DC16BFB37CADBA43DCA66C183634CB3DA278DE174556AE6E17CEBB"_sd)),
                   escDataCounterToken);
 
     // Level 5
-    auto edcTwiceToken =
-        FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterToken);
+    auto edcTwiceToken = EDCTwiceDerivedToken::deriveFrom(edcDataCounterToken);
     ASSERT_EQUALS(EDCTwiceDerivedToken(decodePrf(
                       "B39A7EC33FD976EFB8EEBBBF3A265A933E2128D709BB88C77E3D42AA735F697C"_sd)),
                   edcTwiceToken);
 
-    auto escTwiceTagToken =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDataCounterToken);
+    auto escTwiceTagToken = ESCTwiceDerivedTagToken::deriveFrom(escDataCounterToken);
     ASSERT_EQUALS(ESCTwiceDerivedTagToken(decodePrf(
                       "D6F76A9D4767E0889B709517C8CF0412D81874AEB6E6CEBFBDDFF7B013EB7154"_sd)),
                   escTwiceTagToken);
-    auto escTwiceValueToken =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDataCounterToken);
+    auto escTwiceValueToken = ESCTwiceDerivedValueToken::deriveFrom(escDataCounterToken);
     ASSERT_EQUALS(ESCTwiceDerivedValueToken(decodePrf(
                       "53F0A51A43447B9881D5E79BA4C5F78E80BC2BC6AA42B00C81079EBF4C9D5A7C"_sd)),
                   escTwiceValueToken);
 
     // Anchor Padding
-    auto anchorPaddingTokenRoot =
-        FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(escToken);
+    auto anchorPaddingTokenRoot = AnchorPaddingRootToken::deriveFrom(escToken);
     ASSERT_EQUALS(AnchorPaddingRootToken(decodePrf(
                       "4312890F621FE3CA7497C3405DFD8AAF46A578C77F7404D28C12BA853A4D3327"_sd)),
                   anchorPaddingTokenRoot);
 
-    auto anchorPaddingTokenKey =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(anchorPaddingTokenRoot);
+    auto anchorPaddingTokenKey = AnchorPaddingKeyToken::deriveFrom(anchorPaddingTokenRoot);
     ASSERT_EQUALS(AnchorPaddingKeyToken(decodePrf(
                       "EF6D80379C462FC724CE8C245DC177ED507154B4EBB04DED780FA0DDAF1A2247"_sd)),
                   anchorPaddingTokenKey);
 
-    auto anchorPaddingTokenValue =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(anchorPaddingTokenRoot);
+    auto anchorPaddingTokenValue = AnchorPaddingValueToken::deriveFrom(anchorPaddingTokenRoot);
     ASSERT_EQUALS(AnchorPaddingValueToken(decodePrf(
                       "A3308597F3C5271D5BAB640F749E619E9272A2C33F4CD372680F55F84CC4DF7F"_sd)),
                   anchorPaddingTokenValue);
+
+    auto edcTextExactToken = EDCTextExactToken::deriveFrom(edcToken);
+    ASSERT_EQUALS(EDCTextExactToken(decodePrf(
+                      "17dde6bd0c0d783aa2bf84e255b162b9362032e5ebd6d655d6b478c4d77dc077"_sd)),
+                  edcTextExactToken);
+    auto edcTextSubstringToken = EDCTextSubstringToken::deriveFrom(edcToken);
+    ASSERT_EQUALS(EDCTextSubstringToken(decodePrf(
+                      "4dde679aa0568701a0fda6b1cae21e99da32500541e4ad832ea83db94497478f"_sd)),
+                  edcTextSubstringToken);
+    auto edcTextSuffixToken = EDCTextSuffixToken::deriveFrom(edcToken);
+    ASSERT_EQUALS(EDCTextSuffixToken(decodePrf(
+                      "61fa8b8f02a5e7f3cfd2c3e58d3fb8c2d1bfe8a1acc32e43f26478a52944af78"_sd)),
+                  edcTextSuffixToken);
+    auto edcTextPrefixToken = EDCTextPrefixToken::deriveFrom(edcToken);
+    ASSERT_EQUALS(EDCTextPrefixToken(decodePrf(
+                      "926e96d7142b2d187d10579a26a11499d6c30aac2e3fdd56eb1cd536875decfd"_sd)),
+                  edcTextPrefixToken);
+
+    auto escTextExactToken = ESCTextExactToken::deriveFrom(escToken);
+    ASSERT_EQUALS(ESCTextExactToken(decodePrf(
+                      "2fea10a92e84cce913ea0ffd7fd59964507e9e96cdffa4f1b861521f3e653260"_sd)),
+                  escTextExactToken);
+    auto escTextSubstringToken = ESCTextSubstringToken::deriveFrom(escToken);
+    ASSERT_EQUALS(ESCTextSubstringToken(decodePrf(
+                      "d6a94cacc9f5dd10b2b980bd4c4044e16ff1b29ad50c692e603487c46cbe610e"_sd)),
+                  escTextSubstringToken);
+    auto escTextSuffixToken = ESCTextSuffixToken::deriveFrom(escToken);
+    ASSERT_EQUALS(ESCTextSuffixToken(decodePrf(
+                      "336f39da6fa984a3477261ea19147b77f02e843f82511c94a91ec77bd72dca68"_sd)),
+                  escTextSuffixToken);
+    auto escTextPrefixToken = ESCTextPrefixToken::deriveFrom(escToken);
+    ASSERT_EQUALS(ESCTextPrefixToken(decodePrf(
+                      "2575c2a275e8135ec73093ae2edc793f6a3a0b8ed89767c3a8695ad93f1c6e9e"_sd)),
+                  escTextPrefixToken);
+
+    auto serverTextExactToken = ServerTextExactToken::deriveFrom(serverTokenDerivationToken);
+    ASSERT_EQUALS(ServerTextExactToken(decodePrf(
+                      "2ae33773be27c9fe3522ff0459f621670e93a7423166e63e9a43687a503c7438"_sd)),
+                  serverTextExactToken);
+    auto serverTextSubstringToken =
+        ServerTextSubstringToken::deriveFrom(serverTokenDerivationToken);
+    ASSERT_EQUALS(ServerTextSubstringToken(decodePrf(
+                      "183ff338509675d5377d09978e9becd31b197458e2c8cd45b670c672ceb6dc53"_sd)),
+                  serverTextSubstringToken);
+    auto serverTextSuffixToken = ServerTextSuffixToken::deriveFrom(serverTokenDerivationToken);
+    ASSERT_EQUALS(ServerTextSuffixToken(decodePrf(
+                      "baf7c9392bb37607c6aa1f04163f4db8628872e7e7122e754bcd72771934ccbd"_sd)),
+                  serverTextSuffixToken);
+    auto serverTextPrefixToken = ServerTextPrefixToken::deriveFrom(serverTokenDerivationToken);
+    ASSERT_EQUALS(ServerTextPrefixToken(decodePrf(
+                      "52387ea6942d9299a89f70a2a4d8a4209ea1dfe56e29f6c0e3182ca7818b5c9c"_sd)),
+                  serverTextPrefixToken);
+
+    auto edcTextExactDerivedFromDataTokenAndContentionFactorToken =
+        EDCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            edcTextExactToken, sampleValue, counter);
+    ASSERT_EQUALS(EDCTextExactDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "3551507189d32cc7768390cdd83071deeb3055ca86c4756b16bb740024b23610"_sd)),
+                  edcTextExactDerivedFromDataTokenAndContentionFactorToken);
+    auto edcTextSubstringDerivedFromDataTokenAndContentionFactorToken =
+        EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            edcTextSubstringToken, sampleValue, counter);
+    ASSERT_EQUALS(EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "4b52f6daf3b688971eb5819820c3468b3c79ba45fd3e86134351f9baf203e0d1"_sd)),
+                  edcTextSubstringDerivedFromDataTokenAndContentionFactorToken);
+    auto edcTextSuffixDerivedFromDataTokenAndContentionFactorToken =
+        EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            edcTextSuffixToken, sampleValue, counter);
+    ASSERT_EQUALS(EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "c1f273913631a9a1b36fea884b3c8a3a141c9e21556981094ba15f262e540ac7"_sd)),
+                  edcTextSuffixDerivedFromDataTokenAndContentionFactorToken);
+    auto edcTextPrefixDerivedFromDataTokenAndContentionFactorToken =
+        EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            edcTextPrefixToken, sampleValue, counter);
+    ASSERT_EQUALS(EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "a8d68ebdb0e2d31754f693c56071b0b1d225e6ec5568aff875bd4f7c48c24f66"_sd)),
+                  edcTextPrefixDerivedFromDataTokenAndContentionFactorToken);
+
+    auto escTextExactDerivedFromDataTokenAndContentionFactorToken =
+        ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            escTextExactToken, sampleValue, counter);
+    ASSERT_EQUALS(ESCTextExactDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "4cd82a4883ab0a6224a24937066f94827f5107e8bb2f0fa841e10aff8d49e8e4"_sd)),
+                  escTextExactDerivedFromDataTokenAndContentionFactorToken);
+    auto escTextSubstringDerivedFromDataTokenAndContentionFactorToken =
+        ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            escTextSubstringToken, sampleValue, counter);
+    ASSERT_EQUALS(ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "94f116183f14442e335902756e5b730683cd998c683b90d04dc9e8f48684bdb2"_sd)),
+                  escTextSubstringDerivedFromDataTokenAndContentionFactorToken);
+    auto escTextSuffixDerivedFromDataTokenAndContentionFactorToken =
+        ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            escTextSuffixToken, sampleValue, counter);
+    ASSERT_EQUALS(ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "13390024c674c2d131771cf95af9787c8c7ef76b5d63078b3dc482cb4075a634"_sd)),
+                  escTextSuffixDerivedFromDataTokenAndContentionFactorToken);
+    auto escTextPrefixDerivedFromDataTokenAndContentionFactorToken =
+        ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            escTextPrefixToken, sampleValue, counter);
+    ASSERT_EQUALS(ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken(decodePrf(
+                      "9d0d5f84de779360c43be8e61710deb4b2705b6bf1e11ee41fba09fd4486b7c6"_sd)),
+                  escTextPrefixDerivedFromDataTokenAndContentionFactorToken);
+
+    auto serverTextExactDerivedFromDataToken =
+        ServerTextExactDerivedFromDataToken::deriveFrom(serverTextExactToken, sampleValue);
+    ASSERT_EQUALS(ServerTextExactDerivedFromDataToken(decodePrf(
+                      "ae210cd90c230bb8cb96a4e840c9cf88740ae156f3514260d3f1ce94b0bf941e"_sd)),
+                  serverTextExactDerivedFromDataToken);
+    auto serverTextSubstringDerivedFromDataToken =
+        ServerTextSubstringDerivedFromDataToken::deriveFrom(serverTextSubstringToken, sampleValue);
+    ASSERT_EQUALS(ServerTextSubstringDerivedFromDataToken(decodePrf(
+                      "7b514ede2cd6d364f2da2580bf173a4e68f9e0617c123aee8b9dda4d8d4b47d7"_sd)),
+                  serverTextSubstringDerivedFromDataToken);
+    auto serverTextSuffixDerivedFromDataToken =
+        ServerTextSuffixDerivedFromDataToken::deriveFrom(serverTextSuffixToken, sampleValue);
+    ASSERT_EQUALS(ServerTextSuffixDerivedFromDataToken(decodePrf(
+                      "3e242be8d4c8a5894e81aa5fe0729cf48355dbe219c5c6b5ceb8b0eef124ba40"_sd)),
+                  serverTextSuffixDerivedFromDataToken);
+    auto serverTextPrefixDerivedFromDataToken =
+        ServerTextPrefixDerivedFromDataToken::deriveFrom(serverTextPrefixToken, sampleValue);
+    ASSERT_EQUALS(ServerTextPrefixDerivedFromDataToken(decodePrf(
+                      "8d8d41ac0618b0e98b086d662a2466f4aa1527d6536acdbcf220c724073331eb"_sd)),
+                  serverTextPrefixDerivedFromDataToken);
 }
 
 TEST(FLETokens, TestVectorUnindexedValueDecryption) {
@@ -411,20 +523,16 @@ TEST(FLE_ESC, RoundTrip) {
 
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+    auto c1 = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto escToken = ESCToken::deriveFrom(c1);
 
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, 0);
 
-    auto escTwiceTag =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDataCounterkey);
-    auto escTwiceValue =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDataCounterkey);
+    auto escTwiceTag = ESCTwiceDerivedTagToken::deriveFrom(escDataCounterkey);
+    auto escTwiceValue = ESCTwiceDerivedValueToken::deriveFrom(escDataCounterkey);
 
 
     {
@@ -536,19 +644,16 @@ TEST(FLE_ESC, EmuBinary_Empty) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+    auto c1 = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto escToken = ESCToken::deriveFrom(c1);
 
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
-    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+    auto escDerivedToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, 0);
 
-    auto escTwiceTag =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
-    auto escTwiceValue =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+    auto escTwiceTag = ESCTwiceDerivedTagToken::deriveFrom(escDerivedToken);
+    auto escTwiceValue = ESCTwiceDerivedValueToken::deriveFrom(escDerivedToken);
 
 
     auto i = ESCCollection::emuBinary(coll, escTwiceTag, escTwiceValue);
@@ -561,19 +666,16 @@ namespace {
 
 std::tuple<ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken> generateEmuBinaryTokens(
     ConstDataRange value, uint64_t contention = 0) {
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+    auto c1 = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto escToken = ESCToken::deriveFrom(c1);
 
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
-    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, contention);
+    auto escDerivedToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, contention);
 
-    auto escTwiceTag =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
-    auto escTwiceValue =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+    auto escTwiceTag = ESCTwiceDerivedTagToken::deriveFrom(escDerivedToken);
+    auto escTwiceValue = ESCTwiceDerivedValueToken::deriveFrom(escDerivedToken);
     return std::tie(escTwiceTag, escTwiceValue);
 }
 
@@ -874,19 +976,16 @@ TEST(FLE_ESC, EmuBinary) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+    auto c1 = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto escToken = ESCToken::deriveFrom(c1);
 
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
-    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+    auto escDerivedToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, 0);
 
-    auto escTwiceTag =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
-    auto escTwiceValue =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+    auto escTwiceTag = ESCTwiceDerivedTagToken::deriveFrom(escDerivedToken);
+    auto escTwiceValue = ESCTwiceDerivedValueToken::deriveFrom(escDerivedToken);
 
     for (int j = 1; j <= 5; j++) {
         BSONObj doc = ESCCollection::generateInsertDocument(escTwiceTag, escTwiceValue, j, j);
@@ -916,36 +1015,30 @@ TEST(FLE_ESC, EmuBinary2) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+    auto c1 = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto escToken = ESCToken::deriveFrom(c1);
 
 
-    ESCDerivedFromDataToken escDatakey2 =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, testValue2);
+    ESCDerivedFromDataToken escDatakey2 = ESCDerivedFromDataToken::deriveFrom(escToken, testValue2);
 
-    auto escDerivedToken2 = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey2, 0);
+    auto escDerivedToken2 =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey2, 0);
 
-    auto escTwiceTag2 =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken2);
-    auto escTwiceValue2 =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken2);
+    auto escTwiceTag2 = ESCTwiceDerivedTagToken::deriveFrom(escDerivedToken2);
+    auto escTwiceValue2 = ESCTwiceDerivedValueToken::deriveFrom(escDerivedToken2);
 
     for (int j = 1; j <= 5; j++) {
         BSONObj doc = ESCCollection::generateInsertDocument(escTwiceTag2, escTwiceValue2, j, j);
         coll.insert(doc);
     }
 
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
-    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+    auto escDerivedToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, 0);
 
-    auto escTwiceTag =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
-    auto escTwiceValue =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+    auto escTwiceTag = ESCTwiceDerivedTagToken::deriveFrom(escDerivedToken);
+    auto escTwiceValue = ESCTwiceDerivedValueToken::deriveFrom(escDerivedToken);
 
 
     for (int j = 1; j <= 13; j++) {
@@ -979,19 +1072,16 @@ TEST(FLE_ESC, EmuBinary_NullRecord) {
     TestDocumentCollection coll;
     ConstDataRange value(testValue);
 
-    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+    auto c1 = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto escToken = ESCToken::deriveFrom(c1);
 
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
-    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+    auto escDerivedToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, 0);
 
-    auto escTwiceTag =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
-    auto escTwiceValue =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+    auto escTwiceTag = ESCTwiceDerivedTagToken::deriveFrom(escDerivedToken);
+    auto escTwiceValue = ESCTwiceDerivedValueToken::deriveFrom(escDerivedToken);
 
     BSONObj doc = ESCCollection::generateNullDocument(escTwiceTag, escTwiceValue, 7, 7);
     coll.insert(doc);
@@ -1577,31 +1667,24 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
 
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
-    auto serverDerivationToken =
-        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(getIndexKey());
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
+    auto serverDerivationToken = ServerTokenDerivationLevel1Token::deriveFrom(getIndexKey());
 
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
+    auto ecocToken = ECOCToken::deriveFrom(collectionToken);
     auto serverDerivedFromDataToken =
-        FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverDerivationToken,
-                                                                             value);
+        ServerDerivedFromDataToken::deriveFrom(serverDerivationToken, value);
     FLECounter counter = 0;
 
-    EDCDerivedFromDataToken edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, counter);
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, counter);
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDatakey, counter);
+        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey, counter);
 
     FLE2InsertUpdatePayloadV2 iupayload;
     iupayload.setEdcDerivedToken(edcDataCounterkey);
@@ -1620,8 +1703,7 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
 
     iupayload.setContentionFactor(counter);
 
-    auto edcTwiceDerived =
-        FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterkey);
+    auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(edcDataCounterkey);
 
     auto tag = EDCServerCollection::generateTag(edcTwiceDerived, 123456);
 
@@ -1727,8 +1809,7 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
 
 TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
     ConstDataRange empty(0, 0);
-    auto serverToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
+    auto serverToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
     ServerDerivedFromDataToken serverDataDerivedToken(serverToken.asPrfBlock());
 
     constexpr size_t cipherTextSize = 32;
@@ -1858,32 +1939,25 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
 
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
-    auto serverDerivationToken =
-        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(getIndexKey());
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
+    auto serverDerivationToken = ServerTokenDerivationLevel1Token::deriveFrom(getIndexKey());
 
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
+    auto ecocToken = ECOCToken::deriveFrom(collectionToken);
     auto serverDerivedFromDataToken =
-        FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverDerivationToken,
-                                                                             value);
+        ServerDerivedFromDataToken::deriveFrom(serverDerivationToken, value);
 
     FLECounter counter = 0;
 
-    EDCDerivedFromDataToken edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, counter);
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, counter);
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDatakey, counter);
+        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey, counter);
 
     FLE2InsertUpdatePayloadV2 iupayload;
 
@@ -1915,8 +1989,7 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
 
     iupayload.setEdgeTokenSet(tokens);
 
-    auto edcTwiceDerived =
-        FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterkey);
+    auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(edcDataCounterkey);
 
     auto tag = EDCServerCollection::generateTag(edcTwiceDerived, 123456);
 
@@ -2165,13 +2238,12 @@ TEST(FLE_EDC, RangeParamtersFlow_Find) {
 TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
     std::vector<uint8_t> value(4);
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
-    auto escDataToken =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
-    auto escContentionToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-        generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, 1);
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto escToken = ESCToken::deriveFrom(collectionToken);
+    auto ecocToken = ECOCToken::deriveFrom(collectionToken);
+    auto escDataToken = ESCDerivedFromDataToken::deriveFrom(escToken, value);
+    auto escContentionToken =
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, 1);
 
     std::vector<boost::optional<bool>> isLeafValues({boost::none, true, false});
     for (auto optIsLeaf : isLeafValues) {
@@ -2863,11 +2935,10 @@ TEST(EDCServerCollectionTest, GenerateEDCTokens) {
 
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(getIndexKey());
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
 
-    EDCDerivedFromDataToken edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
+    EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
 
 
     ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 0).size(), 1);
@@ -5361,10 +5432,8 @@ public:
         "4312890F621FE3CA7497C3405DFD8AAF46A578C77F7404D28C12BA853A4D3327"_sd;
 
     const AnchorPaddingRootToken _rootToken{decodePrf(kAnchorPaddingRootHex)};
-    const AnchorPaddingKeyToken _keyToken =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(_rootToken);
-    const AnchorPaddingValueToken _valueToken =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(_rootToken);
+    const AnchorPaddingKeyToken _keyToken = AnchorPaddingKeyToken::deriveFrom(_rootToken);
+    const AnchorPaddingValueToken _valueToken = AnchorPaddingValueToken::deriveFrom(_rootToken);
 };
 
 TEST_F(AnchorPaddingFixture, generatePaddingDocument) {

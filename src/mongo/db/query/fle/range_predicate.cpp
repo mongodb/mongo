@@ -111,14 +111,12 @@ std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayl
     std::vector<ServerZerosEncryptionToken> serverZerosTokens;
     serverZerosTokens.reserve(payload.edges.value().size());
 
-    std::transform(
-        std::make_move_iterator(payload.edges.value().begin()),
-        std::make_move_iterator(payload.edges.value().end()),
-        std::back_inserter(serverZerosTokens),
-        [](FLEFindEdgeTokenSet&& edge) {
-            return FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
-                edge.server);
-        });
+    std::transform(std::make_move_iterator(payload.edges.value().begin()),
+                   std::make_move_iterator(payload.edges.value().end()),
+                   std::back_inserter(serverZerosTokens),
+                   [](FLEFindEdgeTokenSet&& edge) {
+                       return ServerZerosEncryptionToken::deriveFrom(edge.server);
+                   });
 
     auto* expCtx = _rewriter->getExpressionContext();
     return std::make_unique<ExpressionInternalFLEBetween>(

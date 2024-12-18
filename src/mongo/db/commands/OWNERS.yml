@@ -12,9 +12,6 @@ filters:
   - "create_indexes*":
     approvers:
       - 10gen/server-index-builds
-  - "fle2_*":
-    approvers:
-      - 10gen/server-security
   - "fsync*":
     approvers:
       - 10gen/server-storage-engine-integration
@@ -121,3 +118,6 @@ filters:
   - "sysprofile*":
     approvers:
       - 10gen/query-execution
+  - "fle*":
+    approvers:
+      - 10gen/server-security

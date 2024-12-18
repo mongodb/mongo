@@ -32,8 +32,11 @@
 // TODO: Remove after SERVER-95889
 #include "mongo/base/init.h"
 
+#include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_key_types.h"
 #include "mongo/crypto/mongocryptbuffer.h"
 #include "mongo/crypto/mongocryptstatus.h"
+#include "mongo/crypto/symmetric_crypto.h"
 
 extern "C" {
 #include <mc-tokens-private.h>
@@ -46,6 +49,15 @@ extern "C" {
 typedef _mongocrypt_crypto_t mongocrypt_crypto_t;
 
 namespace mongo {
+
+namespace {
+constexpr size_t kHmacKeyOffset = 64;
+ConstDataRange hmacKey(const KeyMaterial& keyMaterial) {
+    static_assert(kHmacKeyOffset + crypto::sym256KeySize <= crypto::kFieldLevelEncryptionKeySize);
+    invariant(crypto::kFieldLevelEncryptionKeySize == keyMaterial->size());
+    return {keyMaterial->data() + kHmacKeyOffset, crypto::sym256KeySize};
+}
+}  // namespace
 
 auto kEmptyPrfBlock = MongoCryptBuffer::copy(ConstDataRange(PrfBlock{}));
 
@@ -163,9 +175,10 @@ auto kEmptyPrfBlock = MongoCryptBuffer::copy(ConstDataRange(PrfBlock{}));
 // FLE_TOKEN_CLASS_IMPL_END
 // ```
 // This is to ensure that the open ended ::deriveFrom function gets properly cleaned up and closed.
-#define FLE_TOKEN_IMPL_FROM_BUFFER(TokenType)                          \
-    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const MongoCryptBuffer& buf) \
-    token = mc_##TokenType##_new(&crypto, buf.get(), status);          \
+#define FLE_TOKEN_IMPL_FROM_ROOT(TokenType)                                    \
+    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const FLEIndexKey& rootKey)          \
+    MongoCryptBuffer argMCB = MongoCryptBuffer::borrow(hmacKey(rootKey.data)); \
+    token = mc_##TokenType##_new(&crypto, argMCB.get(), status);               \
     FLE_TOKEN_CLASS_IMPL_END(TokenType)
 
 #define FLE_TOKEN_IMPL_FROM_TOKEN(TokenType, ParentToken)            \
@@ -186,9 +199,18 @@ auto kEmptyPrfBlock = MongoCryptBuffer::copy(ConstDataRange(PrfBlock{}));
     token = mc_##TokenType##_new(&crypto, parent.get(), arg, status);                   \
     FLE_TOKEN_CLASS_IMPL_END(TokenType)
 
+#define FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(TokenType, ParentToken)                        \
+    FLE_TOKEN_CLASS_IMPL_BEGIN(                                                                  \
+        TokenType, const ParentToken& parent, ConstDataRange cdr, std::uint64_t arg)             \
+    /* mc_##TokenType##_new for these tokens takes in a _mongocrypt_buffer_t, requiring an extra \
+     * conversion step. */                                                                       \
+    MongoCryptBuffer argMCB = MongoCryptBuffer::borrow(cdr);                                     \
+    token = mc_##TokenType##_new(&crypto, parent.get(), argMCB.get(), arg, status);              \
+    FLE_TOKEN_CLASS_IMPL_END(TokenType)
+
 // See comments in fle_tokens.h for token derivation details.
-FLE_TOKEN_IMPL_FROM_BUFFER(CollectionsLevel1Token)
-FLE_TOKEN_IMPL_FROM_BUFFER(ServerDataEncryptionLevel1Token)
+FLE_TOKEN_IMPL_FROM_ROOT(CollectionsLevel1Token)
+FLE_TOKEN_IMPL_FROM_ROOT(ServerDataEncryptionLevel1Token)
 
 FLE_TOKEN_IMPL_FROM_TOKEN(EDCToken, CollectionsLevel1Token)
 FLE_TOKEN_IMPL_FROM_TOKEN(ESCToken, CollectionsLevel1Token)
@@ -206,7 +228,7 @@ FLE_TOKEN_IMPL_FROM_TOKEN(EDCTwiceDerivedToken, EDCDerivedFromDataTokenAndConten
 FLE_TOKEN_IMPL_FROM_TOKEN(ESCTwiceDerivedTagToken, ESCDerivedFromDataTokenAndContentionFactor)
 FLE_TOKEN_IMPL_FROM_TOKEN(ESCTwiceDerivedValueToken, ESCDerivedFromDataTokenAndContentionFactor)
 
-FLE_TOKEN_IMPL_FROM_BUFFER(ServerTokenDerivationLevel1Token)
+FLE_TOKEN_IMPL_FROM_ROOT(ServerTokenDerivationLevel1Token)
 FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR(ServerDerivedFromDataToken, ServerTokenDerivationLevel1Token)
 FLE_TOKEN_IMPL_FROM_TOKEN(ServerCountAndContentionFactorEncryptionToken, ServerDerivedFromDataToken)
 FLE_TOKEN_IMPL_FROM_TOKEN(ServerZerosEncryptionToken, ServerDerivedFromDataToken)
@@ -214,6 +236,44 @@ FLE_TOKEN_IMPL_FROM_TOKEN(ServerZerosEncryptionToken, ServerDerivedFromDataToken
 FLE_TOKEN_IMPL_FROM_TOKEN(AnchorPaddingTokenRoot, ESCToken)
 FLE_TOKEN_IMPL_FROM_TOKEN(AnchorPaddingKeyToken, AnchorPaddingTokenRoot)
 FLE_TOKEN_IMPL_FROM_TOKEN(AnchorPaddingValueToken, AnchorPaddingTokenRoot)
+
+FLE_TOKEN_IMPL_FROM_TOKEN(EDCTextExactToken, EDCToken)
+FLE_TOKEN_IMPL_FROM_TOKEN(EDCTextSubstringToken, EDCToken)
+FLE_TOKEN_IMPL_FROM_TOKEN(EDCTextSuffixToken, EDCToken)
+FLE_TOKEN_IMPL_FROM_TOKEN(EDCTextPrefixToken, EDCToken)
+
+FLE_TOKEN_IMPL_FROM_TOKEN(ESCTextExactToken, ESCToken)
+FLE_TOKEN_IMPL_FROM_TOKEN(ESCTextSubstringToken, ESCToken)
+FLE_TOKEN_IMPL_FROM_TOKEN(ESCTextSuffixToken, ESCToken)
+FLE_TOKEN_IMPL_FROM_TOKEN(ESCTextPrefixToken, ESCToken)
+
+FLE_TOKEN_IMPL_FROM_TOKEN(ServerTextExactToken, ServerTokenDerivationLevel1Token)
+FLE_TOKEN_IMPL_FROM_TOKEN(ServerTextSubstringToken, ServerTokenDerivationLevel1Token)
+FLE_TOKEN_IMPL_FROM_TOKEN(ServerTextSuffixToken, ServerTokenDerivationLevel1Token)
+FLE_TOKEN_IMPL_FROM_TOKEN(ServerTextPrefixToken, ServerTokenDerivationLevel1Token)
+
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                                          EDCTextExactToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(
+    EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken, EDCTextSubstringToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                                          EDCTextSuffixToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                                          EDCTextPrefixToken)
+
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                                          ESCTextExactToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(
+    ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken, ESCTextSubstringToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                                          ESCTextSuffixToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                                          ESCTextPrefixToken)
+
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR(ServerTextExactDerivedFromDataToken, ServerTextExactToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR(ServerTextSubstringDerivedFromDataToken, ServerTextSubstringToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR(ServerTextSuffixDerivedFromDataToken, ServerTextSuffixToken)
+FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR(ServerTextPrefixDerivedFromDataToken, ServerTextPrefixToken)
 
 #undef FLE_TOKEN_TYPE_MC
 #undef FLE_TOKEN_CLASS_IMPL_BEGIN

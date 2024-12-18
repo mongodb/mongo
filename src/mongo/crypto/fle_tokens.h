@@ -35,6 +35,7 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
+#include "mongo/crypto/fle_key_types.h"
 
 /*
  * The many token types are derived from the index key
@@ -165,8 +166,8 @@ public:
 // Declare the classes by passing through the name and a variable amount of parameters that define
 // how each token should be able to be derived. See the comment at the top of the file for more
 // specific details.
-FLE_TOKEN_DECL_CLASS(CollectionsLevel1Token, const MongoCryptBuffer& buf)
-FLE_TOKEN_DECL_CLASS(ServerDataEncryptionLevel1Token, const MongoCryptBuffer& buf)
+FLE_TOKEN_DECL_CLASS(CollectionsLevel1Token, const FLEIndexKey& rootKey)
+FLE_TOKEN_DECL_CLASS(ServerDataEncryptionLevel1Token, const FLEIndexKey& rootKey)
 
 FLE_TOKEN_DECL_CLASS(EDCToken, const CollectionsLevel1Token& parent)
 FLE_TOKEN_DECL_CLASS(ESCToken, const CollectionsLevel1Token& parent)
@@ -188,7 +189,7 @@ FLE_TOKEN_DECL_CLASS(ESCTwiceDerivedTagToken,
 FLE_TOKEN_DECL_CLASS(ESCTwiceDerivedValueToken,
                      const ESCDerivedFromDataTokenAndContentionFactor& parent)
 
-FLE_TOKEN_DECL_CLASS(ServerTokenDerivationLevel1Token, const MongoCryptBuffer& buf)
+FLE_TOKEN_DECL_CLASS(ServerTokenDerivationLevel1Token, const FLEIndexKey& rootKey)
 FLE_TOKEN_DECL_CLASS(ServerDerivedFromDataToken,
                      const ServerTokenDerivationLevel1Token& parent,
                      ConstDataRange cdr)
@@ -199,6 +200,69 @@ FLE_TOKEN_DECL_CLASS(ServerZerosEncryptionToken, const ServerDerivedFromDataToke
 FLE_TOKEN_DECL_CLASS(AnchorPaddingTokenRoot, const ESCToken& parent)
 FLE_TOKEN_DECL_CLASS(AnchorPaddingKeyToken, const AnchorPaddingTokenRoot& parent)
 FLE_TOKEN_DECL_CLASS(AnchorPaddingValueToken, const AnchorPaddingTokenRoot& parent)
+
+
+FLE_TOKEN_DECL_CLASS(EDCTextExactToken, const EDCToken& parent)
+FLE_TOKEN_DECL_CLASS(EDCTextSubstringToken, const EDCToken& parent)
+FLE_TOKEN_DECL_CLASS(EDCTextSuffixToken, const EDCToken& parent)
+FLE_TOKEN_DECL_CLASS(EDCTextPrefixToken, const EDCToken& parent)
+
+FLE_TOKEN_DECL_CLASS(ESCTextExactToken, const ESCToken& parent)
+FLE_TOKEN_DECL_CLASS(ESCTextSubstringToken, const ESCToken& parent)
+FLE_TOKEN_DECL_CLASS(ESCTextSuffixToken, const ESCToken& parent)
+FLE_TOKEN_DECL_CLASS(ESCTextPrefixToken, const ESCToken& parent)
+
+FLE_TOKEN_DECL_CLASS(ServerTextExactToken, const ServerTokenDerivationLevel1Token& parent)
+FLE_TOKEN_DECL_CLASS(ServerTextSubstringToken, const ServerTokenDerivationLevel1Token& parent)
+FLE_TOKEN_DECL_CLASS(ServerTextSuffixToken, const ServerTokenDerivationLevel1Token& parent)
+FLE_TOKEN_DECL_CLASS(ServerTextPrefixToken, const ServerTokenDerivationLevel1Token& parent)
+
+FLE_TOKEN_DECL_CLASS(EDCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                     const EDCTextExactToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+FLE_TOKEN_DECL_CLASS(EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
+                     const EDCTextSubstringToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+FLE_TOKEN_DECL_CLASS(EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                     const EDCTextSuffixToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+FLE_TOKEN_DECL_CLASS(EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                     const EDCTextPrefixToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+
+FLE_TOKEN_DECL_CLASS(ESCTextExactDerivedFromDataTokenAndContentionFactorToken,
+                     const ESCTextExactToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+FLE_TOKEN_DECL_CLASS(ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken,
+                     const ESCTextSubstringToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+FLE_TOKEN_DECL_CLASS(ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken,
+                     const ESCTextSuffixToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+FLE_TOKEN_DECL_CLASS(ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken,
+                     const ESCTextPrefixToken& parent,
+                     ConstDataRange cdr,
+                     std::uint64_t arg)
+
+FLE_TOKEN_DECL_CLASS(ServerTextExactDerivedFromDataToken,
+                     const ServerTextExactToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ServerTextSubstringDerivedFromDataToken,
+                     const ServerTextSubstringToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ServerTextSuffixDerivedFromDataToken,
+                     const ServerTextSuffixToken& parent,
+                     ConstDataRange cdr)
+FLE_TOKEN_DECL_CLASS(ServerTextPrefixDerivedFromDataToken,
+                     const ServerTextPrefixToken& parent,
+                     ConstDataRange cdr)
 
 #undef FLE_TOKEN_TYPE_MC
 #undef FLE_CRYPTO_TOKEN_FWD

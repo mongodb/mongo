@@ -133,8 +133,7 @@ boost::intrusive_ptr<ExpressionInternalFLEEqual> generateFleEqualMatch(StringDat
         expCtx,
         ExpressionFieldPath::createPathFromString(
             expCtx, path.toString(), expCtx->variablesParseState),
-        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
-            tokens.serverDataDerivedToken));
+        ServerZerosEncryptionToken::deriveFrom(tokens.serverDataDerivedToken));
 }
 
 
@@ -149,8 +148,7 @@ std::unique_ptr<ExpressionInternalFLEEqual> generateFleEqualMatchUnique(StringDa
         expCtx,
         ExpressionFieldPath::createPathFromString(
             expCtx, path.toString(), expCtx->variablesParseState),
-        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
-            tokens.serverDataDerivedToken));
+        ServerZerosEncryptionToken::deriveFrom(tokens.serverDataDerivedToken));
 }
 
 std::unique_ptr<MatchExpression> generateFleEqualMatchAndExpr(StringData path,

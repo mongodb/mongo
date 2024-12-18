@@ -184,8 +184,6 @@ constexpr auto kDollarIn = "$in";
 
 constexpr auto kEncryptedFields = "encryptedFields";
 
-constexpr size_t kHmacKeyOffset = 64;
-
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
 constexpr auto kDebugId = "_debug_id";
 constexpr auto kDebugValuePosition = "_debug_value_position";
@@ -283,13 +281,6 @@ private:
 using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 
 static_assert(sizeof(PrfBlock) == SHA256Block::kHashLength);
-
-ConstDataRange hmacKey(const KeyMaterial& keyMaterial) {
-    static_assert(kHmacKeyOffset + crypto::sym256KeySize <= crypto::kFieldLevelEncryptionKeySize);
-    invariant(crypto::kFieldLevelEncryptionKeySize == keyMaterial->size());
-    return {keyMaterial->data() + kHmacKeyOffset, crypto::sym256KeySize};
-}
-
 
 PrfBlock prf(ConstDataRange key, uint64_t value, int64_t value2) {
     uassert(6378003, "Invalid key length", key.length() == crypto::sym256KeySize);
@@ -743,29 +734,22 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2(
     uint64_t contentionFactor) {
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
-    auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
-    auto serverDerivationToken =
-        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(indexKey.key);
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
+    auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(indexKey.key);
+    auto serverDerivationToken = ServerTokenDerivationLevel1Token::deriveFrom(indexKey.key);
 
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
+    auto ecocToken = ECOCToken::deriveFrom(collectionToken);
     auto serverDerivedFromDataToken =
-        FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverDerivationToken,
-                                                                             value);
-    EDCDerivedFromDataToken edcDataToken =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-    ESCDerivedFromDataToken escDataToken =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+        ServerDerivedFromDataToken::deriveFrom(serverDerivationToken, value);
+    EDCDerivedFromDataToken edcDataToken = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
+    ESCDerivedFromDataToken escDataToken = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterToken =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDataToken, contentionFactor);
+        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDataToken, contentionFactor);
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterToken =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, contentionFactor);
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, contentionFactor);
 
     FLE2InsertUpdatePayloadV2 iupayload;
 
@@ -884,22 +868,17 @@ std::vector<EdgeTokenSetV2> getEdgeTokenSet(
     for (const auto& edge : edgesList) {
         ConstDataRange cdr(edge.rawData(), edge.size());
 
-        EDCDerivedFromDataToken edcDatakey =
-            FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, cdr);
-        ESCDerivedFromDataToken escDatakey =
-            FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, cdr);
+        EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, cdr);
+        ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, cdr);
 
         EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
-            FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-                generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDatakey,
+            EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey,
                                                                         contentionFactor);
         ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-            FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-                generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey,
+            ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey,
                                                                         contentionFactor);
         ServerDerivedFromDataToken serverDatakey =
-            FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
-                serverDerivationToken, cdr);
+            ServerDerivedFromDataToken::deriveFrom(serverDerivationToken, cdr);
 
         EdgeTokenSetV2 ets;
 
@@ -927,30 +906,23 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
     auto element = spec.getValue().getElement();
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
-    auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
-    auto serverDerivationToken =
-        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(indexKey.key);
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
+    auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(indexKey.key);
+    auto serverDerivationToken = ServerTokenDerivationLevel1Token::deriveFrom(indexKey.key);
 
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
+    auto ecocToken = ECOCToken::deriveFrom(collectionToken);
     auto serverDerivedFromDataToken =
-        FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverDerivationToken,
-                                                                             value);
+        ServerDerivedFromDataToken::deriveFrom(serverDerivationToken, value);
 
-    EDCDerivedFromDataToken edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
+    ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDatakey, contentionFactor);
+        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey, contentionFactor);
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, contentionFactor);
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, contentionFactor);
 
     FLE2InsertUpdatePayloadV2 iupayload;
 
@@ -1651,10 +1623,8 @@ BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVaul
 FLEEdgeCountInfo getEdgeCountInfoForPadding(const FLEStateCollectionReader& reader,
                                             ConstDataRange tag) {
     auto anchorPaddingRootToken = AnchorPaddingRootToken::parse(tag);
-    auto tagToken =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(anchorPaddingRootToken);
-    auto valueToken =
-        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(anchorPaddingRootToken);
+    auto tagToken = AnchorPaddingKeyToken::deriveFrom(anchorPaddingRootToken);
+    auto valueToken = AnchorPaddingValueToken::deriveFrom(anchorPaddingRootToken);
     // There are no non-anchor padding edges, so we can skip the binaryHops search.
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
     auto apos = ESCCollectionAnchorPadding::anchorBinaryHops(reader, tagToken, valueToken, tracker);
@@ -1668,8 +1638,8 @@ FLEEdgeCountInfo getEdgeCountInfoForPadding(const FLEStateCollectionReader& read
 FLEEdgeCountInfo getEdgeCountInfoForCleanup(const FLEStateCollectionReader& reader,
                                             ConstDataRange tag) {
     auto escToken = EDCServerPayloadInfo::getESCToken(tag);
-    auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
-    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
+    auto tagToken = ESCTwiceDerivedTagToken::deriveFrom(escToken);
+    auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(escToken);
     auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
     return ESCCollection::getEdgeCountInfoForPaddingCleanupCommon(
         reader, tagToken, valueToken, positions);
@@ -1683,8 +1653,8 @@ FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& read
 
     auto escToken = EDCServerPayloadInfo::getESCToken(tag);
 
-    auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
-    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
+    auto tagToken = ESCTwiceDerivedTagToken::deriveFrom(escToken);
+    auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(escToken);
 
     auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
 
@@ -1736,8 +1706,8 @@ FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
 
     auto escToken = EDCServerPayloadInfo::getESCToken(tag);
 
-    auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
-    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
+    auto tagToken = ESCTwiceDerivedTagToken::deriveFrom(escToken);
+    auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(escToken);
 
     auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
 
@@ -1925,107 +1895,6 @@ std::vector<uint8_t> FLEUtil::vectorFromCDR(ConstDataRange cdr) {
     return buf;
 }
 
-CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
-    FLEIndexKey indexKey) {
-    return CollectionsLevel1Token(FLEUtil::prf(hmacKey(indexKey.data), kLevel1Collection));
-}
-
-ServerTokenDerivationLevel1Token FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(
-    FLEIndexKey indexKey) {
-    return ServerTokenDerivationLevel1Token(
-        FLEUtil::prf(hmacKey(indexKey.data), kLevel1ServerTokenDerivation));
-}
-
-ServerDataEncryptionLevel1Token FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
-    FLEIndexKey indexKey) {
-    return ServerDataEncryptionLevel1Token(
-        FLEUtil::prf(hmacKey(indexKey.data), kLevelServerDataEncryption));
-}
-
-
-EDCToken FLECollectionTokenGenerator::generateEDCToken(CollectionsLevel1Token token) {
-    return EDCToken::deriveFrom(token);
-}
-
-ESCToken FLECollectionTokenGenerator::generateESCToken(CollectionsLevel1Token token) {
-    return ESCToken::deriveFrom(token);
-}
-
-ECOCToken FLECollectionTokenGenerator::generateECOCToken(CollectionsLevel1Token token) {
-    return ECOCToken::deriveFrom(token);
-}
-
-
-EDCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(
-    EDCToken token, ConstDataRange value) {
-    return EDCDerivedFromDataToken::deriveFrom(token, value);
-}
-
-ESCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(
-    ESCToken token, ConstDataRange value) {
-    return ESCDerivedFromDataToken::deriveFrom(token, value);
-}
-
-ServerDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
-    ServerTokenDerivationLevel1Token token, ConstDataRange value) {
-    return ServerDerivedFromDataToken::deriveFrom(token, value);
-}
-
-EDCDerivedFromDataTokenAndContentionFactorToken
-FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-    generateEDCDerivedFromDataTokenAndContentionFactorToken(EDCDerivedFromDataToken token,
-                                                            FLECounter counter) {
-    return EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(token, counter);
-}
-
-ESCDerivedFromDataTokenAndContentionFactorToken
-FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-    generateESCDerivedFromDataTokenAndContentionFactorToken(ESCDerivedFromDataToken token,
-                                                            FLECounter counter) {
-    return ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(token, counter);
-}
-
-EDCTwiceDerivedToken FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
-    EDCDerivedFromDataTokenAndContentionFactorToken token) {
-    return EDCTwiceDerivedToken::deriveFrom(token);
-}
-
-ESCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(
-    ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return ESCTwiceDerivedTagToken::deriveFrom(token);
-}
-
-ESCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(
-    ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return ESCTwiceDerivedValueToken::deriveFrom(token);
-}
-
-ServerCountAndContentionFactorEncryptionToken
-FLEServerMetadataEncryptionTokenGenerator::generateServerCountAndContentionFactorEncryptionToken(
-    ServerDerivedFromDataToken token) {
-    return ServerCountAndContentionFactorEncryptionToken::deriveFrom(token);
-}
-
-ServerZerosEncryptionToken
-FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
-    ServerDerivedFromDataToken token) {
-    return ServerZerosEncryptionToken::deriveFrom(token);
-}
-
-AnchorPaddingRootToken FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(ESCToken token) {
-    return AnchorPaddingRootToken::deriveFrom(token);
-}
-
-AnchorPaddingKeyToken FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(
-    AnchorPaddingRootToken token) {
-    return AnchorPaddingKeyToken::deriveFrom(token);
-}
-
-AnchorPaddingValueToken FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(
-    AnchorPaddingRootToken token) {
-    return AnchorPaddingValueToken::deriveFrom(token);
-}
-
 StatusWith<EncryptedStateCollectionTokens> EncryptedStateCollectionTokens::decryptAndParse(
     ECOCToken token, ConstDataRange cdr) {
     auto swUnpack = decryptAndUnpack<PrfBlock, PrfBlock>(cdr, token);
@@ -2128,8 +1997,8 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
     auto& fields = cfg.getFields();
     for (const auto& field : fields) {
         auto indexKey = keyVault->getIndexKeyById(field.getKeyId());
-        auto collToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
-        auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collToken);
+        auto collToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
+        auto ecocToken = ECOCToken::deriveFrom(collToken);
         auto tokenCdr = ecocToken.toCDR();
         if (hasQueryType(field, QueryTypeEnum::RangePreviewDeprecated) ||
             hasQueryType(field, QueryTypeEnum::Range)) {
@@ -2139,8 +2008,8 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
                                 BinDataType::BinDataGeneral,
                                 tokenCdr.data());
 
-            auto escToken = FLECollectionTokenGenerator::generateESCToken(collToken);
-            auto paddingToken = FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(escToken);
+            auto escToken = ESCToken::deriveFrom(collToken);
+            auto paddingToken = AnchorPaddingRootToken::deriveFrom(escToken);
             auto paddingCdr = paddingToken.toCDR();
             token.appendBinData(CompactionTokenDoc::kAnchorPaddingTokenFieldName,
                                 paddingCdr.length(),
@@ -2701,19 +2570,15 @@ FLE2FindEqualityPayloadV2 FLEClientCrypto::serializeFindPayloadV2(FLEIndexKeyAnd
                                                                   uint64_t maxContentionFactor) {
     auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
 
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
-    auto serverToken =
-        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(indexKey.key);
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
+    auto serverToken = ServerTokenDerivationLevel1Token::deriveFrom(indexKey.key);
 
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
 
-    auto edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-    auto escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
-    auto serverDataDerivedToken =
-        FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverToken, value);
+    auto edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
+    auto escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
+    auto serverDataDerivedToken = ServerDerivedFromDataToken::deriveFrom(serverToken, value);
 
     FLE2FindEqualityPayloadV2 payload;
 
@@ -2733,12 +2598,11 @@ FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangePayloadV2(
     uint64_t maxContentionFactor,
     uint32_t sparsity,
     const FLE2RangeFindSpec& spec) {
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
-    auto serverToken =
-        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(indexKey.key);
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
+    auto serverToken = ServerTokenDerivationLevel1Token::deriveFrom(indexKey.key);
 
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
 
     std::vector<EdgeFindTokenSetV2> tokens;
     for (auto const& edge : edges) {
@@ -2746,14 +2610,11 @@ FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangePayloadV2(
         ConstDataRange value(edge.c_str(), edge.size());
 
         EdgeFindTokenSetV2 tokenSet;
-        tokenSet.setEdcDerivedToken(
-            FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value));
+        tokenSet.setEdcDerivedToken(EDCDerivedFromDataToken::deriveFrom(edcToken, value));
 
-        tokenSet.setEscDerivedToken(
-            FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value));
+        tokenSet.setEscDerivedToken(ESCDerivedFromDataToken::deriveFrom(escToken, value));
         tokenSet.setServerDerivedFromDataToken(
-            FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverToken,
-                                                                                 value));
+            ServerDerivedFromDataToken::deriveFrom(serverToken, value));
         tokens.push_back(std::move(tokenSet));
     }
 
@@ -2826,10 +2687,8 @@ FLE2TagAndEncryptedMetadataBlock::FLE2TagAndEncryptedMetadataBlock(uint64_t coun
 StatusWith<std::vector<uint8_t>> FLE2TagAndEncryptedMetadataBlock::serialize(
     ServerDerivedFromDataToken token) {
 
-    auto countEncryptionToken = FLEServerMetadataEncryptionTokenGenerator::
-        generateServerCountAndContentionFactorEncryptionToken(token);
-    auto zerosEncryptionToken =
-        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(token);
+    auto countEncryptionToken = ServerCountAndContentionFactorEncryptionToken::deriveFrom(token);
+    auto zerosEncryptionToken = ServerZerosEncryptionToken::deriveFrom(token);
 
     auto swEncryptedCount = packAndEncrypt(std::tie(count, contentionFactor), countEncryptionToken);
     if (!swEncryptedCount.isOK()) {
@@ -2877,13 +2736,11 @@ StatusWith<FLE2TagAndEncryptedMetadataBlock> FLE2TagAndEncryptedMetadataBlock::d
         return swTag.getStatus();
     }
 
-    auto zerosEncryptionToken =
-        FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(token);
+    auto zerosEncryptionToken = ServerZerosEncryptionToken::deriveFrom(token);
 
     auto swZeros = decryptZerosBlob(zerosEncryptionToken, serializedBlock);
 
-    auto countEncryptionToken = FLEServerMetadataEncryptionTokenGenerator::
-        generateServerCountAndContentionFactorEncryptionToken(token);
+    auto countEncryptionToken = ServerCountAndContentionFactorEncryptionToken::deriveFrom(token);
 
     auto swCounters = decryptAndUnpack<uint64_t, uint64_t>(
         ConstDataRange(swCountersBlob.getValue()), countEncryptionToken);
@@ -3468,8 +3325,7 @@ PrfBlock EDCServerCollection::generateTag(EDCTwiceDerivedToken edcTwiceDerived, 
 }
 
 PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
-    auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
-        payload.payload.getEdcDerivedToken());
+    auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(payload.payload.getEdcDerivedToken());
     dassert(payload.isRangePayload() == false);
     dassert(payload.counts.size() == 1);
     return generateTag(edcTwiceDerived, payload.counts[0]);
@@ -3491,8 +3347,8 @@ std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadIn
     tags.reserve(edgeTokenSets.size());
 
     for (size_t i = 0; i < edgeTokenSets.size(); i++) {
-        auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
-            edgeTokenSets[i].getEdcDerivedToken());
+        auto edcTwiceDerived =
+            EDCTwiceDerivedToken::deriveFrom(edgeTokenSets[i].getEdcDerivedToken());
         tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, rangePayload.counts[i]));
     }
     return tags;
@@ -3504,8 +3360,7 @@ std::vector<EDCDerivedFromDataTokenAndContentionFactorToken> EDCServerCollection
     tokens.reserve(maxContentionFactor);
 
     for (uint64_t i = 0; i <= maxContentionFactor; ++i) {
-        tokens.push_back(FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-                             generateEDCDerivedFromDataTokenAndContentionFactorToken(token, i));
+        tokens.push_back(EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(token, i));
     }
 
     return tokens;

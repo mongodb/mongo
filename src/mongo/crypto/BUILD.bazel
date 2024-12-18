@@ -170,6 +170,7 @@ mongo_cc_library(
     hdrs = [
         "fle_key_types.h",
         "fle_tokens.h",
+        "//src/mongo:core_headers",
     ],
     deps = [
         ":mongocryptutil",
