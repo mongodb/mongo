@@ -867,6 +867,7 @@ tasks:
         vars:
           targets: install-dbtest install-dbtest-debug
           compiling_for_test: true
+          bazel_build_tags: --bazel-build-tag=dbtest
 
   - <<: *compile_dbtest
     name: compile_dbtest_future_git_tag_multiversion
@@ -905,6 +906,7 @@ tasks:
         vars:
           targets: archive-dbtest archive-dbtest-debug
           compiling_for_test: true
+          bazel_build_tags: --bazel-build-tag=dbtest
 
   - <<: *archive_dbtest
     name: archive_dbtest_future_git_tag_multiversion
