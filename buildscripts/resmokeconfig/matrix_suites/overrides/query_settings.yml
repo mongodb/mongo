@@ -5,20 +5,6 @@
       - jstests/core/query/distinct/distinct_semantics.js
       # SERVER-95208 Fix timeseries query failing in explain, but passing when running.
       - jstests/core/timeseries/query/timeseries_union_with.js
-      # TODO SERVER-95456: Make CLUSTERED_IXSCANs obey query settings allowed indexes.
-      - jstests/core/index/express_id_eq.js
-      - jstests/core/timeseries/ddl/bucket_granularity.js
-      - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
-      - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
-      - jstests/core/timeseries/query/timeseries_filter_extended_range.js
-      - jstests/core/timeseries/write/timeseries_findAndModify_deletes_hints.js
-      - jstests/core/timeseries/write/timeseries_findAndModify_updates_hints.js
-      - jstests/core/timeseries/ddl/timeseries_index_partial.js
-      - jstests/core/timeseries/ddl/timeseries_index_use.js
-      - jstests/core/timeseries/query/timeseries_match_pushdown.js
-      - jstests/core/timeseries/write/timeseries_min_max.js
-      - jstests/core/timeseries/query/timeseries_partial_index_opt.js
-      - jstests/core/timeseries/write/timeseries_update_hint.js
       # Tests which already use query settings or index filters, which could be overridden by this suite.
       - jstests/core/index/express.js
       - jstests/core/index/index_filter_commands.js
@@ -150,6 +136,7 @@
       - jstests/core/index/indext.js
       - jstests/core/index/sparse_index_internal_expr.js
       - jstests/core/query/exists/existsa.js
+      - jstests/core/timeseries/ddl/timeseries_index_partial.js
 
 - name: index_filters_to_query_settings_selector
   value:

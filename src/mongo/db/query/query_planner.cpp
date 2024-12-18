@@ -1582,7 +1582,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     bool isClusteredIDXScan = false;
-    if (!mustUseIndexedPlan && (collscanRequested || collScanRequired || clusteredCollection)) {
+    if (!mustUseIndexedPlan && (collscanRequested || collScanRequired || clusteredCollection) &&
+        !noTableAndClusteredIDXScan(params)) {
         boost::optional<int> clusteredScanDirection =
             QueryPlannerCommon::determineClusteredScanDirection(query, params);
         int direction = clusteredScanDirection.value_or(1);

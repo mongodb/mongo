@@ -925,8 +925,8 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
         return {
             EqLookupNode::LookupStrategy::kIndexedLoopJoin, std::move(foreignIndex), scanDirection};
     }
-    const bool tableScanForbidden =
-        foreignCollItr->second.options & QueryPlannerParams::NO_TABLE_SCAN;
+    const bool tableScanForbidden = foreignCollItr->second.options &
+        (QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::STRICT_NO_TABLE_SCAN);
     uassert(ErrorCodes::NoQueryExecutionPlans,
             "No foreign index and table scan disallowed",
             !tableScanForbidden);
