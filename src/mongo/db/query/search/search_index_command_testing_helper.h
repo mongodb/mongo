@@ -100,7 +100,7 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& userCmd,
-    boost::optional<NamespaceString> viewName) {
+    boost::optional<StringData> viewName) {
 
     // This helper can only be called by routers for server testing with a real mongot (eg not tests
     // that use mongotmock).
@@ -116,8 +116,7 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(
                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     bob.append("userCmd", userCmd);
     if (viewName) {
-        bob.append("viewName",
-                   NamespaceStringUtil::serialize(*viewName, SerializationContext::stateDefault()));
+        bob.append("viewName", *viewName);
     }
     /*
      * Fetch the search index management host and port to forward the mongotAlreadyInformed

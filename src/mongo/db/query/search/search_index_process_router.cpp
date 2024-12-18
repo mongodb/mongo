@@ -31,7 +31,6 @@
 
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/views/view_graph.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
@@ -47,75 +46,18 @@ ServiceContext::ConstructorActionRegisterer SearchIndexProcessRouterImplementati
         }
     }};
 
-namespace {
-// Currently, the views catalog lives on the primary shard. However, in Atlas search, the router
-// handles sharded search index commands. Therefore to support search index commands on sharded
-// views, the router must descend the view graph by recursively calling listCollections on the
-// primary shard until we reach the storage collection. The risk in this approach is that the views
-// catalog might change in between each listCollections invocation (eg the user drops one of the
-// ancestor views, modifies an ancestor's view definition, etc). Though not ideal, the current work
-// solution is that if a user changes the view graph and invalidates their correspondent mongot
-// index, said index will be silently killed and queries using that index will return no results.
-// When future work is completed to cache the views catalog on the router aware, we will be able to
-// eliminate this race condition and get a single/locked instance of the view graph for each search
-// index command.
-StatusWith<std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>> resolveViewHelper(
-    OperationContext* opCtx,
-    const CachedDatabaseInfo& cdb,
-    ListCollections listCollections,
-    StringData sourceCollection,
-    NamespaceString nss) {
-    int depth = 0;
 
-    std::string viewOn;
-    for (; depth < ViewGraph::kMaxViewDepth; depth++) {
-        listCollections.setFilter(BSON("name" << sourceCollection));
-        auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-            opCtx,
-            nss.dbName(),
-            cdb,
-            listCollections.toBSON(),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kIdempotent);
-        auto batch = uassertStatusOK(response.swResponse).data["cursor"]["firstBatch"].Array();
-
-        if (batch.empty()) {
-            return std::make_pair(boost::none, boost::none);
-        }
-        const auto& bsonDoc = batch.front();
-
-        if (bsonDoc["type"].String() != "view") {
-            auto uuid = UUID::parse(bsonDoc["info"]["uuid"]);
-            if (!uuid.isOK()) {
-                return std::make_pair(boost::none, boost::none);
-            }
-            return std::make_pair(uuid.getValue(),
-                                  boost::make_optional(NamespaceStringUtil::deserialize(
-                                      nss.dbName(), sourceCollection)));
-        }
-        viewOn = bsonDoc["options"]["viewOn"].String();
-        sourceCollection = StringData(viewOn.c_str(), viewOn.size());
-    }
-    if (depth >= ViewGraph::kMaxViewDepth) {
-        return {ErrorCodes::ViewDepthLimitExceeded,
-                str::stream() << "View depth too deep or view cycle detected; maximum depth is "
-                              << ViewGraph::kMaxViewDepth};
-    }
-
-    MONGO_UNREACHABLE;
-}
-}  // namespace
-
-std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
-SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
-                                                            const NamespaceString& nss) {
+boost::optional<UUID> SearchIndexProcessRouter::fetchCollectionUUID(OperationContext* opCtx,
+                                                                    const NamespaceString& nss) {
+    // We perform a listCollection request to get the UUID from the actual primary shard for the
+    // database. This will ensure it is correct for both SHARDED and UNSHARDED versions of the
+    // collection.
     sharding::router::DBPrimaryRouter router{opCtx->getServiceContext(), nss.dbName()};
 
-    auto uuidAndPossibleCollName = router.route(
+    auto uuid = router.route(
         opCtx,
         "get collection UUID",
-        [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb)
-            -> std::pair<boost::optional<UUID>, boost::optional<NamespaceString>> {
+        [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) -> boost::optional<UUID> {
             ListCollections listCollections;
             listCollections.setDbName(nss.dbName());
             listCollections.setFilter(BSON("name" << nss.coll()));
@@ -125,41 +67,47 @@ SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* op
                 nss.dbName(),
                 cdb,
                 listCollections.toBSON(),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
                 Shard::RetryPolicy::kIdempotent);
 
             // We consider an empty response to mean that the collection doesn't exist.
             auto batch = uassertStatusOK(response.swResponse).data["cursor"]["firstBatch"].Array();
             if (batch.empty()) {
-                return std::make_pair(boost::none, boost::none);
+                return boost::none;
             }
             const auto& bsonDoc = batch.front();
-
-            if (bsonDoc["type"].String() == "view") {
-                auto sourceCollection = bsonDoc["options"]["viewOn"].String();
-                auto status = resolveViewHelper(opCtx, cdb, listCollections, sourceCollection, nss);
-                return uassertStatusOK(status);
-            }
-
             auto uuid = UUID::parse(bsonDoc["info"]["uuid"]);
+
             if (!uuid.isOK()) {
-                return std::make_pair(boost::none, boost::none);
+                return boost::none;
             }
-            // normal collection
-            return std::make_pair(boost::make_optional(uuid.getValue()), boost::none);
+            return uuid.getValue();
         });
-    return uuidAndPossibleCollName;
+    return uuid;
+}
+
+UUID SearchIndexProcessRouter::fetchCollectionUUIDOrThrow(OperationContext* opCtx,
+                                                          const NamespaceString& nss) {
+    auto uuid = fetchCollectionUUID(opCtx, nss);
+    if (!uuid) {
+        uasserted(ErrorCodes::NamespaceNotFound,
+                  str::stream() << "collection " << nss.toStringForErrorMsg() << " does not exist");
+    }
+    return *uuid;
+}
+
+std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
+SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
+                                                            const NamespaceString& nss) {
+    // TODO SERVER-93637 must implement to support running search queries on sharded views.
+    MONGO_UNREACHABLE_TASSERT(9292000);
 }
 
 std::pair<UUID, boost::optional<NamespaceString>>
 SearchIndexProcessRouter::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
                                                                    const NamespaceString& nss) {
-    auto uuidResolvdNssPair = fetchCollectionUUIDAndResolveView(opCtx, nss);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
-            uuidResolvdNssPair.first);
-
-    return std::make_pair(*uuidResolvdNssPair.first, uuidResolvdNssPair.second);
+    // TODO SERVER-93637 must implement to support running search queries on sharded views.
+    MONGO_UNREACHABLE_TASSERT(9292001);
 }
 
 }  // namespace mongo
