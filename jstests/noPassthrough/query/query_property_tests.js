@@ -81,7 +81,7 @@ function runProperty(propertyFn, isTs, indexes, queries) {
         controlColl,
         getPlanCache,
         serverStatus: () => experimentDb.serverStatus(),
-        numQueries: queries.length,
+        numQueryShapes: queries.length,
     };
 
     function getQuery(queryIx, paramIx) {
