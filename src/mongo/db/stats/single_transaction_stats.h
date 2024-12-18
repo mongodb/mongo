@@ -197,6 +197,14 @@ public:
         return &_opDebug;
     }
 
+    AtomicStorageMetrics& getTransactionStorageMetrics() {
+        return _storageMetrics;
+    }
+
+    const AtomicStorageMetrics& getTransactionStorageMetrics() const {
+        return _storageMetrics;
+    }
+
     /**
      * Returns the LastClientInfo object stored in this SingleTransactionStats instance.
      */
@@ -295,6 +303,8 @@ private:
 
     // Tracks and accumulates stats from all operations that run inside the transaction.
     OpDebug _opDebug;
+
+    AtomicStorageMetrics _storageMetrics;
 
     // Holds information about the last client to run a transaction operation.
     LastClientInfo _lastClientInfo;

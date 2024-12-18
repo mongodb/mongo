@@ -109,7 +109,6 @@ mongo_cc_library(
     target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,
     deps = [
         "storage_wiredtiger_customization_hooks",
-        "//src/mongo/db:commands",
         "//src/mongo/db:global_settings",
         "//src/mongo/db:mongod_options",
         "//src/mongo/db:prepare_conflict_tracker",

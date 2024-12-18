@@ -1443,13 +1443,14 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // is just an empty locker. At the end of the operation, if the transaction is not complete, we
     // will stash the operation context's locker and replace it with a new empty locker.
     shard_role_details::swapLocker(opCtx, std::move(_locker), lk);
-    CurOp::get(opCtx)->updateStatsOnTransactionUnstash();
     shard_role_details::getLocker(opCtx)->updateThreadIdToCurrentThread();
 
     auto oldState = shard_role_details::setRecoveryUnit(
         opCtx, std::move(_recoveryUnit), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
               str::stream() << "RecoveryUnit state was " << oldState);
+
+    CurOp::get(opCtx)->updateStatsOnTransactionUnstash();
 
     shard_role_details::setWriteUnitOfWork(
         opCtx, WriteUnitOfWork::createForSnapshotResume(opCtx, _ruState));
@@ -1482,7 +1483,10 @@ TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationCont
 
     // Release recovery unit, saving the recovery unit off to the side, keeping open the storage
     // transaction.
-    _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx);
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx);
+    }
 }
 
 TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
@@ -1494,10 +1498,13 @@ TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
     shard_role_details::getLocker(_opCtx)->restoreWriteUnitOfWork(_WUOWLockSnapshot);
 
     // Restore recovery unit.
-    auto oldState = shard_role_details::setRecoveryUnit(
-        _opCtx, std::move(_recoveryUnit), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
-              str::stream() << "RecoveryUnit state was " << oldState);
+    {
+        stdx::lock_guard<Client> lk(*_opCtx->getClient());
+        auto oldState = shard_role_details::setRecoveryUnit(
+            _opCtx, std::move(_recoveryUnit), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                  str::stream() << "RecoveryUnit state was " << oldState);
+    }
 
     // Restore WUOW.
     shard_role_details::setWriteUnitOfWork(
@@ -1515,8 +1522,12 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
     {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         o(lk).transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx), tickSource);
-        o(lk).transactionMetricsObserver.onTransactionOperation(
-            opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
+
+        auto curop = CurOp::get(opCtx);
+        o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
+                                                                curop->debug().additiveMetrics,
+                                                                curop->getOperationStorageMetrics(),
+                                                                o().txnState.isPrepared());
     }
 
     invariant(!o().txnResourceStash);
@@ -2190,11 +2201,17 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
 
     // We must clear the recovery unit and locker for the 'config.transactions' and oplog entry
     // writes.
-    shard_role_details::setRecoveryUnit(
-        opCtx,
-        std::unique_ptr<RecoveryUnit>(
-            opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    CurOp::get(opCtx)->updateStorageMetricsOnRecoveryUnitChange();
+
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        shard_role_details::setRecoveryUnit(
+            opCtx,
+            std::unique_ptr<RecoveryUnit>(
+                opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    }
+
 
     shard_role_details::getLocker(opCtx)->unsetMaxLockTimeout();
 }
@@ -2288,8 +2305,12 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
                                                   tickSource,
                                                   operationCount,
                                                   oplogOperationBytes);
-        o(lk).transactionMetricsObserver.onTransactionOperation(
-            opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
+
+        auto curop = CurOp::get(opCtx);
+        o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
+                                                                curop->debug().additiveMetrics,
+                                                                curop->getOperationStorageMetrics(),
+                                                                o().txnState.isPrepared());
     }
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
@@ -2381,8 +2402,11 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 
     if (!o().txnState.isInRetryableWriteMode()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).transactionMetricsObserver.onTransactionOperation(
-            opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
+        auto curop = CurOp::get(opCtx);
+        o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
+                                                                curop->debug().additiveMetrics,
+                                                                curop->getOperationStorageMetrics(),
+                                                                o().txnState.isPrepared());
     }
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
@@ -2588,11 +2612,16 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
-    shard_role_details::setRecoveryUnit(
-        opCtx,
-        std::unique_ptr<RecoveryUnit>(
-            opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    CurOp::get(opCtx)->updateStorageMetricsOnRecoveryUnitChange();
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        shard_role_details::setRecoveryUnit(
+            opCtx,
+            std::unique_ptr<RecoveryUnit>(
+                opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    }
+
 
     shard_role_details::getLocker(opCtx)->unsetMaxLockTimeout();
     invariant(UncommittedCatalogUpdates::get(opCtx).isEmpty());
@@ -2841,6 +2870,9 @@ std::string TransactionParticipant::Participant::_transactionInfoForLog(
 
     s << singleTransactionStats.getOpDebug()->additiveMetrics.report();
 
+    s << " prepareReadConflicts:"
+      << singleTransactionStats.getTransactionStorageMetrics().prepareReadConflicts.loadRelaxed();
+
     std::string terminationCauseString =
         terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
     s << " terminationCause:" << terminationCauseString;
@@ -2919,6 +2951,10 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
 
     singleTransactionStats.getOpDebug()->additiveMetrics.report(pAttrs);
 
+    pAttrs->add(
+        "prepareReadConflicts",
+        singleTransactionStats.getTransactionStorageMetrics().prepareReadConflicts.loadRelaxed());
+
     StringData terminationCauseString =
         terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
     pAttrs->add("terminationCause", terminationCauseString);
@@ -2992,6 +3028,10 @@ BSONObj TransactionParticipant::Participant::_transactionInfoBSONForLog(
         attrs.append("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
 
         attrs.appendElements(singleTransactionStats.getOpDebug()->additiveMetrics.reportBSON());
+
+        attrs.append(
+            "prepareReadConflicts",
+            singleTransactionStats.getTransactionStorageMetrics().prepareReadConflicts.load());
 
         StringData terminationCauseString =
             terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";

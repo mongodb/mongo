@@ -218,12 +218,14 @@ bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, Rec
 
 void SpillingStore::switchToSpilling(OperationContext* opCtx) {
     invariant(!_originalUnit);
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     _originalUnit = shard_role_details::releaseRecoveryUnit(opCtx);
     _originalState =
         shard_role_details::setRecoveryUnit(opCtx, std::move(_spillingUnit), _spillingState);
 }
 void SpillingStore::switchToOriginal(OperationContext* opCtx) {
     invariant(!_spillingUnit);
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     _spillingUnit = shard_role_details::releaseRecoveryUnit(opCtx);
     _spillingState =
         shard_role_details::setRecoveryUnit(opCtx, std::move(_originalUnit), _originalState);
