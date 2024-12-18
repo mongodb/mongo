@@ -61,6 +61,10 @@ static const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime"
 static const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
 static const std::string vectorSearchScoreName = "vectorSearchScore";
 static const std::string scoreName = "score";
+static const std::string scoreDetailsName = "scoreDetails";
+
+// This field ("value") is extracted from the 'scoreDetails' Document to set the 'score' field too.
+static const std::string scoreDetailsScoreField = "value";
 
 static const StringMap<MetaType> kMetaNameToMetaType = {
     {scoreName, MetaType::kScore},
@@ -78,6 +82,7 @@ static const StringMap<MetaType> kMetaNameToMetaType = {
     {textScoreName, MetaType::kTextScore},
     {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
     {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
+    {scoreDetailsName, MetaType::kScoreDetails},
 };
 
 static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
@@ -96,6 +101,7 @@ static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
     {MetaType::kTextScore, textScoreName},
     {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
     {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
+    {MetaType::kScoreDetails, scoreDetailsName},
 };
 }  // namespace
 
@@ -206,11 +212,41 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             assertNumeric();
             setScore(val.getDouble());
             break;
+        case DocumentMetadataFields::kScoreDetails:
+            // When using this API to set scoreDetails (likely via $setMetadata), it's required for
+            // 'scoreDetails' to have a "value" field with which 'score' will be set as well. That
+            // validation is done inside setScoreAndScoreDetails().
+            assertType(BSONType::Object);
+            setScoreAndScoreDetails(val);
+            break;
         case DocumentMetadataFields::kSortKey:
             tasserted(9733901,
                       "Cannot set the sort key without knowing if it is a single element key");
         default:
             MONGO_UNREACHABLE_TASSERT(9733902);
+    }
+}
+
+void DocumentMetadataFields::setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated) {
+    if (featureFlagAlreadyValidated ||
+        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        _setCommon(MetaType::kScoreDetails);
+        _holder->scoreDetails = scoreDetails;
+    }
+}
+
+void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
+    if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        auto score = scoreDetails.getDocument().getField(scoreDetailsScoreField);
+        tassert(9679300,
+                "scoreDetails must provide a numeric 'value' field with which to set the score too",
+                score.numeric());
+
+        const bool featureFlagAlreadyValidated = true;
+        setScore(score.getDouble(), featureFlagAlreadyValidated);
+        setScoreDetails(std::move(scoreDetails), featureFlagAlreadyValidated);
     }
 }
 
@@ -260,6 +296,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasScore() && other.hasScore()) {
         setScore(other.getScore());
     }
+    if (!hasScoreDetails() && other.hasScoreDetails()) {
+        setScoreDetails(other.getScoreDetails());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -308,6 +347,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasScore()) {
         setScore(other.getScore());
     }
+    if (other.hasScoreDetails()) {
+        setScoreDetails(other.getScoreDetails());
+    }
 }
 
 size_t DocumentMetadataFields::getApproximateSize() const {
@@ -331,6 +373,8 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size += _holder->searchScoreDetails.objsize();
     size += _holder->searchSortValues.objsize();
     size -= sizeof(_holder->searchSequenceToken);
+    size += _holder->scoreDetails.getApproximateSize();
+    size -= sizeof(_holder->scoreDetails);
     return size;
 }
 
@@ -402,6 +446,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kScore + 1));
         buf.appendNum(getScore());
     }
+    if (hasScoreDetails()) {
+        buf.appendNum(static_cast<char>(MetaType::kScoreDetails + 1));
+        getScoreDetails().serializeForSorter(buf);
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -449,6 +497,9 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
                 Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kScore) + 1) {
             out->setScore(buf.read<LittleEndian<double>>());
+        } else if (marker == static_cast<char>(MetaType::kScoreDetails) + 1) {
+            out->setScoreDetails(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -515,7 +566,9 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
         case DocumentMetadataFields::kVectorSearchScore:
             return "$vectorSearch distance";
         case DocumentMetadataFields::kScore:
-            return "$score score";
+            return "score";
+        case DocumentMetadataFields::kScoreDetails:
+            return "scoreDetails";
         default:
             MONGO_UNREACHABLE;
     }

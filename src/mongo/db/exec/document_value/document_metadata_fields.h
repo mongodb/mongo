@@ -83,6 +83,7 @@ public:
         kVectorSearchScore,
         kSearchSequenceToken,
         kScore,
+        kScoreDetails,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -321,6 +322,9 @@ public:
     void setSearchScoreDetails(BSONObj details) {
         _setCommon(MetaType::kSearchScoreDetails);
         _holder->searchScoreDetails = details.getOwned();
+        // The 'scoreDetails' metadata field is also set. The Value constructor takes an owned copy
+        // of details.
+        setScoreDetails(Value(details));
     }
 
     bool hasTimeseriesBucketMinTime() const {
@@ -408,13 +412,38 @@ public:
         return _holder->score;
     }
 
-    void setScore(double score) {
-        if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+    // TODO SERVER-85426 Remove all feature flag logic.
+    void setScore(double score, bool featureFlagAlreadyValidated = false) {
+        if (featureFlagAlreadyValidated ||
+            feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             _setCommon(MetaType::kScore);
             _holder->score = score;
         }
     }
+
+    bool hasScoreDetails() const {
+        return _holder && _holder->metaFields.test(MetaType::kScoreDetails);
+    }
+
+    Value getScoreDetails() const {
+        tassert(9679301, "score details must be present in metadata", hasScoreDetails());
+        return _holder->scoreDetails;
+    }
+
+    // TODO SERVER-85426 Remove all feature flag logic.
+    void setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated = false);
+
+    /**
+     * This sets 'scoreDetails' and retrieves the "value" field from 'scoreDetails' to set the
+     * 'score' meta field as well.
+     *
+     * This is the default way to set 'scoreDetails' (for example, this is used for
+     * {$setMetadata: kScoreDetails}), and will tassert if the "value" field isn't present.
+     * However, setting 'scoreDetails' via 'searchScoreDetails' will just go through
+     * setScoreDetails() without setting the 'score' too.
+     */
+    void setScoreAndScoreDetails(Value scoreDetails);
 
     void serializeForSorter(BufBuilder& buf) const;
 
@@ -465,6 +494,9 @@ private:
         double vectorSearchScore{0.0};
         Value searchSequenceToken;
         double score{0.0};
+        // scoreDetails expects a Document as the underlying type, but to avoid dependency cycles,
+        // it's easier to store as Value.
+        Value scoreDetails;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.
