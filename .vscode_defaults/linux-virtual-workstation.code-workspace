@@ -84,6 +84,7 @@
 			"esbenp.prettier-vscode",
 			"redhat.vscode-yaml",
 			"streetsidesoftware.code-spell-checker",
+			"jasonnutter.vscode-codeowners",
 		]
 	}
 }
