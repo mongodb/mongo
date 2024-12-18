@@ -454,8 +454,7 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnMergeWith) {
 // Tests involving manipulating only 'score' metadata field.
 // This is currently seperated out because setting it is guarded by a feature flag.
 TEST(DocumentMetadataFieldsTest, ScoreMetadataTest) {
-    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
 
     {
         DocumentMetadataFields metadata;
@@ -516,8 +515,7 @@ TEST(DocumentMetadataFieldsTest, ScoreMetadataTest) {
 TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
     // Tests that for certain types of metadata fields, related to a score,
     // the 'score' metadata is also set.
-    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
 
     // 'searchScore'
     {

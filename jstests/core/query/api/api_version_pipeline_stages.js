@@ -31,6 +31,7 @@ const unstablePipelines = [
 ];
 
 // TODO SERVER-94570 $rankFusion can always be included when it's enabled by default.
+// TODO SERVER-98591 Change RankFusionFull to RankFusionBasic.
 if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'RankFusionFull')) {
     unstablePipelines.push([{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}]);
 }

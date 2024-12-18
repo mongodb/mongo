@@ -3348,8 +3348,7 @@ TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
 
 TEST(ExpressionMetaTest, ExpressionMetaScore) {
     // Used to set 'score' metadata.
-    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{$meta: \"score\"}");
     auto expressionMeta =

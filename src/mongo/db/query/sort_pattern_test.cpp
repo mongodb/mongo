@@ -129,8 +129,7 @@ TEST(SortStageDefaultTest, WrongSortKeyDefinition) {
 
 // Testing expected behavior of 'isSortOnSingleMetaField()' stateless function.
 TEST(IsSortOnSingleMetaFieldTest, TestingIsSortOnSingleMetaFieldFn) {
-    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
 
     auto expCtx = getExpCtx();
 

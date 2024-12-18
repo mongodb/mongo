@@ -1,6 +1,6 @@
 /**
  * Tests the $sigmoid aggregation expression.
- * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
  */
 import {anyEq, assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 

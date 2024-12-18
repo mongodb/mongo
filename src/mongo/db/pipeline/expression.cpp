@@ -3934,7 +3934,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
                                       ExpressionSigmoid::parseExpressionSigmoid,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagRankFusionFull);
+                                      feature_flags::gFeatureFlagRankFusionBasic);
 
 /* ----------------------- ExpressionSize ---------------------------- */
 

@@ -8342,7 +8342,7 @@ export const authCommandsLib = {
         skipSharded: false,
         disableSearch: true,
         skipTest: (conn) => {
-          return !TestData.setParameters.featureFlagRankFusionFull;
+          return !TestData.setParameters.featureFlagRankFusionBasic;
         },
         // Expect this to fail since there's no mongot set up to execute the $search/vectorSearch.
         testcases: testcases_transformationOnlyExpectFail,
