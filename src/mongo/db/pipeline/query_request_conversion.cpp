@@ -179,5 +179,59 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
     return result;
 }
 
+AggregateCommandRequest asAggregateCommandRequest(
+    const CountCommandRequest& countCommand, boost::optional<ExplainOptions::Verbosity> verbosity) {
+
+    tassert(ErrorCodes::BadValue,
+            "Unsupported type UUID for namspace",
+            countCommand.getNamespaceOrUUID().isNamespaceString());
+    auto nss = countCommand.getNamespaceOrUUID().nss();
+    AggregateCommandRequest result{nss, countCommand.getSerializationContext()};
+
+    // Construct an aggregation pipeline that finds the equivalent documents to this query.
+    std::vector<BSONObj> pipeline;
+    if (!countCommand.getQuery().isEmpty()) {
+        pipeline.push_back(BSON("$match" << countCommand.getQuery()));
+    }
+    if (auto skip = countCommand.getSkip()) {
+        pipeline.push_back(BSON("$skip" << skip.value()));
+    }
+    if (auto limit = countCommand.getLimit()) {
+        pipeline.push_back(BSON("$limit" << limit.value()));
+    }
+    pipeline.push_back(BSON("$count"
+                            << "count"));
+    result.setPipeline(std::move(pipeline));
+
+
+    if (auto collation = countCommand.getCollation()) {
+        result.setCollation(countCommand.getCollation().value());
+    }
+
+    if (auto maxTime = countCommand.getMaxTimeMS(); maxTime && maxTime.value() > 0) {
+        result.setMaxTimeMS(maxTime.value());
+    }
+
+    if (auto& hint = countCommand.getHint(); !hint.isEmpty()) {
+        result.setHint(hint);
+    }
+
+    if (auto& readConcern = countCommand.getReadConcern(); readConcern && !readConcern->isEmpty()) {
+        result.setReadConcern(readConcern);
+    }
+
+    if (auto& unwrapped = countCommand.getUnwrappedReadPref(); unwrapped && !unwrapped->isEmpty()) {
+        result.setUnwrappedReadPref(unwrapped);
+    }
+
+    result.setExplain(verbosity);
+    result.setDbName(nss.dbName());
+    result.setIncludeQueryStatsMetrics(countCommand.getIncludeQueryStatsMetrics());
+    result.setSerializationContext(countCommand.getSerializationContext());
+    result.setGenericArguments(countCommand.getGenericArguments());
+
+    return result;
+}
+
 }  // namespace query_request_conversion
 }  // namespace mongo

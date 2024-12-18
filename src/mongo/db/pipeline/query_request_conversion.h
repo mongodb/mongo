@@ -40,12 +40,18 @@ namespace mongo {
 namespace query_request_conversion {
 
 /**
- * Converts this FindCommandRequest into an equivalent aggregation.
+ * Converts this FindCommandRequest into the corresponding AggregationCommandRequest.
  *
  * If this FindCommandRequest has options that cannot be satisfied by aggregation, throws a user
  * assertion with ErrorCodes::InvalidPipelineOperator.
  */
 AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& findCommand);
+
+/**
+ * Converts this CountCommandRequest into the corresponding AggregationCommandRequest.
+ */
+AggregateCommandRequest asAggregateCommandRequest(
+    const CountCommandRequest& countCommand, boost::optional<ExplainOptions::Verbosity> verbosity);
 
 }  // namespace query_request_conversion
 }  // namespace mongo

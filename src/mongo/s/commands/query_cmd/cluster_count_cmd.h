@@ -36,7 +36,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/query/count_command_as_aggregation_command.h"
+#include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -210,14 +210,8 @@ public:
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
-            auto aggCmdOnView =
-                uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
-            const boost::optional<auth::ValidatedTenancyScope>& vts =
-                auth::ValidatedTenancyScope::get(opCtx);
-            auto aggCmdOnViewObj = OpMsgRequestBuilder::create(vts, dbName, aggCmdOnView).body;
             auto aggRequestOnView =
-                aggregation_request_helper::parseFromBSON(aggCmdOnViewObj, vts, boost::none);
-
+                query_request_conversion::asAggregateCommandRequest(countRequest, boost::none);
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
             auto resolvedAggCmd =
                 aggregation_request_helper::serializeToCommandObj(resolvedAggRequest);
@@ -349,19 +343,8 @@ public:
             } catch (...) {
                 return exceptionToStatus();
             }
-
-            auto aggCmdOnView = countCommandAsAggregationCommand(countRequest, nss);
-            if (!aggCmdOnView.isOK()) {
-                return aggCmdOnView.getStatus();
-            }
-
-            const boost::optional<auth::ValidatedTenancyScope>& vts =
-                auth::ValidatedTenancyScope::get(opCtx);
-            auto aggCmdOnViewObj =
-                OpMsgRequestBuilder::create(vts, nss.dbName(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView =
-                aggregation_request_helper::parseFromBSON(aggCmdOnViewObj, vts, verbosity);
-
+                query_request_conversion::asAggregateCommandRequest(countRequest, verbosity);
             auto bodyBuilder = result->getBodyBuilder();
             // An empty PrivilegeVector is acceptable because these privileges are only checked
             // on getMore and explain will not open a cursor.

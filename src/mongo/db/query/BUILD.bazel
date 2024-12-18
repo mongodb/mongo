@@ -523,7 +523,6 @@ mongo_cc_library(
     name = "command_request_response",
     srcs = [
         "analyze_command_gen",
-        "count_command_as_aggregation_command.cpp",
         "count_command_gen",
         "count_request.cpp",
         "view_response_formatter.cpp",
@@ -534,7 +533,6 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:kill_cursors_gen",
     ],
     hdrs = [
-        "count_command_as_aggregation_command.h",
         "count_request.h",
         "view_response_formatter.h",
         "//src/mongo/db/query/client_cursor:cursor_request.h",

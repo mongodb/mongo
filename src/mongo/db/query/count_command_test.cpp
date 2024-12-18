@@ -47,7 +47,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/count_command_as_aggregation_command.h"
+#include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
@@ -182,12 +182,7 @@ TEST(CountCommandTest, ConvertToAggregationWithHint) {
                            << "TestDB"
                            << "hint" << BSON("x" << 1));
     auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
-    auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj =
-        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
-            .body;
-
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(cmdObj));
+    auto ar = query_request_conversion::asAggregateCommandRequest(countCmd, boost::none);
     ASSERT_BSONOBJ_EQ(ar.getHint().value_or(BSONObj()), BSON("x" << 1));
 
     std::vector<BSONObj> expectedPipeline{BSON("$count"
@@ -206,12 +201,7 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
                            << "TestDB"
                            << "limit" << 200 << "skip" << 300 << "query" << BSON("x" << 7));
     auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
-    auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj =
-        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
-            .body;
-
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(cmdObj));
+    auto ar = query_request_conversion::asAggregateCommandRequest(countCmd, boost::none);
     ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
               aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getNamespace(), testns);
@@ -234,12 +224,7 @@ TEST(CountCommandTest, ConvertToAggregationWithMaxTimeMS) {
                                                     << "TestColl"
                                                     << "maxTimeMS" << 100 << "$db"
                                                     << "TestDB"));
-    auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj =
-        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
-            .body;
-
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(cmdObj));
+    auto ar = query_request_conversion::asAggregateCommandRequest(countCmd, boost::none);
     ASSERT_EQ(ar.getMaxTimeMS().value_or(0), 100u);
 
     std::vector<BSONObj> expectedPipeline{BSON("$count"
@@ -259,12 +244,7 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryOptions) {
                                                     << "TestDB"));
     countCmd.setUnwrappedReadPref(BSON("readPreference"
                                        << "secondary"));
-    auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj =
-        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
-            .body;
-
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(cmdObj));
+    auto ar = query_request_conversion::asAggregateCommandRequest(countCmd, boost::none);
     ASSERT_BSONOBJ_EQ(ar.getUnwrappedReadPref().value_or(BSONObj()),
                       BSON("readPreference"
                            << "secondary"));
@@ -285,12 +265,7 @@ TEST(CountCommandTest, ConvertToAggregationWithReadConcern) {
                                                     << "$db"
                                                     << "TestDB"));
     countCmd.setReadConcern(repl::ReadConcernArgs::kLinearizable);
-    auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj =
-        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
-            .body;
-
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(cmdObj));
+    auto ar = query_request_conversion::asAggregateCommandRequest(countCmd, boost::none);
     ASSERT_TRUE(ar.getReadConcern().has_value());
     ASSERT_BSONOBJ_EQ(ar.getReadConcern()->toBSONInner(),
                       repl::ReadConcernArgs::kLinearizable.toBSONInner());
