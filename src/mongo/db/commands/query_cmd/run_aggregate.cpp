@@ -1029,9 +1029,6 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState.createAggCatalogState();
 
-    std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-
     boost::optional<AutoStatsTracker> statsTracker;
     aggCatalogState->getStatsTrackerIfNeeded(statsTracker);
 
@@ -1049,7 +1046,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         }
     }
 
-    expCtx = aggCatalogState->createExpressionContext();
+    boost::intrusive_ptr<ExpressionContext> expCtx = aggCatalogState->createExpressionContext();
 
     // Prepare the parsed pipeline for execution. This involves parsing the pipeline,
     // registering query stats, rewriting the pipeline to support queryable encryption, and
@@ -1060,7 +1057,8 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         return swPipeline.getStatus();
     }
 
-    execs = prepareExecutors(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
+    std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs =
+        prepareExecutors(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
 
     // Dispose of the statsTracker to update stats for Top and CurOp.
     statsTracker.reset();
