@@ -94,9 +94,10 @@ private:
     // MatchExpressions
     CEResult estimate(const MatchExpression* node, bool isFilterRoot);
     CEResult estimate(const ComparisonMatchExpression* node);
-    CEResult estimate(const LeafMatchExpression* node);
+    CEResult estimate(const LeafMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const NotMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const AndMatchExpression* node);
-    CEResult estimate(const OrMatchExpression* node);
+    CEResult estimate(const OrMatchExpression* node, bool isFilterRoot);
     // Intervals
     CEResult estimate(const IndexBounds* node);
     CEResult estimate(const OrderedIntervalList* node, bool forceHistogram = false);
@@ -143,6 +144,22 @@ private:
         SelectivityEstimate disjSel = disjExponentialBackoff(disjSels);
         CardinalityEstimate resultCard = disjSel * inputCard;
         return resultCard;
+    }
+
+    /**
+     * Leaf nodes and ORs that are the root of a QSN's filter are atomic from conjunction
+     * estimation's perspective, therefore conjunction estimation will not add such nodes
+     * to the _conjSels stack. This function adds the selectivity of such root nodes to _conjSels
+     * so that they participate in implicit conjunction selectivity calculation.
+     * For instance a plan of an IndexScanNode with a filter (a < 5) OR (a > 10), and a subsequent
+     * FetchNode with a filter (b > 'abc') express the conjunction
+     * ((a < 5) OR (a > 10)) AND (b > 'abc')
+     * All conjuncts' selectivities are combined when computing the total cardinality of the
+     * FetchNode.
+     */
+    void addRootNodeSel(const CEResult& ceRes) {
+        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
+        _conjSels.emplace_back(sel);
     }
 
     // Pop all selectivities from '_conjSels' after the first 'count' elements.

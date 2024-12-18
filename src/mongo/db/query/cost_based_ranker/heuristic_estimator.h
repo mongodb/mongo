@@ -36,7 +36,7 @@
 namespace mongo::cost_based_ranker {
 
 const SelectivityEstimate kRegexSel{SelectivityType{0.1}, EstimationSource::Heuristics};
-const SelectivityEstimate kExistsSel{SelectivityType{0.99}, EstimationSource::Heuristics};
+const SelectivityEstimate kExistsSel{SelectivityType{0.9}, EstimationSource::Heuristics};
 const SelectivityEstimate kBitsSel{SelectivityType{0.1}, EstimationSource::Heuristics};
 const SelectivityEstimate oneSelHeuristic{SelectivityType{1}, EstimationSource::Heuristics};
 const SelectivityEstimate zeroSelHeuristic{SelectivityType{0}, EstimationSource::Heuristics};

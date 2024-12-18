@@ -76,13 +76,13 @@ try {
         // Conjunctions
         {query: {b: {$gte: 1, $lt: 3}}, expectedCE: 1960},
         {query: {a: 5, b: {$gte: 1, $lt: 3}}, expectedCE: 59.1},
-        // TODO: Support $not estimatation using histogram
-        // {query: {b: {$gt: 5, $ne: 6}}, expectedCE: ...}
         {query: {b: {$gte: 1, $lte: 3}, c: {$gt: 0, $lt: 5}}, expectedCE: 2158.8},
         {
             query: {$and: [{b: {$gte: 1}}, {c: {$gt: 0}}, {b: {$lte: 3}}, {c: {$lt: 5}}]},
             expectedCE: 2158.8,
         },
+        // Negations
+        {query: {a: {$lt: 5, $ne: 6}}, expectedCE: 485.0}
     ];
     testCases.forEach(tc => assertQueryUsesHistograms(tc));
 } finally {

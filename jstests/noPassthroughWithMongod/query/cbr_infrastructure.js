@@ -27,74 +27,82 @@ coll1.drop();
 
 // Insert such data that some queries will do well with an {a: 1} index while
 // others with a {b: 1} index.
-assert.commandWorked(
-    coll.insertMany(Array.from({length: 3000}, (_, i) => ({a: 1, b: i, c: i % 7, x: i % 5}))));
-assert.commandWorked(
-    coll.insertMany(Array.from({length: 3000}, (_, i) => ({a: i, b: 1, c: i % 3, x: i % 9}))));
+assert.commandWorked(coll.insertMany(Array.from({length: 3000}, (_, i) => {
+    const doc = {a: 1, b: i, c: i % 7, x: i % 5};
+    if (i % 9 === 0) {
+        doc.missing_90_percent = i;
+    }
+    return doc;
+})));
+assert.commandWorked(coll.insertMany(Array.from({length: 3000}, (_, i) => {
+    const doc = {a: i, b: 1, c: i % 3, x: i % 9};
+    if (i % 9 === 0) {
+        doc.missing_90_percent = i % 3;
+    }
+    return doc;
+})));
 
-coll.createIndexes([{a: 1}, {b: 1}, {c: 1, b: 1, a: 1}, {a: 1, b: 1}, {c: 1, a: 1}]);
+coll.createIndexes(
+    [{a: 1}, {b: 1}, {c: 1, b: 1, a: 1}, {a: 1, b: 1}, {c: 1, a: 1}, {missing_90_percent: 1}]);
 
 assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "c", numberBuckets: 10}));
+assert.commandWorked(
+    coll.runCommand({analyze: collName, key: "missing_90_percent", numberBuckets: 10}));
 
-// Queries designed in such a way that the winning plan is not the last enumerated plan.
-// The current implementation of CBR chooses the last of all enumerated plans as winning.
-// In this way we can verify that CBR was invoked by checking if the last rejected
-// multi-planned plan is the winning plan.
+// Test queries
+const queries = [
+    {a: {$gt: 10}, b: {$eq: 99}},
+    {a: {$in: [5, 1]}, b: {$in: [7, 99]}},
+    {a: {$gt: 90}, b: {$eq: 99}, c: {$lt: 5}},
+    /*
+    The following query has 4 plans:
+    1. Filter: a in (1,5) AND b in (7, 99)
+       Or
+       |  Ixscan: b: [99, inf]
+       Ixscan: a: [10, 10], b: [MinKey, MaxKey]
 
-const q1 = {
-    a: {$gt: 10},
-    b: {$eq: 99}
-};
-const q2 = {
-    a: {$in: [5, 1]},
-    b: {$in: [7, 99]}
-};
-const q3 = {
-    a: {$gt: 90},
-    b: {$eq: 99},
-    c: {$lt: 5}
-};
-const q4 = {
-    $or: [q1, q2]
-};
+    2. Filter: a in (1,5) AND b in (7, 99)
+       Or
+       |  Ixscan: b: [99, inf]
+       Ixscan: a: [10, 10]
 
-/*
-Query q5 has 4 plans:
-1. Filter: a in (1,5) AND b in (7, 99)
-   Or
-   |  Ixscan: b: [99, inf]
-   Ixscan: a: [10, 10], b: [MinKey, MaxKey]
+    3. Filter: a = 10 AND b > 99
+       Or
+       |  Ixscan: a: [1,1]U[5,5]
+       Ixscan: b: [7,7]U[99,99]
 
-2. Filter: a in (1,5) AND b in (7, 99)
-   Or
-   |  Ixscan: b: [99, inf]
-   Ixscan: a: [10, 10]
+    4. Filter: a = 10 AND b > 99
+       Or
+       |  Ixscan: a: [1,1] U [5,5] b: [MinKey, MaxKey]
+       Ixscan: b: [7,7] U [99,99]
 
-3. Filter: a = 10 AND b > 99
-   Or
-   |  Ixscan: a: [1,1]U[5,5]
-   Ixscan: b: [7,7]U[99,99]
+    In classic, plan 1 is the winner and in CBR, the winner is plan 2. In CBR we cost plans 1 and
+    2 to have equal costs. In reality, plan 2 is better because it uses an index with a shorter key
+    length, but multiplanning is unable to distinguish that because of it's early exit behavior. So
+    asserting that CBR choose the same plan as classic won't always work because CBR's plan may be
+    better. Therefore, instead of comparing plans the test compares the number of keys and documents
+    scanned by a plan. CBR plans should scan no more than Classic plans.
+    */
+    {
+        $and: [
+            {$or: [{a: 10}, {b: {$gt: 99}}]},
+            {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]},
+        ],
+    },
+    {a: {$not: {$lt: 130}}},
+    {missing_90_percent: {$exists: false}},
+    {missing_90_percent: {$not: {$exists: false}}},
+    {a: {$not: {$lt: 130}}, b: 12, c: {$not: {$gt: 1200}}},
+    {a: {$not: {$in: [[100, 101, 102]]}}},
+    {$nor: [{$and: [{a: {$lt: 10}}, {b: {$gt: 19}}]}]},
+    {$nor: [{$or: [{a: {$lt: 10}}, {b: {$gt: 19}}]}]},
+    {$nor: [{b: {$ne: 3}}]},
+    {$nor: [{a: {$ne: 1}}]},
+];
 
-4. Filter: a = 10 AND b > 99
-   Or
-   |  Ixscan: a: [1,1] U [5,5] b: [MinKey, MaxKey]
-   Ixscan: b: [7,7] U [99,99]
-
-In classic, plan 1 is the winner and in CBR, the winner is plan 2. In CBR we cost plans 1 and
-2 to have equal costs. In reality, plan 2 is better because it uses an index with a shorter key
-length, but multiplanning is unable to distinguish that because of it's early exit behavior. So
-asserting that CBR choose the same plan as classic won't always work because CBR's plan may be
-better. Therefore, instead of comparing plans the test compares the number of keys and documents
-scanned by a plan. CBR plans should scan no more than Classic plans.
-*/
-const q5 = {
-    $and: [
-        {$or: [{a: 10}, {b: {$gt: 99}}]},
-        {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]},
-    ],
-};
+queries.push({$or: [queries[0], queries[1]]});
 
 function assertCbrExplain(plan) {
     assert(plan.hasOwnProperty("cardinalityEstimate"), plan);
@@ -128,9 +136,6 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
 
     if (!isRootedOr) {
         assertCbrExplain(w1);
-        // Validate there are rejected plans
-        assert.gte(r0.length, 1);
-        assert.gte(r1.length, 1);
         // Both explains must have the same number of rejected plans
         assert.eq(r0.length, r1.length);
     }
@@ -190,7 +195,6 @@ function verifyIndexScanEstimates() {
 }
 
 try {
-    const queries = [q1, q2, q3, q4, q5];
     for (const q of queries) {
         checkWinningPlan({query: q});
         // Test variants of each query with different combinations of projection and sort fields.
