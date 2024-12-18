@@ -678,10 +678,19 @@ assert.eq(1, coll.find({str: {$ne: "FOO"}}).collation({locale: "en_US", strength
 
 // Find should return correct results when collation specified and compatible index exists.
 assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}}));
-assert.eq(0, coll.find({str: "FOO"}).hint({str: 1}).itcount());
-assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).hint({str: 1}).itcount());
 assert.eq(
     1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
+
+// Find should return correct results even when the hinted index has a collation which does not
+// match the command. This degrades to a whole ixscan followed by a fetch with residual filter to
+// apply the collation-sensitive equality predicate.
+assert.eq(0, coll.find({str: "FOO"}).hint({str: 1}).itcount());
+assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).hint({str: 1}).itcount());
+explainRes = coll.find({str: "FOO"}).hint({str: 1}).explain();
+let ixscan = getPlanStage(getWinningPlanFromExplain(explainRes.queryPlanner), "IXSCAN");
+assert.eq("str_1", ixscan.indexName);
+assert.eq({str: ["[MinKey, MaxKey]"]}, ixscan.indexBounds);
+
 assert.eq(1,
           coll.find({str: {$ne: "FOO"}})
               .collation({locale: "en_US", strength: 2})
@@ -725,6 +734,16 @@ res = coll.find({a: {'$exists': true}}, {_id: 0}).collation({locale: "en_US", st
 });
 assert.eq(res.toArray(), [{a: "a"}, {a: "A"}, {a: "b"}, {a: "B"}]);
 
+// Hinting the incompatible index should not change the result, but we should still see an ixscan.
+res = coll.find({}, {_id: 0}).collation({locale: "en_US", strength: 3}).sort({a: 1}).hint({a: 1});
+assert.eq(res.toArray(), [{a: "a"}, {a: "A"}, {a: "b"}, {a: "B"}]);
+res = coll.find({}, {_id: 0})
+          .collation({locale: "en_US", strength: 3})
+          .sort({a: 1})
+          .hint({a: 1})
+          .explain();
+assert(isIxscan(testDb, getWinningPlanFromExplain(res.queryPlanner)));
+
 // Find should return correct results when collation specified and query contains $expr.
 coll = testDb.collation_find4;
 coll.drop();
@@ -746,6 +765,21 @@ assert.eq(2, coll.find({str: "foo"}).itcount());
 assert.eq(1, coll.find({str: {$ne: "foo"}}).itcount());
 assert.eq([{str: "bar"}, {str: "foo"}, {str: "FOO"}],
           coll.find({}, {_id: 0, str: 1}).sort({str: 1}).toArray());
+
+// Find should return correct results when hinting an index which has a collation that matches the
+// collection default.
+assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}}));
+assert.eq(3, coll.find({str: {$in: ["foo", "bar"]}}).hint({str: 1}).itcount());
+assert.eq(2, coll.find({str: "foo"}).hint({str: 1}).itcount());
+assert.eq(1, coll.find({str: {$ne: "foo"}}).hint({str: 1}).itcount());
+
+// Find should return correct results when hinting an index which has a different collation than the
+// collection default.
+assert.commandWorked(coll.dropIndexes());
+assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "simple"}}));
+assert.eq(3, coll.find({str: {$in: ["foo", "bar"]}}).hint({str: 1}).itcount());
+assert.eq(2, coll.find({str: "foo"}).hint({str: 1}).itcount());
+assert.eq(1, coll.find({str: {$ne: "foo"}}).hint({str: 1}).itcount());
 
 // Find with idhack should return correct results when no collation specified and collection has
 // a default collation.
