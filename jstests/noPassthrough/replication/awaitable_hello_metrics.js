@@ -25,7 +25,8 @@ function runTest(db, cmd, failPoint, useGRPCStats) {
     assert(topologyVersionField.hasOwnProperty("counter"), topologyVersionField);
 
     const connectionStats = () => {
-        return useGRPCStats ? db.serverStatus().gRPC.streams : db.serverStatus().connections;
+        return useGRPCStats ? db.serverStatus().gRPC.ingress.streams
+                            : db.serverStatus().connections;
     };
 
     // Test that metrics are properly updated when there are command requests that are waiting.

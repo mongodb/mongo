@@ -53,6 +53,27 @@
 
 namespace mongo::transport::grpc {
 
+BSONObj getClientStats(std::shared_ptr<GRPCClient> client) {
+    BSONObjBuilder stats;
+    client->appendStats(&stats);
+
+    return stats.obj();
+}
+
+long long getCurrChannelMetric(std::shared_ptr<GRPCClient> client) {
+    auto obj = getClientStats(client);
+    auto currChannelsElem = obj.getField(kCurrentChannelsFieldName);
+
+    return currChannelsElem.numberLong();
+}
+
+long long getCurrStreamsMetric(std::shared_ptr<GRPCClient> client) {
+    auto obj = getClientStats(client);
+    auto streamSubObj = obj.getObjectField(kStreamsSubsectionFieldName);
+
+    return streamSubObj.getField(kCurrentStreamsFieldName).numberLong();
+}
+
 class GRPCClientTest : public ServiceContextTest {
 public:
     void setUp() override {
@@ -74,8 +95,10 @@ public:
 
     std::shared_ptr<GRPCClient> makeClient(
         GRPCClient::Options options = CommandServiceTestFixtures::makeClientOptions()) {
-        return std::make_shared<GRPCClient>(
-            nullptr /* transport layer */, makeClientMetadataDocument(), std::move(options));
+        return std::make_shared<GRPCClient>(nullptr /* transport layer */,
+                                            getServiceContext(),
+                                            makeClientMetadataDocument(),
+                                            std::move(options));
     }
 
     const std::shared_ptr<GRPCReactor>& getReactor() {
@@ -151,7 +174,7 @@ public:
         auto makeClientThreadBody = [&](bool shouldSucceed) {
             return [&, shouldSucceed](auto& server, auto& monitor) {
                 auto client = makeClient(options);
-                client->start(getServiceContext());
+                client->start();
 
                 auto makeSession = [&](Milliseconds timeout) {
                     auto session = client->connect(
@@ -209,7 +232,7 @@ TEST_F(GRPCClientTest, GRPCClientConnect) {
 
     auto clientThreadBody = [&](auto& servers, auto& monitor) {
         auto client = makeClient();
-        client->start(getServiceContext());
+        client->start();
 
         for (auto& server : servers) {
             for (auto& addr : server->getListeningAddresses()) {
@@ -242,7 +265,7 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
         GRPCClient::Options options;
         options.tlsCAFile = CommandServiceTestFixtures::kCAFile;
         auto client = makeClient(std::move(options));
-        client->start(getServiceContext());
+        client->start();
 
         auto session = client->connect(server.getListeningAddresses().at(0),
                                        getReactor(),
@@ -300,7 +323,7 @@ TEST_F(GRPCClientTest, GRPCClientConnectAuthToken) {
 
     auto clientThreadBody = [&](auto& server, auto&) {
         auto client = makeClient();
-        client->start(getServiceContext());
+        client->start();
         Client::ConnectOptions options;
         options.authToken = kAuthToken;
         auto session = client->connect(server.getListeningAddresses().at(0),
@@ -320,7 +343,7 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoAuthToken) {
 
     auto clientThreadBody = [&](auto& server, auto&) {
         auto client = makeClient();
-        client->start(getServiceContext());
+        client->start();
         auto session = client->connect(server.getListeningAddresses().at(0),
                                        getReactor(),
                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
@@ -337,7 +360,7 @@ TEST_F(GRPCClientTest, GRPCClientConnectAfterReactorShutdown) {
 
     auto clientThreadBody = [&](auto& server, auto&) {
         auto client = makeClient();
-        client->start(getServiceContext());
+        client->start();
         getReactor()->stop();
         ASSERT_THROWS_CODE(client->connect(server.getListeningAddresses().at(0),
                                            getReactor(),
@@ -348,6 +371,50 @@ TEST_F(GRPCClientTest, GRPCClientConnectAfterReactorShutdown) {
     };
 
     CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody);
+}
+
+TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
+    auto serverHandler = [&](std::shared_ptr<IngressSession>) {
+    };
+
+    auto clientThreadBody = [&](auto& server, auto&) {
+        auto client = makeClient();
+        client->start();
+
+        ASSERT_EQ(getCurrChannelMetric(client), 0);
+        ASSERT_EQ(getCurrStreamsMetric(client), 0);
+
+        // Create a new session each for a different address
+        auto session1 = client->connect(server.getListeningAddresses().at(0),
+                                        getReactor(),
+                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                        {});
+        ASSERT_EQ(getCurrChannelMetric(client), 1);
+        ASSERT_EQ(getCurrStreamsMetric(client), 1);
+
+        auto session2 = client->connect(server.getListeningAddresses().at(1),
+                                        getReactor(),
+                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                        {});
+        ASSERT_EQ(getCurrChannelMetric(client), 2);
+        ASSERT_EQ(getCurrStreamsMetric(client), 2);
+
+        // Finish one session and cancel the other
+        ASSERT_OK(session1->finish());
+        session2->cancel(Status(ErrorCodes::CallbackCanceled, "Canceled"));
+
+        session1.reset();
+        session2.reset();
+
+        ASSERT_EQ(getCurrChannelMetric(client), 2);
+        ASSERT_EQ(getCurrStreamsMetric(client), 0);
+    };
+
+    auto options = CommandServiceTestFixtures::makeServerOptions();
+    options.addresses.push_back(
+        HostAndPort(CommandServiceTestFixtures::kBindAddress, test::kLetKernelChoosePort));
+
+    CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody, std::move(options));
 }
 
 TEST_F(GRPCClientTest, GRPCClientMetadata) {
@@ -363,7 +430,7 @@ TEST_F(GRPCClientTest, GRPCClientMetadata) {
 
     auto clientThreadBody = [&](auto& server, auto&) {
         auto client = makeClient();
-        client->start(getServiceContext());
+        client->start();
         clientId = client->id();
         auto session = client->connect(server.getListeningAddresses().at(0),
                                        getReactor(),
@@ -395,7 +462,7 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
     auto clientThreadBody = [&](auto& server, auto& monitor) {
         mongo::Client::initThread("GRPCClientShutdown", getGlobalServiceContext()->getService());
         auto client = makeClient();
-        client->start(getServiceContext());
+        client->start();
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {

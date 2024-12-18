@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/transport/client_transport_observer.h"
+#include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/reactor.h"
 #include "mongo/transport/session_manager.h"
@@ -40,7 +41,6 @@
 
 namespace mongo::transport::grpc {
 
-class Client;
 class Server;
 
 class GRPCTransportLayerImpl : public GRPCTransportLayer {
@@ -84,6 +84,14 @@ public:
         ConnectSSLMode sslMode,
         Milliseconds timeout,
         const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) override;
+
+    void appendStatsForServerStatus(BSONObjBuilder* bob) const override {
+        if (!_client) {
+            return;
+        }
+
+        _client->appendStats(bob);
+    }
 
 #ifdef MONGO_CONFIG_SSL
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,

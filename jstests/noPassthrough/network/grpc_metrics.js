@@ -35,7 +35,7 @@ function runCmd(uri, runOnDB, cmd, ok = true) {
 }
 
 function checkGRPCStats(conn, expect) {
-    const grpcStats = assert.commandWorked(conn.adminCommand({serverStatus: 1})).gRPC;
+    const grpcStats = assert.commandWorked(conn.adminCommand({serverStatus: 1})).gRPC.ingress;
     jsTest.log(grpcStats);
 
     function search(prefix, obj, expect) {
@@ -50,7 +50,7 @@ function checkGRPCStats(conn, expect) {
         };
     }
 
-    Object.keys(expect).forEach(search('serverStatus.gRPC', grpcStats, expect));
+    Object.keys(expect).forEach(search('serverStatus.gRPC.ingress', grpcStats, expect));
 }
 
 function runTest(conn) {

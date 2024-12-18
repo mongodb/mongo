@@ -82,7 +82,7 @@ TEST_F(MockClientTest, MockConnect) {
     };
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
-        client.start(getServiceContext());
+        client.start();
 
         for (auto& addr : addresses) {
             auto session = client.connect(
@@ -101,7 +101,8 @@ TEST_F(MockClientTest, MockConnect) {
         }
     };
 
-    CommandServiceTestFixtures::runWithMockServers(addresses, serverHandler, clientThreadBody);
+    CommandServiceTestFixtures::runWithMockServers(
+        addresses, getServiceContext(), serverHandler, clientThreadBody);
 }
 
 TEST_F(MockClientTest, MockAuthToken) {
@@ -112,7 +113,7 @@ TEST_F(MockClientTest, MockAuthToken) {
     };
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
-        client.start(getServiceContext());
+        client.start();
         Client::ConnectOptions options;
         options.authToken = kAuthToken;
         auto session = client.connect(defaultServerAddress(),
@@ -123,7 +124,7 @@ TEST_F(MockClientTest, MockAuthToken) {
     };
 
     CommandServiceTestFixtures::runWithMockServers(
-        {defaultServerAddress()}, serverHandler, clientThreadBody);
+        {defaultServerAddress()}, getServiceContext(), serverHandler, clientThreadBody);
 }
 
 TEST_F(MockClientTest, MockNoAuthToken) {
@@ -132,7 +133,7 @@ TEST_F(MockClientTest, MockNoAuthToken) {
     };
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
-        client.start(getServiceContext());
+        client.start();
         auto session = client.connect(defaultServerAddress(),
                                       getReactor(),
                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
@@ -141,7 +142,7 @@ TEST_F(MockClientTest, MockNoAuthToken) {
     };
 
     CommandServiceTestFixtures::runWithMockServers(
-        {defaultServerAddress()}, serverHandler, clientThreadBody);
+        {defaultServerAddress()}, getServiceContext(), serverHandler, clientThreadBody);
 }
 
 TEST_F(MockClientTest, MockClientShutdown) {
@@ -163,7 +164,7 @@ TEST_F(MockClientTest, MockClientShutdown) {
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
         mongo::Client::initThread("MockClientShutdown", getGlobalServiceContext()->getService());
-        client.start(getServiceContext());
+        client.start();
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {
@@ -197,7 +198,7 @@ TEST_F(MockClientTest, MockClientShutdown) {
     };
 
     CommandServiceTestFixtures::runWithMockServers(
-        {defaultServerAddress()}, serverHandler, clientThreadBody);
+        {defaultServerAddress()}, getServiceContext(), serverHandler, clientThreadBody);
 }
 
 TEST_F(MockClientTest, MockClientMetadata) {
@@ -212,7 +213,7 @@ TEST_F(MockClientTest, MockClientMetadata) {
     };
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
-        client.start(getServiceContext());
+        client.start();
         clientId.set(client.id());
         auto session = client.connect(defaultServerAddress(),
                                       getReactor(),
@@ -221,8 +222,11 @@ TEST_F(MockClientTest, MockClientMetadata) {
         ASSERT_OK(session->finish());
     };
 
-    CommandServiceTestFixtures::runWithMockServers(
-        {defaultServerAddress()}, serverHandler, clientThreadBody, metadataDoc);
+    CommandServiceTestFixtures::runWithMockServers({defaultServerAddress()},
+                                                   getServiceContext(),
+                                                   serverHandler,
+                                                   clientThreadBody,
+                                                   metadataDoc);
 }
 
 TEST_F(MockClientTest, WireVersionGossipping) {
@@ -239,7 +243,7 @@ TEST_F(MockClientTest, WireVersionGossipping) {
     };
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
-        client.start(getServiceContext());
+        client.start();
         ASSERT_EQ(client.getClusterMaxWireVersion(), util::constants::kMinimumWireVersion);
 
         auto runTest = [&](int initialWireVersion, int updatedWireVersion) {
@@ -261,6 +265,7 @@ TEST_F(MockClientTest, WireVersionGossipping) {
     };
 
     CommandServiceTestFixtures::runWithMockServers({defaultServerAddress()},
+                                                   getServiceContext(),
                                                    serverHandler,
                                                    clientThreadBody,
                                                    makeClientMetadataDocument(),

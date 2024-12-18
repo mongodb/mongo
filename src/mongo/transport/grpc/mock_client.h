@@ -46,12 +46,11 @@ public:
     using MockResolver = std::function<MockRPCQueue::Producer(const HostAndPort&)>;
 
     MockClient(TransportLayer* tl,
+               ServiceContext* svcCtx,
                HostAndPort local,
                MockResolver resolver,
                const BSONObj& metadata)
-        : Client(tl, metadata), _local(std::move(local)), _resolver(std::move(resolver)) {}
-
-    void start(ServiceContext* svcCtx) override {
+        : Client(tl, svcCtx, metadata), _local(std::move(local)), _resolver(std::move(resolver)) {
         _pool = std::make_shared<MockChannelPool>(
             svcCtx->getFastClockSource(),
             [](auto) { return true; },
@@ -59,7 +58,14 @@ public:
                 return std::make_shared<MockChannel>(local, remote, resolver(remote));
             },
             [](std::shared_ptr<MockChannel>& channel, Milliseconds) { return MockStub(channel); });
-        Client::start(svcCtx);
+    }
+
+    void start() override {
+        Client::start();
+    }
+
+    void appendStats(BSONObjBuilder* section) const override {
+        MONGO_UNIMPLEMENTED;
     }
 
 private:

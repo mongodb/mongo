@@ -63,11 +63,6 @@ GRPCSession::GRPCSession(TransportLayer* tl, HostAndPort remote)
     _restrictionEnvironment = RestrictionEnvironment(std::move(remoteAddr), SockAddr());
 }
 
-GRPCSession::~GRPCSession() {
-    if (_cleanupCallback)
-        (*_cleanupCallback)(*this);
-}
-
 StatusWith<Message> GRPCSession::sourceMessage() noexcept {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return s.withContext("Could not read from gRPC stream");
@@ -121,7 +116,6 @@ boost::optional<Status> GRPCSession::terminationStatus() const {
     }
     return *status;
 }
-
 
 bool GRPCSession::_setTerminationStatus(Status status) {
     auto ts = _terminationStatus.synchronize();
@@ -244,11 +238,17 @@ EgressSession::EgressSession(TransportLayer* tl,
 
 EgressSession::~EgressSession() {
     end();
+
+    auto status = terminationStatus();
+    invariant(status.has_value());
     LOGV2_DEBUG(7401403,
                 2,
                 "Finished cleaning up a gRPC egress session",
                 "session"_attr = toBSON(),
-                "status"_attr = terminationStatus());
+                "status"_attr = status);
+
+    if (_cleanupCallback)
+        (*_cleanupCallback)();
 }
 
 Future<Message> EgressSession::_asyncReadFromStream() {

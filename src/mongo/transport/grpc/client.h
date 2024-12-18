@@ -33,6 +33,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/base/counter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/channel_pool.h"
@@ -49,13 +50,17 @@
 
 namespace mongo::transport::grpc {
 
+constexpr auto kCurrentChannelsFieldName = "currentChannels"_sd;
+constexpr auto kStreamsSubsectionFieldName = "streams"_sd;
+constexpr auto kCurrentStreamsFieldName = "current"_sd;
+
 class Client : public std::enable_shared_from_this<Client> {
 public:
     static constexpr auto kDefaultChannelTimeout = Minutes(30);
 
     using CtxAndStream = std::pair<std::shared_ptr<ClientContext>, std::shared_ptr<ClientStream>>;
 
-    explicit Client(TransportLayer* tl, const BSONObj& clientMetadata);
+    explicit Client(TransportLayer* tl, ServiceContext* svcCtx, const BSONObj& clientMetadata);
 
     virtual ~Client() = default;
 
@@ -63,7 +68,7 @@ public:
         return _id;
     }
 
-    virtual void start(ServiceContext*) = 0;
+    virtual void start() = 0;
 
     /**
      * Cancels all outstanding sessions created from this client and blocks until they all have been
@@ -71,6 +76,8 @@ public:
      * after this method returns.
      */
     virtual void shutdown();
+
+    virtual void appendStats(BSONObjBuilder* section) const = 0;
 
     struct ConnectOptions {
         boost::optional<std::string> authToken = {};
@@ -97,6 +104,9 @@ protected:
      */
     void setMetadataOnClientContext(ClientContext& ctx, const ConnectOptions& options);
 
+    // TODO SERVER-98590 Implement successful streams and failed streams stat.
+    Counter64 _numCurrentStreams;
+
 private:
     enum class ClientState { kUninitialized, kStarted, kShutdown };
 
@@ -112,6 +122,7 @@ private:
     bool _isShutdownComplete_inlock();
 
     TransportLayer* const _tl;
+    ServiceContext* const _svcCtx;
     const UUID _id;
     std::string _clientMetadata;
     std::shared_ptr<EgressSession::SharedState> _sharedState;
@@ -137,10 +148,14 @@ public:
         bool tlsAllowInvalidHostnames = false;
     };
 
-    GRPCClient(TransportLayer* tl, const BSONObj& clientMetadata, Options options);
+    GRPCClient(TransportLayer* tl,
+               ServiceContext* svcCtx,
+               const BSONObj& clientMetadata,
+               Options options);
 
-    void start(ServiceContext* svcCtx) override;
+    void start() override;
     void shutdown() override;
+    void appendStats(BSONObjBuilder* section) const override;
 
 private:
     CtxAndStream _streamFactory(const HostAndPort&,

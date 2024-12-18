@@ -71,6 +71,7 @@ Status GRPCTransportLayerMock::setup() {
 
     if (_options.enableEgress) {
         _client = std::make_shared<MockClient>(this,
+                                               _svcCtx,
                                                std::move(_mockClientAddress),
                                                std::move(_resolver),
                                                makeClientMetadataDocument());
@@ -99,7 +100,7 @@ Status GRPCTransportLayerMock::start() {
     }
 
     if (_client) {
-        _client->start(_svcCtx);
+        _client->start();
     }
 
     PseudoRandom _random(12);

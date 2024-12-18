@@ -85,7 +85,7 @@ class GRPCSession : public Session {
 public:
     explicit GRPCSession(TransportLayer* tl, HostAndPort remote);
 
-    virtual ~GRPCSession();
+    virtual ~GRPCSession() = default;
 
     const HostAndPort& remote() const {
         return _remote;
@@ -162,14 +162,6 @@ public:
     }
 
     /**
-     * Runs the provided callback when destroying the session.
-     * Not synchronized, thus not safe to call once the session is visible to other threads.
-     */
-    void setCleanupCallback(std::function<void(const GRPCSession&)> callback) {
-        _cleanupCallback.emplace(std::move(callback));
-    }
-
-    /**
      * The following APIs are not implemented for both ingress and egress gRPC sessions.
      */
     Status waitForData() noexcept final {
@@ -238,8 +230,6 @@ private:
 
     const HostAndPort _remote;
     RestrictionEnvironment _restrictionEnvironment;
-
-    boost::optional<std::function<void(const GRPCSession&)>> _cleanupCallback;
 };
 
 /**
@@ -456,6 +446,14 @@ public:
     }
 
     /**
+     * Runs the provided callback when destroying the session.
+     * Not synchronized, thus not safe to call once the session is visible to other threads.
+     */
+    void setCleanupCallback(std::function<void()> callback) {
+        _cleanupCallback.emplace(std::move(callback));
+    }
+
+    /**
      * Indicates to the server side that the client will not be sending any further messages,
      * then requests notification for when all messages from the server have been read and the
      * server has returned a final status. Once a status has been received, this session's
@@ -510,6 +508,8 @@ private:
     const std::shared_ptr<ClientStream> _stream;
     UUID _clientId;
     std::shared_ptr<SharedState> _sharedState;
+
+    boost::optional<std::function<void()>> _cleanupCallback;
 };
 
 }  // namespace mongo::transport::grpc

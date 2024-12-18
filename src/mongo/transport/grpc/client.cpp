@@ -64,15 +64,16 @@ inline Status makeShutdownTerminationStatus() {
 }
 }  // namespace
 
-Client::Client(TransportLayer* tl, const BSONObj& clientMetadata)
+Client::Client(TransportLayer* tl, ServiceContext* svcCtx, const BSONObj& clientMetadata)
     : _tl(tl),
+      _svcCtx(svcCtx),
       _id(UUID::gen()),
       _clientMetadata(base64::encode(clientMetadata.objdata(), clientMetadata.objsize())),
       _sharedState(std::make_shared<EgressSession::SharedState>()) {
     _sharedState->clusterMaxWireVersion.store(util::constants::kMinimumWireVersion);
 }
 
-void Client::start(ServiceContext*) {
+void Client::start() {
     stdx::lock_guard lk(_mutex);
     invariant(std::exchange(_state, ClientState::kStarted) == ClientState::kUninitialized,
               "Cannot start a gRPC client more than once");
@@ -162,10 +163,12 @@ std::shared_ptr<EgressSession> Client::connect(const HostAndPort& remote,
     }
 
     auto it = _sessions.insert(_sessions.begin(), session);
-    session->setCleanupCallback([this, client = weak_from_this(), it = std::move(it)](const auto&) {
+    _numCurrentStreams.increment();
+    session->setCleanupCallback([this, client = weak_from_this(), it = std::move(it)]() {
         if (auto anchor = client.lock()) {
             stdx::lock_guard lk(_mutex);
             _sessions.erase(it);
+            _numCurrentStreams.decrement();
 
             if (MONGO_unlikely(_isShutdownComplete_inlock())) {
                 _shutdownCV.notify_one();
@@ -273,13 +276,11 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
     };
 
 public:
-    explicit StubFactoryImpl(GRPCClient::Options options) : _options(std::move(options)) {}
-
-    void start(ServiceContext* const svcCtx) {
+    explicit StubFactoryImpl(GRPCClient::Options options, ServiceContext* svcCtx)
+        : _options(std::move(options)), _svcCtx(svcCtx) {
         // The pool calls into `ClockSource` to record the last usage of gRPC channels. Since the
         // pool is not concerned with sub-minute durations and this call happens as part of
-        // destroying gRPC stubs (i.e., on threads running user operations), it is important to
-        // use
+        // destroying gRPC stubs (i.e., on threads running user operations), it is important to use
         // `FastClockSource` to minimize the performance implications of recording time on user
         // operations.
         _pool = std::make_shared<ChannelPool<std::shared_ptr<::grpc::Channel>, Stub>>(
@@ -320,14 +321,20 @@ public:
                             (Date_t::now() + connectTimeout).toSystemTimePoint()));
                 return Stub(channel);
             });
+    }
 
-        _prunerService.start(svcCtx, _pool);
+    void start() {
+        _prunerService.start(_svcCtx, _pool);
     }
 
     auto createStub(const HostAndPort& remote,
                     ConnectSSLMode sslMode,
                     Milliseconds connectTimeout) {
         return _pool->createStub(std::move(remote), sslMode, connectTimeout);
+    }
+
+    auto getPoolSize() const {
+        return _pool->size();
     }
 
     void stop() {
@@ -388,23 +395,38 @@ private:
     }
 
     GRPCClient::Options _options;
+    ServiceContext* const _svcCtx;
     std::shared_ptr<ChannelPool<std::shared_ptr<::grpc::Channel>, Stub>> _pool;
     ChannelPrunerService<decltype(_pool)> _prunerService;
 };
 
-GRPCClient::GRPCClient(TransportLayer* tl, const BSONObj& clientMetadata, Options options)
-    : Client(tl, clientMetadata) {
-    _stubFactory = std::make_unique<StubFactoryImpl>(std::move(options));
+GRPCClient::GRPCClient(TransportLayer* tl,
+                       ServiceContext* svcCtx,
+                       const BSONObj& clientMetadata,
+                       Options options)
+    : Client(tl, svcCtx, clientMetadata) {
+    _stubFactory = std::make_unique<StubFactoryImpl>(std::move(options), svcCtx);
 }
 
-void GRPCClient::start(ServiceContext* const svcCtx) {
-    Client::start(svcCtx);
-    static_cast<StubFactoryImpl&>(*_stubFactory).start(svcCtx);
+void GRPCClient::start() {
+    Client::start();
+    static_cast<StubFactoryImpl&>(*_stubFactory).start();
 }
 
 void GRPCClient::shutdown() {
     Client::shutdown();
     static_cast<StubFactoryImpl&>(*_stubFactory).stop();
+}
+
+void GRPCClient::appendStats(BSONObjBuilder* section) const {
+    auto numCurrentChannels = static_cast<StubFactoryImpl&>(*_stubFactory).getPoolSize();
+
+    section->append(kCurrentChannelsFieldName, numCurrentChannels);
+
+    {
+        BSONObjBuilder streamSection(section->subobjStart(kStreamsSubsectionFieldName));
+        streamSection.append(kCurrentStreamsFieldName, _numCurrentStreams.get());
+    }
 }
 
 Client::CtxAndStream GRPCClient::_streamFactory(const HostAndPort& remote,

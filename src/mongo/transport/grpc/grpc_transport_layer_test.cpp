@@ -208,9 +208,12 @@ public:
         };
 
         auto cb = [&](GRPCTransportLayer& tl) {
-            auto client = std::make_shared<GRPCClient>(
-                &tl, makeClientMetadataDocument(), CommandServiceTestFixtures::makeClientOptions());
-            client->start(getServiceContext());
+            auto client =
+                std::make_shared<GRPCClient>(&tl,
+                                             getServiceContext(),
+                                             makeClientMetadataDocument(),
+                                             CommandServiceTestFixtures::makeClientOptions());
+            client->start();
             ON_BLOCK_EXIT([&] { client->shutdown(); });
 
             auto session = client->connect(tl.getListeningAddresses().at(0),
@@ -520,9 +523,11 @@ TEST_F(GRPCTransportLayerTest, SSLModeMismatch) {
 
 TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
     auto tl = makeTL();
-    auto client = std::make_shared<GRPCClient>(
-        tl.get(), makeClientMetadataDocument(), CommandServiceTestFixtures::makeClientOptions());
-    client->start(getServiceContext());
+    auto client = std::make_shared<GRPCClient>(tl.get(),
+                                               getServiceContext(),
+                                               makeClientMetadataDocument(),
+                                               CommandServiceTestFixtures::makeClientOptions());
+    client->start();
     ON_BLOCK_EXIT([&] { client->shutdown(); });
 
     HostAndPort addr;

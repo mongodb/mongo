@@ -340,6 +340,7 @@ public:
      */
     static void runWithMockServers(
         std::vector<HostAndPort> addresses,
+        ServiceContext* svcCtx,
         std::function<void(HostAndPort, std::shared_ptr<IngressSession>)> rpcHandler,
         std::function<void(MockClient&, unittest::ThreadAssertionMonitor&)> clientThreadBody,
         const BSONObj& md = makeClientMetadataDocument(),
@@ -374,8 +375,8 @@ public:
                 return entry->second;
             };
 
-            auto client =
-                std::make_shared<MockClient>(nullptr, HostAndPort(kMockedClientAddr), resolver, md);
+            auto client = std::make_shared<MockClient>(
+                nullptr, svcCtx, HostAndPort(kMockedClientAddr), resolver, md);
             clientThreadBody(*client, monitor);
         });
     }

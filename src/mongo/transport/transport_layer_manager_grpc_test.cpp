@@ -218,9 +218,10 @@ TEST_F(AsioGRPCTransportLayerManagerTest, IngressAsioGRPC) {
         auto grpcThread = monitor.spawn([&] {
             auto client = std::make_shared<grpc::GRPCClient>(
                 nullptr,
+                getServiceContext(),
                 grpc::makeClientMetadataDocument(),
                 grpc::CommandServiceTestFixtures::makeClientOptions());
-            client->start(getServiceContext());
+            client->start();
             ON_BLOCK_EXIT([&] { client->shutdown(); });
 
             for (auto i = 0; i < kNumSessions; i++) {
@@ -321,9 +322,10 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
         {
             auto client = std::make_shared<grpc::GRPCClient>(
                 nullptr,
+                getServiceContext(),
                 grpc::makeClientMetadataDocument(),
                 grpc::CommandServiceTestFixtures::makeClientOptions());
-            client->start(getServiceContext());
+            client->start();
             ON_BLOCK_EXIT([&] { client->shutdown(); });
             auto session = client->connect(getGRPCListenAddress(),
                                            getGRPCReactor(),

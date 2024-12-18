@@ -29,10 +29,8 @@
 
 #include "mongo/transport/grpc/grpc_session_manager.h"
 
-#include "mongo/db/commands/server_status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
@@ -42,33 +40,6 @@
 
 namespace mongo::transport::grpc {
 namespace {
-class GRPCSection : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    bool includeByDefault() const override {
-        return feature_flags::gFeatureFlagGRPC.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
-        bool grpcSeen = false;
-        BSONObjBuilder bb;
-        if (auto tlm = opCtx->getServiceContext()->getTransportLayerManager()) {
-            tlm->forEach([&](TransportLayer* tl) {
-                if (auto sm = dynamic_cast<GRPCSessionManager*>(tl->getSessionManager())) {
-                    massert(8076901, "Multiple GRPCSessionManagers", !grpcSeen);
-                    grpcSeen = true;
-                    sm->appendStats(&bb);
-                }
-            });
-        }
-        return bb.obj();
-    }
-};
-
-auto& grpcSection = *ServerStatusSectionBuilder<GRPCSection>("gRPC");
-
 void appendI64(BSONObjBuilder* b, StringData n, auto v) {
     b->append(n, static_cast<std::int64_t>(v));
 }

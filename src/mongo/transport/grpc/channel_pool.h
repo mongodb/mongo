@@ -32,6 +32,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/base/counter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -168,6 +169,7 @@ public:
                 auto state = std::make_shared<ChannelState>(
                     this->shared_from_this(), remote, useSSL, std::move(pf.future));
                 _channels.insert({key, state});
+                _channelsSize.increment();
                 lk.unlock();
                 if (!serverGlobalParams.quiet.load()) {
                     LOGV2_INFO(7401801,
@@ -226,9 +228,8 @@ public:
         return droppedChannels.size();
     }
 
-    size_t size() const {
-        auto lk = stdx::lock_guard(_mutex);
-        return _channels.size();
+    long long size() const {
+        return _channelsSize.get();
     }
 
 private:
@@ -251,6 +252,7 @@ private:
             invariant(cs.use_count() == 1, "Attempted to drop a channel with existing stubs");
             droppedChannels.push_back(std::move(prev->second));
             _channels.erase(prev);
+            _channelsSize.decrement();
         }
         return droppedChannels;
     }
@@ -264,6 +266,7 @@ private:
 
     using ChannelMapKeyType = std::pair<HostAndPort, bool>;
     stdx::unordered_map<ChannelMapKeyType, std::shared_ptr<ChannelState>> _channels;
+    Counter64 _channelsSize;
 };
 
 }  // namespace mongo::transport::grpc

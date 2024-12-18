@@ -23,7 +23,7 @@ function verifyStats({expectedCurrentCount, expectedRejectedCount}) {
         expectedCurrentCount}, expectedRejectedCount: ${expectedRejectedCount}`);
     let serverStatus = getStats();
     let connectionStats =
-        jsTestOptions().shellGRPC ? serverStatus.gRPC.streams : serverStatus.connections;
+        jsTestOptions().shellGRPC ? serverStatus.gRPC.ingress.streams : serverStatus.connections;
 
     assert.soon(
         () => {
