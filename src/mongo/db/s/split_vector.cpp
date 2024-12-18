@@ -191,7 +191,6 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                 state == PlanExecutor::ADVANCED);
 
         // Get the final key in the range, and see if it's the same as the first key.
-        BSONObj maxKeyInChunk;
         {
             auto exec = InternalPlanner::indexScan(opCtx,
                                                    &collection.getCollection(),
@@ -202,27 +201,28 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                    InternalPlanner::BACKWARD);
 
+            BSONObj maxKeyInChunk;
             PlanExecutor::ExecState state = exec->getNext(&maxKeyInChunk, nullptr);
             uassert(
                 ErrorCodes::OperationFailed,
                 "can't open a cursor to find final key in range (desired range is possibly empty)",
                 state == PlanExecutor::ADVANCED);
-        }
 
-        if (currKey.woCompare(maxKeyInChunk) == 0) {
-            // Range contains only documents with a single key value.  So we cannot possibly find a
-            // split point, and there is no need to scan any further.
-            LOGV2_WARNING(
-                22113,
-                "Possible low cardinality key detected in {namespace} - range {minKey} -->> "
-                "{maxKey} contains only the key {key}",
-                "Possible low cardinality key detected in range. Range contains only a single key.",
-                "namespace"_attr = nss.toString(),
-                "minKey"_attr = redact(minKey),
-                "maxKey"_attr = redact(maxKey),
-                "key"_attr = redact(prettyKey(idx->keyPattern(), currKey)));
-            std::vector<BSONObj> emptyVector;
-            return emptyVector;
+            if (currKey.woCompare(maxKeyInChunk) == 0) {
+                // Range contains only documents with a single key value.  So we cannot possibly
+                // find a split point, and there is no need to scan any further.
+                LOGV2_WARNING(22113,
+                              "Possible low cardinality key detected in {namespace} - range "
+                              "{minKey} -->> {maxKey} contains only the key {key}",
+                              "Possible low cardinality key detected in range. Range contains only "
+                              "a single key.",
+                              "namespace"_attr = nss.toString(),
+                              "minKey"_attr = redact(minKey),
+                              "maxKey"_attr = redact(maxKey),
+                              "key"_attr = redact(prettyKey(idx->keyPattern(), currKey)));
+                std::vector<BSONObj> emptyVector;
+                return emptyVector;
+            }
         }
 
         // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel,
