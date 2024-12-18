@@ -170,9 +170,6 @@ selector:
     # ambiguous multi:false update can target different document on each cluster
     - jstests/core/index/hashed/hashed_index_with_arrays.js
 
-    # Does not expect a replica set connection string.
-    - jstests/core/**/connection_string_validation.js
-
     # Grabs specific stats from mongod directly which causes failure due to there being
     # multiple clusters.
     - jstests/core/administrative/current_op/currentop_cursors.js

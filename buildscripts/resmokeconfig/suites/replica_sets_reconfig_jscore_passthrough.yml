@@ -26,8 +26,6 @@ selector:
     - jstests/core/**/batch_write_command_w0.js
     - jstests/core/**/crud_api.js
 
-    - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
-
     # TODO: SERVER-71487 Legacy shell does not carry over encryption information through
     # getMores in reconfig suites.
     - src/mongo/db/modules/*/jstests/fle2/query/*getMore*.js

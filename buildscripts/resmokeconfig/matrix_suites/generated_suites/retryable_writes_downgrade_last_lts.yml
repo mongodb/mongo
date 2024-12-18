@@ -89,7 +89,6 @@ selector:
     - jstests/core/**/sortc.js
     - jstests/core/**/bench_test*.js
     - jstests/core/**/benchrun_pipeline_updates.js
-    - jstests/core/**/connection_string_validation.js
     - jstests/core/**/explain_large_bounds.js
     - jstests/core/**/list_collections_filter.js
     - jstests/core/**/startup_log.js

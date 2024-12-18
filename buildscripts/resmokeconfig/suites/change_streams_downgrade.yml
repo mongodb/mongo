@@ -233,11 +233,6 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
 
-    # auto_retry_on_network_error.js will timeout with assert.soon and give a different error from
-    # what test expects. Excluding from suite since it doesn't really do any database operations, so
-    # it doesn't provide value here.
-    - jstests/core/**/connection_string_validation.js
-
     # Does not support tojson of command objects.
     - jstests/core/**/query/SERVER-23626.js
 

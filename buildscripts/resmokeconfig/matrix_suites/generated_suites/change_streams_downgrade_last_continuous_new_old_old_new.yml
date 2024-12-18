@@ -236,7 +236,6 @@ selector:
     - jstests/core/**/bench_test1.js
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
-    - jstests/core/**/connection_string_validation.js
     - jstests/core/**/query/SERVER-23626.js
     - jstests/core/**/find_and_modify_server7660.js
     - jstests/core/**/upsert_shell.js

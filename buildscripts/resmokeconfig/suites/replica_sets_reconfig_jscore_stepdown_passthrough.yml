@@ -56,7 +56,6 @@ selector:
 
     - jstests/core/**/bench_test*.js # benchRun() used for writes
     - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
-    - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
     - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
     - jstests/core/**/query/top/top.js # Tests read commands (including getMore) against the secondary
     - jstests/core/**/drop3.js # getMore is not causally consistent if collection is dropped
