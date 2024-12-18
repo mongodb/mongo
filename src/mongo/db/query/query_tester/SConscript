@@ -9,10 +9,31 @@ env.AppendUnique(
         "mongo/platform/basic.h",
     ],
 )
+env.Library(
+    target="mongotest_core",
+    source=[
+        "command_helpers.cpp",
+        "file_helpers.cpp",
+        "test.cpp",
+        "testfile.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/client/clientdriver_network",
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/query/util/jparse_util",
+        "$BUILD_DIR/mongo/rpc/message",
+        "$BUILD_DIR/mongo/shell/shell_utils",
+        "$BUILD_DIR/mongo/transport/transport_layer_manager",
+    ],
+)
 
-mongoTest = env.BazelProgram(
+mongoTest = env.Program(
     target="mongotest",
-    source=[],
+    source=["main.cpp"],
+    LIBDEPS=[
+        "mongotest_core",
+    ],
     AIB_COMPONENT="mongotest",
     AIB_COMPONENTS_EXTRA=[
         "devcore",

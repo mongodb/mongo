@@ -642,7 +642,7 @@ def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builde
         src_suffix=builder.src_suffix,
         source_scanner=builder.source_scanner,
         target_scanner=builder.target_scanner,
-        emitter=SCons.Builder.ListEmitter([bazel_target_emitter]),
+        emitter=SCons.Builder.ListEmitter([builder.emitter, bazel_target_emitter]),
     )
 
 
@@ -874,19 +874,19 @@ def timed_auto_install_bazel(env, libdep, shlib_suffix):
 
 def auto_install_single_target(env, libdep, suffix, bazel_node):
     auto_install_mapping = env["AIB_SUFFIX_MAP"].get(suffix)
-    if auto_install_mapping is not None:
-        env.AutoInstall(
-            target=auto_install_mapping.directory,
-            source=[bazel_node],
-            AIB_COMPONENT=env.get("AIB_COMPONENT", "AIB_DEFAULT_COMPONENT"),
-            AIB_ROLE=auto_install_mapping.default_role,
-            AIB_COMPONENTS_EXTRA=env.get("AIB_COMPONENTS_EXTRA", []),
-        )
-        auto_installed_libdep = env.GetAutoInstalledFiles(libdep)
-        auto_installed_bazel_node = env.GetAutoInstalledFiles(bazel_node)
 
-        if auto_installed_libdep[0] != auto_installed_bazel_node[0]:
-            env.Depends(auto_installed_libdep[0], auto_installed_bazel_node[0])
+    env.AutoInstall(
+        target=auto_install_mapping.directory,
+        source=[bazel_node],
+        AIB_COMPONENT=env.get("AIB_COMPONENT", "AIB_DEFAULT_COMPONENT"),
+        AIB_ROLE=auto_install_mapping.default_role,
+        AIB_COMPONENTS_EXTRA=env.get("AIB_COMPONENTS_EXTRA", []),
+    )
+    auto_installed_libdep = env.GetAutoInstalledFiles(libdep)
+    auto_installed_bazel_node = env.GetAutoInstalledFiles(bazel_node)
+
+    if auto_installed_libdep[0] != auto_installed_bazel_node[0]:
+        env.Depends(auto_installed_libdep[0], auto_installed_bazel_node[0])
 
     return env.GetAutoInstalledFiles(bazel_node)
 
@@ -921,83 +921,20 @@ def auto_install_bazel(env, libdep, shlib_suffix):
             continue
 
         bazel_node = env.File(f"#/{line}")
-        debug_files = []
-        debug_suffix = ""
-        # This was copied from separate_debug.py
-        if env.TargetOSIs("darwin"):
-            # There isn't a lot of great documentation about the structure of dSYM bundles.
-            # For general bundles, see:
-            #
-            # https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html
-            #
-            # But we expect to find two files in the bundle. An
-            # Info.plist file under Contents, and a file with the same
-            # name as the target under Contents/Resources/DWARF.
+        bazel_node_debug = env.File(f"#/{line}$SEPDBG_SUFFIX")
 
-            target0 = bazel_node
-            dsym_dir_name = target0.name + ".dSYM"
-            dsym_dir = env.Dir(f"#/{line}.dSYM")
-
-            dwarf_sym_with_debug = os.path.join(
-                dsym_dir.abspath, f"Contents/Resources/DWARF/{target0.name}_shared_with_debug.dylib"
-            )
-
-            # this handles shared libs or program binaries
-            if os.path.exists(dwarf_sym_with_debug):
-                dwarf_sym_name = f"{target0.name}.dylib"
-            else:
-                dwarf_sym_with_debug = os.path.join(
-                    dsym_dir.abspath, f"Contents/Resources/DWARF/{target0.name}_with_debug"
-                )
-                dwarf_sym_name = f"{target0.name}"
-
-            plist_file = env.File("Contents/Info.plist", directory=dsym_dir)
-            setattr(plist_file.attributes, "aib_effective_suffix", ".dSYM")
-            setattr(
-                plist_file.attributes,
-                "aib_additional_directory",
-                "{}/Contents".format(dsym_dir_name),
-            )
-
-            dwarf_dir = env.Dir("Contents/Resources/DWARF", directory=dsym_dir)
-
-            dwarf_file = env.File(dwarf_sym_with_debug, directory=dwarf_dir)
-            setattr(dwarf_file.attributes, "aib_effective_suffix", ".dSYM")
-            setattr(
-                dwarf_file.attributes,
-                "aib_additional_directory",
-                "{}/Contents/Resources/DWARF".format(dsym_dir_name),
-            )
-            setattr(dwarf_file.attributes, "aib_new_name", dwarf_sym_name)
-
-            debug_files.extend([plist_file, dwarf_file])
-            debug_suffix = ".dSYM"
-
-        elif env.TargetOSIs("posix"):
-            debug_suffix = env.subst("$SEPDBG_SUFFIX")
-            debug_file = env.File(f"#/{line}{debug_suffix}")
-            debug_files.append(debug_file)
-        elif env.TargetOSIs("windows"):
-            debug_suffix = ".pdb"
-            debug_file = env.File(f"#/{line}{debug_suffix}")
-            debug_files.append(debug_file)
-        else:
-            pass
-
-        for debug_file in debug_files:
-            setattr(debug_file.attributes, "debug_file_for", bazel_node)
-        setattr(bazel_node.attributes, "separate_debug_files", debug_files)
+        setattr(bazel_node_debug.attributes, "debug_file_for", bazel_node)
+        setattr(bazel_node.attributes, "separate_debug_files", [bazel_node_debug])
 
         auto_install_single_target(env, bazel_libdep, shlib_suffix, bazel_node)
 
         if env.GetAutoInstalledFiles(bazel_libdep):
-            for debug_file in debug_files:
-                auto_install_single_target(
-                    env,
-                    getattr(bazel_libdep.attributes, "separate_debug_files")[0],
-                    debug_suffix,
-                    debug_file,
-                )
+            auto_install_single_target(
+                env,
+                getattr(bazel_libdep.attributes, "separate_debug_files")[0],
+                env.subst("$SEPDBG_SUFFIX"),
+                bazel_node_debug,
+            )
 
     return env.GetAutoInstalledFiles(libdep)
 

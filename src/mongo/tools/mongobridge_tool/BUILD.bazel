@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -14,34 +14,5 @@ idl_generator(
     src = "mongobridge_options.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_binary(
-    name = "mongobridge",
-    srcs = [
-        "bridge.cpp",
-        "bridge_commands.cpp",
-        "bridge_commands.h",
-        "mongobridge_options.cpp",
-        "mongobridge_options.h",
-        "mongobridge_options_gen",
-        "mongobridge_options_init.cpp",
-    ],
-    tags = [
-        "dist_test",
-    ],
-    deps = [
-        "//src/mongo/db:dbmessage",
-        "//src/mongo/db:service_context_non_d",
-        "//src/mongo/rpc",
-        "//src/mongo/transport:message_compressor",
-        "//src/mongo/transport:message_compressor_options_server",
-        "//src/mongo/transport:service_executor",
-        "//src/mongo/transport:session_manager",
-        "//src/mongo/transport:transport_layer_manager",
-        "//src/mongo/util:signal_handlers",
-        "//src/mongo/util/net:network",
-        "//src/mongo/util/options_parser:options_parser_init",
     ],
 )

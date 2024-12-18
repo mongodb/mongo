@@ -13,9 +13,16 @@ env.Benchmark(
     ],
 )
 
-ksdecode = env.BazelProgram(
+ksdecode = env.Program(
     target="ksdecode",
-    source=[],
+    source=[
+        "key_string_decode.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+        "key_string",
+    ],
     AIB_COMPONENT="ksdecode",
     AIB_COMPONENTS_EXTRA=[
         "dist-test",

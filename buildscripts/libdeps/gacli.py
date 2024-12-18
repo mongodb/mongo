@@ -239,6 +239,13 @@ def setup_args_parser():
     )
 
     parser.add_argument(
+        "--bazel-order-core",
+        action="store_true",
+        default=False,
+        help="Print an optimal order of target conversion for the bazel conversion focused just on the core binaries.",
+    )
+
+    parser.add_argument(
         "--indegree-one",
         action="store_true",
         default=False,
@@ -373,6 +380,9 @@ def main():
 
     if args.bazel_order:
         analysis.append(libdeps_analyzer.BazelOrder(libdeps_graph))
+
+    if args.bazel_order_core:
+        analysis.append(libdeps_analyzer.BazelOrderCore(libdeps_graph))
 
     for analyzer_args in args.critical_edges:
         analysis.append(

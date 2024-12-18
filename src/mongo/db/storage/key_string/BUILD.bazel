@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -32,20 +32,5 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_second_group"],
     deps = [
         "key_string",
-    ],
-)
-
-mongo_cc_binary(
-    name = "ksdecode",
-    srcs = [
-        "key_string_decode.cpp",
-    ],
-    tags = [
-        "dist_test",
-    ],
-    deps = [
-        "key_string",
-        "//src/mongo/db:server_base",
-        "//src/mongo/util/options_parser",
     ],
 )

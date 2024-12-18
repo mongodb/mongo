@@ -20,9 +20,16 @@ env.CppUnitTest(
     LIBDEPS=[],
 )
 
-optimizer_gdb_test_program = env.BazelProgram(
+optimizer_gdb_test_program = env.Program(
     target="optimizer_gdb_test_program",
-    source=[],
+    source=[
+        "optimizer_gdb_test_program.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/exec/sbe/abt_unit_test_utils",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+    ],
     AIB_COMPONENT="pretty-printer-tests",
     AIB_COMPONENTS_EXTRA=["dist-test"],
 )
