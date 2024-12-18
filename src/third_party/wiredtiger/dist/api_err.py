@@ -7,6 +7,55 @@ import os, sys, textwrap
 from dist import compare_srcfile, format_srcfile
 from common_functions import filter_if_fast
 
+# Checks if return section begins and updates error defines
+def check_write_errors(tfile, skip, err_type, errors):
+    if line.count(err_type + ' return section: END'):
+        tfile.write(line)
+        skip = 0
+    elif line.count(err_type + ' return section: BEGIN'):
+        skip = 1
+        tfile.write(' */\n')
+        for err in errors:
+            if 'undoc' in err.flags:
+                tfile.write('/*! @cond internal */\n')
+            tfile.write('/*!%s.%s */\n' %
+                (('\n * ' if err.long_desc else ' ') +
+            err.desc[0].upper() + err.desc[1:],
+                ''.join('\n * ' + l for l in textwrap.wrap(
+            textwrap.dedent(err.long_desc).strip(), 77)) +
+        '\n' if err.long_desc else ''))
+            tfile.write('#define\t%s\t(%d)\n' % (err.name, err.value))
+            if 'undoc' in err.flags:
+                tfile.write('/*! @endcond */\n')
+        tfile.write('/*\n')
+    return skip
+
+def write_err_cases(tfile, err_type, errors):
+    tfile.write('''
+    \t/* Check for WiredTiger specific %s. */
+    \tswitch (error) {
+    ''' % err_type)
+    for err in errors:
+        tfile.write('\tcase ' + err.name + ':\n')
+        tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
+    tfile.write('''\t}\n''')
+
+# Checks if lines should be skipped and updates documentation block
+def check_write_document_errors(tfile, skip, err_type, errors):
+    if line.count(f'IGNORE_BUILT_BY_API_{err_type}_END'):
+        tfile.write(line)
+        skip = 0
+    elif line.count(f'IGNORE_BUILT_BY_API_{err_type}_BEGIN'):
+        tfile.write('@endif\n\n')
+        skip = 1
+        for err in errors:
+            if 'undoc' in err.flags:
+                continue
+            tfile.write(
+                '@par \\c ' + err.name.upper() + '\n' +
+                " ".join(err.long_desc.split()) + '\n\n')
+    return skip
+
 if not [f for f in filter_if_fast([
             "../src/conn/api_strerror.c",
             "../src/docs/error-handling.dox",
@@ -83,6 +132,14 @@ errors = [
         setting.'''),
 ]
 
+sub_errors = [
+    Error('WT_NONE', -32000,
+        'last API call was successful', '''
+        This is the default sub-level error code that should be used when there is no
+        sub-level error to pair with an error. It indicates that no further context
+        exists or is necessary.'''),
+]
+
 # Update the #defines in the wiredtiger.in file.
 tmp_file = '__tmp_api_err' + str(os.getpid())
 tfile = open(tmp_file, 'w')
@@ -90,25 +147,8 @@ skip = 0
 for line in open('../src/include/wiredtiger.in', 'r'):
     if not skip:
         tfile.write(line)
-    if line.count('Error return section: END'):
-        tfile.write(line)
-        skip = 0
-    elif line.count('Error return section: BEGIN'):
-        tfile.write(' */\n')
-        skip = 1
-        for err in errors:
-            if 'undoc' in err.flags:
-                tfile.write('/*! @cond internal */\n')
-            tfile.write('/*!%s.%s */\n' %
-                (('\n * ' if err.long_desc else ' ') +
-            err.desc[0].upper() + err.desc[1:],
-                ''.join('\n * ' + l for l in textwrap.wrap(
-            textwrap.dedent(err.long_desc).strip(), 77)) +
-        '\n' if err.long_desc else ''))
-            tfile.write('#define\t%s\t(%d)\n' % (err.name, err.value))
-            if 'undoc' in err.flags:
-                tfile.write('/*! @endcond */\n')
-        tfile.write('/*\n')
+    skip = check_write_errors(tfile, skip, 'Error', errors)
+    skip = check_write_errors(tfile, skip, 'Sub-level error', sub_errors)
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
@@ -134,19 +174,12 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
  */
 const char *
 __wt_wiredtiger_error(int error)
-{
-\t/*
-\t * Check for WiredTiger specific errors.
-\t */
-\tswitch (error) {
-''')
+{''')
 
-for err in errors:
-    tfile.write('\tcase ' + err.name + ':\n')
-    tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
-tfile.write('''\t}
+write_err_cases(tfile, 'errors', errors)
+write_err_cases(tfile, 'sub-level errors', sub_errors)
 
-\t/* Windows strerror doesn't support ENOTSUP. */
+tfile.write('''\n\t/* Windows strerror doesn't support ENOTSUP. */
 \tif (error == ENOTSUP)
 \t\treturn ("Operation not supported");
 
@@ -188,19 +221,9 @@ skip = 0
 for line in open(doc, 'r'):
     if not skip:
         tfile.write(line)
-    if line.count('IGNORE_BUILT_BY_API_ERR_END'):
-        tfile.write(line)
-        skip = 0
-    elif line.count('IGNORE_BUILT_BY_API_ERR_BEGIN'):
-        tfile.write('@endif\n\n')
-        skip = 1
-
-        for err in errors:
-            if 'undoc' in err.flags:
-                continue
-            tfile.write(
-                '@par \\c ' + err.name.upper() + '\n' +
-                " ".join(err.long_desc.split()) + '\n\n')
+    skip = check_write_document_errors(tfile, skip, 'ERR', errors)
+    skip = check_write_document_errors(tfile, skip, 'SUB_ERR', sub_errors)
+    
 tfile.close()
 format_srcfile(tmp_file)
 compare_srcfile(tmp_file, doc)

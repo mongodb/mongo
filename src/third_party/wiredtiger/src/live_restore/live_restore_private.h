@@ -92,6 +92,9 @@ struct __wt_live_restore_fs {
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
+extern int __wti_live_restore_fs_fill_holes(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+
 #ifdef HAVE_UNITTEST
 
 #endif

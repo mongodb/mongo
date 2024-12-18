@@ -261,7 +261,11 @@ do_random_crud(scoped_session &session, bool fresh_start)
             i = warmup_insertions;
         }
 
-        if (ran < 5000) {
+        if (ran < 3) {
+            // 0.01% Checkpoint.
+            testutil_check(session->checkpoint(session.get(), NULL));
+            logger::log_msg(LOG_INFO, "Taking checkpoint");
+        } else if (ran < 5000) {
             // 50% Write.
             write(session, false);
         } else if (ran <= 9980) {
@@ -275,8 +279,6 @@ do_random_crud(scoped_session &session, bool fresh_start)
               "do_random_crud RNG (" + std::to_string(ran) + ") didn't find an operation to run");
             testutil_assert(false);
         }
-
-        // Unreachable.
     }
 }
 
@@ -298,6 +300,16 @@ configure_database(scoped_session &session)
     }
 }
 
+static void
+get_stat(WT_CURSOR *cursor, int stat_field, int64_t *valuep)
+{
+    const char *desc, *pvalue;
+
+    cursor->set_key(cursor, stat_field);
+    error_check(cursor->search(cursor));
+    error_check(cursor->get_value(cursor, &desc, &pvalue, valuep));
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -307,18 +319,30 @@ main(int argc, char *argv[])
     logger::trace_level = LOG_TRACE;
 
     /* Create a connection, set the cache size and specify the home directory. */
+    /* FIXME-WT-13825: Set max_threads to non zero once extent list concurrency is implemented. */
     // TODO: Make verbosity level configurable at runtime.
-    const std::string conn_config = CONNECTION_CREATE + ",live_restore=(enabled=true,path=\"" +
-      SOURCE_DIR + "\"),cache_size=1GB,verbose=[fileops:2]";
+    const std::string conn_config = CONNECTION_CREATE +
+      ",live_restore=(enabled=true,threads_max=0,path=\"" + SOURCE_DIR +
+      "\"),cache_size=1GB,verbose=[fileops:2],statistics=(all),statistics_log=(json,on_close,wait="
+      "1)";
 
     logger::log_msg(LOG_TRACE, "arg count: " + std::to_string(argc));
     bool fresh_start = false;
+    bool background_debug = false;
     if (argc > 1 && argv[1][1] == 'f') {
         fresh_start = true;
         logger::log_msg(LOG_WARN, "Started in -f mode will clean up existing directories");
         // Live restore expects the source directory to exist.
         testutil_recreate_dir(SOURCE_DIR);
         testutil_remove("WT_TEST");
+    } else if (argc > 1 && argv[1][1] == 'b') {
+        /*
+         * Operate in background thread debug mode, in this case we turn off CRUD operations and
+         * just wait until the relevant statistic is set then exit.
+         *
+         * Right now background_debug and fresh_start are mutually exclusive.
+         */
+        background_debug = true;
     }
     // We will recreate this directory every time, on exit the contents in it will be moved to
     // WT_LIVE_RESTORE_SOURCE/.
@@ -332,10 +356,19 @@ main(int argc, char *argv[])
 
     auto crud_session = connection_manager::instance().create_session();
 
-    if (!fresh_start)
+    if (!fresh_start && !background_debug)
         configure_database(crud_session);
 
-    do_random_crud(crud_session, fresh_start);
+    if (background_debug) {
+        // Loop until the state stat is complete!
+        int64_t state = 0;
+        while (state != WT_LIVE_RESTORE_COMPLETE) {
+            auto stat_cursor = crud_session.open_scoped_cursor("statistics:");
+            get_stat(stat_cursor.get(), WT_STAT_CONN_LIVE_RESTORE_STATE, &state);
+            __wt_sleep(1, 0);
+        }
+    } else
+        do_random_crud(crud_session, fresh_start);
 
     // We need to close the session here because the connection close will close it out for us if we
     // don't. Then we'll crash because we'll double close a WT session.
