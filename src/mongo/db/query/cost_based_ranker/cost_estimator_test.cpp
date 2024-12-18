@@ -42,14 +42,12 @@ TEST(CostEstimator, FullCollScanVsFilteredCollScan) {
     EstimateMap estimates;
 
     auto fullCollScan = makeCollScanPlan(nullptr);
-    estimates[fullCollScan->root()] =
-        QSNEstimate{.inCE = makeCard(100), .filterCE = makeCard(100), .outCE = makeCard(100)};
+    estimates[fullCollScan->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)};
 
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto collScanFilter = makeCollScanPlan(parse(query));
     // The predicate filters out 50 documents.
-    estimates[collScanFilter->root()] =
-        QSNEstimate{.inCE = makeCard(100), .filterCE = makeCard(50), .outCE = makeCard(50)};
+    estimates[collScanFilter->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(50)};
 
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*fullCollScan);
@@ -60,8 +58,7 @@ TEST(CostEstimator, FullCollScanVsFilteredCollScan) {
 
 TEST(CostEstimator, FilterCost) {
     // Test that a more complex filter with the same selectivity results in a higher cost scan node.
-    const QSNEstimate cardEst{
-        .inCE = makeCard(100), .filterCE = makeCard(50), .outCE = makeCard(50)};
+    const QSNEstimate cardEst{.inCE = makeCard(100), .outCE = makeCard(50)};
     EstimateMap estimates;
 
     BSONObj simplePred = fromjson("{a: {$gt: 5}}");
@@ -84,14 +81,12 @@ TEST(CostEstimator, VirtualScan) {
     EstimateMap estimates;
 
     auto fullCollScan = makeVirtualCollScanPlan(100, nullptr);
-    estimates[fullCollScan->root()] =
-        QSNEstimate{.inCE = makeCard(100), .filterCE = makeCard(100), .outCE = makeCard(100)};
+    estimates[fullCollScan->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)};
 
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto collScanFilter = makeVirtualCollScanPlan(100, parse(query));
     // The predicate filters out 50 documents.
-    estimates[collScanFilter->root()] =
-        QSNEstimate{.inCE = makeCard(100), .filterCE = makeCard(50), .outCE = makeCard(50)};
+    estimates[collScanFilter->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(50)};
 
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*fullCollScan);

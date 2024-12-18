@@ -172,28 +172,6 @@ function verifyHeuristicEstimateSource() {
     assert.eq(w1.estimatesMetadata.ceSource, "Heuristics", w1);
 }
 
-function verifyIndexScanEstimates() {
-    coll.drop();
-    assert.commandWorked(coll.insert({a: 1}));
-    assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
-    // This query produces an index scan with a filter and thus show have a 'filterNumKeysEstimate'
-    // field.
-    const e1 = coll.find({a: {$mod: [5, 0]}}).explain();
-    const w1 = getWinningPlanFromExplain(e1);
-    assertCbrExplain(w1);
-    assert(w1.inputStage.hasOwnProperty("filter"), w1);
-    assert(w1.inputStage.hasOwnProperty("filterNumKeysEstimate"), w1);
-
-    // This query produces an index scan without a filter and shouldn't have a
-    // 'filterNumKeysEstimate' field.
-    const e2 = coll.find({a: {$gt: 5}}).explain();
-    const w2 = getWinningPlanFromExplain(e2);
-    assertCbrExplain(w2);
-    assert(!w2.inputStage.hasOwnProperty("filter"), w2);
-    assert(!w2.inputStage.hasOwnProperty("filterNumKeysEstimate"), w2);
-}
-
 try {
     for (const q of queries) {
         checkWinningPlan({query: q});
@@ -219,7 +197,6 @@ try {
 
     verifyCollectionCardinalityEstimate();
     verifyHeuristicEstimateSource();
-    verifyIndexScanEstimates();
 
     /**
      * Test strict and automatic CE modes.

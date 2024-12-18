@@ -173,8 +173,7 @@ CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
         if (!ceRes.isOK()) {
             return ceRes;
         }
-        est.filterCE = ceRes.getValue();
-        est.outCE = *est.filterCE;
+        est.outCE = ceRes.getValue();
     } else {
         est.outCE = card;
     }
@@ -197,12 +196,13 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     est.inCE = ceRes1.getValue();
 
     if (const MatchExpression* filter = node->filter.get()) {
-        // Notice that filterCE is estimated independent of interval CE.
+        // In the OK case the result of this call to estimate() is that the selectivities of all
+        // children are added to _conjSels. These selectivities are accounted in the subsequent
+        // call to conjCard().
         auto ceRes2 = estimate(filter, true);
         if (!ceRes2.isOK()) {
             return ceRes2;
         }
-        est.filterCE = ceRes2.getValue();
     }
 
     // Estimate the cardinality of the combined index scan and filter conditions.
@@ -228,11 +228,13 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
     }
 
     if (const MatchExpression* filter = node->filter.get()) {
+        // In the OK case the result of this call to estimate() is that the selectivities of all
+        // children are added to _conjSels. These selectivities are accounted in the subsequent
+        // call to conjCard().
         auto ceRes2 = estimate(filter, true);
         if (!ceRes2.isOK()) {
             return ceRes2;
         }
-        est.filterCE = ceRes2.getValue();
     }
 
     tassert(9768403,

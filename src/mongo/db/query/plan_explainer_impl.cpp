@@ -259,11 +259,6 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         const auto& est = estimates.at(querySolutionNode);
         bob->append("costEstimate", est.cost.toDouble());
         bob->append("cardinalityEstimate", est.outCE.toDouble());
-        // 'filterCE' is only distinct from 'outCE' for index scans, so we should only print in that
-        // case to avoid showing redundant information and confusing explain readers.
-        if (est.filterCE.has_value() && querySolutionNode->getType() == STAGE_IXSCAN) {
-            bob->append("filterNumKeysEstimate", est.filterCE->toDouble());
-        }
         // Display 'inCE' as 'numKeys' for index scan and 'numDocs' for collection scan.
         if (est.inCE.has_value()) {
             double ce = est.inCE->toDouble();
