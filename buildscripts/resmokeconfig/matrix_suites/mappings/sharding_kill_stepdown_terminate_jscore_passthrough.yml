@@ -1,0 +1,16 @@
+base_suite: sharding_jscore_passthrough
+
+overrides:
+  # ensure the fixture is configured with 2 shards
+  - "sharded_cluster.core_base_exclusion_tags"
+  - "sharded_cluster.with_2_shards"
+  - "kill_primary.sharding_override_fixture"
+  - "kill_primary.sharding_override_hooks"
+  - "kill_primary.sharding_override_shell_options"
+
+extends:
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
+
+excludes:
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"

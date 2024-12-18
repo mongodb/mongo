@@ -276,6 +276,98 @@
           n: 20
 
 ###
+# Overrides for suites based on ShardedClusterFixture
+###
+
+# There is no way to override only one hook in the hook list. Thus, since we need to add 'skipEnforceFastCountOnValidate' to the ValidateCollections hook, we are forced to override all the hooks.
+- name: sharding_override_hooks
+  value:
+    executor:
+      archive:
+        test: true
+        hooks:
+          - CheckReplDBHash
+          - CheckMetadataConsistencyInBackground
+          - ValidateCollections
+          - CheckOrphansDeleted
+          - CleanEveryN
+      hooks:
+        - class: ContinuousStepdown
+          randomize_kill: true
+        - class: CheckReplDBHash
+        - class: CheckMetadataConsistencyInBackground
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CheckOrphansDeleted
+        - class: CleanEveryN
+          n: 20
+
+- name: sharding_override_shell_options
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+            globalThis.db = connect(TestData.connectionString);
+            await import("jstests/libs/override_methods/enable_sessions.js");
+            await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+          global_vars:
+            TestData:
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
+                # causal consistency should not be required to read your own writes on the new primary
+                # after the old one is killed.
+                maybeUseCausalConsistency: true
+              # Inform the tests that we are running with stepdown hook
+              runningWithConfigStepdowns: true
+              runningWithShardStepdowns: true
+              killShards: true
+          # We specify nodb so the shell used by each test will attempt to connect after loading the
+          # retry logic in auto_retry_on_network_error.js.
+          nodb: ""
+
+# Override sharding fixture to accomodate for ContinuousStepdown hook
+- name: sharding_override_fixture
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          set_parameters:
+            enableElectionHandoff: 0
+            enableTestCommands: 1
+        configsvr_options:
+          num_nodes: 3
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
+        num_rs_nodes_per_shard: 3
+        shard_options:
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
+
+###
 # Archival options.
 ###
 - name: replica_sets_archive

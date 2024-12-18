@@ -4,6 +4,10 @@
  *   # This test covers the behaviour of untracked and non-existing collections in a sharded cluster
  *   assumes_unsharded_collection,
  *   assumes_no_implicit_collection_creation_after_drop,
+ *   # It uses rename command that is not retriable.
+ *   # After succeeding, any subsequent attempt will fail
+ *   # because the source namespace does not exist anymore.
+ *   requires_non_retryable_commands,
  * ]
  */
 

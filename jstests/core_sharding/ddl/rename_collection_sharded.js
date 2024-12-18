@@ -9,6 +9,10 @@
  *   # - Locally unknown source collections to rename
  *   # - Locally unknown target collections to drop
  *   requires_2_or_more_shards,
+ *   # It uses rename command that is not retriable.
+ *   # After succeeding, any subsequent attempt will fail
+ *   # because the source namespace does not exist anymore.
+ *   requires_non_retryable_commands,
  *  ]
  */
 

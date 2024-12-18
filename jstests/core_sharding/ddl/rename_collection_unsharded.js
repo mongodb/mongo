@@ -2,6 +2,10 @@
  * A set of sharded-cluster specific test cases involving unsharded source/target namespaces.
  *
  * @tags: [
+ *  # It uses rename command that is not retriable.
+ *  # After succeeding, any subsequent attempt will fail
+ *  # because the source namespace does not exist anymore.
+ *  requires_non_retryable_commands,
  *  # This test requires full control on the lifecycle of an unsharded collection and its placement.
  *  assumes_unsharded_collection,
  *  assumes_no_implicit_collection_creation_after_drop,

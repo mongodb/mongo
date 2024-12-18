@@ -9,6 +9,10 @@
  *   assumes_balancer_off,
  *   # Stepdown test coverage is already provided by the analyze shard key FSM suites.
  *   does_not_support_stepdowns,
+ *   # It uses rename command that is not retriable.
+ *   # After succeeding, any subsequent attempt will fail
+ *   # because the source namespace does not exist anymore.
+ *   requires_non_retryable_commands,
  * ]
  */
 import {

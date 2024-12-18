@@ -1,0 +1,15 @@
+# Basic exclusion tags common to all sharded cluster suite
+- name: core_base_exclusion_tags
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - assumes_against_mongod_not_mongos
+        # system.profile collection doesn't exist on mongos.
+        - requires_profiling
+
+- name: with_2_shards
+  value:
+    executor:
+      fixture:
+        num_shards: 2

@@ -2013,6 +2013,20 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: sharding_kill_stepdown_terminate_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "incompatible_mac",
+        "release_critical",
+        "sharding",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: sharding_jscore_passthrough_with_config_transitions_gen
     tags:
       [
