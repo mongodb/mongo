@@ -361,6 +361,7 @@ mongo_cc_library(
         "//src/mongo/util:itoa.h",
         "//src/mongo/util:lockable_adapter.h",
         "//src/mongo/util:memory_usage_tracker.h",
+        "//src/mongo/util:modules.h",
         "//src/mongo/util:murmur3.h",
         "//src/mongo/util:optional_util.h",
         "//src/mongo/util:out_of_line_executor.h",

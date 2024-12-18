@@ -44,7 +44,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * SemiFuture<T> is logically a possibly-deferred StatusWith<T> (or Status when T is void).
@@ -263,7 +263,7 @@ public:
      * WARNING: Do not use this unless you're extremely sure of what you're doing, as callbacks
      * chained to the resulting Future may run in unexpected places.
      */
-    Future<T> unsafeToInlineFuture() && noexcept;
+    MONGO_MOD_UNFORTUNATELY_PUB Future<T> unsafeToInlineFuture() && noexcept;
 
 private:
     friend class Promise<T>;
@@ -1133,7 +1133,7 @@ public:
      * WARNING: Do not use this unless you're extremely sure of what you're doing, as callbacks
      * chained to the resulting Future may run in unexpected places.
      */
-    Future<T> unsafeToInlineFuture() const noexcept {
+    MONGO_MOD_UNFORTUNATELY_PUB Future<T> unsafeToInlineFuture() const noexcept {
         return Future<T>(toFutureImpl());
     }
 
@@ -1356,11 +1356,13 @@ auto makeReadyFutureWith(Func&& func) -> Future<FutureContinuationResult<Func&&>
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
+}  // namespace mongo
 
 //
 // Implementations of methods that couldn't be defined in the class due to ordering requirements.
+// In a separate namespace block since they shouldn't be marked with MONGO_MOD_PUB.
 //
-
+namespace mongo {
 template <typename T>
 template <typename UniqueFunc>
 auto ExecutorFuture<T>::_wrapCBHelper(ExecutorPtr exec, UniqueFunc&& func) {

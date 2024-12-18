@@ -49,6 +49,7 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -112,7 +113,7 @@ class SharedPromise;
 template <typename T>
 class SharedSemiFuture;
 
-namespace future_details {
+namespace MONGO_MOD_PRIVATE future_details {
 
 template <typename T>
 class FutureImpl;

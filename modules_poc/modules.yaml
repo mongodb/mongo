@@ -1,0 +1,134 @@
+core:
+  - src/mongo/bson/
+  - src/mongo/base/
+  - src/mongo/platform/
+  - src/mongo/stdx/
+  - src/mongo/util/
+
+query:
+  - src/mongo/db/commands/query_cmd/
+  - src/mongo/db/exec/
+  - src/mongo/db/fts/
+  - src/mongo/db/geo/
+  - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
+  - src/mongo/db/matcher/
+  - src/mongo/db/modules/enterprise/src/fle/query_analysis
+  - src/mongo/db/pipeline/
+  - src/mongo/db/query/
+  - src/mongo/db/s/query_analysis* # note the filename pattern
+  - src/mongo/db/s/*query*analyzer* # note the filename pattern
+  - src/mongo/db/stats/
+  - src/mongo/db/update/
+  - src/mongo/db/views/
+
+catalog:
+  - src/mongo/db/catalog/
+
+replication:
+  - src/mongo/db/repl/ # excluding ./dbcheck*
+  - src/mongo/db/transaction/
+  - src/mongo/db/op_observer/op_observer_impl* # specific files
+  - src/mongo/db/op_observer/fcv_op_observer* # specific files
+  - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
+
+storage_engine:
+  - src/third_party/wiredtiger/
+
+access_control:
+  - src/mongo/db/auth/
+
+admission:
+  - src/mongo/db/admission/
+
+security:
+  - src/mongo/crypto
+  - src/mongo/db/modules/enterprise/src/audit
+  - src/mongo/db/modules/enterprise/src/encryptdb
+  - src/mongo/db/modules/enterprise/src/fips
+  - src/mongo/db/modules/enterprise/src/kerberos
+  - src/mongo/db/modules/enterprise/src/kmip
+  - src/mongo/db/modules/enterprise/src/ldap
+  - src/mongo/db/modules/enterprise/src/sasl
+
+router_role:
+  - src/mongo/s/
+
+shard_role:
+  - src/mongo/db/s/
+
+data_movement:
+  - src/mongo/db/s/migration* # note the filename pattern
+  - src/mongo/db/s/resharding
+
+logging:
+  - src/mongo/logv2/
+
+networking:
+  - src/mongo/db/rpc/
+  - src/mongo/util/net
+
+timeseries_bucket_catalog: # authoritative: @10gen/server-timeseries-bucket-catalog
+  - src/mongo/db/timeseries/bucket_catalog
+
+collection_write_path: # authoritative: @10gen/server-collection-write-path
+  - src/mongo/db/collection_crud
+  - src/mongo/db/timeseries # excluding ./bucket_catalog
+  - src/mongo/db/commands/collection_to_capped* # specific files
+
+bsoncolumn: # authoritative: @10gen/server-bsoncolumn
+  - src/mongo/bson/column
+
+external_sorter: # authoritative: @10gen/server-external-sorter
+  - src/mongo/db/sorter
+
+index_builds: # authoritative: @10gen/server-index-builds
+  - src/mongo/db/index_builds
+  - src/mongo/db/index/index_access_methods* # specific files
+  - src/mongo/db/catalog/index_key_validate* # specific files
+  - src/mongo/db/catalog/index_spec_validate* # specific files
+  - src/mongo/db/commands/create_indexes* # specific files
+  - src/mongo/db/commands/set_index_commit_quorum* # specific files
+  - src/mongo/db/commands/vote*index_build* # specific files
+  - src/mongo/dbtests/indexupdatetests.cpp # specific file
+
+key_string: # authoritative: @10gen/server-key-string
+  - src/mongo/db/storage/key_string
+
+storage_engine_integration: # authoritative: @10gen/server-storage-engine-integration
+  - src/mongo/db/storage # excluding ./key_string
+  - src/mongo/db/record_id* # specific files
+  - src/mongo/db/repair* # specific files
+  - src/mongo/db/prepare_conflict_tracker* # specific files
+  - src/mongo/db/repl_set_member_in_standalone_mode* # specific files
+  - src/mongo/db/server_recovery* # specific files
+  - src/mongo/db/mongod_options_storage.idl # specific file
+  - src/mongo/db/dbhelpers* # specific files
+  - src/mongo/db/dbcommands.idl # specific file
+  - src/mongo/db/catalog/import* # specific files
+  - src/mongo/db/catalog/index_repair* # specific files
+  - src/mongo/db/commands/fsync* # specific files
+  - src/mongo/db/commands/dbcommands* # specific files
+  - src/mongo/db/commands/resize_oplog* # specific files
+  - src/mongo/db/op_observer/batched_write* # specific files
+  - src/mongo/db/stats/storage_stats* # specific files
+  - src/mongo/db/stats/*resource_consumption* # specific files
+  - src/mongo/dbtests/storage_debug_util* # specific files
+
+validate: # authoritative: @10gen/server-validate
+  - src/mongo/db/catalog/validate
+  - src/mongo/db/catalog/collection_validation* # specific files
+  - src/mongo/db/catalog/throttle_cursor* # specific files
+  - src/mongo/db/commands/validate.cpp # specific file
+  - src/mongo/dbtests/validate.cpp # specific file
+
+dbcheck: # authoritative: @10gen/server-dbcheck
+  - src/mongo/db/catalog/health_log* # specific files
+  - src/mongo/db/commands/dbcheck* # specific files
+  - src/mongo/db/concurrency/deferred_writer* # specific files
+  - src/mongo/db/repl/dbcheck* # specific files
+
+ttl: # authoritative: @10gen/server-ttl
+  - src/mongo/db/ttl
+
+tracking_allocators: # authoritative: @10gen/server-tracking-allocators
+  - src/mongo/util/tracking
