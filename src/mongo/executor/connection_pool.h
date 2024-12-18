@@ -171,6 +171,12 @@ public:
          */
         bool skipAuthentication = false;
 
+        /**
+         * Prevents the connection pool from reusing connections. If this is set, connections will
+         * not be returned to the ready pool after use.
+         */
+        bool singleUseConnections = false;
+
 #ifdef MONGO_CONFIG_SSL
         /**
          * Provides SSL params if the egress cluster connection requires custom SSL certificates

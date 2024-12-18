@@ -52,8 +52,8 @@ namespace executor {
 namespace {
 
 ConnectionPool::Options makeMongotConnPoolOptions() {
-    // TODO SERVER-97158: Set singleUseConnections flag if using egress grpc
     ConnectionPool::Options mongotOptions;
+    mongotOptions.singleUseConnections = globalMongotParams.useGRPC;
     mongotOptions.skipAuthentication = globalMongotParams.skipAuthToMongot;
     mongotOptions.controllerFactory = [] {
         return std::make_shared<DynamicLimitController>(
@@ -79,8 +79,8 @@ struct State {
                                                         std::move(mongotExecutorNetworkInterface));
 
         // Make a separate searchIndexMgmtExecutor that's independently configurable.
-        // TODO SERVER-97158: Set singleUseConnections flag if using egress grpc
         ConnectionPool::Options searchIndexPoolOptions;
+        searchIndexPoolOptions.singleUseConnections = globalMongotParams.useGRPC;
         searchIndexPoolOptions.skipAuthentication =
             globalSearchIndexParams.skipAuthToSearchIndexServer;
         std::shared_ptr<NetworkInterface> searchIdxNI =
