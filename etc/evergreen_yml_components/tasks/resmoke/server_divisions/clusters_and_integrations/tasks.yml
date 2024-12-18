@@ -220,12 +220,40 @@ tasks:
       ]
     commands:
       - func: "do benchmark setup"
+      - func: "get engflow creds"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-first_half_bm
+            archive-first_half_bm
+          bazel_build_tags: --bazel-build-tag=first_half_bm
+          compiling_for_test: true
+      # scons compile resets install_dir
+      - command: expansions.update
+        display_name: "expansions fix install_dir"
+        params:
+          updates:
+            - key: install_dir
+              value: build/install/bin
+      - func: "f_expansions_write"
+      - func: "consolidate benchmark lists"
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_first_half
           exec_timeout_secs: 28800 # 8 hour timeout.
           timeout_secs: 14400 # 4 hours
           resmoke_jobs_max: 1
+          install_dir: build/install/bin
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/first_half_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/first_half_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Benchmarks
 
   - <<: *benchmark_template
     name: benchmarks_orphaned_second_half
@@ -237,11 +265,39 @@ tasks:
       ]
     commands:
       - func: "do benchmark setup"
+      - func: "get engflow creds"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-second_half_bm
+            archive-second_half_bm
+          bazel_build_tags: --bazel-build-tag=second_half_bm
+          compiling_for_test: true
+      # scons compile resets install_dir
+      - command: expansions.update
+        display_name: "expansions fix install_dir"
+        params:
+          updates:
+            - key: install_dir
+              value: build/install/bin
+      - func: "f_expansions_write"
+      - func: "consolidate benchmark lists"
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_second_half
           exec_timeout_secs: 28800 # 8 hour timeout.
           resmoke_jobs_max: 1
+          install_dir: build/install/bin
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/second_half_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/second_half_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Benchmarks
 
   - <<: *benchmark_template
     name: benchmarks_sep
@@ -1466,10 +1522,38 @@ tasks:
       ]
     commands:
       - func: "do benchmark setup"
+      - func: "get engflow creds"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-sharding_bm
+            archive-sharding_bm
+          bazel_build_tags: --bazel-build-tag=sharding_bm
+          compiling_for_test: true
+      # scons compile resets install_dir
+      - command: expansions.update
+        display_name: "expansions fix install_dir"
+        params:
+          updates:
+            - key: install_dir
+              value: build/install/bin
+      - func: "f_expansions_write"
+      - func: "consolidate benchmark lists"
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_sharding
           resmoke_jobs_max: 1
+          install_dir: build/install/bin
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/sharding_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/sharding_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Benchmarks
 
   - <<: *benchmark_template
     name: benchmarks_bsoncolumn
@@ -1481,10 +1565,38 @@ tasks:
       ]
     commands:
       - func: "do benchmark setup"
+      - func: "get engflow creds"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-bsoncolumn_bm
+            archive-bsoncolumn_bm
+          bazel_build_tags: --bazel-build-tag=bsoncolumn_bm
+          compiling_for_test: true
+      # scons compile resets install_dir
+      - command: expansions.update
+        display_name: "expansions fix install_dir"
+        params:
+          updates:
+            - key: install_dir
+              value: build/install/bin
+      - func: "f_expansions_write"
+      - func: "consolidate benchmark lists"
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_bsoncolumn
           resmoke_jobs_max: 1
+          install_dir: build/install/bin
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bsoncolumn_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/bsoncolumn_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Benchmarks
 
   - <<: *jstestfuzz_template
     name: move_collection_fuzzer_gen

@@ -1755,12 +1755,40 @@ tasks:
       ]
     commands:
       - func: "do benchmark setup"
+      - func: "get engflow creds"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-query_bm
+            archive-query_bm
+          bazel_build_tags: --bazel-build-tag=query_bm
+          compiling_for_test: true
+      # scons compile resets install_dir
+      - command: expansions.update
+        display_name: "expansions fix install_dir"
+        params:
+          updates:
+            - key: install_dir
+              value: build/install/bin
+      - func: "f_expansions_write"
+      - func: "consolidate benchmark lists"
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_query
+          install_dir: build/install/bin
           resmoke_jobs_max: 1
           exec_timeout_secs: 14400 # 4 hours
           timeout_secs: 14400 # 4 hours
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/query_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/query_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Benchmarks
 
   - <<: *task_template
     name: query_stats_aggregation_passthrough

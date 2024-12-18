@@ -10,6 +10,10 @@ selector:
     # It will NOT automagically get updated if new benchmark-related tests are added.
     - build/install/bin/first_half_bm*
     - build/install/bin/lock_manager_bm*
+    - build/install/bin/crypto_bm*
+    - build/install/bin/logv2_bm*
+    - build/install/bin/endian_bm*
+    - build/install/bin/condition_variable_bm*
     - build/install/bin/path_lower_bm*
     - build/install/bin/abt_lower_bm*
     - build/install/bin/string_bm*

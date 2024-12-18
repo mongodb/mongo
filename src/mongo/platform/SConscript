@@ -18,6 +18,7 @@ env.Benchmark(
     target="endian_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="first_half_bm",
 )
 
 if get_option("link-model") == "dynamic":

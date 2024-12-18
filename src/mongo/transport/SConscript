@@ -36,12 +36,14 @@ env.Benchmark(
     target="service_executor_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="second_half_bm",
 )
 
 env.Benchmark(
     target="session_workflow_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="second_half_bm",
 )
 
 env.Benchmark(

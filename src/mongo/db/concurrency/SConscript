@@ -21,6 +21,7 @@ env.Benchmark(
     target="lock_manager_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="first_half_bm",
 )
 
 env.PrettyPrinterTest(target="lock_gdb_test.py")
