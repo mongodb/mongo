@@ -5,6 +5,7 @@ import time
 from collections import namedtuple
 from enum import Enum
 from logging import Logger
+from threading import Lock
 from typing import TYPE_CHECKING, List
 
 import pymongo
@@ -422,6 +423,7 @@ class FixtureTeardownHandler(object):
             logger: A logger to use to log teardown activity.
         """
         self._logger = logger
+        self._lock = Lock()
         self._success = True
         self._message = None
 
@@ -452,9 +454,7 @@ class FixtureTeardownHandler(object):
             return True
         except fixture.fixturelib.ServerFailure as err:
             msg = "Error while stopping {}: {}".format(name, err)
-            self._logger.warning(msg)
-            self._add_error_message(msg)
-            self._success = False
+            self._register_teardown_error(msg)
             return False
 
     def _add_error_message(self, message):
@@ -462,6 +462,12 @@ class FixtureTeardownHandler(object):
             self._message = message
         else:
             self._message = "{} - {}".format(self._message, message)
+
+    def _register_teardown_error(self, message):
+        self._logger.warning(message)
+        with self._lock:
+            self._add_error_message(message)
+            self._success = False
 
 
 def create_fixture_table(fixture):

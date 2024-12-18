@@ -385,16 +385,29 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
-        for mongos in self.mongos:
-            teardown_handler.teardown(mongos, "mongos", mode=mode)
+        with ThreadPoolExecutor() as executor:
+            tasks = []
+            for mongos in self.mongos:
+                tasks.append(executor.submit(teardown_handler.teardown, mongos, "mongos", mode))
+            # Wait for all mongod teardown tasks to complete
+            for task in as_completed(tasks):
+                task.result()
 
-        for shard in self.shards:
-            if shard is self.configsvr:
-                continue
-            teardown_handler.teardown(shard, "shard", mode=mode)
+            tasks = []
+            for shard in self.shards:
+                if shard is self.configsvr:
+                    continue
+                tasks.append(executor.submit(teardown_handler.teardown, shard, "shard", mode))
 
-        if self.configsvr is not None:
-            teardown_handler.teardown(self.configsvr, "config server", mode=mode)
+            if self.configsvr is not None:
+                tasks.append(
+                    executor.submit(
+                        teardown_handler.teardown, self.configsvr, "config server", mode
+                    )
+                )
+            # Wait for all mongod teardown tasks to complete
+            for task in as_completed(tasks):
+                task.result()
 
         if teardown_handler.was_successful():
             self.logger.info("Successfully stopped all members of the sharded cluster.")

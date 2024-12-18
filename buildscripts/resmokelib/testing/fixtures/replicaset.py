@@ -687,9 +687,21 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 self._unpause_initial_sync(self.initial_sync_node)
             teardown_handler.teardown(self.initial_sync_node, "initial sync node", mode=mode)
 
-        # Terminate the secondaries first to reduce noise in the logs.
-        for node in reversed(self.nodes):
-            teardown_handler.teardown(node, "replica set member on port %d" % node.port, mode=mode)
+        with ThreadPoolExecutor() as executor:
+            tasks = []
+            # Terminate the secondaries first to reduce noise in the logs.
+            for node in reversed(self.nodes):
+                tasks.append(
+                    executor.submit(
+                        teardown_handler.teardown,
+                        node,
+                        "replica set member on port %d" % node.port,
+                        mode,
+                    )
+                )
+            # Wait for all the teardown tasks to complete
+            for task in as_completed(tasks):
+                task.result()
 
         if teardown_handler.was_successful():
             self.logger.info("Successfully stopped all members of the replica set.")
