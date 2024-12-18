@@ -25,3 +25,8 @@ if wiredtiger:
         source=[],
         LIBDEPS=[],
     )
+
+env.CppIntegrationTest(
+    target="rpc_integration_test",
+    source=[],
+)

@@ -45,3 +45,8 @@ env.CppLibfuzzerTest(
         "$BUILD_DIR/mongo/bson/bson_validate",
     ],
 )
+
+env.CppIntegrationTest(
+    target="bson_integration_test",
+    source=[],
+)
