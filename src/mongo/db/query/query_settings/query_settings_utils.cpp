@@ -327,6 +327,12 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
         ExpressionContext::makeBlankExpressionContext(opCtx, nss, aggregateCommandRequest.getLet());
     expCtx->addResolvedNamespaces(
         stdx::unordered_set<NamespaceString>{involvedNamespaces.begin(), involvedNamespaces.end()});
+
+    // In order to parse a change stream request, 'inRouter' needs to be set to true.
+    if (parsedPipeline.hasChangeStream()) {
+        expCtx->setInRouter(true);
+    }
+
     auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);
 
     const auto serializationContext = aggregateCommandRequest.getSerializationContext();
