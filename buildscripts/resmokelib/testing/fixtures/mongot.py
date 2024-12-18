@@ -28,6 +28,7 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         # Default to command line options if the YAML configuration is not passed in.
         self.mongot_executable = self.fixturelib.default_if_none(self.config.MONGOT_EXECUTABLE)
         self.port = self.mongot_options["port"]
+
         # Each mongot requires its own unique config journal to persist index definitions, replication status, etc to disk.
         # If dir passed to --data-dir option doesn't exist, mongot will create it
         self.data_dir = "data/config_journal_" + str(self.port)

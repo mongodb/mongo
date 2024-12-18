@@ -1,6 +1,10 @@
 /**
  * This test issues the search index management commands (createSearchIndex, updateSearchIndex) on
  * views.
+ *
+ * @tags: [
+ * requires_mongot_1_43_0
+ * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";

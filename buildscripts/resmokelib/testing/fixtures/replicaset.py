@@ -3,6 +3,7 @@
 import os.path
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
 import bson
 import pymongo
@@ -70,6 +71,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         initial_sync_uninitialized_fcv=False,
         hide_initial_sync_node_from_conn_string=False,
         launch_mongot=False,
+        mongos_port: Optional[int] = None,
     ):
         """Initialize ReplicaSetFixture."""
 
@@ -105,6 +107,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.fcv = None
         # Used by suites that run search integration tests.
         self.launch_mongot = launch_mongot
+        # Used to set --mongoHostAndPort startup option on mongot.
+        self.mongos_port = mongos_port
         # Use the values given from the command line if they exist for linear_chain and num_nodes.
         linear_chain_option = self.fixturelib.default_if_none(
             self.config.LINEAR_CHAIN, linear_chain
@@ -312,7 +316,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # To model Atlas Search's coupled architecture, resmoke deploys a mongot for each
             # mongod node in a replica set.
             for node in self.nodes:
-                node.setup_mongot()
+                node.setup_mongot(self.mongos_port)
             # Saving the mongot port to the ReplicaSetFixture allows the ShardedClusterFixture
             # to spin up a mongos with a connection to the last launched mongot.
             self.mongot_port = node.mongot_port

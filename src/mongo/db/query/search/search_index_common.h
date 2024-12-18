@@ -42,7 +42,7 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& uuid,
                                       const BSONObj& userCmd,
-                                      boost::optional<StringData> viewName = boost::none);
+                                      boost::optional<NamespaceString> viewName = boost::none);
 
 /**
  * Runs the given command against the remote search index management server, if the remote host

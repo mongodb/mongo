@@ -45,37 +45,27 @@ namespace mongo {
 
 namespace {
 template <typename CommandType>
-std::tuple<const UUID, const NamespaceString, boost::optional<StringData>>
+std::tuple<const UUID, const NamespaceString, boost::optional<NamespaceString>>
 retrieveCollectionUUIDAndResolveView(OperationContext* opCtx, CommandType& cmd) {
     const auto& currentOperationNss = cmd.getNamespace();
-    auto role = opCtx->getService()->role();
-    // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
-    // views can support all search commands.
-    if (role.hasExclusively(ClusterRole::ShardServer)) {
-        // If the index management command is being run on a view, this call will return the
-        // underlying source collection UUID and NSS. If not, it will just return a UUID.
-        auto collUUIDresolvedNSSpair =
-            SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
-                opCtx, currentOperationNss);
-        // If the query is on a normal collection, the source collection will be the same as
-        // the current NS.
-        auto sourceCollectionNss = currentOperationNss;
-        boost::optional<StringData> viewNss;
-        auto collUUID = collUUIDresolvedNSSpair.first;
-        if (auto resolvedNss = collUUIDresolvedNSSpair.second) {
-            // The request is on a view! Therefore, currentOperationNss refers to the view
-            // NS and resolvedNss refers to the underlying source collection.
-            sourceCollectionNss = *resolvedNss;
-            viewNss.emplace(currentOperationNss.coll());
-        }
-        return std::make_tuple(collUUID, sourceCollectionNss, viewNss);
-    } else if (role.hasExclusively(ClusterRole::RouterServer)) {
-        auto collectionUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(
+
+    // If the index management command is being run on a view, this call will return the
+    // underlying source collection UUID and NSS. If not, it will just return a UUID.
+    auto collUUIDresolvedNSSpair =
+        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
             opCtx, currentOperationNss);
-        // Run the search index command against the remote search index management server.
-        return std::make_tuple(collectionUUID, currentOperationNss, boost::none);
+    // If the query is on a normal collection, the source collection will be the same as
+    // the current NS.
+    auto sourceCollectionNss = currentOperationNss;
+    boost::optional<NamespaceString> viewNss;
+    auto collUUID = collUUIDresolvedNSSpair.first;
+    if (auto resolvedNss = collUUIDresolvedNSSpair.second) {
+        // The request is on a view! Therefore, currentOperationNss refers to the view
+        // NS and resolvedNss refers to the underlying source collection.
+        sourceCollectionNss = *resolvedNss;
+        viewNss.emplace(currentOperationNss);
     }
-    MONGO_UNREACHABLE;
+    return std::make_tuple(collUUID, sourceCollectionNss, viewNss);
 }
 
 template <typename CommandType>
@@ -419,13 +409,8 @@ public:
                     "Cannot set both 'name' and 'id'.",
                     !(cmd.getName() && cmd.getId()));
 
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
             BSONObj manageSearchIndexResponse =
-                getSearchIndexManagerResponse(opCtx, nss, collectionUUID, cmd.toBSON());
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
 
             IDLParserContext ctx("ListSearchIndexesReply Parser");
             return ListSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
