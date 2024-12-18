@@ -5,3 +5,14 @@ src:src/third_party/IntelRDFPMathLib20U1/TESTS/readtest.c
 # gRPC only supports sanitizers in the native Bazel build (https://github.com/grpc/grpc/issues/19224#issuecomment-610363882)
 # This file has a static init order fiasco.
 src:src/third_party/grpc/dist/src/cpp/util/status.cc
+
+# The following sources rely on a local variable being located on the stack, which is
+# not compatible with the implementation of detect_stack_use_after_return. ASAN does
+# not report a use-after-return, but breaks the correctness of the stack locator.
+# *MozRuntime* -> MozJSImplScope::MozRuntime::MozRuntime
+fun:*MozRuntime*
+src:src/mongo/platform/stack_locator_test.cpp
+src:src/mongo/stdx/sigaltstack_location_test.cpp
+
+# A stack use-after-return is reported by ASAN when running kafka_resolve_callback_test, SERVER-98554
+src:src/mongo/db/modules/enterprise/src/streams/exec/kafka_resolve_callback.cpp

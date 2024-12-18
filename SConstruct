@@ -4523,6 +4523,8 @@ def doConfigure(myenv):
                 "handle_abort=1",
                 "strict_string_checks=true",
                 "detect_invalid_pointer_pairs=1",
+                "detect_stack_use_after_return=1",
+                "max_uar_stack_size_log=16",
             ]
             asan_options = ":".join(asan_options_clear)
             lsan_options = (
