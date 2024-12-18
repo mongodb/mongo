@@ -9,7 +9,7 @@ import yaml
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.errors import RequiresForceRemove
-from buildscripts.util.read_config import read_config_file
+from buildscripts.util.expansions import get_expansion
 
 
 def build_images(suite_name, fixture_instance):
@@ -82,8 +82,7 @@ class DockerComposeImageBuilder:
 
     def _get_san_options(self):
         if self.in_evergreen:
-            expansions = read_config_file("../expansions.yml")
-            san_options = expansions.get("san_options", "")
+            san_options = get_expansion("san_options", "")
         else:
             san_options = os.environ.get("san_options", "")
         lines = [line for line in san_options.split() if line]
@@ -454,29 +453,6 @@ class DockerComposeImageBuilder:
         git.Repo.clone_from("./", mongo_repo_destination, branch=active_branch)
         print("Done cloning MongoDB repo to build context.")
 
-        print("Cloning current MongoDB Enterprise Modules repo to build context...")
-        print(clone_repo_warning_message)
-
-        # Create the modules directory in the mongo repo at the build context
-        modules_directory_at_build_context = os.path.join(
-            mongo_repo_destination, self.MODULES_RELATIVE_PATH
-        )
-        os.mkdir(modules_directory_at_build_context)
-
-        mongo_enterprise_modules_destination = os.path.join(
-            mongo_repo_destination, self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH
-        )
-
-        # Copy the mongo enterprise modules repo to the build context.
-        # If this fails to clone, the `git` library will raise an exception.
-        active_branch = git.Repo(self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH).active_branch.name
-        git.Repo.clone_from(
-            self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH,
-            mongo_enterprise_modules_destination,
-            branch=active_branch,
-        )
-        print("Done cloning MongoDB Enterprise Modules repo to build context.")
-
     def _clone_qa_repo_to_build_context(self, dir_path):
         """
         Clone the QA repo to the build context.
@@ -490,7 +466,7 @@ class DockerComposeImageBuilder:
             print(f"\n\tFound existing QA repo at: {qa_repo_destination}\n")
         else:
             print("Cloning QA repo to build context...")
-            git.Repo.clone_from("git@github.com:10gen/QA.git", qa_repo_destination)
+            self._clone_repo("10gen", "QA", qa_repo_destination, get_expansion("github_token_qa"))
             print("Done cloning QA repo to build context.")
 
     def _clone_jstestfuzz_to_build_context(self, dir_path):
@@ -506,7 +482,12 @@ class DockerComposeImageBuilder:
             print(f"\n\tFound existing jstestfuzz repo at: {jstestfuzz_repo_destination}\n")
         else:
             print("Cloning jstestfuzz repo to build context...")
-            git.Repo.clone_from("git@github.com:10gen/jstestfuzz.git", jstestfuzz_repo_destination)
+            self._clone_repo(
+                "10gen",
+                "jstestfuzz",
+                jstestfuzz_repo_destination,
+                get_expansion("github_token_jstestfuzz"),
+            )
             print("Done cloning jstestfuzz repo to build context.")
 
     def _copy_config_files_to_build_context(self, dir_path):
@@ -587,3 +568,18 @@ class DockerComposeImageBuilder:
             print(
                 "Done writing stub `libvoidstar.so` to build context -- This is for development only."
             )
+
+    def _clone_repo(self, owner, repo, destination, token):
+        """
+        Conditionally clone using either https or ssh depending on if running in evergreen.
+        """
+
+        if token:
+            print(f"Found token for {owner}/{repo} git repo, using http clone")
+            url = f"https://x-access-token:{token}@github.com/{owner}/{repo}.git"
+        else:
+            print(f"No token found for {owner}/{repo} git repo, using ssh clone")
+            assert not self.in_evergreen, "SSH cloning should only be done when not in evergreen"
+            url = f"git@github.com:{owner}/{repo}.git"
+
+        git.Repo.clone_from(url, destination)

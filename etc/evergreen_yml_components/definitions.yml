@@ -1637,7 +1637,15 @@ functions:
       params:
         owner: 10gen
         repo: jepsen-io-mongodb
-        expansion_name: github_token
+        expansion_name: jepsen_io_github_token
+        permissions:
+          metadata: read
+          contents: read
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: jepsen
+        expansion_name: jepsen_github_token
         permissions:
           metadata: read
           contents: read
@@ -1648,7 +1656,8 @@ functions:
         args:
           - "./src/evergreen/jepsen_docker/setup.sh"
         include_expansions_in_env:
-          - github_token
+          - jepsen_io_github_token
+          - jepsen_github_token
   "setup jepsen config fuzzer":
     - *f_expansions_write
     - command: subprocess.exec
@@ -2817,6 +2826,33 @@ functions:
       display_name: multiversion_exclude_tags.yml from resmoke invocation
 
   "antithesis image build and push":
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: QA
+        expansion_name: github_token_qa_temp
+        permissions:
+          metadata: read
+          contents: read
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: jstestfuzz
+        expansion_name: github_token_jstestfuzz_temp
+        permissions:
+          metadata: read
+          contents: read
+    - command: subprocess.exec
+      params:
+        binary: "bash"
+        args:
+          - "-c"
+          - |
+            echo "github_token_qa: ${github_token_qa_temp}" >> github_expansions.yml
+            echo "github_token_jstestfuzz: ${github_token_jstestfuzz_temp}" >> github_expansions.yml
+    - command: expansions.update
+      params:
+        file: github_expansions.yml
     - *f_expansions_write
     - command: subprocess.exec
       params:

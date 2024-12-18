@@ -7,6 +7,7 @@ py_library(
         "cedar_report.py",
         "cmdutils.py",
         "codeowners_utils.py",
+        "expansions.py",
         "fileops.py",
         "generate_co_jira_map.py",
         "oauth.py",
