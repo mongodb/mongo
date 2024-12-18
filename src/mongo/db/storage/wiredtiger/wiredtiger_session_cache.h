@@ -74,9 +74,8 @@ public:
      *
      * @param conn WT connection
      * @param epoch In which session cache cleanup epoch was this session instantiated.
-     * @param cursorEpoch In which cursor cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch = 0, uint64_t cursorEpoch = 0);
+    WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch = 0);
 
     /**
      * Creates a new WT session on the specified connection.
@@ -84,16 +83,27 @@ public:
      * @param conn WT connection
      * @param cache The WiredTigerSessionCache that owns this session.
      * @param epoch In which session cache cleanup epoch was this session instantiated.
-     * @param cursorEpoch In which cursor cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn,
-                      WiredTigerSessionCache* cache,
-                      uint64_t epoch = 0,
-                      uint64_t cursorEpoch = 0);
+    WiredTigerSession(WT_CONNECTION* conn, WiredTigerSessionCache* cache, uint64_t epoch = 0);
+
+    /**
+     * Creates a new WT session on the specified connection.
+     *
+     * @param conn WT connection
+     * @param handler Callback handler that will be invoked by wiredtiger.
+     * @param config configuration string used to open the session with.
+     */
+    WiredTigerSession(WT_CONNECTION* conn, WT_EVENT_HANDLER* handler, const char* config);
 
     ~WiredTigerSession();
 
     WT_SESSION* getSession() const {
+        return _session;
+    }
+    WT_SESSION* operator*() const {
+        return _session;
+    }
+    WT_SESSION* operator->() const {
         return _session;
     }
 

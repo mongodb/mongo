@@ -37,12 +37,14 @@
 
 namespace mongo {
 
+class WiredTigerSession;
+
 class WiredTigerStats final : public StorageStats {
 public:
     /**
      * Construct a new WiredTigerStats object with the statistics of the specified session.
      */
-    WiredTigerStats(WT_SESSION*);
+    WiredTigerStats(WiredTigerSession& session);
 
     WiredTigerStats() = default;
     WiredTigerStats(const WiredTigerStats&) = default;

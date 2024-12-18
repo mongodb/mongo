@@ -81,12 +81,15 @@ protected:
     void openConnectionAndCreateSession() {
         ASSERT_WT_OK(
             wiredtiger_open(_path.path().c_str(), nullptr, "create,statistics=(fast),", &_conn));
-        ASSERT_WT_OK(_conn->open_session(_conn, nullptr, "isolation=snapshot", &_session));
-        ASSERT_WT_OK(_session->create(
-            _session, _uri.c_str(), "type=file,key_format=q,value_format=u,log=(enabled=false)"));
+        _session = std::make_unique<WiredTigerSession>(_conn);
+        ASSERT_WT_OK(
+            (*_session)->create(_session->getSession(),
+                                _uri.c_str(),
+                                "type=file,key_format=q,value_format=u,log=(enabled=false)"));
     }
 
     void closeConnection() {
+        _session.reset();
         ASSERT_EQ(_conn->close(_conn, nullptr), 0);
     }
 
@@ -112,10 +115,11 @@ protected:
      * Writes at the specified key to WT.
      */
     void writeAtKey(const std::string& data, int64_t key) {
-        ASSERT_WT_OK(_session->begin_transaction(_session, nullptr));
+        ASSERT_WT_OK((*_session)->begin_transaction(_session->getSession(), nullptr));
 
         WT_CURSOR* cursor;
-        ASSERT_WT_OK(_session->open_cursor(_session, _uri.c_str(), nullptr, nullptr, &cursor));
+        ASSERT_WT_OK((*_session)->open_cursor(
+            _session->getSession(), _uri.c_str(), nullptr, nullptr, &cursor));
 
         cursor->set_key(cursor, key);
 
@@ -124,20 +128,21 @@ protected:
 
         ASSERT_WT_OK(cursor->insert(cursor));
         ASSERT_WT_OK(cursor->close(cursor));
-        ASSERT_WT_OK(_session->commit_transaction(_session, nullptr));
+        ASSERT_WT_OK((*_session)->commit_transaction(_session->getSession(), nullptr));
 
         // Without a checkpoint, an operation is not guaranteed to write to disk.
-        ASSERT_WT_OK(_session->checkpoint(_session, nullptr));
+        ASSERT_WT_OK((*_session)->checkpoint(_session->getSession(), nullptr));
     }
 
     /**
      * Reads at the specified key from WT.
      */
     void readAtKey(int64_t key) {
-        ASSERT_WT_OK(_session->begin_transaction(_session, nullptr));
+        ASSERT_WT_OK((*_session)->begin_transaction(_session->getSession(), nullptr));
 
         WT_CURSOR* cursor;
-        ASSERT_WT_OK(_session->open_cursor(_session, _uri.c_str(), nullptr, nullptr, &cursor));
+        ASSERT_WT_OK((*_session)->open_cursor(
+            _session->getSession(), _uri.c_str(), nullptr, nullptr, &cursor));
 
         cursor->set_key(cursor, key);
         ASSERT_WT_OK(cursor->search(cursor));
@@ -146,7 +151,7 @@ protected:
         ASSERT_WT_OK(cursor->get_value(cursor, &value));
 
         ASSERT_WT_OK(cursor->close(cursor));
-        ASSERT_WT_OK(_session->commit_transaction(_session, nullptr));
+        ASSERT_WT_OK((*_session)->commit_transaction(_session->getSession(), nullptr));
     }
 
     /**
@@ -162,7 +167,7 @@ protected:
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
     std::string _uri{"table:wiredtiger_operation_stats_test"};
     WT_CONNECTION* _conn;
-    WT_SESSION* _session;
+    std::unique_ptr<WiredTigerSession> _session;
     /* Number of reads the fixture will prepare in setUp(), consequently max amount of times read()
      * can be called in a test.  */
     static constexpr int64_t _kMaxReads = 2;
@@ -181,11 +186,12 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
 
     // Read and write statistics should be empty. Check "data" field does not exist. "wait" fields
     // such as the schemaLock might have some value.
-    auto statsBson = WiredTigerStats{_session}.toBSON();
+    auto statsBson = WiredTigerStats{*_session}.toBSON();
 
     {
         BSONObjBuilder bob;
-        ASSERT_OK(WiredTigerUtil::exportTableToBSON(_session, "statistics:", "", bob));
+        ASSERT_OK(
+            WiredTigerUtil::exportTableToBSON(_session->getSession(), "statistics:", "", bob));
         LOGV2(9032000, "Connection statistics", "stats"_attr = bob.obj());
     }
 
@@ -195,7 +201,7 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
 TEST_F(WiredTigerStatsTest, SessionWithWrite) {
     write();
 
-    auto statsObj = WiredTigerStats{_session}.toBSON();
+    auto statsObj = WiredTigerStats{*_session}.toBSON();
     auto dataSection = statsObj["data"];
     ASSERT_EQ(dataSection.type(), BSONType::Object) << statsObj;
 
@@ -209,7 +215,7 @@ TEST_F(WiredTigerStatsTest, SessionWithWrite) {
 TEST_F(WiredTigerStatsTest, SessionWithRead) {
     read();
 
-    auto statsObj = WiredTigerStats{_session}.toBSON();
+    auto statsObj = WiredTigerStats{*_session}.toBSON();
 
     auto dataSection = statsObj["data"];
     ASSERT_EQ(dataSection.type(), BSONType::Object) << statsObj;
@@ -225,16 +231,16 @@ TEST_F(WiredTigerStatsTest, OperationsAddToSessionStats) {
     std::vector<std::unique_ptr<WiredTigerStats>> operationStats;
 
     write();
-    WiredTigerStats firstWrite(_session);
+    WiredTigerStats firstWrite(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(firstWrite - WiredTigerStats{}));
     read();
-    WiredTigerStats firstRead(_session);
+    WiredTigerStats firstRead(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(firstRead - firstWrite));
     write();
-    WiredTigerStats secondWrite(_session);
+    WiredTigerStats secondWrite(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(secondWrite - firstRead));
     read();
-    WiredTigerStats secondRead(_session);
+    WiredTigerStats secondRead(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(secondRead - secondWrite));
 
     const WiredTigerStats& fetchedSessionStats = secondRead;
@@ -280,16 +286,16 @@ TEST_F(WiredTigerStatsTest, OperationsSubtractToZero) {
     std::vector<std::unique_ptr<WiredTigerStats>> operationStats;
 
     write();
-    WiredTigerStats firstWrite(_session);
+    WiredTigerStats firstWrite(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(firstWrite - WiredTigerStats{}));
     read();
-    WiredTigerStats firstRead(_session);
+    WiredTigerStats firstRead(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(firstRead - firstWrite));
     write();
-    WiredTigerStats secondWrite(_session);
+    WiredTigerStats secondWrite(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(secondWrite - firstRead));
     read();
-    WiredTigerStats secondRead(_session);
+    WiredTigerStats secondRead(*_session);
     operationStats.push_back(std::make_unique<WiredTigerStats>(secondRead - secondWrite));
 
     WiredTigerStats& fetchedSessionStats = secondRead;
@@ -313,7 +319,7 @@ TEST_F(WiredTigerStatsTest, OperationsSubtractToZero) {
 TEST_F(WiredTigerStatsTest, Clone) {
     write();
 
-    WiredTigerStats stats{_session};
+    WiredTigerStats stats{*_session};
     auto clone = stats.clone();
 
     ASSERT_BSONOBJ_EQ(stats.toBSON(), clone->toBSON());

@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch)
     : _epoch(epoch),
       _session(nullptr),
       _cursorGen(0),
@@ -62,8 +62,7 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
                                      WiredTigerSessionCache* cache,
-                                     uint64_t epoch,
-                                     uint64_t cursorEpoch)
+                                     uint64_t epoch)
     : _epoch(epoch),
       _session(nullptr),
       _cursorGen(0),
@@ -73,6 +72,18 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
       _idleExpireTime(Date_t::min()) {
     invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
     setCompiledConfigurationsPerConnection(cache->getCompiledConfigurations());
+}
+
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
+                                     WT_EVENT_HANDLER* handler,
+                                     const char* config)
+    : _epoch(0),
+      _session(nullptr),
+      _cursorGen(0),
+      _cursorsOut(0),
+      _compiled(nullptr),
+      _idleExpireTime(Date_t::min()) {
+    invariantWTOK(conn->open_session(conn, handler, config, &_session), nullptr);
 }
 
 WiredTigerSession::~WiredTigerSession() {

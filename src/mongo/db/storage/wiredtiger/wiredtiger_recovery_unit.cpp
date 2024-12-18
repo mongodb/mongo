@@ -880,7 +880,7 @@ std::unique_ptr<StorageStats> WiredTigerRecoveryUnit::computeOperationStatistics
     // We compute operation statistics as the difference between the current session statistics and
     // the session statistics of the last time the method was called, which should correspond to the
     // end of one operation.
-    WiredTigerStats currentSessionStats{_session->getSession()};
+    WiredTigerStats currentSessionStats{*_session};
 
     auto operationStats =
         std::make_unique<WiredTigerStats>(currentSessionStats - _sessionStatsAfterLastOperation);

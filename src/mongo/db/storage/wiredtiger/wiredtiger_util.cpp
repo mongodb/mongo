@@ -754,24 +754,19 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
     sessionCache->closeAllCursors(uri);
 
     // Open a new session with custom error handlers.
-    WT_CONNECTION* conn = ru.getSessionCache()->conn();
-    WT_SESSION* session;
-
+    const char* sessionConfig = nullptr;
     if (gFeatureFlagPrefetch.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         !sessionCache->isEphemeral()) {
-        invariantWTOK(conn->open_session(conn, &eventHandler, "prefetch=(enabled=true)", &session),
-                      nullptr);
-    } else {
-        invariantWTOK(conn->open_session(conn, &eventHandler, nullptr, &session), nullptr);
+        sessionConfig = "prefetch=(enabled=true)";
     }
+    WT_CONNECTION* conn = ru.getSessionCache()->conn();
+    WiredTigerSession session(conn, &eventHandler, sessionConfig);
 
-    ON_BLOCK_EXIT([&] { session->close(session, ""); });
-
-    const char* config =
+    const char* verifyConfig =
         configurationOverride.has_value() ? configurationOverride->c_str() : nullptr;
     // Do the verify. Weird parens prevent treating "verify" as a macro.
-    return (session->verify)(session, uri.c_str(), config);
+    return (session->verify)(*session, uri.c_str(), verifyConfig);
 }
 
 void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
