@@ -665,7 +665,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         sync_node_conn.admin.command(failpointOnCmd)
         self._check_initial_sync_node_has_uninitialized_fcv(initial_sync_node)
 
-    def _unpause_and_finish_initial_sync(self, initial_sync_node):
+    def _unpause_initial_sync(self, initial_sync_node):
         failpoint_off_cmd = {
             "configureFailPoint": "initialSyncHangAfterResettingFCV",
             "mode": "off",
@@ -673,32 +673,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.logger.info("Unpausing initial sync")
         sync_node_conn = initial_sync_node.mongo_client()
         sync_node_conn.admin.command(failpoint_off_cmd)
-
-        wait_for_initial_sync_finish_cmd = bson.SON(
-            [
-                ("replSetTest", 1),
-                ("waitForMemberState", 2),
-                (
-                    "timeoutMillis",
-                    interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000,
-                ),
-            ]
-        )
-        while True:
-            try:
-                self.logger.info("Waiting for initial sync to finish")
-                sync_node_conn.admin.command(wait_for_initial_sync_finish_cmd)
-                break
-            except pymongo.errors.OperationFailure as err:
-                if err.code not in (
-                    self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
-                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE,
-                ):
-                    raise
-                msg = (
-                    "Interrupted while waiting for node to reach secondary state, retrying: {}"
-                ).format(err)
-                self.logger.error(msg)
 
     def _do_teardown(self, mode=None):
         self.logger.info("Stopping all members of the replica set '%s'...", self.replset_name)
@@ -714,7 +688,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         if self.initial_sync_node:
             if self.initial_sync_uninitialized_fcv:
                 self._check_initial_sync_node_has_uninitialized_fcv(self.initial_sync_node)
-                self._unpause_and_finish_initial_sync(self.initial_sync_node)
+                self._unpause_initial_sync(self.initial_sync_node)
             teardown_handler.teardown(self.initial_sync_node, "initial sync node", mode=mode)
 
         # Terminate the secondaries first to reduce noise in the logs.
