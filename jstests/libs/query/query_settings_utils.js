@@ -291,4 +291,99 @@ export class QuerySettingsUtils {
 
         this.removeAllQuerySettings();
     }
+
+    /**
+     * Tests that setting `reject` fails the expected query `query`, and a query with the same
+     * shape, `queryPrime`, and does _not_ fail a query of differing shape, `unrelatedQuery`.
+     */
+    assertRejection({query, queryPrime, unrelatedQuery}) {
+        // Confirm there's no pre-existing settings.
+        this.assertQueryShapeConfiguration([]);
+
+        const type = Object.keys(query)[0];
+        const getRejectCount = () =>
+            db.runCommand({serverStatus: 1}).metrics.commands[type].rejected;
+
+        const rejectBaseline = getRejectCount();
+
+        const assertRejectedDelta = (delta) => {
+            let actual;
+            assert.soon(() => (actual = getRejectCount()) == delta + rejectBaseline,
+                        () => tojson({
+                            expected: delta + rejectBaseline,
+                            actual: actual,
+                            cmdType: type,
+                            cmdMetrics: db.runCommand({serverStatus: 1}).metrics.commands[type],
+                            metrics: db.runCommand({serverStatus: 1}).metrics,
+                        }));
+        };
+
+        const getFailedCount = () => db.runCommand({serverStatus: 1}).metrics.commands[type].failed;
+
+        query = this.withoutDollarDB(query);
+        queryPrime = this.withoutDollarDB(queryPrime);
+        unrelatedQuery = this.withoutDollarDB(unrelatedQuery);
+
+        for (const q of [query, queryPrime, unrelatedQuery]) {
+            // With no settings, all queries should succeed.
+            assert.commandWorked(db.runCommand(q));
+            // And so should explaining those queries.
+            assert.commandWorked(db.runCommand({explain: q}));
+        }
+
+        // Still nothing has been rejected.
+        assertRejectedDelta(0);
+
+        // Set reject flag for query under test.
+        assert.commandWorked(db.adminCommand(
+            {setQuerySettings: {...query, $db: db.getName()}, settings: {reject: true}}));
+
+        // Confirm settings updated.
+        this.assertQueryShapeConfiguration(
+            [this.makeQueryShapeConfiguration({reject: true}, {...query, $db: db.getName()})],
+            /* shouldRunExplain */ true);
+
+        // Just setting the reject flag should not alter the rejected cmd counter.
+        assertRejectedDelta(0);
+
+        // Verify other query with same shape has those settings applied too.
+        this.assertExplainQuerySettings({...queryPrime, $db: db.getName()}, {reject: true});
+
+        // Explain should not alter the rejected cmd counter.
+        assertRejectedDelta(0);
+
+        const failedBaseline = getFailedCount();
+        // The queries with the same shape should both _fail_.
+        assert.commandFailedWithCode(db.runCommand(query), ErrorCodes.QueryRejectedBySettings);
+        assertRejectedDelta(1);
+        assert.commandFailedWithCode(db.runCommand(queryPrime), ErrorCodes.QueryRejectedBySettings);
+        assertRejectedDelta(2);
+
+        // Despite some rejections occurring, there should not have been any failures.
+        assert.eq(failedBaseline, getFailedCount());
+
+        // Unrelated query should succeed.
+        assert.commandWorked(db.runCommand(unrelatedQuery));
+
+        for (const q of [query, queryPrime, unrelatedQuery]) {
+            // All explains should still succeed.
+            assert.commandWorked(db.runCommand({explain: q}));
+        }
+
+        // Explains still should not alter the cmd rejected counter.
+        assertRejectedDelta(2);
+
+        // Remove the setting.
+        this.removeAllQuerySettings();
+        this.assertQueryShapeConfiguration([]);
+
+        // Once again, all queries should succeed.
+        for (const q of [query, queryPrime, unrelatedQuery]) {
+            assert.commandWorked(db.runCommand(q));
+            assert.commandWorked(db.runCommand({explain: q}));
+        }
+
+        // Successful, non-rejected queries should not alter the rejected cmd counter.
+        assertRejectedDelta(2);
+    }
 }

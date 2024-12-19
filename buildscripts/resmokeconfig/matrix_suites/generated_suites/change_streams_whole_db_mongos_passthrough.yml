@@ -44,6 +44,7 @@ selector:
     - jstests/change_streams/metadata_notifications.js
   exclude_with_any_tags:
     - assumes_write_concern_unchanged
+    - do_not_run_in_whole_db_passthrough
     - assumes_against_mongod_not_mongos
   roots:
     - jstests/change_streams/**/*.js

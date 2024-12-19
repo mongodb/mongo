@@ -13,6 +13,9 @@ selector:
     # TODO (SERVER-87633): Investigate why change_streams/shell_helper.js fails when run against
     # a sharded cluster.
     - jstests/change_streams/shell_helper.js
+    # Test expects changes in metrics (rejected command count), but these are
+    # per-ClusterRole. This suite changes which role's metrics are updated.
+    - jstests/change_streams/change_stream_query_settings_reject.js
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the

@@ -54,6 +54,7 @@ selector:
     - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   exclude_with_any_tags:
     - assumes_write_concern_unchanged
+    - do_not_run_in_whole_db_passthrough
     - assumes_against_mongod_not_mongos
     - assumes_read_preference_unchanged
   roots:
