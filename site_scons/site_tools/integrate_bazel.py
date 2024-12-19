@@ -397,7 +397,7 @@ def bazel_server_timeout_dumper(jvm_out, proc_pid, project_root):
                     config_file=os.path.join(project_root, ".evergreen.yml")
                 )
                 evg_api.send_slack_message(
-                    target="#devprod-build-triager",
+                    target="#devprod-build-automation",
                     msg=error_msg,
                 )
             except Exception:  # pylint: disable=broad-except
