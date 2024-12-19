@@ -3588,6 +3588,18 @@ BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
     return ei.toBSON();
 }
 
+EncryptionInformation EncryptionInformationHelpers::constructEncryptionInformationFromFieldConfig(
+    const NamespaceString& nss, const EncryptedFieldConfig& ef) {
+    EncryptionInformation ei;
+    ei.setType(kEncryptionInformationSchemaVersion);
+
+    // Do not include tenant id in nss in the schema as the command request has unsigned security
+    // token.
+    ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << ef.toBSON()));
+
+    return ei;
+}
+
 EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     const NamespaceString& nss, const EncryptionInformation& ei) {
     BSONObj schema = ei.getSchema();

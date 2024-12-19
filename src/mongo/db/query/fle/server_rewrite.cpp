@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/fle/query_rewriter.h"
+#include "mongo/db/query/fle/server_rewrite_helper.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/stdx/unordered_map.h"
@@ -147,77 +148,6 @@ BSONObj rewriteEncryptedFilterV2(FLETagQueryInterface* queryImpl,
     return filter;
 }
 
-namespace {
-NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encryptInfo,
-                                              const NamespaceString& nss) {
-    auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
-    return NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection()->toString());
-}
-}  // namespace
-
-class RewriteBase {
-public:
-    RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
-                const NamespaceString& nss,
-                const EncryptionInformation& encryptInfo)
-        : expCtx(expCtx), nssEsc(getAndValidateEscNsFromSchema(encryptInfo, nss)) {}
-
-    virtual ~RewriteBase(){};
-
-    virtual void doRewrite(FLETagQueryInterface* queryImpl){};
-
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    const NamespaceString nssEsc;
-};
-
-// This class handles rewriting of an entire pipeline.
-class PipelineRewrite : public RewriteBase {
-public:
-    PipelineRewrite(const NamespaceString& nss,
-                    const EncryptionInformation& encryptInfo,
-                    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
-        : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
-
-    ~PipelineRewrite() override{};
-
-    void doRewrite(FLETagQueryInterface* queryImpl) final {
-        auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc);
-        for (auto&& source : pipeline->getSources()) {
-            if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
-                stageRewriterMap[typeid(*source)](&rewriter, source.get());
-            }
-        }
-    }
-
-    std::unique_ptr<Pipeline, PipelineDeleter> getPipeline() {
-        return std::move(pipeline);
-    }
-
-private:
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
-};
-
-// This class handles rewriting of a single match expression, represented as a BSONObj.
-class FilterRewrite : public RewriteBase {
-public:
-    FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
-                  const NamespaceString& nss,
-                  const EncryptionInformation& encryptInfo,
-                  const BSONObj toRewrite,
-                  EncryptedCollScanModeAllowed mode)
-        : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
-
-    ~FilterRewrite() override{};
-
-    void doRewrite(FLETagQueryInterface* queryImpl) final {
-        rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
-    }
-
-    const BSONObj userFilter;
-    BSONObj rewrittenFilter;
-    EncryptedCollScanModeAllowed _mode;
-};
-
 // This helper executes the rewrite(s) inside a transaction. The transaction runs in a separate
 // executor, and so we can't pass data by reference into the lambda. The provided rewriter should
 // hold all the data we need to do the rewriting inside the lambda, and is passed in a more
@@ -253,7 +183,51 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     uassertStatusOK(swCommitResult.getValue().cmdStatus);
     uassertStatusOK(swCommitResult.getValue().getEffectiveStatus());
 }
+
+NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encryptInfo,
+                                              const NamespaceString& nss) {
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
+    return NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection()->toString());
+}
 }  // namespace
+
+RewriteBase::RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
+                         const NamespaceString& nss,
+                         const EncryptionInformation& encryptInfo)
+    : expCtx(expCtx), nssEsc(getAndValidateEscNsFromSchema(encryptInfo, nss)) {}
+
+FilterRewrite::FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
+                             const NamespaceString& nss,
+                             const EncryptionInformation& encryptInfo,
+                             BSONObj toRewrite,
+                             EncryptedCollScanModeAllowed mode)
+    : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
+
+void FilterRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
+    rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
+}
+
+PipelineRewrite::PipelineRewrite(const NamespaceString& nss,
+                                 const EncryptionInformation& encryptInfo,
+                                 std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
+    : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
+
+void PipelineRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
+    auto rewriter = getQueryRewriterForEsc(queryImpl);
+    for (auto&& source : pipeline->getSources()) {
+        if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
+            stageRewriterMap[typeid(*source)](&rewriter, source.get());
+        }
+    }
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> PipelineRewrite::getPipeline() {
+    return std::move(pipeline);
+}
+
+QueryRewriter PipelineRewrite::getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) {
+    return QueryRewriter(expCtx, queryImpl, nssEsc);
+}
 
 BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
                                         const DatabaseName& dbName,

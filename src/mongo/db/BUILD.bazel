@@ -2709,6 +2709,7 @@ mongo_cc_library(
         "//src/mongo/db/query/fle:range_predicate.h",
         "//src/mongo/db/query/fle:range_validator.h",
         "//src/mongo/db/query/fle:server_rewrite.h",
+        "//src/mongo/db/query/fle:server_rewrite_helper.h",
     ],
     deps = [
         ":dbdirectclient",
@@ -2774,6 +2775,7 @@ mongo_cc_unit_test(
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/crypto:fle_crypto",
         "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/repl:repl_coordinator_interface",

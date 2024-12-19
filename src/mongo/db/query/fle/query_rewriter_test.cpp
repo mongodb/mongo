@@ -45,6 +45,7 @@
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
@@ -53,11 +54,11 @@
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
+#include "mongo/db/query/fle/server_rewrite_helper.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
-
 
 namespace mongo {
 namespace {
@@ -228,33 +229,27 @@ private:
     }
 };
 
-void setMockRewriteMaps(fle::MatchTypeToRewriteMap& match,
-                        fle::ExpressionToRewriteMap& agg,
-                        fle::TagMap& tags,
-                        std::set<StringData>& encryptedFields) {
-    match[MatchExpression::EQ] = {
-        [&](auto* rewriter, auto* expr) { return MockPredicateRewriter{rewriter}.rewrite(expr); },
-        [&](auto* rewriter, auto* expr) {
-            return OtherMockPredicateRewriter{rewriter}.rewrite(expr);
-        },
-    };
-    agg[typeid(ExpressionCompare)] = {
-        [&](auto* rewriter, auto* expr) { return MockPredicateRewriter{rewriter}.rewrite(expr); },
-        [&](auto* rewriter, auto* expr) {
-            return OtherMockPredicateRewriter{rewriter}.rewrite(expr);
-        },
-    };
-}
+// Define the mock match and agg rewrite maps to be used by the unit tests.
+static const fle::MatchTypeToRewriteMap matchRewriteMap{
+    {MatchExpression::EQ,
+     {[](auto* rewriter, auto* expr) { return MockPredicateRewriter{rewriter}.rewrite(expr); },
+      [](auto* rewriter, auto* expr) {
+          return OtherMockPredicateRewriter{rewriter}.rewrite(expr);
+      }}}};
+
+static const fle::ExpressionToRewriteMap aggRewriteMap{
+    {typeid(ExpressionCompare),
+     {[](auto* rewriter, auto* expr) { return MockPredicateRewriter{rewriter}.rewrite(expr); },
+      [](auto* rewriter, auto* expr) {
+          return OtherMockPredicateRewriter{rewriter}.rewrite(expr);
+      }}}};
+
 
 class MockQueryRewriter : public fle::QueryRewriter {
 public:
-    MockQueryRewriter(fle::ExpressionToRewriteMap* exprRewrites,
-                      fle::MatchTypeToRewriteMap* matchRewrites,
+    MockQueryRewriter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       const NamespaceString& mockNss)
-        : fle::QueryRewriter(
-              new ExpressionContextForTest(), mockNss, *exprRewrites, *matchRewrites) {
-        setMockRewriteMaps(*matchRewrites, *exprRewrites, _tags, _encryptedFields);
-    }
+        : fle::QueryRewriter(expCtx, mockNss, aggRewriteMap, matchRewriteMap) {}
 
     BSONObj rewriteMatchExpressionForTest(const BSONObj& obj) {
         auto res = rewriteMatchExpression(obj);
@@ -262,16 +257,24 @@ public:
     }
 
     BSONObj rewriteAggExpressionForTest(const BSONObj& obj) {
-        auto expr = Expression::parseExpression(&_expCtx, obj, _expCtx.variablesParseState);
+        invariant(getExpressionContext());
+        auto expr = Expression::parseExpression(
+            getExpressionContext(), obj, getExpressionContext()->variablesParseState);
         auto result = rewriteExpression(expr.get());
         return result ? result->serialize().getDocument().toBson()
                       : expr->serialize().getDocument().toBson();
     }
 
+    static fle::QueryRewriter getQueryRewriterWithMockedMaps(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) {
+        // Workaround for protected fle::QueryRewriter constructor. Slices the mocked object,
+        // leaving us with the copied base class with mocked maps.
+        return MockQueryRewriter(expCtx, nss);
+    }
+
 private:
     fle::TagMap _tags;
     std::set<StringData> _encryptedFields;
-    ExpressionContextForTest _expCtx;
 };
 
 class FLEServerRewriteTest : public unittest::Test {
@@ -279,16 +282,60 @@ public:
     FLEServerRewriteTest() : _mock(nullptr) {}
 
     void setUp() override {
-        _mock = std::make_unique<MockQueryRewriter>(&_agg, &_match, _mockNss);
+        _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss);
+        setResolvedNamespacesForTest();
     }
 
-    void tearDown() override {}
+    void tearDown() override {
+        _expCtx->setResolvedNamespaces({});
+    }
+
+    EncryptedFieldConfig getTestEncryptedFieldConfig() {
+        constexpr auto schema = R"({
+        "escCollection": "enxcol_.coll.esc",
+        "ecocCollection": "enxcol_.coll.ecoc",
+        "fields": [
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789012"
+                },
+                "path": "ssn",
+                "bsonType": "string",
+                "queries": {
+                    "queryType": "equality"
+                }
+            },
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789013"
+                },
+                "path": "age",
+                "bsonType": "int",
+                "queries": {
+                    "queryType": "equality"
+                }
+            }
+        ]
+    })";
+
+        return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
+    }
+
+    auto getEncryptionInformationForTest() {
+        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+        return EncryptionInformationHelpers::constructEncryptionInformationFromFieldConfig(_mockNss,
+                                                                                           efc);
+    }
+
+    void setResolvedNamespacesForTest() {
+        _expCtx->setResolvedNamespaces(
+            {{_mockNss.coll().toString(), {_mockNss, std::vector<BSONObj>{}}}});
+    }
 
 protected:
     std::unique_ptr<MockQueryRewriter> _mock;
-    fle::ExpressionToRewriteMap _agg;
-    fle::MatchTypeToRewriteMap _match;
-    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("mock"_sd);
+    boost::intrusive_ptr<ExpressionContext> _expCtx{new ExpressionContextForTest()};
+    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("test.mock"_sd);
 };
 
 #define ASSERT_MATCH_EXPRESSION_REWRITE(input, expected)                 \
@@ -404,5 +451,94 @@ TEST_FLE_REWRITE_AGG(
     "{$and: [{$eq: ['$user.ssn', {$const: {encrypt: 2}}]}, {$eq: ['$age', {$const: {foo: "
     "4}}]}]}",
     "{$and: [{$gt: ['$user.ssn', {$const: 2}]}, {$lt: ['$age', {$const: 4}]}]}");
+
+auto jsonToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                    const NamespaceString& nss,
+                    StringData jsonArray) {
+    const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
+
+    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+    auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
+    expCtx->setNamespaceString(nss);
+    return Pipeline::parse(rawPipeline, expCtx);
+}
+
+class MockPipelineRewrite : public fle::PipelineRewrite {
+public:
+    MockPipelineRewrite(const NamespaceString& nss,
+                        const EncryptionInformation& encryptInfo,
+                        std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
+        : PipelineRewrite(nss, encryptInfo, std::move(toRewrite)) {}
+
+    ~MockPipelineRewrite() override{};
+
+protected:
+    fle::QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) override {
+        return MockQueryRewriter::getQueryRewriterWithMockedMaps(expCtx, nssEsc);
+    }
+};
+
+#define TEST_FLE_REWRITE_PIPELINE(name, input, expected)                                           \
+    TEST_F(FLEServerRewriteTest, name##_PipelineRewrite) {                                         \
+        auto pipeline = jsonToPipeline(_expCtx, _mockNss, input);                                  \
+        auto pipelineRewrite =                                                                     \
+            MockPipelineRewrite(_mockNss, getEncryptionInformationForTest(), std::move(pipeline)); \
+        pipelineRewrite.doRewrite(nullptr);                                                        \
+        auto rewrittenPipeline = pipelineRewrite.getPipeline();                                    \
+        ASSERT(rewrittenPipeline);                                                                 \
+        ASSERT_VALUE_EQ(Value(rewrittenPipeline->serialize()),                                     \
+                        Value(jsonToPipeline(_expCtx, _mockNss, expected)->serialize()));          \
+    }
+
+TEST_FLE_REWRITE_PIPELINE(Match,
+                          "[{$match: {$and: [{ssn: {encrypt: 2}}, {age: {encrypt: 4}}]}}]",
+                          "[{$match: {$and: [{ssn: {$gt: 2}}, {age: {$gt: 4}}]}}]");
+
+TEST_FLE_REWRITE_PIPELINE(
+    ProjectWithMatch,
+    "[{$project: {foo: '$ssn'}},{$match: {$and: [{foo: {encrypt: 2}}, {age: {encrypt: 4}}]}}]",
+    "[{$project: {foo: '$ssn'}},{$match: {$and: [{foo: {$gt: 2}}, {age: {$gt: 4}}]}}]");
+
+TEST_FLE_REWRITE_PIPELINE(GraphLookup,
+                          "[{ $graphLookup: {  \
+                                from: \"mock\",\
+                                as: \"selfGraph\",\
+                                connectToField: \"name\",\
+                                connectFromField: \"reportsTo\", \
+                                startWith: \"$reportsTo\", \
+                                restrictSearchWithMatch: { \
+                                     \"ssn\" : { encrypt : 1234 } }}}]",
+                          "[{ $graphLookup: { \
+                                from : \"mock\", \
+                                as : \"selfGraph\",\
+                                connectToField : \"name\", \
+                                connectFromField : \"reportsTo\", \
+                                startWith : \"$reportsTo\", \
+                                restrictSearchWithMatch : { \
+                                    \"ssn\" : { $gt : 1234 } }}}]");
+
+TEST_FLE_REWRITE_PIPELINE(GeoNear,
+                          "[{ $geoNear: { \
+                                key: \"location\", \
+                                near : {type : {$const : \"Point\"}, \
+                                coordinates : [ {$const : -73.99279}, {$const : 40.719296} ]}, \
+                                distanceField : \"dist.calculated\", \
+                                maxDistance : 10, \
+                                minDistance : 2, \
+                                query : {ssn : {encrypt : 1234}}, \
+                                spherical : true, \
+                                includeLocs : \"dist.location\"} \
+                                }]",
+                          "[{ $geoNear: { \
+                                key: \"location\", \
+                                near : {type : {$const : \"Point\"}, \
+                                coordinates : [ {$const : -73.99279}, {$const : 40.719296} ]}, \
+                                distanceField : \"dist.calculated\", \
+                                maxDistance : 10, \
+                                minDistance : 2, \
+                                query : {ssn : {\"$gt\" : 1234}}, \
+                                spherical : true, \
+                                includeLocs : \"dist.location\"} \
+                                }]");
 }  // namespace
 }  // namespace mongo
