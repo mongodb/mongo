@@ -120,6 +120,9 @@ mongo_cc_binary(
     srcs = [
         "sdam_json_test_runner.cpp",
     ],
+    tags = [
+        "sdam_json_test",
+    ],
     deps = [
         "json_test",
         "sdam",
@@ -134,6 +137,9 @@ mongo_cc_binary(
     name = "server_selection_json_test",
     srcs = [
         "server_selection_json_test_runner.cpp",
+    ],
+    tags = [
+        "server_selection_json_test",
     ],
     deps = [
         "json_test",

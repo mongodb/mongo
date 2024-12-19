@@ -861,7 +861,7 @@ tasks:
           targets: install-sdam-json-test
           compiling_for_test: true
           install_dir: build/install/bin
-          bazel_build_tags: --bazel-build-tag=mongo_binary
+          bazel_build_tags: --bazel-build-tag=sdam_json_test
       - func: "run tests"
         vars:
           suite: sdam_json_test
@@ -885,7 +885,7 @@ tasks:
           targets: install-server-selection-json-test
           compiling_for_test: true
           install_dir: build/install/bin
-          bazel_build_tags: --bazel-build-tag=mongo_binary
+          bazel_build_tags: --bazel-build-tag=server_selection_json_test
       - func: "run tests"
 
   - <<: *task_template
