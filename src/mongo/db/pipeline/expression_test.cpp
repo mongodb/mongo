@@ -3358,6 +3358,188 @@ TEST(ExpressionMetaTest, ExpressionMetaScore) {
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_EQ(val.getDouble(), 1.23);
 }
+
+TEST(ExpressionMetaTest, ExpressionMetaStreamNotSupported) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"stream\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 9692105);
+
+    // Field path only supported for $meta: "stream.path".
+    expr = fromjson("{$meta: \"textScore.foo\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 17308);
+
+    // Empty field path.
+    expr = fromjson("{$meta: \"textScore.\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 17308);
+    expr = fromjson("{$meta: \"textScore. \"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 17308);
+    expr = fromjson("{$meta: \".\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 17308);
+    expr = fromjson("{$meta: \".textScore\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 17308);
+    expr = fromjson("{$meta: \"\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 17308);
+
+    // Even with feature flag on, field path only supported for $meta: "stream.path".
+    RAIIServerParameterControllerForTest streamsFeatureFlag("featureFlagStreams", true);
+    auto ctxWithFlag = ExpressionContextForTest{};
+    expr = fromjson("{$meta: \"textScore.foo\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 9692106);
+
+    expr = fromjson("{$meta: \"\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 17308);
+    expr = fromjson("{$meta: \".\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 9692107);
+    // Empty field path.
+    expr = fromjson("{$meta: \"stream.\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 9692107);
+    // Bad field path.
+    expr = fromjson("{$meta: \"textScore.foo.\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 9692111);
+    expr = fromjson("{$meta: \"textScore.$\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 9692111);
+    // Field path only supported for $meta: "stream.path".
+    expr = fromjson("{$meta: \"textScore.foo\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 9692106);
+    // Bad field path.
+    expr = fromjson("{$meta: \".textScore\"}");
+    ASSERT_THROWS_CODE(
+        ExpressionMeta::parse(&ctxWithFlag, expr.firstElement(), vps), DBException, 17308);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaStream) {
+    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
+        "featureFlagStreams", true);
+
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj expr = fromjson(R"({$meta: "stream"})");
+    auto exp = ExpressionMeta::parse(&expCtx, expr.firstElement(), vps);
+    auto makeDoc = [](Value streamMeta) {
+        MutableDocument doc;
+        doc.metadata().setStream(std::move(streamMeta));
+        return doc.freeze();
+    };
+
+    Value kafkaMeta(Document(fromjson(R"(
+        {
+            "source": {"type": "kafka", "topic": "hello", "key": {"k1": "v1", "k2": "v2"}, "headers": [{"k": "foo", "v": "bar"}, {"k": "foo2", "v": "bar2"}]}}
+    )")));
+    Value windowMeta(Document(fromjson(R"(
+        {
+            "source": {"type": "atlas"}, 
+            "window": {
+                "start": {"$date": "2024-01-01T00:00:00.000Z"}, 
+                "end": {"$date": "2024-01-01T00:00:01.000Z"}
+            }
+        }
+    )")));
+
+    // Empty/unset case.
+    ASSERT(exp->evaluate(Document{}, &expCtx.variables).missing());
+
+    // Test reading all stream metadata.
+    ASSERT_VALUE_EQ(kafkaMeta, exp->evaluate(makeDoc(kafkaMeta), &expCtx.variables));
+    ASSERT_VALUE_EQ(windowMeta, exp->evaluate(makeDoc(windowMeta), &expCtx.variables));
+
+    // Test reading source metadata.
+    expr = fromjson("{$meta: \"stream.source\"}");
+    exp = ExpressionMeta::parse(&expCtx, expr.firstElement(), vps);
+    ASSERT_VALUE_EQ(kafkaMeta.getDocument()["source"],
+                    exp->evaluate(makeDoc(kafkaMeta), &expCtx.variables));
+
+    // Test reading header metadata.
+    expr = fromjson("{$meta: \"stream.source.headers\"}");
+    exp = ExpressionMeta::parse(&expCtx, expr.firstElement(), vps);
+    ASSERT_VALUE_EQ(kafkaMeta.getDocument()["source"].getDocument()["headers"],
+                    exp->evaluate(makeDoc(kafkaMeta), &expCtx.variables));
+
+    // Test reading header metadata with path.
+    expr = fromjson("{$meta: \"stream.source.headers.k\"}");
+    exp = ExpressionMeta::parse(&expCtx, expr.firstElement(), vps);
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value("foo"_sd), Value("foo2"_sd)}),
+                    exp->evaluate(makeDoc(kafkaMeta), &expCtx.variables));
+
+    // Test reading window metadata.
+    expr = fromjson("{$meta: \"stream.window\"}");
+    exp = ExpressionMeta::parse(&expCtx, expr.firstElement(), vps);
+    ASSERT_VALUE_EQ(windowMeta.getDocument()["window"],
+                    exp->evaluate(makeDoc(windowMeta), &expCtx.variables));
+    ASSERT_VALUE_EQ(windowMeta["window"]["end"],
+                    Value(dateFromISOString("2024-01-01T00:00:01.000Z").getValue()));
+
+    // Test to ensure that rewriting {$meta: "stream.source.topic"} to
+    // {$let: {in: "$$stream.source.topic"}, vars: {stream: {$meta: "stream"}}}
+    // doesn't run into weird issues when a parent expression has another variable named stream
+    // defined.
+    expr = fromjson(R"(
+    {
+        "$let": {
+            in: { "$concat": ["$$stream", "-", "$$topic"] },
+            vars: {
+                "stream": "foo",
+                "topic": {
+                    "$meta": "stream.source.topic"
+                }
+            }
+        }
+    }
+    )");
+    exp = ExpressionLet::parse(&expCtx, expr.firstElement(), vps);
+    ASSERT_VALUE_EQ(Value("foo-hello"_sd), exp->evaluate(makeDoc(kafkaMeta), &expCtx.variables));
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaStreamSerialization) {
+    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
+        "featureFlagStreams", true);
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    // Serialize and de-serialize the Document with stream meta set.
+    Document kafkaMeta(fromjson(R"(
+        {
+            "source": {"type": "kafka", "key": {"k1": "v1", "k2": "v2"}, "headers": [{"k": "foo"}, {"v": "bar"}]}
+        }
+    )"));
+    MutableDocument mut;
+    mut.metadata().setStream(Value(kafkaMeta));
+    BufBuilder b;
+    mut.freeze().serializeForSorter(b);
+    BufReader r{b.buf(), static_cast<unsigned int>(b.len())};
+    Document doc = Document::deserializeForSorter(r, {});
+
+    // Serialize and de-serialize the meta expression.
+    auto expr = fromjson("{$meta: \"stream\"}");
+    auto expCtx2 = ExpressionContextForTest{};
+    auto expressionMeta = ExpressionMeta::parse(&expCtx, expr.firstElement(), vps);
+    auto result = expressionMeta->evaluate(doc, &expCtx.variables).getDocument();
+    expressionMeta = ExpressionMeta::parse(
+        &expCtx2,
+        expressionMeta->serialize(SerializationOptions{.serializeForCloning = true})
+            .getDocument()
+            .toBson()
+            .firstElement(),
+        expCtx2.variablesParseState);
+
+    ASSERT_VALUE_EQ(Value(result), Value(kafkaMeta));
+}
+
 }  // namespace expression_meta_test
 
 namespace ExpressionRegexTest {

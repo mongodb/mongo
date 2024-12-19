@@ -84,6 +84,7 @@ public:
         kSearchSequenceToken,
         kScore,
         kScoreDetails,
+        kStream,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -445,6 +446,20 @@ public:
      */
     void setScoreAndScoreDetails(Value scoreDetails);
 
+    bool hasStream() const {
+        return _holder && _holder->metaFields.test(MetaType::kStream);
+    }
+
+    void setStream(Value value) {
+        _setCommon(MetaType::kStream);
+        _holder->stream = std::move(value);
+    }
+
+    Value getStream() const {
+        tassert(9484101, "stream must be present in metadata", hasStream());
+        return _holder->stream;
+    }
+
     void serializeForSorter(BufBuilder& buf) const;
 
     bool isModified() const {
@@ -497,6 +512,8 @@ private:
         // scoreDetails expects a Document as the underlying type, but to avoid dependency cycles,
         // it's easier to store as Value.
         Value scoreDetails;
+        // Stream processing related metadata. Only set in Atlas Stream Processing.
+        Value stream;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

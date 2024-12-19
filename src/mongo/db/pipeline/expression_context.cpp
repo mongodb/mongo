@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
@@ -413,7 +414,11 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
       _params(std::move(params)),
       _collator(std::move(_params.collator)),
       _documentComparator(_collator.getCollator()),
-      _valueComparator(_collator.getCollator()) {
+      _valueComparator(_collator.getCollator()),
+      _featureFlagStreams([] {
+          return gFeatureFlagStreams.isEnabledUseLastLTSFCVWhenUninitialized(
+              serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+      }) {
 
     _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);
 

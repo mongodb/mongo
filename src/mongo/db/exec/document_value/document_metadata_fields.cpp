@@ -65,6 +65,7 @@ static const std::string scoreDetailsName = "scoreDetails";
 
 // This field ("value") is extracted from the 'scoreDetails' Document to set the 'score' field too.
 static const std::string scoreDetailsScoreField = "value";
+static const std::string streamName = "stream";
 
 static const StringMap<MetaType> kMetaNameToMetaType = {
     {scoreName, MetaType::kScore},
@@ -83,6 +84,7 @@ static const StringMap<MetaType> kMetaNameToMetaType = {
     {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
     {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
     {scoreDetailsName, MetaType::kScoreDetails},
+    {streamName, MetaType::kStream},
 };
 
 static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
@@ -102,6 +104,7 @@ static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
     {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
     {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
     {MetaType::kScoreDetails, scoreDetailsName},
+    {MetaType::kStream, streamName},
 };
 }  // namespace
 
@@ -222,6 +225,10 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
         case DocumentMetadataFields::kSortKey:
             tasserted(9733901,
                       "Cannot set the sort key without knowing if it is a single element key");
+        case DocumentMetadataFields::kStream:
+            assertType(BSONType::Object);
+            setStream(std::move(val));
+            break;
         default:
             MONGO_UNREACHABLE_TASSERT(9733902);
     }
@@ -299,6 +306,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasScoreDetails() && other.hasScoreDetails()) {
         setScoreDetails(other.getScoreDetails());
     }
+    if (!hasStream() && other.hasStream()) {
+        setStream(other.getStream());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -350,6 +360,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasScoreDetails()) {
         setScoreDetails(other.getScoreDetails());
     }
+    if (other.hasStream()) {
+        setStream(other.getStream());
+    }
 }
 
 size_t DocumentMetadataFields::getApproximateSize() const {
@@ -375,6 +388,8 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size -= sizeof(_holder->searchSequenceToken);
     size += _holder->scoreDetails.getApproximateSize();
     size -= sizeof(_holder->scoreDetails);
+    size += _holder->stream.getApproximateSize();
+    size -= sizeof(_holder->stream);
     return size;
 }
 
@@ -450,6 +465,11 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kScoreDetails + 1));
         getScoreDetails().serializeForSorter(buf);
     }
+    if (hasStream()) {
+        buf.appendNum(static_cast<char>(MetaType::kStream + 1));
+        getStream().serializeForSorter(buf);
+    }
+
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -500,6 +520,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kScoreDetails) + 1) {
             out->setScoreDetails(
                 Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kStream) + 1) {
+            out->setStream(Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -569,6 +591,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "score";
         case DocumentMetadataFields::kScoreDetails:
             return "scoreDetails";
+        case DocumentMetadataFields::kStream:
+            return "stream processing metadata";
         default:
             MONGO_UNREACHABLE;
     }

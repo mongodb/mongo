@@ -2202,6 +2202,17 @@ public:
 
     typedef std::map<Variables::Id, NameAndExpression> VariableMap;
 
+    // Callback function to create the "in" expression with the let variables defined.
+    using CreateInExpr = std::function<boost::intrusive_ptr<Expression>(
+        ExpressionContext*, const VariablesParseState&)>;
+
+    // Internal API to create a ExpressionLet with the specified variables.
+    static boost::intrusive_ptr<Expression> create(
+        ExpressionContext* expCtx,
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> letVariables,
+        const VariablesParseState& vpsIn,
+        CreateInExpr createInFunc);
+
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
     }
@@ -2423,6 +2434,19 @@ public:
     }
 
 private:
+    // An error message prefix used for parsing errors.
+    static constexpr auto kParseErrPrefix = "Unsupported $meta field: ";
+
+    // Used during $meta expression parsing.
+    struct ParseMetaTypeResult {
+        // The meta enum type.
+        DocumentMetadataFields::MetaType metaType;
+        // The string name used for the meta type.
+        StringData typeName;
+        // An optional path, for use cases like $meta: "stream.window".
+        boost::optional<StringData> path;
+    };
+
     /**
      * Asserts that if the API version is strict, that the requested metadata field is compatible
      * with it.
@@ -2433,8 +2457,33 @@ private:
      * Asserts that 'featureFlagRankFusionFull' feature flag is enabled, if the
      * requested metadata field requires it.
      */
-    static void _assertMetaFieldCompatibleWithHybridScoringFF(
+    static void _assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
         ExpressionContext* expCtx, DocumentMetadataFields::MetaType type);
+
+    /**
+     * Asserts that the 'featureFlagStreams' is enabled, depending on the parsed meta type and
+     * optional field path specified.
+     */
+    static void _assertMetaFieldCompatibleWithStreamsFeatureFlag(
+        ExpressionContext* expCtx,
+        DocumentMetadataFields::MetaType type,
+        StringData typeName,
+        boost::optional<StringData> optionalPath);
+
+    /**
+     * Rewrites { $meta: "stream.path" } as
+     * { $let: { in: "$$stream.path", vars: {stream: {$meta: "stream"}} } }
+     */
+    static boost::intrusive_ptr<Expression> _rewriteAsLet(ExpressionContext* expCtx,
+                                                          DocumentMetadataFields::MetaType type,
+                                                          StringData typeName,
+                                                          StringData path,
+                                                          const VariablesParseState& vpsIn);
+
+    /**
+     * Helper utility to parse a meta type and optional path from the user supplied typeName.
+     */
+    static ParseMetaTypeResult _parseMetaType(ExpressionContext* expCtx, StringData typeName);
 
     DocumentMetadataFields::MetaType _metaType;
 };

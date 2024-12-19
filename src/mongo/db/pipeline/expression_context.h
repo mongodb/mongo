@@ -877,6 +877,10 @@ public:
         return _featureFlagShardFilteringDistinctScan.get();
     }
 
+    bool isFeatureFlagStreamsEnabled() const {
+        return _featureFlagStreams.get();
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1075,6 +1079,10 @@ private:
             .isEnabledUseLastLTSFCVWhenUninitialized(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }};
+
+    // Initialized in constructor to avoid including server_feature_flags_gen.h
+    // in this header file.
+    Deferred<bool (*)()> _featureFlagStreams;
 };
 
 class ExpressionContextBuilder {

@@ -2404,7 +2404,8 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
                                                            MetaType::kTextScore,
                                                            MetaType::kSearchHighlights,
                                                            MetaType::kSearchSequenceToken,
-                                                           MetaType::kScore};
+                                                           MetaType::kScore,
+                                                           MetaType::kStream};
     const bool usesUnstableField = kUnstableMetaFields.contains(type);
     uassert(ErrorCodes::APIStrictError,
             str::stream() << "Provided apiStrict is true with an unstable meta field \""
@@ -2412,31 +2413,94 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
             !apiStrict || !usesUnstableField);
 }
 
-void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFF(ExpressionContext* const expCtx,
-                                                                   MetaType type) {
+void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
+    ExpressionContext* const expCtx, MetaType type) {
     // TODO SERVER-97104: add 'scoreDetails' here.
     static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore};
     const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
-    const bool hybridScoringFFEnabled =
+    const bool hybridScoringFeatureFlagEnabled =
         feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     uassert(ErrorCodes::FailedToParse,
             "'featureFlagRankFusionFull' must be enabled to use "
             "this meta field",
-            !usesHybridScoringProtectedField || hybridScoringFFEnabled);
+            !usesHybridScoringProtectedField || hybridScoringFeatureFlagEnabled);
+}
+
+boost::intrusive_ptr<Expression> ExpressionMeta::_rewriteAsLet(
+    ExpressionContext* const expCtx,
+    DocumentMetadataFields::MetaType type,
+    StringData typeName,
+    StringData path,
+    const VariablesParseState& vpsIn) {
+    // Rewrite $meta: "stream.some.path" as
+    // {$let: {in: "$$stream.some.path", vars: {"stream": {$meta: "stream"}}}}.
+    return ExpressionLet::create(
+        expCtx,
+        {std::make_pair(typeName.toString(), make_intrusive<ExpressionMeta>(expCtx, type))},
+        vpsIn,
+        [&path, &typeName](ExpressionContext* ctx, const VariablesParseState& vpsWithLetVars) {
+            auto varAndPath = fmt::format("$${}.{}", typeName, path);
+            return ExpressionFieldPath::parse(ctx, varAndPath, vpsWithLetVars);
+        });
+}
+
+void ExpressionMeta::_assertMetaFieldCompatibleWithStreamsFeatureFlag(
+    ExpressionContext* const expCtx,
+    DocumentMetadataFields::MetaType type,
+    StringData typeName,
+    boost::optional<StringData> optionalPath) {
+    bool streamsEnabled = expCtx->isFeatureFlagStreamsEnabled();
+    // $meta: "stream" is only supported when the ff is enabled.
+    uassert(9692105,
+            ExpressionMeta::kParseErrPrefix + typeName,
+            type != DocumentMetadataFields::kStream || streamsEnabled);
+
+    // Field path is only supported when the ff is enabled.
+    uassert(9692110, ExpressionMeta::kParseErrPrefix + typeName, !optionalPath || streamsEnabled);
+
+    // Field path is only supported with $meta: "stream.<path>".
+    uassert(9692106,
+            ExpressionMeta::kParseErrPrefix + typeName,
+            !optionalPath || type == DocumentMetadataFields::kStream);
+}
+
+ExpressionMeta::ParseMetaTypeResult ExpressionMeta::_parseMetaType(ExpressionContext* const expCtx,
+                                                                   StringData typeName) {
+    boost::optional<StringData> fieldPath;
+    if (size_t idx = typeName.find_first_of('.');
+        idx != StringData::npos && expCtx->isFeatureFlagStreamsEnabled()) {
+        // An optional path is supported for { $meta: "stream.<path>" }
+        uassert(9692107, ExpressionMeta::kParseErrPrefix + typeName, idx + 1 < typeName.size());
+        fieldPath = typeName.substr(idx + 1);
+        try {
+            // Make sure the field path is valid.
+            FieldPath path{fieldPath->toString()};
+        } catch (DBException&) {
+            uasserted(9692111, ExpressionMeta::kParseErrPrefix + typeName);
+        }
+        typeName = typeName.substr(0, idx);
+    }
+
+    // parseMetaType() validates by throwing a uassert if typeName is an invalid meta type name.
+    const auto metaType = DocumentMetadataFields::parseMetaType(typeName);
+
+    return ParseMetaTypeResult{metaType, typeName, std::move(fieldPath)};
 }
 
 intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vpsIn) {
     uassert(17307, "$meta only supports string arguments", expr.type() == String);
-
-    const auto typeName = expr.valueStringData();
-    // parseMetaType() validates by throwing a uassert if typeName is an invalid meta type name.
-    const auto metaType = DocumentMetadataFields::parseMetaType(typeName);
+    const auto [metaType, typeName, optionalPath] = _parseMetaType(expCtx, expr.valueStringData());
 
     _assertMetaFieldCompatibleWithStrictAPI(expCtx, metaType);
-    _assertMetaFieldCompatibleWithHybridScoringFF(expCtx, metaType);
+    _assertMetaFieldCompatibleWithHybridScoringFeatureFlag(expCtx, metaType);
+    _assertMetaFieldCompatibleWithStreamsFeatureFlag(expCtx, metaType, typeName, optionalPath);
+
+    if (optionalPath) {
+        return _rewriteAsLet(expCtx, metaType, typeName, *optionalPath, vpsIn);
+    }
     return new ExpressionMeta(expCtx, metaType);
 }
 
