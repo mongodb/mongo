@@ -7,6 +7,32 @@ set -o errexit
 # path the directory that contains this script.
 evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
+function timeout_and_retry {
+  TIMEOUT=$1
+  shift
+  RETRIES=3
+
+  RET=0
+  for i in $(seq $RETRIES); do
+    echo "Running command with ${TIMEOUT}s timeout: $@"
+    eval timeout $TIMEOUT $@ || RET=$?
+
+    if [ $RET -eq 0 ]; then
+      break
+    elif [ $RET -eq 124 ]; then
+      echo "Command timed out after ${TIMEOUT}s on attempt $i: $@"
+    else
+      echo "Command failed with exitcode $RET after $i attempts: $@"
+    fi
+    sleep 1
+  done
+
+  return $RET
+}
+
+# let child shell processes use timeout_and_retry
+export -f timeout_and_retry
+
 . "$evergreen_dir/prelude_workdir.sh"
 . "$evergreen_dir/prelude_python.sh"
 . "$evergreen_dir/prelude_venv.sh"
