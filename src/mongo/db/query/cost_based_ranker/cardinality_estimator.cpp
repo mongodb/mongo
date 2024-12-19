@@ -113,8 +113,15 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
 
 CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool isFilterRoot) {
     if (isFilterRoot && _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        // Sample the entire filter
-        return _samplingEstimator->estimateCardinality(node);
+        // Sample the entire filter and scale it to the child's input cardinality.
+        // The sampling estimator returns cardinality estimates scaled to the collection
+        // cardinality, however this MatchExpression maybe appear in the context of a plan fragment
+        // which child's cardinality is not that of the original collection (e.g. Fetch above an
+        // index union). In this case, the collection cardinality and input cardinality differ and
+        // we need to scale our estimate accordingly.
+        auto sel = _samplingEstimator->estimateCardinality(node) / _collCard;
+        _conjSels.emplace_back(sel);
+        return sel * _inputCard;
     }
 
     const MatchExpression::MatchType nodeType = node->matchType();
@@ -195,6 +202,20 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     }
     est.inCE = ceRes1.getValue();
 
+    // Sampling will attempt to get an estimate for the number of RIDs that the scan returns after
+    // dedupication and applying the filter. This approach does not combine selectivity computed
+    // from the index scan.
+    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        auto ridsEst = _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
+        _conjSels.push_back(ridsEst / _inputCard);
+        est.outCE = ridsEst;
+        CardinalityEstimate outCE{est.outCE};
+        _qsnEstimates.emplace(node, std::move(est));
+        return outCE;
+    }
+
+    // We are not sampling, so we need to compute the CE of the filter and then combine that with
+    // the selectivity estimated from the index scan.
     if (const MatchExpression* filter = node->filter.get()) {
         // In the OK case the result of this call to estimate() is that the selectivities of all
         // children are added to _conjSels. These selectivities are accounted in the subsequent
@@ -225,6 +246,19 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
     auto ceRes1 = estimate(node->children[0].get());
     if (!ceRes1.isOK()) {
         return ceRes1;
+    }
+
+    if (node->children[0]->getType() == STAGE_IXSCAN &&
+        static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
+            nullptr &&  // TODO SERVER-98577: Remove this restriction
+        _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        auto ce = _samplingEstimator->estimateRIDs(
+            static_cast<const IndexScanNode*>(node->children[0].get())->bounds, node->filter.get());
+        trimSels(0);
+        _conjSels.push_back(ce / _inputCard);
+        est.outCE = ce;
+        _qsnEstimates.emplace(node, std::move(est));
+        return ce;
     }
 
     if (const MatchExpression* filter = node->filter.get()) {
@@ -530,6 +564,32 @@ CEResult CardinalityEstimator::estimate(const OrMatchExpression* node, bool isFi
 /*
  * Intervals
  */
+
+OrderedIntervalList openOil(std::string fieldName) {
+    OrderedIntervalList out;
+    BSONObjBuilder bob;
+    bob.appendMinKey("");
+    bob.appendMaxKey("");
+    out.name = fieldName;
+    out.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
+    return out;
+}
+
+IndexBounds equalityPrefix(const IndexBounds* node) {
+    IndexBounds eqPrefix;
+    bool isEqPrefix = true;
+    for (auto&& oil : node->fields) {
+        if (isEqPrefix) {
+            eqPrefix.fields.push_back(oil);
+            isEqPrefix = isEqPrefix && oil.isPoint();
+        } else {
+            eqPrefix.fields.push_back(openOil(oil.name));
+        }
+    }
+    return eqPrefix;
+}
+
 CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     if (node->isSimpleRange) {
         MONGO_UNIMPLEMENTED_TASSERT(9586707);  // TODO: SERVER-96816
@@ -537,6 +597,12 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     if (node->isUnbounded()) {
         _conjSels.emplace_back(oneSel);
         return _inputCard;
+    }
+
+    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        // TODO: avoid copies to construct the equality prefix. We could do this by teaching
+        // SamplingEstimator or IndexBounds about the equality prefix concept.
+        return _samplingEstimator->estimateKeysScanned(equalityPrefix(node));
     }
 
     // Iterate over all intervals over individual index fields (OILs). These intervals are
