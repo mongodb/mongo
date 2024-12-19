@@ -308,6 +308,10 @@ public:
                     : ::grpc::experimental::TlsCredentials(_makeTlsOptions());
 
                 ::grpc::ChannelArguments channel_args;
+                channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS,
+                                    serverGlobalParams.grpcKeepAliveTimeMs);
+                channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS,
+                                    serverGlobalParams.grpcKeepAliveTimeoutMs);
                 channel_args.SetMaxReceiveMessageSize(MaxMessageSizeBytes);
                 channel_args.SetMaxSendMessageSize(MaxMessageSizeBytes);
                 channel_args.SetCompressionAlgorithm(

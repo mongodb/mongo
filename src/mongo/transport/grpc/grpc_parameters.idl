@@ -51,3 +51,22 @@ configs:
         validator: { gte: 1 }
         # Default is defined in mongo/db/server_options.h
         # default: 1000
+
+server_parameters:
+    grpcKeepAliveTimeMs:
+        description: "The interval in milliseconds between PING frames to check the liveness of
+                      established gRPC channels. Runtime updates will only apply to newly created 
+                      channels."
+        set_at: [ startup, runtime ]
+        default: 2147483647 # INT_MAX
+        cpp_varname: 'serverGlobalParams.grpcKeepAliveTimeMs'
+        redact: false
+
+    grpcKeepAliveTimeoutMs:
+        description: "The timeout in milliseconds for a PING frame to be acknowledged. If the client
+                      does not receive an acknowledgment within this time, it will close the
+                      connection. Runtime updates will only apply to newly created channels."
+        set_at: [ startup, runtime ]
+        default: 20000
+        cpp_varname: 'serverGlobalParams.grpcKeepAliveTimeoutMs'
+        redact: false
