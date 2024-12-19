@@ -148,6 +148,10 @@ def collect_transitive_files(env, entry):
                 try:
                     bazel_libdep = env.File(f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(child)}")
                     install_file = env.GetAutoInstalledFiles(bazel_libdep)
+                    if not install_file:
+                        shlib_suffix = env.subst("$SHLIBSUFFIX")
+                        env.BazelAutoInstall(bazel_libdep, shlib_suffix)
+                        install_file = env.GetAutoInstalledFiles(bazel_libdep)
                     env.BazelAutoArchive(install_file[0], bazel_installed, stack)
                 except KeyError:
                     pass
