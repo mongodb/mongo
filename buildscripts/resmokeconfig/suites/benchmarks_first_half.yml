@@ -21,6 +21,17 @@ selector:
     - build/install/bin/placement_history_bm*
     - build/install/bin/system_resource_canary_bm*
     - build/install/bin/future_bm*
+    - build/install/bin/bson_bm*
+    - build/install/bin/commands_bm*
+    - build/install/bin/document_bm*
+    - build/install/bin/sbe_vm_bm*
+    - build/install/bin/quine_mccluskey_bm*
+    - build/install/bin/storage_record_id_bm*
+    - build/install/bin/clock_source_bm*
+    - build/install/bin/decimal_counter_bm*
+    - build/install/bin/tick_source_bm*
+    - build/install/bin/base64_bm*
+    - build/install/bin/uuid_bm*
 
   exclude_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
@@ -33,7 +44,6 @@ selector:
     - build/install/bin/hash_table_bm*
     # These benchmarks are being run as part of the benchmarks_query.yml
     - build/install/bin/query_bm*
-    - build/install/bin/query_nond_bm*
     - build/install/bin/plan_cache_classic_bm*
     - build/install/bin/point_query_bm*
     - build/install/bin/distinct_scan_bm*

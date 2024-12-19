@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,18 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_benchmark(
+    name = "sbe_builder_bm",
+    srcs = [
+        "sbe_builder_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
 )

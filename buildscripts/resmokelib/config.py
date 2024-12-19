@@ -684,7 +684,6 @@ BENCHMARK_SUITE_TEST_LISTS = [
     "build/bsoncolumn_bm.txt",
     "build/first_half_bm.txt",
     "build/second_half_bm.txt",
-    "build/query_nond_bm.txt",
     "build/wt_storage_bm.txt",
     "build/sharding_bm.txt",
 ]

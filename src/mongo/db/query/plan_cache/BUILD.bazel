@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -44,5 +44,47 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_exec",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "plan_cache_key_encoding_bm",
+    srcs = [
+        "plan_cache_bm_fixture.cpp",
+        "plan_cache_bm_fixture.h",
+        "plan_cache_key_encoding_agg_bm.cpp",
+        "plan_cache_key_encoding_find_bm.cpp",
+        "plan_cache_parse_encode_bm.cpp",
+        "plan_cache_parse_encode_pipeline_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "plan_cache_classic_bm",
+    srcs = [
+        "plan_cache_classic_bm.cpp",
+        "//src/mongo/db/catalog:index_catalog_entry_mock.h",
+        "//src/mongo/db/catalog:index_catalog_mock.h",
+        "//src/mongo/db/query:query_planner_test_fixture.h",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "plan_cache_test_util",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/catalog:collection_mock",
+        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/s:sharding_router_api",
     ],
 )

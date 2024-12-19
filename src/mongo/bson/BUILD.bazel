@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_fuzzer_test", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_fuzzer_test", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -88,6 +88,15 @@ mongo_cc_fuzzer_test(
         "bson_validate_old.cpp",
         "bson_validate_old.h",
     ],
+    deps = [],
+)
+
+mongo_cc_benchmark(
+    name = "bson_bm",
+    srcs = [
+        "bson_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",
