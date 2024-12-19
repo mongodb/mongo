@@ -102,11 +102,9 @@ std::vector<double> specialValues = {-std::numeric_limits<double>::infinity(),
 }  // namespace
 
 TEST(Summation, AddLongs) {
-    int iter = 0;
     for (auto x : longValues) {
         for (auto y : longValues) {
             for (auto z : longValues) {
-                iter++;
                 DoubleDoubleSummation sum;
 
                 // This checks for correct results mod 2**64, which helps with checking correctness

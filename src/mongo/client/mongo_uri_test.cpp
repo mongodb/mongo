@@ -783,7 +783,6 @@ TEST(MongoURI, specTests) {
 
                 // parse the options
                 ConnectionString::ConnectionType connectionType = kMaster;
-                size_t numOptions = 0;
                 std::string setName;
                 const auto optionsElement = test.getField("options");
                 ASSERT_FALSE(optionsElement.eoo());
@@ -791,7 +790,6 @@ TEST(MongoURI, specTests) {
                 if (optionsElement.type() != jstNULL) {
                     ASSERT_EQ(optionsElement.type(), Object);
                     const auto optionsObj = optionsElement.Obj();
-                    numOptions = optionsObj.nFields();
                     const auto replsetElement = optionsObj.getField("replicaSet");
                     if (!replsetElement.eoo()) {
                         ASSERT_EQ(replsetElement.type(), String);

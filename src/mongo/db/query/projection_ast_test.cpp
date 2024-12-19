@@ -93,7 +93,7 @@ public:
     }
 };
 
-void assertCanClone(Projection proj) {
+void assertCanClone(Projection proj, size_t expectedNumGrandChildren) {
     boost::optional<Projection> optProj(std::move(proj));
 
     auto clone = optProj->root()->clone();
@@ -120,6 +120,7 @@ void assertCanClone(Projection proj) {
         // access of "child" so ASAN won't pick up any potential errors.
         numGrandChildren += child->children().size();
     }
+    ASSERT_EQ(numGrandChildren, expectedNumGrandChildren);
 }
 
 TEST_F(ProjectionASTTest, TestParsingTypeEmptyProjectionIsExclusionInFind) {
@@ -361,21 +362,21 @@ TEST_F(ProjectionASTTest, TestCloningWithPositionalAndSlice) {
         parseWithFindFeaturesEnabled(fromjson("{'a.b': 1, b: 1, 'c.d.$': 1, f: {$slice: [1, 2]}}"),
                                      fromjson("{'c.d': {$gt: 1}}"));
     ASSERT(proj.type() == ProjectType::kInclusion);
-    assertCanClone(std::move(proj));
+    assertCanClone(std::move(proj), 2);
 }
 
 TEST_F(ProjectionASTTest, TestCloningWithElemMatch) {
     Projection proj =
         parseWithFindFeaturesEnabled(fromjson("{'a.b': 1, b: 1, f: {$elemMatch: {foo: 'bar'}}}"));
     ASSERT(proj.type() == ProjectType::kInclusion);
-    assertCanClone(std::move(proj));
+    assertCanClone(std::move(proj), 2);
 }
 
 TEST_F(ProjectionASTTest, TestCloningWithExpression) {
     Projection proj =
         parseWithDefaultPolicies(fromjson("{'a.b': 1, b: 1, f: {$add: [1, 2, '$a']}}"));
     ASSERT(proj.type() == ProjectType::kInclusion);
-    assertCanClone(std::move(proj));
+    assertCanClone(std::move(proj), 1);
 }
 
 TEST_F(ProjectionASTTest, TestCloningWithLargeProject) {
@@ -393,7 +394,7 @@ TEST_F(ProjectionASTTest, TestCloningWithLargeProject) {
 
     Projection proj = parseWithDefaultPolicies(fromjson(sb.str()));
     ASSERT(proj.type() == ProjectType::kInclusion);
-    assertCanClone(std::move(proj));
+    assertCanClone(std::move(proj), 0);
 }
 
 TEST_F(ProjectionASTTest, TestDebugBSONWithPositionalAndSliceSkipLimit) {

@@ -4551,10 +4551,8 @@ TEST_F(BSONColumnTest, RLEFirstInControlWithNonRLEAfterWithoutOverflow) {
 
     elems.push_back(createElementInt64(128));
 
-    int i = 0;
     for (auto&& elem : elems) {
         cb.append(elem);
-        ++i;
     }
 
     BufBuilder expected;

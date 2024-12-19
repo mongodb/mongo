@@ -665,7 +665,7 @@ TEST_F(RangeDeleterServiceTest, RescheduleRangeDeletionTasksOnStepUp) {
 
     // Generate and persist range deleter tasks (some pending, some non-pending, some non-pending &&
     // processing)
-    int nPending = 0, nNonPending = 0, nNonPendingAndProcessing = 0;
+    int nNonPending = 0, nNonPendingAndProcessing = 0;
     int minBound = 0;
     for (int i = 0; i < nRangeDeletionTasks; i++) {
         auto rangeDeletionTask = createRangeDeletionTask(uuidCollA,
@@ -678,7 +678,6 @@ TEST_F(RangeDeleterServiceTest, RescheduleRangeDeletionTasksOnStepUp) {
         if (rand == 0) {
             // Pending range deletion task
             rangeDeletionTask.setPending(true);
-            nPending++;
         } else if (rand == 1) {
             // Non-pending range deletion task
             rangeDeletionTask.setPending(false);
