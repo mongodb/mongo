@@ -116,9 +116,6 @@ protected:
     static std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>> parseArgs(
         ExpressionContext* expCtx, const BSONObj& args, VariablesParseState vps);
 
-    // Utility to check that memory limit isn't exceeded.
-    void checkMemUsage();
-
     // Stores the limit of how many values we will return. This value is initialized to
     // 'boost::none' on construction and is only set during 'startNewGroup'.
     boost::optional<long long> _n;

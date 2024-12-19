@@ -59,6 +59,7 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 namespace {
@@ -1070,11 +1071,15 @@ TEST_F(BucketAutoTests, BucketAutoWithPushRespectsMemoryLimit) {
                 }
             }})");
 
-    // Each array in the 100 documents below takes up roughly 110 bytes. The infrastructure that
-    // processes each new element in the accumulator takes up roughly another 100 bytes. So we
-    // should require roughly 100 * 110 + 100 bytes for this operation to succeed, but lets round up
-    // to the nearest 500.
-    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxPushBytes", 11500);
+    // In non-debug modes, each array in the 100 documents below takes up roughly 110 bytes. The
+    // infrastructure that processes each new element in the accumulator takes up roughly another
+    // 100 bytes. So we should require roughly 100 * 110 + 100 bytes for this operation to succeed,
+    // but lets round up to the nearest 500. In debug modes, each array can take up to ~136 bytes as
+    // an upper bound, while the infrastructure that processes each element in the accumulator takes
+    // up ~120 bytes. We should require 136 * 100 + 120 bytes for this operation to succeed, but
+    // we'll round up to the nearest 500 for buffer.
+    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxPushBytes",
+                                                             kDebugBuild ? 14000 : 11500);
     std::deque<Document> docs;
     for (size_t i = 0; i < 100; i++) {
         docs.push_back(
@@ -1099,12 +1104,15 @@ TEST_F(BucketAutoTests, BucketAutoWithConcatArraysRespectsMemoryLimit) {
                 }
             }})");
 
-    // Each array in the 100 documents below takes up roughly 110 bytes. The infrastructure that
-    // processes each new element in the accumulator takes up roughly another 100 bytes. So we
-    // should require roughly 100 * 110 + 100 bytes for this operation to succeed, but lets round up
-    // to the nearest 500.
+    // In non-debug modes, each array in the 100 documents below takes up roughly 110 bytes. The
+    // infrastructure that processes each new element in the accumulator takes up roughly another
+    // 100 bytes. So we should require roughly 100 * 110 + 100 bytes for this operation to succeed,
+    // but lets round up to the nearest 500. In debug modes, each array can take up to ~136 bytes as
+    // an upper bound, while the infrastructure that processes each element in the accumulator takes
+    // up ~120 bytes. We should require 136 * 100 + 120 bytes for this operation to succeed, but
+    // we'll round up to the nearest 500 for buffer.
     RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxConcatArraysBytes",
-                                                             11500);
+                                                             kDebugBuild ? 14000 : 11500);
     std::deque<Document> docs;
     for (size_t i = 0; i < 100; i++) {
         docs.push_back(

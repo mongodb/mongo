@@ -560,11 +560,7 @@ void AccumulatorPushConcatArraysCommonForBucketAuto::addToMap(long long inputPos
         std::pair{inputPosition,
                   SimpleMemoryUsageTokenWith<Value>{
                       SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, std::move(input)}});
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << getOpName()
-                          << " used too much memory and cannot spill to disk. Memory limit: "
-                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-            _memUsageTracker.withinMemoryLimit());
+    checkMemUsage();
 }
 
 void AccumulatorConcatArraysForBucketAuto::addToMap(long long inputPosition, Value input) {

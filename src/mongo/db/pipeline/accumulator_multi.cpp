@@ -212,16 +212,6 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
     return std::make_tuple(n, input);
 }
 
-void AccumulatorN::checkMemUsage() {
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << getOpName()
-                          << " used too much memory and spilling to disk cannot reduce memory "
-                             "consumption any further. Used: "
-                          << _memUsageTracker.currentMemoryBytes() << " bytes. Memory limit: "
-                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-            _memUsageTracker.withinMemoryLimit());
-}
-
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                    const boost::intrusive_ptr<Expression>& argument,
                                    const SerializationOptions& options,
