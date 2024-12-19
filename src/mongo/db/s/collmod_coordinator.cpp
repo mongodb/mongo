@@ -62,7 +62,6 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/async_rpc.h"
-#include "mongo/executor/async_rpc_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"

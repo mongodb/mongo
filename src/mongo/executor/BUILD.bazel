@@ -272,6 +272,21 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "async_rpc_util",
+    srcs = [
+        "async_rpc_util.cpp",
+    ],
+    hdrs = [
+        "async_rpc_util.h",
+        "//src/mongo/util:cancellation.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:future_util",
+    ],
+)
+
+mongo_cc_library(
     name = "async_rpc_error_info",
     srcs = [
         "async_rpc_error_info.cpp",
@@ -590,6 +605,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         "async_rpc",
+        "async_rpc_util",
         "connection_pool_executor",
         "egress_connection_closer_manager",
         "network_interface_mock",

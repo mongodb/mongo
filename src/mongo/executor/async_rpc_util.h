@@ -32,26 +32,11 @@
 #include <memory>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/generic_argument_util.h"
-#include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/executor/async_rpc.h"
-#include "mongo/executor/async_rpc_error_info.h"
-#include "mongo/executor/async_rpc_retry_policy.h"
-#include "mongo/executor/async_rpc_targeter.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/idl/generic_argument_gen.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/async_rpc_shard_targeter.h"
-#include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_util.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo::async_rpc {
 
@@ -106,6 +91,8 @@ Future<ResultType> whenAnyThat(std::vector<ExecutorFuture<ResultType>>&& futures
     return processMultipleFutures<ResultType>(std::move(futures), std::move(processSW));
 }
 
+void logErrorDetails(int responsesLeft, Status errorStatus);
+
 /**
  * Given a vector of input Futures and a processResponse callable, processes the responses
  * from each of the futures and pushes the results onto a vector. Cancels early on error
@@ -136,6 +123,8 @@ Future<std::vector<SingleResult>> getAllResponsesOrFirstErrorWithCancellation(
         if (!sw.isOK()) {
             sharedUtil->source.cancel();
             stdx::lock_guard<stdx::mutex> lk(sharedUtil->mutex);
+            // TODO(SERVER-98556): Debug statement for the purpose of helping with diagnosing BFs.
+            logErrorDetails(sharedUtil->responsesLeft, sw.getStatus());
             if (sharedUtil->results.getStatus() == Status::OK()) {
                 sharedUtil->results = sw.getStatus();
             }

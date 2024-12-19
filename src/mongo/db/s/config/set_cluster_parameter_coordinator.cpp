@@ -66,7 +66,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/executor/async_rpc_util.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

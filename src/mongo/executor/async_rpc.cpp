@@ -39,6 +39,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -47,6 +48,9 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
+
+// TODO(SERVER-98556): kTest debug statements for the purpose of helping with diagnosing BFs.
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::async_rpc {
 namespace detail {
@@ -120,6 +124,9 @@ public:
                     .unsafeToInlineFuture()
                     .then(
                         [exec, callbackHandle = std::move(swCallbackHandle.getValue())]() mutable {
+                            // TODO(SERVER-98556): Debug statement for the purpose of helping with
+                            // diagnosing BFs.
+                            LOGV2_DEBUG(9771000, 1, "Cancellation recognized in async_rpc");
                             exec->cancel(callbackHandle);
                         })
                     .getAsync([](auto) {});
@@ -140,6 +147,13 @@ public:
                     if (extraInfo->isLocal()) {
                         targeter->onRemoteCommandError(r.target, extraInfo->asLocal()).get();
                     } else {
+                        // TODO(SERVER-98556): Debug statement for the purpose of helping with
+                        // diagnosing BFs.
+                        LOGV2_DEBUG(9771003,
+                                    1,
+                                    "Remote error occured in async_rpc",
+                                    "status"_attr =
+                                        extraInfo->asRemote().getRemoteCommandResult().toString());
                         targeter
                             ->onRemoteCommandError(r.target,
                                                    extraInfo->asRemote().getRemoteCommandResult())

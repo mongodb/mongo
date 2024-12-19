@@ -31,6 +31,7 @@
 #include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/s/convert_to_capped_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"

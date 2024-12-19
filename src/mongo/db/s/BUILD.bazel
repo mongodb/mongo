@@ -706,6 +706,7 @@ mongo_cc_library(
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_api",
         "//src/mongo/executor:async_rpc",
+        "//src/mongo/executor:async_rpc_util",
         "//src/mongo/executor:inline_executor",
         "//src/mongo/executor:network_interface",
         "//src/mongo/idl:cluster_server_parameter_common",

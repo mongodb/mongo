@@ -52,6 +52,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"

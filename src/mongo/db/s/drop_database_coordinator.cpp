@@ -80,7 +80,6 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/async_rpc.h"
-#include "mongo/executor/async_rpc_util.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

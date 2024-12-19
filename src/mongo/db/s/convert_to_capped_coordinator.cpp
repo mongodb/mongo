@@ -32,6 +32,7 @@
 
 #include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/async_rpc.h"
-#include "mongo/executor/async_rpc_util.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_state.h"

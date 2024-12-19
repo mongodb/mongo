@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

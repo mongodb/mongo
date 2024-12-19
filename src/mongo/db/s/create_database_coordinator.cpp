@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/create_database_coordinator.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/create_database_util.h"
 #include "mongo/db/s/participant_block_gen.h"
