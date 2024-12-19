@@ -7,16 +7,7 @@ env = env.Clone()
 
 env.CppLibfuzzerTest(
     target="protocol_fuzzer",
-    source=[
-        "protocol_fuzzer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
-        "$BUILD_DIR/mongo/transport/message_compressor",
-        "message",
-        "rpc",
-    ],
+    source=[],
 )
 
 if wiredtiger:

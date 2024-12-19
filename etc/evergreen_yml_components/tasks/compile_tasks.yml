@@ -843,6 +843,7 @@ tasks:
         vars:
           targets: archive-fuzzertests
           compiling_for_test: true
+          bazel_build_tags: --bazel-build-tag=dist_test --bazel-build-tag=mongo_fuzzer_test
       # Store the fuzzer executable, which we use to generate and run fuzzer inputs.
       - command: s3.put
         params:

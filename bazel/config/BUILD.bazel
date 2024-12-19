@@ -1490,8 +1490,19 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "sanitize_without_tsan",
+    match_all = [
+        ":any_enabled_sanitizer",
+        ":tsan_disabled",
+    ],
+)
+
+selects.config_setting_group(
     name = "sanitize_fuzzer_required_settings",
-    match_all = [":fsan_enabled"],
+    match_all = [
+        ":fsan_enabled",
+        ":system_allocator_enabled",
+    ],
 )
 
 selects.config_setting_group(

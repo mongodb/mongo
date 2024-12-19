@@ -566,11 +566,17 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
                     stderr=subprocess.STDOUT,
                     env={**os.environ.copy(), **Globals.bazel_env_variables},
                 )
+            linker_jobs = 4
+            sanitizers = env.GetOption("sanitize")
+            if sanitizers is not None and "fuzzer" in sanitizers.split(","):
+                linker_jobs = 1
             print(
-                "Build failed, retrying with --jobs=4 in case linking failed due to hitting concurrency limits..."
+                f"Build failed, retrying with --jobs={linker_jobs} in case linking failed due to hitting concurrency limits..."
             )
             run_bazel_command(
-                env, bazel_cmd + ["--jobs", "4", "--link_timeout=False"], tries_so_far=1
+                env,
+                bazel_cmd + ["--jobs", str(linker_jobs), "--link_timeout=False"],
+                tries_so_far=1,
             )
             return
 

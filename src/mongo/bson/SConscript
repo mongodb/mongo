@@ -36,14 +36,7 @@ env.Benchmark(
 
 env.CppLibfuzzerTest(
     target="bson_validate_fuzzer",
-    source=[
-        "bson_validate_fuzzer.cpp",
-        "bson_validate_old.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/bson_validate",
-    ],
+    source=[],
 )
 
 env.CppIntegrationTest(

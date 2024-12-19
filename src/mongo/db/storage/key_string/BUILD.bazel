@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -47,5 +47,17 @@ mongo_cc_binary(
         "key_string",
         "//src/mongo/db:server_base",
         "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "key_string_to_bson_fuzzer",
+    srcs = [
+        "key_string_to_bson_fuzzer.cpp",
+    ],
+    deps = [
+        "key_string",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
     ],
 )

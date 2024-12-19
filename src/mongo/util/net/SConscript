@@ -15,15 +15,7 @@ env.CppUnitTest(
 
 env.CppLibfuzzerTest(
     target="asn1_parser_fuzzer",
-    source=[
-        "asn1_parser_fuzzer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-    ],
+    source=[],
 )
 
 if get_option("ssl") == "on":

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -94,5 +94,78 @@ mongo_cc_unit_test(
         ":bson_column_fuzzer_impl",
         ":bsoncolumn_test_util",
         "//src/mongo/util:safe_num",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "simple8b_fuzzer",
+    srcs = [
+        "simple8b_fuzzer.cpp",
+    ],
+    deps = [
+        "column",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bson_column_validate_fuzzer",
+    srcs = [
+        "bson_column_validate_fuzzer.cpp",
+    ],
+    deps = [
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumn_decompress_fuzzer",
+    srcs = [
+        "bsoncolumn_decompress_fuzzer.cpp",
+    ],
+    deps = [
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumn_builder_fuzzer",
+    srcs = [
+        "bsoncolumn_builder_fuzzer.cpp",
+    ],
+    deps = [
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumn_decompress_paths_fuzzer",
+    srcs = [
+        "bsoncolumn_decompress_paths_fuzzer.cpp",
+    ],
+    deps = [
+        "bsoncolumn_test_util",
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumnbuilder_reopen_fuzzer",
+    srcs = [
+        "bsoncolumnbuilder_reopen_fuzzer.cpp",
+    ],
+    deps = [
+        "bson_column_fuzzer_impl",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
     ],
 )

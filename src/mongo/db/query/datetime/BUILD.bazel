@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -49,6 +49,18 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":date_time_support",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "date_time_support_fuzzer",
+    srcs = [
+        "date_time_support_fuzzer.cpp",
+    ],
+    deps = [
+        "date_time_support",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/transport:transport_layer_common",
     ],

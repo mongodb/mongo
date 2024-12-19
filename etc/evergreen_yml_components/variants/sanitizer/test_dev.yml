@@ -422,7 +422,7 @@ buildvariants:
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-large
+      - rhel8.8-xlarge
     stepback: false
     expansions:
       additional_package_targets: >-

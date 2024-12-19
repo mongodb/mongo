@@ -30,12 +30,5 @@ env.CppUnitTest(
 
 env.CppLibfuzzerTest(
     target="key_string_to_bson_fuzzer",
-    source=[
-        "key_string_to_bson_fuzzer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/bson_validate",
-        "key_string",
-    ],
+    source=[],
 )

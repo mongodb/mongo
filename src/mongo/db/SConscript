@@ -278,13 +278,7 @@ asioEnv.CppIntegrationTest(
 
 env.CppLibfuzzerTest(
     target="op_msg_fuzzer",
-    source=[
-        "op_msg_fuzzer.cpp",
-    ],
-    LIBDEPS=[
-        "op_msg_fuzzer_fixture",
-        "server_base",
-    ],
+    source=[],
 )
 
 env.Benchmark(

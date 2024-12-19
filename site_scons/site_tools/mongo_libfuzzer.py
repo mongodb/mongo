@@ -65,7 +65,10 @@ def build_cpp_libfuzzer_test(env, target, source, **kwargs):
     # mongo_test_execution.py for details on undecidability).
     kwargs["UNDECIDABLE_TEST"] = True
 
-    result = myenv.Program(target, source, **kwargs)
+    if not source:
+        result = myenv.BazelProgram(target, source, **kwargs)
+    else:
+        result = myenv.Program(target, source, **kwargs)
     myenv.RegisterTest("$LIBFUZZER_TEST_LIST", result[0])
     myenv.Alias("$LIBFUZZER_TEST_ALIAS", result[0])
 
