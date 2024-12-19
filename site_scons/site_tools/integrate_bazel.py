@@ -666,8 +666,29 @@ def get_default_cert_dir():
         return f"{os.path.expanduser('~')}/.engflow"
 
 
+def get_default_engflow_auth_path():
+    bin_dir = os.path.expanduser("~/.local/bin/")
+    executable_name = "engflow_auth"
+    if platform.system() == "Windows":
+        executable_name += ".exe"
+    return os.path.join(bin_dir, executable_name)
+
+
 def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
     running_in_evergreen = os.environ.get("CI")
+
+    # Check engflow_auth existence
+    if os.path.exists(get_default_engflow_auth_path()):
+        # Check engflow_auth token presence
+        if os.path.exists(
+            os.path.expanduser("~/.config/engflow_auth/tokens/sodalite.cluster.engflow.com")
+        ):
+            return True
+        else:
+            print(
+                "engflow_auth is installed, but found no token. Please run the following to authenticate with EngFlow:\nbazel run --config=local //buildscripts:engflow_auth"
+            )
+            return False
 
     if running_in_evergreen and not os.path.exists("./engflow.cert"):
         print(
