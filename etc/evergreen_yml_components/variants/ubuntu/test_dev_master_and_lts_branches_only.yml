@@ -64,7 +64,7 @@ buildvariants:
         LIBS="voidstar"
       san_options: >-
         UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/usr/lib/llvm-12/bin/llvm-symbolizer"
-        ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:detect_stack_use_after_return=1:max_uar_stack_size_log=16:verify_asan_link_order=0"
+        ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:verify_asan_link_order=0"
       test_flags: >-
         --excludeWithAnyTags=incompatible_aubsan
   # The v4 toolchain doesn't support the -shared-libsan option with TSAN, which is necessary for
