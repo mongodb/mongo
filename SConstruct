@@ -349,14 +349,12 @@ add_option(
     type="choice",
 )
 
-
 add_option(
     "debug-symbols",
-    choices=["on", "off"],
-    const="on",
+    choices=["on", "off", "minimal"],
     default=build_profile.debug_symbols,
     help="Enable producing debug symbols",
-    nargs="?",
+    nargs=1,
     type="choice",
 )
 
@@ -2146,7 +2144,7 @@ env.AddMethod(is_toolchain, "ToolchainIs")
 
 releaseBuild = get_option("release") == "on"
 debugBuild = get_option("dbg") == "on"
-debug_symbols = get_option("debug-symbols") == "on"
+debug_symbols = get_option("debug-symbols") != "off"
 optBuild = mongo_generators.get_opt_options(env)
 
 if env.get("ENABLE_BUILD_RETRY"):
@@ -4700,8 +4698,10 @@ def doConfigure(myenv):
         # Turn off debug symbols. Due to g0 disabling any previously added debugging flags,
         # it is easier to append g0 near the end rather than trying to not add all the other
         # debug flags. This should be added after any debug flags.
-        if not debug_symbols:
+        if get_option("debug-symbols") == "off":
             myenv.AppendUnique(LINKFLAGS=["-g0"], CCFLAGS=["-g0"])
+        elif get_option("debug-symbols") == "minimal":
+            myenv.AppendUnique(LINKFLAGS=["-g1"], CCFLAGS=["-g1"])
 
         # Our build is already parallel.
         if not myenv.AddToLINKFLAGSIfSupported("-Wl,--no-threads"):

@@ -387,6 +387,8 @@ buildvariants:
         MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --debug-symbols=minimal
+      separate_debug: off
       scons_cache_scope: shared
       num_scons_link_jobs_available: 0.5
       compile_variant: *enterprise-rhel-8-benchmarks
