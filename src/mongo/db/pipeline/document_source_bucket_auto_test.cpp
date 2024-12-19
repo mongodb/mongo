@@ -431,7 +431,9 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
         expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
     auto sort =
-        DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx}, 0, maxMemoryUsageBytes);
+        DocumentSourceSort::create(expCtx,
+                                   {BSON("_id" << -1), expCtx},
+                                   {.limit = 0, .maxMemoryUsageBytes = maxMemoryUsageBytes});
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock =

@@ -474,6 +474,25 @@ TEST_F(DocumentSourceSortExecutionTest, ParseableSerialization) {
     ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
 }
 
+TEST_F(DocumentSourceSortExecutionTest, FailsGracefullyWithInvalidInternalParameters) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$sort: {a: 1, $_internalLimit: 'surprise string!'}}");
+    ASSERT_THROWS_CODE(DocumentSourceSort::createFromBson(spec.firstElement(), expCtx),
+                       AssertionException,
+                       9028702);
+
+    spec = fromjson("{$sort: {a: 1, $_internalOutputSortKey: 'surprise string!'}}");
+    ASSERT_THROWS_CODE(
+        DocumentSourceSort::createFromBson(spec.firstElement(), expCtx), AssertionException, 15974);
+
+    // Must be a boolean, not bool-"ish".
+    spec = fromjson("{$sort: {a: 1, $_internalOutputSortKey: 1}}");
+    ASSERT_THROWS_CODE(
+        DocumentSourceSort::createFromBson(spec.firstElement(), expCtx), AssertionException, 16410);
+}
+
+
 TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
     auto sort = DocumentSourceSort::create(getExpCtx(), BSON("a" << 1));
     auto mock =
@@ -530,8 +549,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
     expCtx->setAllowDiskUse(true);
     const size_t maxMemoryUsageBytes = 1000;
 
-    auto sort =
-        DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx}, 0, maxMemoryUsageBytes);
+    auto sort = DocumentSourceSort::create(
+        expCtx, {BSON("_id" << -1), expCtx}, {.maxMemoryUsageBytes = maxMemoryUsageBytes});
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock =
@@ -567,8 +586,8 @@ TEST_F(DocumentSourceSortExecutionTest,
     expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
 
-    auto sort =
-        DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx}, 0, maxMemoryUsageBytes);
+    auto sort = DocumentSourceSort::create(
+        expCtx, {BSON("_id" << -1), expCtx}, {.maxMemoryUsageBytes = maxMemoryUsageBytes});
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
@@ -585,8 +604,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
 
-    auto sort =
-        DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx}, 0, maxMemoryUsageBytes);
+    auto sort = DocumentSourceSort::create(
+        expCtx, {BSON("_id" << -1), expCtx}, {.maxMemoryUsageBytes = maxMemoryUsageBytes});
 
     string largeStr(maxMemoryUsageBytes / 5, 'x');
     auto mock =
@@ -679,6 +698,48 @@ TEST_F(DocumentSourceSortTest, Redaction) {
             "spilledDataStorageSize": "?number"
         })",
         redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
+}
+
+void assertProducesSortKeyMetadata(auto expCtx, auto sortStage) {
+    const auto mock =
+        DocumentSourceMock::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
+    sortStage->setSource(mock.get());
+    const auto output1 = sortStage->getNext();
+    ASSERT(output1.isAdvanced());
+    ASSERT(output1.getDocument().metadata().hasSortKey());
+    const auto output2 = sortStage->getNext();
+    ASSERT(output2.isAdvanced());
+    ASSERT(output2.getDocument().metadata().hasSortKey());
+    ASSERT(sortStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceSortExecutionTest, ShouldOutputSortKeyMetadataIfRequested) {
+    auto expCtx = getExpCtx();
+    auto sort = DocumentSourceSort::create(
+        expCtx, {BSON("_id" << -1), expCtx}, {.outputSortKeyMetadata = true});
+    assertProducesSortKeyMetadata(expCtx, sort);
+}
+
+TEST_F(DocumentSourceSortExecutionTest, OutputSortKeyHoldsUpOverCloning) {
+    auto expCtx = getExpCtx();
+    auto sortBase = DocumentSourceSort::create(
+        expCtx, {BSON("_id" << -1), expCtx}, {.outputSortKeyMetadata = true});
+    auto clone = sortBase->clone(expCtx);
+    assertProducesSortKeyMetadata(expCtx, clone);
+}
+
+TEST_F(DocumentSourceSortExecutionTest, OutputSortKeyHoldsUpOverSerialization) {
+    auto expCtx = getExpCtx();
+    auto sortBase = DocumentSourceSort::create(
+        expCtx, {BSON("_id" << -1), expCtx}, {.outputSortKeyMetadata = true});
+    BSONObj serializedBson = [&]() {
+        std::vector<Value> serialization;
+        sortBase->serializeToArray(serialization);
+        ASSERT(serialization.size() == 1);
+        return serialization.front().getDocument().toBson();
+    }();
+    auto reparsed = DocumentSourceSort::createFromBson(serializedBson.firstElement(), expCtx);
+    assertProducesSortKeyMetadata(expCtx, reparsed);
 }
 
 }  // namespace

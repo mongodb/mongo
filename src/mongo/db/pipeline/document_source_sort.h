@@ -79,6 +79,15 @@ public:
     static constexpr StringData kMax = "max"_sd;
     static constexpr StringData kOffset = "offsetSeconds"_sd;
     static constexpr StringData kInternalLimit = "$_internalLimit"_sd;
+    static constexpr StringData kInternalOutputSortKey = "$_internalOutputSortKeyMetadata"_sd;
+
+    struct SortStageOptions {
+        uint64_t limit = 0;
+        boost::optional<uint64_t> maxMemoryUsageBytes = boost::none;
+        bool outputSortKeyMetadata = false;
+    };
+
+    static const SortStageOptions kDefaultOptions;
 
     struct SortableDate {
         Date_t date;
@@ -99,6 +108,49 @@ public:
     };
 
     static constexpr StringData kStageName = "$sort"_sd;
+
+    /**
+     * Parses a $sort stage from the user-supplied BSON.
+     */
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
+
+    /**
+     * Creates a $sort stage. If maxMemoryUsageBytes is boost::none, then it will actually use the
+     * value of 'internalQueryMaxBlockingSortMemoryUsageBytes'.
+     */
+    static boost::intrusive_ptr<DocumentSourceSort> create(
+        const boost::intrusive_ptr<ExpressionContext>&,
+        const SortPattern&,
+        SortStageOptions options = kDefaultOptions);
+
+    /**
+     * Convenience to create a $sort stage from BSON with no limit and the default memory limit.
+     */
+    static boost::intrusive_ptr<DocumentSourceSort> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& sortOrder) {
+        return create(expCtx, {sortOrder, expCtx}, kDefaultOptions);
+    }
+
+    static boost::intrusive_ptr<DocumentSourceSort> createBoundedSort(
+        SortPattern pat,
+        StringData boundBase,
+        long long boundOffset,
+        boost::optional<long long> limit,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Parse a stage that uses BoundedSorter.
+     */
+    static boost::intrusive_ptr<DocumentSourceSort> parseBoundedSort(
+        BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
+
+    /**
+     * The constructor.
+     */
+    DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>&,
+                       const SortPattern&,
+                       SortStageOptions);
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -157,42 +209,6 @@ public:
     }
 
     /**
-     * Parses a $sort stage from the user-supplied BSON.
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    /**
-     * Creates a $sort stage. If maxMemoryUsageBytes is boost::none, then it will actually use the
-     * value of 'internalQueryMaxBlockingSortMemoryUsageBytes'.
-     */
-    static boost::intrusive_ptr<DocumentSourceSort> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        const SortPattern& sortOrder,
-        uint64_t limit = 0,
-        boost::optional<uint64_t> maxMemoryUsageBytes = boost::none);
-
-    /**
-     * Convenience to create a $sort stage from BSON with no limit and the default memory limit.
-     */
-    static boost::intrusive_ptr<DocumentSourceSort> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const BSONObj& sortOrder) {
-        return create(pExpCtx, {sortOrder, pExpCtx});
-    }
-
-    static boost::intrusive_ptr<DocumentSourceSort> createBoundedSort(
-        SortPattern pat,
-        StringData boundBase,
-        long long boundOffset,
-        boost::optional<long long> limit,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
-    /**
-     * Parse a stage that uses BoundedSorter.
-     */
-    static boost::intrusive_ptr<DocumentSourceSort> parseBoundedSort(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    /**
      * Returns the the limit, if a subsequent $limit stage has been coalesced with this $sort stage.
      * Otherwise, returns boost::none.
      */
@@ -245,11 +261,6 @@ protected:
                                                      Pipeline::SourceContainer* container) final;
 
 private:
-    DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                       const SortPattern& sortOrder,
-                       uint64_t limit,
-                       uint64_t maxMemoryUsageBytes);
-
     Value serialize(const SerializationOptions& opts) const final {
         MONGO_UNREACHABLE_TASSERT(7484302);  // Should call serializeToArray instead.
     }
@@ -270,6 +281,21 @@ private:
      * GetNextResult encountered, which may be either kEOF or kPauseExecution.
      */
     GetNextResult populate();
+
+    /**
+     * Returns true if the output documents of this $sort stage are supposed to have the sort key
+     * metadata field populated.
+     */
+    bool shouldSetSortKeyMetadata() const {
+        // TODO SERVER-98624 It would be preferable to just set '_outputSortKeyMetadata' based on
+        // 'getNeedsMerge()' in the constructor or some earlier time. Sadly, we can't do this right
+        // now without adding complexity elsewhere to account for mixed-version clusters. If you set
+        // '_outputSortKeyMetadata' to true, then it will possibly mean serializing a new field when
+        // sending a $sort to another node in the cluster (as of the time of this writing). This is
+        // OK today because the callers who set this option during construction first must check the
+        // FCV (and/or a feature flag), which guards against mixed-version scenarios.
+        return _outputSortKeyMetadata || pExpCtx->getNeedsMerge();
+    }
 
     /**
      * Returns the sort key for 'doc', as well as the document that should be entered into the
@@ -310,6 +336,9 @@ private:
     boost::optional<SortExecutor<Document>> _sortExecutor;
 
     boost::optional<SortKeyGenerator> _sortKeyGen;
+
+    // Whether to include metadata including the sort key in the output documents from this stage.
+    bool _outputSortKeyMetadata = false;
 
     using TimeSorterInterface = BoundedSorterInterface<SortableDate, Document>;
     std::unique_ptr<TimeSorterInterface> _timeSorter;

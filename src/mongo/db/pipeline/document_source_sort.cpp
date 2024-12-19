@@ -135,21 +135,22 @@ using TimeSorterDescMax =
     BoundedSorter<DocumentSourceSort::SortableDate, Document, CompDesc, BoundMakerMax>;
 }  // namespace
 
-constexpr StringData DocumentSourceSort::kStageName;
+const DocumentSourceSort::SortStageOptions DocumentSourceSort::kDefaultOptions = {};
 
 DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                        const SortPattern& sortOrder,
-                                       uint64_t limit,
-                                       uint64_t maxMemoryUsageBytes)
+                                       DocumentSourceSort::SortStageOptions options)
     : DocumentSource(kStageName, pExpCtx),
       _sortExecutor({sortOrder,
-                     limit,
-                     maxMemoryUsageBytes,
+                     options.limit,
+                     options.maxMemoryUsageBytes.value_or(
+                         internalQueryMaxBlockingSortMemoryUsageBytes.load()),
                      pExpCtx->getTempDir(),
                      pExpCtx->getAllowDiskUse()}),
       // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
       // by a metadata field.
-      _sortKeyGen({sortOrder, pExpCtx->getCollator()}) {
+      _sortKeyGen({sortOrder, pExpCtx->getCollator()}),
+      _outputSortKeyMetadata(options.outputSortKeyMetadata) {
     uassert(15976,
             "$sort stage must have at least one sort key",
             !_sortExecutor->sortPattern().empty());
@@ -331,6 +332,9 @@ void DocumentSourceSort::serializeForCloning(std::vector<Value>& array,
         mutDoc[kInternalLimit] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->getLimit()));
     }
+    if (_outputSortKeyMetadata) {
+        mutDoc[kInternalOutputSortKey] = Value(_outputSortKeyMetadata);
+    }
     array.push_back(Value(DOC(kStageName << mutDoc.freeze())));
 }
 
@@ -339,13 +343,19 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
     tassert(9028701, "SerializationOptions do not specify verbosity", opts.verbosity);
 
     uint64_t limit = _sortExecutor->getLimit();
-    MutableDocument mutDoc(DOC(
-        kStageName << DOC("sortKey" << _sortExecutor->sortPattern().serialize(
-                                           SortPattern::SortKeySerialization::kForExplain, opts)
-                                    << "limit"
-                                    << (_sortExecutor->hasLimit()
-                                            ? opts.serializeLiteral(static_cast<long long>(limit))
-                                            : Value()))));
+    MutableDocument mutDoc(
+        DOC(kStageName << DOC(
+                "sortKey"
+                << _sortExecutor->sortPattern().serialize(
+                       SortPattern::SortKeySerialization::kForExplain, opts)
+                // Only output 'limit' and 'outputSortKeyMetadata' if they're true, mostly to
+                // preserve conciseness for the simple cases without loss of information. It
+                // also prevents the need to update some tests and potentially saves some
+                // downstream changes work if there are similar tests elsewhere.
+                << "limit"
+                << (_sortExecutor->hasLimit() ? opts.serializeLiteral(static_cast<long long>(limit))
+                                              : Value())
+                << "outputSortKeyMetadata" << (_outputSortKeyMetadata ? Value(true) : Value()))));
 
     if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
         auto& stats = _sortExecutor->stats();
@@ -371,6 +381,9 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
     } else {
         MutableDocument mutDoc(_sortExecutor->sortPattern().serialize(
             SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
+        if (_outputSortKeyMetadata) {
+            mutDoc[kInternalOutputSortKey] = Value(_outputSortKeyMetadata);
+        }
         array.push_back(Value(DOC(kStageName << mutDoc.freeze())));
         if (_sortExecutor->hasLimit()) {
             auto limitSrc = DocumentSourceLimit::create(pExpCtx, _sortExecutor->getLimit());
@@ -446,34 +459,32 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
     uassert(15973, "the $sort key specification must be an object", spec.type() == Object);
 
     auto specObj = spec.Obj();
-    auto sortOrder = specObj;
+    // Reconstruct the sort order without these internal fields.
+    BSONObjBuilder sortOrder;
 
-    uint64_t limit{0};
-    auto internalLimit = specObj[kInternalLimit];
-    if (internalLimit) {
-        const auto limitStatus = internalLimit.parseIntegerElementToNonNegativeLong();
-        uassert(9028702,
-                str::stream() << "invalid $_internalLimit value: "
-                              << limitStatus.getStatus().reason(),
-                limitStatus.isOK());
-        limit = limitStatus.getValue();
-
-        sortOrder = sortOrder.removeField(kInternalLimit);
+    auto options = kDefaultOptions;
+    for (auto&& elem : specObj) {
+        if (elem.fieldNameStringData() == kInternalLimit) {
+            const auto limitStatus = elem.parseIntegerElementToNonNegativeLong();
+            uassert(9028702,
+                    str::stream() << "invalid $_internalLimit value: "
+                                  << limitStatus.getStatus().reason(),
+                    limitStatus.isOK());
+            options.limit = limitStatus.getValue();
+        } else if (elem.fieldNameStringData() == kInternalOutputSortKey) {
+            options.outputSortKeyMetadata = elem.Bool();
+        } else {
+            sortOrder.append(elem);
+        }
     }
-    return create(pExpCtx, {sortOrder, pExpCtx}, limit);
+    return create(pExpCtx, {sortOrder.obj(), pExpCtx}, std::move(options));
 }
 
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     const SortPattern& sortOrder,
-    uint64_t limit,
-    boost::optional<uint64_t> maxMemoryUsageBytes) {
-    auto resolvedMaxBytes = maxMemoryUsageBytes
-        ? *maxMemoryUsageBytes
-        : internalQueryMaxBlockingSortMemoryUsageBytes.load();
-    intrusive_ptr<DocumentSourceSort> pSort(
-        new DocumentSourceSort(pExpCtx, sortOrder, limit, resolvedMaxBytes));
-    return pSort;
+    SortStageOptions options) {
+    return make_intrusive<DocumentSourceSort>(pExpCtx, sortOrder, std::move(options));
 }
 
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
@@ -661,7 +672,7 @@ bool DocumentSourceSort::usedDisk() {
 std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) const {
     Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
 
-    if (pExpCtx->getNeedsMerge()) {
+    if (shouldSetSortKeyMetadata()) {
         // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
         // gets saved with its metadata.
         MutableDocument toBeSorted(std::move(doc));
@@ -678,7 +689,7 @@ std::pair<Date_t, Document> DocumentSourceSort::extractTime(Document&& doc) cons
     uassert(6369909, "$_internalBoundedSort only handles Date values", time.getType() == Date);
     auto date = time.getDate();
 
-    if (pExpCtx->getNeedsMerge()) {
+    if (shouldSetSortKeyMetadata()) {
         // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
         // gets saved with its metadata.
         Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
