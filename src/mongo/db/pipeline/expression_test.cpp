@@ -3168,6 +3168,16 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScoreAPIStrict) {
                        ErrorCodes::APIStrictError);
 }
 
+TEST(ExpressionMetaTest, ExpressionMetaSearchScoreDetailsAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"searchScoreDetails\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
+}
+
 TEST(ExpressionMetaTest, ExpressionMetaScoreAPIStrict) {
     auto expCtx = ExpressionContextForTest{};
     APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);

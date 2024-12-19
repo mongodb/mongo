@@ -2400,6 +2400,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
         APIParameters::get(expCtx->getOperationContext()).getAPIStrict().value_or(false);
     // TODO SERVER-97104: add 'scoreDetails' here.
     static const std::set<MetaType> kUnstableMetaFields = {MetaType::kSearchScore,
+                                                           MetaType::kSearchScoreDetails,
                                                            MetaType::kIndexKey,
                                                            MetaType::kTextScore,
                                                            MetaType::kSearchHighlights,
