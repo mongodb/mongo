@@ -442,8 +442,12 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
             // There may not be any endpoints if this connection is directly
             // from the proxy itself or the information isn't available.
             if (results->endpoints) {
-                _proxiedSrcEndpoint = results->endpoints->sourceAddress;
-                _proxiedDstEndpoint = results->endpoints->destinationAddress;
+                const auto& sourceEndpointAddr = results->endpoints->sourceAddress;
+                const auto& dstEndpointAddr = results->endpoints->destinationAddress;
+                _proxiedSrcEndpoint =
+                    HostAndPort(sourceEndpointAddr.getAddr(), sourceEndpointAddr.getPort());
+                _proxiedDstEndpoint =
+                    HostAndPort(dstEndpointAddr.getAddr(), dstEndpointAddr.getPort());
             } else {
                 _proxiedSrcEndpoint = {};
                 _proxiedDstEndpoint = {};

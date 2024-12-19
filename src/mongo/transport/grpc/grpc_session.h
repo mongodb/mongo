@@ -87,8 +87,12 @@ public:
 
     virtual ~GRPCSession() = default;
 
-    const HostAndPort& remote() const {
+    const HostAndPort& remote() const override {
         return _remote;
+    }
+
+    const HostAndPort& local() const override {
+        return _local;
     }
 
     StatusWith<Message> sourceMessage() noexcept override;
@@ -229,6 +233,7 @@ private:
     TransportLayer* const _tl;
 
     const HostAndPort _remote;
+    HostAndPort _local;
     RestrictionEnvironment _restrictionEnvironment;
 };
 

@@ -180,7 +180,49 @@ public:
         return false;
     }
 
+    /**
+     * Returns the HostAndPort of the directly-connected remote
+     * to this session.
+     */
     virtual const HostAndPort& remote() const = 0;
+
+    /**
+     * Returns the HostAndPort of the local endpoint of this session.
+     */
+    virtual const HostAndPort& local() const = 0;
+
+    /**
+     * Returns the source remote endpoint. The server determines the
+     * source remote endpoint via the following set of rules:
+     *  1. If the connection was accepted via the load balancer port:
+     *      a. If the TCP packet presented a valid proxy protocol header, then
+     *         the source remote endpoint is a HostAndPort constructed from the
+     *         source IP address and source port presented in that header.
+     *      b. If the TCP packet did not present a valid proxy protocol header,
+     *         then the transport layer will fail to parse and fail session establishment.
+     *  2. If the connection was NOT accepted via the load balancer port:
+     *      a. The source remote endpoint is always remote(). The proxy protocol
+     *         header is only parsed if presented by a load balancer connection.
+     */
+    virtual const HostAndPort& getSourceRemoteEndpoint() const {
+        return remote();
+    }
+
+    /**
+     * Returns the proxy endpoint. The server determines the
+     * proxy endpoint via the following set of rules:
+     *  1. If the connection was accepted via the load balancer port:
+     *      a. If the TCP packet presented a valid proxy protocol header, then
+     *         the proxy endpoint is a HostAndPort constructed from the
+     *         destination IP address and destination port presented in that header.
+     *      b. If the TCP packet did not present a valid proxy protocol header,
+     *         then the transport layer will fail to parse and fail session establishment.
+     *  2. If the connection was NOT accepted via the load balancer port:
+     *      a. The proxy endpoint is always boost::none since there are no proxies.
+     */
+    virtual boost::optional<const HostAndPort&> getProxiedDstEndpoint() const {
+        return boost::none;
+    }
 
     virtual void appendToBSON(BSONObjBuilder& bb) const = 0;
 

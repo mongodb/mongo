@@ -45,6 +45,7 @@ GRPCSession::GRPCSession(TransportLayer* tl, HostAndPort remote)
     SockAddr remoteAddr;
     try {
         remoteAddr = SockAddr::create(_remote.host(), _remote.port(), AF_UNSPEC);
+        _local = HostAndPort();
     } catch (const DBException& ex) {
         // If {remote} fails to parse for any reason, allow the session to continue anyway.
         // {_restrictionEnvironment} will end up with an AF_UNSPEC remote address

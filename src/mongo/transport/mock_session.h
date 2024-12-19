@@ -52,10 +52,15 @@ public:
         : _remote(std::move(remote)),
           _remoteAddr(std::move(remoteAddr)),
           _localAddr(std::move(localAddr)),
+          _local(HostAndPort(_localAddr.getAddr(), _localAddr.getPort())),
           _restrictionEnvironment(_remoteAddr, _localAddr) {}
 
     const HostAndPort& remote() const override {
         return _remote;
+    }
+
+    const HostAndPort& local() const override {
+        return _local;
     }
 
     const SockAddr& remoteAddr() const {
@@ -109,6 +114,7 @@ private:
     const HostAndPort _remote;
     const SockAddr _remoteAddr;
     const SockAddr _localAddr;
+    const HostAndPort _local;
     RestrictionEnvironment _restrictionEnvironment;
     std::shared_ptr<SSLManagerInterface> _sslManager;
 };
