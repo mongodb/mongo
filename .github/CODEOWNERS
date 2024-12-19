@@ -1198,7 +1198,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
 /src/mongo/db/concurrency/**/deferred_writer* @10gen/server-dbcheck @svc-auto-approve-bot
-/src/mongo/db/concurrency/**/exception_util* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/concurrency/**/exception_util* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/concurrency/**/flow_control_ticketholder* @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/mongo/db/concurrency/**/lock* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/concurrency/**/replication_state_transition_lock_guard* @10gen/server-replication @svc-auto-approve-bot
