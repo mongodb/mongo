@@ -64,6 +64,7 @@ def install() -> str:
 
 
 def update_bazelrc(binary_path: str):
+    norm_path = os.path.normpath(binary_path)
     lines = []
     bazelrc_path = f"{os.path.expanduser('~')}/.bazelrc"
     print(f"Updating {bazelrc_path}")
@@ -73,7 +74,7 @@ def update_bazelrc(binary_path: str):
                 if "--tls_client" in line or "--credential_helper" in line:
                     continue
                 lines.append(line)
-    lines.append(f"build --credential_helper={CLUSTER}={binary_path}")
+    lines.append(f"build --credential_helper={CLUSTER}={norm_path}")
 
     with open(bazelrc_path, "w+") as bazelrc:
         bazelrc.writelines(lines)
@@ -113,7 +114,9 @@ def authenticate(binary_path: str):
         p.kill()
         return
 
-    print(f"Login via the following link to complete EngFlow authentication:\n{login_url}")
+    print(
+        f"On any device with a browser, login via the following link to complete EngFlow authentication:\n{login_url}"
+    )
 
     try:
         p.wait(timeout=LOGIN_TIMEOUT)
