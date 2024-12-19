@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -691,4 +691,45 @@ mongo_cc_unit_test(
 filegroup(
     name = "connection_string_hdrs",
     srcs = [":connection_string.h"],
+)
+
+mongo_cc_integration_test(
+    name = "client_connpool_integration_test",
+    srcs = [
+        "connpool_integration_test.cpp",
+    ],
+    deps = [
+        ":clientdriver_network",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "client_dbclient_connection_integration_test",
+    srcs = [
+        "dbclient_connection_integration_test.cpp",
+    ],
+    deps = [
+        ":clientdriver_network",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "replica_set_monitor_integration_test",
+    srcs = [
+        "replica_set_monitor_integration_test.cpp",
+    ],
+    deps = [
+        ":clientdriver_network",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
 )

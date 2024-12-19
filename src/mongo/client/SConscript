@@ -30,19 +30,8 @@ if wiredtiger:
 
 env.CppIntegrationTest(
     target="replica_set_monitor_integration_test",
-    source=[
-        "replica_set_monitor_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "$BUILD_DIR/mongo/util/version_impl",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
@@ -75,24 +64,12 @@ env.CppUnitTest(
 # integration tests.
 env.CppIntegrationTest(
     target="client_connpool_integration_test",
-    source=[
-        "connpool_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-        "$BUILD_DIR/mongo/util/version_impl",
-        "clientdriver_network",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppIntegrationTest(
     target="client_dbclient_connection_integration_test",
-    source=[
-        "dbclient_connection_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-        "$BUILD_DIR/mongo/util/version_impl",
-        "clientdriver_network",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
