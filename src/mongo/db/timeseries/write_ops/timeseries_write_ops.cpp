@@ -363,6 +363,9 @@ Status performAtomicTimeseriesWrites(
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(!insertOps.empty() || !updateOps.empty());
+    auto expectedUUID = !insertOps.empty() ? insertOps.front().getCollectionUUID()
+                                           : updateOps.front().getCollectionUUID();
+    invariant(expectedUUID.has_value());
 
     auto ns =
         !insertOps.empty() ? insertOps.front().getNamespace() : updateOps.front().getNamespace();
@@ -372,10 +375,11 @@ Status performAtomicTimeseriesWrites(
     write_ops_exec::LastOpFixer lastOpFixer(opCtx);
     lastOpFixer.startingOp(ns);
 
-    const auto coll = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
-        MODE_IX);
+    const auto coll =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, ns, AcquisitionPrerequisites::kWrite, expectedUUID),
+                          MODE_IX);
     if (!coll.exists()) {
         assertTimeseriesBucketsCollectionNotFound(ns);
     }

@@ -469,6 +469,7 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOp(
 
     mongo::write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+    op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
 
@@ -481,6 +482,7 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     mongo::write_ops::UpdateCommandRequest op(
         bucketsNs, {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+    op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
 
@@ -619,6 +621,7 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
         makeTimeseriesCompressedDiffEntry(opCtx, batch, changedToUnsorted, sortedMeasurements);
     mongo::write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+    op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
 

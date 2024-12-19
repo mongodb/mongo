@@ -110,6 +110,7 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
 
         op.setWriteCommandRequestBase(std::move(base));
+        op.setCollectionUUID(bucketsColl->uuid());
 
         ASSERT_OK(timeseries::write_ops::details::performAtomicTimeseriesWrites(opCtx, {}, {op}));
     }
@@ -122,6 +123,34 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(retrievedBucket.value(), bucketDoc));
     }
+}
+
+TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesWritesMismatchedUUID) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "ts");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+    auto incorrectUUID = UUID::gen();
+    write_ops::InsertCommandRequest request(ns);
+    request.setDocuments({fromjson("{_id: 0, foo: 1}")});
+    request.setCollectionUUID(incorrectUUID);
+
+    ASSERT_THROWS_CODE(timeseries::write_ops::performTimeseriesWrites(opCtx, request),
+                       DBException,
+                       ErrorCodes::CollectionUUIDMismatch);
+
+    write_ops::InsertCommandRequest requestUnordered(ns);
+    requestUnordered.setOrdered(false);
+    requestUnordered.setDocuments({fromjson("{_id: 0, foo: 1}")});
+    requestUnordered.setCollectionUUID(incorrectUUID);
+
+    ASSERT_THROWS_CODE(timeseries::write_ops::performTimeseriesWrites(opCtx, requestUnordered),
+                       DBException,
+                       ErrorCodes::CollectionUUIDMismatch);
 }
 
 // It is possible that a collection is dropped after an insert starts but before it finishes. In
