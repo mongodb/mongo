@@ -3188,11 +3188,32 @@ TEST(ExpressionMetaTest, ExpressionMetaScoreAPIStrict) {
                        ErrorCodes::APIStrictError);
 }
 
+TEST(ExpressionMetaTest, ExpressionMetaScoreDetailsAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
+}
+
 TEST(ExpressionMetaTest, ExpressionMetaScoreFFNotEnabled) {
     auto expCtx = ExpressionContextForTest{};
     APIParameters::get(expCtx.getOperationContext()).setAPIStrict(false);
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"score\"}");
+    // Should throw because 'featureFlagRankFusionFull' is not enabled.
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaScoreDetailsFFNotEnabled) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(false);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
     // Should throw because 'featureFlagRankFusionFull' is not enabled.
     ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
                        AssertionException,
@@ -3369,6 +3390,22 @@ TEST(ExpressionMetaTest, ExpressionMetaScore) {
     ASSERT_EQ(val.getDouble(), 1.23);
 }
 
+TEST(ExpressionMetaTest, ExpressionMetaScoreDetails) {
+    // Used to set 'scoreDetails' metadata.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    auto details = BSON("value" << 5 << "scoreDetails"
+                                << "foo");
+    MutableDocument doc;
+    doc.metadata().setScoreAndScoreDetails(Value(details));
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
+    ASSERT_DOCUMENT_EQ(val.getDocument(), Document(details));
+}
+
 TEST(ExpressionMetaTest, ExpressionMetaStreamNotSupported) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
@@ -3453,9 +3490,9 @@ TEST(ExpressionMetaTest, ExpressionMetaStream) {
     )")));
     Value windowMeta(Document(fromjson(R"(
         {
-            "source": {"type": "atlas"}, 
+            "source": {"type": "atlas"},
             "window": {
-                "start": {"$date": "2024-01-01T00:00:00.000Z"}, 
+                "start": {"$date": "2024-01-01T00:00:00.000Z"},
                 "end": {"$date": "2024-01-01T00:00:01.000Z"}
             }
         }

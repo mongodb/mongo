@@ -2398,7 +2398,6 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
                                                              MetaType type) {
     const bool apiStrict = expCtx->getOperationContext() &&
         APIParameters::get(expCtx->getOperationContext()).getAPIStrict().value_or(false);
-    // TODO SERVER-97104: add 'scoreDetails' here.
     static const std::set<MetaType> kUnstableMetaFields = {MetaType::kSearchScore,
                                                            MetaType::kSearchScoreDetails,
                                                            MetaType::kIndexKey,
@@ -2406,6 +2405,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
                                                            MetaType::kSearchHighlights,
                                                            MetaType::kSearchSequenceToken,
                                                            MetaType::kScore,
+                                                           MetaType::kScoreDetails,
                                                            MetaType::kStream};
     const bool usesUnstableField = kUnstableMetaFields.contains(type);
     uassert(ErrorCodes::APIStrictError,
@@ -2416,8 +2416,8 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
 
 void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
     ExpressionContext* const expCtx, MetaType type) {
-    // TODO SERVER-97104: add 'scoreDetails' here.
-    static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore};
+    static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore,
+                                                                     MetaType::kScoreDetails};
     const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
     const bool hybridScoringFeatureFlagEnabled =
         feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
