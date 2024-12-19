@@ -1,6 +1,5 @@
 /**
  * This tests all points using $near.
- * @tags: [requires_fcv_81]
  */
 
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";

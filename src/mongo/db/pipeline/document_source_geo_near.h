@@ -85,7 +85,11 @@ public:
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed};
-        constraints.noFieldModifications = (!includeLocs && !distanceField);
+        // TODO SERVER-35581: Once distanceField is made optional, this stage will be considered a
+        // selection stage if distanceField is also not set (same as includeLocs).
+        if (!includeLocs) {
+            constraints.noFieldModifications = true;
+        }
         return constraints;
     }
 
@@ -135,8 +139,8 @@ public:
     /**
      * The field in which the computed distance will be stored.
      */
-    boost::optional<FieldPath> getDistanceField() const {
-        return distanceField;
+    FieldPath getDistanceField() const {
+        return *distanceField;
     }
 
     /**
@@ -210,10 +214,10 @@ private:
     void parseOptions(BSONObj options, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
     // These fields describe the command to run.
-    // 'near' is required; the rest are optional.
+    // 'near' and 'distanceField' are required; the rest are optional.
     boost::intrusive_ptr<Expression> _nearGeometry;
 
-    boost::optional<FieldPath> distanceField;
+    std::unique_ptr<FieldPath> distanceField;  // Using unique_ptr because FieldPath can't be empty
     std::unique_ptr<Matcher> query;
     bool spherical;
     boost::intrusive_ptr<Expression> maxDistance;

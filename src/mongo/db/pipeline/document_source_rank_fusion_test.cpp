@@ -950,7 +950,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
                        9191103);
 }
 
-TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDistanceField) {
+TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(
         StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
@@ -967,6 +967,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                         {
                             $geoNear: {
                                 near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
                                 maxDistance: 2,
                                 query: { category: "Parks" },
                                 spherical: true
@@ -1057,6 +1058,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                                             }
                                         ]
                                     },
+                                    "distanceField": "dist.calculated",
                                     "maxDistance": 2,
                                     "query": {
                                         "category": {
@@ -1178,39 +1180,10 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearIncludeLocs) {
                         {
                             $geoNear: {
                                 near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
-                                maxDistance: 2,
-                                query: { category: "Parks" },
-                                includeLocs: "dist.location",
-                                spherical: true
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-    })");
-
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9191101);
-}
-
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearDistanceField) {
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            input: {
-                pipelines: {
-                    agatha: [
-                        { $match : { author : "Agatha Christie" } },
-                        { $sort: {author: 1} }
-                    ],
-                    geo: [
-                        {
-                            $geoNear: {
-                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
                                 distanceField: "dist.calculated",
                                 maxDistance: 2,
                                 query: { category: "Parks" },
+                                includeLocs: "dist.location",
                                 spherical: true
                             }
                         }
@@ -2013,6 +1986,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                         {
                             $geoNear: {
                                 near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
                                 maxDistance: 2,
                                 query: { category: "Parks" },
                                 spherical: true
@@ -2110,6 +2084,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                             }
                                         ]
                                     },
+                                    "distanceField": "dist.calculated",
                                     "maxDistance": 2,
                                     "query": {
                                         "category": {
@@ -2468,6 +2443,7 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                         {
                             $geoNear: {
                                 near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
                                 maxDistance: 2,
                                 query: { category: "Parks" },
                                 spherical: true
@@ -2547,6 +2523,7 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                             {
                                 "$geoNear": {
                                     "near": "?object",
+                                    "distanceField": "HASH<dist>.HASH<calculated>",
                                     "maxDistance": "?number",
                                     "query": {
                                         "HASH<category>": {
@@ -2661,6 +2638,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                         {
                             $geoNear: {
                                 near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
                                 maxDistance: 2,
                                 query: { category: "Parks" },
                                 spherical: true
@@ -2746,6 +2724,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                                             "?": "?"
                                         }
                                     },
+                                    "distanceField": "dist.calculated",
                                     "maxDistance": 1,
                                     "query": {
                                         "category": {

@@ -46,6 +46,20 @@ GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale, skipI
     }
 };
 
+GeoNearRandomTest.prototype.assertIsPrefix = function(short, long, errmsg) {
+    for (var i = 0; i < short.length; i++) {
+        var xS = short[i] ? short[i].loc[0] : short[i].loc[0];
+        var yS = short[i] ? short[i].loc[1] : short[i].loc[1];
+        var dS = short[i] ? short[i].dis : 1;
+
+        var xL = long[i] ? long[i].loc[0] : long[i].loc[0];
+        var yL = long[i] ? long[i].loc[1] : long[i].loc[1];
+        var dL = long[i] ? long[i].dis : 1;
+
+        assert.eq([xS, yS, dS], [xL, yL, dL], errmsg);
+    }
+};
+
 GeoNearRandomTest.prototype.testPt = function(pt, opts) {
     assert.neq(this.nPts, 0, "insertPoints not yet called");
 
@@ -57,37 +71,27 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
 
     let query = {loc: {}};
     query.loc[opts.sphere ? '$nearSphere' : '$near'] = pt;
-    const runQuery = (proj) => this.t.find(query, proj).limit(opts.nToTest).toArray();
-    const runAggregation = (distField) => {
-        let geoNearSpec = {near: pt, spherical: opts.sphere};
-        if (distField) {
-            geoNearSpec["distanceField"] = distField;
-        }
-        return this.t.aggregate([{$geoNear: geoNearSpec}, {$limit: opts.nToTest}]).toArray();
-    };
+    const proj = {dis: {$meta: "geoNearDistance"}};
+    const runQuery = (limit) => this.t.find(query, proj).limit(opts.nToTest).toArray();
 
-    // Check that find() results are in increasing order.
-    const distanceProj = {dis: {$meta: "geoNearDistance"}};
-    let queryResults = runQuery(distanceProj);
-
-    assert.gte(
-        queryResults.length, 2, `Expected at least 2 results, got ${queryResults.length} back.`);
-
+    let last = runQuery(1);
     for (var i = 2; i <= opts.nToTest; i++) {
+        let ret = runQuery(i);
+        this.assertIsPrefix(last, ret, `Unexpected result when comparing ${i - 1} and ${i}`);
+
         // Make sure distances are in increasing order.
-        assert.gte(queryResults[i - 1].dis,
-                   queryResults[i - 2].dis,
-                   `Unexpected result when comparing ${i - 1} and ${i}`);
+        assert.gte(ret[ret.length - 1].dis, last[last.length - 1].dis);
+        last = ret;
     }
 
-    // Test that a query using the $geoNear aggregation stage returns the same points in order as
-    // find with $near or $nearSphere.
-    let aggResults = runAggregation('dis');
-    assert.eq(queryResults, aggResults);
-
-    // Test that the results are the same even if we don't pass a distanceField to the aggregation
-    // pipeline.
-    queryResults = runQuery({} /* empty projection, no meta distance */);
-    aggResults = runAggregation(/* no distanceField */);
+    // Test that a query using $near or $nearSphere returns the same points in order as the $geoNear
+    // aggregation stage.
+    const queryResults = runQuery(opts.nToTest);
+    const aggResults = this.t
+                           .aggregate([
+                               {$geoNear: {near: pt, distanceField: "dis", spherical: opts.sphere}},
+                               {$limit: opts.nToTest}
+                           ])
+                           .toArray();
     assert.eq(queryResults, aggResults);
 };

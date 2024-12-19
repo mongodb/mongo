@@ -68,7 +68,7 @@ public:
         const MultipleCollectionAccessor&,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
         const boost::intrusive_ptr<ExpressionContext>&,
-        boost::optional<FieldPath> distanceField,
+        FieldPath distanceField,
         boost::optional<FieldPath> locationField = boost::none,
         double distanceMultiplier = 1.0);
 
@@ -78,7 +78,7 @@ private:
     DocumentSourceGeoNearCursor(const MultipleCollectionAccessor&,
                                 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
                                 const boost::intrusive_ptr<ExpressionContext>&,
-                                boost::optional<FieldPath> distanceField,
+                                FieldPath distanceField,
                                 boost::optional<FieldPath> locationField,
                                 double distanceMultiplier);
 
@@ -89,8 +89,8 @@ private:
      */
     Document transformDoc(Document&& obj) const final;
 
-    // The output field in which to store the computed distance, if specified.
-    boost::optional<FieldPath> _distanceField;
+    // The output field in which to store the computed distance.
+    FieldPath _distanceField;
 
     // The output field to store the point that matched, if specified.
     boost::optional<FieldPath> _locationField;

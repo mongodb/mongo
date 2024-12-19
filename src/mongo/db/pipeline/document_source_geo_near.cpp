@@ -100,9 +100,7 @@ Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
     };
 
     result.setField("near", serializeExpr(_nearGeometry));
-    if (distanceField) {
-        result.setField("distanceField", Value(opts.serializeFieldPath(*distanceField)));
-    }
+    result.setField("distanceField", Value(opts.serializeFieldPath(*distanceField)));
 
     if (maxDistance) {
         result.setField("maxDistance", serializeExpr(maxDistance));
@@ -182,8 +180,7 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     if (!keyFieldPath)
         return std::next(itr);
 
-    // TODO SERVER-97616: Make distanceField optional for time-series.
-    uassert(5860206, "$geoNear distanceField is required for time-series queries", distanceField);
+    tassert(5860206, "$geoNear distanceField unexpectedly null", distanceField);
 
     // In this case, we know:
     // - there are stages before us
@@ -399,8 +396,9 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
             !options["num"]);
     uassert(50856, "$geoNear no longer supports the 'start' argument.", !options["start"]);
 
-    // The "near" parameter is required.
+    // The "near" and "distanceField" parameters are required.
     uassert(5860400, "$geoNear requires a 'near' argument", options[nearStr]);
+    uassert(25278, "$geoNear requires a 'distanceField' argument", options[distanceFieldStr]);
 
     // go through all the fields
     for (auto&& argument : options) {
@@ -410,9 +408,9 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
                 Expression::parseOperand(pCtx.get(), argument, pCtx->variablesParseState);
         } else if (argName == distanceFieldStr) {
             uassert(16606,
-                    "$geoNear requires that the 'distanceField' option is a String",
+                    "$geoNear requires a 'distanceField' option as a String",
                     argument.type() == String);
-            distanceField = FieldPath(argument.str());
+            distanceField.reset(new FieldPath(argument.str()));
         } else if (argName == "maxDistance") {
             maxDistance = Expression::parseOperand(pCtx.get(), argument, pCtx->variablesParseState);
         } else if (argName == "minDistance") {
@@ -549,13 +547,8 @@ DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionConte
 
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGeoNear::distributedPlanLogic() {
-    DistributedPlanLogic logic;
-    logic.shardsStage = this;
-    // Note that we may not output a distance field, and it may have a different name if we do.
-    // This is okay because the merging logic just uses this field to determine sort direction,
-    // while the sort key is made accessible in the document metadata.
-    logic.mergeSortPattern = BSON("distance" << 1);
-    return logic;
+    // {shardsStage, mergingStage, sortPattern}
+    return DistributedPlanLogic{this, nullptr, BSON(distanceField->fullPath() << 1)};
 }
 
 }  // namespace mongo
