@@ -2,7 +2,7 @@
  * Tests the dbCheck command's missing index keys check behavior when the index is not found.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_81
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

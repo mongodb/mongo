@@ -2,7 +2,7 @@
  * Test that dbcheck will be ignored during initial sync.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_81
  * ]
  */
 

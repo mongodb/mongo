@@ -3,7 +3,7 @@
  * them is running at a time.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_81
  * ]
  */
 

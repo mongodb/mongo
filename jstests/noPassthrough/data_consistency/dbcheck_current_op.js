@@ -1,7 +1,7 @@
 /**
  * Tests that dbcheck currentOp has the correct information.
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_81
  * ]
  */
 
