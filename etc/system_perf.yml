@@ -325,6 +325,10 @@ functions:
 tasks:
   - name: schedule_compile
     commands:
+      - command: expansions.write
+        params:
+          file: expansions.yml
+          redacted: true
       - command: git.get_project
         params:
           directory: src
