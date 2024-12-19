@@ -100,6 +100,11 @@ Status GRPCTransportLayerMock::start() {
     }
 
     if (_client) {
+        _ioThread = stdx::thread([this] {
+            setThreadName("MockGRPCTLEgressReactor");
+            _reactor->run();
+            _reactor->drain();
+        });
         _client->start();
     }
 
@@ -117,6 +122,8 @@ void GRPCTransportLayerMock::shutdown() {
     }
     if (_client) {
         _client->shutdown();
+        _reactor->stop();
+        _ioThread.join();
     }
 }
 
@@ -125,13 +132,8 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connectWithAuthToke
     ConnectSSLMode sslMode,
     Milliseconds timeout,
     boost::optional<std::string> authToken) {
-    if (!_client) {
-        return Status(
-            ErrorCodes::IllegalOperation,
-            "start() must have been called with useEgress = true before attempting to connect");
-    }
-    return _client->connect(
-        std::move(peer), _reactor, std::move(timeout), {std::move(authToken), sslMode});
+    return asyncConnectWithAuthToken(peer, sslMode, _reactor, timeout, nullptr, authToken)
+        .getNoThrow();
 }
 
 StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connect(
@@ -140,6 +142,39 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connect(
     Milliseconds timeout,
     const boost::optional<TransientSSLParams>& transientSSLParams) {
     return connectWithAuthToken(std::move(peer), sslMode, std::move(timeout));
+}
+
+Future<std::shared_ptr<Session>> GRPCTransportLayerMock::asyncConnectWithAuthToken(
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    const ReactorHandle& reactor,
+    Milliseconds timeout,
+    std::shared_ptr<ConnectionMetrics> connectionMetrics,
+    boost::optional<std::string> authToken) {
+    if (!_client) {
+        return Status(
+            ErrorCodes::IllegalOperation,
+            "start() must have been called with useEgress = true before attempting to connect");
+    }
+    return _client
+        ->connect(std::move(peer),
+                  _reactor,
+                  std::move(timeout),
+                  {std::move(authToken), sslMode},
+                  connectionMetrics)
+        .then([](std::shared_ptr<EgressSession> egressSession) -> std::shared_ptr<Session> {
+            return egressSession;
+        });
+}
+
+Future<std::shared_ptr<Session>> GRPCTransportLayerMock::asyncConnect(
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    const ReactorHandle& reactor,
+    Milliseconds timeout,
+    std::shared_ptr<ConnectionMetrics> connectionMetrics,
+    std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
+    return asyncConnectWithAuthToken(peer, sslMode, reactor, timeout, connectionMetrics);
 }
 
 const std::vector<HostAndPort>& GRPCTransportLayerMock::getListeningAddresses() const {

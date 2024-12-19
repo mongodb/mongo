@@ -80,7 +80,7 @@ private:
 
     Date_t _deadline;
     MetadataContainer _metadata;
-    MockClientStream* _stream;
+    std::shared_ptr<MockClientStream> _stream;
 };
 
 }  // namespace mongo::transport::grpc

@@ -30,7 +30,10 @@
 #include <grpcpp/support/time.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/logv2/log.h"
 #include "mongo/transport/grpc/reactor.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport::grpc {
 
@@ -98,7 +101,11 @@ void GRPCReactor::drain() {
     while (_cq.Next(&tag, &ok)) {
         _processCompletionQueueNotification(tag, ok);
     }
-    invariant(_cqTaskStash.size() == 0, "GRPCReactor did not properly drain all tasks");
+
+    // TODO SERVER-98524: Make this an invariant failure.
+    if (_cqTaskStash.size() != 0) {
+        LOGV2_WARNING(9715301, "GRPCReactor did not properly drain all tasks");
+    }
 }
 
 void GRPCReactor::schedule(Task task) {

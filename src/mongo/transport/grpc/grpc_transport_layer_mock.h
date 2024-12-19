@@ -78,6 +78,22 @@ public:
         Milliseconds timeout,
         const boost::optional<TransientSSLParams>& transientSSLParams) override;
 
+    Future<std::shared_ptr<Session>> asyncConnectWithAuthToken(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        const ReactorHandle& reactor,
+        Milliseconds timeout,
+        std::shared_ptr<ConnectionMetrics> connectionMetrics,
+        boost::optional<std::string> authToken = boost::none) override;
+
+    Future<std::shared_ptr<Session>> asyncConnect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        const ReactorHandle& reactor,
+        Milliseconds timeout,
+        std::shared_ptr<ConnectionMetrics> connectionMetrics,
+        std::shared_ptr<const SSLConnectionContext> transientSSLContext) override;
+
 #ifdef MONGO_CONFIG_SSL
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager, bool asyncOCSPStaple) {
         MONGO_UNIMPLEMENTED;
@@ -115,9 +131,9 @@ private:
     std::shared_ptr<Client> _client;
     ServiceContext* const _svcCtx;
     Options _options;
-    // This reactor is used to produce CompletionQueueEntry tags for the mocks that don't use the
-    // completion queue, but it does not need to be run.
+
     std::shared_ptr<GRPCReactor> _reactor;
+    stdx::thread _ioThread;
 
     // Invalidated after setup().
     MockClient::MockResolver _resolver;

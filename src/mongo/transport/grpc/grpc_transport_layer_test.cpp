@@ -62,10 +62,10 @@
 namespace mongo::transport::grpc {
 namespace {
 
-class GRPCTransportLayerTest : public ServiceContextWithClockSourceMockTest {
+class GRPCTransportLayerTest : public ServiceContextTest {
 public:
     void setUp() override {
-        ServiceContextWithClockSourceMockTest::setUp();
+        ServiceContextTest::setUp();
 
         auto svcCtx = getServiceContext();
 
@@ -87,7 +87,7 @@ public:
     }
 
     void tearDown() override {
-        ServiceContextWithClockSourceMockTest::tearDown();
+        ServiceContextTest::tearDown();
         ServiceExecutor::shutdownAll(getServiceContext(), Seconds{10});
     }
 
@@ -216,10 +216,12 @@ public:
             client->start();
             ON_BLOCK_EXIT([&] { client->shutdown(); });
 
-            auto session = client->connect(tl.getListeningAddresses().at(0),
-                                           getGRPCEgressReactor(&tl),
-                                           CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                           {});
+            auto session = client
+                               ->connect(tl.getListeningAddresses().at(0),
+                                         getGRPCEgressReactor(&tl),
+                                         CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                         {})
+                               .get();
 
             ASSERT_OK(session->sinkMessage(makeMessage(BSON(kCommandName << message))));
             auto replyMessage = uassertStatusOK(session->sourceMessage());
@@ -379,7 +381,7 @@ public:
 
     void tearDown() override {
         _tl.reset();
-        ServiceContextWithClockSourceMockTest::tearDown();
+        ServiceContextTest::tearDown();
     }
 
     GRPCTransportLayer& transportLayer() {
@@ -485,6 +487,60 @@ TEST_F(GRPCTransportLayerTest, DefaultIPList) {
         std::move(noIPListOptions));
 }
 
+TEST_F(GRPCTransportLayerTest, ConcurrentAsyncConnectsSucceed) {
+    runWithTL(
+        CommandServiceTestFixtures::makeEchoHandler(),
+        [&](auto& tl) {
+            const size_t kNumConcurrentStreamEstablishments = 20;
+            std::vector<Future<std::shared_ptr<Session>>> streamFutures;
+
+            for (size_t i = 0; i < kNumConcurrentStreamEstablishments; i++) {
+                streamFutures.push_back(
+                    tl.asyncConnect(tl.getListeningAddresses().at(0),
+                                    ConnectSSLMode::kGlobalSSLMode,
+                                    tl.getReactor(TransportLayer::WhichReactor::kEgress),
+                                    CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                    nullptr /** connectionMetrics */,
+                                    nullptr /** transientSSLContext */));
+            }
+
+            for (auto& fut : streamFutures) {
+                auto swSession = fut.getNoThrow();
+                ASSERT_OK(swSession.getStatus());
+
+                // Ensure the sessions are useable.
+                std::shared_ptr<EgressSession> session =
+                    checked_pointer_cast<EgressSession>(swSession.getValue());
+                assertEchoSucceeds(*session);
+                ASSERT_OK(session->finish());
+            }
+        },
+        CommandServiceTestFixtures::makeTLOptions());
+}
+
+TEST_F(GRPCTransportLayerTest, AsyncConnectConnectionMetrics) {
+    runWithTL(
+        makeNoopRPCHandler(),
+        [&](auto& tl) {
+            auto connMetrics =
+                std::make_shared<ConnectionMetrics>(getServiceContext()->getFastClockSource());
+            auto fut = tl.asyncConnect(tl.getListeningAddresses().at(0),
+                                       ConnectSSLMode::kGlobalSSLMode,
+                                       tl.getReactor(TransportLayer::WhichReactor::kEgress),
+                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       connMetrics,
+                                       nullptr /** transientSSLContext */);
+            auto swSession = fut.getNoThrow();
+            ASSERT_OK(swSession.getStatus());
+
+            ASSERT_GT(connMetrics->dnsResolution().get(), Milliseconds(0));
+            // These timers are resolved immediately after the dnsResolution timer.
+            ASSERT_GTE(connMetrics->tcpConnection().get(), Milliseconds(0));
+            ASSERT_GTE(connMetrics->tlsHandshake().get(), Milliseconds(0));
+        },
+        CommandServiceTestFixtures::makeTLOptions());
+}
+
 TEST_F(GRPCTransportLayerTest, ConnectionError) {
     runWithTL(
         makeNoopRPCHandler(),
@@ -494,7 +550,7 @@ TEST_F(GRPCTransportLayerTest, ConnectionError) {
                                          ConnectSSLMode::kGlobalSSLMode,
                                          Milliseconds(50));
                 ASSERT_NOT_OK(status);
-                ASSERT_TRUE(ErrorCodes::isNetworkError(status.getStatus()));
+                ASSERT_EQ(status.getStatus().code(), ErrorCodes::HostUnreachable);
             };
             tryConnect();
             // Ensure second attempt on already created channel object also gracefully fails.
@@ -512,7 +568,7 @@ TEST_F(GRPCTransportLayerTest, SSLModeMismatch) {
                                          ConnectSSLMode::kDisableSSL,
                                          CommandServiceTestFixtures::kDefaultConnectTimeout);
                 ASSERT_NOT_OK(status);
-                ASSERT_TRUE(ErrorCodes::isNetworkError(status.getStatus()));
+                ASSERT_EQ(status.getStatus().code(), ErrorCodes::HostUnreachable);
             };
             tryConnect();
             // Ensure second attempt on already created channel object also gracefully fails.
@@ -537,17 +593,20 @@ TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
         ON_BLOCK_EXIT([&] { tl->shutdown(); });
         addr = tl->getListeningAddresses().at(0);
 
-        auto session = client->connect(addr,
-                                       getGRPCEgressReactor(tl.get()),
-                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                       {});
+        auto session = client
+                           ->connect(addr,
+                                     getGRPCEgressReactor(tl.get()),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     {})
+                           .get();
         ASSERT_OK(session->finish());
         session.reset();
     }
 
-    ASSERT_THROWS_CODE(client->connect(addr, getGRPCEgressReactor(tl.get()), Milliseconds(50), {}),
-                       DBException,
-                       ErrorCodes::NetworkTimeout);
+    ASSERT_THROWS_CODE(
+        client->connect(addr, getGRPCEgressReactor(tl.get()), Milliseconds(50), {}).get(),
+        DBException,
+        ErrorCodes::ShutdownInProgress);
     ASSERT_NOT_OK(tl->connect(addr, ConnectSSLMode::kGlobalSSLMode, Milliseconds(50)));
 }
 

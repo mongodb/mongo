@@ -34,6 +34,8 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/counter.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/channel_pool.h"
@@ -84,10 +86,12 @@ public:
         ConnectSSLMode sslMode = ConnectSSLMode::kGlobalSSLMode;
     };
 
-    std::shared_ptr<EgressSession> connect(const HostAndPort& remote,
-                                           const std::shared_ptr<GRPCReactor>& reactor,
-                                           Milliseconds timeout,
-                                           ConnectOptions options);
+    Future<std::shared_ptr<EgressSession>> connect(
+        const HostAndPort& remote,
+        const std::shared_ptr<GRPCReactor>& reactor,
+        Milliseconds timeout,
+        ConnectOptions options,
+        std::shared_ptr<ConnectionMetrics> connectionMetrics = nullptr);
 
     /**
      * Get this client's current idea of what the cluster's maxWireVersion is. This will be updated
@@ -109,11 +113,59 @@ protected:
 
 private:
     enum class ClientState { kUninitialized, kStarted, kShutdown };
+    class PendingStreamState {
+    public:
+        std::list<std::shared_ptr<PendingStreamState>>::iterator iter;
 
-    virtual CtxAndStream _streamFactory(const HostAndPort&,
-                                        const std::shared_ptr<GRPCReactor>&,
-                                        Milliseconds,
-                                        const ConnectOptions&) = 0;
+        void cancel(Status reason) {
+            {
+                stdx::lock_guard lg(_mutex);
+                if (!_cancellationReason.isOK()) {
+                    // Already cancelled, can early return.
+                    return;
+                }
+                _cancellationReason = reason;
+            }
+            _cancelSource.cancel();
+            cancelTimer();
+        }
+
+        Status getCancellationReason() {
+            stdx::lock_guard lg(_mutex);
+            return _cancellationReason;
+        }
+
+        CancellationToken getCancellationToken() {
+            return _cancelSource.token();
+        }
+
+        void setTimer(std::shared_ptr<ReactorTimer> timer) {
+            _timer = std::move(timer);
+        }
+
+        ReactorTimer* getTimer() {
+            return _timer.get();
+        }
+
+        void cancelTimer() {
+            if (_timer) {
+                _timer->cancel();
+            }
+        }
+
+    private:
+        stdx::mutex _mutex;
+        Status _cancellationReason = Status::OK();
+        CancellationSource _cancelSource;
+
+        std::shared_ptr<ReactorTimer> _timer;
+    };
+
+    virtual Future<CtxAndStream> _streamFactory(const HostAndPort&,
+                                                const std::shared_ptr<GRPCReactor>&,
+                                                Milliseconds,
+                                                const ConnectOptions&,
+                                                const CancellationToken& token) = 0;
 
     /**
      * Returns whether all outstanding sessions created by this client have been destroyed and this
@@ -130,8 +182,11 @@ private:
     mutable stdx::mutex _mutex;
     stdx::condition_variable _shutdownCV;
     ClientState _state = ClientState::kUninitialized;
-    size_t _ongoingConnects = 0;
     std::list<std::weak_ptr<EgressSession>> _sessions;
+
+    // This list corresponds to ongoing stream establishment attempts, and holds the timeout and
+    // cancellation state for those attemps.
+    std::list<std::shared_ptr<PendingStreamState>> _pendingStreamStates;
 };
 
 class GRPCClient : public Client {
@@ -158,10 +213,11 @@ public:
     void appendStats(BSONObjBuilder* section) const override;
 
 private:
-    CtxAndStream _streamFactory(const HostAndPort&,
-                                const std::shared_ptr<GRPCReactor>&,
-                                Milliseconds,
-                                const ConnectOptions&) override;
+    Future<CtxAndStream> _streamFactory(const HostAndPort&,
+                                        const std::shared_ptr<GRPCReactor>&,
+                                        Milliseconds,
+                                        const ConnectOptions&,
+                                        const CancellationToken&) override;
 
     std::unique_ptr<StubFactory> _stubFactory;
 };

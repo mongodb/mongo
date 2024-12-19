@@ -177,8 +177,11 @@ public:
                 client->start();
 
                 auto makeSession = [&](Milliseconds timeout) {
-                    auto session = client->connect(
-                        server.getListeningAddresses().at(0), getReactor(), timeout, {});
+                    auto session =
+                        client
+                            ->connect(
+                                server.getListeningAddresses().at(0), getReactor(), timeout, {})
+                            .get();
                     ASSERT_OK(session->finish());
                 };
 
@@ -236,8 +239,12 @@ TEST_F(GRPCClientTest, GRPCClientConnect) {
 
         for (auto& server : servers) {
             for (auto& addr : server->getListeningAddresses()) {
-                auto session = client->connect(
-                    addr, getReactor(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
+                auto session = client
+                                   ->connect(addr,
+                                             getReactor(),
+                                             CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                             {})
+                                   .get();
                 ASSERT_TRUE(session->isConnected());
 
                 OpMsg msg;
@@ -267,10 +274,12 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
         auto client = makeClient(std::move(options));
         client->start();
 
-        auto session = client->connect(server.getListeningAddresses().at(0),
-                                       getReactor(),
-                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                       {});
+        auto session = client
+                           ->connect(server.getListeningAddresses().at(0),
+                                     getReactor(),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     {})
+                           .get();
         assertEchoSucceeds(*session);
         ASSERT_OK(session->finish());
     };
@@ -326,10 +335,12 @@ TEST_F(GRPCClientTest, GRPCClientConnectAuthToken) {
         client->start();
         Client::ConnectOptions options;
         options.authToken = kAuthToken;
-        auto session = client->connect(server.getListeningAddresses().at(0),
-                                       getReactor(),
-                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                       options);
+        auto session = client
+                           ->connect(server.getListeningAddresses().at(0),
+                                     getReactor(),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     options)
+                           .get();
         ASSERT_OK(session->finish());
     };
 
@@ -344,10 +355,12 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoAuthToken) {
     auto clientThreadBody = [&](auto& server, auto&) {
         auto client = makeClient();
         client->start();
-        auto session = client->connect(server.getListeningAddresses().at(0),
-                                       getReactor(),
-                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                       {});
+        auto session = client
+                           ->connect(server.getListeningAddresses().at(0),
+                                     getReactor(),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     {})
+                           .get();
         ASSERT_OK(session->finish());
     };
 
@@ -362,10 +375,12 @@ TEST_F(GRPCClientTest, GRPCClientConnectAfterReactorShutdown) {
         auto client = makeClient();
         client->start();
         getReactor()->stop();
-        ASSERT_THROWS_CODE(client->connect(server.getListeningAddresses().at(0),
-                                           getReactor(),
-                                           CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                           {}),
+        ASSERT_THROWS_CODE(client
+                               ->connect(server.getListeningAddresses().at(0),
+                                         getReactor(),
+                                         CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                         {})
+                               .get(),
                            DBException,
                            ErrorCodes::ShutdownInProgress);
     };
@@ -385,17 +400,21 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
         ASSERT_EQ(getCurrStreamsMetric(client), 0);
 
         // Create a new session each for a different address
-        auto session1 = client->connect(server.getListeningAddresses().at(0),
-                                        getReactor(),
-                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                        {});
+        auto session1 = client
+                            ->connect(server.getListeningAddresses().at(0),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {})
+                            .get();
         ASSERT_EQ(getCurrChannelMetric(client), 1);
         ASSERT_EQ(getCurrStreamsMetric(client), 1);
 
-        auto session2 = client->connect(server.getListeningAddresses().at(1),
-                                        getReactor(),
-                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                        {});
+        auto session2 = client
+                            ->connect(server.getListeningAddresses().at(1),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {})
+                            .get();
         ASSERT_EQ(getCurrChannelMetric(client), 2);
         ASSERT_EQ(getCurrStreamsMetric(client), 2);
 
@@ -432,10 +451,12 @@ TEST_F(GRPCClientTest, GRPCClientMetadata) {
         auto client = makeClient();
         client->start();
         clientId = client->id();
-        auto session = client->connect(server.getListeningAddresses().at(0),
-                                       getReactor(),
-                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                       {});
+        auto session = client
+                           ->connect(server.getListeningAddresses().at(0),
+                                     getReactor(),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     {})
+                           .get();
         ASSERT_OK(session->finish());
     };
 
@@ -466,10 +487,12 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {
-            sessions.push_back(client->connect(server.getListeningAddresses().at(0),
-                                               getReactor(),
-                                               CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                               {}));
+            sessions.push_back(client
+                                   ->connect(server.getListeningAddresses().at(0),
+                                             getReactor(),
+                                             CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                             {})
+                                   .get());
         }
 
         Notification<void> shutdownFinished;
@@ -486,10 +509,12 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
             ASSERT_EQ(session->finish().code(), ErrorCodes::ShutdownInProgress);
         }
 
-        ASSERT_THROWS_CODE(client->connect(server.getListeningAddresses().at(0),
-                                           getReactor(),
-                                           CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                           {}),
+        ASSERT_THROWS_CODE(client
+                               ->connect(server.getListeningAddresses().at(0),
+                                         getReactor(),
+                                         CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                         {})
+                               .get(),
                            DBException,
                            ErrorCodes::ShutdownInProgress);
 

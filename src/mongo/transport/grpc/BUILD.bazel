@@ -152,6 +152,7 @@ mongo_cc_library(
     name = "grpc_transport_mock",
     srcs = [
         "grpc_transport_layer_mock.cpp",
+        "mock_client.cpp",
         "mock_client_stream.cpp",
         "mock_server_context.cpp",
         "mock_server_stream.cpp",

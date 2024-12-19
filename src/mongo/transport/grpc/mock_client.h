@@ -35,7 +35,6 @@
 #include "mongo/transport/grpc/channel_pool.h"
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/mock_stub.h"
-#include "mongo/transport/grpc/util.h"
 #include "mongo/transport/transport_layer.h"
 
 namespace mongo::transport::grpc {
@@ -49,16 +48,7 @@ public:
                ServiceContext* svcCtx,
                HostAndPort local,
                MockResolver resolver,
-               const BSONObj& metadata)
-        : Client(tl, svcCtx, metadata), _local(std::move(local)), _resolver(std::move(resolver)) {
-        _pool = std::make_shared<MockChannelPool>(
-            svcCtx->getFastClockSource(),
-            [](auto) { return true; },
-            [resolver = _resolver, local = _local](const HostAndPort& remote, bool) {
-                return std::make_shared<MockChannel>(local, remote, resolver(remote));
-            },
-            [](std::shared_ptr<MockChannel>& channel, Milliseconds) { return MockStub(channel); });
-    }
+               const BSONObj& metadata);
 
     void start() override {
         Client::start();
@@ -69,19 +59,11 @@ public:
     }
 
 private:
-    CtxAndStream _streamFactory(const HostAndPort& remote,
-                                const std::shared_ptr<GRPCReactor>& reactor,
-                                Milliseconds timeout,
-                                const ConnectOptions& options) override {
-        auto stub = _pool->createStub(remote, options.sslMode, timeout);
-        auto ctx = std::make_shared<MockClientContext>();
-        setMetadataOnClientContext(*ctx, options);
-        if (options.authToken) {
-            return {ctx, stub->stub().authenticatedCommandStream(ctx.get())};
-        } else {
-            return {ctx, stub->stub().unauthenticatedCommandStream(ctx.get())};
-        }
-    }
+    Future<CtxAndStream> _streamFactory(const HostAndPort& remote,
+                                        const std::shared_ptr<GRPCReactor>& reactor,
+                                        Milliseconds timeout,
+                                        const ConnectOptions& options,
+                                        const CancellationToken& token) override;
 
     const HostAndPort _local;
     MockResolver _resolver;

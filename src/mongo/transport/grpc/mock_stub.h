@@ -225,7 +225,7 @@ private:
                                                cancellationState,
                                                std::move(*pipe.right));
 
-        ctx->_stream = clientStream.get();
+        ctx->_stream = clientStream;
         _channel->sendRPC(std::move(rpc));
         return clientStream;
     }

@@ -88,19 +88,13 @@ public:
         Milliseconds timeout,
         boost::optional<std::string> authToken = boost::none) = 0;
 
-    /**
-     * The server's current gRPC integration doesn't support async networking, so this is
-     * left unimplemented.
-     */
-    Future<std::shared_ptr<Session>> asyncConnect(
+    virtual Future<std::shared_ptr<Session>> asyncConnectWithAuthToken(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,
         Milliseconds timeout,
         std::shared_ptr<ConnectionMetrics> connectionMetrics,
-        std::shared_ptr<const SSLConnectionContext> transientSSLContext) override {
-        MONGO_UNIMPLEMENTED;
-    }
+        boost::optional<std::string> authToken = boost::none) = 0;
 
     StringData getNameForLogging() const override {
         return "gRPC"_sd;

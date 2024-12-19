@@ -226,10 +226,12 @@ TEST_F(AsioGRPCTransportLayerManagerTest, IngressAsioGRPC) {
 
             for (auto i = 0; i < kNumSessions; i++) {
                 auto session =
-                    client->connect(getGRPCListenAddress(),
-                                    getGRPCReactor(),
-                                    grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                    {});
+                    client
+                        ->connect(getGRPCListenAddress(),
+                                  getGRPCReactor(),
+                                  grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                  {})
+                        .get();
                 ON_BLOCK_EXIT([&] { ASSERT_OK(session->finish()); });
                 assertEchoSucceeds(*session);
             }
@@ -327,10 +329,12 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
                 grpc::CommandServiceTestFixtures::makeClientOptions());
             client->start();
             ON_BLOCK_EXIT([&] { client->shutdown(); });
-            auto session = client->connect(getGRPCListenAddress(),
-                                           getGRPCReactor(),
-                                           grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                           {});
+            auto session = client
+                               ->connect(getGRPCListenAddress(),
+                                         getGRPCReactor(),
+                                         grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                         {})
+                               .get();
             ON_BLOCK_EXIT([&] { session->end(); });
             {
                 stdx::unique_lock lk(mutex);

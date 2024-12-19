@@ -85,6 +85,22 @@ public:
         Milliseconds timeout,
         const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) override;
 
+    Future<std::shared_ptr<Session>> asyncConnectWithAuthToken(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        const ReactorHandle& reactor,
+        Milliseconds timeout,
+        std::shared_ptr<ConnectionMetrics> connectionMetrics,
+        boost::optional<std::string> authToken = boost::none) override;
+
+    Future<std::shared_ptr<Session>> asyncConnect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        const ReactorHandle& reactor,
+        Milliseconds timeout,
+        std::shared_ptr<ConnectionMetrics> connectionMetrics,
+        std::shared_ptr<const SSLConnectionContext> transientSSLContext) override;
+
     void appendStatsForServerStatus(BSONObjBuilder* bob) const override {
         if (!_client) {
             return;
