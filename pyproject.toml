@@ -51,7 +51,7 @@ wheel = "0.37.0"
 [tool.poetry.group.core.dependencies]
 psutil = "^6.0.0"
 pymongo = "4.3.3"
-PyYAML = "5.3.1"
+PyYAML = "^6.0.2"
 types-PyYAML = "^6.0.12.20240808"
 requests = "^2.32.3"
 typing-extensions = "^4.12.2"
