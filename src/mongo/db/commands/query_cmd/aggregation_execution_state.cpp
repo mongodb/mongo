@@ -609,10 +609,13 @@ void AggCatalogState::validate() const {
                 !getCtx().getView());
         const auto& collection = getCtx().getCollection();
         const bool isClusteredCollection = collection && collection->isClustered();
-        uassertStatusOK(
-            query_request_helper::validateResumeAfter(_aggExState.getOpCtx(),
-                                                      *_aggExState.getRequest().getResumeAfter(),
-                                                      isClusteredCollection));
+        uassertStatusOK(query_request_helper::validateResumeInput(
+            _aggExState.getOpCtx(),
+            _aggExState.getRequest().getResumeAfter() ? *_aggExState.getRequest().getResumeAfter()
+                                                      : BSONObj(),
+            _aggExState.getRequest().getStartAt() ? *_aggExState.getRequest().getStartAt()
+                                                  : BSONObj(),
+            isClusteredCollection));
     }
 
     // If collectionUUID was provided, verify the collection exists and has the expected UUID.

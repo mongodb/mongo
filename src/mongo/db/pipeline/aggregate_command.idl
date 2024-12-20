@@ -198,7 +198,7 @@ commands:
                 - privilege: # $listSearchIndexes
                     agg_stage: listSearchIndexes
                     resource_pattern: database
-                    action_type: listSearchIndexes 
+                    action_type: listSearchIndexes
                 - privilege: # $listClusterCatalog
                     agg_stage: listClusterCatalog
                     resource_pattern: cluster
@@ -335,11 +335,21 @@ commands:
             $_resumeAfter:
                 description: "Internal usage only. If present, the collection scan will seek to the
                 exact RecordId, or return KeyNotFound if it does not exist. Must only be set on
-                forward collection scans. This field cannot be used in conjunction with 'min' or 'max'."
+                forward collection scans. This field cannot be used in conjunction with 'min', 'max',
+                or '$_startAt', and is not valid on views, or on mongos."
                 cpp_name: resumeAfter
                 type: object_owned
                 optional: true
                 stability: unstable
+            $_startAt:
+                description: "Internal usage only. If present, the collection scan will seek to the
+                exact RecordId, or the next available RecordId if it does not exist. Must only be set
+                on forward collection scans. This field cannot be used in conjunction with 'min',
+                'max', or '$_resumeAfter', and is not valid on views, or on mongos."
+                cpp_name: startAt
+                type: object_owned
+                optional: true
+                stability: internal
             includeQueryStatsMetrics:
                 description: "Determines whether or not to include query stats metrics in the response."
                 type: optionalBool

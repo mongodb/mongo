@@ -91,7 +91,8 @@ ScanStage::ScanStage(UUID collUuid,
                      bool useRandomCursor,
                      bool participateInTrialRunTracking,
                      bool includeScanStartRecordId,
-                     bool includeScanEndRecordId)
+                     bool includeScanEndRecordId,
+                     bool tolerateKeyNotFound)
     : PlanStage(seekRecordIdSlot ? "seek"_sd : "scan"_sd,
                 yieldPolicy,
                 nodeId,
@@ -113,7 +114,8 @@ ScanStage::ScanStage(UUID collUuid,
                                               maxRecordIdSlot,
                                               forward,
                                               scanCallbacks,
-                                              useRandomCursor)),
+                                              useRandomCursor,
+                                              tolerateKeyNotFound)),
       _includeScanStartRecordId(includeScanStartRecordId),
       _includeScanEndRecordId(includeScanEndRecordId) {
     invariant(!seekRecordIdSlot || forward);
@@ -496,8 +498,13 @@ PlanState ScanStage::getNext() {
                                      "the collection: "
                                   << _seekRecordId);
                 }
-                doSeekExact = true;
-                nextRecord = _cursor->seekExact(_seekRecordId);
+                if (_state->tolerateKeyNotFound) {
+                    nextRecord = _cursor->seek(_seekRecordId,
+                                               SeekableRecordCursor::BoundInclusion::kInclude);
+                } else {
+                    doSeekExact = true;
+                    nextRecord = _cursor->seekExact(_seekRecordId);
+                }
             } else if (_minRecordIdAccessor && _state->forward) {
                 // The range may be exclusive of the start record.
                 // Find the first record equal to _minRecordId
@@ -705,6 +712,9 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
 
     if (_state->seekRecordIdSlot) {
         DebugPrinter::addIdentifier(ret, _state->seekRecordIdSlot.value());
+        if (_state->tolerateKeyNotFound) {
+            DebugPrinter::addKeyword(ret, "tolerateKeyNotFound");
+        }
     }
 
     if (_state->recordSlot) {
