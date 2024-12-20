@@ -340,6 +340,20 @@ shared_archive = rule(
 )
 
 # =========
+# skip_archive
+# =========
+
+skip_archive_provider = provider(
+    doc = "Skip generating archives in favor of using --start-lib --end-lib",
+    fields = ["enabled"],
+)
+
+skip_archive = rule(
+    implementation = lambda ctx: skip_archive_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # detect_odr_violations
 # =========
 

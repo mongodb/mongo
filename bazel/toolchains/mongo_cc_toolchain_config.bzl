@@ -248,6 +248,11 @@ def _impl(ctx):
         enabled = True,
     )
 
+    supports_start_end_lib_feature = feature(
+        name = "supports_start_end_lib",
+        enabled = False,
+    )
+
     objcopy_embed_flags_feature = feature(
         name = "objcopy_embed_flags",
         enabled = True,
@@ -767,6 +772,7 @@ def _impl(ctx):
         include_paths_feature,
         library_search_directories_feature,
         supports_dynamic_linker_feature,
+        supports_start_end_lib_feature,
         supports_pic_feature,
         pic_feature,
         pie_feature,

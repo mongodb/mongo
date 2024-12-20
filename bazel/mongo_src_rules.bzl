@@ -1016,6 +1016,16 @@ LINKSTATIC_ENABLED = select({
     "//bazel/config:linkstatic_enabled": True,
 }, no_match_error = REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE)
 
+SKIP_ARCHIVE_ENABLED = select({
+    "//bazel/config:skip_archive_linkstatic_not_windows": True,
+    "//conditions:default": False,
+})
+
+SKIP_ARCHIVE_FEATURE = select({
+    "//bazel/config:skip_archive_linkstatic_not_windows": ["supports_start_end_lib"],
+    "//conditions:default": [],
+})
+
 SEPARATE_DEBUG_ENABLED = select({
     "//bazel/config:separate_debug_enabled": True,
     "//conditions:default": False,
@@ -1651,6 +1661,12 @@ def mongo_cc_library(
         exec_properties = exec_properties,
         **kwargs
     )
+
+    # Did not want to expose alwayslink for cc_library as it ends up getting
+    # modified in extract_debuginfo
+    if "alwayslink" not in kwargs:
+        kwargs["alwayslink"] = SKIP_ARCHIVE_ENABLED
+
     cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs + SANITIZER_DENYLIST_HEADERS,
@@ -1667,7 +1683,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + select({
+        features = MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + select({
             "//bazel/config:linkstatic_disabled": ["supports_pic", "pic"],
             "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
             "//conditions:default": ["-pic", "pie"],
@@ -1716,6 +1732,7 @@ def mongo_cc_library(
             "//bazel/config:shared_archive_enabled": ":" + name + SHARED_ARCHIVE_SUFFIX,
             "//conditions:default": None,
         }),
+        skip_archive = SKIP_ARCHIVE_ENABLED,
         visibility = visibility,
         deps = deps + cc_deps + [name + HEADER_DEP_SUFFIX],
     )
@@ -1865,7 +1882,7 @@ def _mongo_cc_binary_and_program(
         "local_defines": MONGO_GLOBAL_DEFINES + local_defines,
         "defines": defines,
         "includes": includes,
-        "features": MONGO_GLOBAL_FEATURES + ["-pic", "pie"] + features + select({
+        "features": MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + ["-pic", "pie"] + features + select({
             "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
             "//conditions:default": [],
         }),

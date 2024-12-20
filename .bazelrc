@@ -57,6 +57,7 @@ build --flag_alias=build_otel=//bazel/config:build_otel
 build --flag_alias=use_libcxx=//bazel/config:use_libcxx
 build --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations
 build --flag_alias=shared_archive=//bazel/config:shared_archive
+build --flag_alias=skip_archive=//bazel/config:skip_archive
 build --flag_alias=streams_release_build=//bazel/config:streams_release_build
 build --flag_alias=release=//bazel/config:release
 build --flag_alias=build_enterprise=//bazel/config:build_enterprise
@@ -114,6 +115,7 @@ build --//bazel/config:compiler_type=clang
 build --//bazel/config:linkstatic=True
 build --//bazel/config:build_enterprise=True
 build --//bazel/config:release=False
+build --//bazel/config:skip_archive=True
 build --enable_platform_specific_config=true
 
 # Profile for building fast with minimal debuggability - the build is fast ##################################################
@@ -127,6 +129,7 @@ build:fastbuild --//bazel/config:compiler_type=clang
 build:fastbuild --//bazel/config:linkstatic=True
 build:fastbuild --//bazel/config:build_enterprise=True
 build:fastbuild --//bazel/config:release=False
+build:fastbuild --//bazel/config:skip_archive=True
 build:fastbuild --enable_platform_specific_config=true
 
 # Profile for building highly debuggable code - the build is slow, the code is slow, the binaries are large #################
@@ -140,6 +143,7 @@ build:dbg --//bazel/config:compiler_type=clang
 build:dbg --//bazel/config:linkstatic=True
 build:dbg --//bazel/config:build_enterprise=True
 build:dbg --//bazel/config:release=False
+build:dbg --//bazel/config:skip_archive=True
 build:dbg --enable_platform_specific_config=true
 
 # Build with address and undefined sanitizers
@@ -148,6 +152,7 @@ build:dbg_aubsan --//bazel/config:linkstatic=False
 build:dbg_aubsan --//bazel/config:allocator=system
 build:dbg_aubsan --//bazel/config:asan=True
 build:dbg_aubsan --//bazel/config:ubsan=True
+build:dbg_aubsan --//bazel/config:skip_archive=False
 build:dbg_aubsan --enable_platform_specific_config=true
 
 # Build with thread sanitizers
@@ -156,6 +161,7 @@ build:dbg_tsan --//bazel/config:linkstatic=False
 build:dbg_tsan --//bazel/config:allocator=system
 build:dbg_tsan --//bazel/config:tsan=True
 build:dbg_tsan --//bazel/config:libunwind=off
+build:dbg_tsan --//bazel/config:skip_archive=False
 build:dbg_tsan --enable_platform_specific_config=true
 
 # Profile for building optimized code - the build is slow, the code is fast #################################################
@@ -169,6 +175,7 @@ build:opt --//bazel/config:compiler_type=gcc
 build:opt --//bazel/config:linkstatic=True
 build:opt --//bazel/config:build_enterprise=True
 build:opt --//bazel/config:release=False
+build:opt --//bazel/config:skip_archive=True
 build:opt --enable_platform_specific_config=true
 
 # TODO: Build the code as we would release it

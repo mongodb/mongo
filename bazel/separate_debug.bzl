@@ -482,8 +482,15 @@ def extract_debuginfo_impl(ctx):
     windows_constraint = ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]
 
     if ctx.target_platform_has_constraint(linux_constraint):
+        # When skipping the archives we have to skip modifying debug info
+        # for the intermediates because we end up taking a dependency
+        # on the _with_debug .a files
+        if ctx.attr.skip_archive and ctx.attr.cc_shared_library == None:
+            return ctx.attr.binary_with_debug[CcInfo]
         return linux_extraction(ctx, cc_toolchain, inputs)
     elif ctx.target_platform_has_constraint(macos_constraint):
+        if ctx.attr.skip_archive and ctx.attr.cc_shared_library == None:
+            return ctx.attr.binary_with_debug[CcInfo]
         return macos_extraction(ctx, cc_toolchain, inputs)
     elif ctx.target_platform_has_constraint(windows_constraint):
         return windows_extraction(ctx, cc_toolchain, inputs)
@@ -509,6 +516,7 @@ extract_debuginfo = rule(
             doc = "If generating a shared archive(.so.a/.dll.lib), the shared archive's cc_library. Otherwise empty.",
             allow_files = True,
         ),
+        "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
@@ -540,6 +548,7 @@ extract_debuginfo_binary = rule(
             doc = "If generating a shared archive(.so.a/.dll.lib), the shared archive's cc_library. Otherwise empty.",
             allow_files = True,
         ),
+        "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
@@ -572,6 +581,7 @@ extract_debuginfo_test = rule(
             doc = "If generating a shared archive(.so.a/.dll.lib), the shared archive's cc_library. Otherwise empty.",
             allow_files = True,
         ),
+        "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
