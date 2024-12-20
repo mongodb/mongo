@@ -138,10 +138,19 @@ function testUserCollections({trackUnshardedCollections}) {
         }));
     }
 
-    const transitionRes2 =
-        assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
-    jsTest.log("The third transitionToDedicatedConfigServer response: " + tojson(transitionRes2));
-    assert.eq(transitionRes2.state, "completed", transitionRes2);
+    // The command is compleated when all the orphans are deleted and no range deletion tasks are
+    // left. Every migration above runs with _waitForDelete=true, which guarantees every range
+    // deletions task to be processed but not necessarly removed from disk yet.
+    assert.soon(
+        () => {
+            const transitionRes2 =
+                assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+            jsTest.log("The third transitionToDedicatedConfigServer response: " +
+                       tojson(transitionRes2));
+            return transitionRes2.state == "completed";
+        },
+        "transitionToDedicatedConfigServer did not return 'complete' status within the timeout.",
+        60000 /*1 minute*/);
 
     jsTest.log("Testing 'movePrimaryFailIfNeedToCloneMovableCollections' without 'comment'");
 
