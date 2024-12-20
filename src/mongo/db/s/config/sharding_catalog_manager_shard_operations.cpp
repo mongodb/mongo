@@ -1281,6 +1281,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         _addShardInTransaction(
             opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
+        // Once the transaction has committed, we must immediately dismiss the guard to avoid
+        // incorrectly removing the RSM after persisting the shard addition.
+        stopMonitoringGuard.dismiss();
 
         // Record in changelog
         BSONObjBuilder shardDetails;
@@ -1297,13 +1300,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         // Ensure the added shard is visible to this process.
         shardRegistry->reload(opCtx);
-        if (!shardRegistry->getShard(opCtx, shardType.getName()).isOK()) {
-            return {ErrorCodes::OperationFailed,
-                    "Could not find shard metadata for shard after adding it. This most likely "
-                    "indicates that the shard was removed immediately after it was added."};
-        }
-
-        stopMonitoringGuard.dismiss();
+        tassert(9870600,
+                "Shard not found in ShardRegistry after committing addShard",
+                shardRegistry->getShard(opCtx, shardType.getName()).isOK());
 
         hangAddShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
         // Release the shard membership lock since the set cluster parameter operation below
