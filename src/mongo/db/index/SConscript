@@ -6,14 +6,9 @@ env = env.Clone()
 
 env.Benchmark(
     target="key_gen_bm",
-    source="key_gen_bm.cpp",
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query/sort_pattern",
-        "index_access_method",
-    ],
-    CONSOLIDATED_TARGET="second_half_bm",
+    source=[],
+    LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="second_half_bm",
 )
 
 env.CppUnitTest(

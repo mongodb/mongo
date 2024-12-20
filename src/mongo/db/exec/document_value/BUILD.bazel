@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -45,6 +45,19 @@ mongo_cc_library(
     deps = [
         ":document_value",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "document_bm",
+    srcs = [
+        "document_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        ":document_value",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:lock_manager",
     ],
 )
 
