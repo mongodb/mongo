@@ -69,5 +69,10 @@ void createCollectionWithRouterLoop(OperationContext* opCtx,
  */
 void createCollectionWithRouterLoop(OperationContext* opCtx, const NamespaceString& nss);
 
+/**
+ * Returns the only allowed `shardCollection` request for `config.system.sessions`
+ */
+ShardsvrCreateCollection shardLogicalSessionsCollectionRequest();
+
 }  // namespace cluster
 }  // namespace mongo

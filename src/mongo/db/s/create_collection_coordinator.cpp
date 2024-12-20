@@ -1290,11 +1290,11 @@ void commit(OperationContext* opCtx,
             std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder) {
     LOGV2_DEBUG(5277906, 2, "Create collection commit", logAttrs(nss));
 
-    // Never track the `system.session` collection as unsplittable . Note that this code will be
-    // reached only when a CSRS is designated as a coordinator. The CSRS is not capable of early
-    // exit because the `system.session` collection won't be found locally.
-    if (nss == NamespaceString::kLogicalSessionsNamespace && isUnsplittable(request)) {
-        return;
+    if (MONGO_unlikely(nss == NamespaceString::kLogicalSessionsNamespace)) {
+        tassert(ErrorCodes::IllegalOperation,
+                "The '{}' collection must always be sharded"_format(
+                    NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()),
+                isSharded(request));
     }
 
     if (MONGO_unlikely(failAtCommitCreateCollectionCoordinator.shouldFail())) {

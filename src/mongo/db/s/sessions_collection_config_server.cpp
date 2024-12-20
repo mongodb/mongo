@@ -94,13 +94,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
                           << ": cannot create the collection until there are shards",
             Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) != 0);
 
-    ShardsvrCreateCollection shardsvrCollRequest(NamespaceString::kLogicalSessionsNamespace);
-    ShardsvrCreateCollectionRequest requestParamsObj;
-    requestParamsObj.setShardKey(BSON("_id" << 1));
-    shardsvrCollRequest.setShardsvrCreateCollectionRequest(std::move(requestParamsObj));
-    shardsvrCollRequest.setDbName(NamespaceString::kLogicalSessionsNamespace.dbName());
-
-    cluster::createCollection(opCtx, std::move(shardsvrCollRequest));
+    cluster::createCollection(opCtx, cluster::shardLogicalSessionsCollectionRequest());
 
     Lock::GlobalLock lock(opCtx, MODE_IX);
     if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);

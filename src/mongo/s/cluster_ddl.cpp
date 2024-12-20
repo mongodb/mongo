@@ -162,6 +162,27 @@ void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request)
     const auto& nss = request.getNamespace();
     const auto dbInfo = createDatabase(opCtx, nss.dbName());
 
+    // The config.system.session collection can only exist as sharded and it's essential for the
+    // correct cluster functionality. To prevent potential issues, the operation must always be
+    // performed as a sharded creation with internal defaults. Ignore potentially different
+    // user-provided parameters.
+    if (nss == NamespaceString::kLogicalSessionsNamespace) {
+        auto newRequest = shardLogicalSessionsCollectionRequest();
+        bool isValidRequest = newRequest.getShardsvrCreateCollectionRequest().toBSON().woCompare(
+                                  request.getShardsvrCreateCollectionRequest().toBSON()) == 0;
+        if (!isValidRequest) {
+            LOGV2_WARNING(
+                9733600,
+                "Detected an invalid creation request for {nss}. To guarantee the correct "
+                "behavior, the request will be replaced with a shardCollection with internal "
+                "defaults",
+                "nss"_attr = nss.toStringForErrorMsg(),
+                "original request"_attr = request.toBSON(),
+                "new request"_attr = newRequest.toBSON());
+            request = newRequest;
+        }
+    }
+
     if (MONGO_unlikely(createUnshardedCollectionRandomizeDataShard.shouldFail()) &&
         request.getUnsplittable() && !request.getDataShard()) {
         // Select a random 'dataShard'.
@@ -278,6 +299,15 @@ void createCollectionWithRouterLoop(OperationContext* opCtx, const NamespaceStri
     shardsvrCollCommand.setDbName(nss.dbName());
 
     createCollectionWithRouterLoop(opCtx, shardsvrCollCommand);
+}
+
+ShardsvrCreateCollection shardLogicalSessionsCollectionRequest() {
+    ShardsvrCreateCollection systemSessionRequest(NamespaceString::kLogicalSessionsNamespace);
+    ShardsvrCreateCollectionRequest params;
+    params.setShardKey(BSON("_id" << 1));
+    systemSessionRequest.setShardsvrCreateCollectionRequest(std::move(params));
+    systemSessionRequest.setDbName(NamespaceString::kLogicalSessionsNamespace.dbName());
+    return systemSessionRequest;
 }
 
 }  // namespace cluster
