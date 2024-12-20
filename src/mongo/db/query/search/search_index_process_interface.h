@@ -43,22 +43,6 @@ public:
     static SearchIndexProcessInterface* get(OperationContext* opCtx);
 
     static void set(Service* service, std::unique_ptr<SearchIndexProcessInterface> impl);
-    /*
-     * TODO SERVER-93637 remove fetchCollectionUUIDOrThrow and fetchCollectionUUID from the
-     * interface and all derived classes once all search index commands can support sharded views.
-     */
-
-    /**
-     * Returns the collection UUID or throws a NamespaceNotFound error.
-     */
-    virtual UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx,
-                                            const NamespaceString& nss) = 0;
-
-    /**
-     * Returns the collection UUID or boost::none if no collection is found.
-     */
-    virtual boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
-                                                      const NamespaceString& nss) = 0;
 
     /**
      * Returns the collection UUID and optionally an underlying NSS (if query is on a view). If no

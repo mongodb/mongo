@@ -172,10 +172,13 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.logger.info("Waiting to connect to mongod on port %d.", self.port)
         time.sleep(0.1)  # Wait a little bit before trying again.
 
-    def setup_mongot(self):
+    def setup_mongot(self, router_endpoint_for_mongot: Optional[int] = None):
         mongot_options = {}
         mongot_options["mongodHostAndPort"] = "localhost:" + str(self.port)
         mongot_options["port"] = self.mongot_port
+
+        if router_endpoint_for_mongot is not None:
+            mongot_options["mongosHostAndPort"] = "localhost:" + str(router_endpoint_for_mongot)
 
         if "keyFile" not in self.mongod_options:
             raise self.fixturelib.ServerFailure("Cannot launch mongot without providing a keyfile")
