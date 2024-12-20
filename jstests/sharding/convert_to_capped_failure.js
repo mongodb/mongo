@@ -1,8 +1,6 @@
 /**
  * Tests the convertToCapped coordinator behavior when there is an hypothetical failure during the
  * local convertToCapped operation.
- *
- * @tags: [featureFlagConvertToCappedCoordinator]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

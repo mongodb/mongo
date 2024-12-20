@@ -78,30 +78,16 @@ public:
 
             const auto& nss = ns();
 
-            boost::optional<SharedSemiFuture<void>> coordinatorCompletionFuture;
-            {
-                FixedFCVRegion fixedFcvRegion{opCtx};
-                bool mustUseCoordinator = feature_flags::gConvertToCappedCoordinator.isEnabled(
-                    (*fixedFcvRegion).acquireFCVSnapshot());
+            auto coordinatorDoc = ConvertToCappedCoordinatorDocument();
+            coordinatorDoc.setShardsvrConvertToCappedRequest(
+                request().getShardsvrConvertToCappedRequest());
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{nss, DDLCoordinatorTypeEnum::kConvertToCapped}});
 
-                if (!mustUseCoordinator) {
-                    convertToCapped(opCtx, nss, request().getSize());
-                    return;
-                }
-
-                auto coordinatorDoc = ConvertToCappedCoordinatorDocument();
-                coordinatorDoc.setShardsvrConvertToCappedRequest(
-                    request().getShardsvrConvertToCappedRequest());
-                coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{nss, DDLCoordinatorTypeEnum::kConvertToCapped}});
-
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                auto coordinator = checked_pointer_cast<ConvertToCappedCoordinator>(
-                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-                coordinatorCompletionFuture.emplace(coordinator->getCompletionFuture());
-            }
-
-            coordinatorCompletionFuture->get(opCtx);
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto coordinator = checked_pointer_cast<ConvertToCappedCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            coordinator->getCompletionFuture().get(opCtx);
         }
 
     private:
