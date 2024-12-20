@@ -6,8 +6,33 @@ Import("wiredtiger")
 env = env.Clone()
 
 if wiredtiger:
-    env.CppUnitTest(
+    wtEnv = env.Clone()
+    wtEnv.InjectThirdParty(libraries=["wiredtiger"])
+
+    wtEnv.CppUnitTest(
         target="index_builds_test",
-        source=[],
-        LIBDEPS=[],
+        source=[
+            "index_build_entry_helpers_test.cpp",
+            "index_builds_coordinator_mongod_test.cpp",
+            "index_builds_coordinator_test.cpp",
+            "commit_quorum_options_test.cpp",
+            "index_build_interceptor_test.cpp",
+            "index_build_entry_test.cpp",
+            "index_builds_manager_test.cpp",
+            "multi_index_block_test.cpp",
+        ],
+        LIBDEPS=[
+            "$BUILD_DIR/mongo/db/shard_role",
+            "catalog/catalog_test_fixture",
+            "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
+            "$BUILD_DIR/mongo/db/query_exec",
+            "$BUILD_DIR/mongo/db/repl/replmocks",
+            "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
+            "$BUILD_DIR/mongo/db/server_base",
+            "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+            "$BUILD_DIR/mongo/db/service_context_test_fixture",
+            "index_build_entry_idl",
+            "index_build_entry_helpers",
+            "index_builds_coordinator_mongod",
+        ],
     )

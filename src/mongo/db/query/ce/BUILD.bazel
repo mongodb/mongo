@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -136,27 +136,5 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_expressions",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "sampling_estimator_test",
-    srcs = [
-        "sampling_estimator_test.cpp",
-    ],
-    tags = ["mongo_unittest_fourth_group"],
-    deps = [
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db/catalog:catalog_test_fixture",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "histogram_bm",
-    srcs = ["ce_histogram_bm.cpp"],
-    tags = ["second_half_bm"],
-    deps = [
-        "ce_test_utils",
-        "//src/mongo/db/query:query_test_service_context",
     ],
 )

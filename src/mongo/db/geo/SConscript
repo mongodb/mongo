@@ -12,6 +12,8 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="hash_bm",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        "hash_bm.cpp",
+    ],
+    LIBDEPS=["geometry"],
 )

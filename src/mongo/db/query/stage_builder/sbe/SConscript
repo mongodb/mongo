@@ -6,6 +6,13 @@ env = env.Clone()
 
 env.Benchmark(
     target="sbe_builder_bm",
-    source=[],
-    BAZEL_BENCHMARK_TAG="query_bm",
+    source=[
+        "sbe_builder_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/query_exec",
+    ],
+    CONSOLIDATED_TARGET="query_bm",
 )

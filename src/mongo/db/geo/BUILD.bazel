@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -66,15 +66,5 @@ mongo_cc_unit_test(
         ":geometry",
         ":geoparser",
         "//src/mongo/db:common",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "hash_bm",
-    srcs = [
-        "hash_bm.cpp",
-    ],
-    deps = [
-        ":geometry",
     ],
 )

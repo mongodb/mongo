@@ -4,7 +4,13 @@ Import("env")
 
 env.Benchmark(
     target="document_bm",
-    source=[],
-    LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="first_half_bm",
+    source=[
+        "document_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/server_base",
+        "document_value",
+    ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )

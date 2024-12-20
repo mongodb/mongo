@@ -24,8 +24,14 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="bson_bm",
-    source=[],
-    BAZEL_BENCHMARK_TAG="first_half_bm",
+    source=[
+        "bson_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/bson_validate",
+    ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.CppLibfuzzerTest(

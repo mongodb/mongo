@@ -16,9 +16,17 @@ env.SConscript(
 
 env.Benchmark(
     target="document_source_group_bm",
-    source=[],
-    LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="second_half_bm",
+    source=[
+        "document_source_group_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "document_source_mock",
+        "pipeline",
+    ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )
 
 env.CppUnitTest(
@@ -35,9 +43,13 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="percentile_algo_bm",
-    source=[],
-    LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="query_bm",
+    source=[
+        "percentile_algo_bm_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "accumulator",
+    ],
+    CONSOLIDATED_TARGET="query_bm",
 )
 
 env.CppUnitTest(
@@ -54,17 +66,32 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="window_function_percentile_bm",
-    source=[],
-    LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="query_bm",
+    source=[
+        "window_function/window_function_percentile_bm_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "accumulator",
+    ],
+    CONSOLIDATED_TARGET="query_nond_bm",
 )
 
 env.Benchmark(
     target="window_function_concat_arrays_bm",
-    source=[],
-    LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="query_bm",
+    source=[
+        "window_function/window_function_concat_arrays_bm_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "accumulator",
+    ],
+    CONSOLIDATED_TARGET="query_nond_bm",
 )
+
+bmEnv = env.Clone()
+bmEnv.InjectThirdParty(libraries=["benchmark"])
 
 env.Benchmark(
     target="expression_bm",

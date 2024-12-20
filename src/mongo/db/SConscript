@@ -66,15 +66,26 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="profile_filter_bm",
-    source=[],
-    LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="query_bm",
+    source=[
+        "profile_filter_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/profile_common",
+        "$BUILD_DIR/mongo/util/processinfo",
+        "profile_settings",
+    ],
+    CONSOLIDATED_TARGET="query_bm",
 )
 
 env.CppUnitTest(
     target="profile_filter_test",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        "profile_filter_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/profile_common",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+    ],
 )
 
 env.CppUnitTest(
@@ -118,8 +129,23 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="replica_set_endpoint_test",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        "direct_shard_client_tracker_test.cpp",
+        "replica_set_endpoint_sharding_state_test.cpp",
+        "replica_set_endpoint_test_fixture.cpp",
+        "replica_set_endpoint_util_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/rpc/message",
+        "$BUILD_DIR/mongo/transport/transport_layer_mock",
+        "auth/authmocks",
+        "commands",
+        "commands_test_example",
+        "repl/replmocks",
+        "s/sharding_catalog_manager",
+        "service_context_d_test_fixture",
+        "shard_role_api",
+    ],
 )
 
 asioEnv = env.Clone()
@@ -237,8 +263,17 @@ envWithAsio.CppUnitTest(
 
 asioEnv.CppIntegrationTest(
     target="db_integration_test",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        "nesting_depth_test.cpp",
+        "$BUILD_DIR/mongo/db/query/client_cursor/exhaust_cursor_currentop_integration_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/client/clientdriver_network",
+        "$BUILD_DIR/mongo/executor/network_interface_fixture",
+        "$BUILD_DIR/mongo/rpc/message",
+        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
+        "$BUILD_DIR/mongo/util/version_impl",
+    ],
 )
 
 env.CppLibfuzzerTest(
@@ -248,9 +283,13 @@ env.CppLibfuzzerTest(
 
 env.Benchmark(
     target="commands_bm",
-    source=[],
-    LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="first_half_bm",
+    source=[
+        "commands_bm.cpp",
+    ],
+    LIBDEPS=[
+        "server_base",
+    ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.Benchmark(
@@ -261,8 +300,13 @@ env.Benchmark(
 
 env.Benchmark(
     target="d_concurrency_bm",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        "d_concurrency_bm.cpp",
+    ],
+    LIBDEPS=[
+        "service_context_non_d",
+        "shard_role_api",
+    ],
 )
 
 env.CppUnitTest(
@@ -274,8 +318,28 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="service_entry_point_shard_role_bm",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        "service_entry_point_shard_role_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
+        "$BUILD_DIR/mongo/util/periodic_runner_factory",
+        "auth/authserver",
+        "catalog/catalog_impl",
+        "commands/standalone",
+        "dbdirectclient",
+        "mongod_options_init",
+        "op_observer/op_observer",
+        "read_write_concern_defaults_mock",
+        "repl/replmocks",
+        "repl/storage_interface_impl",
+        "s/sharding_runtime_d",
+        "server_base",
+        "service_context_d",
+        "storage/storage_control",
+        "storage/wiredtiger/storage_wiredtiger",
+        "vector_clock_mongod",
+    ],
 )
 
 env.Benchmark(

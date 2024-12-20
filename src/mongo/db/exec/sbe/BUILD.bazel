@@ -654,16 +654,3 @@ mongo_cc_benchmark(
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
-
-mongo_cc_benchmark(
-    name = "sbe_vm_bm",
-    srcs = [
-        "//src/mongo/db/exec/sbe/vm:vm_bm.cpp",
-    ],
-    tags = ["first_half_bm"],
-    deps = [
-        ":query_sbe",
-        "//src/mongo/db/query/collation:collator_icu",
-        "//src/mongo/unittest",
-    ],
-)

@@ -20,9 +20,6 @@ selector:
     - build/install/bin/placement_history_bm*
     - build/install/bin/system_resource_canary_bm*
     - build/install/bin/future_bm*
-    - build/install/bin/key_gen_bm*
-    - build/install/bin/histogram_bm*
-    - build/install/bin/document_source_group_bm*
 
     # The trailing asterisk is for handling the .exe extension on Windows.
     # These benchmarks are being run as part of the benchmarks_sharding.yml test suite.
@@ -34,6 +31,7 @@ selector:
     - build/install/bin/hash_table_bm*
     # These benchmarks are being run as part of the benchmarks_query.yml
     - build/install/bin/query_bm*
+    - build/install/bin/query_nond_bm*
     - build/install/bin/plan_cache_classic_bm*
     - build/install/bin/point_query_bm*
     - build/install/bin/distinct_scan_bm*

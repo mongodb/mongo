@@ -24,13 +24,23 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="sampling_estimator_test",
-    source=[],
+    source=[
+        "sampling_estimator_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/query_exec",
+    ],
 )
 
 env.Benchmark(
     target="histogram_bm",
-    source=[],
-    BAZEL_BENCHMARK_TAG="second_half_bm",
+    source=["ce_histogram_bm.cpp"],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "ce_test_utils",
+    ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )
 
 env.BazelProgram(

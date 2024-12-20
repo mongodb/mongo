@@ -1,5 +1,5 @@
 load("@poetry//:dependencies.bzl", "dependency")
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
 load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -4116,120 +4116,6 @@ mongo_cc_benchmark(
     deps = [
         ":service_context_non_d",
         ":shard_role_api",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "profile_filter_bm",
-    srcs = [
-        "profile_filter_bm.cpp",
-    ],
-    tags = ["query_bm"],
-    deps = [
-        ":profile_settings",
-        "//src/mongo/db/commands:profile_common",
-        "//src/mongo/util:processinfo",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "profile_filter_test",
-    srcs = [
-        "profile_filter_test.cpp",
-    ],
-    tags = ["mongo_unittest_third_group"],
-    deps = [
-        ":service_context_test_fixture",
-        "//src/mongo/db/commands:profile_common",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "replica_set_endpoint_test",
-    srcs = [
-        "direct_shard_client_tracker_test.cpp",
-        "replica_set_endpoint_sharding_state_test.cpp",
-        "replica_set_endpoint_test_fixture.cpp",
-        "replica_set_endpoint_test_fixture.h",
-        "replica_set_endpoint_util_test.cpp",
-    ],
-    tags = ["mongo_unittest_first_group"],
-    deps = [
-        ":commands",
-        ":commands_test_example",
-        ":service_context_d_test_fixture",
-        ":shard_role_api",
-        "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/repl:replmocks",
-        "//src/mongo/db/s:sharding_catalog_manager",
-        "//src/mongo/idl:server_parameter_test_util",
-        "//src/mongo/rpc:message",
-        "//src/mongo/transport:transport_layer_mock",
-    ],
-)
-
-mongo_cc_integration_test(
-    name = "db_integration_test",
-    srcs = [
-        "nesting_depth_test.cpp",
-        "//src/mongo/db/query/client_cursor:exhaust_cursor_currentop_integration_test.cpp",
-    ],
-    deps = [
-        "//src/mongo/client:clientdriver_network",
-        "//src/mongo/executor:network_interface_fixture",
-        "//src/mongo/rpc:message",
-        "//src/mongo/transport:transport_layer_egress_init",
-        "//src/mongo/util:version_impl",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "commands_bm",
-    srcs = [
-        "commands_bm.cpp",
-    ],
-    tags = ["first_half_bm"],
-    deps = [
-        ":server_base",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "d_concurrency_bm",
-    srcs = [
-        "d_concurrency_bm.cpp",
-    ],
-    deps = [
-        ":service_context_non_d",
-        ":shard_role_api",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "service_entry_point_shard_role_bm",
-    srcs = [
-        "profiler_bm_fixture.h",
-        "service_entry_point_bm_fixture.h",
-        "service_entry_point_shard_role_bm.cpp",
-    ],
-    deps = [
-        ":dbdirectclient",
-        ":mongod_options_init",
-        ":read_write_concern_defaults_mock",
-        ":server_base",
-        ":service_context_d",
-        ":vector_clock_mongod",
-        "//src/mongo/db/auth:authserver",
-        "//src/mongo/db/catalog:catalog_impl",
-        "//src/mongo/db/commands:standalone",
-        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
-        "//src/mongo/db/op_observer",
-        "//src/mongo/db/repl:replmocks",
-        "//src/mongo/db/repl:storage_interface_impl",
-        "//src/mongo/db/s:sharding_runtime_d",
-        "//src/mongo/db/storage:storage_control",
-        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
-        "//src/mongo/util:periodic_runner_factory",
     ],
 )
 
