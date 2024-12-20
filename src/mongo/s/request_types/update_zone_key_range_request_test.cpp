@@ -27,379 +27,289 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/request_types/update_zone_key_range_request_type.h"
+#include "mongo/s/update_zone_key_range_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 namespace {
 
-TEST(UpdateZoneKeyRangeRequest, BasicValidMongosAssignCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
-    ASSERT_FALSE(request.isRemove());
-    ASSERT_EQ("z", request.getZoneName());
+TEST(UpdateZoneKeyRange, BasicValidMongosAssignCommand) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    auto parsedRequest = UpdateZoneKeyRange::parse(ctx, cmdObj);
+    ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
+    ASSERT_EQ("z", *parsedRequest.getZone());
 }
 
-TEST(UpdateZoneKeyRangeRequest, BasicValidMongosRemoveCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: null
-        })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
-    ASSERT_TRUE(request.isRemove());
+TEST(UpdateZoneKeyRange, BasicValidMongosAssignCommandRemoveZone) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: null,
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    auto parsedRequest = UpdateZoneKeyRange::parse(ctx, cmdObj);
+    ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
+    ASSERT_EQ(boost::none, parsedRequest.getZone());
 }
 
-TEST(UpdateZoneKeyRangeRequest, InvalidNSMongosAssignCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::InvalidNamespace, requestStatus.getStatus());
+TEST(UpdateZoneKeyRange, MissingMinErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
-TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandForAssignType) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-                updateZoneKeyRange: "foo.bar",
-                min: { x: 1 },
-                max: { x: 100 },
-                zone: "z"
-            })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-
-    BSONObjBuilder builder;
-    request.appendAsConfigCommand(&builder);
-    auto configCmdObj = builder.obj();
-
-    auto expectedObj = fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON");
-    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
+TEST(UpdateZoneKeyRange, MissingMaxErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
-TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-                updateZoneKeyRange: "foo.bar",
-                min: { x: 1 },
-                max: { x: 100 },
-                zone: null
-            })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-
-    BSONObjBuilder builder;
-    request.appendAsConfigCommand(&builder);
-    auto configCmdObj = builder.obj();
-
-    auto expectedObj = fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: null
-        })BSON");
-    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
+TEST(UpdateZoneKeyRange, MissingZoneErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
-
-TEST(UpdateZoneKeyRangeRequest, MissingMinErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo.bar",
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
+TEST(UpdateZoneKeyRange, MissingShardNameErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
-TEST(UpdateZoneKeyRangeRequest, MissingMaxErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
+TEST(UpdateZoneKeyRange, WrongShardNameTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: 1234,
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST(UpdateZoneKeyRangeRequest, MissingZoneErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 }
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(UpdateZoneKeyRange, WrongMinRangeTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        min: 1,
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST(UpdateZoneKeyRangeRequest, MissingShardNameErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(UpdateZoneKeyRange, WrongMaxRangeTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: 100,
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST(UpdateZoneKeyRangeRequest, WrongShardNameTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-                updateZoneKeyRange: 1234,
-                min: { x: 1 },
-                max: { x: 100 },
-                zone: "z"
-            })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+TEST(UpdateZoneKeyRange, WrongZoneNameTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        updateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: 1234,
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("UpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(
+        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST(UpdateZoneKeyRangeRequest, WrongMinRangeTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-                updateZoneKeyRange: "foo.bar",
-                min: "1",
-                max: { x: 100 },
-                zone: "z"
-            })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+TEST(ConfigsvrUpdateZoneKeyRange, BasicValidConfigsvrAssignCommand) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    auto parsedRequest = ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj);
+    ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
+    ASSERT_EQ("z", *parsedRequest.getZone());
 }
 
-TEST(UpdateZoneKeyRangeRequest, WrongMaxRangeTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-                updateZoneKeyRange: "foo.bar",
-                min: { x: 1 },
-                max: "x",
-                zone: "z"
-            })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+TEST(ConfigsvrUpdateZoneKeyRange, BasicValidConfigsvrAssignCommandRemoveZone) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: null,
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    auto parsedRequest = ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj);
+    ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
+    ASSERT_EQ(boost::none, parsedRequest.getZone());
 }
 
-TEST(UpdateZoneKeyRangeRequest, WrongZoneNameTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: 123
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+TEST(ConfigsvrUpdateZoneKeyRange, MissingMinErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
-TEST(UpdateZoneKeyRangeRequest, CannotUseMongosToParseConfigCommand) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(ConfigsvrUpdateZoneKeyRange, MissingMaxErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
-    ASSERT_FALSE(request.isRemove());
-    ASSERT_EQ("z", request.getZoneName());
+TEST(ConfigsvrUpdateZoneKeyRange, MissingZoneErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: null
-        })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
-    ASSERT_TRUE(request.isRemove());
+TEST(ConfigsvrUpdateZoneKeyRange, MissingShardNameErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, InvalidNSConfigAssignCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::InvalidNamespace, requestStatus.getStatus());
+TEST(ConfigsvrUpdateZoneKeyRange, WrongShardNameTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: 1234,
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandForAssignType) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrUpdateZoneKeyRange: "foo.bar",
-                min: { x: 1 },
-                max: { x: 100 },
-                zone: "z"
-            })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-
-    BSONObjBuilder builder;
-    request.appendAsConfigCommand(&builder);
-    auto configCmdObj = builder.obj();
-
-    auto expectedObj = fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON");
-    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
+TEST(ConfigsvrUpdateZoneKeyRange, WrongMinRangeTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        min: 1,
+        max: { x: 100 },
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrUpdateZoneKeyRange: "foo.bar",
-                min: { x: 1 },
-                max: { x: 100 },
-                zone: null
-            })BSON"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-
-    BSONObjBuilder builder;
-    request.appendAsConfigCommand(&builder);
-    auto configCmdObj = builder.obj();
-
-    auto expectedObj = fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: null
-        })BSON");
-    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
+TEST(ConfigsvrUpdateZoneKeyRange, WrongMaxRangeTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: 100,
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
-
-TEST(CfgAssignKeyRangeToZoneRequest, MissingMinErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, MissingMaxErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, MissingZoneErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 }
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, MissingShardNameErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, WrongShardNameTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrUpdateZoneKeyRange: 1234,
-                min: { x: 1 },
-                max: { x: 100 },
-                zone: "z"
-            })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, WrongMinRangeTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrUpdateZoneKeyRange: "foo.bar",
-                min: "1",
-                max: { x: 100 },
-                zone: "z"
-            })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, WrongMaxRangeTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrUpdateZoneKeyRange: "foo.bar",
-                min: { x: 1 },
-                max: "x",
-                zone: "z"
-            })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, WrongZoneNameTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrUpdateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: 123
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
-}
-
-TEST(CfgAssignKeyRangeToZoneRequest, CannotUseConfigToParseMongosCommand) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
-            updateZoneKeyRange: "foo.bar",
-            min: { x: 1 },
-            max: { x: 100 },
-            zone: "z"
-        })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(ConfigsvrUpdateZoneKeyRange, WrongZoneNameTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrUpdateZoneKeyRange: "foo.bar",
+        min: { x: 1 },
+        max: { x: 100 },
+        zone: 1234,
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
 }  // unnamed namespace

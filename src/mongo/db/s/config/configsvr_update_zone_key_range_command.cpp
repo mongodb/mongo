@@ -28,63 +28,89 @@
  */
 
 
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/request_types/update_zone_key_range_request_type.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/update_zone_key_range_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
+
 namespace {
 
-using std::string;
-
-/**
- * Internal sharding command run on config servers to add a shard to zone.
- *
- * Format:
- * {
- *   _configsvrUpdateZoneKeyRange: <string namespace>,
- *   min: <BSONObj min>,
- *   max: <BSONObj max>,
- *   zone: <string zone|null>,
- *   writeConcern: <BSONObj>
- * }
- */
-class ConfigsvrUpdateZoneKeyRangeCommand : public BasicCommand {
+class ConfigsvrUpdateZoneKeyRangeCommand : public TypedCommand<ConfigsvrUpdateZoneKeyRangeCommand> {
 public:
-    ConfigsvrUpdateZoneKeyRangeCommand() : BasicCommand("_configsvrUpdateZoneKeyRange") {}
+    using Request = ConfigsvrUpdateZoneKeyRange;
 
-    bool skipApiVersionCheck() const override {
-        // Internal command (server to server).
-        return true;
-    }
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
 
-    std::string help() const override {
-        return "Internal command, which is exported by the sharding config server. Do not call "
-               "directly. Validates and assigns a new range to a zone.";
-    }
+        void typedRun(OperationContext* opCtx) {
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    "invalid namespace specified for request",
+                    ns().isValid());
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrAssignKeyRangeToZone can only be run on config servers",
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            if (isRemove()) {
+                ShardingCatalogManager::get(opCtx)->removeKeyRangeFromZone(opCtx, ns(), getRange());
+            } else {
+                ShardingCatalogManager::get(opCtx)->assignKeyRangeToZone(
+                    opCtx, ns(), getRange(), *request().getZone());
+            }
+        }
+
+    private:
+        bool isRemove() const {
+            if (request().getZone()) {
+                return false;
+            }
+            return true;
+        }
+
+        ChunkRange getRange() const {
+            auto range = ChunkRange(request().getMin(), request().getMax());
+            uassertStatusOK(ChunkRange::validate(range));
+            return range;
+        }
+
+        NamespaceString ns() const override {
+            return request().getCommandParameter();
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
+        }
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -94,51 +120,18 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
+    std::string help() const override {
+        return "Internal command, which is exported by the sharding config server. Do not call "
+               "directly. Validates and assigns a new range to a zone.";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj&) const override {
-        if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(
-                     ResourcePattern::forClusterResource(dbName.tenantId()),
-                     ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                "_configsvrAssignKeyRangeToZone can only be run on config servers",
-                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-
-        // Set the operation context read concern level to local for reads into the config database.
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-        auto parsedRequest =
-            uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromConfigCommand(cmdObj));
-
-        if (parsedRequest.isRemove()) {
-            ShardingCatalogManager::get(opCtx)->removeKeyRangeFromZone(
-                opCtx, parsedRequest.getNS(), parsedRequest.getRange());
-        } else {
-            ShardingCatalogManager::get(opCtx)->assignKeyRangeToZone(opCtx,
-                                                                     parsedRequest.getNS(),
-                                                                     parsedRequest.getRange(),
-                                                                     parsedRequest.getZoneName());
-        }
-
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
         return true;
     }
 };
 MONGO_REGISTER_COMMAND(ConfigsvrUpdateZoneKeyRangeCommand).forShard();
 
 }  // namespace
+
 }  // namespace mongo
