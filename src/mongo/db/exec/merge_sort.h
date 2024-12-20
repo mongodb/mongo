@@ -34,17 +34,15 @@
 #include <queue>
 #include <vector>
 
-#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/recordid_deduplicator.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -128,7 +126,7 @@ private:
     const bool _dedup;
 
     // Which RecordIds have we seen?
-    stdx::unordered_set<RecordId, RecordId::Hasher> _seen;
+    RecordIdDeduplicator _recordIdDeduplicator;
 
     // In order to pick the next smallest value, we need each child work(...) until it produces
     // a result.  This is the queue of children that haven't given us a result yet.

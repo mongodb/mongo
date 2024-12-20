@@ -102,12 +102,7 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
                                    .getObjectField(IndexDescriptor::kCollationFieldName)
                                    .getOwned();
     if (_shouldDedup && internalUseRoaringBitmapsForRecordIDDeduplication.load()) {
-        const size_t threshold = static_cast<size_t>(internalRoaringBitmapsThreshold.load());
-        const size_t batchSize = static_cast<size_t>(internalRoaringBitmapsBatchSize.load());
-        const uint64_t universeSize =
-            static_cast<uint64_t>(threshold / internalRoaringBitmapsMinimalDensity.load());
-        _recordIdDeduplicator =
-            std::make_unique<RecordIdDeduplicator>(threshold, batchSize, universeSize);
+        _recordIdDeduplicator = std::make_unique<RecordIdDeduplicator>();
     }
 }
 

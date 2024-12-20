@@ -37,9 +37,7 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -97,16 +95,14 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
                 } else {
                     ++_specificStats.dupsTested;
                     // ...and there's a RecordId and and we've seen the RecordId before
-                    if (_seen.end() != _seen.find(member->recordId)) {
+                    if (!_recordIdDeduplicator.insert(member->recordId)) {
                         // ...drop it.
                         _ws->free(id);
                         ++_specificStats.dupsDropped;
                         return PlanStage::NEED_TIME;
                     } else {
-                        // Otherwise, note that we've seen it.
-                        _seen.insert(member->recordId);
-                        // We're going to use the result from the child, so we remove it from
-                        // the queue of children without a result.
+                        // Otherwise, we're going to use the result from the child, so we remove it
+                        // from the queue of children without a result.
                         _noResultToMerge.pop();
                     }
                 }

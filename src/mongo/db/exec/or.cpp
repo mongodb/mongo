@@ -50,15 +50,7 @@ OrStage::OrStage(ExpressionContext* expCtx,
                  WorkingSet* ws,
                  bool dedup,
                  const MatchExpression* filter)
-    : PlanStage(kStageType, expCtx),
-      _ws(ws),
-      _filter(filter),
-      _currentChild(0),
-      _dedup(dedup),
-      _recordIdDeduplicator(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
-                            static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
-                            static_cast<uint64_t>(internalRoaringBitmapsThreshold.load() /
-                                                  internalRoaringBitmapsMinimalDensity.load())) {}
+    : PlanStage(kStageType, expCtx), _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) {}
 
 void OrStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));

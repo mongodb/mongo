@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/hash_roaring_set.h"
 #include "mongo/db/record_id.h"
 
@@ -45,6 +46,13 @@ public:
      * 'universeSize' parameters.
      */
     RecordIdDeduplicator(size_t threshold, size_t chunkSize, uint64_t universeSize);
+
+    RecordIdDeduplicator()
+        : RecordIdDeduplicator(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
+                               static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
+                               static_cast<uint64_t>(internalRoaringBitmapsThreshold.load() /
+                                                     internalRoaringBitmapsMinimalDensity.load())) {
+    }
 
     /**
      * Insert a RecordId and return true if the RecordId has not been seen.
