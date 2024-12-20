@@ -35,7 +35,9 @@ export var TxnUtil = (function() {
     function commandIsNonTxnAggregation(cmdName, cmdObj) {
         return !("explain" in cmdObj) &&
             OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj) ||
-            OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj);
+            OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithListClusterCatalog(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithInternalListCollections(cmdName, cmdObj);
     }
 
     function commandSupportsTxn(dbName, cmdName, cmdObj) {

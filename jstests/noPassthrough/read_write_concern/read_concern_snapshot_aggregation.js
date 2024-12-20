@@ -55,6 +55,10 @@ testSnapshotAggFailsWithCode(
 testSnapshotAggFailsWithCode(
     1, [{$listLocalSessions: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
+// Test that $listClusterCatalog is disallowed with transactions.
+testSnapshotAggFailsWithCode(
+    1, [{$listClusterCatalog: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+
 // Test that $out is disallowed with transactions.
 testSnapshotAggFailsWithCode(
     kCollName, [{$out: "out"}], ErrorCodes.OperationNotSupportedInTransaction);

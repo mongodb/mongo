@@ -4,13 +4,13 @@
  *
  * @tags: [
  *    # $_internalListCollections was introduced in v8.1
+ *    # TODO (SERVER-98651) remove the tag as part of this ticket.
  *    requires_fcv_81,
  *    # $_internalListCollections only supports local read concern
  *    assumes_read_concern_unchanged,
  *    # There is no need to support multitenancy, as it has been canceled and was never in
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
- *    does_not_support_transactions,
  * ]
  */
 
@@ -66,10 +66,7 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest,
     try {
         internalStageResponseAgainstDbTest =
             dbTest
-                .aggregate([
-                    {$_internalListCollections: {}},
-                    {$match: {$and: [{ns: {$not: /resharding/}}, {ns: {$not: /system.profile/}}]}}
-                ])
+                .aggregate([{$_internalListCollections: {}}, {$match: {ns: {$not: /resharding/}}}])
                 .toArray();
     } catch (error) {
         if (!testingReplicaSetEndpoint) {

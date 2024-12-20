@@ -5,12 +5,12 @@
  *
  * @tags: [
  *    # $listClusterCatalog was introduced in v8.1
+ *    # TODO (SERVER-98651) remove the tag as part of this ticket.
  *    requires_fcv_81,
  *    # $listClusterCatalog only supports local read concern
  *    assumes_read_concern_unchanged,
  *    # TODO SERVER-97215: remove `command_not_supported_in_serverless`
  *    command_not_supported_in_serverless,
- *    does_not_support_transactions,
  *    # In a clustered environment, the $listClusterCatalog will eventually target the CSRS to
  *    # access the cluster catalog. The causally consistent suites run on fixtures with CSRS without
  *    # secondaries.

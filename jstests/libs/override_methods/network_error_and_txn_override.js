@@ -402,7 +402,9 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
     } else if (cmdName === "aggregate") {
         if (OverrideHelpers.isAggregationWithListLocalSessionsStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
-            OverrideHelpers.isAggregationWithCurrentOpStage(cmdName, cmdObj)) {
+            OverrideHelpers.isAggregationWithCurrentOpStage(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithListClusterCatalog(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithInternalListCollections(cmdName, cmdObj)) {
             // The $listLocalSessions and $currentOp stages can only be used with
             // readConcern={level: "local"}, and the $changeStream stage can only be used with
             // readConcern={level: "majority"}.

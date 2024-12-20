@@ -4,6 +4,7 @@
  *
  *
  * @tags: [
+ *    # TODO (SERVER-98651) remove the tag as part of this ticket.
  *   requires_fcv_81,
  *   # Requires to know the exact list of shards owning chunks for the collection.
  *   # Requires exact knowledge on whether the collection is tracked or not.

@@ -55,6 +55,13 @@ function runCommandAfterEnablingProfiler(
             commandObj.filter = {$and: [{name: {$ne: "system.profile"}}, commandObj.filter]};
         }
     }
+    if (commandName == "aggregate") {
+        if (OverrideHelpers.isAggregationWithInternalListCollections(commandName, commandObj) ||
+            OverrideHelpers.isAggregationWithListClusterCatalog(commandName, commandObj)) {
+            // Note that $match will be optimized and pushed on top of the pipeline.
+            commandObj.pipeline.push({$match: {ns: {$not: /system.profile/}}});
+        }
+    }
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 

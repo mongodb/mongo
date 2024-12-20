@@ -30,6 +30,18 @@ const unstablePipelines = [
     [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],
 ];
 
+function is81orAbove(db) {
+    const res = db.getSiblingDB("admin")
+                    .system.version.find({_id: "featureCompatibilityVersion"})
+                    .toArray();
+    return res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.1") >= 0;
+}
+
+// TODO (SERVER-98651) listClusterCatalog can always be included once backported.
+if (is81orAbove(db)) {
+    unstablePipelines.push([{$listClusterCatalog: {}}]);
+}
+
 // TODO SERVER-94570 $rankFusion can always be included when it's enabled by default.
 // TODO SERVER-98591 Change RankFusionFull to RankFusionBasic.
 if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'RankFusionFull')) {
