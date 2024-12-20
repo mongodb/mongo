@@ -178,12 +178,6 @@ feature_flags:
     default: true
     version: 8.1
     shouldBeFCVGated: true
-  # TODO (SERVER-94367): remove once 9.0 becomes last LTS.
-  featureFlagListClusterCatalogAggStage:
-    description: "Feature flag for enabling the aggregation stage $listClusterCatalog"
-    cpp_varname: feature_flags::gListClusterCatalogAggStage
-    default: false
-    shouldBeFCVGated: true
   # TODO (SERVER-97261): remove once 9.0 becomes last LTS.
   featureFlagDualCatalogCache:
     description: "Feature flag to enable one catalog cache for the shard role and another one for
