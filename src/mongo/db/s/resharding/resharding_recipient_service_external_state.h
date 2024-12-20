@@ -80,8 +80,16 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const UUID& uuid,
-        Timestamp afterClusterTime,
+        boost::optional<Timestamp> afterClusterTime,
         StringData reason) = 0;
+
+    virtual MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        boost::optional<Timestamp> afterClusterTime,
+        StringData reason,
+        const ShardId& fromShardId) = 0;
 
     virtual MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
         OperationContext* opCtx,
@@ -133,8 +141,16 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const UUID& uuid,
-        Timestamp afterClusterTime,
+        boost::optional<Timestamp> afterClusterTime,
         StringData reason) override;
+
+    MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        boost::optional<Timestamp> afterClusterTime,
+        StringData reason,
+        const ShardId& fromShardId) override;
 
     MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
         OperationContext* opCtx,

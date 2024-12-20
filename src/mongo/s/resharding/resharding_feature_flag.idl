@@ -81,3 +81,8 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingStoreOplogFetcherProgress
         default: false
         shouldBeFCVGated: true
+    featureFlagReshardingVerification:
+        description: "Feature flag to enable data loss and consistency verification steps during resharding to ensure correctness."
+        cpp_varname: gFeatureFlagReshardingVerification
+        default: false
+        shouldBeFCVGated: true

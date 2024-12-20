@@ -32,6 +32,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <initializer_list>
+#include <memory>
 #include <ostream>
 #include <string>
 
@@ -121,6 +122,9 @@ const ShardId recipientShardId{"myShardId"};
 const long approxBytesToCopy = 10000;
 const long approxDocumentsToCopy = 100;
 
+const BSONObj sourceCollectionOptions = BSONObj();
+BSONObj tempReshardingCollectionOptions = BSONObj();
+
 class ExternalStateForTest : public ReshardingRecipientService::RecipientStateMachineExternalState {
 public:
     ShardId myShardId(ServiceContext* serviceContext) const override {
@@ -172,10 +176,23 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const UUID& uuid,
-        Timestamp afterClusterTime,
+        boost::optional<Timestamp> afterClusterTime,
         StringData reason) override {
-        invariant(nss == _sourceNss);
-        return {BSONObj(), uuid};
+        if (nss == _sourceNss) {
+            return {sourceCollectionOptions, uuid};
+        } else {
+            return {tempReshardingCollectionOptions, uuid};
+        }
+    }
+
+    MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        boost::optional<Timestamp> afterClusterTime,
+        StringData reason,
+        const ShardId& fromShardId) override {
+        return getCollectionOptions(opCtx, nss, uuid, afterClusterTime, reason);
     }
 
     MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
@@ -1552,6 +1569,125 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
 
             recipient->abort(false);
             ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        }
+    }
+}
+
+// The collection options for the source and temporary collections are both defaulted to BSONObj(),
+// so this test will pass since both collection options are equal.
+TEST_F(ReshardingRecipientServiceTest, TestVerifyCollectionOptionsHappyPath) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingVerification",
+                                                               true);
+    for (bool isAlsoDonor : {false, true}) {
+        for (bool skipCloningAndApplying : {false, true}) {
+            LOGV2(9799201,
+                  "Running case",
+                  "test"_attr = _agent.getTestName(),
+                  "isAlsoDonor"_attr = isAlsoDonor,
+                  "skipCloningAndApplying"_attr = skipCloningAndApplying);
+
+            auto doc = makeStateDocument(isAlsoDonor, skipCloningAndApplying);
+            auto instanceId = BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                                   << doc.getReshardingUUID());
+
+            auto opCtx = makeOperationContext();
+            RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+            auto recipient =
+                RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+            notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+            notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+            ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        }
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest,
+       TestVerifyCollectionOptionsThrowsExceptionOnMismatchedOptions) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingVerification",
+                                                               true);
+    for (bool isAlsoDonor : {false, true}) {
+        for (bool skipCloningAndApplying : {false, true}) {
+            LOGV2(9799202,
+                  "Running case",
+                  "test"_attr = _agent.getTestName(),
+                  "isAlsoDonor"_attr = isAlsoDonor,
+                  "skipCloningAndApplying"_attr = skipCloningAndApplying);
+
+            auto doc = makeStateDocument(isAlsoDonor, skipCloningAndApplying);
+            auto instanceId = BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                                   << doc.getReshardingUUID());
+
+            auto opCtx = makeOperationContext();
+            RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+            auto recipient =
+                RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+            // Add dummy data to tempReshardingCollectionOptions to create mismatched collection
+            // options.
+            tempReshardingCollectionOptions = BSONObjBuilder().append("foo", "bar").obj();
+
+            notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+            boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
+            stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kError);
+
+            stateTransitionsGuard->wait(RecipientStateEnum::kError);
+            stateTransitionsGuard->unset(RecipientStateEnum::kError);
+
+            {
+                auto persistedRecipientDocument =
+                    getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+                auto state = persistedRecipientDocument.getMutableState().getState();
+                ASSERT_EQ(state, RecipientStateEnum::kError);
+                ASSERT(persistedRecipientDocument.getMutableState().getAbortReason());
+            }
+
+            recipient->abort(false);
+
+            ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+
+            tempReshardingCollectionOptions = BSONObj();
+        }
+    }
+}
+
+// Creates mismatched collection options with the feature flag turned off.
+// If the feature was turned on we would catch the mismatched options and throw an exception.
+TEST_F(ReshardingRecipientServiceTest,
+       TestVerifyCollectionOptionsDoesNotPerformVerificationIfFeatureFlagIsNotSet) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingVerification",
+                                                               false);
+    for (bool isAlsoDonor : {false, true}) {
+        for (bool skipCloningAndApplying : {false, true}) {
+            LOGV2(9799203,
+                  "Running case",
+                  "test"_attr = _agent.getTestName(),
+                  "isAlsoDonor"_attr = isAlsoDonor,
+                  "skipCloningAndApplying"_attr = skipCloningAndApplying);
+
+            auto doc = makeStateDocument(isAlsoDonor, skipCloningAndApplying);
+            auto instanceId = BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                                   << doc.getReshardingUUID());
+
+            auto opCtx = makeOperationContext();
+            RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+            auto recipient =
+                RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+            // Add dummy data to tempReshardingCollectionOptions to create mismatched collection
+            // options.
+            tempReshardingCollectionOptions = BSONObjBuilder().append("foo", "bar").obj();
+
+            notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+            notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+            ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+
+            tempReshardingCollectionOptions = BSONObj();
         }
     }
 }

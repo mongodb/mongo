@@ -826,6 +826,43 @@ void ReshardingRecipientService::RecipientStateMachine::
                                              _metadata.getReshardingUUID(),
                                              createCollRequest,
                                              CommitPhase::kSuccessful);
+
+        if (resharding::gFeatureFlagReshardingVerification.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            auto [sourceCollOptions, _] = _externalState->getCollectionOptions(
+                opCtx.get(),
+                _metadata.getSourceNss(),
+                _metadata.getSourceUUID(),
+                *_cloneTimestamp,
+                "loading collection options of source collection to verify collection options equality"_sd);
+
+            CollectionOptions sourceCollectionOptions = uassertStatusOK(
+                CollectionOptions::parse(sourceCollOptions, CollectionOptions::parseForStorage));
+
+            auto myShardId = _externalState->myShardId(opCtx->getServiceContext());
+
+            auto [tempReshardingCollOptions, __] = _externalState->getCollectionOptions(
+                opCtx.get(),
+                _metadata.getTempReshardingNss(),
+                _metadata.getReshardingUUID(),
+                boost::none,
+                "loading collection options of the temporary resharding collection to verify collection options equality"_sd,
+                myShardId);
+
+            CollectionOptions tempReshardingCollectionOptions =
+                uassertStatusOK(CollectionOptions::parse(tempReshardingCollOptions,
+                                                         CollectionOptions::parseForStorage));
+
+            uassert(9799200,
+                    str::stream() << "Resharded collection created non-matching collection "
+                                     "options. Source collection options: "
+                                  << sourceCollectionOptions.toBSON()
+                                  << " Resharded collection options: "
+                                  << tempReshardingCollectionOptions.toBSON(),
+                    tempReshardingCollectionOptions.matchesStorageOptions(
+                        sourceCollectionOptions,
+                        CollatorFactoryInterface::get(opCtx->getServiceContext())));
+        }
     }
 
     _transitionState(RecipientStateEnum::kCloning, factory);
@@ -1050,7 +1087,8 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                abortToken)
         .thenRunOn(**executor)
         .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
-            {
+            if (resharding::gFeatureFlagReshardingVerification.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 auto opCtx = factory.makeOperationContext(&cc());
                 auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
                     opCtx.get(),
@@ -1063,10 +1101,10 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 DBDirectClient client(opCtx.get());
                 auto tempCollIdxSpecs =
                     client.getIndexSpecs(_metadata.getTempReshardingNss(), false, 0);
-                resharding::validateIndexSpecsMatch(sourceIdxSpecs.cbegin(),
-                                                    sourceIdxSpecs.cend(),
-                                                    tempCollIdxSpecs.cbegin(),
-                                                    tempCollIdxSpecs.cend());
+                resharding::verifyIndexSpecsMatch(sourceIdxSpecs.cbegin(),
+                                                  sourceIdxSpecs.cend(),
+                                                  tempCollIdxSpecs.cbegin(),
+                                                  tempCollIdxSpecs.cend());
             }
             _transitionState(RecipientStateEnum::kApplying, factory);
         });

@@ -172,15 +172,34 @@ CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getTrackedCollecti
 }
 
 MigrationDestinationManager::CollectionOptionsAndUUID
-RecipientStateMachineExternalStateImpl::getCollectionOptions(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             const UUID& uuid,
-                                                             Timestamp afterClusterTime,
-                                                             StringData reason) {
+RecipientStateMachineExternalStateImpl::getCollectionOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    boost::optional<Timestamp> afterClusterTime,
+    StringData reason) {
     // Load the collection options from the primary shard for the database.
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
         return MigrationDestinationManager::getCollectionOptions(
             opCtx, NamespaceStringOrUUID{nss.dbName(), uuid}, afterClusterTime);
+    });
+}
+
+MigrationDestinationManager::CollectionOptionsAndUUID
+RecipientStateMachineExternalStateImpl::getCollectionOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    boost::optional<Timestamp> afterClusterTime,
+    StringData reason,
+    const ShardId& fromShardId) {
+    // Load the collection options from the specified shard for the database.
+    return _withShardVersionRetry(opCtx, nss, reason, [&] {
+        const auto nssOrUUID = NamespaceStringOrUUID{nss.dbName(), uuid};
+        const auto dbInfo = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nssOrUUID.dbName()));
+        return MigrationDestinationManager::getCollectionOptions(
+            opCtx, nssOrUUID, fromShardId, dbInfo->getVersion(), afterClusterTime);
     });
 }
 

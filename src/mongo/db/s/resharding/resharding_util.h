@@ -418,14 +418,14 @@ boost::optional<Status> coordinatorAbortedError();
 void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& shardKey);
 
 /**
- * Validates that for each index spec in sourceIndexSpecs, there is an identical spec in
+ * Verifies that for each index spec in sourceIndexSpecs, there is an identical spec in
  * localIndexSpecs. Field order does not matter.
  */
 template <typename InputIterator1, typename InputIterator2>
-void validateIndexSpecsMatch(InputIterator1 sourceIndexSpecsBegin,
-                             InputIterator1 sourceIndexSpecsEnd,
-                             InputIterator2 localIndexSpecsBegin,
-                             InputIterator2 localIndexSpecsEnd) {
+void verifyIndexSpecsMatch(InputIterator1 sourceIndexSpecsBegin,
+                           InputIterator1 sourceIndexSpecsEnd,
+                           InputIterator2 localIndexSpecsBegin,
+                           InputIterator2 localIndexSpecsEnd) {
     stdx::unordered_map<std::string, BSONObj> localIndexSpecMap;
     std::transform(
         localIndexSpecsBegin,

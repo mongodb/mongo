@@ -110,15 +110,15 @@ protected:
                          std::vector<BSONObj>& recipientSpecs,
                          ErrorCodes::Error code) {
         if (code == ErrorCodes::OK) {
-            ASSERT_DOES_NOT_THROW(validateIndexSpecsMatch(sourceSpecs.cbegin(),
-                                                          sourceSpecs.cend(),
-                                                          recipientSpecs.cbegin(),
-                                                          recipientSpecs.cend()));
+            ASSERT_DOES_NOT_THROW(verifyIndexSpecsMatch(sourceSpecs.cbegin(),
+                                                        sourceSpecs.cend(),
+                                                        recipientSpecs.cbegin(),
+                                                        recipientSpecs.cend()));
         } else {
-            ASSERT_THROWS_CODE(validateIndexSpecsMatch(sourceSpecs.cbegin(),
-                                                       sourceSpecs.cend(),
-                                                       recipientSpecs.cbegin(),
-                                                       recipientSpecs.cend()),
+            ASSERT_THROWS_CODE(verifyIndexSpecsMatch(sourceSpecs.cbegin(),
+                                                     sourceSpecs.cend(),
+                                                     recipientSpecs.cbegin(),
+                                                     recipientSpecs.cend()),
                                DBException,
                                code);
         }
