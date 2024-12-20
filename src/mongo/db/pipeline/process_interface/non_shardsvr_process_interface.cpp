@@ -106,7 +106,7 @@ std::vector<DatabaseName> NonShardServerProcessInterface::getAllDatabases(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     DBDirectClient dbClient(opCtx);
     auto databasesResponse = dbClient.getDatabaseInfos(
-        BSONObj() /* filter */, true /* nameOnly */, true /* authorizedDatabases */);
+        BSONObj() /* filter */, true /* nameOnly */, false /* authorizedDatabases */);
 
     std::vector<DatabaseName> databases;
     databases.reserve(databasesResponse.size());

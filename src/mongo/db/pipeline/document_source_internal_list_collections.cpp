@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/matcher/expression.h"
@@ -85,9 +84,7 @@ DocumentSource::GetNextResult DocumentSourceInternalListCollections::doGetNext()
             return GetNextResult::makeEOF();
         }
 
-        if (_databases->back().isInternalDb() ||
-            !AuthorizationSession::get(pExpCtx->getOperationContext()->getClient())
-                 ->isAuthorizedForAnyActionOnAnyResourceInDB(_databases->back())) {
+        if (_databases->back().isInternalDb()) {
             _databases->pop_back();
             continue;
         }
