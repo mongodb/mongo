@@ -69,9 +69,17 @@ public:
         : LiteParsedDocumentSource(std::move(parseTimeName)) {
 
         if (nss.dbName() != DatabaseName::kAdmin) {
-            _privileges.emplace_back(Privilege(ResourcePattern::forDatabaseName(nss.dbName()),
-                                               ActionType::listCollections));
-
+            if (nss.isCollectionlessAggregateNS()) {
+                _privileges.emplace_back(Privilege(ResourcePattern::forDatabaseName(nss.dbName()),
+                                                   ActionType::listCollections));
+            } else {
+                // This stage is designed to operate only on database-level namespaces (without
+                // collections). By authorizing any users to run $listClusterCatalog when a
+                // collection is specified, we allow the stage to fail correctly and warn the user
+                // that only a database name should be provided instead of failing with
+                // authorization issues.
+                _privileges.emplace_back(Privilege());
+            }
         } else {
             _privileges.emplace_back(Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
                                                ActionType::listClusterCatalog));

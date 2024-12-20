@@ -77,6 +77,11 @@ function runCommandWithReadAndWriteConcerns(
             shouldForceReadConcern = false;
         }
 
+        if (OverrideHelpers.isAggregationWithListClusterCatalog(commandName, commandObj)) {
+            // The $listClusterCatalog stage can only be used with readConcern={level:"local"}.
+            shouldForceReadConcern = false;
+        }
+
         if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObj)) {
             // The $out stage can only be used with readConcern={level: "local"} or
             // readConcern={level: "majority"}
@@ -162,7 +167,6 @@ function runCommandWithReadAndWriteConcerns(
         writeConcern = Object.assign({}, writeConcern, kDefaultWriteConcern);
         commandObj.writeConcern = writeConcern;
     }
-
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 

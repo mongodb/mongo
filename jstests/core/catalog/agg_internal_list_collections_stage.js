@@ -9,7 +9,6 @@
  *    # There is no need to support multitenancy, as it has been canceled and was never in
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
- *    does_not_support_transactions,
  * ]
  */
 
@@ -66,10 +65,7 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest,
     try {
         internalStageResponseAgainstDbTest =
             dbTest
-                .aggregate([
-                    {$_internalListCollections: {}},
-                    {$match: {$and: [{ns: {$not: /resharding/}}, {ns: {$not: /system.profile/}}]}}
-                ])
+                .aggregate([{$_internalListCollections: {}}, {$match: {ns: {$not: /resharding/}}}])
                 .toArray();
     } catch (error) {
         if (!testingReplicaSetEndpoint) {

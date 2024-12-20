@@ -28,6 +28,17 @@ const unstablePipelines = [
     [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],
 ];
 
+function is80orAbove(db) {
+    const res = db.getSiblingDB("admin")
+                    .system.version.find({_id: "featureCompatibilityVersion"})
+                    .toArray();
+    return res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.0") >= 0;
+}
+
+if (is80orAbove(db)) {
+    unstablePipelines.push([{$listClusterCatalog: {}}]);
+}
+
 function assertAggregateFailsWithAPIStrict(pipeline) {
     assert.commandFailedWithCode(testDb.runCommand({
         aggregate: collName,
