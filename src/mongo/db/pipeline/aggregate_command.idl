@@ -94,7 +94,6 @@ commands:
         access_check:
             complex:
                 - check: check_cursor_session_privilege
-                - check: is_authorized_for_any_action_on_any_resource_in_db
                 - check: is_coauthorized_with_client
                 - check: is_coauthorized_with
                 - check: should_ignore_auth_checks
