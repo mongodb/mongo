@@ -1,5 +1,6 @@
 load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,6 +21,8 @@ alias(
     name = "codeowners",
     actual = "//buildscripts:codeowners",
 )
+
+setup_mongo_toolchain_aliases()
 
 # This rule makes it possible to set the clang-tidy configuration setting:
 genrule(

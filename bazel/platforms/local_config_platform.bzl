@@ -1,20 +1,7 @@
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
+load("//bazel/platforms:normalize.bzl", "ARCH_TO_PLATFORM_MAP", "OS_TO_PLATFORM_MAP")
 load("//bazel/toolchains:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel:utils.bzl", "get_host_distro_major_version")
-
-_OS_MAP = {
-    "macos": "@platforms//os:osx",
-    "linux": "@platforms//os:linux",
-    "windows": "@platforms//os:windows",
-}
-
-_ARCH_MAP = {
-    "amd64": "@platforms//cpu:x86_64",
-    "aarch64": "@platforms//cpu:arm64",
-    "x86_64": "@platforms//cpu:x86_64",
-    "ppc64le": "@platforms//cpu:ppc",
-    "s390x": "@platforms//cpu:s390x",
-}
 
 def _setup_local_config_platform(ctx):
     """
@@ -33,8 +20,8 @@ def _setup_local_config_platform(ctx):
 
     arch = ctx.os.arch
 
-    os_constraint = _OS_MAP[os]
-    arch_constraint = _ARCH_MAP[arch]
+    os_constraint = OS_TO_PLATFORM_MAP[os]
+    arch_constraint = ARCH_TO_PLATFORM_MAP[arch]
 
     constraints = [os_constraint, arch_constraint]
 
@@ -51,6 +38,12 @@ def _setup_local_config_platform(ctx):
     remote_execution_pool = "x86_64" if arch == "amd64" else "default"
     result = None
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
+    toolchain_exists = False
+    for version in TOOLCHAIN_MAP:
+        if toolchain_key in TOOLCHAIN_MAP[version]:
+            toolchain_exists = True
+            break
+
     if ctx.os.environ.get("USE_NATIVE_TOOLCHAIN"):
         exec_props = ""
         result = {"USE_NATIVE_TOOLCHAIN": "1"}
@@ -68,7 +61,7 @@ def _setup_local_config_platform(ctx):
     },
 """ % (container_url, remote_execution_pool)
         result = {"DISTRO": distro}
-    elif distro != None and distro in TOOLCHAIN_MAP:
+    elif distro != None and toolchain_exists:
         constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
         result = {"DISTRO": distro}
         exec_props = ""

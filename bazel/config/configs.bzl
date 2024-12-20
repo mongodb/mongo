@@ -14,6 +14,20 @@ compiler_type = rule(
     build_setting = config.string(flag = True),
 )
 
+# =========
+# mongo_toolchain_version
+# =========
+
+mongo_toolchain_version_provider = provider(
+    doc = "Select the mongo toolchain version (e.g.: v4)",
+    fields = {"mongo_toolchain_version": "Choose one of [v4, v5]"},
+)
+
+mongo_toolchain_version = rule(
+    implementation = lambda ctx: mongo_toolchain_version_provider(mongo_toolchain_version = ctx.build_setting_value),
+    build_setting = config.string(flag = True),
+)
+
 # ==========
 # linker
 # ==========

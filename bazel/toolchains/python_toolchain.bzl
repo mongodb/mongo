@@ -1,20 +1,7 @@
 """Repository rules for rules_py_simple"""
 
 load("//bazel:utils.bzl", "retry_download_and_extract")
-
-_OS_MAP = {
-    "macos": "@platforms//os:osx",
-    "linux": "@platforms//os:linux",
-    "windows": "@platforms//os:windows",
-}
-
-_ARCH_MAP = {
-    "amd64": "@platforms//cpu:x86_64",
-    "aarch64": "@platforms//cpu:arm64",
-    "x86_64": "@platforms//cpu:x86_64",
-    "ppc64le": "@platforms//cpu:ppc",
-    "s390x": "@platforms//cpu:s390x",
-}
+load("//bazel/platforms:normalize.bzl", "ARCH_TO_PLATFORM_MAP", "OS_TO_PLATFORM_MAP")
 
 URLS_MAP = {
     "linux_aarch64": {
@@ -144,8 +131,8 @@ sys.dont_write_bytecode = True
     )
 
     ctx.report_progress("generating build file")
-    os_constraint = _OS_MAP[os]
-    arch_constraint = _ARCH_MAP[arch]
+    os_constraint = OS_TO_PLATFORM_MAP[os]
+    arch_constraint = ARCH_TO_PLATFORM_MAP[arch]
 
     constraints = [os_constraint, arch_constraint]
 

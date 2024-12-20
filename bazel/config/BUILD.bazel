@@ -23,6 +23,7 @@ load(
     "linker",
     "linkstatic",
     "lsan",
+    "mongo_toolchain_version",
     "msan",
     "opt",
     "pgo_profile",
@@ -287,6 +288,29 @@ selects.config_setting_group(
         ":compiler_type_gcc",
         "@platforms//cpu:aarch64",
     ],
+)
+
+# --------------------------------------
+# mongo_toolchain_version options
+# --------------------------------------
+
+mongo_toolchain_version(
+    name = "mongo_toolchain_version",
+    build_setting_default = "v4",
+)
+
+config_setting(
+    name = "mongo_toolchain_v4",
+    flag_values = {
+        "//bazel/config:mongo_toolchain_version": "v4",
+    },
+)
+
+config_setting(
+    name = "mongo_toolchain_v5",
+    flag_values = {
+        "//bazel/config:mongo_toolchain_version": "v5",
+    },
 )
 
 # ==========

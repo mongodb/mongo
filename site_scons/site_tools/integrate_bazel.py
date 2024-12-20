@@ -1089,7 +1089,11 @@ def add_libdeps_time(env, delate_time):
     count_of_libdeps_links += 1
 
 
-def prefetch_toolchain(env):
+def bazel_execroot(env):
+    return f'bazel-{os.path.basename(env.Dir("#").abspath)}'
+
+
+def prefetch_toolchain(env, version):
     setup_bazel_env_vars()
     setup_max_retry_attempts()
     bazel_bin_dir = (
@@ -1101,13 +1105,21 @@ def prefetch_toolchain(env):
         os.makedirs(bazel_bin_dir)
     Globals.bazel_executable = install_bazel(bazel_bin_dir)
     if platform.system() == "Linux" and not ARGUMENTS.get("CC") and not ARGUMENTS.get("CXX"):
-        exec_root = f'bazel-{os.path.basename(env.Dir("#").abspath)}'
-        if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain"):
+        exec_root = bazel_execroot(env)
+        if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain_{version}"):
             print("Prefetch the mongo toolchain...")
             try:
                 retry_call(
                     subprocess.run,
-                    [[Globals.bazel_executable, "build", "@mongo_toolchain", "--config=local"]],
+                    [
+                        [
+                            Globals.bazel_executable,
+                            "build",
+                            "mongo_toolchain",
+                            "--config=local",
+                            f"--//bazel/config:mongo_toolchain_version={version}",
+                        ]
+                    ],
                     fkwargs={
                         "env": {**os.environ.copy(), **Globals.bazel_env_variables},
                         "check": True,
@@ -1116,9 +1128,12 @@ def prefetch_toolchain(env):
                     exceptions=(subprocess.CalledProcessError,),
                 )
             except subprocess.CalledProcessError as ex:
-                print("ERROR: Bazel fetch failed!")
+                print(f"ERROR: Bazel fetch of {version} toolchain failed!")
                 print(ex)
-                print("Please ask about this in #ask-devprod-build slack channel.")
+                if version == "v4":
+                    print("Please ask about this in #ask-devprod-build slack channel.")
+                else:
+                    print(f"The {version} toolchain may not be supported on this platform.")
                 sys.exit(1)
 
         return exec_root
@@ -1130,6 +1145,7 @@ def exists(env: SCons.Environment.Environment) -> bool:
 
     write_workstation_bazelrc()
     env.AddMethod(prefetch_toolchain, "PrefetchToolchain")
+    env.AddMethod(bazel_execroot, "BazelExecroot")
     env.AddMethod(load_bazel_builders, "LoadBazelBuilders")
     return True
 
@@ -1361,6 +1377,9 @@ def generate(env: SCons.Environment.Environment) -> None:
             f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}",
             f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}",
         ]
+
+        if tc := env.get("MONGO_TOOLCHAIN_VERSION"):
+            bazel_internal_flags += [f"--//bazel/config:mongo_toolchain_version={tc}"]
 
     if "MONGO_ENTERPRISE_VERSION" in env:
         enterprise_features = env.GetOption("enterprise_features")

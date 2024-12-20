@@ -148,10 +148,10 @@ add_option(
     help="Configures the path to the evergreen configured tmp directory.",
     default=None,
 )
-# Preload to perform early fetch fo repositories
-tool = Tool("integrate_bazel")
-tool.exists(DefaultEnvironment())
-mongo_toolchain_execroot = DefaultEnvironment().PrefetchToolchain()
+
+integrate_bazel = Tool("integrate_bazel")
+integrate_bazel.exists(DefaultEnvironment())
+mongo_toolchain_execroot = DefaultEnvironment().BazelExecroot()
 
 build_profile = build_profiles.get_build_profile(get_option("build-profile"))
 
@@ -755,31 +755,6 @@ add_option(
     help="Name a toolchain root for use with toolchain selection Variables files in etc/scons",
 )
 
-if mongo_toolchain_execroot:
-    bin_dir = os.path.join(mongo_toolchain_execroot, "external/mongo_toolchain/v4/bin")
-    gcc_path = os.path.dirname(
-        os.path.realpath(os.path.join(bin_dir, os.readlink(os.path.join(bin_dir, "g++"))))
-    )
-    clang_path = os.path.dirname(
-        os.path.realpath(os.path.join(bin_dir, os.readlink(os.path.join(bin_dir, "clang++"))))
-    )
-else:
-    gcc_path = ""
-    clang_path = ""
-
-add_option(
-    "bazel-toolchain-clang",
-    default=clang_path,
-    help="used in Variables files to help find the real bazel toolchain location.",
-)
-
-add_option(
-    "bazel-toolchain-gcc",
-    default=gcc_path,
-    help="used in Variables files to help find the real bazel toolchain location.",
-)
-
-
 add_option(
     "msvc-debugging-format",
     choices=["codeview", "pdb"],
@@ -1192,6 +1167,12 @@ env_vars.Add(
 env_vars.Add(
     "DSYMUTIL",
     help="Path to the dsymutil utility",
+)
+
+env_vars.Add(
+    "MONGO_TOOLCHAIN_VERSION",
+    default="v4",
+    help="Version of the mongo toolchain to use in bazel.",
 )
 
 
@@ -1813,6 +1794,7 @@ if ARGUMENTS.get("CC") and ARGUMENTS.get("CXX"):
 # Early load to setup env functions
 tool = Tool("integrate_bazel")
 tool.exists(env)
+env.PrefetchToolchain(env.get("MONGO_TOOLCHAIN_VERSION"))
 
 # The placement of this is intentional. Here we setup an atexit method to store tooling metrics.
 # We should only register this function after env, env_vars and the parser have been properly initialized.
@@ -4483,7 +4465,11 @@ def doConfigure(myenv):
             llvm_symbolizer = env["LLVM_SYMBOLIZER"]
 
             if not os.path.isabs(llvm_symbolizer):
-                llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
+                # WhereIs looks at the path, but not the PWD. If it fails, try assuming
+                # the path is relative to the PWD.
+                llvm_symbolizer = myenv.WhereIs(llvm_symbolizer) or os.path.realpath(
+                    llvm_symbolizer
+                )
 
             if not myenv.File(llvm_symbolizer).exists():
                 myenv.FatalError(f"Symbolizer binary at path {llvm_symbolizer} does not exist")

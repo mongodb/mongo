@@ -1,4 +1,5 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchains")
 
 # Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
 http_archive(
@@ -19,7 +20,6 @@ load("@bazel_features//:deps.bzl", "bazel_features_deps")
 bazel_features_deps()
 
 load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
-load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
 
 http_archive(
     name = "bazel_clang_tidy",
@@ -38,7 +38,7 @@ http_archive(
 
 setup_local_config_platform(name = "internal_platforms_do_not_use")
 
-toolchain_download(name = "mongo_toolchain")
+setup_mongo_toolchains()
 
 http_archive(
     name = "windows_sasl",
@@ -64,8 +64,6 @@ filegroup(
     sha256 = "3e22e2b16f802277123590f64dfda44f1c9c8a2b7e758180cd956d8ab0965817",
     url = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
 )
-
-register_toolchains("@mongo_toolchain//:mongo_toolchain")
 
 load("//bazel/toolchains:python_toolchain.bzl", "setup_mongo_python_toolchains")
 

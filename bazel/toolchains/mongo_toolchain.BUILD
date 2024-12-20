@@ -1,14 +1,25 @@
 # This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
 
 load("@//bazel/toolchains:mongo_cc_toolchain_config.bzl", "mongo_cc_toolchain_config")
-load("@mongo_toolchain//:mongo_toolchain_flags.bzl", "CLANG_INCLUDE_DIRS", "COMMON_BINDIRS", "COMMON_BUILTIN_INCLUDE_DIRECTORIES", "COMMON_INCLUDE_DIRECTORIES", "COMMON_LINK_FLAGS", "GCC_INCLUDE_DIRS")
+load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl", "CLANG_INCLUDE_DIRS", "COMMON_BINDIRS", "COMMON_BUILTIN_INCLUDE_DIRECTORIES", "COMMON_INCLUDE_DIRECTORIES", "COMMON_LINK_FLAGS", "GCC_INCLUDE_DIRS")
 
 package(default_visibility = ["//visibility:public"])
 
 # Helper target for the toolchain (see below):
 filegroup(
-    name = "all",
+    name = "all_files",
     srcs = glob(["**/*"]),
+)
+
+# Export headers used for clang-tidy checks.
+cc_library(
+    name = "llvm_headers",
+    hdrs = glob([
+        "stow/llvm-{version}/include/**/*.h",
+        "stow/llvm-{version}/include/**/*.inc",
+        "stow/llvm-{version}/include/**/*.def",
+    ]),
+    visibility = ["//visibility:public"],
 )
 
 # A note on toolchains: this is complicated! Bazel requires multiple layers of indirection.
@@ -47,21 +58,21 @@ mongo_cc_toolchain_config(
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
         # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
         # we have to conditionally set the value pointed to by `gcc`.
-        "gcc": "v4/bin/gcc",
-        "g++": "v4/bin/g++",
-        "cpp": "v4/bin/cpp",
-        "ar": "v4/bin/ar",
-        "nm": "v4/bin/nm",
-        "ld": "v4/bin/ld",
-        "as": "v4/bin/as",
-        "dwp": "v4/bin/dwp",
-        "objcopy": "v4/bin/llvm-objcopy",
-        "objdump": "v4/bin/objdump",
-        "gcov": "v4/bin/gcov",
-        "strip": "v4/bin/strip",
+        "gcc": "{version}/bin/gcc",
+        "g++": "{version}/bin/g++",
+        "cpp": "{version}/bin/cpp",
+        "ar": "{version}/bin/ar",
+        "nm": "{version}/bin/nm",
+        "ld": "{version}/bin/ld",
+        "as": "{version}/bin/as",
+        "dwp": "{version}/bin/dwp",
+        "objcopy": "{version}/bin/llvm-objcopy",
+        "objdump": "{version}/bin/objdump",
+        "gcov": "{version}/bin/gcov",
+        "strip": "{version}/bin/strip",
         "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
     },
-    toolchain_identifier = "gcc_v4_toolchain",
+    toolchain_identifier = "gcc_toolchain",
     verbose = True,
 )
 
@@ -72,41 +83,43 @@ mongo_cc_toolchain_config(
     cpu = "{bazel_toolchain_cpu}",
     cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     extra_ldflags = LINK_FLAGS,
-    includes = CLANG_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    # Note that CLANG_INCLUDE_DIRS needs to be searched after the common ones, otherwise some files
+    # will have include_next chains going backwards from the intended order.
+    includes = COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES + CLANG_INCLUDE_DIRS,
     tool_paths = {
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
         # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
         # we have to conditionally set the value pointed to by `gcc`.
         # TODO(SERVER-87211): The two lines below are using the absolute path to help clang find the sanitizer .a
-        # files. Switch these to the v4/bin/* paths once EngFlow fixes the issue where symlinks are fully resolved
+        # files. Switch these to the {version}/bin/* paths once EngFlow fixes the issue where symlinks are fully resolved
         # when copied to the remote execution system.
-        "gcc": "stow/llvm-v4/bin/clang",
-        "g++": "stow/llvm-v4/bin/clang++",
-        "cpp": "v4/bin/cpp",
-        "ar": "v4/bin/ar",
-        "nm": "v4/bin/nm",
-        "ld": "v4/bin/ld",
-        "as": "v4/bin/as",
-        "dwp": "v4/bin/dwp",
-        "objcopy": "v4/bin/llvm-objcopy",
-        "objdump": "v4/bin/objdump",
-        "gcov": "v4/bin/gcov",
-        "strip": "v4/bin/strip",
+        "gcc": "{version}/bin/clang",
+        "g++": "{version}/bin/clang++",
+        "cpp": "{version}/bin/cpp",
+        "ar": "{version}/bin/ar",
+        "nm": "{version}/bin/nm",
+        "ld": "{version}/bin/ld",
+        "as": "{version}/bin/as",
+        "dwp": "{version}/bin/dwp",
+        "objcopy": "{version}/bin/llvm-objcopy",
+        "objdump": "{version}/bin/objdump",
+        "gcov": "{version}/bin/gcov",
+        "strip": "{version}/bin/strip",
         "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
     },
-    toolchain_identifier = "clang_v4_toolchain",
+    toolchain_identifier = "clang_toolchain",
     verbose = True,
 )
 
 cc_toolchain(
     name = "cc_mongo_toolchain",
-    all_files = ":all",
-    ar_files = ":all",
-    compiler_files = ":all",
-    dwp_files = ":all",
-    linker_files = ":all",
-    objcopy_files = ":all",
-    strip_files = ":all",
+    all_files = ":all_files",
+    ar_files = ":all_files",
+    compiler_files = ":all_files",
+    dwp_files = ":all_files",
+    linker_files = ":all_files",
+    objcopy_files = ":all_files",
+    strip_files = ":all_files",
     toolchain_config = select({
         "@//bazel/config:compiler_type_clang": ":cc_clang_toolchain_config",
         "@//bazel/config:compiler_type_gcc": ":cc_gcc_toolchain_config",
@@ -125,6 +138,9 @@ toolchain(
         "@platforms//cpu:{bazel_toolchain_cpu}",
         "@//bazel/platforms:use_mongo_toolchain",
     ],
+    target_settings = [
+        "@//bazel/config:mongo_toolchain_{version}",
+    ],
     toolchain = ":cc_mongo_toolchain",
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
@@ -134,6 +150,6 @@ toolchain(
 filegroup(
     name = "clang_tidy",
     srcs = [
-        "v4/bin/clang-tidy",
+        "{version}/bin/clang-tidy",
     ],
 )

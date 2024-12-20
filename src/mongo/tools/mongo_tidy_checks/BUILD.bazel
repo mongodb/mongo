@@ -61,7 +61,6 @@ cc_library(
     ],
     copts = [
         "-Isrc/mongo/tools/mongo_tidy_checks/",  # Ensures that `#include "Mongo..."` calls continue to work in Bazel AND in SCons
-        "-Iexternal/mongo_toolchain/stow/llvm-v4/include",  # Ensures that `#include "clang-tidy/*` directives work.
         "-DNDEBUG",
         "-Wall",
         "-fdiagnostics-color",
@@ -92,6 +91,7 @@ cc_library(
         "-Woverloaded-virtual",
         "-Wwrite-strings",
         "-Wsuggest-override",
+        "-Iexternal/mongo_toolchain_v4/stow/llvm-v4/include/",
     ],
     local_defines = [
         "GTEST_HAS_RTTI=0",
@@ -107,7 +107,10 @@ cc_library(
         "@platforms//os:windows": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
-    deps = [],
+    deps = select({
+        "@//bazel/platforms:use_mongo_toolchain": ["@mongo_toolchain_v4//:llvm_headers"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_shared_library(
@@ -147,7 +150,6 @@ cc_shared_library(
         "-Wsuggest-override",
         "-Wno-comment",
         "-Wl,-z,nodelete",
-        "-Wl,-rpath-link,external/mongo_toolchain/stow/llvm-v4/lib",
         "-Wl,-O3",
         "-Wl,--gc-sections",
         "-Wl,-rpath,\\$ORIGIN/../lib",  # Ensure that the shared library can find its dependencies.

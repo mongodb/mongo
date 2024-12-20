@@ -188,6 +188,10 @@ build:remote_link --strategy=ExtractDebugInfo=remote
 build:remote_link --strategy=StripDebugInfo=remote
 build:remote_link --features=-thin_archive
 
+# Don't detect the native toolchain on linux, only use the hermetic toolchains.
+# Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.
+build:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
 # Disable the default compiler flags to avoid certain flags that conflict with flags we setup.
 build:windows --features=-smaller_binary
 build:windows --features=-frame_pointer
@@ -240,10 +244,19 @@ build:clang-tidy --//bazel/config:compiler_type=clang
 build:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
 build:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
-build:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=@mongo_toolchain//:clang_tidy
-build:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=@mongo_toolchain//:all
+build:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
+build:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files
 build:clang-tidy --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks
 
+# clang-tidy config using the v4 toolchain
+--config=clang-tidy-v4
+build:clang-tidy-v4 --config=clang-tidy
+build:clang-tidy --//bazel/config:mongo_toolchain_version=v4
+
+# clang-tidy config using the v5 toolchain
+--config=clang-tidy-v5
+build:clang-tidy-v5 --config=clang-tidy
+build:clang-tidy-v5 --//bazel/config:mongo_toolchain_version=v5
 
 # if you don't have access to the remote execution cluster above, use the local config
 # described below.
