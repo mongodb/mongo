@@ -268,7 +268,18 @@ function analyzeRandomShardKeys(dbName, collName) {
     jsTest.log("Analyzing random shard keys for the collection " +
                tojsononeline({ns, collInfo: collInfos[0]}));
 
-    const doc = coll.findOne({});
+    let doc;
+    try {
+        doc = coll.findOne({});
+    } catch (e) {
+        if (e.code == ErrorCodes.QueryPlanKilled) {
+            jsTest.log(`Skip analyzing shard keys for ${ns}` +
+                       `since the collection has been dropped: ${tojsononeline(e)}`);
+            return;
+        }
+        throw e;
+    }
+
     if (doc) {
         const shardKey = generateRandomShardKey(doc);
         if (!AnalyzeShardKeyUtil.isIdKeyPattern(shardKey)) {
@@ -277,9 +288,9 @@ function analyzeRandomShardKeys(dbName, collName) {
             analyzeShardKey(ns, shardKey);
         }
     }
-    let indexes;
 
-    // Catch any errors due to a collection potentially being dropped and recreated as a view
+    let indexes;
+    // Catch any errors due to a collection potentially being dropped and recreated as a view.
     try {
         indexes = coll.getIndexes();
     } catch (err) {
