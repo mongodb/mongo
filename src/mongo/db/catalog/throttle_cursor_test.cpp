@@ -346,8 +346,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         setMaxMbPerSec(5);
         Date_t start = getTime();
 
-        ASSERT_TRUE(
-            cursor.seek(opCtx, StringData(kMinKeyString.getBuffer(), kMinKeyString.getSize())));
+        ASSERT_TRUE(cursor.seek(opCtx, kMinKeyString.getView()));
         int numRecords = 1;
 
         while (cursor.next(opCtx)) {
@@ -446,8 +445,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         setMaxMbPerSec(5);
         Date_t start = getTime();
 
-        ASSERT_TRUE(indexCursor.seek(
-            opCtx, StringData(kMinKeyString.getBuffer(), kMinKeyString.getSize())));
+        ASSERT_TRUE(indexCursor.seek(opCtx, kMinKeyString.getView()));
         ASSERT_TRUE(recordCursor.seekExact(opCtx, RecordId(1)));
         int numRecords = 2;
 

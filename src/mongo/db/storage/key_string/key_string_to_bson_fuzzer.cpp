@@ -65,20 +65,21 @@ uint8_t getZeroType(char val) {
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     if (Size < 4)
         return 0;
+    std::span data(Data, Size);
 
-    const auto version = Data[0] % 2 == 0 ? kV0 : kV1;
-    const auto ord = Data[1] % 2 == 0 ? kAllAscending : kOneDescending;
+    const auto version = data[0] % 2 == 0 ? kV0 : kV1;
+    const auto ord = data[1] % 2 == 0 ? kAllAscending : kOneDescending;
 
     mongo::key_string::TypeBits tb(version);
 
-    const size_t len = Data[2];
-    if (len > static_cast<size_t>(Size - 3))
+    const size_t len = data[2];
+    if (len > data.size() - 3)
         return 0;
     // Data[2] defines the number of types to append to the TypeBits
     // Data[3 + i] defines which types have to be added
     for (size_t i = 0; i < len; i++) {
-        char randomType = Data[3 + i] & 0xf;
-        char randomZeroType = (Data[3 + i] & 0xf0) >> 4;
+        char randomType = data[3 + i] & 0xf;
+        char randomZeroType = (data[3 + i] & 0xf0) >> 4;
         switch (randomType % 9) {
             case 0:
                 tb.appendString();
@@ -112,9 +113,9 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         }
     }
 
+    auto keyString = data.subspan(len + 2);
     try {
-        mongo::BSONObj obj =
-            mongo::key_string::toBsonSafe(&Data[2 + len], Size - (2 + len), ord, tb);
+        mongo::BSONObj obj = mongo::key_string::toBsonSafe(keyString, ord, tb);
         // We want to make sure the generated BSON is valid
         auto validationResult = mongo::validateBSON(obj.objdata(), obj.objsize());
         invariant(validationResult.isOK() ||
@@ -124,13 +125,13 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     }
 
     try {
-        mongo::key_string::decodeRecordIdLongAtEnd(&Data[2 + len], Size - (2 + len));
+        mongo::key_string::decodeRecordIdLongAtEnd(keyString);
     } catch (const mongo::AssertionException&) {
         // We need to catch exceptions caused by invalid inputs
     }
 
     try {
-        mongo::key_string::decodeRecordIdStrAtEnd(&Data[2 + len], Size - (2 + len));
+        mongo::key_string::decodeRecordIdStrAtEnd(keyString);
     } catch (const mongo::AssertionException&) {
         // We need to catch exceptions caused by invalid inputs
     }

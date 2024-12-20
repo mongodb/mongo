@@ -76,12 +76,12 @@ Value evaluate(const ExpressionInternalKeyStringValue& expr,
     } else {
         ksBuilder.appendBSONElement(inputBson.firstElement());
     }
-    auto ksValue = ksBuilder.release();
 
     // The result omits the typebits so that the numeric value of different types have the same
     // binary representation.
-    return Value(
-        BSONBinData{ksValue.getBuffer(), static_cast<int>(ksValue.getSize()), BinDataGeneral});
+    auto ksValue = ksBuilder.release();
+    auto ksView = ksValue.getView();
+    return Value(BSONBinData{ksView.data(), static_cast<int>(ksView.size()), BinDataGeneral});
 }
 
 }  // namespace exec::expression

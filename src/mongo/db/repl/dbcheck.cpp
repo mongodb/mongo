@@ -325,18 +325,13 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchHealthLogEntry(
 bool isIndexOrderAndUniquenessPreserved(const KeyStringEntry& curr,
                                         const KeyStringEntry& next,
                                         bool isUnique) {
-    const int comparisonWithRecordId = curr.keyString.compare(next.keyString);
+    const auto comparisonWithRecordId = curr.keyString.compare(next.keyString);
     if (comparisonWithRecordId >= 0) {
         return false;
     }
 
     if (isUnique) {
-        if (curr.loc.isLong()) {
-            return curr.keyString.compareWithoutRecordIdLong(next.keyString) < 0;
-        } else if (curr.loc.isStr()) {
-            return curr.keyString.compareWithoutRecordIdStr(next.keyString) < 0;
-        }
-        MONGO_UNREACHABLE;
+        return curr.keyString.compareWithoutRecordId(next.keyString, curr.loc.keyFormat()) < 0;
     }
 
     return true;
@@ -471,13 +466,11 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
 }
 
 BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ordering& ordering) {
-    return key_string::toBsonSafe(
-        keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+    return key_string::toBsonSafe(keyString.getView(), ordering, keyString.getTypeBits());
 }
 
 BSONObj _builderToBsonSafeHelper(const key_string::Builder& builder, const Ordering& ordering) {
-    return key_string::toBsonSafe(
-        builder.getBuffer(), builder.getSize(), ordering, builder.getTypeBits());
+    return key_string::toBsonSafe(builder.getView(), ordering, builder.getTypeBits());
 }
 
 boost::optional<KeyStringEntry> _getNextDistinctKeyInIndex(
@@ -518,9 +511,8 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     const key_string::Version keyStringVersion =
         iam->getSortedDataInterface()->getKeyStringVersion();
 
-    auto buildKeyStringWithoutRecordId = [keyStringVersion,
-                                          ordering](const BSONObj& batchBoundaryBson) {
-        key_string::Builder ksBuilder(keyStringVersion);
+    key_string::Builder ksBuilder(keyStringVersion);
+    auto buildKeyStringWithoutRecordId = [&](const BSONObj& batchBoundaryBson) {
         ksBuilder.resetToKey(batchBoundaryBson, ordering);
         return ksBuilder.getValueCopy();
     };
@@ -528,7 +520,6 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     // Rebuild first and last keystrings from their BSON format.
     const key_string::Value batchStartWithoutRecordId =
         buildKeyStringWithoutRecordId(batchStartBson);
-    const key_string::Value batchEndWithoutRecordId = buildKeyStringWithoutRecordId(batchEndBson);
     const key_string::Value lastKeyCheckedWithoutRecordId =
         buildKeyStringWithoutRecordId(lastKeyCheckedBson);
 
@@ -554,9 +545,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     // Note that seekForKeyString/nextKeyString always return a keyString with RecordId appended,
     // regardless of what format the index has.
     for (auto currEntryWithRecordId =
-             indexCursor->seekForKeyString(opCtx,
-                                           StringData(batchStartWithoutRecordId.getBuffer(),
-                                                      batchStartWithoutRecordId.getSize()));
+             indexCursor->seekForKeyString(opCtx, batchStartWithoutRecordId.getView());
          currEntryWithRecordId;
          currEntryWithRecordId = nextEntryWithRecordId) {
         iassert(opCtx->checkForInterruptNoAssert());
@@ -569,19 +558,19 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                         key_string::rehydrateKey(indexDescriptor->keyPattern(), currKeyStringBson),
                     "indexName"_attr = indexName);
         // Append the keystring to the hash without the recordId at end.
-        size_t sizeWithoutRecordId = currKeyStringWithRecordId.getSizeWithoutRecordId();
+        auto currKeyStringWithoutRecordId = currKeyStringWithRecordId.getViewWithoutRecordId();
 
-        _bytesSeen += sizeWithoutRecordId;
+        _bytesSeen += currKeyStringWithoutRecordId.size();
         _countKeysSeen += 1;
-        md5_append(&_state, md5Cast(currKeyStringWithRecordId.getBuffer()), sizeWithoutRecordId);
+        md5_append(&_state,
+                   md5Cast(currKeyStringWithoutRecordId.data()),
+                   currKeyStringWithoutRecordId.size());
 
         _lastKeySeen = currKeyStringBson;
 
-        const int comparisonWithoutRecordId =
-            key_string::compare(currKeyStringWithRecordId.getBuffer(),
-                                lastKeyCheckedWithoutRecordId.getBuffer(),
-                                sizeWithoutRecordId,
-                                lastKeyCheckedWithoutRecordId.getSize());
+        const auto comparisonWithoutRecordId =
+            key_string::compare(currKeyStringWithRecordId.getViewWithoutRecordId(),
+                                lastKeyCheckedWithoutRecordId.getView());
 
         // Last keystring in batch is in a series of consecutive identical keys.
         if (comparisonWithoutRecordId == 0) {
@@ -773,8 +762,7 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
 
             // seekForKeyString returns the closest key string if the exact keystring does not
             // exist.
-            auto ksEntry =
-                cursor->seekForKeyString(opCtx, StringData(key.getBuffer(), key.getSize()));
+            auto ksEntry = cursor->seekForKeyString(opCtx, key.getView());
             // Dbcheck will access every index for each document, and we aim for the count to
             // represent the storage accesses. Therefore, we increment the number of keys seen.
             _countKeysSeen++;

@@ -629,7 +629,7 @@ size_t SimpleIndexScanStage::estimateCompileTimeSize() const {
 
 SortedDataKeyValueView SimpleIndexScanStage::seek() {
     auto& query = getSeekKeyLow();
-    return _cursor->seekForKeyValueView(StringData(query.getBuffer(), query.getSize()));
+    return _cursor->seekForKeyValueView(query.getView());
 }
 
 bool SimpleIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
@@ -759,8 +759,7 @@ bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
     auto keyStringData = key.getKeyStringWithoutRecordIdView();
 
     if (!_endKey.isEmpty()) {
-        auto result = key_string::compare(
-            keyStringData.data(), _endKey.getBuffer(), keyStringData.size(), _endKey.getSize());
+        auto result = key_string::compare(keyStringData, _endKey.getView());
         if ((_forward && result <= 0) || (!_forward && result >= 0)) {
             ++_specificStats.keyCheckSkipped;
             _scanState = ScanState::kScanning;
@@ -776,8 +775,7 @@ bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
         BufReader typeBitsBr(typeBits.data(), typeBits.size());
         auto reader = key_string::TypeBits::getReaderFromBuffer(key.getVersion(), &typeBitsBr);
 
-        key_string::toBsonSafe(
-            keyStringData.data(), keyStringData.size(), _params.ord, reader, keyBuilder);
+        key_string::toBsonSafe(keyStringData, _params.ord, reader, keyBuilder);
         auto bsonKey = keyBuilder.done();
 
         switch (_checker->checkKeyWithEndPosition(

@@ -333,7 +333,7 @@ public:
     }
 
     boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                      StringData keyString) const override {
+                                      std::span<const char> keyString) const override {
         return boost::none;
     }
 

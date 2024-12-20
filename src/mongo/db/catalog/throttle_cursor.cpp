@@ -87,7 +87,7 @@ SortedDataInterfaceThrottleCursor::SortedDataInterfaceThrottleCursor(
 }
 
 boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::seek(OperationContext* opCtx,
-                                                                       StringData key) {
+                                                                       std::span<const char> key) {
     boost::optional<IndexKeyEntry> entry = _cursor->seek(key);
     if (entry) {
         const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc);
@@ -98,7 +98,7 @@ boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::seek(Operation
 }
 
 boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::seekForKeyString(
-    OperationContext* opCtx, StringData key) {
+    OperationContext* opCtx, std::span<const char> key) {
     boost::optional<KeyStringEntry> entry = _cursor->seekForKeyString(key);
     if (entry) {
         const int64_t dataSize = entry->keyString.getSize() + sizeof(entry->loc);

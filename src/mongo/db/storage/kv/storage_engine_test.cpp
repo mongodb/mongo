@@ -164,7 +164,7 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
 
     // Insert record with RecordId of KeyFormat::String.
     const auto id = StringData{"1"};
-    const auto rid = RecordId(id.rawData(), id.size());
+    const auto rid = RecordId(id);
     const auto data = "data";
     WriteUnitOfWork wuow(opCtx.get());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());

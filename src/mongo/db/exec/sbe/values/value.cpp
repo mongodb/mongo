@@ -202,7 +202,7 @@ std::pair<TypeTags, Value> makeNewRecordId(int64_t rid) {
 }
 
 std::pair<TypeTags, Value> makeNewRecordId(const char* str, int32_t size) {
-    auto val = bitcastFrom<RecordId*>(new RecordId(str, size));
+    auto val = bitcastFrom<RecordId*>(new RecordId(std::span(str, size)));
     return {TypeTags::RecordId, val};
 }
 

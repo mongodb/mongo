@@ -172,7 +172,7 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
 
         for (auto&& [uri, sizeInfo] : buffer) {
             WiredTigerItem key(uri.c_str(), uri.size());
-            cursor->set_key(cursor, key.Get());
+            cursor->set_key(cursor, key.get());
 
             int ret = 0;
             if (!sizeInfo) {
@@ -198,7 +198,7 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
                             "data"_attr = redact(data));
 
                 WiredTigerItem value(data.objdata(), data.objsize());
-                cursor->set_value(cursor, value.Get());
+                cursor->set_value(cursor, value.get());
                 ret = cursor->insert(cursor);
             }
 

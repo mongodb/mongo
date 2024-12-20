@@ -188,15 +188,9 @@ TEST_F(SBEKeyStringTest, Basic) {
 
             builder.reset();
             keyStringValues.resize(size);
-            auto keySize = static_cast<int32_t>(key_string::getKeySize(
-                keyString.getBuffer(), keyString.getSize(), ordering, keyString.getVersion()));
-            auto b = keyString.getTypeBitsView();
-            SortedDataKeyValueView view{keyString.getBuffer(),
-                                        keySize,
-                                        keyString.getBuffer() + keySize,
-                                        static_cast<int32_t>(keyString.getSize() - keySize),
-                                        b.data(),
-                                        static_cast<int32_t>(b.size()),
+            SortedDataKeyValueView view{keyString.getView(),
+                                        keyString.getRecordIdView(),
+                                        keyString.getTypeBitsView(),
                                         keyString.getVersion(),
                                         true};
             readKeyStringValueIntoAccessors(view, ordering, &builder, &keyStringValues);
@@ -234,17 +228,11 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
     std::vector<value::OwnedValueAccessor> accessors;
     accessors.resize(2);
 
-    auto keySize = static_cast<int32_t>(key_string::getKeySize(keyStringBuilder.getBuffer(),
-                                                               keyStringBuilder.getSize(),
-                                                               key_string::ALL_ASCENDING,
-                                                               keyStringBuilder.version));
-    auto b = keyStringBuilder.getTypeBits();
-    SortedDataKeyValueView view{keyStringBuilder.getBuffer(),
-                                keySize,
-                                keyStringBuilder.getBuffer() + keySize,
-                                static_cast<int32_t>(keyStringBuilder.getSize() - keySize),
-                                b.getBuffer(),
-                                b.getSize(),
+    auto keySize = key_string::getKeySize(
+        keyStringBuilder.getView(), key_string::ALL_ASCENDING, keyStringBuilder.version);
+    SortedDataKeyValueView view{keyStringBuilder.getView(),
+                                keyStringBuilder.getView().subspan(keySize),
+                                keyStringBuilder.getTypeBits().getView(),
                                 keyStringBuilder.version,
                                 true};
     BufBuilder builder;

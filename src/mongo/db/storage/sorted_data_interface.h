@@ -29,6 +29,7 @@
 
 #include <boost/optional/optional.hpp>
 #include <memory>
+#include <span>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -126,7 +127,7 @@ public:
      * This will not accept a KeyString with a Discriminator other than kInclusive.
      */
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                              StringData keyString) const = 0;
+                                              std::span<const char> keyString) const = 0;
 
     /**
      * Return duplicate key information if there is more than one occurrence of 'KeyString' in this
@@ -268,7 +269,6 @@ public:
 
         virtual ~Cursor() = default;
 
-
         /**
          * Sets the position to stop scanning. An empty key unsets the end position.
          *
@@ -303,7 +303,8 @@ public:
          * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
          * obtained from BuilderBase::finishAndGetBuffer().
          */
-        virtual boost::optional<KeyStringEntry> seekForKeyString(StringData keyString) = 0;
+        virtual boost::optional<KeyStringEntry> seekForKeyString(
+            std::span<const char> keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the SortedDataKeyValueView.
@@ -314,7 +315,7 @@ public:
          * Returns unowned data, which is invalidated upon calling a next() or seek()
          * variant, a save(), or when the cursor is destructed.
          */
-        virtual SortedDataKeyValueView seekForKeyValueView(StringData keyString) = 0;
+        virtual SortedDataKeyValueView seekForKeyValueView(std::span<const char> keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the IndexKeyEntry.
@@ -323,7 +324,8 @@ public:
          * obtained from BuilderBase::finishAndGetBuffer().
          */
         virtual boost::optional<IndexKeyEntry> seek(
-            StringData keyString, KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
+            std::span<const char> keyString,
+            KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
 
         /**
          * Seeks to the provided keyString and returns the RecordId of the matching key, or
@@ -332,7 +334,7 @@ public:
          * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
          * obtained from BuilderBase::finishAndGetBuffer().
          */
-        virtual boost::optional<RecordId> seekExact(StringData keyString) = 0;
+        virtual boost::optional<RecordId> seekExact(std::span<const char> keyString) = 0;
 
         //
         // Saving and restoring state
@@ -467,25 +469,24 @@ public:
     /**
      * Construct a SortedDataKeyValueView with pointers and sizes to each underlying component.
      */
-    SortedDataKeyValueView(const char* ksData,
-                           int32_t ksSize,
-                           const char* ridData,
-                           int32_t ridSize,
-                           const char* typeBitsData,
-                           int32_t typeBitsSize,
+    SortedDataKeyValueView(std::span<const char> key,
+                           std::span<const char> rid,
+                           std::span<const char> typeBits,
                            key_string::Version version,
                            bool isRecordIdAtEndOfKeyString,
                            const RecordId* id = nullptr)
-        : _ksData(ksData),
-          _ridData(ridData),
-          _tbData(typeBitsData),
-          _ksSize(ksSize),
-          _ridSize(ridSize),
-          _tbSize(typeBitsSize),
+        : _ksData(key.data()),
+          _ridData(rid.data()),
+          _tbData(typeBits.data()),
+          _ksSize(static_cast<int32_t>(key.size())),
+          _ridSize(static_cast<int32_t>(rid.size())),
+          _tbSize(static_cast<int32_t>(typeBits.size())),
           _version(version),
           _id(id) {
-        invariant(ksSize > 0 && ridSize >= 0 && typeBitsSize >= 0);
-        _ksOriginalSize = isRecordIdAtEndOfKeyString ? (ksSize + ridSize) : ksSize;
+        invariant(key.size() > 0 && key.size() < std::numeric_limits<int32_t>::max());
+        invariant(rid.size() < std::numeric_limits<int32_t>::max());
+        invariant(typeBits.size() < std::numeric_limits<int32_t>::max());
+        _ksOriginalSize = isRecordIdAtEndOfKeyString ? (key.size() + rid.size()) : key.size();
     }
 
     /**
@@ -511,23 +512,23 @@ public:
      * Return the original index key buffer as is, which may or may not end with a RecordId,
      * depending on isRecordIdAtEndOfKeyString().
      */
-    StringData getKeyStringOriginalView() const {
-        return {_ksData, static_cast<StringData::size_type>(_ksOriginalSize)};
+    std::span<const char> getKeyStringOriginalView() const {
+        return {_ksData, static_cast<std::span<const char>::size_type>(_ksOriginalSize)};
     }
 
-    StringData getKeyStringWithoutRecordIdView() const {
-        return {_ksData, static_cast<StringData::size_type>(_ksSize)};
+    std::span<const char> getKeyStringWithoutRecordIdView() const {
+        return {_ksData, static_cast<std::span<const char>::size_type>(_ksSize)};
     }
 
     /**
      * Return the raw TypeBits buffer including the size prefix.
      */
-    StringData getTypeBitsView() const {
-        return {_tbData, static_cast<StringData::size_type>(_tbSize)};
+    std::span<const char> getTypeBitsView() const {
+        return {_tbData, static_cast<std::span<const char>::size_type>(_tbSize)};
     }
 
-    StringData getRecordIdView() const {
-        return {_ridData, static_cast<StringData::size_type>(_ridSize)};
+    std::span<const char> getRecordIdView() const {
+        return {_ridData, static_cast<std::span<const char>::size_type>(_ridSize)};
     }
 
     key_string::Version getVersion() const {
@@ -563,13 +564,9 @@ public:
      * valid.
      */
     static SortedDataKeyValueView fromValue(const key_string::Value& value) {
-        auto typeBits = value.getTypeBitsView();
-        return {value.getBuffer(),                                  /* ksData */
-                value.getSizeWithoutRecordId(),                     /* ksSize */
-                value.getBuffer() + value.getSizeWithoutRecordId(), /* ridData */
-                value.getRecordIdSize(),                            /* ridSize */
-                typeBits.data(),                                    /* typeBitsData */
-                static_cast<int32_t>(typeBits.size()),              /* typeBitsSize */
+        return {value.getViewWithoutRecordId(),
+                value.getRecordIdView(),
+                value.getTypeBitsView(),
                 value.getVersion(),
                 value.getRecordIdSize() > 0 /* isRecordIdAtEndOfKeyString */};
     }

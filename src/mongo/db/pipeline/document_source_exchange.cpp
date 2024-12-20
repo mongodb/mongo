@@ -172,44 +172,34 @@ std::vector<std::string> Exchange::extractBoundaries(
     }
 
     for (auto& b : *obj) {
-        // Build the key.
-        BSONObjBuilder kb;
-        for (auto elem : b) {
-            kb << "" << elem;
-        }
-
-        key_string::Builder key{key_string::Version::V1, kb.obj(), ordering};
-        std::string keyStr{key.getBuffer(), key.getSize()};
-
-        ret.emplace_back(std::move(keyStr));
+        key_string::Builder key{key_string::Version::V1, b, ordering};
+        ret.emplace_back(key.getView().begin(), key.getView().end());
     }
 
-    uassert(50960, str::stream() << "Exchange range boundaries are not valid", ret.size() > 1);
+    uassert(50960, "Exchange range boundaries are not valid", ret.size() > 1);
 
     for (size_t idx = 1; idx < ret.size(); ++idx) {
         uassert(50893,
-                str::stream() << "Exchange range boundaries are not in ascending order.",
+                "Exchange range boundaries are not in ascending order.",
                 ret[idx - 1] < ret[idx]);
     }
 
     BSONObjBuilder kbMin;
     BSONObjBuilder kbMax;
     for (int i = 0; i < obj->front().nFields(); ++i) {
-        kbMin << "" << MINKEY;
-        kbMax << "" << MAXKEY;
+        kbMin.appendMinKey("");
+        kbMax.appendMaxKey("");
     }
 
     key_string::Builder minKey{key_string::Version::V1, kbMin.obj(), ordering};
     key_string::Builder maxKey{key_string::Version::V1, kbMax.obj(), ordering};
-    StringData minKeyStr{minKey.getBuffer(), minKey.getSize()};
-    StringData maxKeyStr{maxKey.getBuffer(), maxKey.getSize()};
 
     uassert(50958,
-            str::stream() << "Exchange lower bound must be the minkey.",
-            ret.front() == minKeyStr);
+            "Exchange lower bound must be the minkey.",
+            key_string::compare(ret.front(), minKey.getView()) == 0);
     uassert(50959,
-            str::stream() << "Exchange upper bound must be the maxkey.",
-            ret.back() == maxKeyStr);
+            "Exchange upper bound must be the maxkey.",
+            key_string::compare(ret.back(), maxKey.getView()) == 0);
 
     return ret;
 }
@@ -439,7 +429,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
     }
 
     key_string::Builder key{key_string::Version::V1, kb.obj(), _ordering};
-    std::string keyStr{key.getBuffer(), key.getSize()};
+    std::string_view keyStr{key.getView().data(), key.getView().size()};
 
     // Binary search for the consumer id.
     auto it = std::upper_bound(_boundaries.begin(), _boundaries.end(), keyStr);
