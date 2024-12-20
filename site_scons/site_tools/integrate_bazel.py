@@ -604,6 +604,7 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
 
     if ninja_generate:
         for file in glob.glob("bazel-out/**/*.gen_source_list", recursive=True):
+            os.chmod(file, stat.S_IWRITE)
             os.remove(file)
         extra_args += ["--build_tag_filters=scons_link_lists"]
         bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
