@@ -132,3 +132,9 @@ structs:
                 description: "Whether to create an index on the shard key pattern if the shard key
                               does not already have a support index."
                 default: true
+            skipVerification:
+                type: bool
+                description: "Whether to skip data comparison verification. Defaults to true since
+                             the absence of this field implies that the cluster might contain nodes
+                             that do not support verification."
+                default: true

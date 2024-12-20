@@ -64,6 +64,7 @@ public:
                 request().getDbName(),
                 nss,
                 request().getToShard(),
+                request().getSkipVerification(),
                 request().getOplogBatchApplierTaskCount());
 
             LOGV2(8018400,

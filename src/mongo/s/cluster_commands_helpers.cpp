@@ -95,6 +95,7 @@ ShardsvrReshardCollection makeMoveCollectionOrUnshardCollectionRequest(
     const NamespaceString& nss,
     const boost::optional<ShardId>& destinationShard,
     ProvenanceEnum provenance,
+    const boost::optional<bool>& skipVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount) {
     ShardsvrReshardCollection shardsvrReshardCollection(nss);
     shardsvrReshardCollection.setDbName(dbName);
@@ -113,6 +114,7 @@ ShardsvrReshardCollection makeMoveCollectionOrUnshardCollectionRequest(
 
     reshardCollectionRequest.setForceRedistribution(true);
     reshardCollectionRequest.setNumInitialChunks(1);
+    reshardCollectionRequest.setSkipVerification(skipVerification);
     reshardCollectionRequest.setRecipientOplogBatchTaskCount(oplogBatchApplierTaskCount);
 
     shardsvrReshardCollection.setReshardCollectionRequest(std::move(reshardCollectionRequest));
@@ -124,20 +126,23 @@ ShardsvrReshardCollection makeMoveCollectionRequest(
     const NamespaceString& nss,
     const ShardId& destinationShard,
     ProvenanceEnum provenance,
+    const boost::optional<bool>& skipVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount) {
     return makeMoveCollectionOrUnshardCollectionRequest(
-        dbName, nss, destinationShard, provenance, oplogBatchApplierTaskCount);
+        dbName, nss, destinationShard, provenance, skipVerification, oplogBatchApplierTaskCount);
 }
 
 ShardsvrReshardCollection makeUnshardCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
     const boost::optional<ShardId>& destinationShard,
+    const boost::optional<bool>& skipVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount) {
     return makeMoveCollectionOrUnshardCollectionRequest(dbName,
                                                         nss,
                                                         destinationShard,
                                                         ProvenanceEnum::kUnshardCollection,
+                                                        skipVerification,
                                                         oplogBatchApplierTaskCount);
 }
 }  // namespace cluster::unsplittable

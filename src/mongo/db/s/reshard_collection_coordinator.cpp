@@ -203,6 +203,8 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             resharding::validateImplicitlyCreateIndex(_doc.getImplicitlyCreateIndex(),
                                                       _doc.getKey());
             configsvrReshardCollection.setImplicitlyCreateIndex(_doc.getImplicitlyCreateIndex());
+            resharding::validateSkipVerification(_doc.getSkipVerification());
+            configsvrReshardCollection.setSkipVerification(_doc.getSkipVerification());
 
             auto provenance = _doc.getProvenance();
             if (resharding::isMoveCollection(provenance)) {

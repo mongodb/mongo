@@ -65,6 +65,7 @@ public:
                 nss,
                 request().getToShard(),
                 ProvenanceEnum::kMoveCollection,
+                request().getSkipVerification(),
                 request().getOplogBatchApplierTaskCount());
             generic_argument_util::setMajorityWriteConcern(moveCollectionRequest,
                                                            &opCtx->getWriteConcern());

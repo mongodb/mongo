@@ -419,6 +419,8 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                 coordinatorDoc.getCommonReshardingMetadata().getProvenance());
             originalEntryReshardingFields.setImplicitlyCreateIndex(
                 coordinatorDoc.getCommonReshardingMetadata().getImplicitlyCreateIndex());
+            originalEntryReshardingFields.setSkipVerification(
+                coordinatorDoc.getCommonReshardingMetadata().getSkipVerification());
 
             return BSON("$set" << BSON(CollectionType::kReshardingFieldsFieldName
                                        << originalEntryReshardingFields.toBSON()
@@ -869,6 +871,8 @@ CollectionType createTempReshardingCollectionType(
         coordinatorDoc.getCommonReshardingMetadata().getProvenance());
     tempEntryReshardingFields.setImplicitlyCreateIndex(
         coordinatorDoc.getCommonReshardingMetadata().getImplicitlyCreateIndex());
+    tempEntryReshardingFields.setSkipVerification(
+        coordinatorDoc.getCommonReshardingMetadata().getSkipVerification());
 
     auto recipientFields = constructRecipientFields(coordinatorDoc);
     tempEntryReshardingFields.setRecipientFields(std::move(recipientFields));

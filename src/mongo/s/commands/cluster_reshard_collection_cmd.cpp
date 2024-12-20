@@ -128,6 +128,7 @@ public:
                 reshardCollectionRequest.setProvenance(ProvenanceEnum::kReshardCollection);
             }
             reshardCollectionRequest.setImplicitlyCreateIndex(request().getImplicitlyCreateIndex());
+            reshardCollectionRequest.setSkipVerification(request().getSkipVerification());
 
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));

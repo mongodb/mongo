@@ -200,6 +200,10 @@ public:
             }
             resharding::validateImplicitlyCreateIndex(request().getImplicitlyCreateIndex(),
                                                       request().getKey());
+            resharding::validateSkipVerification(request().getSkipVerification());
+            bool skipVerification = request().getSkipVerification().value_or(
+                !resharding::gFeatureFlagReshardingVerification.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance = ([&]()
@@ -297,6 +301,7 @@ public:
                 coordinatorDoc.setUnique(request().getUnique());
                 coordinatorDoc.setCollation(request().getCollation());
                 coordinatorDoc.setImplicitlyCreateIndex(request().getImplicitlyCreateIndex());
+                coordinatorDoc.setSkipVerification(skipVerification);
                 coordinatorDoc.setRecipientOplogBatchTaskCount(
                     request().getRecipientOplogBatchTaskCount());
                 coordinatorDoc.setRelaxed(request().getRelaxed());
