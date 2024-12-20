@@ -73,6 +73,7 @@ def run_mongotest(
     load: bool = True,
     minimal_index: bool = False,
     out_result: bool = False,
+    extract_features: bool = False,
 ) -> tuple[ExitCode, bytes]:
     """
     Execute mongotest binary with specified test files and options. It constructs the command-line invocation of mongotest based on the input parameters and executes the command. It returns the output of the mongotest process to the calling function.
@@ -110,11 +111,13 @@ def run_mongotest(
         cmd.extend(("--out", "result"))
     if minimal_index:
         cmd.append("--minimal-index")
+    if extract_features:
+        cmd.extend(("-v", "--extractFeatures"))
 
     try:
         output = subprocess.run(
             cmd,
-            timeout=10,
+            timeout=60 if extract_features else 10,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

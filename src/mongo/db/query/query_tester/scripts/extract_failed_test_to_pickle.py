@@ -14,6 +14,7 @@ that can be further analyzed or processed within the QueryTester framework.
 """
 
 import subprocess
+from pathlib import Path
 
 import utils
 
@@ -23,7 +24,7 @@ args = utils.parse_args_common(
     fail_filepath=True,
 )
 output_prefix = args.output_prefix
-fail_filepath = args.fail_filepath
+fail_filepath = Path(args.fail_filepath).resolve()
 
 # Validate directories and change to feature-extractor directory
 feature_extractor_dir = utils.validate_and_change_directory(args.feature_extractor_dir)

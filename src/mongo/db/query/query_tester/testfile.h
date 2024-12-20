@@ -73,6 +73,7 @@ public:
     const std::vector<CollectionSpec>& getCollectionsNeeded() const;
     size_t getFailedQueryCount() const;
     size_t getTestsRun() const;
+    const std::string& getQuery(size_t testNum) const;
 
     /**
      * Loads or drops then loads the collections needed for the test files depending on the passed
@@ -84,15 +85,36 @@ public:
                          bool createAllIndices,
                          const std::set<CollectionSpec>& prevFileCollections) const;
 
+    void assertTestNumExists(size_t testNum) const;
+
+    /**
+     * Given a featureSet containing a testNum and its corresponding feature information, group the
+     * features into higher-level categories and print each individual feature under its category.
+     * The output will look like:
+     *
+     * Query Features:
+     *    Category 1:
+     *       - Feature
+     *       - Feature
+     *    Category 2:
+     *       - Feature
+     *       - Feature
+     *    ... and so on
+     */
+    void displayFeaturesByCategory(const BSONElement& featureSet) const;
+    /**
+     * Parse a feature file into a BSONObj and process features for each testNum by category.
+     */
+    void parseFeatureFileToBson(const std::filesystem::path& queryFeaturesFile) const;
     /**
      * Print out failed test numbers and their corresponding queries. Optionally, with the -v
      * (verbose) flag set, also extract and print out metadata about common features across failed
      * queries for an enriched debugging experience.
      */
+    void printFailedTestFileHeader() const;
     void printAndExtractFailedQueries(const std::set<size_t>& failedTestNums) const;
     void printFailedQueries(const std::set<size_t>& failedTestNums) const;
-    void printFailedQueriesHelper(const std::set<size_t>& failedTestNums,
-                                  std::fstream* fs = nullptr) const;
+
     bool readInEntireFile(ModeOption, size_t = kMinTestNum, size_t = kMaxTestNum);
     void runTestFile(DBClientConnection*, ModeOption);
 
@@ -115,6 +137,8 @@ public:
     bool writeAndValidate(ModeOption, WriteOutOptions, ErrorLogLevel, DiffStyle);
 
     bool writeOutAndNumber(std::fstream&, WriteOutOptions);
+
+    std::filesystem::path writeOutFailedQueries(const std::set<size_t>& failedTestNums) const;
 
     template <bool IncludeComments>
     void writeOutHeader(std::fstream&) const;

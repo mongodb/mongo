@@ -203,25 +203,13 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                 << std::endl;
         } else {
             printFailureSummary(failedTestFiles, failedQueryCount, totalTestsRun);
-        }
 
-        if (errorLogLevel == ErrorLogLevel::kExtractFeatures) {
-            const auto pyCmd = std::stringstream{}
-                << "python3 src/mongo/db/query/query_tester/scripts/extract_pickle_to_json.py "
-                << getMongoRepoRoot() << " " << kFeatureExtractorDir << " " << kTmpFailureFile;
-            const auto queryFeaturesFile =
-                std::filesystem::path{(std::stringstream{} << "src/mongo/db/query/query_tester/"
-                                                           << kTmpFailureFile << ".json")
-                                          .str()};
-            if (shellExec(pyCmd.str(), kShellTimeout, kShellMaxLen, true).isOK()) {
-                displayFailingQueryFeatures(queryFeaturesFile);
-            } else {
-                exitWithError(1, "failed to extract pickle file to json for feature processing.");
+            if (errorLogLevel == ErrorLogLevel::kVerbose) {
+                std::cout
+                    << "Tests failed! Run test locally with --extractFeatures for more details."
+                    << std::endl;
             }
-
-            std::filesystem::remove(queryFeaturesFile);
         }
-
         return 1;
     }
 }
@@ -249,8 +237,8 @@ void printHelpString() {
          "specified with the load argument or "
          "no documents will exist in the test collections."},
         {"--extractFeatures",
-         "Extracts metadata about most common features across failed queries for an enriched "
-         "debugging experience."},
+         "Extracts syntax, query planner, and execution stats metadata for failed queries for an "
+         "enriched debugging experience."},
         {"--load",
          "Load all collections specified in relevant test files. If "
          "not specified will assume data "

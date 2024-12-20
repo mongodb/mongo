@@ -96,6 +96,13 @@ void moveResultsFile(const std::filesystem::path& actualPath,
     }
 }
 
+void printFailedTestNumAndQuery(const size_t testNum, const std::string& query) {
+    // Print out the failed testId and its corresponding query.
+    std::cout << applyBold() << "TestNum: " << applyReset() << testNum << std::endl
+              << applyBold() << "Query: " << applyReset() << query << std::endl
+              << std::endl;
+}
+
 void readAndBuildOrSkipIndexes(DBClientConnection* const conn,
                                const std::string& dbName,
                                const std::string& collName,
@@ -246,6 +253,10 @@ size_t QueryFile::getTestsRun() const {
     return _testsRun;
 }
 
+const std::string& QueryFile::getQuery(const size_t testNum) const {
+    return _testNumToQuery.at(testNum);
+}
+
 void QueryFile::loadCollections(DBClientConnection* const conn,
                                 const bool dropData,
                                 const bool loadData,
@@ -311,24 +322,99 @@ void QueryFile::parseHeader(std::fstream& fs) {
             lineFromFile.empty());
 }
 
-void QueryFile::printAndExtractFailedQueries(const std::set<size_t>& failedQueryIds) const {
-    const auto failPath = std::filesystem::path{_filePath}.replace_extension(".fail");
-    auto fs = std::fstream{failPath, std::ios::out | std::ios::trunc};
-    // Write out header without comments.
-    writeOutHeader<false>(fs);
+void QueryFile::assertTestNumExists(const size_t testNum) const {
+    uassert(9699600,
+            str::stream() << "Test " << testNum << " does not exist.",
+            _testNumToQuery.find(testNum) != _testNumToQuery.end());
+}
 
-    // Print and write the failed queries to a temp file for feature processing.
-    printFailedQueriesHelper(failedQueryIds, &fs);
-    fs.close();
+void QueryFile::displayFeaturesByCategory(const BSONElement& featureSet) const {
+    const auto& testNum = static_cast<size_t>(std::stoull(featureSet.fieldName()));
+    assertTestNumExists(testNum);
+
+    printFailedTestNumAndQuery(testNum, getQuery(testNum));
+
+    std::cout << applyBold() << "Query Features:" << applyReset() << std::endl;
+    auto groupedFeatures = std::map<std::string, std::vector<std::string>>{};
+
+    for (const auto& feature : featureSet.Obj()) {
+        // Only count features that are not null and begin with an allowed prefix.
+        if (const auto featureName = feature.fieldName();
+            !feature.isNull() && matchesPrefix(featureName)) {
+            const auto [category, value] = splitFeature(featureName);
+            groupedFeatures[category].push_back(value);
+        }
+    }
+
+    for (auto& [category, values] : groupedFeatures) {
+        // Display individual features under their broader categories.
+        std::cout << "   " << applyBold() << category << ":" << applyReset() << std::endl;
+        std::sort(values.begin(), values.end());
+        for (const auto& value : values) {
+            if (!value.empty()) {
+                std::cout << "      - " << value << std::endl;
+            }
+        }
+    }
+    std::cout << std::endl << std::endl;
+}
+
+void QueryFile::parseFeatureFileToBson(const std::filesystem::path& queryFeaturesFile) const {
+    auto ifs = std::ifstream{queryFeaturesFile};
+    tassert(9699500,
+            "Expected file to be open and ready for reading, but it wasn't",
+            ifs.is_open() && ifs.good());
+
+    const auto jsonStr =
+        std::string{std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>()};
+    const auto& obj = fromjson(jsonStr);
+    for (const auto& featureSet : obj) {
+        // For each testNum, group and display features by category.
+        displayFeaturesByCategory(featureSet);
+    }
+}
+
+void QueryFile::printFailedTestFileHeader() const {
+    std::cout << applyRed() << "------------------------------------------------------------"
+              << applyReset() << std::endl
+              << applyCyan() << "FAIL: " << getBaseNameFromFilePath(_filePath) << applyReset()
+              << std::endl;
+}
+
+void QueryFile::printAndExtractFailedQueries(const std::set<size_t>& failedTestNums) const {
+    const auto& failPath = writeOutFailedQueries(failedTestNums);
+    const auto& repoRoot = getMongoRepoRoot();
 
     // Extract failed test file to a pickle of dataframes.
-    const auto pyCmd = std::stringstream{}
+    const auto pickleFailedTestCmd = std::stringstream{}
         << "python3 src/mongo/db/query/query_tester/scripts/extract_failed_test_to_pickle.py "
-        << getMongoRepoRoot() << " " << kFeatureExtractorDir << " " << kTmpFailureFile << " "
-        << std::filesystem::path{failPath}.string();
-    if (const auto swRes = shellExec(pyCmd.str(), kShellTimeout, kShellMaxLen, true);
-        swRes.isOK()) {
-        // Clean up temp .fail file containing failed queries on success.
+        << repoRoot << " " << kFeatureExtractorDir << " " << kTmpFailureFile << " "
+        << failPath.string();
+
+    if (executeShellCmd(pickleFailedTestCmd.str()).isOK()) {
+        // Convert pickle file to an intermediate json file for feature processing.
+        const auto pickleToJsonCmd = std::stringstream{}
+            << "python3 src/mongo/db/query/query_tester/scripts/extract_pickle_to_json.py "
+            << repoRoot << " " << kFeatureExtractorDir << " " << kTmpFailureFile;
+
+        const auto queryFeaturesFile =
+            std::filesystem::path{(std::stringstream{} << "src/mongo/db/query/query_tester/"
+                                                       << kTmpFailureFile << ".json")
+                                      .str()};
+
+        if (executeShellCmd(pickleToJsonCmd.str()).isOK()) {
+            // Parse, process, and pretty print query features by category.
+            parseFeatureFileToBson(queryFeaturesFile);
+        } else {
+            uasserted(
+                9836400,
+                str::stream{}
+                    << "Failed to extract pickle file to json for feature processing for file "
+                    << failPath.string());
+        }
+
+        // Clean up intermediate files on success.
+        std::filesystem::remove(queryFeaturesFile);
         std::filesystem::remove(failPath);
     } else {
         // No clean up on failure.
@@ -342,32 +428,12 @@ void QueryFile::printAndExtractFailedQueries(const std::set<size_t>& failedQuery
     }
 }
 
-void QueryFile::printFailedQueries(const std::set<size_t>& failedQueryIds) const {
+void QueryFile::printFailedQueries(const std::set<size_t>& failedTestNums) const {
     // Print the failed queries without any metadata extraction for feature processing.
-    printFailedQueriesHelper(failedQueryIds);
-}
-
-void QueryFile::printFailedQueriesHelper(const std::set<size_t>& failedTestNums,
-                                         std::fstream* fs) const {
-    std::cout << applyRed() << "------------------------------------------------------------"
-              << applyReset() << std::endl
-              << applyCyan() << "FAIL: " << getBaseNameFromFilePath(_filePath) << applyReset()
-              << std::endl;
+    printFailedTestFileHeader();
     for (const auto& testNum : failedTestNums) {
-        uassert(9699600,
-                str::stream() << "Test " << testNum << " does not exist.",
-                _testNumToQuery.find(testNum) != _testNumToQuery.end());
-
-        // Print out the failed testId and its corresponding query.
-        const auto& query = _testNumToQuery.at(testNum);
-        std::cout << applyBold() << "TestNum: " << applyReset() << testNum << std::endl
-                  << applyBold() << "Query: " << applyReset() << query << std::endl
-                  << std::endl;
-
-        // If a file stream is provided, write the failing query to it.
-        if (fs) {
-            *fs << std::endl << query << std::endl;
-        }
+        assertTestNumExists(testNum);
+        printFailedTestNumAndQuery(testNum, getQuery(testNum));
     }
 }
 
@@ -509,6 +575,23 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
     }
 
     return true;
+}
+
+std::filesystem::path QueryFile::writeOutFailedQueries(
+    const std::set<size_t>& failedTestNums) const {
+    auto failPath = std::filesystem::path{_filePath}.replace_extension(".fail");
+    auto ofs = std::fstream{failPath, std::ios::out | std::ios::trunc};
+
+    // Write out header without comments.
+    writeOutHeader<false>(ofs);
+
+    // Print and write the failed queries to a temp file for feature processing.
+    for (const auto& testNum : failedTestNums) {
+        assertTestNumExists(testNum);
+        ofs << std::endl << testNum << std::endl << getQuery(testNum) << std::endl;
+    }
+    ofs.close();
+    return failPath;
 }
 
 template <bool IncludeComments>

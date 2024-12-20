@@ -104,17 +104,10 @@ static const auto kFeatureTypes = std::vector<std::string>{/* Operator Features 
                                                            "AnyError",
                                                            "SpecificError"};
 
-bool matchesPrefix(const std::string& key) {
-    // Check if the key starts with any of the valid prefixes.
-    return std::any_of(kFeatureTypes.begin(),
-                       kFeatureTypes.end(),
-                       [&key](const std::string& prefix) { return key.starts_with(prefix); });
-}
-
 // Discover the MongoDB repository root with git command.
 std::string discoverMongoRepoRoot() {
     const auto gitCmd = std::string{"git rev-parse --show-toplevel"};
-    const auto res = shellExec(gitCmd, kShellTimeout, kShellMaxLen, true);
+    const auto res = executeShellCmd(gitCmd);
     if (!res.isOK()) {
         uasserted(9699502,
                   "Error: Unable to execute git command. Ensure this is run from within the mongo "
@@ -151,43 +144,8 @@ ConditionalColor applyYellow() {
     return ConditionalColor(kColorYellow);
 }
 
-void displayFailingQueryFeatures(const std::filesystem::path& queryFeaturesFile) {
-    auto fs = std::ifstream{queryFeaturesFile};
-    tassert(9699500,
-            "Expected file to be open and ready for reading, but it wasn't",
-            fs.is_open() && fs.good());
-
-    const auto jsonStr =
-        std::string{std::istreambuf_iterator<char>(fs), std::istreambuf_iterator<char>()};
-    const auto& obj = fromjson(jsonStr);
-
-    auto featureCounts = stdx::unordered_map<std::string, size_t>{};
-
-    // Iterate through the BSON array of documents.
-    for (auto&& featureSet : obj) {
-        for (const auto& feature : featureSet.Obj()) {
-            // Only count features that are not null and begin with an allowed prefix.
-            if (const auto fieldName = feature.fieldName();
-                !feature.isNull() && matchesPrefix(fieldName)) {
-                featureCounts[fieldName]++;
-            }
-        }
-    }
-
-    // Convert unordered_map to vector of pairs to sort by descending count.
-    auto sortedCounts =
-        std::vector<std::pair<std::string, size_t>>(featureCounts.begin(), featureCounts.end());
-    std::sort(sortedCounts.begin(), sortedCounts.end(), [](const auto& a, const auto& b) {
-        return a.second > b.second;
-    });
-
-    // Display sorted feature counts.
-    std::cout << applyCyan() << "Feature Count:" << applyReset() << std::endl;
-    static constexpr auto kDefaultFeatureCountMax = size_t{10};
-    sortedCounts.resize(std::min(sortedCounts.size(), kDefaultFeatureCountMax));
-    for (const auto& [feature, count] : sortedCounts) {
-        std::cout << feature << ": " << count << std::endl;
-    }
+StatusWith<std::string> executeShellCmd(const std::string& cmd) {
+    return shellExec(cmd, kShellTimeout, kShellMaxLen, true);
 }
 
 std::string getBaseNameFromFilePath(const std::filesystem::path& filePath) {
@@ -234,11 +192,18 @@ std::string gitDiff(const std::filesystem::path& expected,
 
     // Need to ignore exit status because the implied --exit-code will return an error sttatus when
     // there is a diff.
-    if (auto result = shellExec(gitDiffCmd, kShellTimeout, kShellMaxLen, true); result.isOK()) {
+    if (auto result = executeShellCmd(gitDiffCmd); result.isOK()) {
         return result.getValue();
     } else {
         return std::string{};
     }
+}
+
+bool matchesPrefix(const std::string& key) {
+    // Check if the key starts with any of the valid prefixes.
+    return std::any_of(kFeatureTypes.begin(),
+                       kFeatureTypes.end(),
+                       [&key](const std::string& prefix) { return key.starts_with(prefix); });
 }
 
 void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
@@ -285,6 +250,23 @@ std::vector<std::string> readLine(std::fstream& fs, std::string& lineFromFile) {
         std::getline(fs, lineFromFile);
     }
     return comments;
+}
+
+std::pair<std::string, std::string> splitFeature(const std::string& feature) {
+    const auto colonPos = feature.find(':');
+    const auto dotPos = feature.find('.');
+
+    // Use the first delimiter (smallest non-npos value between colonPos and dotPos).
+    const auto delimiterPos =
+        (colonPos != std::string::npos && (dotPos == std::string::npos || colonPos < dotPos))
+        ? colonPos
+        : dotPos;
+
+    if (delimiterPos != std::string::npos) {
+        return {feature.substr(0, delimiterPos), feature.substr(delimiterPos + 1)};
+    } else {
+        return {feature, ""};
+    }
 }
 
 DiffStyle stringToDiffStyle(const std::string& style) {

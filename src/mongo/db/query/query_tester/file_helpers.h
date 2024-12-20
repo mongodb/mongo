@@ -141,7 +141,8 @@ ConditionalColor applyRed();
 ConditionalColor applyReset();
 ConditionalColor applyYellow();
 
-void displayFailingQueryFeatures(const std::filesystem::path&);
+StatusWith<std::string> executeShellCmd(const std::string& cmd);
+
 std::string getBaseNameFromFilePath(const std::filesystem::path&);
 /**
  * Extracts the test numbers associated with failing queries from hunk headers in the git diff
@@ -160,11 +161,18 @@ inline bool isTerminal() {
     return isTerminal;
 }
 
+bool matchesPrefix(const std::string& key);
 void printFailureSummary(const std::vector<std::filesystem::path>& failedTestFiles,
                          size_t failedQueryCount,
                          size_t totalTestsRun);
 std::vector<std::string> readAndAssertNewline(std::fstream&, const std::string& context);
 std::vector<std::string> readLine(std::fstream&, std::string& lineFromFile);
+/**
+ * A feature is of the format <FeatureCategory>:<Feature> (ex: Operator:$accumulator) or
+ * <FeatureCategory>.<Feature> (ex: IndexProperty.isUnique). This function splits the feature
+ * struture on either a ":" or "." delimiter depending on its format.
+ */
+std::pair<std::string, std::string> splitFeature(const std::string& feature);
 DiffStyle stringToDiffStyle(const std::string&);
 WriteOutOptions stringToWriteOutOpt(const std::string& opt);
 CollectionSpec toCollectionSpec(const std::string&);
