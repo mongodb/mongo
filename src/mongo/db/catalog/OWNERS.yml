@@ -121,3 +121,6 @@ filters:
   - "external_data_source_scope_guard*":
     approvers:
       - 10gen/query-integration-analytic-extensions
+  - "README_terminology.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
