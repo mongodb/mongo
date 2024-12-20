@@ -631,6 +631,12 @@ DocumentSourceGroupBase::pipelineDependentDistributedPlanLogic(
         return distributedPlanLogic();
     }
 
+    if (repl::ReadConcernArgs::get(pExpCtx->getOperationContext()).getLevel() ==
+        repl::ReadConcernLevel::kAvailableReadConcern) {
+        // Can't rely on multiple shards not returning the same document twice.
+        return distributedPlanLogic();
+    }
+
     // TODO SERVER-97135: Refactor so we can remove the following check.
     auto mergeStage = ctx.pipelineSuffix.getSources().empty()
         ? nullptr
