@@ -438,7 +438,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         # We install the configsvr before the shards, so that embedded-router shards can know the
         # config-server connection string when they are created. Since config servers do not
         # currently hold collection data, a mongot enabled shared cluster doesn't couple/launch
-        # the config server with an accompanying mongot.
+        # the config server with an accompanying mongot
         if config_shard is None:
             config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
         else:
@@ -449,9 +449,31 @@ class ShardedClusterBuilder(FixtureBuilder):
                 config_shard,
                 kwargs["num_rs_nodes_per_shard"],
                 launch_mongot=False,
-                router_endpoint_for_mongot=None,
             )
         sharded_cluster.install_configsvr(config_svr)
+
+        # Persist a list of all nodes from the cluster with a boolean that indicates if that node
+        # acts as a config server or not.
+        nodes = [(node, True) for node in config_svr._all_mongo_d_s_t()]
+
+        launch_mongot = kwargs.get("launch_mongot")
+        for rs_shard_index in range(kwargs["num_shards"]):
+            if rs_shard_index != config_shard:
+                rs_shard = self._new_rs_shard(
+                    sharded_cluster,
+                    mixed_bin_versions,
+                    old_bin_version,
+                    rs_shard_index,
+                    kwargs["num_rs_nodes_per_shard"],
+                    launch_mongot,
+                )
+                sharded_cluster.install_rs_shard(rs_shard)
+                # Extend the list of nodes to be sure configsvr nodes are placed at first places.
+                nodes.extend([(node, False) for node in rs_shard._all_mongo_d_s_t()])
+            else:
+                sharded_cluster.install_rs_shard(config_svr)
+
+        num_routers = kwargs["num_mongos"]
 
         def install_router():
             if not kwargs.get("embedded_router", None):
@@ -471,33 +493,8 @@ class ShardedClusterBuilder(FixtureBuilder):
                 )
                 sharded_cluster.install_mongos(router_view)
 
-        num_routers = kwargs["num_mongos"]
         for mongos_index in range(num_routers):
             install_router()
-
-        router_endpoint_for_mongot = sharded_cluster.mongos[-1].port
-
-        # Persist a list of all nodes from the cluster with a boolean that indicates if that node
-        # acts as a config server or not.
-        nodes = [(node, True) for node in config_svr._all_mongo_d_s_t()]
-
-        launch_mongot = kwargs.get("launch_mongot")
-        for rs_shard_index in range(kwargs["num_shards"]):
-            if rs_shard_index != config_shard:
-                rs_shard = self._new_rs_shard(
-                    sharded_cluster,
-                    mixed_bin_versions,
-                    old_bin_version,
-                    rs_shard_index,
-                    kwargs["num_rs_nodes_per_shard"],
-                    launch_mongot,
-                    router_endpoint_for_mongot,
-                )
-                sharded_cluster.install_rs_shard(rs_shard)
-                # Extend the list of nodes to be sure configsvr nodes are placed at first places.
-                nodes.extend([(node, False) for node in rs_shard._all_mongo_d_s_t()])
-            else:
-                sharded_cluster.install_rs_shard(config_svr)
 
         return sharded_cluster
 
@@ -659,7 +656,6 @@ class ShardedClusterBuilder(FixtureBuilder):
         rs_shard_index: int,
         num_rs_nodes_per_shard: int,
         launch_mongot: bool,
-        router_endpoint_for_mongot: Optional[int],
     ) -> ReplicaSetFixture:
         """Return a replica set fixture configured as a shard in a sharded cluster.
 
@@ -668,26 +664,12 @@ class ShardedClusterBuilder(FixtureBuilder):
         :param old_bin_version: old bin version
         :param rs_shard_index: replica set shard index
         :param num_rs_nodes_per_shard: the number of nodes in a replica set per shard
-        :param launch_mongot: bool indicating if each shard needs to startup a mongot
-        :param router_endpoint_for_mongot: a temporary, optional parameter to support testing
-        mongot-indexed views. When a createSearchIndex command is issued, mongot
-        sends a $listCollections to verify information in the index command.
-        However, mongot is not necessarily connected to a primary shard, in which case
-        its coloated mongod will not be able to answer $listCollections on a sharded
-        view namespace. Instead, mongot routes $listCollections to mongos. Therefore
-        each MongoTFixture needs to know the port of the MongoSFixture. Since the
-        MongoDFixture launches MongoTFixture, we need to push down the router_endpoint_for_mongot
-        parameter to the MongoDFixture so that information is known at setup_mongot().
-        This is in conflict with MongoDB architecture which dictates that mongod does
-        not know of mongos and is thus only a *temporary* stop-gap for supporting
-        testing of search index commands on sharded views.
         :return: replica set fixture configured as a shard in a sharded cluster
         """
 
         rs_shard_logger = sharded_cluster.get_rs_shard_logger(rs_shard_index)
         rs_shard_kwargs = sharded_cluster.get_rs_shard_kwargs(rs_shard_index)
         rs_shard_kwargs["launch_mongot"] = launch_mongot
-        rs_shard_kwargs["router_endpoint_for_mongot"] = router_endpoint_for_mongot
 
         if mixed_bin_versions is not None:
             start_index = rs_shard_index * num_rs_nodes_per_shard

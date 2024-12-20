@@ -512,17 +512,6 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
         mongot_version = subprocess.check_output(
             [_config.MONGOT_EXECUTABLE, "--version"], text=True
         ).strip()
-
-        commit_version_substr = "-"
-        if commit_version_substr in mongot_version:
-            # Mongot release versions are in the format of x.y.z. Its possible that the release version of mongot can have a higher x.y.z value
-            # than the latest version of mongot master. We can identify a latest binary by the presence of a commit version (a hash/substring
-            # that starts with "-"). We can get the true value of the latest release by then removing the commit version and increasing the
-            # minor version. eg x.y.z-a becaomes x.y+1.0 or 1.42.3-26-g328e4474f becomes 1.44.0
-            major_version = mongot_version.split(".")[0]
-            minor_version = mongot_version.split(".")[1]
-            mongot_version = major_version + "." + str(int(minor_version) + 1) + ".0"
-
         mongot_excluded_versions = get_excluded_mongot_versions(mongot_version)
         _config.EXCLUDE_WITH_ANY_TAGS.extend(mongot_excluded_versions)
 

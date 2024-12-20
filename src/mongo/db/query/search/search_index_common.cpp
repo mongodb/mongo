@@ -46,7 +46,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     const NamespaceString& nss,
     const UUID& uuid,
     const BSONObj& userCmd,
-    boost::optional<NamespaceString> viewName = boost::none) {
+    boost::optional<StringData> viewName = boost::none) {
     // Fetch the search index management host and port.
     invariant(!globalSearchIndexParams.host.empty());
     auto swHostAndPort = HostAndPort::parse(globalSearchIndexParams.host);
@@ -59,9 +59,8 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     manageSearchIndexRequest.setCollectionUUID(uuid);
     manageSearchIndexRequest.setUserCommand(userCmd);
     if (viewName) {
-        manageSearchIndexRequest.setViewName(viewName->coll());
+        manageSearchIndexRequest.setViewName(viewName);
     }
-    auto req = manageSearchIndexRequest.toBSON();
 
     // Create a RemoteCommandRequest with the request and host-and-port.
     executor::RemoteCommandRequest remoteManageSearchIndexRequest(executor::RemoteCommandRequest(
@@ -75,7 +74,7 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& uuid,
                                       const BSONObj& userCmd,
-                                      boost::optional<NamespaceString> viewName) {
+                                      boost::optional<StringData> viewName) {
     // Create the RemoteCommandRequest.
     auto request = createManageSearchIndexRemoteCommandRequest(opCtx, nss, uuid, userCmd, viewName);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
@@ -137,8 +136,13 @@ BSONObj runSearchIndexCommand(OperationContext* opCtx,
                               const UUID& collUUID,
                               boost::optional<NamespaceString> viewNss) {
     throwIfNotRunningWithRemoteSearchIndexManagement();
-    BSONObj manageSearchIndexResponse =
-        getSearchIndexManagerResponse(opCtx, nss, collUUID, cmdObj, viewNss);
+
+    BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
+        opCtx,
+        nss,
+        collUUID,
+        cmdObj,
+        viewNss ? boost::make_optional(viewNss->coll()) : boost::none);
 
     return manageSearchIndexResponse;
 }

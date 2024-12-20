@@ -97,25 +97,23 @@ StageConstraints DocumentSourceListSearchIndexes::constraints(
 
 DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     auto* opCtx = pExpCtx->getOperationContext();
-    boost::optional<NamespaceString> viewNss;
     // Cache the collectionUUID for subsequent 'doGetNext' calls. We cannot use 'pExpCtx->getUUID()'
     // like other aggregation stages, because this stage can run directly on mongos.
     // 'pExpCtx->getUUID()' will always be null on mongos. The search index commands already has
     // helper functions to retrieve the collectionUUID from either mongos or mongod depending on
     // where the request was sent, so we call those functions here.
     if (!_collectionUUID) {
-        // If the index management command is being run on a view, this call will return the
-        // underlying source collection UUID and NSS. If not, it will just return a UUID.
-        auto currentOperationNss = pExpCtx->getViewNS().value_or(pExpCtx->getNamespaceString());
-        auto collUUIDresolvedNSSpair =
-            SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
-                opCtx, currentOperationNss);
-        _collectionUUID = collUUIDresolvedNSSpair.first;
-        if (auto resolvedNss = collUUIDresolvedNSSpair.second) {
-            // The request is on a view! Therefore, currentOperationNss refers to the view
-            // NS and resolvedNss refers to the underlying source collection.
-            _resolvedNamespace = *resolvedNss;
-            viewNss.emplace(currentOperationNss);
+        // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
+        // views can support all search commands.
+        if (pExpCtx->getMongoProcessInterface()->inShardedEnvironment(opCtx)) {
+            _collectionUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUID(
+                opCtx, pExpCtx->getNamespaceString());
+        } else {
+            // If the query is on a view, this call will return the
+            // underlying source collection UUID and NSS. If not, it will just return a UUID.
+            std::tie(_collectionUUID, _resolvedNamespace) =
+                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
+                    opCtx, pExpCtx->getNamespaceString());
         }
     }
 
@@ -132,13 +130,16 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
      * $listSearchIndexes: { name: "<index name>"}
      */
     if (_searchIndexes.empty()) {
+        BSONObjBuilder bob;
+        bob.append(kStageName, _cmdObj);
+
         // Sends a manageSearchIndex command and returns a cursor with index information.
         BSONObj manageSearchIndexResponse = runSearchIndexCommand(
             opCtx,
             _resolvedNamespace ? *_resolvedNamespace : pExpCtx->getNamespaceString(),
-            BSON(kStageName << _cmdObj),
+            bob.done(),
             *_collectionUUID,
-            viewNss);
+            pExpCtx->getViewNS());
 
         /**
          * 'mangeSearchIndex' returns a cursor with the following fields:

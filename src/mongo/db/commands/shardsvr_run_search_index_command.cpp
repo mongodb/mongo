@@ -87,11 +87,6 @@ public:
             generic_argument_util::prepareRequestForSearchIndexManagerPassthrough(cmd);
 
             auto alreadyInformedMongot = cmd.getMongotAlreadyInformed();
-            // TODO SERVER-98535 remove and replace with better way to identify if mongot mock is
-            // running.
-            if (globalSearchIndexParams.host.empty()) {
-                return;
-            }
             if (globalSearchIndexParams.host == alreadyInformedMongot) {
                 // This mongod shares its mongot with a mongos that originally received the user's
                 // search index command. We therefore can return early as this mongod's mongot has
@@ -103,11 +98,11 @@ public:
             auto resolvedNamespace = cmd.getResolvedNss();
 
             BSONObj manageSearchIndexResponse =
-                getSearchIndexManagerResponse(opCtx,
-                                              resolvedNamespace,
-                                              *catalog->lookupUUIDByNSS(opCtx, resolvedNamespace),
-                                              cmd.getUserCmd(),
-                                              cmd.getViewName());
+                runSearchIndexCommand(opCtx,
+                                      resolvedNamespace,
+                                      cmd.getUserCmd(),
+                                      *catalog->lookupUUIDByNSS(opCtx, resolvedNamespace),
+                                      cmd.getViewName());
         }
 
     private:
