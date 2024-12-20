@@ -7,6 +7,7 @@ import {
     assertCatalogListOperationsConsistencyForDb
 } from "jstests/libs/catalog_list_operations_consistency_validator.js";
 import {CommandSequenceWithRetries} from "jstests/libs/command_sequence_with_retries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 MongoRunner.validateCollectionsCallback = function(port, options) {
     options = options || {};
@@ -157,7 +158,15 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
                 }
 
                 try {
-                    assertCatalogListOperationsConsistencyForDb(conn.getDB(dbName), tenant);
+                    // The replica set endpoint of a single-shard cluster with config shard
+                    // can currently become unavailable if a majority of nodes steps down.
+                    // Skip the catalog consistency check it may not be able to read the catalog.
+                    // TODO(SERVER-98707): Don't skip the catalog consistency check
+                    const skipCatalogConsistencyChecker = TestData.configShard &&
+                        FeatureFlagUtil.isEnabled(conn, "ReplicaSetEndpoint");
+                    if (!skipCatalogConsistencyChecker) {
+                        assertCatalogListOperationsConsistencyForDb(conn.getDB(dbName), tenant);
+                    }
                 } catch (e) {
                     return {
                         shouldStop: true,
