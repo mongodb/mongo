@@ -7,6 +7,8 @@ import platform
 import subprocess
 import threading
 import os
+import json
+import tempfile
 from typing import Dict
 
 logfile_path: str = ""
@@ -29,22 +31,48 @@ class HeaderDefinition:
 
 
 def compile_check(source_text: str) -> bool:
-    command = [
-        CompilerSettings.compiler_path,
-        "-C",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
-        "-E",
-        "-x",
-        "c++",
-        *CompilerSettings.compiler_args.split(" "),
-        "-",
-    ]
-    log_check(" ".join(command + [source_text]))
-    result = subprocess.run(command, input=source_text, capture_output=True, text=True)
+    temp = None
+    if platform.system() == "Windows":
+        temp = tempfile.NamedTemporaryFile(suffix=".cpp", delete=False)
+        temp.write(source_text.encode())
+        temp.close()
+        command = [
+            CompilerSettings.compiler_path,
+            "/c",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
+            temp.name,
+            *CompilerSettings.compiler_args.split(" "),
+        ]
+        log_check(" ".join(command[:-1] + [source_text]))
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            env={**os.environ.copy(), **CompilerSettings.env_vars},
+        )
+    else:
+        command = [
+            CompilerSettings.compiler_path,
+            "-c",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
+            "-x",
+            "c++",
+            *CompilerSettings.compiler_args.split(" "),
+            "-",
+        ]
+        log_check(" ".join(command + [source_text]))
+        result = subprocess.run(
+            command,
+            input=source_text,
+            capture_output=True,
+            text=True,
+            env={**os.environ.copy(), **CompilerSettings.env_vars},
+        )
     if result.returncode != 0:
         log_check(f"stdout:\n{result.stdout}")
         log_check(f"stderr:\n{result.stderr}")
     log_check(f"Exit code:\n{result.returncode}")
     log_check("--------------------------------------------------\n\n")
+    if temp:
+        os.unlink(temp.name)
     return result.returncode == 0
 
 
@@ -109,7 +137,9 @@ def generate_config_header(compiler_path, compiler_args, env_vars, logpath, addi
     global logfile_path
     CompilerSettings.compiler_path = compiler_path
     CompilerSettings.compiler_args = compiler_args
-
+    CompilerSettings.env_vars = {
+        **json.loads(env_vars),
+    }
     if platform.system() == "Linux":
         CompilerSettings.compiler_args += " -D_GNU_SOURCE"
 

@@ -21,6 +21,8 @@ build --experimental_cc_shared_library
 # Reuse sandboxes to save sandbox execution and deletion times.
 build --experimental_reuse_sandbox_directories
 
+build:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
+
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
 # in those cases:

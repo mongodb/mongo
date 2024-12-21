@@ -19,8 +19,6 @@ load("@bazel_features//:deps.bzl", "bazel_features_deps")
 
 bazel_features_deps()
 
-load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
-
 http_archive(
     name = "bazel_clang_tidy",
     sha256 = "f77f7f63fc43b6f7dba23f807132e24c36110d481826685ce49f38a04058c4ea",
@@ -36,9 +34,20 @@ http_archive(
     ],
 )
 
+load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
+load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
+
 setup_local_config_platform(name = "internal_platforms_do_not_use")
 
 setup_mongo_toolchains()
+
+load("//bazel/toolchains/mongo_apple:mongo_apple_toolchain.bzl", "mongo_apple_toolchain_config", "mongo_apple_toolchain_setup")
+
+mongo_apple_toolchain_config(name = "mongo_apple_toolchain_config")
+
+mongo_apple_toolchain_setup(name = "mongo_apple_toolchain")
+
+register_toolchains("@mongo_apple_toolchain//...")
 
 http_archive(
     name = "windows_sasl",

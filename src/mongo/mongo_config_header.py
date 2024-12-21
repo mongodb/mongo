@@ -31,11 +31,6 @@ class HeaderDefinition:
         self.value = value
 
 
-def macos_get_sdk_path():
-    result = subprocess.run(["xcrun", "--show-sdk-path"], capture_output=True, text=True)
-    return result.stdout.strip()
-
-
 def compile_check(source_text: str) -> bool:
     temp = None
     if platform.system() == "Windows":
@@ -451,7 +446,6 @@ def generate_config_header(
     CompilerSettings.compiler_args = compiler_args
     CompilerSettings.env_vars = {
         **json.loads(env_vars),
-        **({"SDKROOT": macos_get_sdk_path()} if platform.system() == "Darwin" else {}),
     }
     logfile_path = logpath
 

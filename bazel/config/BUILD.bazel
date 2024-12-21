@@ -28,6 +28,7 @@ load(
     "opt",
     "pgo_profile",
     "release",
+    "sdkroot",
     "separate_debug",
     "server_js",
     "shared_archive",
@@ -1736,6 +1737,14 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "build_enterprise_linux_enabled",
+    match_all = [
+        ":build_enterprise_enabled",
+        "@platforms//os:linux",
+    ],
+)
+
 # --------------------------------------
 # stream_release_build
 # --------------------------------------
@@ -2152,6 +2161,15 @@ selects.config_setting_group(
 developer_dir(
     name = "developer_dir",
     build_setting_default = "/Applications/Xcode.app",
+)
+
+# --------------------------------------
+# sdkroot
+# --------------------------------------
+
+sdkroot(
+    name = "sdkroot",
+    build_setting_default = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
 )
 
 # --------------------------------------

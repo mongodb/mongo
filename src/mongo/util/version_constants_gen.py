@@ -40,23 +40,31 @@ def tool_to_path(tool, compiler_path):
             return os.path.join(os.path.dirname(compiler_path), "g++")
         elif os.path.basename(compiler_path) == "clang":
             return os.path.join(os.path.dirname(compiler_path), "clang++")
+        elif os.path.basename(compiler_path) == "wrapped_clang":
+            return os.path.join(os.path.dirname(compiler_path), "wrapped_clang_pp")
         else:
             return
 
 
-def get_toolchain_ver(tool, compiler_path):
+def get_toolchain_ver(tool, compiler_path, env_vars):
     # By default we don't know the version of each tool, and only report what
     # command gets executed (gcc vs /opt/mongodbtoolchain/bin/gcc).
     verstr = "version unknown"
     proc = None
     tool = tool_to_path(tool, compiler_path)
-    if compiler_path.endswith("gcc") or compiler_path.endswith("clang"):
+    if (
+        compiler_path.endswith("gcc")
+        or compiler_path.endswith("clang")
+        or compiler_path.endswith("wrapped_clang_pp")
+        or compiler_path.endswith("wrapped_clang")
+    ):
         proc = subprocess.run(
             f"{tool} --version",
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
             universal_newlines=True,
+            env=env_vars,
             check=True,
             shell=True,
             text=True,
@@ -69,6 +77,7 @@ def get_toolchain_ver(tool, compiler_path):
             stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
             universal_newlines=True,
+            env=env_vars,
             check=True,
             shell=True,
             text=True,
@@ -87,7 +96,7 @@ def get_toolchain_ver(tool, compiler_path):
 #   inVersion: <bool> : should it be included in --version output
 # The `value` field will be passed through env.subst, so you can use any SCons variables you
 # want to define them.
-def default_buildinfo_environment_data(compiler_path, extra_definitions):
+def default_buildinfo_environment_data(compiler_path, extra_definitions, env_vars):
     data = (
         (
             "distmod",
@@ -103,7 +112,7 @@ def default_buildinfo_environment_data(compiler_path, extra_definitions):
         ),
         (
             "cc",
-            get_toolchain_ver("CC", compiler_path),
+            get_toolchain_ver("CC", compiler_path, env_vars),
             True,
             False,
         ),
@@ -115,7 +124,7 @@ def default_buildinfo_environment_data(compiler_path, extra_definitions):
         ),
         (
             "cxx",
-            get_toolchain_ver("CXX", compiler_path),
+            get_toolchain_ver("CXX", compiler_path, env_vars),
             True,
             False,
         ),
@@ -195,7 +204,9 @@ def generate_config_header(
     log_check("")
     extra_definitions_dict = json.loads(extra_definitions)
     buildInfoInitializer = fmt_build_info(
-        default_buildinfo_environment_data(compiler_path, extra_definitions_dict)
+        default_buildinfo_environment_data(
+            compiler_path, extra_definitions_dict, json.loads(env_vars)
+        )
     )
 
     # This generates a numeric representation of the version string so that

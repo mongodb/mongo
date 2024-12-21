@@ -1274,14 +1274,6 @@ PGO_PROFILE_FLAGS = select({
     "//conditions:default": [],
 })
 
-MACOS_SSL_LINKFLAGS = select({
-    "//bazel/config:ssl_enabled_macos": [
-        "-framework CoreFoundation",
-        "-framework Security",
-    ],
-    "//conditions:default": [],
-})
-
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
     "-I$(GENDIR)/src",
@@ -1379,7 +1371,6 @@ MONGO_GLOBAL_LINKFLAGS = (
     COVERAGE_FLAGS +
     GLOBAL_WINDOWS_LIBRAY_LINKFLAGS +
     SASL_WINDOWS_LINKFLAGS +
-    MACOS_SSL_LINKFLAGS +
     PGO_PROFILE_FLAGS +
     SANITIZE_WITHOUT_TSAN_LINKFLAGS
 )

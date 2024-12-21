@@ -606,6 +606,20 @@ developer_dir = rule(
     build_setting = config.string(flag = True),
 )
 
+# =============
+# sdkroot
+# =============
+
+sdkroot_provider = provider(
+    doc = "The path to the sdk, e.g. SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+    fields = {"path": "sdk root.]"},
+)
+
+sdkroot = rule(
+    implementation = lambda ctx: sdkroot_provider(path = ctx.build_setting_value),
+    build_setting = config.string(flag = True),
+)
+
 # =========
 # js_engine
 # =========
