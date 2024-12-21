@@ -81,6 +81,8 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/aggregation/sources/facet/facet_stats.js
     - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+    # SERVER-98709: We don't guarantee plan cache key/shape consistency across feature flag changes.
+    - jstests/aggregation/sources/unionWith/unionWith_explain.js
 
     # SERVER-85472: test runs an updateOne without shard key which will use an internal transaction
     # that can be aborted by the fcv upgrade downgrade suite.
