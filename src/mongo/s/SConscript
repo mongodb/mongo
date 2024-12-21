@@ -58,16 +58,8 @@ env.BazelProgram(
 
 env.CppUnitTest(
     target="multi_statement_transaction_requests_sender_test",
-    source=[
-        "multi_statement_transaction_requests_sender_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/s/shard_server_test_fixture",
-        "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
-        "commands/cluster_commands",
-        "sharding_api",
-        "sharding_mongos_test_fixture",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

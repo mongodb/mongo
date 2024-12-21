@@ -8,28 +8,14 @@ env.SConscript(must_exist=1, dirs=["mongotmock"], exports=["env"])
 
 env.CppUnitTest(
     target="mongot_cursor_test",
-    source=["mongot_cursor_test.cpp", "mongot_cursor_helpers_test.cpp"],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/network_interface_mock",
-        "$BUILD_DIR/mongo/executor/network_interface_tl",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "mongot_cursor",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppIntegrationTest(
     target="search_task_executors_integration_test",
-    source=[
-        "search_task_executors_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/executor/network_interface",
-        "$BUILD_DIR/mongo/executor/pinned_connection_task_executor_factory",
-        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-        "$BUILD_DIR/mongo/util/version_impl",
-        "search_task_executors",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

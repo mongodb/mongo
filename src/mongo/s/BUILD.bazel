@@ -1201,3 +1201,18 @@ mongo_cc_unit_test(
         "//src/mongo/util:version_impl",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "multi_statement_transaction_requests_sender_test",
+    srcs = [
+        "multi_statement_transaction_requests_sender_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":sharding_api",
+        ":sharding_mongos_test_fixture",
+        "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/s/commands:cluster_commands",
+    ],
+)

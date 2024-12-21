@@ -6,38 +6,12 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_ops_test",
-    source=[
-        "write_ops_exec_test.cpp",
-        "write_ops_parsers_test.cpp",
-        "write_ops_retryability_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture",
-        "$BUILD_DIR/mongo/db/repl/oplog_entry",
-        "$BUILD_DIR/mongo/db/session/session_catalog",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_compression",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "write_ops",
-        "write_ops_exec",
-        "write_ops_parsers",
-        "write_ops_parsers_test_helpers",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppIntegrationTest(
     target="db_ops_integration_test",
-    source=[
-        "write_ops_document_stream_integration_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-        "$BUILD_DIR/mongo/util/version_impl",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
