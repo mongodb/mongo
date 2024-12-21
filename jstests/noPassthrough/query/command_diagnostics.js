@@ -1,11 +1,12 @@
 /**
- * Test that tassert during find command execution will log diagnostics about the query.
+ * Test that tassert during CRUD command execution will log diagnostics about the query.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     assertOnDiagnosticLogContents,
     failAllInserts,
     planExecutorAlwaysFails,
+    queryPlannerAlwaysFails,
     runWithFailpoint
 } from "jstests/libs/query/command_diagnostic_utils.js";
 
@@ -334,6 +335,29 @@ runTest({
         `{\'currentOp\': { op: \\"bulkWrite\\", ns: \\"test.${jsTestName()}\\"`,
         // Ensure the failing sub-operation is included in the diagnostic log.
         '\'opDescription\': { insert: 0, documents: [ { a: 0.0 } ] }',
+    ]
+});
+
+// Explain
+runTest({
+    ...queryPlannerAlwaysFails,
+    description: "explain find",
+    command: {explain: {find: collName, filter: {a: 1, b: 1}, limit: 1}},
+    expectedDiagnosticInfo: [
+        `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
+        '\'opDescription\': { explain: { find: \\"command_diagnostics\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0',
+    ],
+});
+runTest({
+    ...queryPlannerAlwaysFails,
+    description: "explain aggregate",
+    command: {
+        explain:
+            {aggregate: collName, pipeline: [{$match: {a: 1, b: 1}}, {$unwind: "$arr"}], cursor: {}}
+    },
+    expectedDiagnosticInfo: [
+        `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
+        '\'opDescription\': { explain: { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: \\"$arr\\" } ]',
     ]
 });
 

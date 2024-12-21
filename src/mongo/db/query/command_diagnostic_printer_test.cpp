@@ -33,6 +33,7 @@
 #include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log_util.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -69,12 +70,16 @@ public:
                                  const BSONObj&) const override {
         return Status::OK();
     }
+
+    bool enableDiagnosticPrintingOnFailure() const override {
+        return true;
+    }
 };
 
 class CommandDiagnosticPrinterTest : public ServiceContextTest {
 public:
     CommandDiagnosticPrinterTest() {
-        _nss = NamespaceString::createNamespaceString_forTest("myDb");
+        _nss = NamespaceString::createNamespaceString_forTest("myDB.myColl");
         _opCtxHolder = makeOperationContext();
         _cmdBson = BSON(kCmdName << kCmdValue << kSensitiveFieldName << kSensitiveValue);
     }
@@ -92,12 +97,16 @@ public:
         curOp()->setGenericOpRequestDetails(clientLock, _nss, &_cmd, _cmdBson, NetworkOp::dbQuery);
     }
 
+    void setCmdOnCurOp(Command* cmdObj, const BSONObj& cmdBson) {
+        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        curOp()->setGenericOpRequestDetails(clientLock, _nss, cmdObj, cmdBson, NetworkOp::dbQuery);
+    }
+
     std::string printCommandDiagnostics() {
         command_diagnostics::Printer printer{opCtx()};
         return "{}"_format(printer);
     }
 
-private:
     MockCmd _cmd;
     NamespaceString _nss;
     ServiceContext::UniqueOperationContext _opCtxHolder;
@@ -107,11 +116,7 @@ private:
 TEST_F(CommandDiagnosticPrinterTest, PrinterOmitsCommandFieldsWhenThereIsNoCommandSet) {
     // When CurOp doesn't have a command object on it, the diagnostic printer shouldn't log any
     // command fields, since it's unclear if any of them are sensitive.
-    auto str = printCommandDiagnostics();
-    ASSERT_STRING_OMITS(str, kCmdName);
-    ASSERT_STRING_OMITS(str, kCmdValue);
-    ASSERT_STRING_OMITS(str, kSensitiveFieldName);
-    ASSERT_STRING_OMITS(str, kSensitiveValue);
+    ASSERT_EQ(command_diagnostics::Printer::kOmitUnrecognizedCommandMsg, printCommandDiagnostics());
 }
 
 TEST_F(CommandDiagnosticPrinterTest, PrinterOmitsAllFieldsWhenRequested) {
@@ -122,7 +127,7 @@ TEST_F(CommandDiagnosticPrinterTest, PrinterOmitsAllFieldsWhenRequested) {
         stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
         curOp()->setShouldOmitDiagnosticInformation(clientLock, true);
     }
-    ASSERT_EQ("omitted", printCommandDiagnostics());
+    ASSERT_EQ(command_diagnostics::Printer::kOmitUnsupportedCurOpMsg, printCommandDiagnostics());
 }
 
 TEST_F(CommandDiagnosticPrinterTest, PrinterRedactsSensitiveCommandFields) {
@@ -145,6 +150,40 @@ TEST_F(CommandDiagnosticPrinterTest, PrinterRedactsWhenRedactionIsEnabled) {
     ASSERT_STRING_OMITS(str, kCmdValue);
     ASSERT_STRING_CONTAINS(str, kSensitiveFieldName);
     ASSERT_STRING_OMITS(str, kSensitiveValue);
+
+    // Reset at the end of the test to not affect other test cases.
+    logv2::setShouldRedactLogs(false);
+}
+
+TEST_F(CommandDiagnosticPrinterTest, OmitsAllFieldsWhenCommandDoesNotEnableDiagnosticPrinting) {
+    class MockCmdWithoutDiagnosticPrinting : public MockCmd {
+        bool enableDiagnosticPrintingOnFailure() const final {
+            return false;
+        }
+    };
+
+    MockCmdWithoutDiagnosticPrinting cmdWithoutPrinting;
+    BSONObj mockBson = BSON("mockCmd" << 1);
+    setCmdOnCurOp(&cmdWithoutPrinting, mockBson);
+    ASSERT_EQ(command_diagnostics::Printer::kOmitUnsupportedCommandMsg, printCommandDiagnostics());
+}
+
+TEST_F(CommandDiagnosticPrinterTest, CreateIndexCommandIsEligibleForDiagnosticLog) {
+    auto command = CommandHelpers::findCommand(opCtx(), "createIndexes");
+    auto createIndexesReq =
+        BSON("createIndexes" << _nss.coll() << "indexes"
+                             << BSON_ARRAY(BSON("key" << BSON("a" << 1) << "partialFilterExpression"
+                                                      << BSON("b" << 1))));
+
+    // Prove that the command BSON is appropriate for this command (parsing succeeds).
+    auto request = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx()), _nss.dbName(), createIndexesReq);
+    ASSERT_NOT_EQUALS(command->parse(opCtx(), request), nullptr);
+
+    // Diagnostics log includes the entire command BSON (command name, namespace, and index spec).
+    setCmdOnCurOp(command, createIndexesReq);
+    auto str = printCommandDiagnostics();
+    ASSERT_STRING_CONTAINS(str, createIndexesReq.toString());
 }
 }  // namespace
 

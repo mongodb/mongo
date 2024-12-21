@@ -745,6 +745,10 @@ public:
         return true;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;

@@ -58,7 +58,6 @@
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -159,6 +158,10 @@ public:
     }
 
     bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
+    bool enableDiagnosticPrintingOnFailure() const final {
         return true;
     }
 
@@ -273,14 +276,6 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
-
-            // Capture diagnostics for tassert and invariant failures that may occur during query
-            // parsing, planning or execution. No work is done on the hot-path, all computation of
-            // these diagnostics is done lazily during failure handling. This line just creates an
-            // RAII object which holds references to objects on this stack frame, which will be used
-            // to print diagnostics in the event of a tassert or invariant.
-            ScopedDebugInfo aggregateCmdDiagnostics("commandDiagnostics",
-                                                    command_diagnostics::Printer{opCtx});
 
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest,

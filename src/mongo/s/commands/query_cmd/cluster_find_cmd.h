@@ -141,6 +141,10 @@ public:
         return "query for documents";
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const ClusterFindCmdBase* definition,

@@ -237,7 +237,6 @@ mongo_cc_library(
     name = "bulk_write_command",
     srcs = [
         "bulk_write.cpp",
-        "//src/mongo/db/query:command_diagnostic_printer.h",
     ],
     hdrs = [
         "bulk_write.h",

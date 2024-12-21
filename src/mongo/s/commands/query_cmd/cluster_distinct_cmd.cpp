@@ -204,6 +204,10 @@ public:
         return false;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }

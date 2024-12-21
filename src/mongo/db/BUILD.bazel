@@ -994,6 +994,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query:command_diagnostic_printer",
         "//src/mongo/db/query:common_query_enums_and_helpers",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/client_cursor:generic_cursor",

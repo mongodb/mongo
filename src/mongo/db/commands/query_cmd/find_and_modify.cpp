@@ -66,7 +66,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
@@ -275,6 +274,10 @@ public:
         return true;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
@@ -478,14 +481,6 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
 write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     OperationContext* opCtx) {
-    // Capture diagnostics for tassert and invariant failures that may occur during query
-    // parsing, planning or execution. No work is done on the hot-path, all computation of
-    // these diagnostics is done lazily during failure handling. This line just creates an
-    // RAII object which holds references to objects on this stack frame, which will be used
-    // to print diagnostics in the event of a tassert or invariant.
-    ScopedDebugInfo findAndModifyCmdDiagnostics("commandDiagnostics",
-                                                command_diagnostics::Printer{opCtx});
-
     const auto& req = request();
 
     validate(req);

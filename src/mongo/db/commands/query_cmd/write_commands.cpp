@@ -63,7 +63,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -260,6 +259,10 @@ public:
         return true;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -282,14 +285,6 @@ public:
         }
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
-            // Capture diagnostics for tassert and invariant failures that may occur during query
-            // parsing, planning or execution. No work is done on the hot-path, all computation of
-            // these diagnostics is done lazily during failure handling. This line just creates an
-            // RAII object which holds references to objects on this stack frame, which will be used
-            // to print diagnostics in the event of a tassert or invariant.
-            ScopedDebugInfo insertCmdDiagnostics("commandDiagnostics",
-                                                 command_diagnostics::Printer{opCtx});
-
             // On debug builds, verify that the estimated size of the insert command is at least as
             // large as the size of the actual, serialized insert command. This ensures that the
             // logic which estimates the size of insert commands is correct.
@@ -391,6 +386,10 @@ public:
         return true;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -474,14 +473,6 @@ public:
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {
-            // Capture diagnostics for tassert and invariant failures that may occur during query
-            // parsing, planning or execution. No work is done on the hot-path, all computation of
-            // these diagnostics is done lazily during failure handling. This line just creates an
-            // RAII object which holds references to objects on this stack frame, which will be used
-            // to print diagnostics in the event of a tassert or invariant.
-            ScopedDebugInfo updateCmdDiagnostics("commandDiagnostics",
-                                                 command_diagnostics::Printer{opCtx});
-
             // On debug builds, verify that the estimated size of the update command is at least as
             // large as the size of the actual, serialized update command. This ensures that the
             // logic which estimates the size of update commands is correct.
@@ -687,6 +678,10 @@ public:
         return true;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -709,14 +704,6 @@ public:
         }
 
         write_ops::DeleteCommandReply typedRun(OperationContext* opCtx) final try {
-            // Capture diagnostics for tassert and invariant failures that may occur during query
-            // parsing, planning or execution. No work is done on the hot-path, all computation of
-            // these diagnostics is done lazily during failure handling. This line just creates an
-            // RAII object which holds references to objects on this stack frame, which will be used
-            // to print diagnostics in the event of a tassert or invariant.
-            ScopedDebugInfo deleteCmdDiagnostics("commandDiagnostics",
-                                                 command_diagnostics::Printer{opCtx});
-
             // On debug builds, verify that the estimated size of the deletes are at least as large
             // as the actual, serialized size. This ensures that the logic that estimates the size
             // of deletes for batch writes is correct.
