@@ -8,8 +8,10 @@
  *    # TODO (SERVER-98651) remove the tag as part of this ticket.
  *    requires_fcv_81,
  *    # $listClusterCatalog only supports local read concern
+ *    # TODO (SERVER-98658) Reconsider the following tag after resolving this ticket.
  *    assumes_read_concern_unchanged,
- *    # TODO SERVER-97215: remove `command_not_supported_in_serverless`
+ *    # There is no need to support multitenancy, as it has been canceled and was never in
+ *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
  *    # In a clustered environment, the $listClusterCatalog will eventually target the CSRS to
  *    # access the cluster catalog. The causally consistent suites run on fixtures with CSRS without

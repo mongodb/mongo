@@ -41,6 +41,7 @@ executor:
       global_vars:
         TestData:
           implicitlyTrackUnshardedCollectionOnCreation: true
+          createsUnsplittableCollectionsOnRandomShards: true
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

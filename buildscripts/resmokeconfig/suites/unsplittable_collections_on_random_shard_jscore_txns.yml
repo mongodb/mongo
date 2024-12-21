@@ -41,6 +41,7 @@ executor:
       global_vars:
         TestData:
           implicitlyTrackUnshardedCollectionOnCreation: true
+          createsUnsplittableCollectionsOnRandomShards: true
   hooks:
     # We don't execute dbHash or oplog consistency checks since there is only a single replica set
     # node.

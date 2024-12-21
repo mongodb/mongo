@@ -100,6 +100,8 @@ selector:
     - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
     # Some TS rewrites cannot be done on mongos.
     - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
+    # This test expects to see an unsharded collection as untracked
+    - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
 
     # TODO SERVER-94428: Reenable this test.
     # This test is currently incompatible with dbcheck.

@@ -54,6 +54,8 @@ selector:
     # The 'queryShapeHash' is only computed on mongos in sharded clusters, therefore the test will fail
     # as hash won't be present when running via replica set endpoint.
     - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
+    # This test expects to see an unsharded collection as untracked
+    - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
