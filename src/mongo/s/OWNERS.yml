@@ -153,6 +153,3 @@ filters:
   - "shard_targeting_helpers*":
     approvers:
       - 10gen/query-optimization-cluster-planning
-  - "update_zone_key_range*":
-    approvers:
-      - 10gen/server-catalog-and-routing

@@ -26,15 +26,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "update_zone_key_range_gen",
-    src = "update_zone_key_range.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "gossiped_routing_cache_gen",
     src = "gossiped_routing_cache.idl",
     deps = [
@@ -437,6 +428,7 @@ mongo_cc_library(
         "//src/mongo/s/request_types:transition_from_dedicated_config_server_gen",
         "//src/mongo/s/request_types:transition_to_dedicated_config_server_gen",
         "//src/mongo/s/request_types:untrack_unsplittable_collection_gen",
+        "//src/mongo/s/request_types:update_zone_key_range_request_type.cpp",
         "//src/mongo/s/request_types:wait_for_fail_point_gen",
         "//src/mongo/s/resharding:common_types_gen",
         "//src/mongo/s/resharding:resharding_coordinator_service_conflicting_op_in_progress_info.cpp",
@@ -454,7 +446,6 @@ mongo_cc_library(
         "refresh_query_analyzer_configuration_cmd_gen",
         "shard_cannot_refresh_due_to_locks_held_exception.cpp",
         "shard_key_pattern.cpp",
-        "update_zone_key_range_serialization.cpp",
         "shard_version_factory.cpp",
         "sharding_cluster_parameters_gen",
         "sharding_feature_flags.cpp",
@@ -463,7 +454,6 @@ mongo_cc_library(
         "transaction_participant_failed_unyield_exception.cpp",
         "type_collection_common_types_gen",
         "would_change_owning_shard_exception.cpp",
-        "update_zone_key_range_gen",
 
         # TODO(SERVER-9414): Clean this up.
         "//src/mongo/db/repl:primary_only_service.h",
@@ -522,6 +512,7 @@ mongo_cc_library(
         "//src/mongo/s/request_types:add_shard_to_zone_request_type.h",
         "//src/mongo/s/request_types:migration_secondary_throttle_options.h",
         "//src/mongo/s/request_types:remove_shard_from_zone_request_type.h",
+        "//src/mongo/s/request_types:update_zone_key_range_request_type.h",
         "//src/mongo/s/resharding:resharding_coordinator_service_conflicting_op_in_progress_info.h",
         "cannot_implicitly_create_collection_info.h",
         "chunk.h",
@@ -530,7 +521,6 @@ mongo_cc_library(
         "shard_key_pattern.h",
         "shard_version_factory.h",
         "stale_exception.h",
-        "update_zone_key_range_serialization.h",
         "transaction_participant_failed_unyield_exception.h",
         "would_change_owning_shard_exception.h",
         "//src/mongo/db:drop_gen",

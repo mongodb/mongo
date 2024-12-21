@@ -1909,7 +1909,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/cluster_cursor_stats.cpp @10gen/query-execution-router-query-exec @svc-auto-approve-bot
 /src/mongo/s/**/cluster_write* @10gen/query-execution-router-query-exec @svc-auto-approve-bot
 /src/mongo/s/**/shard_targeting_helpers* @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
-/src/mongo/s/**/update_zone_key_range* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/catalog/OWNERS.yml
 /src/mongo/s/catalog/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2022,6 +2021,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/request_types/**/set_allow_migrations.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/sharded_ddl_commands.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/shardsvr_join_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/s/request_types/**/update_zone_key_range_request_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/*balanc* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/move_primary.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/cluster_commands_without_shard_key.idl @10gen/query-execution-router-write-exec @svc-auto-approve-bot
