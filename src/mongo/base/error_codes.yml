@@ -824,6 +824,11 @@ error_codes:
       name: QueryStatsFailedToRecord,
       extra: QueryStatsFailedToRecordInfo,
     }
+  - {
+      code: 436,
+      name: StreamProcessorHTTPSConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
