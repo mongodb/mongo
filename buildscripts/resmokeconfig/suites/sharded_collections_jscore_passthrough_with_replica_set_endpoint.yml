@@ -71,6 +71,8 @@ selector:
   - jstests/core/commands_with_uuid.js
   # This test cares about command metrics, and fails under this suite.
   - jstests/core/query/query_settings/query_settings_reject_application.js
+  # This test expects to see an unsharded collection as untracked
+  - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

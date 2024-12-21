@@ -217,6 +217,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFrom
            })");
     }
 
+    // TODO (SERVER-61033) balancingEnabled should stop depening on `permitMigrations`.
+    // TODO (SERVER-61033) Remove balancingEnabledReason field.
     if (specs.getBalancingConfiguration()) {
         const auto maxChunkSizeInMb = getDefaultMaxChunkSize(expCtx->opCtx);
         pipeline.addStage<DocumentSourceAddFields>(R"({
@@ -225,7 +227,20 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFrom
                     $cond: {
                         if: "$sharded",
                         then: {
-                            $ne: [ "$firstTrackedCollectionInfo.noBalance", true]
+                            $and:[
+                                {$not: {$ifNull: ["$firstTrackedCollectionInfo.noBalance", false]}},
+                                {$ifNull: ["$firstTrackedCollectionInfo.permitMigrations", true]}
+                            ]
+                        },
+                        else: "$$REMOVE"
+                    }
+                },
+                "balancingEnabledReason": {
+                    $cond: {
+                        if: "$sharded",
+                        then: {
+                            "enableBalancing": {$not: {$ifNull: ["$firstTrackedCollectionInfo.noBalance", false]}},
+                            "allowMigrations": {$ifNull: ["$firstTrackedCollectionInfo.permitMigrations", true]}
                         },
                         else: "$$REMOVE"
                     }
