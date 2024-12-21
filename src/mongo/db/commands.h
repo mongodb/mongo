@@ -611,6 +611,14 @@ public:
     virtual void snipForLogging(mutablebson::Document* cmdObj) const;
 
     /**
+     * Return true if this Command type is eligible for diagnostic printing when the command
+     * unexpectedly fails due to a tassert, invariant, or signal such as segfault.
+     */
+    virtual bool enableDiagnosticPrintingOnFailure() const {
+        return false;
+    }
+
+    /**
      * Marks a field name in a cmdObj as sensitive.
      *
      * The default snipForLogging shall remove these field names. Auditing shall not

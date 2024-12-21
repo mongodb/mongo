@@ -45,6 +45,10 @@ public:
                "details.";
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     /**
      * The mapReduce command supports only 'local' and 'available' readConcern levels.
      * For aggregation-based mapReduce there are no known restrictions to broader support, but work

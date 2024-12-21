@@ -222,6 +222,10 @@ public:
     bool allowedInTransactions() const final {
         return true;
     }
+
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
 };
 
 }  // namespace

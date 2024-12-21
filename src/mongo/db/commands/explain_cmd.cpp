@@ -113,6 +113,10 @@ public:
         return "explain database reads and writes";
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
 private:
     class Invocation;
 };

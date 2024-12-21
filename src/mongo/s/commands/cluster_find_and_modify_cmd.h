@@ -112,6 +112,10 @@ public:
         return false;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }

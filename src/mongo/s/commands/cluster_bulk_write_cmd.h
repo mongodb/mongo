@@ -143,6 +143,10 @@ public:
         return "command to apply inserts, updates and deletes in bulk";
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     class Invocation : public CommandInvocation {
     public:
         Invocation(const ClusterBulkWriteCmd* command,

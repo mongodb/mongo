@@ -116,6 +116,10 @@ public:
         return true;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     bool runWithRequestParser(OperationContext* opCtx,
                               const DatabaseName& dbName,
                               const BSONObj& cmdObj,

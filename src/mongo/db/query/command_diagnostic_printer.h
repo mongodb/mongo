@@ -46,6 +46,11 @@
 namespace mongo::command_diagnostics {
 
 struct Printer {
+    static constexpr char kOmitUnsupportedCurOpMsg[] = "omitted";
+    static constexpr char kOmitUnrecognizedCommandMsg[] = "omitted: unrecognized command";
+    static constexpr char kOmitUnsupportedCommandMsg[] =
+        "omitted: command does not support diagnostic printing";
+
     auto format(auto& fc) const {
         // All operations have an OperationContext, and all OpContexts are decorated with a
         // CurOpStack. This access should always be valid while 'opCtx' is a valid pointer.
@@ -53,8 +58,15 @@ struct Printer {
         auto out = fc.out();
 
         // Do not log any information if asked to omit it.
+        const Command* curCommand = curOp.getCommand();
         if (CurOp::shouldCurOpStackOmitDiagnosticInformation(&curOp)) {
-            out = format_to(out, FMT_STRING("omitted"));
+            out = format_to(out, FMT_STRING(kOmitUnsupportedCurOpMsg));
+            return out;
+        } else if (!curCommand) {
+            out = format_to(out, FMT_STRING(kOmitUnrecognizedCommandMsg));
+            return out;
+        } else if (!curCommand->enableDiagnosticPrintingOnFailure()) {
+            out = format_to(out, FMT_STRING(kOmitUnsupportedCommandMsg));
             return out;
         }
 
@@ -62,13 +74,10 @@ struct Printer {
         // TODO SERVER-74604: When the implementations of OpDebug::append() and OpDebug::report()
         // are merged, we should be able to remove the duplicated logic here that handles
         // 'snipForLogging()' and 'redact()'.
-        BSONObj cmd;
-        if (const Command* curCommand = curOp.getCommand()) {
-            mutablebson::Document cmdToLog(curOp.opDescription(),
-                                           mutablebson::Document::kInPlaceDisabled);
-            curCommand->snipForLogging(&cmdToLog);
-            cmd = cmdToLog.getObject();
-        }
+        mutablebson::Document cmdToLog(curOp.opDescription(),
+                                       mutablebson::Document::kInPlaceDisabled);
+        curCommand->snipForLogging(&cmdToLog);
+        BSONObj cmd = cmdToLog.getObject();
 
         auto opDesc = redact(cmd).toString();
         auto opDebug = redact(serializeOpDebug(curOp)).toString();

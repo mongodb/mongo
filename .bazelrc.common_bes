@@ -1,0 +1,11 @@
+# Generated file, do not modify
+common --bes_keywords=developerBuild=True
+common --bes_keywords=user_email=nicholas.zolnierz@mongodb.com
+common --bes_keywords=operating_system=linux
+common --bes_keywords=engflow:BuildScmRemote=git@github.com:10gen/mongo.git
+common --bes_keywords=engflow:BuildScmBranch=spm-3887-8-0
+common --bes_keywords=engflow:BuildScmRevision=c65f149a03495bf60bfc5ae8f4fec6e4befa8214
+common --bes_keywords=engflow:BuildScmStatus=modified
+common --bes_keywords=rawCommandLineBase64=WyIvaG9tZS91YnVudHUvLmNhY2hlL2JhemVsaXNrL2Rvd25sb2Fkcy9iYXplbGJ1aWxkL2JhemVsLTcuNS4wLW1vbmdvXzllYTNhOGFkOWYtbGludXgtYXJtNjQvYmluL2JhemVsIiwgImJ1aWxkIiwgIi0tYmVzX2JhY2tlbmQ9IiwgIi0tYmVzX3Jlc3VsdHNfdXJsPSIsICJAbW9uZ29fdG9vbGNoYWluX3Y1Ly86YWxsIl0=
+common --bes_keywords=workstation=ip-10-128-16-109
+common --remote_execution_priority=5

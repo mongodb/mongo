@@ -88,6 +88,10 @@ public:
         return Command::ReadWriteType::kWrite;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     /**
      * Changes the shard key for the document if the response object contains a
      * WouldChangeOwningShard error. If the original command was sent as a retryable write, starts a
