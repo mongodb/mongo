@@ -5,15 +5,9 @@ env = env.Clone()
 env.CppUnitTest(
     target="db_sorter_test",
     source=[],
-    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="sorter_checksum_calculator_bm",
-    source=[
-        "sorter_checksum_calculator_bm.cpp",
-    ],
-    LIBDEPS=[
-        "sorter_base",
-    ],
+    source=[],
 )

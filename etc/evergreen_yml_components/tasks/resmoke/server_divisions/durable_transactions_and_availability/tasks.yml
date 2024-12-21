@@ -1772,9 +1772,9 @@ tasks:
       - func: "scons compile"
         vars:
           targets: >-
-            install-wt_storage_bm
-            archive-wt_storage_bm
-          bazel_build_tags: --bazel-build-tag=wt_storage_bm
+            install-storage_bm
+            archive-storage_bm
+          bazel_build_tags: --bazel-build-tag=storage_bm
           compiling_for_test: true
       # scons compile resets install_dir
       - command: expansions.update
@@ -1794,8 +1794,8 @@ tasks:
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: src/wt_storage_bm.${ext|tgz}
-          remote_file: ${project}/${compile_variant}/${version_id}/binaries/wt_storage_bm-${revision_order_id}.${ext|tgz}
+          local_file: src/storage_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/storage_bm-${revision_order_id}.${ext|tgz}
           bucket: mciuploads
           permissions: public-read
           content_type: application/tar

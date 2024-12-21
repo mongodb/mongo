@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -94,6 +94,31 @@ mongo_cc_unit_test(
         ":bson_column_fuzzer_impl",
         ":bsoncolumn_test_util",
         "//src/mongo/util:safe_num",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "simple8b_bm",
+    srcs = [
+        "simple8b_bm.cpp",
+    ],
+    tags = ["bsoncolumn_bm"],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "bson_column_bm",
+    srcs = [
+        "bsoncolumn_bm.cpp",
+    ],
+    tags = ["bsoncolumn_bm"],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
     ],
 )
 

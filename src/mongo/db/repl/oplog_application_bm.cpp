@@ -90,7 +90,6 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine_init.h"

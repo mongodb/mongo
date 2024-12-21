@@ -33,7 +33,7 @@ BAZEL_BENCHMARK_TAGS["query_bm"] = []
 BAZEL_BENCHMARK_TAGS["bsoncolumn_bm"] = []
 BAZEL_BENCHMARK_TAGS["first_half_bm"] = []
 BAZEL_BENCHMARK_TAGS["second_half_bm"] = []
-BAZEL_BENCHMARK_TAGS["wt_storage_bm"] = []
+BAZEL_BENCHMARK_TAGS["storage_bm"] = []
 BAZEL_BENCHMARK_TAGS["sharding_bm"] = []
 
 

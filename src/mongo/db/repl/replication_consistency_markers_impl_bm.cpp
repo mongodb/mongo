@@ -31,8 +31,6 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
-#include "mongo/db/catalog/database_holder_impl.h"
-#include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 #include "mongo/db/op_observer/fallback_op_observer.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"

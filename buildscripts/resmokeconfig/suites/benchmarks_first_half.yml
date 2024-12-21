@@ -35,11 +35,6 @@ selector:
 
   exclude_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
-    # These benchmarks are being run as part of the benchmarks_sharding.yml test suite.
-    - build/install/bin/chunk_manager_refresh_bm*
-    - build/install/bin/sharding_write_router_bm*
-    # These benchmarks are being run as part of the benchmarks_bsoncolumn.yml test suite.
-    - build/install/bin/bsoncolumn_bm*
     # Hash table benchmark is really slow, don't run on evergreen
     - build/install/bin/hash_table_bm*
     # These benchmarks are being run as part of the benchmarks_query.yml
@@ -56,12 +51,6 @@ selector:
     # These benchmarks are only run when modifying or upgrading the immutable library.
     - build/install/bin/immutable_absl_comparison_bm*
     - build/install/bin/immutable_std_comparison_bm*
-    # These benchmarks are being run as part of the benchmarks_replication.yml test suite.
-    - build/install/bin/repl_bm*
-    # These benchmarks are being run as part of the benchmarks_storage.yml test suite.
-    - build/install/bin/storage_key_string_bm*
-    - build/install/bin/write_conflict_retry_bm*
-    - build/install/bin/wt_storage_bm*
     # These benchmarks are being run as part of the benchmarks_util.yml test suite.
     - build/install/bin/tracking_allocator_bm*
     # These benchmarks are being run as part of the benchmarks_sorter.yml test suite.

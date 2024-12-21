@@ -7,38 +7,23 @@ env = env.Clone()
 env.BazelProgram(
     target="bson_column_encoder",
     source=[],
-    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="simple8b_bm",
-    source=[
-        "simple8b_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "column",
-    ],
-    CONSOLIDATED_TARGET="bsoncolumn_bm",
+    source=[],
+    BAZEL_BENCHMARK_TAG="bsoncolumn_bm",
 )
 
 env.CppUnitTest(
     target="bsoncolumn_test",
     source=[],
-    LIBDEPS=[],
 )
 
 env.Benchmark(
-    target="bsoncolumn_bm",
-    source=[
-        "bsoncolumn_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/sbe_values",
-        "column",
-    ],
-    CONSOLIDATED_TARGET="bsoncolumn_bm",
+    target="bson_column_bm",
+    source=[],
+    BAZEL_BENCHMARK_TAG="bsoncolumn_bm",
 )
 
 env.CppLibfuzzerTest(

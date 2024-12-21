@@ -2318,8 +2318,6 @@ mongo_cc_unit_test(
     ],
 )
 
-# The following two tests appear to clash when combined with the above list.
-
 mongo_cc_unit_test(
     name = "db_repl_coordinator_test",
     srcs = [
@@ -2615,7 +2613,6 @@ mongo_cc_benchmark(
         ":apply_ops_command_info",
         ":oplog_entry",
         "//src/mongo/db/concurrency:lock_manager",
-        "//src/mongo/unittest",
     ],
 )
 
@@ -2623,7 +2620,6 @@ mongo_cc_benchmark(
     name = "oplog_application_bm",
     srcs = [
         "oplog_application_bm.cpp",
-        "//src/mongo/db:session_manager_mongod.h",
     ],
     tags = ["repl_bm"],
     deps = [
@@ -2681,7 +2677,6 @@ mongo_cc_benchmark(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:auth_op_observer",
         "//src/mongo/db/auth:authserver",
-        "//src/mongo/db/catalog:database_holder_mock",
         "//src/mongo/db/op_observer:change_stream_pre_images_op_observer",
         "//src/mongo/db/op_observer:fallback_op_observer",
         "//src/mongo/db/op_observer:fcv_op_observer",
@@ -2701,7 +2696,6 @@ mongo_cc_benchmark(
     name = "oplog_write_bm",
     srcs = [
         "oplog_write_bm.cpp",
-        "//src/mongo/db:session_manager_mongod.h",
     ],
     tags = ["repl_bm"],
     deps = [
@@ -2717,7 +2711,6 @@ mongo_cc_benchmark(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/catalog:catalog_impl",
-        "//src/mongo/db/catalog:database_holder_mock",
         "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",

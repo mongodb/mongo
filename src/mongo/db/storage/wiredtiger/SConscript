@@ -7,66 +7,30 @@ if not wiredtiger:
 
 env = env.Clone()
 
-wtEnv = env.Clone()
-wtEnv.InjectThirdParty(libraries=["wiredtiger"])
-wtEnv.InjectThirdParty(libraries=["zlib"])
-wtEnv.InjectThirdParty(libraries=["valgrind"])
-
-wtEnv.CppUnitTest(
+env.CppUnitTest(
     target="storage_wiredtiger_test",
     source=[],
-    LIBDEPS=[],
 )
 
-wtEnv.CppUnitTest(
+env.CppUnitTest(
     target="storage_wiredtiger_record_store_and_index_test",
     source=[],
-    LIBDEPS=[],
 )
 
-wtEnv.Benchmark(
+env.Benchmark(
     target="storage_wiredtiger_record_store_and_index_bm",
-    source=[
-        "wiredtiger_index_bm.cpp",
-        "wiredtiger_record_store_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/storage/record_store_bm",
-        "$BUILD_DIR/mongo/db/storage/sorted_data_interface_bm",
-        "wiredtiger_index_test_harness",
-        "wiredtiger_record_store_test_harness",
-    ],
-    CONSOLIDATED_TARGET="wt_storage_bm",
+    source=[],
+    BAZEL_BENCHMARK_TAG="storage_bm",
 )
 
-wtEnv.Benchmark(
+env.Benchmark(
     target="storage_wiredtiger_begin_transaction_block_bm",
-    source="wiredtiger_begin_transaction_block_bm.cpp",
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "storage_wiredtiger_core",
-    ],
-    CONSOLIDATED_TARGET="wt_storage_bm",
+    source=[],
+    BAZEL_BENCHMARK_TAG="storage_bm",
 )
 
-wtEnv.Benchmark(
+env.Benchmark(
     target="write_conflict_retry_bm",
-    source=[
-        "write_conflict_retry_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "wiredtiger_record_store_test_harness",
-    ],
+    source=[],
+    BAZEL_BENCHMARK_TAG="storage_bm",
 )

@@ -7,18 +7,9 @@ env = env.Clone()
 env.CppUnitTest(
     target="db_transaction_test",
     source=[],
-    LIBDEPS=[],
 )
 
 env.Benchmark(
     target="transaction_operations_bm",
-    source=[
-        "transaction_operations_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/repl/oplog_entry",
-        "$BUILD_DIR/mongo/db/server_base",
-        "transaction_operations",
-    ],
+    source=[],
 )

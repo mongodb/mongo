@@ -4,13 +4,8 @@ env = env.Clone()
 
 env.Benchmark(
     target="storage_key_string_bm",
-    source=[
-        "key_string_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "key_string",
-    ],
+    source=[],
+    BAZEL_BENCHMARK_TAG="storage_bm",
 )
 
 ksdecode = env.BazelProgram(
@@ -25,7 +20,6 @@ ksdecode = env.BazelProgram(
 env.CppUnitTest(
     target="key_string_test",
     source=[],
-    LIBDEPS=[],
 )
 
 env.CppLibfuzzerTest(

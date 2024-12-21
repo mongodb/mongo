@@ -6,7 +6,6 @@ env = env.Clone()
 env.SConscript(
     must_exist=1,
     dirs=[
-        "devnull",
         "key_string",
         "wiredtiger",
     ],
@@ -15,46 +14,13 @@ env.SConscript(
     ],
 )
 
-bmEnv = env.Clone()
-bmEnv.InjectThirdParty(libraries=["benchmark"])
-bmEnv.Library(
-    target="sorted_data_interface_bm",
-    source=[
-        "sorted_data_interface_bm_cursor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/third_party/benchmark/benchmark",
-        "sorted_data_interface_test_harness",
-    ],
-)
-bmEnv.Library(
-    target="record_store_bm",
-    source=[
-        "record_store_bm_cursor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/third_party/benchmark/benchmark",
-        "record_store_test_harness",
-    ],
-)
-
 env.Benchmark(
     target="storage_record_id_bm",
-    source=[
-        "record_id_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-    CONSOLIDATED_TARGET="first_half_bm",
+    source=[],
+    BAZEL_BENCHMARK_TAG="first_half_bm",
 )
 
 env.CppUnitTest(
     target="db_storage_test",
     source=[],
-    LIBDEPS=[],
 )
