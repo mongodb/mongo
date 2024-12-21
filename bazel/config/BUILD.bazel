@@ -1235,6 +1235,7 @@ config_setting(
     ],
     flag_values = {
         "//bazel/config:build_otel": "True",
+        "//bazel/config:release": "False",
     },
 )
 
