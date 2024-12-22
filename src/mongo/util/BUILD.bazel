@@ -1042,3 +1042,21 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "util_windows_test",
+    srcs = [
+        "ntservice_test.cpp",
+        "perfctr_collect_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":ntservice",
+        ":perfctr_collect",
+        "//src/mongo:base",
+    ],
+)

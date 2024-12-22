@@ -31,14 +31,8 @@ env.Benchmark(
 
 env.Benchmark(
     target="migration_chunk_cloner_source_bm",
-    source=[
-        "migration_chunk_cloner_source_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/auth/authorization_manager_global",
-        "sharding_runtime_d",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

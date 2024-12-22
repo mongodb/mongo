@@ -6,9 +6,7 @@ env = env.Clone()
 
 env.Benchmark(
     target="tracking_allocator_bm",
-    source=[
-        "tracking_allocator_bm.cpp",
-    ],
+    source=[],
     LIBDEPS=[],
 )
 

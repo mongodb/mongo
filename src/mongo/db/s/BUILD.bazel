@@ -1640,3 +1640,15 @@ mongo_cc_benchmark(
         "//src/mongo/idl:server_parameter_test_util",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "migration_chunk_cloner_source_bm",
+    srcs = [
+        "migration_chunk_cloner_source_bm.cpp",
+    ],
+    deps = [
+        ":sharding_runtime_d",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authorization_manager_global",
+    ],
+)

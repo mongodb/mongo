@@ -249,18 +249,8 @@ if not env.TargetOSIs("windows"):
 if env.TargetOSIs("windows"):
     env.CppUnitTest(
         target="util_windows_test",
-        source=[
-            "ntservice_test.cpp",
-            "perfctr_collect_test.cpp",
-        ],
-        LIBDEPS=[
-            "ntservice",
-            "perfctr_collect",
-        ],
-        LIBS=[
-            "shell32",
-            env["LIBS"],
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
 env.Benchmark(target="base64_bm", source="base64_bm.cpp", CONSOLIDATED_TARGET="first_half_bm")

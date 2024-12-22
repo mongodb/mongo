@@ -13,14 +13,10 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="immutable_absl_comparison_bm",
-    source=[
-        "immutable_absl_comparison_bm.cpp",
-    ],
+    source=[],
 )
 
 env.Benchmark(
     target="immutable_std_comparison_bm",
-    source=[
-        "immutable_std_comparison_bm.cpp",
-    ],
+    source=[],
 )

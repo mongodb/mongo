@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -94,6 +94,30 @@ mongo_cc_library(
     ],
     deps = [
         ":collator_icu",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_query_collation_test",
+    srcs = [
+        "collation_bson_comparison_test.cpp",
+        "collation_index_key_test.cpp",
+        "collator_factory_icu_locales_test.cpp",
+        "collator_factory_icu_test.cpp",
+        "collator_factory_mock_test.cpp",
+        "collator_interface_icu_test.cpp",
+        "collator_interface_mock_test.cpp",
+        "//src/mongo/bson:bsonobj_comparator.h",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":collator_factory_mock",
+        ":collator_icu",
+        ":collator_interface",
+        ":collator_interface_mock",
+        "//src/mongo:base",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 
