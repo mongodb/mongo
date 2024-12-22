@@ -33,12 +33,12 @@ TEST_CASE("Session get last error - test getting verbose info about the last err
         int err, sub_level_err;
         const char *err_msg;
 
-        /* Call the placeholder API. */
+        /* Call the error info API. */
         session->get_last_error(session, &err, &sub_level_err, &err_msg);
 
-        /* Test that the API returns expected placeholder values. */
+        /* Test that the API returns expected default values. */
         CHECK(err == 0);
-        CHECK(sub_level_err == 0);
-        CHECK(strcmp(err_msg, "") == 0);
+        CHECK(sub_level_err == WT_NONE);
+        CHECK(strcmp(err_msg, "WT_NONE: last API call was successful") == 0);
     }
 }

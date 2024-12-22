@@ -75,3 +75,14 @@ wiredtiger_strerror(int error)
 
     return (__wt_strerror(NULL, error, buf, sizeof(buf)));
 }
+
+/*
+ * __wt_is_valid_sub_level_error --
+ *     Return true if the provided error falls within the valid range for sub level error codes,
+ *     return false otherwise.
+ */
+bool
+__wt_is_valid_sub_level_error(int sub_level_err)
+{
+    return (sub_level_err <= -32000 && sub_level_err > -32200);
+}

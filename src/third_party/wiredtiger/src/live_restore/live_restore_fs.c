@@ -579,16 +579,16 @@ __live_restore_fh_read(
 }
 
 /*
- * __live_restore_fs_fill_holes_on_file_close --
- *     On file close make sure we've copied across all data from source to destination. This means
- *     there are no holes in the destination file's extent list. If we find one promote read the
- *     content into the destination.
+ * __wti_live_restore_fs_fill_holes --
+ *     Copy all remaining data from the source to the destination. On completion this means there
+ *     are no holes in the destination file's extent list. If we find one promote-read the content
+ *     into the destination.
  *
  * NOTE!! This assumes there cannot be holes in source, and that any truncates/extensions of the
  *     destination file are already handled elsewhere.
  */
-static int
-__live_restore_fs_fill_holes_on_file_close(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
+int
+__wti_live_restore_fs_fill_holes(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
 {
 /*
  * Holes can be large, potentially the size of an entire file. When we find a large hole we'll read
@@ -603,8 +603,12 @@ __live_restore_fs_fill_holes_on_file_close(WT_FILE_HANDLE *fh, WT_SESSION *wt_se
 
     while ((hole = lr_fh->destination.hole_list_head) != NULL) {
         __wt_verbose_debug3((WT_SESSION_IMPL *)wt_session, WT_VERB_FILEOPS,
-          "Found hole in %s at %" PRId64 "-%" PRId64 " during file close. Filling", fh->name,
+          "Found hole in %s at %" PRId64 "-%" PRId64 " during background migration. ", fh->name,
           hole->off, WT_EXTENT_END(hole));
+
+        /* If panic is set on the connection stop doing work. */
+        WT_RET(WT_SESSION_CHECK_PANIC(wt_session));
+
         /*
          * When encountering a large hole, break the read into small chunks. Split the hole into n
          * chunks: the first n - 1 chunks will read a full WT_LIVE_RESTORE_READ_SIZE buffer, and the
@@ -634,7 +638,7 @@ __live_restore_fh_close(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
 
     if (FLD_ISSET(
           lr_fh->destination.back_pointer->debug_flags, WT_LIVE_RESTORE_DEBUG_FILL_HOLES_ON_CLOSE))
-        WT_RET(__live_restore_fs_fill_holes_on_file_close(fh, wt_session));
+        WT_RET(__wti_live_restore_fs_fill_holes(fh, wt_session));
 
     lr_fh->destination.fh->close(lr_fh->destination.fh, wt_session);
     __live_restore_fs_free_extent_list(session, lr_fh);
@@ -1238,6 +1242,9 @@ __wt_os_live_restore_fs(
 
     /* Update the callers pointer. */
     *fsp = (WT_FILE_SYSTEM *)lr_fs;
+
+    /* Flag that a live restore file system is in use. */
+    F_SET(S2C(session), WT_CONN_LIVE_RESTORE_FS);
     if (0) {
 err:
         __wt_free(session, lr_fs->source.home);

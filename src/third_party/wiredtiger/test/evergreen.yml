@@ -2485,7 +2485,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ../test/live_restore/test_live_restore_loop.sh 5
+            ../test/live_restore/short_test.sh
 
   - name: live-restore-long
     depends_on:
@@ -2498,7 +2498,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ../test/live_restore/test_live_restore_loop.sh 50
+            ../test/live_restore/long_test.sh
 
   # End of live restore tests
 
@@ -4053,7 +4053,10 @@ tasks:
             source venv/bin/activate
             # Need both pymongo and pymongo[srv] as upload-results-atlas.py uses mongo+srv for the URI.
             pip3 install lorem==0.1.1 pymongo==3.12.2 "pymongo[srv]==3.12.2"
-            mongod_path=$(find ../../mongo/build -executable -type f -path \*/bin/mongod)
+            mongod_path=$(find -L ../../mongo/build -executable -type f -path \*/bin/mongod)
+            echo "mongod_path = '$mongod_path'"
+            # Log the actual path, using ls to display any symlinks
+            ls -l $mongod_path
             ./run_many_coll.sh $mongod_path mongodb.log config/many-collection-testing many-collection clean-and-populate
       - func: "convert-to-atlas-evergreen-format"
         vars:

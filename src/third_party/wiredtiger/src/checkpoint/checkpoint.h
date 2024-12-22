@@ -9,7 +9,10 @@
 #pragma once
 
 #include "checkpoint_private.h"
-
+/*
+ * WT_CKPT_SESSION --
+ *     Per-session checkpoint information.
+ */
 struct __wt_ckpt_session {
     WT_SPINLOCK lock; /* Checkpoint spinlock */
 
@@ -30,27 +33,48 @@ struct __wt_ckpt_session {
     uint64_t current_sec;
 };
 
-struct __wt_ckpt_connection {
-    WT_SESSION_IMPL *session;       /* Checkpoint thread session */
-    wt_thread_t tid;                /* Checkpoint thread */
-    bool tid_set;                   /* Checkpoint thread set */
-    WT_CONDVAR *cond;               /* Checkpoint wait mutex */
-    wt_shared uint64_t most_recent; /* Clock value of most recent checkpoint */
-#define WT_CKPT_LOGSIZE(conn) (__wt_atomic_loadi64(&(conn)->ckpt.logsize) != 0)
-    wt_shared wt_off_t logsize; /* Checkpoint log size period */
-    bool signalled;             /* Checkpoint signalled */
+/*
+ * WT_CKPT_HANDLE_STATS --
+ *     Statistics related to handles.
+ */
+struct __wt_ckpt_handle_stats {
+    uint64_t apply;           /* handles applied */
+    uint64_t apply_time;      /* applied handles gather time */
+    uint64_t drop;            /* handles dropped */
+    uint64_t drop_time;       /* handles dropped time */
+    uint64_t lock;            /* handles locked */
+    uint64_t lock_time;       /* handles locked time */
+    uint64_t meta_check;      /* handles metadata check */
+    uint64_t meta_check_time; /* handles metadata check time */
+    uint64_t skip;            /* handles skipped */
+    uint64_t skip_time;       /* skipped handles gather time */
+};
 
-    uint64_t apply;           /* Checkpoint handles applied */
-    uint64_t apply_time;      /* Checkpoint applied handles gather time */
-    uint64_t drop;            /* Checkpoint handles drop */
-    uint64_t drop_time;       /* Checkpoint handles drop time */
-    uint64_t lock;            /* Checkpoint handles lock */
-    uint64_t lock_time;       /* Checkpoint handles lock time */
-    uint64_t meta_check;      /* Checkpoint handles metadata check */
-    uint64_t meta_check_time; /* Checkpoint handles metadata check time */
-    uint64_t skip;            /* Checkpoint handles skipped */
-    uint64_t skip_time;       /* Checkpoint skipped handles gather time */
-    uint64_t usecs;           /* Checkpoint timer */
+/*
+ * WT_CKPT_THREAD --
+ *     Checkpoint server information.
+ */
+struct __wt_ckpt_thread {
+    WT_CONDVAR *cond;         /* wait mutex */
+    WT_SESSION_IMPL *session; /* session associated with thread */
+    wt_thread_t tid;          /* thread id */
+    bool tid_set;             /* thread set */
+#define WT_CKPT_LOGSIZE(conn) (__wt_atomic_loadi64(&(conn)->ckpt.server.logsize) != 0)
+    wt_shared wt_off_t logsize; /* thread log size period */
+    bool signalled;             /* thread signalled */
+    uint64_t usecs;             /* thread timer */
+};
+
+/*
+ * WT_CKPT_CONNECTION --
+ *     Checkpoint information.
+ */
+struct __wt_ckpt_connection {
+    WT_CKPT_THREAD server; /* Checkpoint thread.*/
+
+    wt_shared uint64_t most_recent; /* Clock value of most recent checkpoint */
+
+    WT_CKPT_HANDLE_STATS handle_stats;
 
     uint64_t scrub_max; /* Checkpoint scrub time min/max */
     uint64_t scrub_min;

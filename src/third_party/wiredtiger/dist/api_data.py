@@ -1036,7 +1036,7 @@ wiredtiger_open_live_restore_configuration = [
             maximum number of threads WiredTiger will start to migrate data from the backup to the
             running WiredTiger database. Each worker thread uses a session handle from the
             configured session_max''',
-            min=1, max=12)
+            min=0, max=12)
     ])
 ]
 

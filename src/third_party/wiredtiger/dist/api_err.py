@@ -208,6 +208,17 @@ wiredtiger_strerror(int error)
 
 \treturn (__wt_strerror(NULL, error, buf, sizeof(buf)));
 }
+
+/*
+ * __wt_is_valid_sub_level_error --
+ *\tReturn true if the provided error falls within the valid range for sub level error codes, 
+ *\treturn false otherwise.
+ */
+bool
+__wt_is_valid_sub_level_error(int sub_level_err)
+{
+\treturn (sub_level_err <= -32000 && sub_level_err > -32200);
+}
 ''')
 tfile.close()
 format_srcfile(tmp_file)

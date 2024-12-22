@@ -201,6 +201,7 @@ main(int argc, char *argv[])
     (void)testutil_set_progname(argv);
 
     /* See print_help() for all the different options and their description. */
+    /* FIXME-WT-13919: Use the util options parsing code for this. */
     for (size_t i = 1; (i < argc) && (error_code == 0); ++i) {
         const std::string option = std::string(argv[i]);
         if (option == "-h" || option == "--help") {

@@ -47,6 +47,7 @@ err:
      * 2.  When the connection is closing.
      * 3.  When a shutdown has been requested via clearing the run flag.
      * 4.  When an error has occurred and the connection panic flag is set.
+     * 5.  When live restore threads terminate themselves.
      */
     WT_ASSERT(session,
       !F_ISSET(thread, WT_THREAD_RUN) ||

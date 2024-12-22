@@ -74,3 +74,6 @@ class test_live_restore01(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.open_conn(config="live_restore=(enabled=true,path=\".\",threads_max=13)"),
             "/Value too large for key/")
+
+        # Specify the minimum allowed number of threads.
+        self.open_conn(config="live_restore=(enabled=true,path=\".\",threads_max=0)")

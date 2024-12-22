@@ -2220,6 +2220,36 @@ __session_get_last_error(WT_SESSION *wt_session, int *err, int *sub_level_err, c
 }
 
 /*
+ * __session_set_last_error --
+ *     WT_SESSION->set_last_error method.
+ */
+static int
+__session_set_last_error(WT_SESSION *wt_session, int err, int sub_level_err)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
+
+    char *err_msg = session->err_info.err_msg;
+    const char *err_msg_content;
+    size_t err_msg_size;
+
+    WT_ASSERT(session, __wt_is_valid_sub_level_error(sub_level_err));
+
+    /* Free the last error message string, if it was allocated. */
+    __wt_free(session, err_msg);
+
+    /* Load error codes and message content into err_info. */
+    err_msg_content = __wt_wiredtiger_error(sub_level_err);
+    err_msg_size = (strlen(err_msg_content) + 1) * sizeof(char);
+    WT_ERR(__wt_malloc(session, err_msg_size, &err_msg));
+    WT_ERR(__wt_snprintf(err_msg, err_msg_size, "%s", err_msg_content));
+    session->err_info = (WT_ERROR_INFO){err, sub_level_err, err_msg};
+
+err:
+    return (ret);
+}
+
+/*
  * __session_checkpoint --
  *     WT_SESSION->checkpoint method.
  */
@@ -2322,8 +2352,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_begin_transaction, __session_commit_transaction, __session_prepare_transaction,
         __session_rollback_transaction, __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint, __session_reset_snapshot,
-        __session_transaction_pinned_range, __session_get_last_error, __session_get_rollback_reason,
-        __wt_session_breakpoint},
+        __session_transaction_pinned_range, __session_get_last_error, __session_set_last_error,
+        __session_get_rollback_reason, __wt_session_breakpoint},
       stds_min = {NULL, NULL, __session_close, __session_reconfigure_notsup, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
         __session_create_readonly, __wti_session_compact_readonly, __session_drop_readonly,
@@ -2334,7 +2364,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_query_timestamp_notsup, __session_timestamp_transaction_notsup,
         __session_timestamp_transaction_uint_notsup, __session_checkpoint_readonly,
         __session_reset_snapshot_notsup, __session_transaction_pinned_range_notsup,
-        __session_get_last_error, __session_get_rollback_reason, __wt_session_breakpoint},
+        __session_get_last_error, __session_set_last_error, __session_get_rollback_reason,
+        __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
         __session_create_readonly, __wti_session_compact_readonly, __session_drop_readonly,
@@ -2345,7 +2376,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint_readonly,
         __session_reset_snapshot, __session_transaction_pinned_range, __session_get_last_error,
-        __session_get_rollback_reason, __wt_session_breakpoint};
+        __session_set_last_error, __session_get_rollback_reason, __wt_session_breakpoint};
     WT_DECL_RET;
     WT_SESSION_IMPL *session, *session_ret;
     uint32_t i;
@@ -2491,12 +2522,9 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      */
     WT_RELEASE_WRITE_WITH_BARRIER(session_ret->active, 1);
 
-    /* Set the default error codes and message. */
-    char *init_err_msg;
-    WT_ERR(__wt_malloc(session_ret, sizeof(WT_SESSION_DEFAULT_ERR_MSG), &init_err_msg));
-    WT_ERR(__wt_snprintf(
-      init_err_msg, sizeof(WT_SESSION_DEFAULT_ERR_MSG), "%s", WT_SESSION_DEFAULT_ERR_MSG));
-    session_ret->err_info = (WT_ERROR_INFO){0, 0, init_err_msg};
+    /* Initialize the default error info to WT_NONE. */
+    session_ret->err_info.err_msg = NULL;
+    WT_ERR(__session_set_last_error((WT_SESSION *)session_ret, 0, WT_NONE));
 
     *sessionp = session_ret;
 

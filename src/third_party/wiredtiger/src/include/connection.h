@@ -410,6 +410,8 @@ struct __wt_connection_impl {
 
     WT_BACKGROUND_COMPACT background_compact; /* Background compaction server */
 
+    WT_LIVE_RESTORE_SERVER live_restore_server; /* Live restore server. */
+
     WT_HEURISTIC_CONTROLS heuristic_controls; /* Heuristic controls configuration */
 
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
@@ -799,7 +801,7 @@ struct __wt_connection_impl {
 #define WT_CONN_INCR_BACKUP 0x00004000u
 #define WT_CONN_IN_MEMORY 0x00008000u
 #define WT_CONN_LEAK_MEMORY 0x00010000u
-#define WT_CONN_LIVE_RESTORE 0x00020000u
+#define WT_CONN_LIVE_RESTORE_FS 0x00020000u
 #define WT_CONN_MINIMAL 0x00040000u
 #define WT_CONN_OPTRACK 0x00080000u
 #define WT_CONN_PANIC 0x00100000u

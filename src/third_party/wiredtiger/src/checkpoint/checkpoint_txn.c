@@ -423,8 +423,8 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
         ret = __wt_curfile_insert_check(meta_cursor);
         time_stop = __wt_clock(session);
         time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
-        ++S2C(session)->ckpt.meta_check;
-        S2C(session)->ckpt.meta_check_time += time_diff;
+        ++S2C(session)->ckpt.handle_stats.meta_check;
+        S2C(session)->ckpt.handle_stats.meta_check_time += time_diff;
         if (ret == WT_ROLLBACK) {
             /*
              * If create or drop or any schema operation of a table is with in an user transaction
@@ -449,8 +449,8 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
     WT_SAVE_DHANDLE(session, ret = __checkpoint_lock_dirty_tree(session, true, force, true, cfg));
     time_stop = __wt_clock(session);
     time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
-    ++S2C(session)->ckpt.lock;
-    S2C(session)->ckpt.lock_time += time_diff;
+    ++S2C(session)->ckpt.handle_stats.lock;
+    S2C(session)->ckpt.handle_stats.lock_time += time_diff;
     WT_RET(ret);
     if (F_ISSET(btree, WT_BTREE_SKIP_CKPT)) {
         __checkpoint_update_generation(session);
@@ -581,7 +581,8 @@ __checkpoint_prepare_progress(WT_SESSION_IMPL *session, bool final)
         __wt_verbose_info(session, WT_VERB_CHECKPOINT_PROGRESS,
           "Checkpoint prepare %s for %" PRIu64 " seconds and it has gathered %" PRIu64
           " dhandles and skipped %" PRIu64 " dhandles",
-          final ? "ran" : "has been running", time_diff, conn->ckpt.apply, conn->ckpt.skip);
+          final ? "ran" : "has been running", time_diff, conn->ckpt.handle_stats.apply,
+          conn->ckpt.handle_stats.skip);
         conn->ckpt.progress_msg_count++;
     }
 }
@@ -2061,9 +2062,9 @@ __checkpoint_lock_dirty_tree(
     WT_ERR(__drop(session, NULL, ckptbase, name, strlen(name)));
 
     time_stop = __wt_clock(session);
-    ++S2C(session)->ckpt.drop;
+    ++S2C(session)->ckpt.handle_stats.drop;
     time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
-    S2C(session)->ckpt.drop_time += time_diff;
+    S2C(session)->ckpt.handle_stats.drop_time += time_diff;
 
     /* Set the name of the new entry at the end of the list. */
     WT_CKPT_FOREACH (ckptbase, ckpt)
@@ -2722,7 +2723,7 @@ __checkpoint_timing_stress(WT_SESSION_IMPL *session, uint64_t flag, struct times
      * We only want to sleep if the flag is set and the checkpoint comes from the API, so check if
      * the session used is either of the two sessions set aside for internal checkpoints.
      */
-    if (conn->ckpt.session != session && conn->meta_ckpt_session != session &&
+    if (conn->ckpt.server.session != session && conn->meta_ckpt_session != session &&
       FLD_ISSET(conn->timing_stress_flags, flag))
 #ifdef ENABLE_ANTITHESIS
         WT_UNUSED(tsp);

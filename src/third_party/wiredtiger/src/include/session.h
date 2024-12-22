@@ -98,9 +98,6 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 /* A fake session ID for when we need to refer to a session that is actually NULL. */
 #define WT_SESSION_ID_NULL 0xfffffffe
 
-/* The default error message stored in err_info */
-#define WT_SESSION_DEFAULT_ERR_MSG ""
-
 /*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
