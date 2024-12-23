@@ -455,11 +455,8 @@ public:
             const auto& collectionPtr = collectionOrView->getCollectionPtr();
             if (!collectionOrView->isView()) {
                 const bool isClusteredCollection = collectionPtr && collectionPtr->isClustered();
-                uassertStatusOK(
-                    query_request_helper::validateResumeInput(opCtx,
-                                                              _cmdRequest->getResumeAfter(),
-                                                              _cmdRequest->getStartAt(),
-                                                              isClusteredCollection));
+                uassertStatusOK(query_request_helper::validateResumeAfter(
+                    opCtx, _cmdRequest->getResumeAfter(), isClusteredCollection));
             }
             const auto* collator = collectionPtr ? collectionPtr->getDefaultCollator() : nullptr;
             auto expCtx =
@@ -745,15 +742,12 @@ public:
                 }
             }
 
-            // Views use the aggregation system and the $_resumeAfter/ $_startAt parameter is not
-            // allowed. A more descriptive error will be raised later, but we want to validate this
-            // parameter before beginning the operation.
+            // Views use the aggregation system and the $_resumeAfter parameter is not allowed. A
+            // more descriptive error will be raised later, but we want to validate this parameter
+            // before beginning the operation.
             if (!collectionOrView->isView()) {
-                uassertStatusOK(
-                    query_request_helper::validateResumeInput(opCtx,
-                                                              _cmdRequest->getResumeAfter(),
-                                                              _cmdRequest->getStartAt(),
-                                                              isClusteredCollection));
+                uassertStatusOK(query_request_helper::validateResumeAfter(
+                    opCtx, _cmdRequest->getResumeAfter(), isClusteredCollection));
             }
 
             auto cq = parseQueryAndBeginOperation(

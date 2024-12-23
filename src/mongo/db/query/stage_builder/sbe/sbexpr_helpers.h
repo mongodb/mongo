@@ -306,7 +306,6 @@ public:
         DatabaseName dbName,
         bool forward = true,
         boost::optional<SbSlot> seekSlot = boost::none,
-        bool tolerateKeyNotFound = false,
         std::vector<std::string> scanFieldNames = {},
         const SbScanBounds& scanBounds = {},
         const SbIndexInfoSlots& indexInfoSlots = {},

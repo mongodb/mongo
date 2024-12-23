@@ -71,12 +71,11 @@ static constexpr auto kNaturalSortField = "$natural";
 Status validateGetMoreCollectionName(StringData collectionName);
 
 /**
- * Returns a non-OK status if '$_resumeAfter' or '$_startAt' is set to an unexpected value, or the
- * wrong type determined by the collection type.
+ * Returns a non-OK status if '$_resumeAfter' is set to an unexpected value, or the wrong type
+ * determined by the collection type.
  */
-Status validateResumeInput(OperationContext* opCtx,
+Status validateResumeAfter(OperationContext* opCtx,
                            const mongo::BSONObj& resumeAfter,
-                           const mongo::BSONObj& startAt,
                            bool isClusteredCollection);
 
 /**

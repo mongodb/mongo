@@ -35,11 +35,6 @@
 
 namespace mongo {
 
-struct ResumeScanPoint {
-    RecordId recordId;
-    bool tolerateKeyNotFound = false;
-};
-
 struct CollectionScanParams {
     enum Direction {
         FORWARD = 1,
@@ -63,7 +58,7 @@ struct CollectionScanParams {
     // document with a RecordId less than minRecord, or a higher record if none exists. May only
     // be used for scans on clustered collections and forward oplog scans. If exclusive
     // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
-    // cannot be used in conjunction with 'resumeScanPoint'.
+    // cannot be used in conjunction with 'resumeAfterRecordId'
     boost::optional<RecordIdBound> minRecord;
 
     // If present, this parameter sets the start point of a reverse scan or the end point of a
@@ -72,20 +67,16 @@ struct CollectionScanParams {
     // highest RecordId less than or equal to maxRecord, or a lower record if none exists. May
     // only be used for scans on clustered collections and forward oplog scans. If exclusive
     // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
-    // cannot be used in conjunction with 'resumeScanPoint'.
+    // cannot be used in conjunction with 'resumeAfterRecordId'.
     boost::optional<RecordIdBound> maxRecord;
 
     // If true, the collection scan will return a token that can be used to resume the scan.
     bool requestResumeToken = false;
 
-    // If present, collection scan will seek to the exact RecordId.
-    // - If 'tolerateKeyNotFound' is false, and if the RecordId does not exist, it will raise
-    // KeyNotFound.
-    // - If 'tolerateKeyNotFound' is true, and if the RecordId does not exist, it will seek to the
-    // next valid one.
-    // This field must only be set on forward collection scans and cannot be used in conjunction
-    // with 'minRecord' or 'maxRecord'.
-    boost::optional<ResumeScanPoint> resumeScanPoint;
+    // If present, the collection scan will seek to the exact RecordId, or return KeyNotFound if it
+    // does not exist. Must only be set on forward collection scans.
+    // This field cannot be used in conjunction with 'minRecord' or 'maxRecord'.
+    boost::optional<RecordId> resumeAfterRecordId;
 
     Direction direction = FORWARD;
 

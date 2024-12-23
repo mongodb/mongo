@@ -115,7 +115,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.minRecord = csn->minRecord;
                 params.maxRecord = csn->maxRecord;
                 params.requestResumeToken = csn->requestResumeToken;
-                params.resumeScanPoint = csn->resumeScanPoint;
+                params.resumeAfterRecordId = csn->resumeAfterRecordId;
                 params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
                 params.boundInclusion = csn->boundInclusion;
                 return std::make_unique<CollectionScan>(

@@ -106,65 +106,52 @@ Status validateGetMoreCollectionName(StringData collectionName) {
     return Status::OK();
 }
 
-Status validateResumeInput(OperationContext* opCtx,
+Status validateResumeAfter(OperationContext* opCtx,
                            const mongo::BSONObj& resumeAfter,
-                           const mongo::BSONObj& startAt,
                            bool isClusteredCollection) {
-    if (resumeAfter.isEmpty() && startAt.isEmpty()) {
+    if (resumeAfter.isEmpty()) {
         return Status::OK();
     }
 
-    if (!resumeAfter.isEmpty() && !startAt.isEmpty()) {
-        return Status(ErrorCodes::BadValue, "Cannot set both '$_resumeAfter' and '$_startAt'");
-    }
-
-    auto [resumeInput, resumeInputName] = !resumeAfter.isEmpty()
-        ? std::make_pair(mongo::BSONObj(resumeAfter), FindCommandRequest::kResumeAfterFieldName)
-        : std::make_pair(mongo::BSONObj(startAt), FindCommandRequest::kStartAtFieldName);
-
-    BSONType recordIdType = resumeInput["$recordId"].type();
+    BSONType recordIdType = resumeAfter["$recordId"].type();
     if (mongo::resharding::gFeatureFlagReshardingImprovements.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        if (resumeInput.nFields() > 2 ||
+        if (resumeAfter.nFields() > 2 ||
             (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
              recordIdType != BSONType::jstNULL) ||
-            (resumeInput.nFields() == 2 &&
-             (resumeInput["$initialSyncId"].type() != BSONType::BinData ||
-              resumeInput["$initialSyncId"].binDataType() != BinDataType::newUUID))) {
+            (resumeAfter.nFields() == 2 &&
+             (resumeAfter["$initialSyncId"].type() != BSONType::BinData ||
+              resumeAfter["$initialSyncId"].binDataType() != BinDataType::newUUID))) {
             return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "Malformed resume token: the '" << resumeInputName
-                              << "' object must contain '$recordId', of type NumberLong, BinData "
-                                 "or jstNULL and optional '$initialSyncId of type BinData.");
+                          "Malformed resume token: the '_resumeAfter' object must contain"
+                          " '$recordId', of type NumberLong, BinData or jstNULL and"
+                          " optional '$initialSyncId of type BinData.");
         }
-        if (resumeInput.hasField("$initialSyncId")) {
+        if (resumeAfter.hasField("$initialSyncId")) {
             auto initialSyncId = repl::ReplicationCoordinator::get(opCtx)->getInitialSyncId(opCtx);
-            auto requestInitialSyncId = uassertStatusOK(UUID::parse(resumeInput["$initialSyncId"]));
+            auto requestInitialSyncId = uassertStatusOK(UUID::parse(resumeAfter["$initialSyncId"]));
             if (!initialSyncId || requestInitialSyncId != *initialSyncId) {
                 return Status(ErrorCodes::Error(8132701),
                               "$initialSyncId mismatch, the query is no longer resumable.");
             }
         }
-    } else if (resumeInput.nFields() != 1 ||
+    } else if (resumeAfter.nFields() != 1 ||
                (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
                 recordIdType != BSONType::jstNULL)) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Malformed resume token: the '" << resumeInputName
-                                    << "' object must contain exactly one field named '$recordId', "
-                                       "of type NumberLong, BinData or jstNULL.");
+                      "Malformed resume token: the '_resumeAfter' object must contain"
+                      " exactly one field named '$recordId', of type NumberLong, BinData "
+                      "or jstNULL.");
     }
 
-    // Clustered collections can only accept '$_resumeAfter' or '$_startAt' parameter of type
-    // BinData. Non clustered collections should only accept '$_resumeAfter' or '$_startAt' of type
-    // Long.
+    // Clustered collections can only accept '$_resumeAfter' parameter of type BinData. Non
+    // clustered collections should only accept '$_resumeAfter' of type Long.
     if ((isClusteredCollection && recordIdType == BSONType::NumberLong) ||
         (!isClusteredCollection && recordIdType == BSONType::BinData)) {
         return Status(ErrorCodes::Error(7738600),
-                      str::stream()
-                          << "The '" << resumeInputName
-                          << "' parameter must match collection type. Clustered "
-                             "collections only have BinData recordIds, and all other collections"
-                             "have Long recordId.");
+                      "The '$_resumeAfter parameter must match collection type. Clustered "
+                      "collections only have BinData recordIds, and all other collections"
+                      "have Long recordId.");
     }
 
     return Status::OK();
@@ -216,15 +203,11 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
             return Status(ErrorCodes::BadValue,
                           "sort must be unset or {$natural:1} if 'requestResumeToken' is enabled");
         }
-        // The $_resumeAfter/ $_startAt parameter is checked in 'validateResumeInput()'.
+        // The $_resumeAfter parameter is checked in 'validateResumeAfter()'.
 
     } else if (!findCommand.getResumeAfter().isEmpty()) {
         return Status(ErrorCodes::BadValue,
                       "'requestResumeToken' must be true if 'resumeAfter' is"
-                      " specified");
-    } else if (!findCommand.getStartAt().isEmpty()) {
-        return Status(ErrorCodes::BadValue,
-                      "'requestResumeToken' must be true if 'startAt' is"
                       " specified");
     }
 

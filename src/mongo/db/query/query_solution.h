@@ -573,7 +573,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     // Tells whether this scan will be performed as a clustered collection scan in SBE.
     bool doClusteredCollectionScanSbe() const {
-        return (isClustered && !isOplog && (minRecord || maxRecord || resumeScanPoint));
+        return (isClustered && !isOplog && (minRecord || maxRecord || resumeAfterRecordId));
     }
 
     // Tells whether this scan will be performed as a clustered collection scan in classic.
@@ -610,14 +610,10 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // If true, the collection scan will return a token that can be used to resume the scan.
     bool requestResumeToken = false;
 
-    // If present, collection scan will seek to the exact RecordId.
-    // - If 'tolerateKeyNotFound' is false, and if the RecordId does not exist, it will raise
-    // KeyNotFound.
-    // - If 'tolerateKeyNotFound' is true, and if the RecordId does not exist, it will seek to the
-    // next valid one.
-    // This field must only be set on forward collection scans and cannot be used in conjunction
-    // with 'minRecord' or 'maxRecord'.
-    boost::optional<ResumeScanPoint> resumeScanPoint;
+    // If present, the collection scan will seek to the exact RecordId, or return KeyNotFound if it
+    // does not exist. Must only be set on forward collection scans.
+    // This field cannot be used in conjunction with 'minRecord' or 'maxRecord'.
+    boost::optional<RecordId> resumeAfterRecordId;
 
     // Should we make a tailable cursor?
     bool tailable;

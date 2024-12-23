@@ -655,8 +655,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // Attempting to establish a resumable query through mongoS is illegal.
     uassert(ErrorCodes::BadValue,
             "Queries on mongoS may not request or provide a resume token",
-            !findCommand.getRequestResumeToken() && findCommand.getResumeAfter().isEmpty() &&
-                findCommand.getStartAt().isEmpty());
+            !findCommand.getRequestResumeToken() && findCommand.getResumeAfter().isEmpty());
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     // Try to generate a sample id for this query here instead of inside 'runQueryWithoutRetrying()'

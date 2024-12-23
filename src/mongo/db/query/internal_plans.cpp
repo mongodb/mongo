@@ -145,12 +145,7 @@ CollectionScanParams createCollectionScanParams(
     CollectionScanParams params;
     params.shouldWaitForOplogVisibility =
         shouldWaitForOplogVisibility(expCtx->getOperationContext(), collection, false);
-
-    if (resumeAfterRecordId) {
-        params.resumeScanPoint =
-            ResumeScanPoint{*resumeAfterRecordId, false /* tolerateKeyNotFound */};
-    }
-
+    params.resumeAfterRecordId = resumeAfterRecordId;
     params.minRecord = minRecord;
     params.maxRecord = maxRecord;
     if (InternalPlanner::FORWARD == direction) {

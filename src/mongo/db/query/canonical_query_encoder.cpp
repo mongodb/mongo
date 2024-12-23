@@ -799,8 +799,6 @@ void encodeFindCommandRequest(const CanonicalQuery& cq, BufBuilder* bufBuilder) 
     };
     encodeBSONObj(findCommand.getResumeAfter());
 
-    encodeBSONObj(findCommand.getStartAt());
-
     // Read concern "available" results in SBE plans that do not perform shard filtering, so it must
     // be encoded differently from other read concerns.
     bool isAvailableReadConcern{false};

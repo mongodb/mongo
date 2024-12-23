@@ -82,11 +82,6 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
                           << " not supported in aggregation.",
             !findCommand.getReadOnce());
 
-    uassert(ErrorCodes::InvalidPipelineOperator,
-            str::stream() << "Option " << FindCommandRequest::kStartAtFieldName
-                          << " not supported in aggregation.",
-            findCommand.getStartAt().isEmpty());
-
     // Some options are disallowed when resharding improvements are disabled.
     if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -177,10 +172,6 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
 
         if (!findCommand.getResumeAfter().isEmpty()) {
             result.setResumeAfter(findCommand.getResumeAfter().getOwned());
-        }
-
-        if (!findCommand.getStartAt().isEmpty()) {
-            result.setStartAt(findCommand.getStartAt().getOwned());
         }
     }
     result.setIncludeQueryStatsMetrics(findCommand.getIncludeQueryStatsMetrics());

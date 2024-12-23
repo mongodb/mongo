@@ -192,9 +192,6 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
         if (aggRequest->getResumeAfter()) {
             findCommand->setResumeAfter(*aggRequest->getResumeAfter());
         }
-        if (aggRequest->getStartAt()) {
-            findCommand->setStartAt(*aggRequest->getStartAt());
-        }
     }
 
     // The collation on the ExpressionContext has been resolved to either the user-specified
