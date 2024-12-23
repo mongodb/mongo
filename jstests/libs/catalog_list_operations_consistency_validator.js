@@ -494,8 +494,11 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             }
             collInfo = db.getCollectionInfos(filter);
             catalogInfo = getCatalogInfoIfAvailable(filter);
+            if (catalogInfo === null) {
+                return true;
+            }
             // TODO SERVER-75675: do not skip index consistency check on sharded clusters.
-            collIndexes = (catalogInfo && !isMongos)
+            collIndexes = !isMongos
                 ? collInfo.filter(coll => coll.type === "collection")
                       .map(
                           coll => (
@@ -525,11 +528,29 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         // Replica set endpoints with profiling enabled on an empty database do not show the
         // system.profile collection in listCollections, but they do in $listCatalog.
         // TODO(SERVER-97721): Remove this workaround.
-        if (collInfo.length === 0 && catalogInfo !== null && catalogInfo.length === 1 &&
+        if (collInfo.length === 0 && catalogInfo.length === 1 &&
             catalogInfo[0].name === "system.profile" &&
             FeatureFlagUtil.isEnabled(db, "ReplicaSetEndpoint")) {
             print("Skipped consistency check: Stray system.profile on RSEndpoint (SERVER-97721)");
             return true;
+        }
+
+        // Skip checks for non-timeseries namespaces having an accompanying buckets namespace, as
+        // several operations behave anomalously on those, including listIndexes.
+        // TODO(SERVER-90862): Remove this workaround once this situation can not happen.
+        const namespaceSet = new Set(catalogInfo.map(c => c.name));
+        const nsWithUnexpectedBucketsSet =
+            new Set(catalogInfo
+                        .filter(c => c.type !== 'timeseries' &&
+                                    namespaceSet.has('system.buckets.' + c.name))
+                        .map(c => c.name));
+        if (nsWithUnexpectedBucketsSet.size > 0) {
+            print("Ignored namespaces with unexpected buckets: " + [...nsWithUnexpectedBucketsSet]);
+            collInfo = collInfo.filter(c => !nsWithUnexpectedBucketsSet.has(c.name));
+            catalogInfo = catalogInfo.filter(c => !nsWithUnexpectedBucketsSet.has(c.name));
+            if (collIndexes !== null) {
+                collIndexes = collIndexes.filter(c => !nsWithUnexpectedBucketsSet.has(c.name));
+            }
         }
 
         // Check consistency between `listCollections`, `listIndexes` and `$listCatalog` results.
@@ -538,13 +559,12 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         // So, we may need to retry a few times until we converge to a consistent result set.
         // But, if we repeatedly fail, don't stall the test for too long but fail fast instead.
         const shouldAssert = consistencyCheckAttempts++ > 20;
-        if (catalogInfo !== null &&
-            !validateListCatalogToListCollectionsConsistency(
+        if (!validateListCatalogToListCollectionsConsistency(
                 catalogInfo, collInfo, isDbReadOnly, shouldAssert)) {
             print("$listCatalog/listCollections consistency check failed, retrying...");
             return false;
         }
-        if (catalogInfo !== null && collIndexes !== null &&
+        if (collIndexes !== null &&
             !validateListCatalogToListIndexesConsistency(catalogInfo, collIndexes, shouldAssert)) {
             print("$listCatalog/listIndexes consistency check failed, retrying...");
             return false;
