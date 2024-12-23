@@ -89,7 +89,8 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     if not source:
         result = env.BazelProgram(target, source, **kwargs)
     else:
-        result = env.Program(target, source, **kwargs)
+        print(f"sources included in SCons in {target}, please move the target definition to bazel!")
+        exit(-1)
 
     env.RegisterTest("$UNITTEST_LIST", result[0])
     env.Alias("$UNITTEST_ALIAS", result[0])

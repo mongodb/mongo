@@ -685,31 +685,6 @@ class SymbolDependents(Analyzer):
         )
 
 
-class BazelOrder(Analyzer):
-    """Generate a topo sort order to covnert bazel targets."""
-
-    def __init__(self, dependency_graph):
-        """Store graph and strip the nodes."""
-        super().__init__(dependency_graph)
-
-    @schema_check(schema_version=1)
-    def run(self):
-        """Let networkx generate the list for us."""
-        order = []
-        for node in networkx.lexicographical_topological_sort(self._dependents_graph):
-            node_type = self._dependents_graph.nodes()[node].get(NodeProps.bin_type.name, "Unknown")
-            if node_type != "ThinTarget":
-                order.append({"type": node_type, "name": node})
-        return order
-
-    def report(self, report):
-        """Add the symbol dependents list to the report."""
-
-        if DependsReportTypes.BAZEL_ORDER.name not in report:
-            report[DependsReportTypes.BAZEL_ORDER.name] = {}
-        report[DependsReportTypes.BAZEL_ORDER.name] = self.run()
-
-
 class Efficiency(Analyzer):
     """Find efficiency of each public dependency originating from each node in a given set."""
 
@@ -1046,29 +1021,6 @@ class GaJsonPrinter(GaPrinter):
         return json.dumps(self.serialize(results))
 
 
-def _bazel_order_print(results, report_name, title):
-    res = results[report_name]
-    builder_names = ("Bazel", "ThinTarget")
-    print(f"\n{title}:")
-    print(f"\tTotal targets: {len(res)}")
-    print(
-        f"\tTargets Converted: {len([node for node in res if node['type'].startswith(builder_names)])}"
-    )
-    print(
-        f"\tTargets left to convert: {len([node for node in res if not node['type'].startswith(builder_names)])}"
-    )
-    print("\tList of targets to convert (==== bars means independency groups):")
-    last_node = None
-    for num, node in enumerate(results[report_name]):
-        if last_node is None:
-            last_node = node["name"].lower()
-        if last_node != min(last_node, node["name"].lower()):
-            print("\t\t" + "=" * 60)
-        last_node = node["name"].lower()
-        target_type = "Bazel" if node["type"].startswith(builder_names) else "SCons"
-        print(f"\t\t{num}. {target_type}: {node['name']}")
-
-
 class GaPrettyPrinter(GaPrinter):
     """Printer for pretty console output."""
 
@@ -1178,11 +1130,6 @@ class GaPrettyPrinter(GaPrinter):
             print("\nNon-bazelfied nodes with no non-bazelfied dependencies:")
             for node in results[DependsReportTypes.BAZEL_CONV_CANDIDATES.name]:
                 print(f"\t{node}")
-
-        if DependsReportTypes.BAZEL_ORDER.name in results:
-            _bazel_order_print(
-                results, DependsReportTypes.BAZEL_ORDER.name, "Bazel Target Conversion Order"
-            )
 
         if LinterTypes.EFFICIENCY_LINT.name in results:
             data = results[LinterTypes.EFFICIENCY_LINT.name]

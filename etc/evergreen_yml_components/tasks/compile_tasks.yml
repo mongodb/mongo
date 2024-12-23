@@ -600,17 +600,6 @@ tasks:
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          local_file: src/bazel_order.txt
-          remote_file: ${project}/${build_variant}/${revision}/artifacts/bazel_order.txt.${build_id}-${task_name}.${execution}
-          bucket: mciuploads
-          permissions: public-read
-          content_type: text/plain
-          display_name: Bazel Target Conversions
-
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
           local_file: src/libdeps.graphml.gz
           remote_file: ${project}/${build_variant}/${revision}/artifacts/libdeps.graphml.${build_id}-${task_name}.${execution}.gz
           bucket: mciuploads

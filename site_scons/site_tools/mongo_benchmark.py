@@ -89,7 +89,8 @@ def build_benchmark(env, target, source, **kwargs):
     if not source:
         result = bmEnv.BazelProgram(target, source, **kwargs)
     else:
-        result = bmEnv.Program(target, source, **kwargs)
+        print(f"sources included in SCons in {target}, please move the target definition to bazel!")
+        exit(-1)
 
     if "BAZEL_BENCHMARK_TAG" in kwargs:
         tag = kwargs["BAZEL_BENCHMARK_TAG"]
