@@ -3898,6 +3898,10 @@ def doConfigure(myenv):
         # TODO SERVER-58675 - Remove this suppression after abseil is upgraded
         myenv.AddToCXXFLAGSIfSupported("-Wno-deprecated-builtins")
 
+        # We do not define an ABI that must be stable from build to build, so inconsistent hardware
+        # interference sizes between builds does not affect correctness.
+        myenv.AddToCXXFLAGSIfSupported("-Wno-interference-size")
+
         # This warning overzealously warns on uses of non-virtual destructors which are benign.
         myenv.AddToCXXFLAGSIfSupported("-Wno-non-virtual-dtor")
 

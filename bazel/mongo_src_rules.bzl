@@ -489,11 +489,6 @@ GCC_OR_CLANG_WARNINGS_COPTS = select({
         # SERVER-76472 we don't try to maintain ABI so disable warnings about
         # possible ABI issues.
         "-Wno-psabi",
-
-        # TODO(SERVER-97447): Remove this once we're fully on the v5 toolchain.
-        # In the meantime, we need to suppress some warnings that are only
-        # recognized by the new compilers.
-        "-Wno-unknown-warning-option",
     ],
     "//conditions:default": [],
 })

@@ -766,6 +766,33 @@ def _impl(ctx):
         ],
     )
 
+    # We shouldn't define any external-facing ABIs dependent on hardware interference sizes, so
+    # inconsistent interference sizes between builds should not affect correctness.
+    no_interference_size_warning_feature = feature(
+        name = "no_interference_size_warning",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-interference-size"])],
+            ),
+        ],
+    )
+
+    # TODO(SERVER-97447): Remove this once we're fully on the v5 toolchain.
+    # In the meantime, we need to suppress some warnings that are only
+    # recognized by the new compilers.
+    no_unknown_warning_option_feature = feature(
+        name = "no_unknown_warning_option",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-unknown-warning-option"])],
+            ),
+        ],
+    )
+
     features = [
         bin_dirs_feature,
         default_compile_flags_feature,
@@ -812,6 +839,8 @@ def _impl(ctx):
         pessimizing_move_warning_feature,
         no_invalid_offsetof_warning_feature,
         no_class_memaccess_warning_feature,
+        no_interference_size_warning_feature,
+        no_unknown_warning_option_feature,
     ]
 
     return [
