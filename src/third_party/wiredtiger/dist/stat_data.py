@@ -818,6 +818,7 @@ conn_dsrc_stats = [
     CacheStat('cache_eviction_clean', 'unmodified pages evicted'),
     CacheStat('cache_eviction_deepen', 'page split during eviction deepened the tree'),
     CacheStat('cache_eviction_dirty', 'modified pages evicted'),
+    CacheStat('cache_eviction_dirty_obsolete_tw', 'pages dirtied due to obsolete time window'),
     CacheStat('cache_eviction_hazard', 'hazard pointer blocked page eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
     CacheStat('cache_eviction_pages_seen', 'pages seen by eviction walk'),

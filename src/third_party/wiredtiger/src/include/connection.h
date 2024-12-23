@@ -64,6 +64,26 @@ struct __wt_bucket_storage {
     } while (0)
 
 /*
+ * WT_HEURISTIC_CONTROLS --
+ *  Heuristic controls configuration.
+ */
+struct __wt_heuristic_controls {
+    /*
+     * The controls below deal with the cleanup of obsolete time window information. This process
+     * can be configured on two levels:
+     *   - The maximum number of btrees to process in a single checkpoint,
+     *   - The maximum number of pages per btree to process in a single checkpoint.
+     */
+
+    /* Number of btrees processed in the current checkpoint. */
+    uint32_t obsolete_tw_btree_count;
+    /* Maximum number of btrees that can be processed per checkpoint. */
+    uint32_t obsolete_tw_btree_max;
+    /* Maximum number of pages that can be processed per btree. */
+    uint32_t obsolete_tw_pages_dirty_max;
+};
+
+/*
  * WT_KEYED_ENCRYPTOR --
  *	A list entry for an encryptor with a unique (name, keyid).
  */
@@ -265,6 +285,8 @@ struct __wt_connection_impl {
 
     /* Configuration */
     const WT_CONFIG_ENTRY **config_entries;
+
+    WT_HEURISTIC_CONTROLS heuristic_controls; /* Heuristic controls configuration */
 
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
 

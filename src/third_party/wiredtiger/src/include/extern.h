@@ -780,6 +780,8 @@ extern int __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *bus
   const char *func, int line
 #endif
   ) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_heuristic_controls_config(WT_SESSION_IMPL *session, const char *cfg[])
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hex2byte(const u_char *from, u_char *to)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)

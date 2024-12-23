@@ -735,6 +735,20 @@ connection_runtime_config = [
             interval in seconds at which to check for files that are
             inactive and close them''', min=1, max=100000),
         ]),
+    Config('heuristic_controls', '', r'''
+        control the behavior of various optimizations. This is primarily used as a mechanism for
+        rolling out changes to internal heuristics while providing a mechanism for quickly
+        reverting to prior behavior in the field''',
+        type='category', subconfig=[
+            Config('obsolete_tw_btree_max', '100', r'''
+                maximum number of btrees that can be checked for obsolete time window cleanup in a
+                single checkpoint''',
+                min=0, max=500000),
+            Config('obsolete_tw_pages_dirty_max', '100', r'''
+                maximum number of pages that can be marked dirty because of obsolete time window
+                information per btree in a single checkpoint''',
+                min=0, max=100000),
+        ]),
     Config('io_capacity', '', r'''
         control how many bytes per second are written and read. Exceeding
         the capacity results in throttling.''',
