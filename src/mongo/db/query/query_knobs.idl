@@ -1204,14 +1204,6 @@ server_parameters:
     default: true
     redact: false
 
-  internalUseRoaringBitmapsForRecordIDDeduplication:
-    description: "Use a hybrid container combining Hash Table and Roaring Bitmaps for RecordID deduplication."
-    set_at: [ startup, runtime ]
-    cpp_varname: internalUseRoaringBitmapsForRecordIDDeduplication
-    cpp_vartype: AtomicWord<bool>
-    default: true
-    redact: false
-
   internalRoaringBitmapsThreshold:
     description: "The number of RecordIDs after which the hybrid container switches from hash table to Roaring Bitmaps."
     set_at: [ startup, runtime ]

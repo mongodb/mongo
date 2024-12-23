@@ -35,9 +35,7 @@
 #include <utility>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/recordid_deduplicator.h"
@@ -45,18 +43,13 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/transaction_resources.h"
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -191,8 +184,6 @@ private:
     const int _direction;
     const bool _forward;
 
-    const bool _shouldDedup;
-
     // Do we want to add the key as metadata?
     const bool _addKeyMetadata;
 
@@ -202,10 +193,11 @@ private:
     // Keeps track of what work we need to do next.
     ScanState _scanState = ScanState::INITIALIZING;
 
-    // TODO SERVER-88337: keep only of deduplicator here.
-    // Could our index have duplicates?  If so, we use _recordIdDeduplicator or _returned to dedup.
-    std::unique_ptr<RecordIdDeduplicator> _recordIdDeduplicator;
-    stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
+    // True if we dedup on RecordId, false otherwise.
+    const bool _dedup;
+
+    // Which RecordIds have we returned?
+    RecordIdDeduplicator _recordIdDeduplicator;
 
     //
     // This class employs one of two different algorithms for determining when the index scan

@@ -4,7 +4,6 @@
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalUseRoaringBitmapsForRecordIDDeduplication: true,
         // Set the threshold small to force HashRoaringSet's transition earlier.
         internalRoaringBitmapsThreshold: 100,
         internalRoaringBitmapsMinimalDensity: 0.00001,

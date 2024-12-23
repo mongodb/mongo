@@ -28,32 +28,17 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
-#include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <memory>
-#include <vector>
 
-#include <boost/optional/optional.hpp>
-
-#include "mongo/bson/ordering.h"
-#include "mongo/db/client.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/debug_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -86,8 +71,8 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _direction(params.direction),
       _forward(params.direction == 1),
-      _shouldDedup(params.shouldDedup),
       _addKeyMetadata(params.addKeyMetadata),
+      _dedup(params.shouldDedup),
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_bounds.boundInclusion)),
       _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)) {
     _specificStats.indexName = params.name;
@@ -101,9 +86,6 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
     _specificStats.collation = params.indexDescriptor->infoObj()
                                    .getObjectField(IndexDescriptor::kCollationFieldName)
                                    .getOwned();
-    if (_shouldDedup && internalUseRoaringBitmapsForRecordIDDeduplication.load()) {
-        _recordIdDeduplicator = std::make_unique<RecordIdDeduplicator>();
-    }
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
@@ -244,12 +226,13 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
     _scanState = GETTING_NEXT;
 
-    if (_shouldDedup) {
+    // If we're deduping
+    if (_dedup) {
         ++_specificStats.dupsTested;
-        const bool newRecordId = _recordIdDeduplicator ? _recordIdDeduplicator->insert(kv->loc)
-                                                       : _returned.insert(kv->loc).second;
-        if (!newRecordId) {
-            // We've seen this RecordId before. Skip it this time.
+
+        // ...and we've seen the RecordId before
+        if (!_recordIdDeduplicator.insert(kv->loc)) {
+            // ...skip it.
             ++_specificStats.dupsDropped;
             return PlanStage::NEED_TIME;
         }
