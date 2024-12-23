@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -1199,6 +1199,22 @@ mongo_cc_unit_test(
         "//src/mongo/rpc:message",
         "//src/mongo/transport:service_entry_point_test_fixture",
         "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "service_entry_point_router_role_bm",
+    srcs = [
+        "service_entry_point_router_role_bm.cpp",
+        "//src/mongo/db:profiler_bm_fixture.h",
+        "//src/mongo/db:service_entry_point_bm_fixture.h",
+    ],
+    deps = [
+        ":startup_initialization",
+        "//src/mongo/db:read_write_concern_defaults_mock",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/rpc:message",
     ],
 )
 

@@ -632,6 +632,9 @@ mongo_cc_benchmark(
     srcs = [
         "//src/mongo/db/exec/sbe/abt:abt_lower_bm.cpp",
     ],
+    tags = [
+        "first_half_bm",
+    ],
     deps = [
         ":abt_unit_test_utils",
         ":query_sbe_abt",
@@ -660,7 +663,9 @@ mongo_cc_benchmark(
     srcs = [
         "//src/mongo/db/exec/sbe/vm:vm_bm.cpp",
     ],
-    tags = ["first_half_bm"],
+    tags = [
+        "first_half_bm",
+    ],
     deps = [
         ":query_sbe",
         "//src/mongo/db/query/collation:collator_icu",

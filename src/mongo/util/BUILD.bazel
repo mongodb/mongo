@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "MONGO_GLOBAL_COPTS", "MONGO_GLOBAL_DEFINES", "MONGO_GLOBAL_LINKFLAGS", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "MONGO_GLOBAL_COPTS", "MONGO_GLOBAL_DEFINES", "MONGO_GLOBAL_LINKFLAGS", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 load("//bazel/config:render_template.bzl", "render_template")
 
@@ -1040,6 +1040,132 @@ mongo_cc_unit_test(
         ":version_impl",
         "//src/mongo:base",
         "//src/mongo/db:service_context_non_d",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "string_bm",
+    srcs = [
+        "string_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "cancellation_bm",
+    srcs = [
+        "cancellation_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "inline_memory_bm",
+    srcs = [
+        "inline_memory_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "uuid_bm",
+    srcs = [
+        "uuid_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":processinfo",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "fail_point_bm",
+    srcs = [
+        "fail_point_bm.cpp",
+    ],
+    deps = [
+        ":fail_point",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "clock_source_bm",
+    srcs = [
+        "clock_source_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":clock_sources",
+        ":processinfo",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "decimal_counter_bm",
+    srcs = [
+        "decimal_counter_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "itoa_bm",
+    srcs = [
+        "itoa_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "future_bm",
+    srcs = [
+        "future_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "tick_source_bm",
+    srcs = [
+        "tick_source_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "hash_table_bm",
+    srcs = [
+        "hash_table_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "base64_bm",
+    srcs = [
+        "base64_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "stacktrace_bm",
+    srcs = [
+        "stacktrace_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
     ],
 )
 

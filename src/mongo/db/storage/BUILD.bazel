@@ -770,7 +770,9 @@ mongo_cc_benchmark(
     srcs = [
         "record_id_bm.cpp",
     ],
-    tags = ["first_half_bm"],
+    tags = [
+        "first_half_bm",
+    ],
     deps = [
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:server_base",

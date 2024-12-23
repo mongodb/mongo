@@ -144,6 +144,16 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_benchmark(
+    name = "lock_free_read_list_bm",
+    srcs = [
+        "lock_free_read_list_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "ticketholder_bm",
     srcs = [
         "ticketholder_bm.cpp",

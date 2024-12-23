@@ -46,4 +46,5 @@ env.Benchmark(
     target="placement_history_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="first_half_bm",
 )

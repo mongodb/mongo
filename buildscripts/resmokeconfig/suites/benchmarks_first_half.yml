@@ -1,37 +1,7 @@
 test_kind: benchmark_test
 
 selector:
-  root: build/benchmarks.txt
-  # Please always add the glob pattern for the canary tests as part of "include_files" section when
-  # defining a new test suite for your benchmarks. Doing so ensures they'll still run as part of the
-  # Evergreen task associated with the new test suite.
-  include_files:
-    # Note: This list is manually curated based on https://docs.google.com/spreadsheets/d/1yK0JIM9fN6CS-KlnOl7BcdsWd5qdJtlILo9e3BCB8QQ/edit#gid=0
-    # It will NOT automagically get updated if new benchmark-related tests are added.
-    - build/install/bin/first_half_bm*
-    - build/install/bin/lock_manager_bm*
-    - build/install/bin/crypto_bm*
-    - build/install/bin/logv2_bm*
-    - build/install/bin/endian_bm*
-    - build/install/bin/condition_variable_bm*
-    - build/install/bin/path_lower_bm*
-    - build/install/bin/abt_lower_bm*
-    - build/install/bin/string_bm*
-    - build/install/bin/stacktrace_bm*
-    - build/install/bin/placement_history_bm*
-    - build/install/bin/system_resource_canary_bm*
-    - build/install/bin/future_bm*
-    - build/install/bin/bson_bm*
-    - build/install/bin/commands_bm*
-    - build/install/bin/document_bm*
-    - build/install/bin/sbe_vm_bm*
-    - build/install/bin/quine_mccluskey_bm*
-    - build/install/bin/storage_record_id_bm*
-    - build/install/bin/clock_source_bm*
-    - build/install/bin/decimal_counter_bm*
-    - build/install/bin/tick_source_bm*
-    - build/install/bin/base64_bm*
-    - build/install/bin/uuid_bm*
+  root: build/first_half_bm.txt
 
   exclude_files:
     # The trailing asterisk is for handling the .exe extension on Windows.

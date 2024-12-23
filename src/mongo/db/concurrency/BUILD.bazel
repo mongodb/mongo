@@ -253,7 +253,9 @@ mongo_cc_benchmark(
     srcs = [
         "lock_manager_bm.cpp",
     ],
-    tags = ["first_half_bm"],
+    tags = [
+        "first_half_bm",
+    ],
     deps = [
         ":lock_manager",
         "//src/mongo/db:service_context_non_d",

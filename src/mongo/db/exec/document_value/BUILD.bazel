@@ -53,7 +53,9 @@ mongo_cc_benchmark(
     srcs = [
         "document_bm.cpp",
     ],
-    tags = ["first_half_bm"],
+    tags = [
+        "first_half_bm",
+    ],
     deps = [
         ":document_value",
         "//src/mongo/db:server_base",

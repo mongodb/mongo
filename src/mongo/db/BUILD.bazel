@@ -4189,7 +4189,9 @@ mongo_cc_benchmark(
     srcs = [
         "commands_bm.cpp",
     ],
-    tags = ["first_half_bm"],
+    tags = [
+        "first_half_bm",
+    ],
     deps = [
         ":server_base",
     ],

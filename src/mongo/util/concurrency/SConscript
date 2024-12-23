@@ -33,12 +33,8 @@ env.Benchmark(
 
 env.Benchmark(
     target="lock_free_read_list_bm",
-    source=[
-        "lock_free_read_list_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/processinfo",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

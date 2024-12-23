@@ -133,6 +133,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "mongo_unittest_fourth_group",
+        "platform",
         "server-programmability",
     ],
     deps = [
