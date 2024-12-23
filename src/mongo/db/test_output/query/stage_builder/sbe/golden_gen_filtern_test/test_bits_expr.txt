@@ -1,0 +1,28 @@
+# Golden test output of GoldenGenFilternTest/TestBitsExpr
+BitsAllClearMatchExpression
+traverseF(getField(s1, "field1"), lambda(l2.0) { (
+    if isBinData(l2.0) 
+    then bitTestPosition([0ll, 1ll, 5ll], move(l2.0), 2) 
+    else bitTestZero(35ll, convert ( move(l2.0), int64)) 
+?: false) }, false) 
+# Golden test output of GoldenGenFilternTest/TestBitsExpr
+BitsAllSetMatchExpression
+traverseF(getField(s1, "field1"), lambda(l4.0) { (
+    if isBinData(l4.0) 
+    then bitTestPosition([0ll, 2ll], move(l4.0), 0) 
+    else bitTestMask(5ll, convert ( move(l4.0), int64)) 
+?: false) }, false) 
+# Golden test output of GoldenGenFilternTest/TestBitsExpr
+BitsAnyClearMatchExpression
+traverseF(getField(s1, "field1"), lambda(l6.0) { (
+    if isBinData(l6.0) 
+    then bitTestPosition([0ll, 3ll, 7ll], move(l6.0), 1) 
+    else !(bitTestMask(137ll, convert ( move(l6.0), int64))) 
+?: false) }, false) 
+# Golden test output of GoldenGenFilternTest/TestBitsExpr
+BitsAnySetMatchExpression
+traverseF(getField(s1, "field1"), lambda(l8.0) { (
+    if isBinData(l8.0) 
+    then bitTestPosition([0ll, 2ll], move(l8.0), 3) 
+    else !(bitTestZero(5ll, convert ( move(l8.0), int64))) 
+?: false) }, false) 

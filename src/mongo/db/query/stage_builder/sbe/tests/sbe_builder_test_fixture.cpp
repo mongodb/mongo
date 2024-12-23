@@ -184,6 +184,7 @@ void GoldenSbeStageBuilderTestFixture::insertDocuments(const std::vector<BSONObj
 void GoldenSbeExprBuilderTestFixture::setUp() {
     SbeStageBuilderTestFixture::setUp();
     _expCtx = new ExpressionContextForTest();
+    _planStageData = std::make_unique<stage_builder::PlanStageStaticData>();
     _state.emplace(operationContext(),
                    _env,
                    _planStageData.get(),

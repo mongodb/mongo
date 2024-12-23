@@ -1,0 +1,67 @@
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+GTEMatchExpression_isFilterOverIxscan
+((s2 >= 1) ?: false) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+GTEMatchExpression_MinKey
+traverseF(getField(s1, "field1"), lambda(l2.0) { true }, true) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+GTEMatchExpression_MaxKey
+traverseF(getField(s1, "field1"), lambda(l4.0) { isMaxKey((move(l4.0) ?: null)) }, true) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+GTMatchExpression_MinKey
+traverseF(getField(s1, "field1"), lambda(l6.0) { !(isMinKey((move(l6.0) ?: null))) }, true) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+GTMatchExpression_MaxKey
+traverseF(getField(s1, "field1"), lambda(l8.0) { false }, true) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+InternalExprEqMatchExpression
+
+    let [
+        l11.0 = getField(s1, "_id") 
+    ] 
+    in ((isArray(l11.0) ?: false) || (((l11.0 <=> 0) == 0) ?: (exists(l11.0) && typeMatch(l11.0, -65)))) 
+
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+InternalExprGTMatchExpression
+
+    let [
+        l14.0 = getField(s1, "_id") 
+    ] 
+    in ((isArray(l14.0) ?: false) || (((l14.0 <=> 0) > 0) ?: ((exists(l14.0) && typeMatch(l14.0, -65)) > true))) 
+
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+InternalExprGTEMatchExpression
+
+    let [
+        l17.0 = getField(s1, "_id") 
+    ] 
+    in ((isArray(l17.0) ?: false) || (((l17.0 <=> 0) >= 0) ?: ((exists(l17.0) && typeMatch(l17.0, -65)) >= true))) 
+
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+InternalExprLTMatchExpression
+
+    let [
+        l20.0 = getField(s1, "_id") 
+    ] 
+    in ((isArray(l20.0) ?: false) || (((l20.0 <=> 0) < 0) ?: ((exists(l20.0) && typeMatch(l20.0, -65)) < true))) 
+
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+InternalExprLTEMatchExpression
+
+    let [
+        l23.0 = getField(s1, "_id") 
+    ] 
+    in ((isArray(l23.0) ?: false) || (((l23.0 <=> 0) <= 0) ?: ((exists(l23.0) && typeMatch(l23.0, -65)) <= true))) 
+
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+LTEMatchExpression
+traverseF(getField(s1, "field1"), lambda(l25.0) { ((move(l25.0) <= 10) ?: false) }, false) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+LTEMatchExpression_MaxKey
+traverseF(getField(s1, "field1"), lambda(l27.0) { true }, true) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+LTMatchExpression
+traverseF(getField(s1, "field1"), lambda(l29.0) { ((move(l29.0) < 10) ?: false) }, false) 
+# Golden test output of GoldenGenFilternTest/TestCompExpr
+LTMatchExpression_MinKey
+traverseF(getField(s1, "field1"), lambda(l31.0) { false }, true) 
