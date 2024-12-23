@@ -32,6 +32,10 @@ mongo_cc_unit_test(
     srcs = [
         "profiler_test.cpp",
     ],
+    data = [
+        "//src/mongo/unittest/expected_output/golden_self_test:sanity_test",
+        "//src/mongo/util/tracing_profiler/test_output/profiler_test_fixture:profiler_service_simple",
+    ],
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":tracing_profiler",
