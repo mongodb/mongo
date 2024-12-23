@@ -21,7 +21,7 @@ python = ">=3.10,<4.0"
 # Libdeps depdencies
 networkx = "*"                                    # This is also used as a part of build_metrics so it is sort of required
 flask = { version = "*", optional = true }
-flask-cors = { version = "*", optional = true }
+flask-cors = { version = ">=4.0.2", optional = true }
 lxml = { version = "*", optional = true }
 eventlet = { version = "*", optional = true }
 gevent = { version = "*", optional = true }
