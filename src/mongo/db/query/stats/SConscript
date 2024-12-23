@@ -46,13 +46,4 @@ env.CppUnitTest(
     LIBDEPS=[],
 )
 
-env.Benchmark(
-    target="value_utils_bm",
-    source=[
-        "value_utils_bm.cpp",
-    ],
-    LIBDEPS=[
-        "stats_histograms",
-        "test_utils",
-    ],
-)
+env.Benchmark(target="value_utils_bm", source=[])

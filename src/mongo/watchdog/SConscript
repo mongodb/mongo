@@ -2,16 +2,4 @@
 
 Import("env")
 
-env.CppUnitTest(
-    target="watchdog_test",
-    source=[
-        "watchdog_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "watchdog",
-    ],
-)
+env.CppUnitTest(target="watchdog_test", source=[])

@@ -81,55 +81,10 @@ env.CppUnitTest(
     PROVE_ALIASES=["server-programmability"],
 )
 
-tcmallocAttrs = None
-for impl in [
-    {
-        # Modern standalone tcmalloc (not gperftools)
-        "options": ["tcmalloc-google"],
-        "sys_name": "tcmalloc-google",
-        "inject": "tcmalloc",
-        "cppdefs": [],
-    },
-    {
-        # Old gperftools tcmalloc
-        "options": ["tcmalloc-gperf"],
-        "sys_name": "tcmalloc-gperf",
-        "inject": "gperftools",
-        # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
-        # level configure check, though its effects should still be scoped just to these files.
-        "cppdefs": [
-            "MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS",
-        ],
-    },
-]:
-    if env["MONGO_ALLOCATOR"] in impl["options"]:
-        tcmallocAttrs = impl
-
-if tcmallocAttrs:
-    tcmspEnv = env.Clone()
-    if not use_system_version_of_library(tcmallocAttrs["sys_name"]):
-        tcmspEnv.InjectThirdParty(tcmallocAttrs["inject"])
-    tcmspEnv.Append(CPPDEFINES=tcmallocAttrs["cppdefs"])
-
-    if tcmspEnv.ToolchainIs("clang", "GCC"):
-        tcmspEnv.Append(CCFLAGS=["-Wno-sign-compare"])
-
-    if not use_system_version_of_library("valgrind"):
-        # Include valgrind since tcmalloc disables itself while running under valgrind
-        tcmspEnv.InjectThirdParty("valgrind")
-
-    tcmspEnv.CppUnitTest(
+if env["MONGO_ALLOCATOR"] in set(["tcmalloc-google", "tcmalloc-gperf"]):
+    env.CppUnitTest(
         target="tcmalloc_set_parameters_test",
-        source=[
-            "tcmalloc_set_parameter_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/db/commands/server_status_core",
-            "$BUILD_DIR/mongo/db/server_base",
-            "processinfo",
-            "tcmalloc_server_status",
-            "tcmalloc_set_parameter",
-        ],
+        source=[],
     )
 
 env.Benchmark(
@@ -230,27 +185,9 @@ stacktraceEnv = env.Clone()
 if use_libunwind:
     stacktraceEnv.InjectThirdParty(libraries=["unwind"])
     stacktraceEnv.CppUnitTest(
-        target=[
-            "stacktrace_libunwind_test",
-        ],
-        source=[
-            "stacktrace_libunwind_test_functions.cpp",
-            "stacktrace_libunwind_test.cpp",
-        ],
+        target="stacktrace_libunwind_test",
+        source=[],
         PROVE_ALIASES=["server-programmability"],
-        # Do not add LIBDEPS the ordinary way here, as they will override
-        # the LIBDEPS settings for stacktraceEnv, configured above. If
-        # you must add new libdeps here, or for the similar cases
-        # below, do it as follows:
-        #
-        # LIBDEPS=(stacktraceEnv.get('LIBDEPS', []) + [
-        #     some_new_libdep,
-        #     another_new_libdep,
-        # ]),
-        #
-        # to ensure that the new library dependency is added to the
-        # existing LIBDEPS state in the environment and does not
-        # overwrite it.
     )
 
 stacktrace_test_LIBDEPS = stacktraceEnv.get("LIBDEPS", []).copy()
@@ -258,13 +195,7 @@ insort_wrapper(stacktrace_test_LIBDEPS, "pcre_wrapper")
 
 stacktraceEnv.CppUnitTest(
     target="stacktrace_test",
-    source=[
-        "stacktrace_test.cpp",
-    ],
-    LIBDEPS=stacktrace_test_LIBDEPS,
-    EXPORT_SYMBOLS=[
-        "mongo_stacktrace_test_detail_testFunctionWithLinkage",
-    ],
+    source=[],
     PROVE_ALIASES=["server-programmability"],
 )
 

@@ -12,17 +12,6 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="query_settings_lookup_bm",
-    source=[
-        "query_settings_lookup_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/canonical_query",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/util/processinfo",
-        "manager",
-        "utils",
-    ],
-    CONSOLIDATED_TARGET="query_bm",
+    source=[],
+    BAZEL_BENCHMARK_TAG="query_bm",
 )

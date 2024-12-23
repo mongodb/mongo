@@ -40,7 +40,10 @@ def build_workload_simulator(env, target, source, **kwargs):
     insort_wrapper(libdeps, "$BUILD_DIR/mongo/tools/workload_simulation/simulator_main")
     kwargs["LIBDEPS"] = libdeps
 
-    result = env.Program(target, source, **kwargs)
+    if not source:
+        result = env.BazelProgram(target, source, **kwargs)
+    else:
+        result = env.Program(target, source, **kwargs)
 
     return result
 

@@ -887,6 +887,14 @@ mongo_cc_unit_test(
     srcs = [
         "tcmalloc_set_parameter_test.cpp",
     ],
+    copts = select({
+        "//bazel/config:gcc_or_clang": ["-Wno-sign-compare"],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
     tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
         "//bazel/config:tcmalloc_gperf_enabled": [],
@@ -894,9 +902,9 @@ mongo_cc_unit_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
-        ":processinfo",
-        ":tcmalloc_server_status",
-        ":tcmalloc_set_parameter",
+        "processinfo",
+        "tcmalloc_server_status",
+        "tcmalloc_set_parameter",
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:server_status_core",
     ],
@@ -957,7 +965,6 @@ mongo_cc_unit_test(
         "optional_util_test.cpp",
         "out_of_line_executor_test.cpp",
         "overloaded_visitor_test.cpp",
-        "packaged_task.h",
         "packaged_task_test.cpp",
         "parking_lot_test.cpp",
         "pcre_test.cpp",
@@ -995,6 +1002,7 @@ mongo_cc_unit_test(
         "server-programmability",
     ],
     deps = [
+        "packaged_task",
         ":alarm",
         ":background_job",
         ":caching",
@@ -1184,5 +1192,54 @@ mongo_cc_unit_test(
         ":ntservice",
         ":perfctr_collect",
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "stacktrace_test_helpers",
+    srcs = [
+        "stacktrace_test_helpers.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stacktrace_libunwind_test",
+    srcs = [
+        "stacktrace_libunwind_test.cpp",
+        "stacktrace_libunwind_test_functions.cpp",
+        "stacktrace_libunwind_test_functions.h",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:libunwind_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = ["stacktrace_test_helpers"],
+)
+
+mongo_cc_unit_test(
+    name = "stacktrace_test",
+    srcs = [
+        "stacktrace_test.cpp",
+    ],
+    # deps=stacktrace_test_LIBDEPS,
+    # From SCons, unclear if necessasry:
+    # EXPORT_SYMBOLS=[
+    #     "mongo_stacktrace_test_detail_testFunctionWithLinkage",
+    # ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+    deps = ["stacktrace_test_helpers"],
+)
+
+mongo_cc_library(
+    name = "packaged_task",
+    srcs = [
+        "packaged_task.h",
     ],
 )

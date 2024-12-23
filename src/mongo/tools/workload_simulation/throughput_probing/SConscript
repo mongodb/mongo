@@ -4,19 +4,5 @@ env = env.Clone()
 
 env.WorkloadSimulator(
     target="throughput_probing_simulator",
-    source=[
-        "throughput_probing_simulator.cpp",
-        "ticketed_workload_driver.cpp",
-        "workloads.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/admission/execution_admission_context",
-        "$BUILD_DIR/mongo/db/admission/execution_control",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/tools/workload_simulation/workload_characteristics",
-        "$BUILD_DIR/mongo/util/concurrency/ticketholder",
-        "$BUILD_DIR/mongo/util/mock_periodic_runner",
-    ],
+    source=[],
 )

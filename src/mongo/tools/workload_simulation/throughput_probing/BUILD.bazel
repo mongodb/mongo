@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,26 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_binary(
+    name = "throughput_probing_simulator",
+    srcs = [
+        "throughput_probing_simulator.cpp",
+        "throughput_probing_simulator.h",
+        "ticketed_workload_driver.cpp",
+        "ticketed_workload_driver.h",
+        "workloads.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/admission:execution_control",
+        "//src/mongo/tools/workload_simulation:simulator_main",
+        "//src/mongo/tools/workload_simulation:workload_characteristics",
+        "//src/mongo/util:mock_periodic_runner",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
 )

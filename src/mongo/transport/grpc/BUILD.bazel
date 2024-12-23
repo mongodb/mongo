@@ -227,20 +227,20 @@ mongo_cc_unit_test(
     ],
 )
 
-# cc_test(
-#     name = "grpc_core_test",
-#     srcs = [
-#         "core_test.cpp",
-#     ],
-#     copts = [
-#         "-Isrc",
-#         "-I$(BINDIR)/src",
-#     ],
-#     deps = [
-#         ":core_test_cc_grpc",
-#         "//src/mongo:base",
-#         "//src/mongo/unittest",
-#         "//src/mongo/unittest:unittest_main",
-#         "//src/third_party/grpc:grpc++_reflection",
-#     ],
-# )
+mongo_cc_unit_test(
+    name = "grpc_core_test",
+    srcs = [
+        "core_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = select({
+        "//bazel/config:build_grpc_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "core_test_cc_grpc",
+        "//src/mongo:base",
+        "//src/third_party/grpc:grpc++_reflection",
+        "//src/third_party/protobuf",
+    ],
+)

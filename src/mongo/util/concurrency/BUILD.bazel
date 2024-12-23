@@ -116,7 +116,6 @@ mongo_cc_unit_test(
         "spin_lock_test.cpp",
         "thread_pool_test.cpp",
         "with_lock_test.cpp",
-        "//src/mongo/util:packaged_task.h",
     ],
     tags = [
         "mongo_unittest_second_group",
@@ -130,6 +129,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/util:packaged_task",
     ],
 )
 
@@ -168,5 +168,20 @@ mongo_cc_benchmark(
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/util:tick_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ticketholder_test",
+    srcs = [
+        "ticketholder_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/util:packaged_task",
+        "//src/mongo/util/concurrency:ticketholder",
     ],
 )

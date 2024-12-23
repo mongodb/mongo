@@ -32,15 +32,4 @@ protoEnv.Append(
     ]
 )
 
-protoEnv.CppUnitTest(
-    target="grpc_core_test",
-    source=[
-        "core_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/third_party/grpc/grpc++_reflection",
-        "$BUILD_DIR/third_party/protobuf/protobuf",
-        "core_test_cc_grpc",
-    ],
-)
+protoEnv.CppUnitTest(target="grpc_core_test", source=[])

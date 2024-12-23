@@ -134,18 +134,7 @@ grpc_unittest_env.Append(CPPPATH=[
 
 grpc_unittest_env.CppUnitTest(
     target='grpc_lib_test',
-    source=[
-        'grpc_source_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'grpc++_reflection',
-        "helloworld_cc_grpc"
-    ],
-    SYSLIBDEPS=[
-        'ssl',
-        'crypto',
-    ],
+    source=[],
 )
 
 grpc_unittest_env.BazelProgram(

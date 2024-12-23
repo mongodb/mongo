@@ -6,12 +6,5 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="options_parser_test",
-    source=[
-        "environment_test.cpp",
-        "options_parser_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "options_parser",
-    ],
+    source=[],
 )

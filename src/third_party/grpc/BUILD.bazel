@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_grpc_library", "mongo_cc_library", "mongo_cc_proto_library", "mongo_proto_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_grpc_library", "mongo_cc_library", "mongo_cc_proto_library", "mongo_cc_unit_test", "mongo_proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -3470,5 +3470,24 @@ mongo_cc_library(
     ],
     hdrs = [
         "dist/include/grpc/impl/channel_arg_names.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "grpc_lib_test",
+    srcs = [
+        "greeter_server.h",
+        "grpc_source_test.cpp",
+    ],
+    copts = [
+        "-Isrc/third_party/grpc/dist/examples/protos",
+        "-I$(BINDIR)/src/third_party/grpc/dist/examples/protos",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [
+        "grpc++_reflection",
+        "helloworld_cc_grpc",
+        "//src/mongo:base",
     ],
 )
