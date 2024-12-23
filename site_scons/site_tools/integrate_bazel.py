@@ -1174,7 +1174,11 @@ def exists(env: SCons.Environment.Environment) -> bool:
 
 
 def handle_bazel_program_exception(env, target, outputs):
-    if sys.platform == "win32" and env.GetOption("link-model") == "dynamic-sdk":
+    if sys.platform == "win32" and (
+        env.GetOption("link-model") == "dynamic-sdk"
+        or "cyrus_sasl_windows_test_plugin" in target
+        or "mongoca" in target
+    ):
         is_shared_library = False
         for bazel_output_file in outputs:
             if os.path.splitext(bazel_output_file)[1] in set([".dll", ".pdb"]):

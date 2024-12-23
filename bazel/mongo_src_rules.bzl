@@ -232,7 +232,6 @@ WINDOWS_COPTS = (
     WINDOWS_GENERAL_COPTS +
     WINDOWS_DEBUG_COPTS +
     WINDOWS_OPT_COPTS +
-    WINDOWS_MULTITHREAD_RUNTIME_COPTS +
     WINDOWS_RUNTIME_ERROR_CHECK_COPTS +
     WINDOWS_SUPRESSED_WARNINGS_COPTS +
     WINDOWS_WARNINGS_AS_ERRORS_COPTS +
@@ -1535,6 +1534,7 @@ def mongo_cc_library(
         exec_properties = {},
         no_undefined_ref_DO_NOT_USE = True,
         linkshared = False,
+        skip_windows_crt_flags = False,
         **kwargs):
     """Wrapper around cc_library.
 
@@ -1593,7 +1593,7 @@ def mongo_cc_library(
 
     if native.package_name().startswith("src/mongo"):
         hdrs = hdrs + ["//src/mongo:mongo_config_header"]
-        if name != "boost_assert_shim":
+        if name != "boost_assert_shim" and name != "mongoca" and name != "cyrus_sasl_windows_test_plugin":
             deps += MONGO_GLOBAL_SRC_DEPS
             if name != "_global_header_bypass":
                 deps += ["//src/mongo:_global_header_bypass"]
@@ -1635,6 +1635,9 @@ def mongo_cc_library(
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     package_specific_copts = package_specific_copt(native.package_name())
     package_specific_linkflags = package_specific_linkflag(native.package_name())
+
+    if not skip_windows_crt_flags:
+        package_specific_copts += WINDOWS_MULTITHREAD_RUNTIME_COPTS
 
     if mongo_api_name:
         visibility_support_defines_list = ["MONGO_USE_VISIBILITY", "MONGO_API_" + mongo_api_name]
@@ -1865,6 +1868,7 @@ def _mongo_cc_binary_and_program(
         exec_properties = {},
         skip_global_deps = [],
         _program_type = "",
+        skip_windows_crt_flags = False,
         **kwargs):
     if linkstatic == True:
         fail("""Linking specific targets statically is not supported.
@@ -1916,6 +1920,8 @@ def _mongo_cc_binary_and_program(
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     package_specific_copts = package_specific_copt(native.package_name())
     package_specific_linkflags = package_specific_linkflag(native.package_name())
+    if not skip_windows_crt_flags:
+        package_specific_copts += WINDOWS_MULTITHREAD_RUNTIME_COPTS
 
     all_deps = deps
 

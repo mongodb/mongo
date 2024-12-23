@@ -6907,7 +6907,7 @@ if env.get("__NINJA_NO") != "1":
                 "aib_additional_directory",
                 "{}/Contents/Resources/DWARF".format(dsym_dir_name),
             )
-            setattr(dwarf_file.attributes, "aib_new_name", dwarf_sym_name.name)
+            setattr(dwarf_file.attributes, "aib_new_name", dwarf_sym_name)
 
             debug_files.extend([plist_file, dwarf_file])
             debug_suffix = ".dSYM"
