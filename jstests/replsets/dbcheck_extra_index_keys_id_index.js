@@ -3,7 +3,7 @@
  *  but fail on clustered collections with proper message.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 

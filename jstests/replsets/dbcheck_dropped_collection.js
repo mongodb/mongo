@@ -6,7 +6,7 @@
  * an identical name, the 'dbcheck healthLog' must issue a 'NamespaceNotFound' warning and not an
  * inconsistency error.
  *
- * @tags: [requires_fcv_81]
+ * @tags: [featureFlagSecondaryIndexChecksInDbCheck]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

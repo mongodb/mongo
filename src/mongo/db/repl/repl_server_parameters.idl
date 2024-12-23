@@ -672,8 +672,7 @@ feature_flags:
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
         cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck
-        default: true
-        version: 8.1
+        default: false
         shouldBeFCVGated: true
 
     featureFlagReduceMajorityWriteLatency:

@@ -2,7 +2,7 @@
  * Test secondaryIndexCheckParameter field in dbCheck health log entries.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 

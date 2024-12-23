@@ -2,7 +2,7 @@
  * Test BSON validation warning logs in the dbCheck command for full bson validate mode.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 

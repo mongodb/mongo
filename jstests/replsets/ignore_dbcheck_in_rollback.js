@@ -2,7 +2,7 @@
  * This test makes sure the 'dbcheck' command is ignored during rollback and a warning health log
  * entry is logged.
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 

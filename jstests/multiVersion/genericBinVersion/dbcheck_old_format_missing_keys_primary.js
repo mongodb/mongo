@@ -3,7 +3,7 @@
  * detects the inconsistency. Insert inconsistencies on just the primary node.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 

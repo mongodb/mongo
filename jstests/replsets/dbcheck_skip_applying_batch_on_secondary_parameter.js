@@ -2,7 +2,7 @@
  * Tests the skipApplyingDbCheckBatchOnSecondary parameter.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

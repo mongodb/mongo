@@ -2,7 +2,7 @@
  * Tests dbCheck fails on write concern error.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

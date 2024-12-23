@@ -2,7 +2,7 @@
  * Tests dbCheck with old format index keys and verifies that no inconsistency is found.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 

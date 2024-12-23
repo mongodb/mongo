@@ -4,7 +4,7 @@
  * exist in the index. The healthlog entry contains a list of all missing index keys.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 

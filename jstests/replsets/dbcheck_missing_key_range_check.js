@@ -4,7 +4,7 @@
  * if the doc is outside of the range specified in the dbCheck invocation.
  *
  * @tags: [
- *   requires_fcv_81
+ *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
 
