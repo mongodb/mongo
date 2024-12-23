@@ -1,5 +1,7 @@
 import os.path
+import random
 import shlex
+import string
 import sys
 
 import typer
@@ -14,6 +16,8 @@ import buildscripts.run_smoke_tests as smoke_tests
 from buildscripts.util.fileops import write_file
 from buildscripts.util.read_config import read_config_file
 
+RANDOM_STRING_LENGTH = 5
+
 
 def make_smoke_test_task(suite: str, tests: list[str], compile_variant: str) -> Task:
     commands = [
@@ -21,7 +25,13 @@ def make_smoke_test_task(suite: str, tests: list[str], compile_variant: str) -> 
         FunctionCall("run tests", {"suite": suite, "resmoke_args": shlex.join(tests)}),
     ]
     dependencies = {TaskDependency("archive_dist_test", compile_variant)}
-    return Task(f"smoke_tests_{suite}", commands, dependencies)
+    # random string so we do not define the same task name for multiple variants which causes issues
+    random_string = "".join(
+        random.choices(
+            string.ascii_uppercase + string.digits + string.ascii_lowercase, k=RANDOM_STRING_LENGTH
+        )
+    )
+    return Task(f"smoke_tests_{suite}_{random_string}", commands, dependencies)
 
 
 def main(
