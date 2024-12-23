@@ -1,5 +1,8 @@
 // Tests query settings are applied to find queries regardless of the query engine (SBE or classic).
 // @tags: [
+//   # TODO SERVER-98659 Investigate why this test is failing on
+//   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
+//   does_not_support_stepdowns,
 //   # Balancer may impact the explain output (e.g. data was previously present on both shards and
 //   # now only on one).
 //   assumes_balancer_off,

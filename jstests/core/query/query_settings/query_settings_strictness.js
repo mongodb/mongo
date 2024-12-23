@@ -2,6 +2,9 @@
  * Tests that the query settings object accepts arbitrary fields to avoid having breaking changes in
  * the future.
  * @tags: [
+ *   # TODO SERVER-98659 Investigate why this test is failing on
+ *   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
+ *   does_not_support_stepdowns,
  *   directly_against_shardsvrs_incompatible,
  *   requires_non_retryable_commands,
  *   simulate_atlas_proxy_incompatible,

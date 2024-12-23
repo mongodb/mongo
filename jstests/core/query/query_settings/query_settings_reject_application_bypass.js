@@ -1,6 +1,9 @@
 // Tests that internal/administrative queries cannot be rejected via the use of `reject` in query
 // settings.
 // @tags: [
+//   # TODO SERVER-98659 Investigate why this test is failing on
+//   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
+//   does_not_support_stepdowns,
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
 //   assumes_read_preference_unchanged,

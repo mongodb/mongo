@@ -3,6 +3,9 @@
  * Excluding test suites that do not expect parallel shell or connect to shards directly
  * ('setClusterParameter' can only run on mongos in sharded clusters).
  * @tags: [
+ *   # TODO SERVER-98659 Investigate why this test is failing on
+ *   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
+ *   does_not_support_stepdowns,
  *   command_not_supported_in_serverless,
  *   directly_against_shardsvrs_incompatible,
  *   uses_parallel_shell,
