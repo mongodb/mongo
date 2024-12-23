@@ -36,6 +36,7 @@
     - [Extending IDL](#extending-idl)
     - [Implementation Details](#implementation)
   - [Best Practices](#best-practices)
+  - [Developer Workflow](#developer-workflow)
 
 Interface Definition Language (IDL) is a custom Domain Specific Language (DSL) originally designed
 to generate code to meets MongoDB's needs for handling BSON. Server parameters and configuration
@@ -1015,3 +1016,8 @@ true` is the default. 1. For persistance: For upgrade/downgrade, if a persisted 
       the generated class. It is not advisable though to use these methods during normal command
       request processing. The network buffer that holds the inbound request is available during the
       lifetime of the request even though IDL does not anchor the network buffer.
+
+## Developer Workflow
+
+Adding new functionality to IDL should be accompanied by adding tests to `idl_test.cpp`, adding
+tests to `buildscripts/idl/tests`, and adding the necessary schema to `idl_schema.json`.

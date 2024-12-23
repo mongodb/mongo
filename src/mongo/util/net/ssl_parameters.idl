@@ -38,7 +38,7 @@ imports:
 
 structs:
   TLSCATrust:
-    description:
+    description: "An individual record mapping the sha256 fingerprint of one X.509 Certificate Authority file to the list of MongoDB RoleName identities which that CA may grant to a client certificate"
     strict: true
     fields:
         sha256: sha256BlockHex

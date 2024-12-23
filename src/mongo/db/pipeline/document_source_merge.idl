@@ -85,7 +85,7 @@ structs:
                 description: Target namespace to merge documents from an aggregation pipeline into.
                 query_shape: custom
 
-            on:
+            "on":
                 type: MergeOnFields
                 optional: true
                 description: A single field or array of fields that uniquely identify a document.

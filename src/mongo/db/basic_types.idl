@@ -401,7 +401,7 @@ enums:
         values:
             kUpper: upper
             kLower: lower
-            kOff: off
+            kOff: "off"
 
     CollationStrength:
         description: Controls the set of characteristics used to compare strings.

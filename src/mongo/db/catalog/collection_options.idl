@@ -39,7 +39,7 @@ enums:
         description: "Determines how strictly MongoDB applies the validation rules to existing documents during an update."
         type: string
         values:
-            off: off
+            "off": "off"
             strict: strict
             moderate: moderate
 
