@@ -982,7 +982,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::viewPipelineHelperForSearch
     // need to set the resolved namespace so that idLookup knows to apply the view.
     if (!search_helper_bson_obj::isStoredSource(currentPipeline)) {
         const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
-        search_helpers::setResolvedNamespaceForSearch(originalNs, resolvedView, subPipelineExpCtx);
+        search_helpers::addResolvedNamespaceForSearch(originalNs, resolvedView, subPipelineExpCtx);
     }
     // return the user pipeline without appending the view stages.
     return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);

@@ -174,7 +174,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
             // storedSource is disabled, idLookup will retrieve full/unmodified documents during
             // (from the _id values returned by mongot), apply the view's data transforms, and pass
             // said transformed documents through the rest of the user pipeline.
-            search_helpers::setResolvedNamespaceForSearch(
+            search_helpers::addResolvedNamespaceForSearch(
                 aggExState.getOriginalNss(), aggExState.getResolvedView().value(), expCtx, uuid);
             return pipeline;
         }

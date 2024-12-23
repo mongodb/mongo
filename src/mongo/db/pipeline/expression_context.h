@@ -363,6 +363,23 @@ public:
         _params.resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
+    void addResolvedNamespace(StringData collName, const ResolvedNamespace& resolvedNs) {
+        auto it = _params.resolvedNamespaces.find(collName);
+
+        // Assert that the resolved namespace we are adding either doesn't exist in the map or we
+        // are reassigning the same value (no modification allowed). Only perform the uuid check if
+        // both uuids exist.
+        uassert(9825500,
+                "Cannot overwrite an existing namespace with a different value",
+                it == _params.resolvedNamespaces.end() ||
+                    (it->second.involvedNamespaceIsAView == resolvedNs.involvedNamespaceIsAView &&
+                     it->second.ns == resolvedNs.ns &&
+                     (!it->second.uuid.has_value() || !resolvedNs.uuid.has_value() ||
+                      it->second.uuid.value() == resolvedNs.uuid.value())));
+
+        _params.resolvedNamespaces[collName] = resolvedNs;
+    }
+
     void addResolvedNamespaces(
         const mongo::stdx::unordered_set<mongo::NamespaceString>& resolvedNamespaces) {
         for (const auto& nss : resolvedNamespaces) {

@@ -254,16 +254,15 @@ bool isSearchMetaPipeline(const Pipeline* pipeline) {
     return isSearchMetaStage(pipeline->peekFront());
 }
 
-void setResolvedNamespaceForSearch(const NamespaceString& origNss,
+void addResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    const ResolvedView& resolvedView,
                                    boost::intrusive_ptr<ExpressionContext> expCtx,
                                    boost::optional<UUID> uuid) {
-    auto resolvedNamespaces = StringMap<ResolvedNamespace>{{origNss.coll().toString(),
-                                                            {resolvedView.getNamespace(),
-                                                             resolvedView.getPipeline(),
-                                                             uuid,
-                                                             true /*involvedNamespaceIsAView*/}}};
-    expCtx->setResolvedNamespaces(resolvedNamespaces);
+    expCtx->addResolvedNamespace(origNss.coll().toString(),
+                                 ResolvedNamespace(resolvedView.getNamespace(),
+                                                   resolvedView.getPipeline(),
+                                                   uuid,
+                                                   true /*involvedNamespaceIsAView*/));
     expCtx->setViewNS(boost::make_optional(origNss));
 }
 
