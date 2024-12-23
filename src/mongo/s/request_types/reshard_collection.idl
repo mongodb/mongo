@@ -91,10 +91,6 @@ commands:
         description: "Whether to create an index on the shard key pattern if the shard key
                       does not already have a support index."
         default: true
-      skipVerification:
-        type: bool
-        description: "Whether to skip data comparison verification."
-        optional: true
       relaxed:
         type: optionalBool
         description: >-
@@ -160,10 +156,6 @@ commands:
         description: "Whether to create an index on the shard key pattern if the shard key
                       does not already have a support index."
         default: true
-      skipVerification:
-        type: bool
-        description: "Whether to skip data comparison verification."
-        optional: true
       recipientOplogBatchTaskCount:
         type: long
         description: >-
@@ -190,10 +182,6 @@ commands:
         type: shard_id
         description: "The id specification of the destination shard."
         optional: false
-      skipVerification:
-        type: bool
-        description: "Whether to skip data comparison verification."
-        optional: true
       oplogBatchApplierTaskCount:
         type: safeInt64
         description: >-
@@ -215,10 +203,6 @@ commands:
       toShard:
         type: shard_id
         description: "The id specification of the destination shard. If empty, we will pick the emptiest shard."
-        optional: true
-      skipVerification:
-        type: bool
-        description: "Whether to skip data comparison verification."
         optional: true
       oplogBatchApplierTaskCount:
         type: safeInt64
