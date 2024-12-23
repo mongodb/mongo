@@ -868,6 +868,7 @@ tasks:
         vars:
           targets: install-dbtest install-dbtest-debug
           compiling_for_test: true
+          skip_archive: on
           bazel_build_tags: --bazel-build-tag=dbtest
 
   - <<: *compile_dbtest
@@ -907,6 +908,7 @@ tasks:
         vars:
           targets: archive-dbtest archive-dbtest-debug
           compiling_for_test: true
+          skip_archive: on
           bazel_build_tags: --bazel-build-tag=dbtest
 
   - <<: *archive_dbtest
@@ -922,7 +924,8 @@ tasks:
       - func: "scons compile"
         vars:
           targets: install-integration-tests
-          bazel_build_tags: --bazel-build-tag=mongo_integration_test --bazel-build-tag=dist_test --bazel-build-tag=mongo_library
+          skip_archive: on
+          bazel_build_tags: --bazel-build-tag=mongo_integration_test --bazel-build-tag=dist_test
           compiling_for_test: true
 
   - name: archive_jstestshell
@@ -939,6 +942,7 @@ tasks:
           targets: archive-jstestshell
           compiling_for_test: true
           separate_debug: on
+          skip_archive: on
           bazel_build_tags: --bazel-build-tag=jstestshell
           task_compile_flags: >-
             PREFIX=dist-test
@@ -967,6 +971,7 @@ tasks:
         vars:
           <<: *archive_jstestshell_vars
           targets: archive-jstestshell-debug
+          skip_archive: on
       - command: s3.put
         params:
           aws_key: ${aws_key}
