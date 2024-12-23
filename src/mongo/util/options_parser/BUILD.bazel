@@ -51,6 +51,9 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+    tags = [
+        "mongo_crypt",
+    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/crypto:sha_block",

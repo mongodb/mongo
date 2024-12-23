@@ -6833,6 +6833,124 @@ if env.get("__NINJA_NO") != "1":
     new_emitter = SCons.Builder.ListEmitter([bazel_program_auto_install_emitter, base_emitter])
     builder.emitter = new_emitter
 
+    def bazel_shared_library_auto_install_emitter(target, source, env):
+        bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(target[0].path)
+        bazel_output = env["SCONS2BAZEL_TARGETS"].bazel_output(target[0].path)
+
+        linkfile = bazel_target.replace("//src/", "bazel-bin/src/") + "_links.list"
+        linkfile = "/".join(linkfile.rsplit(":", 1))
+
+        with open(os.path.join(env.Dir("#").abspath, linkfile)) as f:
+            query_results = f.read()
+
+        filtered_results = ""
+        for lib in query_results.splitlines():
+            bazel_out_path = lib.replace("\\", "/").replace(
+                f"{env['BAZEL_OUT_DIR']}/src", "bazel-bin/src"
+            )
+            if os.path.exists(
+                env.File("#/" + bazel_out_path + ".exclude_lib").abspath.replace("\\", "/")
+            ):
+                continue
+            filtered_results += lib + "\n"
+        query_results = filtered_results
+
+        t = target[0]
+        suffix = getattr(t.attributes, "aib_effective_suffix", t.get_suffix())
+
+        bazel_node = env.File("#/" + bazel_output)
+
+        debug_files = []
+        debug_suffix = ""
+        # This was copied from separate_debug.py
+        if env.TargetOSIs("darwin"):
+            # There isn't a lot of great documentation about the structure of dSYM bundles.
+            # For general bundles, see:
+            #
+            # https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html
+            #
+            # But we expect to find two files in the bundle. An
+            # Info.plist file under Contents, and a file with the same
+            # name as the target under Contents/Resources/DWARF.
+
+            target0 = bazel_node
+            dsym_dir_name = target0.name + ".dSYM"
+            dsym_dir = env.Dir(dsym_dir_name, directory=target0.get_dir())
+
+            dwarf_sym_with_debug = os.path.join(
+                dsym_dir.abspath, f"Contents/Resources/DWARF/{target0.name}_shared_with_debug.dylib"
+            )
+
+            # this handles shared libs or program binaries
+            if os.path.exists(dwarf_sym_with_debug):
+                dwarf_sym_name = f"{target0.name}.dylib"
+            else:
+                dwarf_sym_with_debug = os.path.join(
+                    dsym_dir.abspath, f"Contents/Resources/DWARF/{target0.name}_with_debug"
+                )
+                dwarf_sym_name = f"{target0.name}"
+
+            plist_file = env.File("Contents/Info.plist", directory=dsym_dir)
+            setattr(plist_file.attributes, "aib_effective_suffix", ".dSYM")
+            setattr(
+                plist_file.attributes,
+                "aib_additional_directory",
+                "{}/Contents".format(dsym_dir_name),
+            )
+
+            dwarf_dir = env.Dir("Contents/Resources/DWARF", directory=dsym_dir)
+
+            dwarf_file = env.File(dwarf_sym_with_debug, directory=dwarf_dir)
+            setattr(dwarf_file.attributes, "aib_effective_suffix", ".dSYM")
+            setattr(
+                dwarf_file.attributes,
+                "aib_additional_directory",
+                "{}/Contents/Resources/DWARF".format(dsym_dir_name),
+            )
+            setattr(dwarf_file.attributes, "aib_new_name", dwarf_sym_name.name)
+
+            debug_files.extend([plist_file, dwarf_file])
+            debug_suffix = ".dSYM"
+
+        elif env.TargetOSIs("posix"):
+            debug_suffix = env.subst("$SEPDBG_SUFFIX")
+            debug_file = env.File(f"{bazel_node.abspath}{debug_suffix}")
+            debug_files.append(debug_file)
+        elif env.TargetOSIs("windows"):
+            debug_suffix = ".pdb"
+            debug_file = env.File(f"{bazel_node.abspath}{debug_suffix}")
+            debug_files.append(debug_file)
+        else:
+            pass
+
+        if debug_symbols:
+            for debug_file in debug_files:
+                setattr(debug_file.attributes, "debug_file_for", bazel_node)
+            setattr(bazel_node.attributes, "separate_debug_files", debug_files)
+
+        if not env.TargetOSIs("windows"):
+            setattr(bazel_node.attributes, "aib_new_name", bazel_node.name[len("lib") :])
+
+        installed_prog = env.BazelAutoInstallSingleTarget(bazel_node, suffix, bazel_node)
+
+        installed_debugs = []
+        if debug_symbols:
+            for debug_file in debug_files:
+                installed_debugs.append(
+                    env.BazelAutoInstallSingleTarget(debug_file, debug_suffix, debug_file)
+                )
+
+        setattr(t.attributes, "AIB_INSTALLED_FILES", installed_prog)
+
+        return target, source
+
+    builder = env["BUILDERS"]["BazelSharedLibrary"]
+    base_emitter = builder.emitter
+    new_emitter = SCons.Builder.ListEmitter(
+        [bazel_shared_library_auto_install_emitter, base_emitter]
+    )
+    builder.emitter = new_emitter
+
 
 def injectMongoIncludePaths(thisEnv):
     if thisEnv.get("BAZEL_OUT_DIR"):

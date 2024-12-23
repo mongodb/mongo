@@ -1650,6 +1650,22 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "shared_archive_or_link_dynamic",
+    match_any = [
+        ":shared_archive_enabled",
+        ":linkstatic_disabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "shared_archive_enabled_gcc",
+    match_all = [
+        ":shared_archive_enabled",
+        ":compiler_type_gcc",
+    ],
+)
+
 # --------------------------------------
 # skip_archive options
 # --------------------------------------

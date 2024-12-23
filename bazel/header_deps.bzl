@@ -24,7 +24,7 @@ def create_link_dep_impl(ctx):
         if dep[CcInfo].linking_context:
             for input in dep[CcInfo].linking_context.linker_inputs.to_list():
                 for library in input.libraries:
-                    if library.dynamic_library:
+                    if library.dynamic_library and library.resolved_symlink_dynamic_library:
                         dep = library.resolved_symlink_dynamic_library.path
                         if dep not in deps:
                             deps.append(library.resolved_symlink_dynamic_library.path)

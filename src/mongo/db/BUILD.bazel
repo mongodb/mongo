@@ -830,6 +830,9 @@ mongo_cc_library(
     srcs = [
         "transaction_resources_init_non_mongod.cpp",
     ],
+    tags = [
+        "mongo_crypt",
+    ],
     deps = [
         ":service_context",
         ":shard_role_api",
@@ -2257,6 +2260,9 @@ mongo_cc_library(
     ],
     hdrs = [
         "service_context_test_fixture.h",
+    ],
+    tags = [
+        "mongo_crypt",
     ],
     deps = [
         ":service_context",

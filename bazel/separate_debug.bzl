@@ -404,6 +404,8 @@ def windows_extraction(ctx, cc_toolchain, inputs):
     pdb = None
     if ctx.attr.type == "library":
         ext = ".lib"
+        if ctx.attr.cc_shared_library and ctx.attr.enable_pdb:
+            pdb = ctx.attr.cc_shared_library[OutputGroupInfo].pdb_file
     elif ctx.attr.type == "program":
         ext = ".exe"
         if ctx.attr.enable_pdb:
@@ -429,19 +431,33 @@ def windows_extraction(ctx, cc_toolchain, inputs):
 
             if ext == ".lib":
                 output_library = output
-            if ext == ".dll":
-                output_dynamic_library = output
-                # TODO support PDB outputs for dynamic windows builds when we are on bazel 7.2
-                # https://github.com/bazelbuild/bazel/pull/21900/files
 
             ctx.actions.symlink(
                 output = output,
                 target_file = input,
             )
 
+        if ctx.attr.cc_shared_library != None:
+            for file in ctx.attr.cc_shared_library.files.to_list():
+                if file.path.endswith(".dll"):
+                    basename = file.basename[:-len(WITH_DEBUG_SUFFIX + CC_SHARED_LIBRARY_SUFFIX + ".dll")]
+                    output = ctx.actions.declare_file(basename + ".dll")
+                    outputs.append(output)
+
+                    output_dynamic_library = output
+
+                    ctx.actions.symlink(
+                        output = output,
+                        target_file = file,
+                    )
+
         if pdb:
-            basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
-            pdb_output = ctx.actions.declare_file(basename + ".pdb")
+            if ctx.attr.cc_shared_library != None:
+                basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ".pdb")]
+                pdb_output = ctx.actions.declare_file(basename + ".dll.pdb")
+            else:
+                basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
+                pdb_output = ctx.actions.declare_file(basename + ".pdb")
             outputs.append(pdb_output)
 
             ctx.actions.symlink(

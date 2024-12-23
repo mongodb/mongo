@@ -139,11 +139,17 @@ class Globals:
 
     @staticmethod
     def bazel_output(scons_node):
-        return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]["bazel_output"]
+        scons_node = str(scons_node).replace("\\", "/")
+        if platform.system() != "Windows":
+            scons_node = scons_node.replace("/mongo_crypt_v1", "/libmongo_crypt_v1")
+        return Globals.scons2bazel_targets[scons_node]["bazel_output"]
 
     @staticmethod
     def bazel_target(scons_node):
-        return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]["bazel_target"]
+        scons_node = str(scons_node).replace("\\", "/")
+        if platform.system() != "Windows":
+            scons_node = scons_node.replace("/mongo_crypt_v1", "/libmongo_crypt_v1")
+        return Globals.scons2bazel_targets[scons_node]["bazel_target"]
 
     @staticmethod
     def bazel_link_file(scons_node):
@@ -652,9 +658,25 @@ def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builde
     )
 
 
+def create_scons_and_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builder:
+    return SCons.Builder.Builder(
+        action=BazelCopyOutputsAction,
+        prefix=builder.prefix,
+        suffix=builder.suffix,
+        src_suffix=builder.src_suffix,
+        source_scanner=builder.source_scanner,
+        target_scanner=builder.target_scanner,
+        emitter=SCons.Builder.ListEmitter([builder.emitter, bazel_target_emitter]),
+    )
+
+
 # TODO delete this builder when we have testlist support in bazel
 def create_program_builder(env: SCons.Environment.Environment) -> None:
     env["BUILDERS"]["BazelProgram"] = create_bazel_builder(env["BUILDERS"]["Program"])
+
+
+def create_shared_library_builder(env: SCons.Environment.Environment) -> None:
+    env["BUILDERS"]["BazelSharedLibrary"] = create_bazel_builder(env["BUILDERS"]["SharedLibrary"])
 
 
 def get_default_cert_dir():
@@ -1072,6 +1094,7 @@ def auto_archive_bazel(env, node, already_archived, search_stack):
 def load_bazel_builders(env):
     # === Builders ===
     create_program_builder(env)
+    create_shared_library_builder(env)
 
     if env.GetOption("ninja") != "disabled":
         env.NinjaRule(
@@ -1151,6 +1174,21 @@ def exists(env: SCons.Environment.Environment) -> bool:
 
 
 def handle_bazel_program_exception(env, target, outputs):
+    if sys.platform == "win32" and env.GetOption("link-model") == "dynamic-sdk":
+        is_shared_library = False
+        for bazel_output_file in outputs:
+            if os.path.splitext(bazel_output_file)[1] in set([".dll", ".pdb"]):
+                is_shared_library = True
+                scons_node_str = bazel_output_file.replace(
+                    f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path.replace("\\", "/")
+                )
+
+                Globals.scons2bazel_targets[scons_node_str.replace("\\", "/")] = {
+                    "bazel_target": target,
+                    "bazel_output": bazel_output_file.replace("\\", "/"),
+                }
+        return is_shared_library
+
     prog_suf = env.subst("$PROGSUFFIX")
     dbg_suffix = ".pdb" if sys.platform == "win32" else env.subst("$SEPDBG_SUFFIX")
     bazel_program = False
@@ -1303,9 +1341,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     # We don't support DLL generation on Windows, but need shared object generation in dynamic-sdk mode
     # on linux.
-    linkstatic = env.GetOption("link-model") in ["auto", "static"] or (
-        normalized_os == "windows" and env.GetOption("link-model") == "dynamic-sdk"
-    )
+    linkstatic = env.GetOption("link-model") in ["auto", "static", "dynamic-sdk"]
 
     allocator = env.get("MONGO_ALLOCATOR", "tcmalloc-google")
 

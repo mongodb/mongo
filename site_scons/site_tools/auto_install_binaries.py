@@ -454,7 +454,9 @@ def auto_install_emitter(target, source, env):
         if env.get("AIB_IGNORE", False):
             continue
 
-        if t.has_builder() and t.get_builder().get_name(env) == "BazelProgram":
+        if t.has_builder() and t.get_builder().get_name(env) in set(
+            ["BazelProgram", "BazelSharedLibrary"]
+        ):
             continue
 
         # There is no API for determining if an Entry is operating in
