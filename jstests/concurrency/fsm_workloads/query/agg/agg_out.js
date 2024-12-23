@@ -14,8 +14,6 @@
  *   requires_capped,
  *   # Uses $out, which is non-retryable.
  *   requires_non_retryable_writes,
- *   requires_getmore,
- *   uses_getmore_outside_of_transaction,
  * ]
  */
 
@@ -27,6 +25,10 @@ import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_base.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
+    // Use a smaller document size, but more iterations. The smaller documents will ensure each
+    // operation is faster, giving us time to do more operations and thus increasing the likelihood
+    // that any two operations will be happening concurrently.
+    $config.data.docSize = 1000;
     $config.iterations = 100;
 
     $config.data.outputCollName = 'agg_out';  // Use the workload name as the collection name
@@ -242,10 +244,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Calls the super class' setup but using our own database.
      */
     $config.setup = function setup(db, collName, cluster) {
-        // Use a smaller document size, but more iterations. The smaller documents will ensure each
-        // operation is faster, giving us time to do more operations and thus increasing the
-        // likelihood that any two operations will be happening concurrently.
-        this.docSize = 1000;
         $super.setup.apply(this, [db, collName, cluster]);
 
         // `shardCollection()` requires a shard key index to be in place on the output collection,

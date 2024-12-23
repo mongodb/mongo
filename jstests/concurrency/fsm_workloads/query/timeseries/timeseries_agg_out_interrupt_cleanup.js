@@ -11,8 +11,6 @@
  *   uses_curop_agg_stage,
  *   # TODO Undenylist (SERVER-38852).
  *   assumes_against_mongod_not_mongos,
- *   requires_getmore,
- *   uses_getmore_outside_of_transaction,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -6,9 +6,7 @@
  *   # SERVER-33753, '.count() without a predicate can be wrong on sharded
  *   # collections'. This bug is problematic for these workloads because they assert on count()
  *   # values
- *   assumes_unsharded_collection,
- *   requires_getmore,
- *   uses_getmore_outside_of_transaction,
+ *   assumes_unsharded_collection
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

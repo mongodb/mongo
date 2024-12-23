@@ -210,9 +210,6 @@ selector:
     - assumes_stable_collection_uuid
     - does_not_support_retryable_writes
     - requires_non_retryable_writes
-    # This suite executes random moveCollections in the background that cause open cursors on the
-    # collection to be killed.
-    - requires_getmore
 
 executor:
   archive:

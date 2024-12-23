@@ -40,8 +40,7 @@ const kRetryableErrors = [
 
 // Commands known not to work with transitions so tests can fail immediately with a clear error.
 // Empty for now.
-const kDisallowedCommandsInsideTxns = [];
-const kDisallowedCommandsOutsideTxns = ["getMore"];
+const kDisallowedCommands = [];
 
 function matchesRetryableError(error, retryableError) {
     for (const key of Object.keys(retryableError)) {
@@ -116,15 +115,9 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
     let res;
     let attempt = 0;
 
-    const inTransaction = cmdObj.hasOwnProperty("autocommit");
-    const disallowedCommands =
-        inTransaction ? kDisallowedCommandsInsideTxns : kDisallowedCommandsOutsideTxns;
-
-    if (disallowedCommands.includes(cmdName)) {
-        throw new Error(`Cowardly refusing to run command ${
-            (inTransaction
-                 ? "inside"
-                 : "outside")} of transaction with a transitioning shard ${tojson(cmdObj)}`);
+    if (kDisallowedCommands.includes(cmdName)) {
+        throw new Error("Cowardly refusing to run command with a transitioning shard" +
+                        tojson(cmdObj));
     }
 
     assert.soon(

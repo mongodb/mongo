@@ -68,7 +68,6 @@ selector:
     - requires_profiling
     - assumes_against_mongod_not_mongos
     - assumes_unsharded_collection
-    - requires_getmore
     - temp_disabled_embedded_router_uncategorized
   roots:
     - jstests/concurrency/fsm_workloads/**/*.js
