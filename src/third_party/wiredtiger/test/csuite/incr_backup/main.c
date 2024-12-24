@@ -650,8 +650,6 @@ run_test(char const *working_dir, WT_RAND_STATE *rnd, bool preserve)
             testutil_check(wiredtiger_open(WT_HOME_DIR, NULL, conf, &conn));
             testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-            /* Test against the copied directory. */
-            testutil_verify_src_backup(conn, backup_src, WT_HOME_DIR, NULL);
             testutil_remove(backup_src);
             nreopens++;
         }

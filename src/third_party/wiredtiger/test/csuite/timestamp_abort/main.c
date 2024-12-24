@@ -424,7 +424,7 @@ static void
 backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t index)
 {
     int nfiles, nranges, nunmodified;
-    char backup_home[PATH_MAX], backup_id[32];
+    char backup_home[PATH_MAX];
 
     printf("Create incremental backup %" PRIu32 " - start: source=%" PRIu32 "\n", index, src_index);
     testutil_backup_create_incremental(conn, WT_HOME_DIR, (int)index, (int)src_index,
@@ -441,11 +441,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
     /* Immediately verify the backup. */
     if (backup_verify_immediately) {
         PRINT_BACKUP_VERIFY(index);
-        if (backup_verify_quick) {
-            testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
-            testutil_verify_src_backup(conn, backup_home, WT_HOME_DIR, backup_id);
-        } else
-            testutil_check(recover_and_verify(index, 0));
+        testutil_check(recover_and_verify(index, 0));
         PRINT_BACKUP_VERIFY_DONE(index);
     }
 }
@@ -1025,47 +1021,6 @@ print_missing(REPORT *r, const char *fname, const char *msg)
 }
 
 /*
- * backup_exists --
- *     Check whether the backup with the given ID exists in the database.
- */
-static bool
-backup_exists(WT_CONNECTION *conn, uint32_t index)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    WT_SESSION *session;
-    char backup_id[64];
-    const char *idstr;
-    bool found;
-
-    testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    /*
-     * Check if we find the backup with the given ID. But depending on scheduling of backups,
-     * checkpoints and killing the process, the backup ID may or may not have been saved to disk
-     * after a restart. If opening the backup query cursor gets EINVAL then there is no backup.
-     */
-    found = false;
-    ret = session->open_cursor(session, "backup:query_id", NULL, NULL, &cursor);
-    if (ret == EINVAL)
-        goto done;
-    testutil_check(ret);
-    while (cursor->next(cursor) == 0) {
-        testutil_check(cursor->get_key(cursor, &idstr));
-        if (strcmp(idstr, backup_id) == 0) {
-            found = true;
-            break;
-        }
-    }
-    testutil_check(cursor->close(cursor));
-
-done:
-    testutil_check(session->close(session, NULL));
-    return (found);
-}
-
-/*
  * backup_verify --
  *     Verify previous backups created within the given workload iteration (use 0 to verify all).
  */
@@ -1076,7 +1031,8 @@ backup_verify(WT_CONNECTION *conn, uint32_t workload_iteration)
     DIR *d;
     size_t len;
     uint32_t index;
-    char backup_id[64];
+
+    WT_UNUSED(conn);
 
     testutil_assert_errno((d = opendir(".")) != NULL);
     len = strlen(BACKUP_BASE);
@@ -1094,14 +1050,6 @@ backup_verify(WT_CONNECTION *conn, uint32_t workload_iteration)
             if (backup_verify_quick) {
                 /* Just check that chunks that are supposed to be different are indeed different. */
                 printf("Verify backup %" PRIu32 " (quick)\n", index);
-
-                /* Continue the verification only if we have the backup ID. */
-                if (backup_exists(conn, index)) {
-                    PRINT_BACKUP_VERIFY(index);
-                    testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
-                    testutil_verify_src_backup(conn, dir->d_name, WT_HOME_DIR, backup_id);
-                    PRINT_BACKUP_VERIFY_DONE(index);
-                }
             } else {
                 /* Perform a full test. */
                 PRINT_BACKUP_VERIFY(index);
@@ -1150,13 +1098,6 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
         testutil_snprintf(verify_dir, sizeof(verify_dir), "%s", WT_HOME_DIR);
         testutil_wiredtiger_open(opts, verify_dir, NULL, &reopen_event, &conn, true, false);
         printf("Connection open and recovery complete. Verify content\n");
-        /* Compare against the copy of the home directory just before recovery. */
-        if (use_backups) {
-            printf("--- Verify saved dir against the backup source\n");
-            testutil_snprintf(buf, sizeof(buf), "%s.SAVE/%s", home, WT_HOME_DIR);
-            testutil_verify_src_backup(conn, buf, WT_HOME_DIR, NULL);
-            printf("--- DONE: Verify saved dir against the backup source\n");
-        }
         /*
          * Only call this when index is 0 because it calls back into here to verify a specific
          * backup.
