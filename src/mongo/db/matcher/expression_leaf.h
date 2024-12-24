@@ -200,7 +200,6 @@ public:
      * BSONObj backing 'elem' outlives this MatchExpression.
      */
     void setData(BSONElement elem) {
-        // TODO SERVER-50629: Ensure that the _backingBSON is consistent with the new element.
         _rhs = elem;
     }
 
