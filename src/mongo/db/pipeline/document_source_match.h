@@ -255,7 +255,6 @@ private:
                       const StringMap<std::string>& renames,
                       expression::ShouldSplitExprFunc func) &&;
 
-    // TODO(SERVER-48830): Remove need for holding serialized version of the MatchExpression.
     BSONObj _predicate;
     bool _isTextQuery{false};
     boost::optional<MatchProcessor> _matchProcessor;
