@@ -1398,7 +1398,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--ssl={"True" if env.GetOption("ssl") == "on" else "False"}',
         f'--js_engine={env.GetOption("js-engine")}',
         f'--use_sasl_client={env.GetOption("use-sasl-client") is not None}',
-        f'--skip_archive={env.GetOption("skip-archive") != "off"}',
+        "--skip_archive=False",
         "--define",
         f"MONGO_VERSION={mongo_version}",
         "--define",
