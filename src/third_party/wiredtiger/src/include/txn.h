@@ -52,6 +52,11 @@ typedef enum {
 } WT_VISIBLE_TYPE;
 
 /*
+ * Enumeration used to track the context of reconstructing modifies within a update list.
+ */
+typedef enum { WT_OPCTX_TRANSACTION, WT_OPCTX_RECONCILATION } WT_OP_CONTEXT;
+
+/*
  * Transaction ID comparison dealing with edge cases.
  *
  * WT_TXN_ABORTED is the largest possible ID (never visible to a running transaction), WT_TXN_NONE

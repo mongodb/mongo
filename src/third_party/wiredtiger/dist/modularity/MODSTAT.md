@@ -6,7 +6,7 @@ It uses the same engine as the `s_access` script.
 ## Modularity info
 
 Information about WT modules configuration is stored in the
-`dist/access_check/wt_defs.py` file.
+`dist/modularity/wt_defs.py` file.
 It contains module names and their aliases in the file system and in C sources.
 
 The initial list of modules is filled in as a list of subdirectories of `src/`
