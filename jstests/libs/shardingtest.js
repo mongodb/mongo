@@ -1275,9 +1275,9 @@ export class ShardingTest {
             randomSeedAlreadySet = true;
         }
 
-        TestData.setParameters = TestData.setParameters || {};
+        jsTest.options().setParameters = jsTest.options().setParameters || {};
         let setDefaultTransactionLockTimeout = false;
-        if (TestData.setParameters.maxTransactionLockRequestTimeoutMillis === undefined) {
+        if (jsTest.options().setParameters.maxTransactionLockRequestTimeoutMillis === undefined) {
             // Set a higher maxTransactionLockRequestTimeoutMillis. Tests written with ShardingTest
             // are generally single threaded and often don't expect lock timeouts, so a higher
             // timeout avoids spurious failures on slow machines.
@@ -1286,7 +1286,7 @@ export class ShardingTest {
             // ReplSetTest, but the rules for passing default options to ReplSetTest via
             // ShardingTest are finnicky and tests rely on the current behaviors. Once this is
             // refactored, we should be able to avoid using TestData.
-            TestData.setParameters.maxTransactionLockRequestTimeoutMillis = 5 * 60 * 1000;
+            jsTest.options().setParameters.maxTransactionLockRequestTimeoutMillis = 5 * 60 * 1000;
             setDefaultTransactionLockTimeout = true;
         }
 
