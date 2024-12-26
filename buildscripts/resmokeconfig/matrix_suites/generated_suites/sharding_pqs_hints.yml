@@ -31,6 +31,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
     num_rs_nodes_per_shard: 1
+    num_shards: 2
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
@@ -111,7 +112,6 @@ selector:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
     - requires_profiling
-    - requires_2_or_more_shards
     - assumes_standalone_mongod
     - does_not_support_repeated_reads
     - requires_profiling
