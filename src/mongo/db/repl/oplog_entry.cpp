@@ -757,5 +757,32 @@ int OplogEntry::getRawObjSizeBytes() const {
     return _entry.getRawObjSizeBytes();
 }
 
+OplogEntryParserNonStrict::OplogEntryParserNonStrict(const BSONObj& oplogEntry)
+    : _oplogEntryObject{oplogEntry.getOwned()} {}
+
+repl::OpTime OplogEntryParserNonStrict::getOpTime() const {
+    return uassertStatusOKWithContext(repl::OpTime::parseFromOplogEntry(_oplogEntryObject),
+                                      str::stream() << "Failed to parse opTime");
+}
+
+repl::OpTypeEnum OplogEntryParserNonStrict::getOpType() const {
+    auto opTypeElement = _oplogEntryObject[repl::OplogEntry::kOpTypeFieldName];
+    uassert(8881100,
+            str::stream() << "Invalid '" << repl::OplogEntry::kOpTypeFieldName
+                          << "' field type (expected String)",
+            opTypeElement.type() == BSONType::String);
+    return repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"),
+                              opTypeElement.checkAndGetStringData());
+}
+
+BSONObj OplogEntryParserNonStrict::getObject() const {
+    auto objectElement = _oplogEntryObject[repl::OplogEntry::kObjectFieldName];
+    uassert(8881101,
+            str::stream() << "Invalid '" << repl::OplogEntry::kObjectFieldName
+                          << "' field type (expected Object)",
+            objectElement.isABSONObj());
+    return objectElement.Obj();
+}
+
 }  // namespace repl
 }  // namespace mongo
