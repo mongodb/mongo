@@ -308,6 +308,11 @@ public:
      */
     Document shred() const;
 
+    /**
+     * Loads the whole document into cache.
+     */
+    void loadIntoCache() const;
+
     static const DocumentStorage& emptyDoc() {
         return kEmptyDoc;
     }

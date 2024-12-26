@@ -247,6 +247,13 @@ public:
         return storage().shred();
     }
 
+    /**
+     * Loads the whole document into cache.
+     */
+    void loadIntoCache() const {
+        return storage().loadIntoCache();
+    }
+
     /** Calculate a hash value.
      *
      * Meant to be used to create composite hashes suitable for
