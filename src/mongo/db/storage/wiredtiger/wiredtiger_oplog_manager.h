@@ -75,7 +75,7 @@ public:
      * `commitTimestamp`, and notifies any capped waiters on the oplog if the visibility point is
      * advanced.
      *
-     * Callers must ensure this call is not concurrenct with a call to `initialize`, as this is not
+     * Callers must ensure this call is not concurrent with a call to `initialize`, as this is not
      * thread-safe.
      */
     void triggerOplogVisibilityUpdate(KVEngine* engine, Timestamp commitTimestamp);

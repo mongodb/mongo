@@ -173,7 +173,7 @@ TEST(WiredTigerSessionCacheTest, resetConfigurationBeforeReleasingSessionToCache
         WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
         // Set ignore_cache_size to be true
         session->reconfigure("ignore_cache_size=true", "ignore_cache_size=false");
-        // Set isolation level to be read-uncomitted (by default it is snapshot)
+        // Set isolation level to be read-uncommitted (by default it is snapshot)
         session->reconfigure("isolation=read-uncommitted", "isolation=snapshot");
         // Set cache_cursors to be false
         session->reconfigure("cache_cursors=false", "cache_cursors=true");
@@ -213,7 +213,7 @@ TEST(WiredTigerSessionCacheTest, resetConfigurationToDefault) {
     WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
     // Set ignore_cache_size to be true
     session->reconfigure("ignore_cache_size=true", "ignore_cache_size=false");
-    // Set isolation level to be read-uncomitted (by default it is snapshot)
+    // Set isolation level to be read-uncommitted (by default it is snapshot)
     session->reconfigure("isolation=read-uncommitted", "isolation=snapshot");
     // Set cache_cursors to be false
     session->reconfigure("cache_cursors=false", "cache_cursors=true");

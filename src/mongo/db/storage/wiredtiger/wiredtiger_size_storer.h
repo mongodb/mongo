@@ -45,7 +45,7 @@ namespace mongo {
  * The WiredTigerSizeStorer class serves as a write buffer to durably store size information for
  * MongoDB collections. The size storer uses a separate WiredTiger table as key-value store, where
  * the URI serves as key and the value is a BSON document with `numRecords` and `dataSize` fields.
- * This buffering is neccessary to allow concurrent updates of size information without causing
+ * This buffering is necessary to allow concurrent updates of size information without causing
  * write conflicts. The dirty size information is periodically stored written back to the table,
  * including on clean shutdown and/or catalog reload. Crashes or replica-set fail-overs may result
  * in size updates to be lost, so size information is only approximate. Reads use the buffer for

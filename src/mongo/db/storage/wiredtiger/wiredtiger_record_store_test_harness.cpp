@@ -188,12 +188,12 @@ std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {
     return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());
 }
 
-std::unique_ptr<RecordStoreHarnessHelper> makeWTRSHarnessHelper(
+std::unique_ptr<RecordStoreHarnessHelper> makeWTRecordStoreHarnessHelper(
     RecordStoreHarnessHelper::Options options) {
     return std::make_unique<WiredTigerHarnessHelper>(options);
 }
 
 MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
-    mongo::registerRecordStoreHarnessHelperFactory(makeWTRSHarnessHelper);
+    mongo::registerRecordStoreHarnessHelperFactory(makeWTRecordStoreHarnessHelper);
 }
 }  // namespace mongo

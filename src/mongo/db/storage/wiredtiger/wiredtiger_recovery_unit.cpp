@@ -670,8 +670,8 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp() {
 Timestamp WiredTigerRecoveryUnit::_getTransactionReadTimestamp() {
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
     WT_SESSION* session = _session->getSession();
-    auto wtstatus = session->query_timestamp(session, buf, "get=read");
-    invariantWTOK(wtstatus, session);
+    auto wtStatus = session->query_timestamp(session, buf, "get=read");
+    invariantWTOK(wtStatus, session);
     uint64_t read_timestamp;
     fassert(50949, NumberParser().base(16)(buf, &read_timestamp));
     return Timestamp(read_timestamp);

@@ -204,7 +204,7 @@ void WiredTigerSession::closeAllCursors(const std::string& uri) {
 void WiredTigerSession::reconfigure(const std::string& newConfig, std::string undoConfig) {
     if (newConfig == undoConfig) {
         // The undoConfig string is the config string that resets our session back to default
-        // settings. If our new configuration is the same as the undoconfig string, then that means
+        // settings. If our new configuration is the same as the undoConfig string, then that means
         // that we are either setting our configuration back to default, or that the newConfig
         // string does not change our default values. In this case, we can erase the undoConfig
         // string from our set of undo config strings, since we no longer need to do any work to

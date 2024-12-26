@@ -1258,7 +1258,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
     auto cursor = sessRaii.getNewCursor(_uri);
     int ret = cursor->largest_key(cursor);
     if (ret == WT_ROLLBACK) {
-        // Force the caller to rollback its transaction if we can't make progess with eviction.
+        // Force the caller to rollback its transaction if we can't make progress with eviction.
         // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
         // a true write conflict.
         auto rollbackReason = wtSession->get_rollback_reason(wtSession);
@@ -1580,7 +1580,7 @@ Status WiredTigerRecordStore::Oplog::updateSize(long long newOplogSize) {
 StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getLatestTimestamp(RecoveryUnit& ru) const {
     // Using this function inside a UOW is not supported because the main reason to call it is to
     // synchronize to the last op before waiting for write concern, so it makes little sense to do
-    // so in a UOW. This also ensures we do not return uncommited entries.
+    // so in a UOW. This also ensures we do not return uncommitted entries.
     invariant(!ru.inUnitOfWork());
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
@@ -1626,7 +1626,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(Recover
 }
 
 int64_t WiredTigerRecordStore::Oplog::getMaxSize() const {
-    // TODO make TruncateMarkers depend on OplogData (not RecrodStore), then move this method.
+    // TODO make TruncateMarkers depend on OplogData (not RecordStore), then move this method.
     return _oplog->getMaxSize();
 }
 

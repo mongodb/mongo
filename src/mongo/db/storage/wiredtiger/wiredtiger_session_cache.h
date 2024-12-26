@@ -344,7 +344,7 @@ public:
                                                     uint64_t lastCount);
 
     /**
-     * Notifies waiters that the caller's perpared unit of work has ended (either committed or
+     * Notifies waiters that the caller's prepared unit of work has ended (either committed or
      * aborted).
      */
     void notifyPreparedUnitOfWorkHasCommittedOrAborted();

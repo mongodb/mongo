@@ -233,7 +233,7 @@ private:
     /**
      * Starts a transaction at the lastApplied timestamp stored in '_readAtTimestamp'. Sets
      * '_readAtTimestamp' to the actual timestamp used by the storage engine in case rounding
-     * occured.
+     * occurred.
      */
     void _beginTransactionAtLastAppliedTimestamp();
 

@@ -390,8 +390,8 @@ StatusWith<RecordId> insertBSONWithSize(
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     StorageWriteTransaction txn(ru);
-    WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs);
-    invariant(wtrs);
+    WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs);
+    invariant(wtRS);
     Status status = engine->oplogDiskLocRegister(
         *shard_role_details::getRecoveryUnit(opCtx), rs, opTime, false);
     if (!status.isOK()) {
@@ -415,7 +415,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     auto wtHarnessHelper = dynamic_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
     std::unique_ptr<RecordStore> rs(wtHarnessHelper->newOplogRecordStoreNoInit());
 
-    auto wtrs = static_cast<WiredTigerRecordStore::Oplog*>(rs.get());
+    auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs.get());
 
     int realNumRecords = 4;
     int realSizePerRecord = 100;
@@ -433,17 +433,17 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     }
 
     // Force the estimates of 'dataSize' and 'numRecords' to be lower than the real values.
-    wtrs->setNumRecords(realNumRecords - 1);
-    wtrs->setDataSize((realNumRecords - 1) * realSizePerRecord);
+    wtRS->setNumRecords(realNumRecords - 1);
+    wtRS->setDataSize((realNumRecords - 1) * realSizePerRecord);
 
     // Initialize the truncate markers.
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-    wtrs->setTruncateMarkers(
-        WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtrs));
+    wtRS->setTruncateMarkers(
+        WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtRS));
 
     // Confirm that small oplogs are processed by scanning.
-    auto oplogTruncateMarkers = wtrs->oplog()->getCollectionTruncateMarkers();
+    auto oplogTruncateMarkers = wtRS->oplog()->getCollectionTruncateMarkers();
     ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Scanning,
               oplogTruncateMarkers->getMarkersCreationMethod());
     ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
@@ -453,8 +453,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     // A forced scan over the RecordStore should force the 'currentBytes' to be accurate in the
     // truncate markers as well as the RecordStore's 'numRecords' and 'dataSize'.
     ASSERT_EQ(oplogTruncateMarkers->currentBytes_forTest(), realNumRecords * realSizePerRecord);
-    ASSERT_EQ(wtrs->dataSize(), realNumRecords * realSizePerRecord);
-    ASSERT_EQ(wtrs->numRecords(), realNumRecords);
+    ASSERT_EQ(wtRS->dataSize(), realNumRecords * realSizePerRecord);
+    ASSERT_EQ(wtRS->numRecords(), realNumRecords);
 }
 
 // Ensure that if we sample and create duplicate oplog truncate markers, perform truncation
@@ -467,7 +467,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
     std::unique_ptr<RecordStore> rs(wtHarnessHelper->newOplogRecordStoreNoInit());
     auto engine = harnessHelper->getEngine();
 
-    auto wtrs = static_cast<WiredTigerRecordStore::Oplog*>(rs.get());
+    auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs.get());
 
     {
         // Before initializing the RecordStore, which also starts the oplog sampling process,
@@ -486,16 +486,16 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
 
     {
         // Force initialize the oplog truncate markers to use sampling by providing very large,
-        // inaccurate sizes. This should cause us to oversample the records in the oplog.
+        // inaccurate sizes. This should cause us to over sample the records in the oplog.
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        wtrs->setNumRecords(1024 * 1024);
-        wtrs->setDataSize(1024 * 1024 * 1024);
-        wtrs->setTruncateMarkers(
-            WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtrs));
+        wtRS->setNumRecords(1024 * 1024);
+        wtRS->setDataSize(1024 * 1024 * 1024);
+        wtRS->setTruncateMarkers(
+            WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtRS));
     }
 
     // Confirm that some truncate markers were generated.
-    auto oplogTruncateMarkers = wtrs->oplog()->getCollectionTruncateMarkers();
+    auto oplogTruncateMarkers = wtRS->oplog()->getCollectionTruncateMarkers();
     ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
               oplogTruncateMarkers->getMarkersCreationMethod());
     ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
@@ -514,7 +514,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
 
         // Reduce the oplog size to ensure we create a truncate marker and truncate on the next
         // insert.
-        ASSERT_OK(wtrs->updateSize(400));
+        ASSERT_OK(wtRS->updateSize(400));
 
         // Inserting these records should meet the requirements for truncation. That is: there is a
         // record, 5, after the last truncate marker, 4, and before the truncation point, 6.
@@ -530,8 +530,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         ASSERT_EQ(1, oplogTruncateMarkers->numMarkers_forTest());
 
         // The original oplog should have rolled over and the size and count should be accurate.
-        ASSERT_EQ(1, wtrs->numRecords());
-        ASSERT_EQ(100, wtrs->dataSize());
+        ASSERT_EQ(1, wtRS->numRecords());
+        ASSERT_EQ(100, wtRS->dataSize());
     }
 }
 
@@ -542,7 +542,7 @@ void testTruncateRange(int64_t numRecordsToInsert,
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
     auto engine = harnessHelper->getEngine();
 
-    auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
+    auto wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
 
     std::vector<RecordId> recordIds;
 
@@ -550,12 +550,12 @@ void testTruncateRange(int64_t numRecordsToInsert,
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     for (int i = 0; i < numRecordsToInsert; i++) {
-        auto recordId = insertBSONWithSize(opCtx.get(), engine, wtrs, Timestamp(1, i), 100);
+        auto recordId = insertBSONWithSize(opCtx.get(), engine, wtRS, Timestamp(1, i), 100);
         ASSERT_OK(recordId);
         recordIds.emplace_back(std::move(recordId.getValue()));
     }
 
-    auto sizePerRecord = wtrs->dataSize() / wtrs->numRecords();
+    auto sizePerRecord = wtRS->dataSize() / wtRS->numRecords();
 
     std::sort(recordIds.begin(), recordIds.end());
 
@@ -566,11 +566,11 @@ void testTruncateRange(int64_t numRecordsToInsert,
 
         auto numRecordsDeleted = deletionPosEnd - deletionPosBegin + 1;
 
-        ASSERT_OK(wtrs->rangeTruncate(
+        ASSERT_OK(wtRS->rangeTruncate(
             opCtx.get(), beginId, endId, -(sizePerRecord * numRecordsDeleted), -numRecordsDeleted));
 
-        ASSERT_EQ(wtrs->dataSize(), sizePerRecord * (numRecordsToInsert - numRecordsDeleted));
-        ASSERT_EQ(wtrs->numRecords(), (numRecordsToInsert - numRecordsDeleted));
+        ASSERT_EQ(wtRS->dataSize(), sizePerRecord * (numRecordsToInsert - numRecordsDeleted));
+        ASSERT_EQ(wtRS->numRecords(), (numRecordsToInsert - numRecordsDeleted));
 
         txn.commit();
     }
@@ -584,7 +584,7 @@ void testTruncateRange(int64_t numRecordsToInsert,
 
     std::set<RecordId> actualRemainingRecordIds;
 
-    auto cursor = wtrs->getCursor(opCtx.get(), true);
+    auto cursor = wtRS->getCursor(opCtx.get(), true);
     while (auto record = cursor->next()) {
         actualRemainingRecordIds.emplace(record->id);
     }
@@ -607,7 +607,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = harnessHelper->getEngine();
 
-    auto wtrs = checked_cast<WiredTigerRecordStore::Oplog*>(rs.get());
+    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs.get());
 
     // 1) Initialize the top of oplog to "1".
     ServiceContext::UniqueOperationContext op1(harnessHelper->newOperationContext());
@@ -621,7 +621,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
         return tsOne;
     }();
     // Asserting on a recovery unit without a snapshot.
-    ASSERT_EQ(tsOne, wtrs->getLatestTimestamp(ru1));
+    ASSERT_EQ(tsOne, wtRS->getLatestTimestamp(ru1));
 
     // 2) Open a hole at time "2".
     boost::optional<StorageWriteTransaction> op1txn(ru1);
@@ -635,7 +635,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
     auto& ru2 = *shard_role_details::getRecoveryUnit(op2.get());
     // Should not see uncommitted write from op1.
-    ASSERT_EQ(tsOne, wtrs->getLatestTimestamp(ru2));
+    ASSERT_EQ(tsOne, wtRS->getLatestTimestamp(ru2));
 
     Timestamp tsThree = [&] {
         StorageWriteTransaction op2Txn(ru2);
@@ -645,7 +645,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
         return tsThree;
     }();
     // After committing, three is the top of oplog.
-    ASSERT_EQ(tsThree, wtrs->getLatestTimestamp(ru2));
+    ASSERT_EQ(tsThree, wtRS->getLatestTimestamp(ru2));
 
     // Switch to client 1.
     op2.reset();
@@ -655,7 +655,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     op1txn->commit();
     // Committing the write at timestamp "2" does not change the top of oplog result. A new query
     // with client 1 will see timestamp "3".
-    ASSERT_EQ(tsThree, wtrs->getLatestTimestamp(ru1));
+    ASSERT_EQ(tsThree, wtRS->getLatestTimestamp(ru1));
 }
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {

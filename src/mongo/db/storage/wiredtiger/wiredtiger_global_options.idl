@@ -47,7 +47,7 @@ configs:
             gte: 0.25
             lte: 10000
     "storage.wiredTiger.engineConfig.statisticsLogDelaySecs":
-        # FTDC supercedes WiredTiger's statistics logging.
+        # FTDC supersedes WiredTiger's statistics logging.
         description: >-
             Seconds to wait between each write to a statistics file in the dbpath;
             0 means do not log statistics
@@ -60,7 +60,7 @@ configs:
             lte: 100000
         default: 0
     "storage.wiredTiger.engineConfig.zstdCompressionLevel":
-        description: 'Default compression level for zstandard compressor'
+        description: 'Default compression level for zstd compressor'
         arg_vartype: Int
         cpp_varname: 'wiredTigerGlobalOptions.zstdCompressorLevel'
         short_name: zstdDefaultCompressionLevel

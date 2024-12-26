@@ -302,7 +302,7 @@ private:
 
     stdx::mutex _mutex;  // protects _condvar
     // The session sweeper thread idles on this condition variable for a particular time duration
-    // between cleaning up expired sessions. It can be triggered early to expediate shutdown.
+    // between cleaning up expired sessions. It can be triggered early to expedite shutdown.
     stdx::condition_variable _condvar;
 };
 

@@ -326,7 +326,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture,
-       LocalReadOnADocumentBeingPreparedDoesntTriggerPrepareConflict) {
+       LocalReadsOnADocumentBeingPreparedDontTriggerPrepareConflict) {
     // Prepare but don't commit a transaction
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
     WT_CURSOR* cursor;

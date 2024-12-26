@@ -48,17 +48,17 @@ public:
     enum class RoundUpReadTimestamp {
         kNoRoundError = 0,  // Do not round to the oldest timestamp. BadValue error may be returned.
         kRound,  // Round the read timestamp up to the oldest timestamp when it is behind.
-        kMax     // kMax should alwyas be last and is a counter of the number of enum values.
+        kMax     // kMax should always be last and is a counter of the number of enum values.
     };
 
     // Dictates whether to round up prepare and commit timestamp of a prepared transaction.
     // 'kNoRound' - Does not round up prepare and commit timestamp of a prepared transaction.
     // 'kRound' - The prepare timestamp will be rounded up to the oldest timestamp if found to be
     // earlier; and the commit timestamp will be rounded up to the prepare timestamp if found to be
-    // earlier. kMax should alwyas be last and is a counter of the number of enum values.
+    // earlier. kMax should always be last and is a counter of the number of enum values.
     enum class RoundUpPreparedTimestamps { kNoRound = 0, kRound, kMax };
 
-    // kMax should alwyas be last and is a counter of the number of enum values.
+    // kMax should always be last and is a counter of the number of enum values.
     enum class NoReadTimestamp { kFalse = 0, kTrue, kMax };
 
     WiredTigerBeginTxnBlock(WiredTigerSession* session,

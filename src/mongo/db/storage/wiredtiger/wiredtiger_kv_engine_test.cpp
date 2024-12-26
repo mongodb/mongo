@@ -88,7 +88,7 @@ class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
         : _svcCtx(svcCtx), _dbpath("wt-kv-harness"), _forRepair(forRepair) {
-        // Faitfhully simulate being in replica set mode for timestamping tests which requires
+        // Faithfully simulate being in replica set mode for timestamping tests which requires
         // parity for journaling settings.
         repl::ReplSettings replSettings;
         replSettings.setReplSetString("i am a replica set");
@@ -818,7 +818,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
         auto permit = engine->tryGetStatsCollectionPermit();
         ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
         ASSERT_EQ(engine->getActiveStatsReaders(), 1);
-        stdx::thread shudownThread([&]() { engine->cleanShutdown(); });
+        stdx::thread shutdownThread([&]() { engine->cleanShutdown(); });
         ASSERT_EQ(engine->getActiveStatsReaders(), 1);
         while (engine->isWtConnReadyForStatsCollection_UNSAFE()) {
             stdx::this_thread::yield();
@@ -826,7 +826,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
 
         // Ensure that releasing the permit unblocks the shutdown
         permit.reset();
-        shudownThread.join();
+        shutdownThread.join();
     }
     ASSERT_EQ(engine->getActiveStatsReaders(), 0);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());

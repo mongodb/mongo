@@ -51,10 +51,10 @@ const auto getCustomizationHooks =
 }  // namespace
 
 void WiredTigerCustomizationHooks::set(ServiceContext* service,
-                                       std::unique_ptr<WiredTigerCustomizationHooks> custHooks) {
+                                       std::unique_ptr<WiredTigerCustomizationHooks> customHooks) {
     auto& hooks = getCustomizationHooks(service);
-    invariant(custHooks);
-    hooks = std::move(custHooks);
+    invariant(customHooks);
+    hooks = std::move(customHooks);
 }
 
 WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* service) {

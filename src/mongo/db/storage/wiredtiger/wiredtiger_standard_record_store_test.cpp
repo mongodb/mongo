@@ -165,10 +165,10 @@ private:
         sizeStorer.reset(new WiredTigerSizeStorer(
             harnessHelper->conn(), WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
         rs = harnessHelper->newRecordStore();
-        WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
-        wtrs->setSizeStorer(sizeStorer.get());
-        ident = wtrs->getIdent();
-        uri = wtrs->getURI();
+        WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
+        wtRS->setSizeStorer(sizeStorer.get());
+        ident = wtRS->getIdent();
+        uri = wtRS->getURI();
     }
     void tearDown() override {
         rs.reset(nullptr);
@@ -288,8 +288,8 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     sizeStorer->flush(true);
     sizeStorer.reset(new WiredTigerSizeStorer(harnessHelper->conn(),
                                               WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
-    WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
-    wtrs->setSizeStorer(sizeStorer.get());
+    WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
+    wtRS->setSizeStorer(sizeStorer.get());
 
     // As the operation was rolled back, numRecords and dataSize should be for the first op only. If
     // rollback does not properly mark the sizeInfo as dirty, on load sizeInfo will account for the

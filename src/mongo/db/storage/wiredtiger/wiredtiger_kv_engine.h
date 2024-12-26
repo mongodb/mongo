@@ -146,7 +146,7 @@ struct WiredTigerBackup {
  * statistics safely.
 
  * Statistics can be safely collected while the permit is held, but storage engine shutdown is
- * blocked while any oustanding permits are held.
+ * blocked while any outstanding permits are held.
  *
  * Destruction releases the permit and allows shutdown to proceed.
  */
@@ -173,7 +173,7 @@ public:
     /**
      * When the section generation activity for a reader is done, this destructor is called (one of
      * the permits is released). The destructor call releases the section generation activity
-     * permit. If it is a _eventHandler is NULL (the object is stale, the permit is tranferred) or
+     * permit. If it is a _eventHandler is NULL (the object is stale, the permit is transferred) or
      * _permitActive is false (no permit was issued), releaseStatsCollectionPermit is not called. If
      * all the permits are released WT connection is allowed to shut down cleanly.
      */
@@ -345,7 +345,7 @@ public:
     /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. If force is true, oldest will be set to the given input value, unmodified, even if
-     * it is backwards in time from the last oldest timestamp (accomodating initial sync).
+     * it is backwards in time from the last oldest timestamp (accommodating initial sync).
      */
     void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
 
@@ -469,7 +469,7 @@ public:
     /**
      * Returns the data file path associated with an ident on disk. Returns boost::none if the data
      * file can not be found. This will attempt to locate a file even if the storage engine's own
-     * metadata is not aware of the ident. This is intented for database repair purposes only.
+     * metadata is not aware of the ident. This is intended for database repair purposes only.
      */
     boost::optional<boost::filesystem::path> getDataFilePathForIdent(StringData ident) const;
 
@@ -544,7 +544,7 @@ public:
     /**
      * WiredTiger statistics cursors can be used if the WT connection is ready and it is not
      * shutting down or starting up. In that case, a tryGetStatsCollectionPermit call returns a
-     * StatsCollectionPermit object indcating that the caller may safely open statistics cursors,
+     * StatsCollectionPermit object indicating that the caller may safely open statistics cursors,
      * but the storage engine shutdown will be prevented from invalidating the underlying WT
      * connection until the caller is done. When the WT connection is not ready, a
      * tryGetStatsCollectionPermit call returns boost::none. ~StatsCollectionPermit releases the
@@ -590,7 +590,7 @@ private:
 
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
-     * Only returns when successful. Intializes both '_conn' and '_fileVersion'.
+     * Only returns when successful. Initializes both '_conn' and '_fileVersion'.
      *
      * If corruption is detected and _inRepairMode is 'true', attempts to salvage the WiredTiger
      * metadata.
@@ -738,7 +738,7 @@ private:
     AtomicWord<unsigned> _lastSyncTime;
     stdx::mutex _lastSyncMutex;
 
-    // A long-lived session for ensuring data is preiodically flushed to disk.
+    // A long-lived session for ensuring data is periodically flushed to disk.
     std::unique_ptr<WiredTigerSession> _waitUntilDurableSession = nullptr;
 
     // Tracks the time since the last _waitUntilDurableSession reset().

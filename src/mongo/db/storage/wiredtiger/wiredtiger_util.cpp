@@ -464,7 +464,7 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
     return static_cast<size_t>(cacheSizeMB);
 }
 
-logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {
+logv2::LogSeverity getWTLogSeverityLevel(const BSONObj& obj) {
     const std::string field = "verbose_level_id";
 
     if (!obj.hasField(field)) {
@@ -496,7 +496,7 @@ logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {
     }
 }
 
-logv2::LogComponent getWTLOGV2Component(const BSONObj& obj) {
+logv2::LogComponent getWTLogComponent(const BSONObj& obj) {
     const std::string field = "category_id";
 
     if (!obj.hasField(field)) {
@@ -556,7 +556,7 @@ void logWTErrorMessage(int id, int errorCode, const std::string& message) {
         // Parse the WT JSON message string.
         BSONObj obj = fromjson(message);
         attr.add("message", obj);
-        component = getWTLOGV2Component(obj);
+        component = getWTLogComponent(obj);
     } catch (...) {
         // Fall back to default behaviour.
         attr.add("message", message);
@@ -630,8 +630,8 @@ int mdb_handle_message(WT_EVENT_HANDLER* handler, WT_SESSION* session, const cha
         try {
             // Parse the WT JSON message string.
             const BSONObj obj = fromjson(message);
-            severity = getWTLOGV2SeverityLevel(obj);
-            options = logv2::LogOptions{getWTLOGV2Component(obj)};
+            severity = getWTLogSeverityLevel(obj);
+            options = logv2::LogOptions{getWTLogComponent(obj)};
             attr.add("message", redact(obj));
         } catch (...) {
             // Fall back to default behaviour.
@@ -922,7 +922,7 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
     // potentially before the storage engine itself shuts down.
     WiredTigerSession session(permit->conn());
 
-    // Filter out unrelevant statistic fields.
+    // Filter out irrelevant statistic fields.
     std::vector<std::string> fieldsToIgnore = {"LSM"};
 
     Status status = WiredTigerUtil::exportTableToBSON(
