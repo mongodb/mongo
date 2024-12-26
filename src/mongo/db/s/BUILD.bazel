@@ -1628,6 +1628,7 @@ mongo_cc_benchmark(
     srcs = [
         "placement_history_bm.cpp",
     ],
+    tags = ["first_half_bm"],
     deps = [
         ":config_server_test_fixture",
         ":sharding_catalog_manager",
