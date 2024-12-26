@@ -1,0 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+sh_binary(
+    name = "pigz_bin",
+    srcs = ["pigz"],
+)

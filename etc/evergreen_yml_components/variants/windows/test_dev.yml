@@ -108,6 +108,7 @@ buildvariants:
           - windows-2022-xxlarge
       # server_selection_json_test & server_discovery_and_monitoring_json_test depend on this
       - name: compile_unittest_libaries_TG
+      - name: run_bazel_TG
 
   - <<: *windows_compile_variant_dependency
     name: enterprise-windows-all-feature-flags-required

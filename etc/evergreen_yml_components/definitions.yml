@@ -1450,6 +1450,12 @@ functions:
     - *f_expansions_write
     - *bazel_compile_sh
 
+  "bazel compile":
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *bazel_compile_sh
+
   "bazel run sh": &bazel_run_sh
     command: subprocess.exec
     display_name: "bazel run sh"

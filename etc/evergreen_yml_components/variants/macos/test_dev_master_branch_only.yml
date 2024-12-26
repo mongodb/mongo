@@ -60,3 +60,4 @@ buildvariants:
       - name: replica_sets_auth_gen
       - name: sasl
       - name: .crypt
+      - name: run_bazel_TG

@@ -2177,7 +2177,7 @@ def mongo_cc_unit_test(
         srcs = [],
         deps = [],
         header_deps = [],
-        visibility = None,
+        visibility = ["//visibility:public"],
         data = [],
         tags = [],
         copts = [],

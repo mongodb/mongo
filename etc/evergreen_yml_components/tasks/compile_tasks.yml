@@ -248,6 +248,24 @@ tasks:
           target: >-
             //src/mongo/platform:visibility1_test
 
+  - name: bazel_install_dist_test
+    tags: ["assigned_to_jira_team_devprod_build", "bazel_check", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "fetch bazel"
+      - func: "bazel compile"
+        vars:
+          compiler: clang
+          targets: archive-dist-test
+          args: --config=opt --separate_debug=True
+      - func: "run tests"
+        vars:
+          suite: core
+          install_dir: bazel-bin/install/bin
+          resmoke_jobs_max: 4 # No cap on number of jobs.
+
   - <<: *clang_tidy_task_template
     name: run_bazel_clang_tidy
     commands:
@@ -2050,6 +2068,7 @@ task_groups:
     name: run_bazel_TG
     tasks:
       - run_bazel_program
+      - bazel_install_dist_test
 
   - <<: *compile_task_group_template
     name: bazel_workstation_TG

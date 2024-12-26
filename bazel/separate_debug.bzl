@@ -95,6 +95,20 @@ def get_transitive_dyn_libs(deps):
                     transitive_dyn_libs.append(library.dynamic_library)
     return transitive_dyn_libs
 
+def get_transitive_debug_files(deps):
+    """
+    Get a transitive list of all dynamic library files under a set of dependencies.
+    """
+
+    # TODO(SERVER-85819): Investigate to see if it's possible to merge the depset without looping over all transitive
+    # dependencies.
+    transitive_debugs = []
+    for dep in deps:
+        for input in dep[DefaultInfo].files.to_list():
+            if input.basename.endswith(".debug"):
+                transitive_debugs.append(input)
+    return transitive_debugs
+
 def symlink_shared_archive(ctx, shared_ext, static_ext):
     """
     Shared archives (.so.a/.dll.lib) have different extensions depending on the operating system.
@@ -311,7 +325,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
 
     provided_info = [
         DefaultInfo(
-            files = depset(outputs),
+            files = depset(outputs, transitive = [depset(get_transitive_debug_files(ctx.attr.deps))]),
             runfiles = dynamic_deps_runfiles,
             executable = output_bin if ctx.attr.type == "program" else None,
         ),
