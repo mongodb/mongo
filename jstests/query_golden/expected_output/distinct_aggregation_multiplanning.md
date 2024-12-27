@@ -3612,3 +3612,255 @@ Execution Engine: classic
 }
 ```
 
+### Multiplanning tie between DISTINCT_SCANs favors fewest index keys
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"a" : {
+				"$gt" : 0
+			}
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a"
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1 }
+{  "_id" : 2 }
+{  "_id" : 3 }
+{  "_id" : 4 }
+```
+### Summarized explain
+Execution Engine: classic
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(0.0, inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[MinKey, MaxKey]"
+								],
+								"d" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1_c_1_d_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"c" : 1,
+								"d" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"c" : [ ],
+								"d" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(0.0, inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1_c_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"c" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"c" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(0.0, inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(0.0, inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[MinKey, MaxKey]"
+								],
+								"d" : [
+									"[MinKey, MaxKey]"
+								],
+								"e" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1_c_1_d_1_e_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"c" : 1,
+								"d" : 1,
+								"e" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"c" : [ ],
+								"d" : [ ],
+								"e" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"(0.0, inf.0]"
+							]
+						},
+						"indexName" : "a_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a"
+				}
+			}
+		}
+	]
+}
+```
+

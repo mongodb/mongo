@@ -15,7 +15,7 @@
 						"[5.0, 5.0]"
 					]
 				},
-				"indexName" : "x_1_y_1",
+				"indexName" : "y_1_x_1",
 				"indexVersion" : 2,
 				"isFetching" : false,
 				"isMultiKey" : false,
@@ -73,7 +73,7 @@
 						"[5.0, 5.0]"
 					]
 				},
-				"indexName" : "x_1_y_1",
+				"indexName" : "y_1_x_1",
 				"indexVersion" : 2,
 				"isFetching" : false,
 				"isMultiKey" : false,

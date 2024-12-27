@@ -156,3 +156,20 @@ outputAggregationPlanAndResults(
 section("$group by non-multikey field with $first/$last on a multikey field");
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$b", accum: {$first: "$a"}}}]);
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$b", accum: {$last: "$a"}}}]);
+
+subSection("Multiplanning tie between DISTINCT_SCANs favors fewest index keys");
+{
+    const coll = db[jsTestName()];
+    coll.drop();
+    const distinctDocs = [];
+    for (let i = 0; i < 5; i++) {
+        distinctDocs.push({a: i, b: -i, c: (i % 2 ? "even" : "odd"), d: i + 1});
+    }
+    coll.insertMany(distinctDocs);
+    coll.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1});
+    coll.createIndex({a: 1, b: 1, c: 1, d: 1});
+    coll.createIndex({a: 1, b: 1, c: 1});
+    coll.createIndex({a: 1, b: 1});
+    coll.createIndex({a: 1});
+    outputAggregationPlanAndResults(coll, [{$match: {a: {$gt: 0}}}, {$group: {_id: "$a"}}]);
+}

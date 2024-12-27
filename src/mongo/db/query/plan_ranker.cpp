@@ -37,6 +37,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -110,6 +111,7 @@ void logFailedPlan(std::function<std::string()> planSummary) {
 void logTieBreaking(double score,
                     double docsExaminedBonus,
                     double indexPrefixBonus,
+                    double distinctScanBonus,
                     bool isPlanTied) {
     LOGV2_DEBUG(
         8027500, 2, "Tie breaking heuristics", "formula"_attr = [&]() {
@@ -118,7 +120,8 @@ void logTieBreaking(double score,
                << str::convertDoubleToString(score + docsExaminedBonus + indexPrefixBonus)
                << ") = score(" << str::convertDoubleToString(score) << ") + docsExaminedBonus("
                << str::convertDoubleToString(docsExaminedBonus) << ") + indexPrefixBonus("
-               << str::convertDoubleToString(indexPrefixBonus) << ")";
+               << str::convertDoubleToString(indexPrefixBonus) << ") + distinctScanBonus("
+               << str::convertDoubleToString(distinctScanBonus);
             return sb.str();
         }());
 }
@@ -436,12 +439,30 @@ std::vector<size_t> applyIndexPrefixHeuristic(const std::vector<const QuerySolut
             }
         }
 
-        if (top.front()->getType() == STAGE_IXSCAN) {
+        if (top.front()->getType() == STAGE_IXSCAN ||
+            top.front()->getType() == STAGE_DISTINCT_SCAN) {
             std::vector<const IndexBounds*> bounds{};
             bounds.reserve(solutions.size());
 
-            for (auto node : top) {
-                bounds.emplace_back(&static_cast<const IndexScanNode*>(node)->bounds);
+            for (auto&& node : top) {
+                const IndexBounds* nodeBounds;
+                switch (node->getType()) {
+                    case STAGE_IXSCAN: {
+                        nodeBounds = &static_cast<const IndexScanNode*>(node)->bounds;
+                        break;
+                    }
+                    case STAGE_DISTINCT_SCAN: {
+                        nodeBounds = &static_cast<const DistinctNode*>(node)->bounds;
+                        break;
+                    }
+                    default: {
+                        tasserted(9844200,
+                                  str::stream()
+                                      << "Unexpected node type for index prefix heuristic "
+                                      << node->getType());
+                    }
+                }
+                bounds.emplace_back(nodeBounds);
             }
 
             scoreIndexBounds(bounds, solutionScores);

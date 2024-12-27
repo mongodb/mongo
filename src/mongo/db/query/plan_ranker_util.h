@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/stage_types.h"
 #include <algorithm>
 
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -63,16 +64,21 @@ inline std::vector<std::pair<double, size_t>>::iterator findTopTiedPlans(
  */
 struct TieBreakingScores {
     TieBreakingScores(bool isPlanTied, double score)
-        : isPlanTied(isPlanTied), score(score), docsExaminedBonus(0.0), indexPrefixBonus(0.0) {}
+        : isPlanTied(isPlanTied),
+          score(score),
+          docsExaminedBonus(0.0),
+          indexPrefixBonus(0.0),
+          distinctScanBonus(0.0) {}
 
     double getTotalBonus() const {
-        return docsExaminedBonus + indexPrefixBonus;
+        return docsExaminedBonus + indexPrefixBonus + distinctScanBonus;
     }
 
     const bool isPlanTied;
     const double score;
     double docsExaminedBonus;
     double indexPrefixBonus;
+    double distinctScanBonus;
 };
 
 /**
@@ -132,6 +138,24 @@ void calcIndexPrefixHeuristicBonus(
 }
 
 /**
+ * Boost the score of distinct scan plans in case of a tie.
+ */
+template <typename PlanStageType, typename ResultType, typename Data>
+void calcDistinctScanBonus(
+    const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    size_t numberOfTiedPlans,
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    std::vector<TieBreakingScores>& scores) {
+
+    for (size_t i = 0; i < numberOfTiedPlans; ++i) {
+        const size_t candidateIndex = scoresAndCandidateIndices[i].second;
+        if (candidates[candidateIndex].solution->hasNode(STAGE_DISTINCT_SCAN)) {
+            scores[candidateIndex].distinctScanBonus += kBonusEpsilon;
+        }
+    }
+}
+
+/**
  * Apply tie-breaking hearistics and update candidate plan scores.
  */
 template <typename PlanStageType, typename ResultType, typename Data>
@@ -158,10 +182,15 @@ void addTieBreakingHeuristicsBonuses(
         calcIndexPrefixHeuristicBonus(
             scoresAndCandidateIndices, numberOfTiedPlans, candidates, scores);
 
+        calcDistinctScanBonus(scoresAndCandidateIndices, numberOfTiedPlans, candidates, scores);
+
         // Log tie breaking bonuses.
         for (const auto& score : scores) {
-            log_detail::logTieBreaking(
-                score.score, score.docsExaminedBonus, score.indexPrefixBonus, score.isPlanTied);
+            log_detail::logTieBreaking(score.score,
+                                       score.docsExaminedBonus,
+                                       score.indexPrefixBonus,
+                                       score.distinctScanBonus,
+                                       score.isPlanTied);
         }
 
         for (auto& scoreAndIndex : scoresAndCandidateIndices) {
