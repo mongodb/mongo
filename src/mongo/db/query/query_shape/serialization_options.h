@@ -240,6 +240,10 @@ struct SerializationOptions {
 
     // If set to true, serializes each stage and expression as needed for query analysis.
     bool serializeForQueryAnalysis = false;
+    // If set to true, serializes each stage and expression as needed for FLE2.
+    // TODO SERVER-81802: This is a workaround for testing server rewrites for DocumentSourceLookup,
+    // while waiting for SERVER-81802 fix.
+    bool serializeForFLE2 = false;
 };
 
 }  // namespace mongo

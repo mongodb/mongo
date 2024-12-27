@@ -990,10 +990,6 @@ public:
                                                   const EncryptedFieldConfig& ef);
     static BSONObj encryptionInformationSerialize(const NamespaceString& nss,
                                                   const BSONObj& encryptedFields);
-    static EncryptionInformation constructEncryptionInformationFromFieldConfig(
-        const NamespaceString& nss, const EncryptedFieldConfig& ef);
-
-
     /**
      * Get a schema from EncryptionInformation and ensure the esc/ecoc are setup correctly.
      */

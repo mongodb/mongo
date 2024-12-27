@@ -2788,6 +2788,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/shell:kms_idl",
     ],
 )

@@ -1228,6 +1228,37 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
             // TODO SERVER-81802 always serialize the resolved pipeline for non-query-shapification
             // cases.
             return _resolvedIntrospectionPipeline->serializeToBson(opts);
+        } else if (opts.serializeForFLE2) {
+            // This is a workaround for testing server rewrites for FLE2. We need to verify that the
+            // _resolvedPipeline was rewritten, since the _resolvedPipeline is used to execute the
+            // query. We should remove this serialization option once we serialize the resolved
+            // pipeline SERVER-81802.
+            auto resolvedPipelineWithoutIndexMatchPlaceholder = _resolvedPipeline;
+
+            /**
+             * We serialize for FLE2 in two cases:
+             * 1) In rebuildResolvedPipeline:
+             *    This method is called during FLE2 the server rewrite step for FLE2. It relies on
+             *    serializing the rewritten _resolvedIntrospectionPipeline to regenerate the
+             *   _resolvedPipeline. In this step, we add the _fieldMatchPipelineIdx placeholder to
+             *   the _resolvedPipeline after it has been serialized.
+             * 2) From query_rewriter_test.cpp, where we would like to verify the _resolvedPipeline
+             *    was succesfully rewritten.
+             *
+             * In both of these cases, we would like to serialize the _resolvedPipeline, since
+             * doGetNext() uses the resolved pipeline for the query execution. Using the resolved
+             * pipeline also ensures we serialize nested pipelines (i.e from nested lookups) in
+             * their FLE2 rewritten form as well. However, in both of these cases we don't want the
+             * index match placeholder.
+             * We don't want the empty $match stage, because when $lookup's pipeline is
+             * parsed, the match stage is added in the DocumentSourceLookUp constructor, leading to
+             * a duplicate empty match stage.
+             */
+            if (_fieldMatchPipelineIdx) {
+                resolvedPipelineWithoutIndexMatchPlaceholder.erase(
+                    resolvedPipelineWithoutIndexMatchPlaceholder.begin() + *_fieldMatchPipelineIdx);
+            }
+            return resolvedPipelineWithoutIndexMatchPlaceholder;
         }
         return *_userPipeline;
     }();
@@ -1552,4 +1583,24 @@ void DocumentSourceLookUp::addInvolvedCollections(
         stage->addInvolvedCollections(collectionNames);
     }
 }
+
+void DocumentSourceLookUp::rebuildResolvedPipeline() {
+    tassert(9775504, "Invalid resolved introspection pipeline ", _resolvedIntrospectionPipeline);
+    // We must serialize the resolved introspection pipeline with the "serializeForFLE2" option to
+    // ensure that any nested DocumentSourceLookUp stages serialize their _resolvedPipeline.
+    SerializationOptions opts{.serializeForFLE2 = true};
+    _resolvedPipeline = _resolvedIntrospectionPipeline->serializeToBson(opts);
+    // The introspection pipeline does not contain the placeholder match stage or the additional
+    // filter. Add those back in here if applicable.
+    if (_fieldMatchPipelineIdx) {
+        _resolvedPipeline.insert(_resolvedPipeline.begin() + *_fieldMatchPipelineIdx,
+                                 BSON("$match" << BSONObj()));
+    }
+
+    if (_additionalFilter) {
+        auto matchObj = BSON("$match" << *_additionalFilter);
+        _resolvedPipeline.push_back(matchObj);
+    }
+}
+
 }  // namespace mongo

@@ -56,6 +56,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -129,19 +130,49 @@ void rewriteGraphLookUp(QueryRewriter* rewriter, DocumentSourceGraphLookUp* sour
     }
 }
 
+void rewriteLookUp(QueryRewriter* rewriter, DocumentSourceLookUp* source) {
+    // (Ignore FCV check): No FCV gating for this feature.
+    if (!feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabledAndIgnoreFCVUnsafe()) {
+        return;
+    }
+    // When rewriting a lookup, we're only concerned with rewriting the pipeline of the lookup which
+    // may contain encrypted placeholders.
+    if (!source->hasPipeline()) {
+        return;
+    }
+
+    bool hadPipelineRewrites{false};
+    auto fromExpCtx = source->getSubpipelineExpCtx();
+    tassert(9775505, "Invalid from expression context", fromExpCtx);
+    // Create a new pipeline rewriter for the foreign collection namespace's pipeline.
+    auto subpipelineRewriter = rewriter->createSubpipelineRewriter(source->getFromNs(), fromExpCtx);
+    for (auto&& src : source->getResolvedIntrospectionPipeline().getSources()) {
+        if (stageRewriterMap.find(typeid(*src)) != stageRewriterMap.end()) {
+            hadPipelineRewrites = true;
+            stageRewriterMap[typeid(*src)](&subpipelineRewriter, src.get());
+        }
+    }
+
+    if (hadPipelineRewrites) {
+        source->rebuildResolvedPipeline();
+    }
+}
+
 REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceMatch, rewriteMatch);
 REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGeoNear, rewriteGeoNear);
 REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGraphLookUp, rewriteGraphLookUp);
+REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceLookUp, rewriteLookUp);
 
 
 BSONObj rewriteEncryptedFilterV2(FLETagQueryInterface* queryImpl,
                                  const NamespaceString& nssEsc,
                                  boost::intrusive_ptr<ExpressionContext> expCtx,
                                  BSONObj filter,
+                                 const std::map<NamespaceString, NamespaceString>& escMap,
                                  EncryptedCollScanModeAllowed mode) {
 
     if (auto rewritten =
-            QueryRewriter(expCtx, queryImpl, nssEsc, mode).rewriteMatchExpression(filter)) {
+            QueryRewriter(expCtx, queryImpl, nssEsc, escMap, mode).rewriteMatchExpression(filter)) {
         return rewritten.value();
     }
 
@@ -189,12 +220,38 @@ NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encry
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
     return NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection()->toString());
 }
+
+std::map<NamespaceString, NamespaceString> generateEncryptInfoEscMap(
+    const DatabaseName& dbName, const EncryptionInformation& encryptInfo) {
+    std::map<NamespaceString, NamespaceString> escMap;
+    // (Ignore FCV check): No FCV gating for this feature.
+    if (feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabledAndIgnoreFCVUnsafe()) {
+        // Get the Esc collection namespace for every namespace in our encryption schema.
+        for (const auto& elem : encryptInfo.getSchema()) {
+            uassert(9775500,
+                    "Each namespace schema "
+                    "must be an object",
+                    elem.type() == Object);
+            auto schemaNs = NamespaceStringUtil::deserialize(
+                boost::none, elem.fieldNameStringData(), SerializationContext::stateDefault());
+            auto efc = EncryptionInformationHelpers::getAndValidateSchema(schemaNs, encryptInfo);
+
+            escMap.emplace(std::piecewise_construct,
+                           std::forward_as_tuple(std::move(schemaNs)),
+                           std::forward_as_tuple(NamespaceStringUtil::deserialize(
+                               dbName, efc.getEscCollection()->toString())));
+        }
+    }
+    return escMap;
+}
 }  // namespace
 
 RewriteBase::RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const NamespaceString& nss,
                          const EncryptionInformation& encryptInfo)
-    : expCtx(expCtx), nssEsc(getAndValidateEscNsFromSchema(encryptInfo, nss)) {}
+    : expCtx(expCtx),
+      nssEsc(getAndValidateEscNsFromSchema(encryptInfo, nss)),
+      _escMap(generateEncryptInfoEscMap(nss.dbName(), encryptInfo)) {}
 
 FilterRewrite::FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const NamespaceString& nss,
@@ -204,17 +261,18 @@ FilterRewrite::FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
     : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
 void FilterRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
-    rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
+    rewrittenFilter =
+        rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _escMap, _mode);
 }
 
 PipelineRewrite::PipelineRewrite(const NamespaceString& nss,
                                  const EncryptionInformation& encryptInfo,
                                  std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
-    : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
+    : RewriteBase(toRewrite->getContext(), nss, encryptInfo), _pipeline(std::move(toRewrite)) {}
 
 void PipelineRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
     auto rewriter = getQueryRewriterForEsc(queryImpl);
-    for (auto&& source : pipeline->getSources()) {
+    for (auto&& source : _pipeline->getSources()) {
         if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
             stageRewriterMap[typeid(*source)](&rewriter, source.get());
         }
@@ -222,23 +280,23 @@ void PipelineRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> PipelineRewrite::getPipeline() {
-    return std::move(pipeline);
+    return std::move(_pipeline);
 }
 
 QueryRewriter PipelineRewrite::getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) {
-    return QueryRewriter(expCtx, queryImpl, nssEsc);
+    return QueryRewriter(expCtx, queryImpl, nssEsc, _escMap);
 }
 
 BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
-                                        const DatabaseName& dbName,
+                                        const NamespaceString& nss,
                                         const EncryptedFieldConfig& efc,
                                         boost::intrusive_ptr<ExpressionContext> expCtx,
                                         BSONObj filter,
                                         EncryptedCollScanModeAllowed mode) {
     NamespaceString nssEsc(
-        NamespaceStringUtil::deserialize(dbName, efc.getEscCollection().value()));
+        NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection().value()));
 
-    return rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, filter, mode);
+    return rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, filter, {{nss, nssEsc}}, mode);
 }
 
 BSONObj rewriteQuery(OperationContext* opCtx,

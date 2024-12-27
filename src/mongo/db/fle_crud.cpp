@@ -1075,8 +1075,8 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
     auto newDeleteRequest = deleteRequest;
 
     auto newDeleteOp = newDeleteRequest.getDeletes()[0];
-    newDeleteOp.setQ(fle::rewriteEncryptedFilterInsideTxn(
-        queryImpl, edcNss.dbName(), efc, expCtx, newDeleteOp.getQ()));
+    newDeleteOp.setQ(
+        fle::rewriteEncryptedFilterInsideTxn(queryImpl, edcNss, efc, expCtx, newDeleteOp.getQ()));
 
     newDeleteRequest.setDeletes({newDeleteOp});
 
@@ -1146,12 +1146,8 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         ? fle::EncryptedCollScanModeAllowed::kDisallow
         : fle::EncryptedCollScanModeAllowed::kAllow;
 
-    newUpdateOpEntry.setQ(fle::rewriteEncryptedFilterInsideTxn(queryImpl,
-                                                               edcNss.dbName(),
-                                                               efc,
-                                                               expCtx,
-                                                               newUpdateOpEntry.getQ(),
-                                                               encryptedCollScanModeAllowed));
+    newUpdateOpEntry.setQ(fle::rewriteEncryptedFilterInsideTxn(
+        queryImpl, edcNss, efc, expCtx, newUpdateOpEntry.getQ(), encryptedCollScanModeAllowed));
 
     if (updateModification.type() == write_ops::UpdateModification::Type::kModifier) {
         auto updateModifier = updateModification.getUpdateModifier();
@@ -1417,7 +1413,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
     newFindAndModifyRequest.setQuery(
         fle::rewriteEncryptedFilterInsideTxn(queryImpl,
-                                             edcNss.dbName(),
+                                             edcNss,
                                              efc,
                                              expCtx,
                                              findAndModifyRequest.getQuery(),
@@ -1562,7 +1558,7 @@ write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
 
     newFindAndModifyRequest.setQuery(
         fle::rewriteEncryptedFilterInsideTxn(queryImpl,
-                                             edcNss.dbName(),
+                                             edcNss,
                                              efc,
                                              expCtx,
                                              findAndModifyRequest.getQuery(),

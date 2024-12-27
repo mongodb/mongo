@@ -314,6 +314,24 @@ public:
     PipelinePtr buildPipeline(const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
                               const Document& inputDoc);
 
+    /**
+     * Rebuilds the _resolvedPipeline from the _resolvedIntrospectionPipeline. This is required for
+     * server rewrites for FLE2. The server rewrite code operates on DocumentSources of a parsed
+     * pipeline, which we obtain from DocumentSourceLookUp::_resolvedIntrospectionPipeline.
+     * However, we use _resolvedPipeline to execute each iteration of doGetNext(). This method is
+     * called exclusively from rewriteLookUp (server_rewrite.cpp) once the pipeline has been
+     * rewritten for FLE2.
+     */
+    void rebuildResolvedPipeline();
+
+    /**
+     * Returns the expression context associated with foreign collection namespace and/or
+     * sub-pipeline.
+     */
+    boost::intrusive_ptr<ExpressionContext> getSubpipelineExpCtx() {
+        return _fromExpCtx;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;

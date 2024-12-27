@@ -55,6 +55,7 @@
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/query/fle/server_rewrite_helper.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -248,8 +249,9 @@ static const fle::ExpressionToRewriteMap aggRewriteMap{
 class MockQueryRewriter : public fle::QueryRewriter {
 public:
     MockQueryRewriter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                      const NamespaceString& mockNss)
-        : fle::QueryRewriter(expCtx, mockNss, aggRewriteMap, matchRewriteMap) {}
+                      const NamespaceString& mockNss,
+                      const std::map<NamespaceString, NamespaceString>& escMap)
+        : fle::QueryRewriter(expCtx, mockNss, aggRewriteMap, matchRewriteMap, escMap) {}
 
     BSONObj rewriteMatchExpressionForTest(const BSONObj& obj) {
         auto res = rewriteMatchExpression(obj);
@@ -257,7 +259,7 @@ public:
     }
 
     BSONObj rewriteAggExpressionForTest(const BSONObj& obj) {
-        invariant(getExpressionContext());
+        tassert(9775503, "Invalid expression context", getExpressionContext());
         auto expr = Expression::parseExpression(
             getExpressionContext(), obj, getExpressionContext()->variablesParseState);
         auto result = rewriteExpression(expr.get());
@@ -266,10 +268,12 @@ public:
     }
 
     static fle::QueryRewriter getQueryRewriterWithMockedMaps(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const std::map<NamespaceString, NamespaceString>& escMap) {
         // Workaround for protected fle::QueryRewriter constructor. Slices the mocked object,
         // leaving us with the copied base class with mocked maps.
-        return MockQueryRewriter(expCtx, nss);
+        return MockQueryRewriter(expCtx, nss, escMap);
     }
 
 private:
@@ -282,60 +286,16 @@ public:
     FLEServerRewriteTest() : _mock(nullptr) {}
 
     void setUp() override {
-        _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss);
-        setResolvedNamespacesForTest();
+        _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss, _mockEscMap);
     }
 
-    void tearDown() override {
-        _expCtx->setResolvedNamespaces({});
-    }
-
-    EncryptedFieldConfig getTestEncryptedFieldConfig() {
-        constexpr auto schema = R"({
-        "escCollection": "enxcol_.coll.esc",
-        "ecocCollection": "enxcol_.coll.ecoc",
-        "fields": [
-            {
-                "keyId": {
-                    "$uuid": "12345678-1234-9876-1234-123456789012"
-                },
-                "path": "ssn",
-                "bsonType": "string",
-                "queries": {
-                    "queryType": "equality"
-                }
-            },
-            {
-                "keyId": {
-                    "$uuid": "12345678-1234-9876-1234-123456789013"
-                },
-                "path": "age",
-                "bsonType": "int",
-                "queries": {
-                    "queryType": "equality"
-                }
-            }
-        ]
-    })";
-
-        return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
-    }
-
-    auto getEncryptionInformationForTest() {
-        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-        return EncryptionInformationHelpers::constructEncryptionInformationFromFieldConfig(_mockNss,
-                                                                                           efc);
-    }
-
-    void setResolvedNamespacesForTest() {
-        _expCtx->setResolvedNamespaces(
-            {{_mockNss.coll().toString(), {_mockNss, std::vector<BSONObj>{}}}});
-    }
+    void tearDown() override {}
 
 protected:
     std::unique_ptr<MockQueryRewriter> _mock;
     boost::intrusive_ptr<ExpressionContext> _expCtx{new ExpressionContextForTest()};
     NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("test.mock"_sd);
+    std::map<NamespaceString, NamespaceString> _mockEscMap{{_mockNss, _mockNss}};
 };
 
 #define ASSERT_MATCH_EXPRESSION_REWRITE(input, expected)                 \
@@ -452,17 +412,6 @@ TEST_FLE_REWRITE_AGG(
     "4}}]}]}",
     "{$and: [{$gt: ['$user.ssn', {$const: 2}]}, {$lt: ['$age', {$const: 4}]}]}");
 
-auto jsonToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                    const NamespaceString& nss,
-                    StringData jsonArray) {
-    const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
-
-    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
-    auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
-    expCtx->setNamespaceString(nss);
-    return Pipeline::parse(rawPipeline, expCtx);
-}
-
 class MockPipelineRewrite : public fle::PipelineRewrite {
 public:
     MockPipelineRewrite(const NamespaceString& nss,
@@ -474,34 +423,266 @@ public:
 
 protected:
     fle::QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) override {
-        return MockQueryRewriter::getQueryRewriterWithMockedMaps(expCtx, nssEsc);
+        return MockQueryRewriter::getQueryRewriterWithMockedMaps(expCtx, nssEsc, _escMap);
     }
 };
 
-#define TEST_FLE_REWRITE_PIPELINE(name, input, expected)                                           \
-    TEST_F(FLEServerRewriteTest, name##_PipelineRewrite) {                                         \
-        auto pipeline = jsonToPipeline(_expCtx, _mockNss, input);                                  \
-        auto pipelineRewrite =                                                                     \
-            MockPipelineRewrite(_mockNss, getEncryptionInformationForTest(), std::move(pipeline)); \
-        pipelineRewrite.doRewrite(nullptr);                                                        \
-        auto rewrittenPipeline = pipelineRewrite.getPipeline();                                    \
-        ASSERT(rewrittenPipeline);                                                                 \
-        ASSERT_VALUE_EQ(Value(rewrittenPipeline->serialize()),                                     \
-                        Value(jsonToPipeline(_expCtx, _mockNss, expected)->serialize()));          \
+
+class FLEServerRewritePipelineTest : public unittest::Test {
+public:
+    static constexpr auto kSingleEncryptionSchemaEncryptionInfo = R"({
+                    "type": 1,
+                    "schema":{
+                        "test.coll_a": {
+                            "escCollection": "enxcol_.coll_a.esc",
+                            "ecocCollection": "enxcol_.coll_a.ecoc",
+                            "fields": [
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789012"
+                                    },
+                                    "path": "ssn",
+                                    "bsonType": "string",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                },
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789013"
+                                    },
+                                    "path": "age",
+                                    "bsonType": "int",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                }
+                            ]
+                        }
+                    }   
+                })";
+    static constexpr auto kTwoEncryptionSchemaEncryptionInfo = R"({
+                    "type": 1,
+                    "schema":{
+                        "test.coll_a": {
+                            "escCollection": "enxcol_.coll_a.esc",
+                            "ecocCollection": "enxcol_.coll_a.ecoc",
+                            "fields": [
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789012"
+                                    },
+                                    "path": "ssn",
+                                    "bsonType": "string",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                },
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789013"
+                                    },
+                                    "path": "age",
+                                    "bsonType": "int",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                }
+                            ]
+                        },
+                        "test.coll_b": {
+                            "escCollection": "enxcol_.coll_b.esc",
+                            "ecocCollection": "enxcol_.coll_b.ecoc",
+                            "fields": [
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789014"
+                                    },
+                                    "path": "b_ssn",
+                                    "bsonType": "string",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                },
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789015"
+                                    },
+                                    "path": "b_age",
+                                    "bsonType": "int",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                }
+                            ]
+                        }
+                    }   
+                })";
+    static constexpr auto kThreeEncryptionSchemaEncryptionInfo = R"({
+                    "type": 1,
+                    "schema":{
+                        "test.coll_a": {
+                            "escCollection": "enxcol_.coll_a.esc",
+                            "ecocCollection": "enxcol_.coll_a.ecoc",
+                            "fields": [
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789012"
+                                    },
+                                    "path": "ssn",
+                                    "bsonType": "string",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                },
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789013"
+                                    },
+                                    "path": "age",
+                                    "bsonType": "int",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                }
+                            ]
+                        },
+                        "test.coll_b": {
+                            "escCollection": "enxcol_.coll_b.esc",
+                            "ecocCollection": "enxcol_.coll_b.ecoc",
+                            "fields": [
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789014"
+                                    },
+                                    "path": "b_ssn",
+                                    "bsonType": "string",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                },
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789015"
+                                    },
+                                    "path": "b_age",
+                                    "bsonType": "int",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                }
+                            ]
+                        },
+                        "test.coll_c": {
+                            "escCollection": "enxcol_.coll_c.esc",
+                            "ecocCollection": "enxcol_.coll_c.ecoc",
+                            "fields": [
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789016"
+                                    },
+                                    "path": "c_ssn",
+                                    "bsonType": "string",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                },
+                                {
+                                    "keyId": {
+                                        "$uuid": "12345678-1234-9876-1234-123456789017"
+                                    },
+                                    "path": "c_age",
+                                    "bsonType": "int",
+                                    "queries": {
+                                        "queryType": "equality"
+                                    }
+                                }
+                            ]
+                        }
+                    }   
+                })";
+
+    void setResolvedNamespacesForTest(const std::vector<NamespaceString>& additionalNs) {
+        StringMap<ResolvedNamespace> resolvedNs;
+        resolvedNs.insert_or_assign(_primaryNss.coll().toString(),
+                                    {_primaryNss, std::vector<BSONObj>{}});
+        for (auto&& ns : additionalNs) {
+            resolvedNs.insert_or_assign(ns.coll().toString(), {ns, std::vector<BSONObj>{}});
+        }
+        _expCtx->setResolvedNamespaces(std::move(resolvedNs));
+    }
+
+    auto jsonToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        const NamespaceString& nss,
+                        StringData jsonArray) {
+        const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
+
+        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+        auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
+        expCtx->setNamespaceString(nss);
+        return Pipeline::parse(rawPipeline, expCtx);
+    }
+
+protected:
+    boost::intrusive_ptr<ExpressionContext> _expCtx{new ExpressionContextForTest()};
+    NamespaceString _primaryNss = NamespaceString::createNamespaceString_forTest("test.coll_a"_sd);
+};
+
+static inline void assertPipelinesSame(const std::vector<BSONObj>& expectedPipeline,
+                                       const std::vector<BSONObj>& actualPipeline) {
+    ASSERT_EQUALS(expectedPipeline.size(), actualPipeline.size());
+
+    auto flags =
+        BSONObj::ComparisonRules::kIgnoreFieldOrder | BSONObj::ComparisonRules::kConsiderFieldName;
+    for (size_t i = 0; i < actualPipeline.size(); ++i) {
+        ASSERT_TRUE(actualPipeline[i].woCompare(expectedPipeline[i], {}, flags) == 0);
+    }
+}
+
+#define TEST_FLE_REWRITE_PIPELINE(name,                                                        \
+                                  input,                                                       \
+                                  expected,                                                    \
+                                  additionalNamespaces,                                        \
+                                  encryptionInformation,                                       \
+                                  enableMultiSchemaFeatureFlag)                                \
+    TEST_F(FLEServerRewritePipelineTest, name##_PipelineRewrite) {                             \
+        RAIIServerParameterControllerForTest _scopedFeature{                                   \
+            "featureFlagLookupEncryptionSchemasFLE", enableMultiSchemaFeatureFlag};            \
+        setResolvedNamespacesForTest(additionalNamespaces);                                    \
+        auto pipeline = jsonToPipeline(_expCtx, _primaryNss, input);                           \
+        auto pipelineRewrite =                                                                 \
+            MockPipelineRewrite(_primaryNss,                                                   \
+                                EncryptionInformation::parse(IDLParserContext("root"),         \
+                                                             fromjson(encryptionInformation)), \
+                                std::move(pipeline));                                          \
+        pipelineRewrite.doRewrite(nullptr);                                                    \
+        auto rewrittenPipeline = pipelineRewrite.getPipeline();                                \
+        ASSERT(rewrittenPipeline);                                                             \
+        SerializationOptions opts{.serializeForFLE2 = true};                                   \
+        auto serializedRewrittenPipeline = rewrittenPipeline->serializeToBson(opts);           \
+        auto expectedPipeline =                                                                \
+            jsonToPipeline(_expCtx, _primaryNss, expected)->serializeToBson(opts);             \
+        assertPipelinesSame(expectedPipeline, serializedRewrittenPipeline);                    \
     }
 
 TEST_FLE_REWRITE_PIPELINE(Match,
                           "[{$match: {$and: [{ssn: {encrypt: 2}}, {age: {encrypt: 4}}]}}]",
-                          "[{$match: {$and: [{ssn: {$gt: 2}}, {age: {$gt: 4}}]}}]");
+                          "[{$match: {$and: [{ssn: {$gt: 2}}, {age: {$gt: 4}}]}}]",
+                          {},
+                          FLEServerRewritePipelineTest::kSingleEncryptionSchemaEncryptionInfo,
+                          true);
 
 TEST_FLE_REWRITE_PIPELINE(
     ProjectWithMatch,
     "[{$project: {foo: '$ssn'}},{$match: {$and: [{foo: {encrypt: 2}}, {age: {encrypt: 4}}]}}]",
-    "[{$project: {foo: '$ssn'}},{$match: {$and: [{foo: {$gt: 2}}, {age: {$gt: 4}}]}}]");
+    "[{$project: {foo: '$ssn'}},{$match: {$and: [{foo: {$gt: 2}}, {age: {$gt: 4}}]}}]",
+    {},
+    FLEServerRewritePipelineTest::kSingleEncryptionSchemaEncryptionInfo,
+    true);
 
 TEST_FLE_REWRITE_PIPELINE(GraphLookup,
                           "[{ $graphLookup: {  \
-                                from: \"mock\",\
+                                from: \"coll_a\",\
                                 as: \"selfGraph\",\
                                 connectToField: \"name\",\
                                 connectFromField: \"reportsTo\", \
@@ -509,13 +690,16 @@ TEST_FLE_REWRITE_PIPELINE(GraphLookup,
                                 restrictSearchWithMatch: { \
                                      \"ssn\" : { encrypt : 1234 } }}}]",
                           "[{ $graphLookup: { \
-                                from : \"mock\", \
+                                from : \"coll_a\", \
                                 as : \"selfGraph\",\
                                 connectToField : \"name\", \
                                 connectFromField : \"reportsTo\", \
                                 startWith : \"$reportsTo\", \
                                 restrictSearchWithMatch : { \
-                                    \"ssn\" : { $gt : 1234 } }}}]");
+                                    \"ssn\" : { $gt : 1234 } }}}]",
+                          {},
+                          FLEServerRewritePipelineTest::kSingleEncryptionSchemaEncryptionInfo,
+                          true);
 
 TEST_FLE_REWRITE_PIPELINE(GeoNear,
                           "[{ $geoNear: { \
@@ -539,6 +723,162 @@ TEST_FLE_REWRITE_PIPELINE(GeoNear,
                                 query : {ssn : {\"$gt\" : 1234}}, \
                                 spherical : true, \
                                 includeLocs : \"dist.location\"} \
-                                }]");
+                                }]",
+                          {},
+                          FLEServerRewritePipelineTest::kSingleEncryptionSchemaEncryptionInfo,
+                          true);
+
+// Note, for DocumentSourceLookup testing, we purposely provide an empty "let", because the
+// implementation for the rewrites relies on pipeline::serialize() which will add the superfluous
+// empty let variables.
+TEST_FLE_REWRITE_PIPELINE(LookupSinglyNestedMatch,
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    {$match:
+                                        {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]} 
+                                    }]}}])",
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    {$match:
+                                        {$and: [{b_ssn: {$gt: 2}}, {b_age: {$gt: 4}}]} 
+                                    }]}}])",
+                          {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd)},
+                          FLEServerRewritePipelineTest::kTwoEncryptionSchemaEncryptionInfo,
+                          true);
+
+TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch,
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    { $lookup: {
+                                        from: "coll_c",
+                                        localField: "b_foo", 
+                                        foreignField: "c_foo",
+                                        as: "inner_docs",
+                                        let: {},
+                                        pipeline: [ 
+                                            {$match:
+                                                {$and: [{c_ssn: {encrypt: 2}}, {c_age: {encrypt: 4}}]} 
+                                            }
+                                            ]}},
+                                    {$match: 
+                                        {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]} 
+                                    }]}}])",
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    { $lookup: {
+                                        from: "coll_c",
+                                        localField: "b_foo", 
+                                        foreignField: "c_foo",
+                                        as: "inner_docs",
+                                        let: {},
+                                        pipeline: [ 
+                                            {$match:
+                                                {$and: [{c_ssn: {$gt: 2}}, {c_age: {$gt: 4}}]} 
+                                            }
+                                            ]}},
+                                    {$match: 
+                                        {$and: [{b_ssn: {$gt: 2}}, {b_age: {$gt: 4}}]} 
+                                    }]}}])",
+                          std::vector<NamespaceString>(
+                              {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd),
+                               NamespaceString::createNamespaceString_forTest("test.coll_c"_sd)}),
+                          FLEServerRewritePipelineTest::kThreeEncryptionSchemaEncryptionInfo,
+                          true);
+
+// Test that no rewrites take place when feature flag is disabled.
+TEST_FLE_REWRITE_PIPELINE(LookupSinglyNestedMatch_FeatureFlagDisabled,
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    {$match:
+                                        {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]} 
+                                    }]}}])",
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    {$match:
+                                        {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]} 
+                                    }]}}])",
+                          {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd)},
+                          FLEServerRewritePipelineTest::kTwoEncryptionSchemaEncryptionInfo,
+                          false);
+
+TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch_FeatureFlagDisabled,
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    { $lookup: {
+                                        from: "coll_c",
+                                        localField: "b_foo", 
+                                        foreignField: "c_foo",
+                                        as: "inner_docs",
+                                        let: {},
+                                        pipeline: [ 
+                                            {$match:
+                                                {$and: [{c_ssn: {encrypt: 2}}, {c_age: {encrypt: 4}}]} 
+                                            }
+                                            ]}},
+                                    {$match: 
+                                        {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]} 
+                                    }]}}])",
+                          R"([{ $lookup: {
+                                from: "coll_b",
+                                localField: "foo", 
+                                foreignField: "b_foo",
+                                as: "docs",
+                                let: {},
+                                pipeline: [ 
+                                    { $lookup: {
+                                        from: "coll_c",
+                                        localField: "b_foo", 
+                                        foreignField: "c_foo",
+                                        as: "inner_docs",
+                                        let: {},
+                                        pipeline: [ 
+                                            {$match:
+                                                {$and: [{c_ssn: {encrypt: 2}}, {c_age: {encrypt: 4}}]} 
+                                            }
+                                            ]}},
+                                    {$match: 
+                                        {$and: [{b_ssn: {encrypt: 2}}, {b_age: {encrypt: 4}}]} 
+                                    }]}}])",
+                          std::vector<NamespaceString>(
+                              {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd),
+                               NamespaceString::createNamespaceString_forTest("test.coll_c"_sd)}),
+                          FLEServerRewritePipelineTest::kThreeEncryptionSchemaEncryptionInfo,
+                          false);
+
 }  // namespace
 }  // namespace mongo

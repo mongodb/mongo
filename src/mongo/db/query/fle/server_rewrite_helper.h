@@ -64,6 +64,8 @@ protected:
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const NamespaceString nssEsc;
+    const std::map<NamespaceString, NamespaceString>
+        _escMap;  // Map collection Ns to ESC metadata collection nss.
 };
 
 /**
@@ -109,8 +111,7 @@ protected:
     // own mocked QueryRewriter.
     virtual QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl);
 
-private:
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 };
 }  // namespace fle
 }  // namespace mongo
