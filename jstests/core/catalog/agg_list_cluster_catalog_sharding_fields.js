@@ -245,38 +245,38 @@ if (FixtureHelpers.isMongos(dbTest)) {
 
     testBalancingConfiguration(kCollSharded,
                                /* noBalance = */ undefined,
+                               /* permitMigrations = */ false,
+                               /* expectedBalancingEnabled = */ false);
+    testBalancingConfiguration(kCollSharded,
+                               /* noBalance = */ true,
+                               /* permitMigrations = */ undefined,
+                               /* expectedBalancingEnabled = */ false);
+    testBalancingConfiguration(kCollSharded,
+                               /* noBalance = */ true,
+                               /* permitMigrations = */ true,
+                               /* expectedBalancingEnabled = */ false);
+    testBalancingConfiguration(kCollSharded,
+                               /* noBalance = */ true,
+                               /* permitMigrations = */ false,
+                               /* expectedBalancingEnabled = */ false);
+    testBalancingConfiguration(kCollSharded,
+                               /* noBalance = */ false,
+                               /* permitMigrations = */ undefined,
+                               /* expectedBalancingEnabled = */ true);
+    testBalancingConfiguration(kCollSharded,
+                               /* noBalance = */ false,
+                               /* permitMigrations = */ true,
+                               /* expectedBalancingEnabled = */ true);
+    testBalancingConfiguration(kCollSharded,
+                               /* noBalance = */ false,
+                               /* permitMigrations = */ false,
+                               /* expectedBalancingEnabled = */ false);
+    testBalancingConfiguration(kCollSharded,
+                               /* noBalance = */ undefined,
                                /* permitMigrations = */ undefined,
                                /* expectedBalancingEnabled = */ true);
     testBalancingConfiguration(kCollSharded,
                                /* noBalance = */ undefined,
                                /* permitMigrations = */ true,
                                /* expectedBalancingEnabled = */ true);
-    testBalancingConfiguration(kCollSharded,
-                               /* noBalance = */ undefined,
-                               /* permitMigrations = */ false,
-                               /* expectedBalancingEnabled = */ false);
-    testBalancingConfiguration(kCollSharded,
-                               /* noBalance = */ true,
-                               /* permitMigrations = */ undefined,
-                               /* expectedBalancingEnabled = */ false);
-    testBalancingConfiguration(kCollSharded,
-                               /* noBalance = */ true,
-                               /* permitMigrations = */ true,
-                               /* expectedBalancingEnabled = */ false);
-    testBalancingConfiguration(kCollSharded,
-                               /* noBalance = */ true,
-                               /* permitMigrations = */ false,
-                               /* expectedBalancingEnabled = */ false);
-    testBalancingConfiguration(kCollSharded,
-                               /* noBalance = */ false,
-                               /* permitMigrations = */ undefined,
-                               /* expectedBalancingEnabled = */ true);
-    testBalancingConfiguration(kCollSharded,
-                               /* noBalance = */ false,
-                               /* permitMigrations = */ true,
-                               /* expectedBalancingEnabled = */ true);
-    testBalancingConfiguration(kCollSharded,
-                               /* noBalance = */ false,
-                               /* permitMigrations = */ false,
-                               /* expectedBalancingEnabled = */ false);
 }
