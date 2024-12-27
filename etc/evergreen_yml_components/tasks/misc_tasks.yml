@@ -938,6 +938,17 @@ tasks:
             - "--generate-report"
             - "--binary-dir=./"
             - "lint-all"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/local-buildifier-invocation.txt
+          remote_file: ${project}/${build_variant}/${revision}/local-buildifier-invocation-${task_id}-${execution}.txt
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: Buildifier.py Invocation for Local Usage
 
   # TODO: DEVPROD-9047 Enable after the issue with getting third party file is resolved
   - name: lint_sbom

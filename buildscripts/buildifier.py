@@ -4,6 +4,7 @@ import os
 import pathlib
 import platform
 import subprocess
+import sys
 
 import download_buildifier
 from simple_report import make_report, put_report, try_combine_reports
@@ -169,6 +170,13 @@ def main():
         # we purposefully do not use sub.choices.keys() so it does not print as a dict_keys object
         choices = [key for key in sub.choices]
         raise RuntimeError(f"One of the following subcommands must be specified: {choices}")
+
+    if os.environ.get("CI"):
+        local_usage = "python buildscripts/buildifier.py fix-all\npython buildscripts/buildifier.py fix-unittests\n"
+        sys.stderr.write("buildifier.py invocations with params for local usage:\n")
+        sys.stderr.write(local_usage)
+        with open("local-buildifier-invocation.txt", "w") as f:
+            f.write(local_usage)
 
 
 if __name__ == "__main__":
