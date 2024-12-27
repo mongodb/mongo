@@ -15,6 +15,7 @@
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
 //   requires_profiling,
+//   requires_getmore,
 //   assumes_balancer_off,
 //   featureFlagSbeFull,
 // ]

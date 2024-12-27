@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 var t = db.geod;
 t.drop();
 t.save({loc: [0, 0]});

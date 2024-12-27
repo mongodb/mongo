@@ -1,4 +1,7 @@
 // Test $in regular expressions with overlapping index bounds.  SERVER-4677
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_inb;
 t.drop();

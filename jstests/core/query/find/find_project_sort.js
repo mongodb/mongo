@@ -1,5 +1,8 @@
 /**
  * Test a variety of predicates for the find command's filter, projection and sort expressions.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 

@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.geo_box2;
 
 t.drop();

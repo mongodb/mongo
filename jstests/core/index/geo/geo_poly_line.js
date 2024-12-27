@@ -1,4 +1,7 @@
 // Test that weird polygons work SERVER-3725
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.geo_polygon5;
 t.drop();

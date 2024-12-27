@@ -10,6 +10,7 @@
 //   assumes_read_preference_unchanged,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
+//   requires_getmore,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";

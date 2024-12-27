@@ -1,6 +1,9 @@
 // end-to-end tests on index bounds for numerical values
 // should handle numerical extremes
 // such as Number.MAX_VALUE and Infinity
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.indexboundsnumberedgecases;
 

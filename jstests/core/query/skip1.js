@@ -1,5 +1,8 @@
 // SERVER-2845 When skipping objects without loading them, they shouldn't be
 // included in the nscannedObjects count.
+// @tags: [
+//   requires_getmore,
+// ]
 
 var t = db.jstests_skip1;
 

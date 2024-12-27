@@ -10,6 +10,7 @@
 //   multiversion_incompatible,
 //   # Uses $where operator
 //   requires_scripting,
+//   requires_getmore,
 // ]
 // Note: It's important to use our own database here to avoid sharing a javascript execution context
 // (Scope) with other tests which could pollute the global scope. This context is cached and shared

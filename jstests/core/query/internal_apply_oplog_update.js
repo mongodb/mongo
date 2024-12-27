@@ -4,6 +4,7 @@
  *   requires_fcv_60,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
+ *   requires_getmore,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

@@ -3,6 +3,9 @@
  * {$not: {$geoIntersects: <>}} queries should return proper results. Previously, those queries
  * failed due to attempting to build geospatial index bounds on the non-geo index. See SERVER-92193
  * for more details.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 
 const coll = db.negated_geo_queries;

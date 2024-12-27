@@ -3,6 +3,7 @@
 // @tags: [
 //   # in memory variants won't treat this workload the same and may not fail.
 //   requires_persistence,
+//   requires_getmore,
 // ]
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

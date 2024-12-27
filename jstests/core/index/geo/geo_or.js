@@ -1,4 +1,7 @@
 // multiple geo clauses with $or
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.geoor;
 

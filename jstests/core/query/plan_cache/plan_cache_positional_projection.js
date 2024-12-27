@@ -1,5 +1,8 @@
 /**
  * Tests the autoparameterization of the SBE cached plan that includes positional projection.
+ *  @tags: [
+ *    requires_getmore,
+ *  ]
  */
 const coll = db.plan_cache_positional_projection;
 coll.drop();

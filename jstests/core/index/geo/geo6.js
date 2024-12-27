@@ -1,3 +1,6 @@
+// @tags: [
+//   requires_getmore,
+// ]
 let t = db.geo6;
 t.drop();
 

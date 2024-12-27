@@ -1,4 +1,8 @@
 // Regression test for SERVER-34846.
+// @tags: [
+//   requires_getmore,
+// ]
+
 const coll = db.collation_with_reverse_index;
 coll.drop();
 

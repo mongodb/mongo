@@ -1,6 +1,9 @@
 /**
  * Tests behavior of indexing geo values incredibly close to the upper boundary of the 2d index.
  * See SERVER-92930 for more details.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 
 var coll = db.getCollection(jsTestName());

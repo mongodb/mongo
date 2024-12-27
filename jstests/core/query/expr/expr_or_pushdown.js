@@ -1,6 +1,9 @@
 /**
  * Test that an $expr predicated which is eligible for being indexed with an $or pushdown executes
  * as expected.
+ *  @tags: [
+ *    requires_getmore,
+ *  ]
  */
 const coll = db.expr_or_pushdown;
 coll.drop();

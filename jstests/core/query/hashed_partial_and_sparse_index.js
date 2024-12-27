@@ -4,6 +4,7 @@
  * prefix.
  * @tags: [
  *   assumes_read_concern_local,
+ *   requires_getmore,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

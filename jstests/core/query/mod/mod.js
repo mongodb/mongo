@@ -1,4 +1,7 @@
 // Tests the behavior of $mod for match expressions.
+// @tags: [
+//   requires_getmore,
+// ]
 
 const coll = db.mod;
 coll.drop();

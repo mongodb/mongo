@@ -6,6 +6,7 @@
  * @tags: [
  *   multiversion_incompatible,
  *   does_not_support_transactions,
+ *   requires_getmore,
  * ]
  */
 

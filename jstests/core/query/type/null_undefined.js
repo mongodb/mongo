@@ -4,7 +4,8 @@
  * @tags: [
  *   does_not_support_transactions,
  *   # The explain command does not support majority read concern.
- *   assumes_read_concern_local
+ *   assumes_read_concern_local,
+ *   requires_getmore,
  * ]
  */
 

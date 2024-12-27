@@ -14,6 +14,7 @@
  *   requires_non_retryable_writes,
  *   # Tailable cursors do not work correctly on previous versions.
  *   requires_fcv_63,
+ *   requires_getmore,
  * ]
  */
 

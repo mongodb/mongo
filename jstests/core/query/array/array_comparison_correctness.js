@@ -2,6 +2,9 @@
  * Demonstrate the expected behavior of $lt and $gt comparisons involving arrays. This is only
  * tested without an index, results between index and non-index behavior are compared in
  * array_index_and_nonIndex_consistent.js
+ *  @tags: [
+ *   requires_getmore
+ * ]
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

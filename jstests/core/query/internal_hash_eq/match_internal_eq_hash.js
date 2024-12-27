@@ -4,6 +4,7 @@
  *   # explain doesn't support read concern
  *   assumes_read_concern_unchanged,
  *   requires_fcv_70,
+ *   requires_getmore,
  * ]
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";

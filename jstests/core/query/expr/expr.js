@@ -12,6 +12,7 @@
 //   requires_scripting,
 //   # Does not support multiplanning, because it makes explain fail
 //   does_not_support_multiplanning_single_solutions,
+//   requires_getmore,
 // ]
 
 import "jstests/libs/query/sbe_assert_error_override.js";

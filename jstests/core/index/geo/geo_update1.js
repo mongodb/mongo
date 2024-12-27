@@ -1,6 +1,7 @@
 // @tags: [
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 let t = db.geo_update1;

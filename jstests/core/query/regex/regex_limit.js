@@ -1,5 +1,8 @@
 /**
  * Test the behavior of very, very long regex patterns.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const coll = db.regex_limit;
 coll.drop();

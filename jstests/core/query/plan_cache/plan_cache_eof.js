@@ -15,6 +15,7 @@
  *   assumes_balancer_off,
  *   assumes_unsharded_collection,
  *   requires_fcv_81,
+ *   requires_getmore,
  * ]
  */
 

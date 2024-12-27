@@ -1,4 +1,7 @@
 // Test $type expression with non-existent field in the document.
+// @tags: [
+//   requires_getmore,
+// ]
 
 const coll = db.type_operator_on_missing_values;
 coll.drop();

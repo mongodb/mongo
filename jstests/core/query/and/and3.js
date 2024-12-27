@@ -5,6 +5,7 @@
 //   requires_scripting,
 //   assumes_read_concern_local,
 //   requires_fcv_80,
+//   requires_getmore,
 // ]
 
 let t = db.jstests_and3;

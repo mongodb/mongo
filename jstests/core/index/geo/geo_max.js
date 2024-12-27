@@ -3,6 +3,7 @@
 // If there aren't enough points the test passes even if the code is broken.
 // @tags: [
 //   assumes_read_concern_local,
+//   requires_getmore,
 // ]
 
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";

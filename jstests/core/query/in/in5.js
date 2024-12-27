@@ -2,6 +2,7 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
+//   requires_getmore
 // ]
 
 let t = db.in5;

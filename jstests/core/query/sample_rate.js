@@ -1,6 +1,7 @@
 /**
  * Test the $sampleRate match expression.
  * @tags: [
+ *   requires_getmore,
  * ]
  */
 const coll = db.expression_sample_rate;

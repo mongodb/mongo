@@ -1,5 +1,8 @@
 // Test handling of comparison between long longs and their double approximations in btrees -
 // SERVER-3719.
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_numberlong4;
 t.drop();

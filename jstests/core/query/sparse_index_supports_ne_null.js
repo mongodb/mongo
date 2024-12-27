@@ -9,6 +9,7 @@
  *   assumes_unsharded_collection,
  *   # In 8.0, we changed behavior for equality to null.
  *   requires_fcv_80,
+ *   requires_getmore,
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";

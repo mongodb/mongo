@@ -1,4 +1,7 @@
 // Tests for $geowithin $centerSphere operator with LineString and Polygon.
+// @tags: [
+//   requires_getmore,
+// ]
 function testGeoWithinCenterSphereLinePolygon(coll) {
     coll.drop();
 

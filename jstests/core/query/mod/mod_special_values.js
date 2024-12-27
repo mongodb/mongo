@@ -2,7 +2,10 @@
  * Tests $mod match expression with NaN, Infinity and large value inputs.
  *
  * This test exercises a changed behavior, thus prevent it running in multi-version variants.
- * @tags: [requires_fcv_51]
+ * @tags: [
+ *   requires_fcv_51,
+ *   requires_getmore,
+ * ]
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
 const testDB = db.getSiblingDB(jsTestName());

@@ -1,5 +1,8 @@
 // Test $or with predicates that generate inexact bounds. The access planner
 // has special logic for such queries.
+// @tags: [
+//   requires_getmore,
+// ]
 var t = db.jstests_or_inexact;
 var cursor;
 

@@ -1,4 +1,7 @@
 // SERVER-1932 Test unindexed matching of a range that is only valid in a multikey context.
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_find8;
 t.drop();

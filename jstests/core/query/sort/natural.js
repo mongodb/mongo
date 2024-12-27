@@ -1,4 +1,8 @@
 // Tests for $natural sort and $natural hint.
+// @tags: [
+//   requires_getmore,
+// ]
+
 var results;
 
 var coll = db.jstests_natural;

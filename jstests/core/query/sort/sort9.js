@@ -1,4 +1,7 @@
 // Unindexed array sorting SERVER-2884
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_sort9;
 t.drop();

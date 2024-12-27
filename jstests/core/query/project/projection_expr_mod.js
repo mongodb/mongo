@@ -1,4 +1,7 @@
 // Confirm correctness of $mod evaluation in find projection.
+// @tags: [
+//   requires_getmore,
+// ]
 
 import "jstests/libs/query/sbe_assert_error_override.js";
 

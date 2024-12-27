@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_non_retryable_writes,
+//   requires_getmore
 // ]
 
 // Test query empty array SERVER-2258

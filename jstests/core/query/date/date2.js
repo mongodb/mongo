@@ -1,4 +1,7 @@
 // Check that it's possible to compare a Date to a Timestamp, but they are never equal - SERVER-3304
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_date2;
 t.drop();

@@ -2,7 +2,8 @@
 //
 // @tags: [
 //     # Uses $where operator
-//     requires_scripting
+//     requires_scripting,
+//     requires_getmore,
 // ]
 
 const coll = db.expressions_matching_whole_array;

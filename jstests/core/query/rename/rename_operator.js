@@ -8,6 +8,7 @@
  *   does_not_support_transactions,
  *   # update with multi:false is not supported on sharded collection
  *   assumes_unsharded_collection,
+ *   requires_getmore,
  * ]
  */
 

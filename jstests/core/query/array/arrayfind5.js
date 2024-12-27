@@ -1,4 +1,7 @@
 // Test indexed elemmatch of missing field.
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_arrayfind5;
 t.drop();

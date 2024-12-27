@@ -1,4 +1,7 @@
 
+// @tags: [
+//   requires_getmore,
+// ]
 let t = db.basic7;
 t.drop();
 

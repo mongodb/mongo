@@ -1,4 +1,7 @@
 // Test $all/$elemMatch with missing field - SERVER-4492
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_all4;
 t.drop();

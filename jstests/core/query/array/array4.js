@@ -1,5 +1,8 @@
 /**
  * Basic test for querying on documents containing arrays.
+ *  @tags: [
+ *    requires_getmore
+ *  ]
  */
 const collNamePrefix = 'array4_';
 let collCount = 0;

@@ -8,6 +8,7 @@
 //   does_not_support_causal_consistency,
 //   # Uses mapReduce command.
 //   requires_scripting,
+//   requires_getmore,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

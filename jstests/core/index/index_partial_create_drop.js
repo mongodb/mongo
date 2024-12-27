@@ -8,6 +8,7 @@
 //
 //     uses_full_validation,
 //     requires_fcv_51,
+//     requires_getmore,
 //
 // ]
 

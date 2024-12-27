@@ -6,6 +6,7 @@
  *   not_allowed_with_signed_security_token,
  *   assumes_against_mongod_not_mongos,
  *   requires_non_retryable_writes,
+ *   requires_getmore,
  * ]
  */
 let topDB = db.getSiblingDB("topdrop");

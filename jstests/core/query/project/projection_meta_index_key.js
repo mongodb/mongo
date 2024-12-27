@@ -1,5 +1,9 @@
 // Test that indexKey $meta projection works in find and aggregate commands and produces correct
 // result depending on whether index key metadata is available or not.
+// @tags: [
+//   requires_getmore,
+// ]
+
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.projection_meta_index_key;

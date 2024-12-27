@@ -3,6 +3,7 @@
  * with numeric ordering.
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
+ *   requires_getmore,
  * ]
  */
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";

@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.geo_sort1;
 t.drop();
 

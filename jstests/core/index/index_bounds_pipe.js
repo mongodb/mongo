@@ -4,6 +4,7 @@
  * @tags: [
  *   assumes_read_concern_local,
  *   requires_fcv_80,
+ *   requires_getmore,
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";

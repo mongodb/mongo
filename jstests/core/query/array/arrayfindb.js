@@ -1,4 +1,7 @@
 // Test $elemMatch object with complex embedded expressions.
+// @tags: [
+//   requires_getmore,
+// ]
 
 var t = db.jstests_arrayfindb;
 t.drop();

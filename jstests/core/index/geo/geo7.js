@@ -1,6 +1,9 @@
 /**
  * Tests that we can create both simple and compound geo indexes.
  * Also tests that a geo index can support non-geo searches on the indexed field.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const docs = [
     {_id: 1, y: [1, 1]},

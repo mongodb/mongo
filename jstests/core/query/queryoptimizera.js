@@ -6,6 +6,7 @@
 //   not_allowed_with_signed_security_token,
 //   does_not_support_stepdowns,
 //   requires_capped,
+//   requires_getmore,
 // ]
 
 function numWarnings() {

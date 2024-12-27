@@ -7,7 +7,8 @@
  *
  * @tags: [
  *   requires_fcv_63,
- *   requires_scripting
+ *   requires_scripting,
+ *   requires_getmore,
  * ]
  */
 /**

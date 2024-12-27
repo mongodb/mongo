@@ -1,4 +1,8 @@
 // A few rooted $or cases.
+// @tags: [
+//   requires_getmore,
+// ]
+
 var t = db.jstests_orq;
 t.drop();
 

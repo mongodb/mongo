@@ -3,7 +3,8 @@
  *
  * @tags: [
  *      cannot_create_unique_index_when_using_hashed_shard_key,
- *      does_not_support_transactions
+ *      does_not_support_transactions,
+ *      requires_getmore,
  *  ]
  */
 const dbName = "unique_index_insert";

@@ -1,7 +1,8 @@
 // Some tests for $and SERVER-1089
 // @tags: [
 //     # Uses $where operator
-//     requires_scripting
+//     requires_scripting,
+//     requires_getmore
 // ]
 
 let t = db.jstests_and;

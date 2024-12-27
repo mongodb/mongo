@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const t = db.type_bracket;

@@ -1,5 +1,8 @@
 /**
  * Tests basic NaN handling. Note that WiredTiger indexes handle -NaN and NaN differently.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 

@@ -5,6 +5,7 @@
 //   # able to be covered when they aren't on the shard key since the document needs to be fetched
 //   # in order to apply the SHARDING_FILTER stage.
 //   assumes_unsharded_collection,
+//   requires_getmore,
 // ]
 
 import {

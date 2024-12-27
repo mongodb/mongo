@@ -19,6 +19,7 @@
  *   # versions.
  *   requires_fcv_72,
  *   multiversion_incompatible,
+ *   requires_getmore,
  * ]
  */
 (function() {

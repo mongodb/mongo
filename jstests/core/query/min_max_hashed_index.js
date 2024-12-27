@@ -1,5 +1,8 @@
 /*
  * Check that min() and max() work with a hashed index.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const coll = db.min_max_hashed_index;
 coll.drop();

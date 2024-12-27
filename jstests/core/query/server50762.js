@@ -1,4 +1,7 @@
 // Tests the behavior of $size for match expressions.
+// @tags: [
+//   requires_getmore,
+// ]
 
 const coll = db.server50762;
 coll.drop();

@@ -20,6 +20,7 @@
  *   # Test depends on hardcoded database name equality which is incompatible with tenant prefixing.
  *   simulate_atlas_proxy_incompatible,
  *   references_foreign_collection,
+ *   requires_getmore,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

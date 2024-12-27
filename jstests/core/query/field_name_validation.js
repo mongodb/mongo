@@ -9,6 +9,7 @@
  *
  * @tags: [
  *   assumes_unsharded_collection,
+ *   requires_getmore,
  * ]
  */
 const coll = db.field_name_validation;

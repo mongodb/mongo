@@ -1,6 +1,10 @@
 // Cannot implicitly shard accessed collections because of not being able to create unique index
 // using hashed shard key pattern.
-// @tags: [cannot_create_unique_index_when_using_hashed_shard_key, requires_non_retryable_writes]
+// @tags: [
+//  cannot_create_unique_index_when_using_hashed_shard_key,
+//  requires_non_retryable_writes,
+//  requires_getmore,
+//]
 
 // Test that multiple indexes behave correctly together.
 var coll = db.index_multiple_compatibility;

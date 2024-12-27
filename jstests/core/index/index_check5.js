@@ -1,4 +1,6 @@
-
+// @tags: [
+//   requires_getmore,
+// ]
 let t = db.index_check5;
 t.drop();
 

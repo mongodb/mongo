@@ -1,4 +1,7 @@
 // Test dollar sign operator with $and SERVER-1089
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_and2;
 

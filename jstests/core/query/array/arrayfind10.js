@@ -1,5 +1,8 @@
 /**
  * Tests some of the find command's semantics with respect to how arrays are handled.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 

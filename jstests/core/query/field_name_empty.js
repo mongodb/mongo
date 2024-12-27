@@ -2,6 +2,7 @@
  * Test the behavior of match expressions with empty field names.
  * @tags: [
  *   assumes_read_concern_local,
+ *   requires_getmore,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

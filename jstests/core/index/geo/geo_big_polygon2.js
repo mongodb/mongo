@@ -2,6 +2,7 @@
 //   requires_fastcount,
 //   requires_non_retryable_writes,
 //   requires_multi_updates,
+//   requires_getmore,
 // ]
 
 //

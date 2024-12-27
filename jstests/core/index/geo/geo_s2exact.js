@@ -1,4 +1,8 @@
 // Queries on exact geometry should return the exact geometry.
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.geo_s2exact;
 t.drop();
 

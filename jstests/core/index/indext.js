@@ -1,4 +1,7 @@
 // Sparse indexes with arrays SERVER-3216
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_indext;
 t.drop();

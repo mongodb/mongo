@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 // Additional checks for geo uniqueDocs and includeLocs SERVER-3139.

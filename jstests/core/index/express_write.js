@@ -6,6 +6,7 @@
  *   requires_fcv_81,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
+ *   requires_getmore,
  * ]
  */
 

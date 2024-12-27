@@ -1,5 +1,8 @@
 /**
  * Test out ElemMatchObjectMatchExpression
+ *  @tags: [
+ *    requires_getmore,
+ *  ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 

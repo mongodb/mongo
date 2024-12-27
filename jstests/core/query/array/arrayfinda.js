@@ -1,4 +1,7 @@
 // Assorted $elemMatch matching behavior checks.
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_arrayfinda;
 t.drop();

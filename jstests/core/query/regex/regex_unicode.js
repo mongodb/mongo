@@ -1,5 +1,8 @@
 /**
  * Test regexes with various Unicode options.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const coll = db.getCollection("regex_unicode");
 coll.drop();

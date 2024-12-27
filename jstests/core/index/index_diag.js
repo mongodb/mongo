@@ -1,5 +1,6 @@
 // @tags: [
 //   assumes_balancer_off,
+//   requires_getmore,
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

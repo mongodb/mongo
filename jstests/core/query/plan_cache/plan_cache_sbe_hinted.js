@@ -10,6 +10,7 @@
  *   # Multiple servers can mess up the plan cache list.
  *   assumes_standalone_mongod,
  *   featureFlagSbeFull,
+ *   requires_getmore,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 // Check multikey index cases with parallel nested fields SERVER-958.

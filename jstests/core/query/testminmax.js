@@ -1,4 +1,7 @@
-// @tags: [requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   requires_getmore,
+// ]
 
 let t = db.minmaxtest;
 t.drop();

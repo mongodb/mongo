@@ -1,4 +1,7 @@
 // SERVER-7322
+// @tags: [
+//   requires_getmore,
+// ]
 let t = db.geo_exactfetch;
 t.drop();
 

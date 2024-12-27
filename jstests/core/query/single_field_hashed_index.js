@@ -5,6 +5,7 @@
  * @tags: [
  *   assumes_no_implicit_index_creation,
  *   requires_fastcount,
+ *   requires_getmore,
  * ]
  */
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";

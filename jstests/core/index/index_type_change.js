@@ -1,6 +1,9 @@
 /**
  * Tests that replacing a document with an equivalent document with different types for the fields
  * will update the index entries associated with that document.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";

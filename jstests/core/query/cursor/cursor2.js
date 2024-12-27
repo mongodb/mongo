@@ -5,7 +5,7 @@
  *
  * BUG 884
  *
- * @tags: [requires_fastcount]
+ * @tags: [requires_fastcount, requires_getmore]
  */
 function testCursorCountVsArrLen(dbConn) {
     var coll = dbConn.ed_db_cursor2_ccvsal;

@@ -4,6 +4,7 @@
 //   # Uses $where operator
 //   requires_scripting,
 //   assumes_read_concern_local,
+//   requires_getmore,
 // ]
 
 const coll = db.mod_with_where;

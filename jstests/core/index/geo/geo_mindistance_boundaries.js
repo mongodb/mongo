@@ -1,5 +1,8 @@
 /**Test boundary conditions for $minDistance option for $near and $nearSphere
  * queries. SERVER-9395.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 var t = db.geo_mindistance_boundaries;
 t.drop();

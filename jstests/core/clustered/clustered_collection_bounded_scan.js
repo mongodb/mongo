@@ -7,6 +7,7 @@
  *   # Does not support sharding
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
+ *   requires_getmore,
  * ]
  */
 import {

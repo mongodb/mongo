@@ -1,4 +1,7 @@
 // Check exists with non empty document, based on SERVER-2470 example.
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_exists3;
 t.drop();

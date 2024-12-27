@@ -2,6 +2,7 @@
 // shard key since the document needs to be fetched in order to apply the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_getmore,
 // ]
 
 /**

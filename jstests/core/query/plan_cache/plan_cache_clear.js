@@ -16,6 +16,7 @@
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
 //   references_foreign_collection,
+//   requires_getmore,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

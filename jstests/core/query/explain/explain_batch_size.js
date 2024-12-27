@@ -6,6 +6,7 @@
 //
 // @tags: [
 //   requires_fastcount,
+//   requires_getmore,
 // ]
 
 let t = db.explain_batch_size;

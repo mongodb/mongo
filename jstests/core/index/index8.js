@@ -8,7 +8,8 @@
 //     # Cannot implicitly shard accessed collections because of not being able to create unique
 //     # index using hashed shard key pattern.
 //     cannot_create_unique_index_when_using_hashed_shard_key,
-//     requires_fastcount
+//     requires_fastcount,
+//     requires_getmore,
 // ]
 
 let t = db.jstests_index8;

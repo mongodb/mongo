@@ -1,4 +1,7 @@
 // Tests the behavior of queries using MinKey and MaxKey
+// @tags: [
+//   requires_getmore,
+// ]
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

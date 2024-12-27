@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore
+// ]
+
 let t = db.arrayfind3;
 t.drop();
 

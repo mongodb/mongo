@@ -2,6 +2,9 @@
  * Test that reusing a plan cache entry correctly distinguishes whether the entry's predicate is
  * compatible with the query. Specifically when using an index for a predicate inside an $elemMatch
  * when the entry and predicate have different data types which affect index compatibility.
+ *  @tags: [
+ *    requires_getmore,
+ *  ]
  */
 
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";

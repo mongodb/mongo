@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 // Test precision of NumberLong values with v1 index code SERVER-3717

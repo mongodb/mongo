@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_fcv_60,
  *   requires_scripting,
+ *   requires_getmore,
  * ]
  */
 const coll = db.where_multiple_plans;

@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 var t = db.geo_s2overlappingpolys;
 t.drop();
 

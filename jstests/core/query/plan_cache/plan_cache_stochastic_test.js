@@ -21,6 +21,7 @@
  *   assumes_standalone_mongod,
  *   assumes_balancer_off,
  *   assumes_no_implicit_index_creation,
+ *   requires_getmore,
  * ]
  */
 

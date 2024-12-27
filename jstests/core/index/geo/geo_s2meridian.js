@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.geo_s2meridian;
 t.drop();
 t.createIndex({geo: "2dsphere"});

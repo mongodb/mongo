@@ -1,5 +1,7 @@
 // Tests the behavior of $size for match expressions.
-
+// @tags: [
+//   requires_getmore
+// ]
 const coll = db.jstests_find_size;
 coll.drop();
 

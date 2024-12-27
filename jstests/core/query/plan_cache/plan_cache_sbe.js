@@ -21,6 +21,7 @@
  *   assumes_no_implicit_index_creation,
  *   # This test looks for plan cache hits, which would change with repeated reads.
  *   does_not_support_repeated_reads,
+ *   requires_getmore,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

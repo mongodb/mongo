@@ -1,4 +1,7 @@
 // SERVER-7343: allow $within without a geo index.
+// @tags: [
+//   requires_getmore,
+// ]
 
 const t = db.geo_circle1_noindex;
 t.drop();

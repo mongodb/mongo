@@ -1,5 +1,8 @@
 /**
  * Tests that date expressions remain monotonic despite timezone changes.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 
 const coll = db.monotonic_date_operations;

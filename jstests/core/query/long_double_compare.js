@@ -1,6 +1,9 @@
 /**
  * Tests some of the find command's semantics with respect to how 64-bit integers and doubles are
  * compared with each other.
+ *  @tags: [
+ *   requires_getmore
+ * ]
  */
 import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 

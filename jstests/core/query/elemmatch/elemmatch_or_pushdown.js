@@ -1,6 +1,9 @@
 /**
  * Tests that an $elemMatch-$or query is evaluated correctly. Designed to reproduce SERVER-33005 and
  * SERVER-38164.
+ *  @tags: [
+ *    requires_getmore,
+ *  ]
  */
 const coll = db.elemmatch_or_pushdown;
 coll.drop();

@@ -1,4 +1,7 @@
 // Uassert when $elemMatch is attempted within $in SERVER-3545
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_ina;
 t.drop();

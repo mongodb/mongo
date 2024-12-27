@@ -2,6 +2,7 @@
  * Test that query plans involving sort and project are correct.
  * @tags: [
  *   requires_fcv_72,
+ *   requires_getmore,
  * ]
  */
 (function() {

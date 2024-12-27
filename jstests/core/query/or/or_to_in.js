@@ -7,6 +7,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   requires_fcv_80,
+//   requires_getmore,
 // ]
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

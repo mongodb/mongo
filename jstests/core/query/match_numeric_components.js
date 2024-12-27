@@ -1,5 +1,8 @@
 /**
  * Tests behavior of the match language when using numeric path components.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const coll = db.match_numeric_components;
 coll.drop();

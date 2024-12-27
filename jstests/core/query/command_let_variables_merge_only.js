@@ -13,6 +13,7 @@
  *   # UUID by dropping and re-creating the collection. This specially happens on $out aggregations
  *   # where the collection doesn't live on the primary shard.
  *   assumes_balancer_off,
+ *   requires_getmore,
  * ]
  */
 const coll = db.command_let_variables;

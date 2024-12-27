@@ -19,6 +19,7 @@
 //   requires_fcv_80,
 //   # Query settings commands can not be handled by atlas proxy.
 //   simulate_atlas_proxy_incompatible,
+//   requires_getmore,
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

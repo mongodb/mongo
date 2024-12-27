@@ -1,6 +1,7 @@
 // @tags: [
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
+//   requires_getmore,
 // ]
 const t = db.index_check3;
 t.drop();

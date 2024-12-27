@@ -15,6 +15,7 @@
  *   assumes_unsharded_collection,
  *   requires_fcv_81,
  *   featureFlagShardFilteringDistinctScan,
+ *   requires_getmore,
  * ]
  */
 

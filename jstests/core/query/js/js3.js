@@ -5,6 +5,7 @@
 //   requires_non_retryable_commands,
 //   # Uses $where operator
 //   requires_scripting,
+//   requires_getmore,
 // ]
 
 let t = db.jstests_js3;

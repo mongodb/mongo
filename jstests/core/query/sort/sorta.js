@@ -1,4 +1,8 @@
 // SERVER-2905 sorting with missing fields
+// @tags: [
+//   requires_getmore,
+// ]
+
 var coll = db.jstests_sorta;
 coll.drop();
 

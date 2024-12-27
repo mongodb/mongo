@@ -1,5 +1,8 @@
 /**
  * Tests that sparse indexes are disallowed for $exists:false queries.
+ *  @tags: [
+ *    requires_getmore,
+ *  ]
  */
 const coll = db.jstests_existsa;
 coll.drop();

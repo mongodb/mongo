@@ -4,6 +4,7 @@
 //   requires_fcv_63,
 //   # TODO SERVER-32311: re-enable test in balancer suites when the relative issue is solved.
 //   assumes_balancer_off,
+//   requires_getmore,
 // ]
 
 import {

@@ -1,5 +1,6 @@
 // @tags: [
 //   assumes_read_concern_local,
+//   requires_getmore
 // ]
 
 var t = db.array_match4;

@@ -2,6 +2,7 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
+//   requires_getmore,
 // ]
 
 // Make sure the very basics of geo arrays are sane by creating a few multi location docs

@@ -1,3 +1,6 @@
+// @tags: [
+//   requires_getmore,
+// ]
 let t = db.regex8;
 t.drop();
 

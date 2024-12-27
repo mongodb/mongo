@@ -1,5 +1,9 @@
 // Explode arrays when indexing non-geo fields in 2dsphere, and make sure that
 // we find them with queries.
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.geo_s2nongeoarray;
 
 let oldPoint = [40, 5];

@@ -1,4 +1,8 @@
 // Test some cases that might be iffy with $within, mostly related to polygon w/holes.
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.geo_s2within;
 t.drop();
 t.createIndex({geo: "2dsphere"});

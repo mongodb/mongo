@@ -1,4 +1,8 @@
 // test sorting, mainly a test ver simple with no index
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.sort2;
 
 t.drop();

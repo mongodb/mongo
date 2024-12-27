@@ -2,6 +2,7 @@
 // a partial index filter.
 // @tags: [
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 let coll = db.index_partial_2dsphere;

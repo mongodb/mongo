@@ -1,3 +1,6 @@
+// @tags: [
+//   requires_getmore
+// ]
 let t = db.all2;
 t.drop();
 

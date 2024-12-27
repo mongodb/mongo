@@ -1,6 +1,7 @@
 // @tags: [
 //   operations_longer_than_stepdown_interval_in_txns,
 //   requires_fastcount,
+//   requires_getmore,
 // ]
 
 let t = db.geo3;

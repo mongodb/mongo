@@ -1,5 +1,8 @@
 // Test min / max query parameters.
-// @tags: [assumes_balancer_off]
+// @tags: [
+//  assumes_balancer_off,
+//  requires_getmore,
+// ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

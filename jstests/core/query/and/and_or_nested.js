@@ -1,5 +1,8 @@
 /**
  * Some more tests $and/$or being nested in various ways.
+ *  @tags: [
+ *      requires_getmore
+ *   ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 

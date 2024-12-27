@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_writes, requires_fcv_51]
+// @tags: [
+//  requires_non_retryable_writes,
+//  requires_fcv_51,
+//  requires_getmore,
+// ]
 
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 

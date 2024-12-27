@@ -6,6 +6,7 @@
  *   requires_non_retryable_writes,
  *   # update with multi:false is not supported on sharded collection
  *   assumes_unsharded_collection,
+ *   requires_getmore,
  * ]
  */
 

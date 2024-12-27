@@ -1,5 +1,8 @@
 /**
  * Test indexing where the key is an embedded object.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 
 let t = db.index2_without_index;

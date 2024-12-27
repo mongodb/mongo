@@ -8,6 +8,7 @@
  *   assumes_unsharded_collection,
  *   # This test uses a non-retryable multi-update command.
  *   requires_non_retryable_writes,
+ *   requires_getmore,
  * ]
  */
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";

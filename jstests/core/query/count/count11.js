@@ -1,6 +1,10 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_fastcount]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   requires_fastcount,
+//   requires_getmore,
+// ]
 
 // SERVER-8514: Test the count command returns an error to the user when given an invalid query
 // predicate, even when the collection doesn't exist.

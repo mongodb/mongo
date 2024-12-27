@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 let t = db.exists2;
 t.drop();
 

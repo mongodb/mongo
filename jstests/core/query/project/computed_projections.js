@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

@@ -1,4 +1,7 @@
 // SERVER-393 Test indexed matching with $exists.
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_exists6;
 t.drop();

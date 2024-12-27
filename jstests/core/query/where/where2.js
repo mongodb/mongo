@@ -1,6 +1,7 @@
 // @tags: [
 //   # Uses $where operator
 //   requires_scripting,
+//   requires_getmore,
 // ]
 
 let t = db.getCollection("where2");

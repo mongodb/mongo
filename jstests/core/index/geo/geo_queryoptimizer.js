@@ -1,3 +1,6 @@
+// @tags: [
+//   requires_getmore,
+// ]
 let t = db.geo_qo1;
 t.drop();
 

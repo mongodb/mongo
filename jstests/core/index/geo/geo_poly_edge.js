@@ -1,6 +1,9 @@
 //
 // Tests polygon edge cases
 //
+// @tags: [
+//   requires_getmore,
+// ]
 
 var coll = db.getCollection('jstests_geo_poly_edge');
 coll.drop();

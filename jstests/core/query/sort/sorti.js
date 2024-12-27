@@ -1,4 +1,7 @@
 // Check that a projection is applied after an in memory sort.
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_sorti;
 t.drop();

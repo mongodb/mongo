@@ -5,6 +5,7 @@
 //   # Requires a batch size greater than one.
 //   does_not_support_config_fuzzer,
 //   requires_fcv_81,
+//   requires_getmore,
 // ]
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

@@ -27,6 +27,7 @@
 //   # versions.
 //   requires_fcv_72,
 //   multiversion_incompatible,
+//   requires_getmore,
 // ]
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

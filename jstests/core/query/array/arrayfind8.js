@@ -1,6 +1,9 @@
 /**
  * Matching behavior for $elemMatch applied to a top level element.
  * Includes tests for bugs described in SERVER-1264 and SERVER-4180.
+ *  @tags: [
+ *    requires_getmore
+ *  ]
  */
 const collNamePrefix = 'jstests_arrayfind8_';
 let collCount = 0;

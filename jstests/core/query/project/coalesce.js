@@ -1,5 +1,8 @@
-/*
+/**
  * Tests projections that can be coalesced.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";

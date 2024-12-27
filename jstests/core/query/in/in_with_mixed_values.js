@@ -1,4 +1,7 @@
 // Test $in regular expressions with a mix of types.
+// @tags: [
+//   requires_getmore
+// ]
 const coll = db.jstests_in_with_mixed_values;
 
 // Exercise mixed regex and scalar integer cases.

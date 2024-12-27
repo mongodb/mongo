@@ -1,4 +1,7 @@
 // This test was designed to reproduce a memory leak that was fixed by SERVER-35455.
+// @tags: [
+//   requires_getmore,
+// ]
 const coll = db.contained_or_with_nested_or;
 coll.drop();
 assert.commandWorked(coll.insert([

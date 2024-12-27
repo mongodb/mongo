@@ -4,6 +4,7 @@
 // @tags: [
 //   requires_non_retryable_writes,
 //   does_not_support_transactions,
+//   requires_getmore,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 

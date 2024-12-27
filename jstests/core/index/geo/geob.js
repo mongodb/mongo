@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 var t = db.geob;
 t.drop();
 

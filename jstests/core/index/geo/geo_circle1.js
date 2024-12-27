@@ -3,6 +3,7 @@
  *   assumes_balancer_off,
  *   # explain does not support majority read concern
  *   assumes_read_concern_local,
+ *   requires_getmore,
  * ]
  */
 

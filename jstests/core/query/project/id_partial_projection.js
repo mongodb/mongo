@@ -1,6 +1,9 @@
 /**
  * Tests partial inclusion/exclusion of _id.
  * See SERVER-7502 for details.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const coll = db.id_partial_projection;
 coll.drop();

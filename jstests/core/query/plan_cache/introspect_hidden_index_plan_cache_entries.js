@@ -9,6 +9,7 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   assumes_balancer_off,
+ *   requires_getmore,
  * ]
  */
 

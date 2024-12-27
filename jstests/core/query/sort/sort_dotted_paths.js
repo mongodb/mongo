@@ -1,5 +1,8 @@
 /**
  * Test sorting with dotted field paths.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const coll = db.sort_dotted_paths;
 coll.drop();

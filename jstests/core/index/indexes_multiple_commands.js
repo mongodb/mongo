@@ -2,6 +2,7 @@
 // expected.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
+//   requires_getmore,
 // ]
 
 // Test that commands behave correctly under the presence of multiple indexes with the same key

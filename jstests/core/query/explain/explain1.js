@@ -1,5 +1,6 @@
 // @tags: [
 //   assumes_read_concern_local,
+//   requires_getmore,
 // ]
 
 let t = db.explain1;

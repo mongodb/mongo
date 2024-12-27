@@ -2,6 +2,7 @@
 // key).
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_getmore,
 // ]
 
 // Tests geo queries w/ update & upsert

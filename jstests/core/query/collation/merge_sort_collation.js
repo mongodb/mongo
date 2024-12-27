@@ -4,6 +4,7 @@
  *  2) MERGE_SORT stage execution.
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
+ *   requires_getmore,
  * ]
  */
 const collNamePrefix = 'merge_sort_collation_';

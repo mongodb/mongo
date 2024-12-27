@@ -1,6 +1,9 @@
 //
 // Tests for N-dimensional polygon querying
 //
+// @tags: [
+//   requires_getmore,
+// ]
 
 const collNamePrefix = 'geo_polygon1_';
 let collCount = 0;

@@ -1,4 +1,7 @@
 // SERVER-1089 Test and/or/nor nesting
+// @tags: [
+//   requires_getmore
+// ]
 
 let t = db.jstests_andor;
 t.drop();

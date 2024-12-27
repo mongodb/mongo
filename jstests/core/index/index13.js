@@ -1,6 +1,7 @@
 // @tags: [
 //   requires_fastcount,
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 // Top level match fields within an $elemMatch clause may constrain multiple subfields from a

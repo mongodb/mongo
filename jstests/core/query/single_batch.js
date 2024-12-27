@@ -1,4 +1,7 @@
 // Test the "single batch" semantics of negative limit.
+// @tags: [
+//   requires_getmore,
+// ]
 var coll = db.jstests_single_batch;
 coll.drop();
 

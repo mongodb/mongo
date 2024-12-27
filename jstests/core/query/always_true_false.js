@@ -1,4 +1,8 @@
 // Tests $alwaysTrue and $alwaysFalse behavior for match expressions.
+// @tags: [
+//   requires_getmore,
+// ]
+
 const coll = db.always_true_false;
 coll.drop();
 

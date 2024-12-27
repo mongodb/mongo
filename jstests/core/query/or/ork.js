@@ -1,4 +1,7 @@
 // SERVER-2585 Test $or clauses within indexed top level $or clauses.
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_ork;
 t.drop();

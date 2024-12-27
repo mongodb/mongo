@@ -19,6 +19,7 @@
  *   assumes_no_implicit_index_creation,
  *   # Plan does not support repeat queries
  *   does_not_support_repeated_reads,
+ *   requires_getmore,
  * ]
  */
 import {

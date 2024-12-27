@@ -1,4 +1,8 @@
 // Test $geoNear + $within.
+// @tags: [
+//   requires_getmore,
+// ]
+
 const t = db.geo_s2nearwithin;
 t.drop();
 

@@ -18,6 +18,7 @@
 //   # versions.
 //   requires_fcv_72,
 //   multiversion_incompatible,
+//   requires_getmore,
 // ]
 import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";

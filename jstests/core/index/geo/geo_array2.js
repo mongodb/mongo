@@ -1,4 +1,7 @@
 // Check the semantics of near calls with multiple locations
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.geoarray2;
 t.drop();

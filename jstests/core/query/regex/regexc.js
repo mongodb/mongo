@@ -1,4 +1,7 @@
 // Multiple regular expressions using the same index
+// @tags: [
+//   requires_getmore,
+// ]
 
 var t = db.jstests_regexc;
 

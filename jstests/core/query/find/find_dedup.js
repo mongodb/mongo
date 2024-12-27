@@ -2,6 +2,7 @@
 //
 // @tags: [
 //   requires_fastcount,
+//   requires_getmore
 // ]
 
 const coll = db.jstests_find_dedup;

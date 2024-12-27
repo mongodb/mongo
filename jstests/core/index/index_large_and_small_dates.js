@@ -1,6 +1,7 @@
 // @tags: [
 //   # The `simulate_atlas_proxy` override cannot deep copy very large or small dates.
 //   simulate_atlas_proxy_incompatible,
+//   requires_getmore,
 // ]
 
 const coll = db.index_dates;

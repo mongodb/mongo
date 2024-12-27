@@ -11,6 +11,7 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   assumes_unsharded_collection,
+//   requires_getmore,
 // ]
 import {getPlanCacheShapeHashFromObject} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";

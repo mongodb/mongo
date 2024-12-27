@@ -1,4 +1,7 @@
 // Reported as server-848.
+// @tags: [
+//   requires_getmore,
+// ]
 function test(index) {
     db.server848.drop();
 

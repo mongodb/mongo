@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 const t = db.geo_s2index;
 t.drop();
 

@@ -1,4 +1,7 @@
 // Verify that $expr can be used in the top-level position, but not in subdocuments.
+// @tags: [
+//   requires_getmore,
+// ]
 
 const coll = db.expr_valid_positions;
 

@@ -13,6 +13,7 @@
 //   requires_scripting,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   requires_getmore,
 // ]
 
 var t = db.jstests_count_plan_summary;

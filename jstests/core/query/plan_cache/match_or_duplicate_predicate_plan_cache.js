@@ -14,6 +14,7 @@
  *   # If all chunks are moved off of a shard, it can cause the plan cache to miss commands.
  *   assumes_balancer_off,
  *   assumes_unsharded_collection,
+ *   requires_getmore,
  * ]
  */
 

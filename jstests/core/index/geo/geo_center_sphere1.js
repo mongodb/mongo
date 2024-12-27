@@ -1,6 +1,7 @@
 // @tags: [
 //   assumes_balancer_off,
 //   requires_fastcount,
+//   requires_getmore,
 // ]
 
 let t = db.geo_center_sphere1;

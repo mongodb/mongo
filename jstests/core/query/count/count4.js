@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 const t = db.count4;
 t.drop();
 

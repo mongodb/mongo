@@ -2,6 +2,7 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
+//   requires_getmore,
 // ]
 
 // Test for SERVER-2746

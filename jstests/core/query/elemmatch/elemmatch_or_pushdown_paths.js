@@ -1,5 +1,8 @@
 /**
  * Test OR-pushdown fixes for elemMatch based on SERVER-74954.
+ *  @tags: [
+ *    requires_getmore,
+ *  ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 

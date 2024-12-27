@@ -3,6 +3,7 @@
 //   assumes_unsharded_collection,
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
+//   requires_getmore,
 // ]
 
 // Test that updates with geo queries which match

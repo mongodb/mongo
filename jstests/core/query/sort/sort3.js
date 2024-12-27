@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_getmore,
+// ]
+
 const coll = db.sort3;
 coll.drop();
 

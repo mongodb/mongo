@@ -1,7 +1,8 @@
 /**
  * This test ensures that queries using simple ranges handle bound inclusion properly.
  * @tags: [
- *   assumes_balancer_off
+ *   assumes_balancer_off,
+ *   requires_getmore,
  * ]
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";

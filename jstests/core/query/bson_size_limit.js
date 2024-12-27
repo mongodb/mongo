@@ -9,6 +9,7 @@
  * @tags: [
  *     # Overflows WT cache on in-memory variants.
  *     requires_persistence,
+ *     requires_getmore,
  * ]
  */
 const collName = jsTestName();

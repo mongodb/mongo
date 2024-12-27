@@ -1,4 +1,7 @@
 // Test nested $or clauses SERVER-2585 SERVER-3192
+// @tags: [
+//   requires_getmore,
+// ]
 
 let t = db.jstests_orj;
 t.drop();

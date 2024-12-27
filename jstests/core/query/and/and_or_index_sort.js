@@ -1,5 +1,8 @@
 /**
  * Some more tests $and/$or being nested in various ways.
+ *   @tags: [
+ *      requires_getmore
+ *   ]
  */
 
 const coll = db.jstests_and_or_index_sort;

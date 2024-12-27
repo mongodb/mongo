@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_fastcount,
+//   requires_getmore
 // ]
 
 let t = db.arrayfind1;

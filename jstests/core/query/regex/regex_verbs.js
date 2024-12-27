@@ -1,5 +1,8 @@
 /**
  * Tests regular expressions and the use of various UCP verbs.
+ * @tags: [
+ *   requires_getmore,
+ * ]
  */
 const coll = db.getCollection("regex_backtracking_verbs");
 coll.drop();

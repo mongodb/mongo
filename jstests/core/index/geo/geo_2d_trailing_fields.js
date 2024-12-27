@@ -1,4 +1,8 @@
 // Tests for predicates which can use the trailing field of a 2d index.
+// @tags: [
+//   requires_getmore,
+// ]
+
 const coll = db.geo_2d_trailing_fields;
 
 coll.drop();

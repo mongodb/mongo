@@ -2,6 +2,7 @@
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 //   requires_fcv_80,
+//   requires_getmore,
 // ]
 
 const colName = jsTestName();

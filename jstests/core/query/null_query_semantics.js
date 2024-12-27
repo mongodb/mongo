@@ -3,6 +3,7 @@
 //   not_allowed_with_signed_security_token,
 //   # In 8.0, we changed behavior for equality to null.
 //   requires_fcv_80,
+//   requires_getmore,
 // ]
 //
 import {resultsEq} from "jstests/aggregation/extras/utils.js";

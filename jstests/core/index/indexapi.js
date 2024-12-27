@@ -4,6 +4,7 @@
 //     cannot_create_unique_index_when_using_hashed_shard_key,
 //     # Uses $indexStats which is not supported in a transaction.
 //     does_not_support_transactions,
+//     requires_getmore,
 // ]
 const coll = db.indexapi;
 coll.drop();

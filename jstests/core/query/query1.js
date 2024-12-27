@@ -1,4 +1,7 @@
-// @tags: [requires_fastcount]
+// @tags: [
+//  requires_fastcount,
+//  requires_getmore,
+// ]
 
 let t = db.query1;
 t.drop();

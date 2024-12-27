@@ -4,6 +4,7 @@
  * @tags: [
  *   assumes_balancer_off,
  *   assumes_read_concern_local,
+ *   requires_getmore,
  * ]
  */
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";

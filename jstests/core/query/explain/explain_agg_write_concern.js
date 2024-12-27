@@ -11,6 +11,7 @@
 //   # suites with random migrations because moveCollection changes the collection UUID by dropping
 //   # and re-creating the collection.
 //   assumes_balancer_off,
+//   requires_getmore,
 // ]
 
 /**

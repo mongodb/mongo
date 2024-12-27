@@ -8,6 +8,7 @@
  *   does_not_support_transactions,
  *   requires_fcv_70,
  *   references_foreign_collection,
+ *   requires_getmore,
  * ]
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";

@@ -10,7 +10,8 @@
  *   does_not_support_transactions,
  *   # $listCatalog does not include the tenant prefix in its results.
  *   command_not_supported_in_serverless,
- *   requires_fastcount
+ *   requires_fastcount,
+ *   requires_getmore,
  * ]
  */
 
