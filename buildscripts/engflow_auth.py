@@ -64,7 +64,7 @@ def install() -> str:
 
 
 def update_bazelrc(binary_path: str):
-    norm_path = os.path.normpath(binary_path)
+    norm_path = os.path.normpath(binary_path).replace("\\", "/")
     lines = []
     bazelrc_path = f"{os.path.expanduser('~')}/.bazelrc"
     print(f"Updating {bazelrc_path}")
