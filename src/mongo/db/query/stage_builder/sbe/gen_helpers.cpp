@@ -352,14 +352,16 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     indexInfoSlots.snapshotIdSlot = snapshotIdSlot;
 
     // Create a limit-1/scan subtree to perform the seek.
-    auto [scanStage, resultSlot, recordIdSlot, fieldSlots] = b.makeScan(collToFetch->uuid(),
-                                                                        collToFetch->ns().dbName(),
-                                                                        true /* forward */,
-                                                                        seekRecordIdSlot,
-                                                                        fields,
-                                                                        {} /* scanBounds */,
-                                                                        std::move(indexInfoSlots),
-                                                                        std::move(callbacks));
+    auto [scanStage, resultSlot, recordIdSlot, fieldSlots] =
+        b.makeScan(collToFetch->uuid(),
+                   collToFetch->ns().dbName(),
+                   true /* forward */,
+                   seekRecordIdSlot,
+                   false, /* tolerateKeyNotFound */
+                   fields,
+                   {} /* scanBounds */,
+                   std::move(indexInfoSlots),
+                   std::move(callbacks));
 
     auto seekStage = b.makeLimit(std::move(scanStage), b.makeInt64Constant(1));
 

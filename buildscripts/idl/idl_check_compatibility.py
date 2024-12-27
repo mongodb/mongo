@@ -1398,7 +1398,11 @@ def check_command_params_or_type_struct_fields(
                     is_command_parameter,
                 )
 
-            if is_unstable(new_field.stability) and not new_field_optional:
+            if (
+                is_unstable(new_field.stability)
+                and not new_field.stability == "internal"
+                and not new_field_optional
+            ):
                 ctxt.add_new_param_or_type_field_added_as_unstable_required_error(
                     cmd_name, new_field.name, new_idl_file_path, is_command_parameter
                 )

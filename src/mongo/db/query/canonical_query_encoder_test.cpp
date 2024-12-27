@@ -199,6 +199,12 @@ protected:
                    << ", allowDiskUse=" << findCommand->getAllowDiskUse()
                    << ", returnKey=" << findCommand->getReturnKey()
                    << ", requestResumeToken=" << findCommand->getRequestResumeToken();
+            if (!findCommand->getResumeAfter().isEmpty()) {
+                stream << ", resumeAfter=1";
+            }
+            if (!findCommand->getStartAt().isEmpty()) {
+                stream << ", startAt=1";
+            }
         }
         if (isCountLike) {
             stream << ", isCountLike=true";
@@ -641,11 +647,19 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeySBE) {
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setMax(mongo::fromjson("{ a : 1 }"));
     testComputeSBEKey(gctx, "{a: 1}", "{a: 1}", "{}", std::move(findCommand));
+
     findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setRequestResumeToken(true);
     // "hint" must be {$natural:1} if 'requestResumeToken' is enabled.
     findCommand->setHint(fromjson("{$natural: 1}"));
     findCommand->setResumeAfter(mongo::fromjson("{ $recordId: NumberLong(1) }"));
+    testComputeSBEKey(gctx, "{a: 1}", "{}", "{}", std::move(findCommand));
+
+
+    findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setRequestResumeToken(true);
+    findCommand->setHint(fromjson("{$natural: 1}"));
+    findCommand->setStartAt(mongo::fromjson("{ $recordId: NumberLong(1) }"));
     testComputeSBEKey(gctx, "{a: 1}", "{}", "{}", std::move(findCommand));
 
     findCommand = std::make_unique<FindCommandRequest>(nss);

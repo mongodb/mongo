@@ -100,6 +100,7 @@ ALLOW_ANY_TYPE_LIST:
   - "find-param-readOnce"
   - "find-param-$_requestResumeToken"
   - "find-param-$_resumeAfter"
+  - "find-param-$_startAt"
   - "find-param-maxTimeMS"
   - "update-param-u"
   - "update-param-hint"
@@ -352,6 +353,7 @@ IGNORE_STABLE_TO_UNSTABLE_LIST:
   - "bulkWrite-reply-opTime"
   - "hello-reply-opTime"
   - "hello-reply-majorityOpTime"
+  - "find-param-$_startAt"
 
 RENAMED_COMPLEX_ACCESS_CHECKS:
   # Changed during 6.1 as part of removing multi-auth support.

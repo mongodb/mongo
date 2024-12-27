@@ -295,7 +295,7 @@ void performValidationChecks(const OperationContext* opCtx,
             !request.getNeedsMerge() && !aggregation_request_helper::getFromRouter(request));
     uassert(ErrorCodes::BadValue,
             "Aggregate queries on router may not request or provide a resume token",
-            !request.getRequestResumeToken() && !request.getResumeAfter());
+            !request.getRequestResumeToken() && !request.getResumeAfter() && !request.getStartAt());
 }
 
 /**

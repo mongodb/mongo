@@ -607,7 +607,9 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
     params.direction = CollectionScanParams::FORWARD;
 
     // Pick a recordId that is known to be in the collection.
-    params.resumeAfterRecordId = recordIds[offset - 1];
+    params.resumeScanPoint = ResumeScanPoint{
+        recordIds[offset - 1], false /* tolerateKeyNotFound */
+    };
 
     // Create plan stage.
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
@@ -656,17 +658,68 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     // guarantee it does not exist.
     auto recordId = recordIds[offset - 1];
     remove(coll->docFor(&_opCtx, recordId).value());
-    params.resumeAfterRecordId = recordId;
+    params.resumeScanPoint = ResumeScanPoint{
+        recordId, false /* tolerateKeyNotFound */
+    };
 
     // Create plan stage.
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    std::unique_ptr<PlanStage> ps =
-        std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
+    std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+        _expCtx.get(), &coll, params, ws.get(), nullptr /* filter */);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
 
     // Check that failed seek causes the entire resume to fail.
     ASSERT_THROWS_CODE(ps->work(&id), DBException, ErrorCodes::KeyNotFound);
+}
+
+
+// Verify resuming with tolerateKeyNotFound set to true can handle deleted records by skipping to
+// next valid one.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanStartAtDeletedRecord) {
+    dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
+    auto coll = ctx.getCollection();
+
+    std::vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+
+    auto offset = numObj() / 2;
+    auto recordId = recordIds[offset - 1];
+    remove(coll->docFor(&_opCtx, recordId).value());
+
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.resumeScanPoint = ResumeScanPoint{recordId, true /* tolerateKeyNotFound */};
+
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    std::unique_ptr<PlanStage> ps =
+        std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
+
+    auto statusWithPlanExecutor =
+        plan_executor_factory::make(_expCtx,
+                                    std::move(ws),
+                                    std::move(ps),
+                                    &coll,
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    QueryPlannerParams::DEFAULT);
+
+    ASSERT_OK(statusWithPlanExecutor.getStatus());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
+
+    int count = 0;
+    PlanExecutor::ExecState state;
+    RecordId rid;
+    for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &rid));) {
+        // Assert that we get the RecordId following the previous one (starting with the one after
+        // 'startAt').
+        ASSERT_EQUALS(recordIds[offset + count + 1], rid);
+
+        // Assert that the document content is as expected.
+        ASSERT_EQUALS(count + offset + 1, obj["foo"].numberInt());
+        ++count;
+    }
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
+    ASSERT_EQUALS(numObj() - offset - 1, count);
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {
