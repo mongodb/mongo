@@ -134,6 +134,11 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
         [{_id: 2, data: kVeryLargeDataString}, {_id: -2, data: kVeryLargeDataString}];
     assert.commandWorked(coll.insertMany(kLargeDocs));
     assert.commandWorked(outColl.insertMany(kLargeDocs));
+
+    if (isReplSet) {
+        testFixture.awaitReplication();
+    }
+
     assert.commandFailedWithCode(aggColl.runCommand("aggregate", aggCommand),
                                  ErrorCodes.BSONObjectTooLarge);
 }
