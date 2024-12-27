@@ -2005,25 +2005,28 @@ def _mongo_cc_binary_and_program(
         tags = ["scons_link_lists"],
     )
 
+    original_tags = list(args["tags"])
     if _program_type == "binary":
+        args["tags"] += ["intermediate_target"]
         cc_binary(**args)
         extract_debuginfo_binary(
             name = name,
             binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
             type = "program",
-            tags = tags,
+            tags = original_tags,
             enabled = SEPARATE_DEBUG_ENABLED,
             enable_pdb = PDB_GENERATION_ENABLED,
             deps = all_deps,
             visibility = visibility,
         )
     else:
+        args["tags"] += ["intermediate_target"]
         native.cc_test(**args)
         extract_debuginfo_test(
             name = name,
             binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
             type = "program",
-            tags = tags,
+            tags = original_tags,
             enabled = SEPARATE_DEBUG_ENABLED,
             enable_pdb = PDB_GENERATION_ENABLED,
             deps = all_deps,

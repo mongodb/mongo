@@ -1118,7 +1118,8 @@ tasks:
             --test_output=all
             --config=local
             --combined_report=lcov
-            --build_tag_filters=mongo_unittest
+            --test_tag_filters=mongo_unittest,-intermediate_target
+            --test_timeout=600
 
   - name: monitor_build_status
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
