@@ -10,6 +10,7 @@ CompileFlags:
   CompilationDatabase: ./
   Add: [-Isrc/third_party/asio-master/asio/include, -Wall]
 Diagnostics:
+  Suppress: builtin_definition
   UnusedIncludes: Strict
   ClangTidy:
     Add: [
@@ -29,9 +30,26 @@ Diagnostics:
 If:
   PathMatch:
     [
-      src/mongo/db/modules/monograph/cass/*,
-      src/mongo/db/modules/monograph/tx_service/*,
-      src/mongo/db/modules/monograph/mono_metrics/*,
+      src/mongo/db/modules/monograph/cass/.*,
+      src/mongo/db/modules/monograph/tx_service/.*,
+      src/mongo/db/modules/monograph/mono_metrics/.*,
     ]
 CompileFlags:
   CompilationDatabase: src/mongo/db/modules/monograph/build
+  Add: [-Wall]
+Diagnostics:
+  Suppress: builtin_definition
+  UnusedIncludes: Strict
+  ClangTidy:
+    Add: [
+        bugprone-*,
+        clang-analyzer-*,
+        concurrency-*,
+        cppcoreguidelines-*,
+        google-*,
+        modernize-*,
+        performance-*,
+      ]
+    Remove: [
+        modernize-use-trailing-return-type
+    ]

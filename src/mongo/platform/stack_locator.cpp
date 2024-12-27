@@ -35,6 +35,9 @@
 namespace mongo {
 
 boost::optional<std::size_t> StackLocator::available() const {
+    // Returns a disengaged optional since the remaining stack cannot be determined.
+    return boost::none;
+
     if (!begin() || !end())
         return boost::none;
 
