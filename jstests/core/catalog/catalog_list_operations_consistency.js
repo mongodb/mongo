@@ -7,6 +7,8 @@
  *   requires_timeseries,
  *   # $listCatalog does not include the tenant prefix in its results.
  *   command_not_supported_in_serverless,
+ *   # Exclude from suites that kill server processes, in order to preserve the $listCatalog cursor.
+ *   does_not_support_stepdowns,
  * ]
  */
 import {
