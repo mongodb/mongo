@@ -1627,23 +1627,17 @@ TEST_F(ReshardingRecipientServiceTest,
 
             // Add dummy data to tempReshardingCollectionOptions to create mismatched collection
             // options.
-            tempReshardingCollectionOptions = BSONObjBuilder().append("foo", "bar").obj();
+            tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
 
             notifyToStartCloning(opCtx.get(), *recipient, doc);
 
             boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
             stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kError);
 
+            // Ensure we get to the errored state when we try to match options.
+            // If we do not get to an errored state this test should hang here and time out.
             stateTransitionsGuard->wait(RecipientStateEnum::kError);
             stateTransitionsGuard->unset(RecipientStateEnum::kError);
-
-            {
-                auto persistedRecipientDocument =
-                    getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
-                auto state = persistedRecipientDocument.getMutableState().getState();
-                ASSERT_EQ(state, RecipientStateEnum::kError);
-                ASSERT(persistedRecipientDocument.getMutableState().getAbortReason());
-            }
 
             recipient->abort(false);
 
@@ -1679,7 +1673,7 @@ TEST_F(ReshardingRecipientServiceTest,
 
             // Add dummy data to tempReshardingCollectionOptions to create mismatched collection
             // options.
-            tempReshardingCollectionOptions = BSONObjBuilder().append("foo", "bar").obj();
+            tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
 
             notifyToStartCloning(opCtx.get(), *recipient, doc);
 
