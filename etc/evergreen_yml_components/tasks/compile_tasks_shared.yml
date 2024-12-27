@@ -128,6 +128,8 @@ tasks:
           targets: >-
             install-dist-test
             ${additional_compile_targets|}
+          bazel_build_tags: --bazel-build-tag=dist_test
+          skip_archive: on
           task_compile_flags: >-
             PREFIX=dist-test
 
@@ -151,6 +153,8 @@ tasks:
         vars:
           targets: >-
             archive-dist-test
+          bazel_build_tags: --bazel-build-tag=dist_test
+          skip_archive: on
           task_compile_flags: >-
             PREFIX=dist-test
       - func: "f_expansions_write"
@@ -268,6 +272,8 @@ tasks:
         vars:
           targets: >-
             archive-dist-test-debug
+          bazel_build_tags: --bazel-build-tag=dist_test
+          skip_archive: on
           task_compile_flags: >-
             PREFIX=dist-test
       - func: "upload debugsymbols"
@@ -358,6 +364,8 @@ tasks:
             archive-jstestshell
             archive-jstestshell-debug
             ${additional_package_targets|}
+          bazel_build_tags: --bazel-build-tag=dist_test
+          skip_archive: on
           task_compile_flags: >-
             --legacy-tarball
       - command: subprocess.exec
