@@ -14,6 +14,7 @@ selector:
     - jstests/core/**/system_profile.js
     # The following tests examine the SBE plan cache, which initial sync may change the contents of.
     - jstests/core/query/explain/explain_plan_cache.js
+    - jstests/core/query/plan_cache/plan_cache_distinct.js
     - jstests/core/query/plan_cache/plan_cache_list_plans.js
     - jstests/core/query/plan_cache/plan_cache_sbe.js
     - jstests/core/query/plan_cache/query_solution_hash.js
