@@ -122,6 +122,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/matcher/schema:scalar_keywords_test.cpp",
         "//src/mongo/db/query/boolean_simplification:bitset_test_util.h",
     ],
+    data = [
+        "//src/mongo/db/test_output/matcher/debug_string_test:test_data",
+    ],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":path",

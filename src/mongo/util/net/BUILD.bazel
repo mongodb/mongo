@@ -410,6 +410,9 @@ mongo_cc_unit_test(
         "ssl_options_test.cpp",
         "//src/mongo/util/cmdline_utils:censor_cmdline_test.h",
     ],
+    data = [
+        "//jstests/libs:test_pem_files",
+    ],
     tags = ["mongo_unittest_first_group"],
     target_compatible_with = select({
         "//bazel/config:ssl_enabled": [],

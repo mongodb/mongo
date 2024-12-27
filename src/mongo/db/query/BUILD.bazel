@@ -830,6 +830,12 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/util:jparse_util_test.cpp",
         "//src/mongo/db/query/util:memory_util_test.cpp",
     ],
+    data = [
+        "//src/mongo/db/test_output/query/canonical_query_encoder_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_expression_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_filtern_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_stage_builder_test:test_data",
+    ],
     tags = [
         "compile_requires_large_memory_gcc",
         "mongo_unittest_second_group",

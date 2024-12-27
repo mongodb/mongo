@@ -5,3 +5,25 @@ exports_files(
         "*.pem",
     ]),
 )
+
+filegroup(
+    name = "test_pem_files",
+    srcs = glob([
+        "*.pem",
+    ]),
+)
+
+filegroup(
+    name = "mock_krb5",
+    srcs = [
+        "mockkrb5.conf",
+    ],
+)
+
+filegroup(
+    name = "mock_keytabs",
+    srcs = [
+        "mockservice.keytab",
+        "mockuser.keytab",
+    ],
+)

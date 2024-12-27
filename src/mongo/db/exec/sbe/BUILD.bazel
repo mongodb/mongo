@@ -495,6 +495,7 @@ mongo_cc_unit_test(
     srcs = [
         "//src/mongo/db/exec/sbe/abt:abt_lower_test.cpp",
     ],
+    data = ["//src/mongo/db/test_output/exec/sbe:test_data"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":abt_unit_test_utils",
@@ -611,6 +612,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/values:value_serialization_test.cpp",
         "//src/mongo/db/exec/sbe/values:value_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test_fixture.h",
+    ],
+    data = [
+        "//src/mongo/db/test_output/exec/sbe:test_data",
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [

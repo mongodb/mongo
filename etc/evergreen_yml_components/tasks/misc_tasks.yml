@@ -1125,12 +1125,20 @@ tasks:
           #   bazel test $targets
           target: >-
             //src/mongo/...
+          # -Wno-mismatched-new-delete to address https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100485
+          # which appears to only happen when coverage is enabled. It seems like enabling coverage is
+          # changing inlining behavior, since this doesn't manifest when -fno-inline is passed in.
           args: >-
+            --config=dbg
+            --compiler_type=gcc
+            --linkstatic=False
             --test_output=all
-            --config=local
             --combined_report=lcov
-            --test_tag_filters=mongo_unittest,-intermediate_target
+            --test_tag_filters=mongo_unittest,-intermediate_target,-code_coverage_quarantine
             --test_timeout=600
+            --verbose_failures
+            --copt=-Wno-mismatched-new-delete
+            ${coverage_bazel_tags}
 
   - name: monitor_build_status
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

@@ -88,6 +88,9 @@ mongo_cc_unit_test(
         "environment_test.cpp",
         "options_parser_test.cpp",
     ],
+    data = [
+        "//src/mongo/util/options_parser/test_config_files:test_data",
+    ],
     tags = ["mongo_unittest_first_group"],
     deps = [
         "options_parser",

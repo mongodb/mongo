@@ -1469,6 +1469,9 @@ mongo_cc_unit_test(
     tags = [
         "compile_requires_large_memory_gcc",
         "mongo_unittest_second_group",
+        # State mismatch in sandbox in resharding_recipient_service_test.cpp
+        "code_coverage_quarantine",
+        "code_coverage_quarantine_SERVER-98847",
     ],
     deps = [
         ":analyze_shard_key_util",

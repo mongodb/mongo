@@ -33,8 +33,12 @@ parameters:
     description: "Patch id of evergreen patch to pull binaries from for testing."
 
   - key: bazel_build_tags
-    value: "--bazel-build-tag=dist_test --bazel-build-tag=mongo_library" # Every 4 hours starting at 0000 UTC
+    value: "--bazel-build-tag=dist_test --bazel-build-tag=mongo_library"
     description: "Default build tags"
+
+  - key: coverage_bazel_tags
+    value: "--remote_download_outputs=all --config=no-remote-exec"
+    description: "Default coverage bazel tags"
 
   - key: run_covered_tests
     description: >-

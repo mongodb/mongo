@@ -596,6 +596,9 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
         "//src/mongo/util:future_test_utils.h",
     ],
+    data = [
+        "//src/mongo/client/mongo_uri_tests:test_data",
+    ],
     tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],

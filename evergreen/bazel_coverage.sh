@@ -34,11 +34,5 @@ BAZEL_BINARY=bazel
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
 
-set +e
-
-echo "       bazel coverage --keep_going --verbose_failures --config=dbg --compiler_type=gcc --linkstatic=False $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
-eval $BAZEL_BINARY coverage --keep_going --verbose_failures --config=dbg --compiler_type=gcc --linkstatic=False $LOCAL_ARG ${args} ${target}
-
-# TODO(SERVER-97069): Uncomment when all unit tests are compatible with bazel sandboxing
-# exit $RET
-exit 0
+echo "       bazel coverage $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
+$BAZEL_BINARY coverage $LOCAL_ARG ${args} ${target}

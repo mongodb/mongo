@@ -332,6 +332,7 @@ mongo_cc_unit_test(
         "@platforms//os:linux": ["session_manager_common_test.cpp"],
         "//conditions:default": [],
     }),
+    data = ["//jstests/libs:test_pem_files"],
     tags = ["mongo_unittest_second_group"],
     deps = [
         ":message_compressor",

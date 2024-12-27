@@ -20,7 +20,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        BAZEL_FLAGS="--remote_download_outputs=all --config=no-remote-exec"
+        BAZEL_FLAGS="${coverage_bazel_tags}"
       large_distro_name: amazon2023.3-arm64-large
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
@@ -39,9 +39,6 @@ buildvariants:
       # These are carefully and explicitly curated. Do not add more tests/tasks without consulting with DevProd.
       # unittests
       - name: compile_and_package_serial_no_unittests_TG
-        distros:
-          - amazon2023.3-arm64-large
-      - name: compile_test_parallel_unittest_stream_TG
         distros:
           - amazon2023.3-arm64-large
       - name: bazel_coverage
@@ -77,7 +74,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        BAZEL_FLAGS="--remote_download_outputs=all --config=no-remote-exec"
+        BAZEL_FLAGS="${coverage_bazel_tags}"
       large_distro_name: rhel93-medium
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
@@ -96,9 +93,6 @@ buildvariants:
       # These are carefully and explicitly curated. Do not add more tests/tasks without consulting with DevProd.
       # unittests
       - name: compile_and_package_serial_no_unittests_TG
-        distros:
-          - rhel93-large
-      - name: compile_test_parallel_unittest_stream_TG
         distros:
           - rhel93-large
       - name: bazel_coverage
