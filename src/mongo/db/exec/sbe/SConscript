@@ -36,7 +36,6 @@ env.Benchmark(
     target="abt_lower_bm",
     source=[],
     LIBDEPS=[],
-    BAZEL_BENCHMARK_TAG="first_half_bm",
 )
 
 env.Benchmark(

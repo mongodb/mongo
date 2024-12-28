@@ -19,5 +19,4 @@ env.CppUnitTest(
 env.Benchmark(
     target="system_resource_canary_bm",
     source=[],
-    BAZEL_BENCHMARK_TAG="first_half_bm",
 )

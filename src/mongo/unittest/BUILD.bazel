@@ -189,9 +189,6 @@ mongo_cc_benchmark(
     srcs = [
         "system_resource_canary_bm.cpp",
     ],
-    tags = [
-        "first_half_bm",
-    ],
     deps = [
         "//src/mongo/util:processinfo",
     ],
