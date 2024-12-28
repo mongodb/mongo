@@ -84,6 +84,7 @@ buildvariants:
     expansions:
       <<: *linux-arm64-static-enterprise-compile-expansions
       compile_variant: *amazon-linux2-arm64-crypt-compile
+      evergreen_remote_exec: on
     tasks:
       - name: .crypt
       - name: crypt_build_debug_and_test
@@ -98,6 +99,7 @@ buildvariants:
       build_mongot: true
       download_mongot_release: true
       compile_variant: *amazon-linux2-arm64-static-compile
+      evergreen_remote_exec: on
     tasks:
       - name: compile_ninja_quick_TG
       - name: compile_test_parallel_unittest_stream_TG
@@ -178,6 +180,7 @@ buildvariants:
       scons_cache_mode: all
       has_packages: false
       skip_symbolization: true
+      evergreen_remote_exec: on
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=amazon2
@@ -282,6 +285,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      evergreen_remote_exec: on
     run_on:
       - amazon2-latest-xlarge
     tasks:
@@ -299,6 +303,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      evergreen_remote_exec: on
     run_on:
       - amazon2-arm64-latest-xlarge
     tasks:

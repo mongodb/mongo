@@ -30,6 +30,15 @@ else
   echo "build --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> .bazelrc.gitinfo
 fi
 
+source ./evergreen/bazel_RBE_supported.sh
+
+if bazel_rbe_supported && [[ "${evergreen_remote_exec}" == "off" ]]; then
+  # Temporarily disable remote exec and only use remote cache
+  echo "common --remote_executor=" >> .bazelrc.evergreen
+  echo "common --modify_execution_info=.*=+no-remote-exec" >> .bazelrc.evergreen
+  echo "common --jobs=auto" >> .bazelrc.evergreen
+fi
+
 uri="https://spruce.mongodb.com/task/${task_id:?}?execution=${execution:?}"
 
 echo "common --tls_client_certificate=./engflow.cert" >> .bazelrc.evergreen

@@ -59,6 +59,7 @@ buildvariants:
       <<: *linux_debug_community_compile_expansions
       use_wt_develop: true
       compile_variant: *linux-x86-dynamic-debug-wtdevelop-compile
+      evergreen_remote_exec: on
 
   - name: linux-64-debug-wtdevelop
     display_name: "~ Linux DEBUG WiredTiger develop"
