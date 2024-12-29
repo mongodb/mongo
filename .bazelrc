@@ -7,9 +7,6 @@ info --config=local
 # Don't use legacy toolchain resolution.
 build --incompatible_enable_cc_toolchain_resolution
 
-# allow multiple execution infos to be set
-build --incompatible_modify_execution_info_additive
-
 # This makes builds more hermetic by preventing environment variables from leaking into the execution of rules
 build --incompatible_strict_action_env=true
 
@@ -122,9 +119,6 @@ build --//bazel/config:build_enterprise=True
 build --//bazel/config:release=False
 build --//bazel/config:skip_archive=True
 build --enable_platform_specific_config=true
-build --jobs=200
-build:macos --jobs=auto
-build:windows --jobs=auto
 
 # Profile for building fast with minimal debuggability - the build is fast ##################################################
 build:fastbuild -c fastbuild
@@ -239,6 +233,7 @@ build:windows --cxxopt=-UCOMPILER_MSVC
 
 # Enable remote build execution:
 build:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
+build:linux --jobs=200
 
 # Enable remote cache (also necessary for remote build execution):
 build --remote_cache=grpcs://sodalite.cluster.engflow.com

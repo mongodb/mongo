@@ -224,7 +224,6 @@ buildvariants:
       compile_variant: *linux-x86-dynamic-debug-compile-required
       build_mongot: true
       download_mongot_release: true
-      evergreen_remote_exec: on
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
@@ -262,7 +261,6 @@ buildvariants:
         --link-model=dynamic
       build_mongot: true
       download_mongot_release: true
-      evergreen_remote_exec: on
       compile_variant: *linux-debug-aubsan-compile-required
       test_flags: >-
         --excludeWithAnyTags=incompatible_aubsan

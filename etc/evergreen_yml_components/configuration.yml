@@ -45,10 +45,6 @@ parameters:
       When set to `true`, patch builds will run all tests compatible with some suite_A even if a more complex suite_A_B will
       also run the same test. For more information see SERVER-94816.
 
-  - key: evergreen_remote_exec
-    value: "off"
-    description: "disable remote exec in CI"
-
   ## Cron parameters.
   - key: project_required_suggested_cron
     value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
