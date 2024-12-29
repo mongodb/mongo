@@ -40,4 +40,3 @@ num_scons_unit_cc_jobs_available: "0.75"
 scons_cache_mode: nolinked
 show_scons_timings: "true"
 separate_debug: "on"
-skip_archive: "off"
