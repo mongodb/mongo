@@ -51,5 +51,4 @@ def mongo_cc_proto_lib(
         deps = [
             "//src/third_party/protobuf",
         ],
-        no_undefined_ref_DO_NOT_USE = False,
     )
