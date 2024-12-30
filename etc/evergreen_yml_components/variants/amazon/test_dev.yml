@@ -109,6 +109,8 @@ buildvariants:
           - amazon2-arm64-latest-nvme
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
+        distros:
+          - amazon2-arm64-latest-nvme
       - name: compile_jstestshell_TG
         distros:
           - amazon2-arm64-latest-nvme
