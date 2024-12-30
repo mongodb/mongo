@@ -52,6 +52,15 @@ elif [[ $ARCH == "s390x" ]]; then
   export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
 fi
 
+# AL2 stores certs in a nonstandard location
+if [[ -f /etc/os-release ]]; then
+  DISTRO=$(awk -F '[="]*' '/^PRETTY_NAME/ { print $2 }' < /etc/os-release)
+  if [[ $DISTRO == "Amazon Linux 2" ]]; then
+    export SSL_CERT_DIR=/etc/pki/tls/certs
+    export SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+  fi
+fi
+
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
 echo "bazel run --verbose_failures $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt

@@ -3,8 +3,22 @@ import os
 import pathlib
 import subprocess
 
+from buildscripts import download_buildifier
+from buildscripts.buildifier import fix_all, lint_all
 
-def run_prettier(prettier: pathlib.Path, check: bool) -> int:
+
+def run_buildifier(check: bool) -> bool:
+    binary_path = os.path.join(os.curdir, "buildifier")
+    if not os.path.exists(binary_path):
+        download_buildifier.download(download_location=os.curdir)
+    if check:
+        return lint_all(binary_path, generate_report=True)
+    else:
+        fix_all(binary_path)
+        return True
+
+
+def run_prettier(prettier: pathlib.Path, check: bool) -> bool:
     # Explicitly ignore anything in the output directories or any symlinks in the root of the repository
     # to prevent bad symlinks from failing the run, see https://github.com/prettier/prettier/issues/11568 as
     # to why it the paths being present in .prettierignore isn't sufficient
@@ -30,11 +44,11 @@ def run_prettier(prettier: pathlib.Path, check: bool) -> int:
         print("Found formatting errors. Run 'bazel run //:format' to fix")
         print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
-        return 1
+        return False
 
     if check:
         print("No formatting errors")
-    return 0
+    return True
 
 
 def main() -> int:
@@ -59,7 +73,8 @@ def main() -> int:
     prettier_path: pathlib.Path = args.prettier.resolve()
 
     os.chdir(default_dir)
-    return run_prettier(prettier_path, args.check)
+
+    return 0 if run_prettier(prettier_path, args.check) and run_buildifier(args.check) else 1
 
 
 if __name__ == "__main__":
