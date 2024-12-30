@@ -186,8 +186,11 @@ std::string gitDiff(const std::filesystem::path& expected,
          // The --no-index option allows us to compare files that are not in any repository. -U0
          // removes any lines of context around the diff so that the correct test number directly
          // preceding the diff will be captured.
-         << " --no-index " << (diffStyle == DiffStyle::kWord ? "--word-diff=color" : "--no-color")
-         << " -U0 -- " << expected << " " << actual << " 2>&1")
+         << " --no-index "
+         << (diffStyle == DiffStyle::kWord ? "--word-diff=color" : "--no-color")
+         // Use character-based-diff when in non-CI mode for (hopefully) clearer diffs.
+         << (diffStyle == DiffStyle::kPlain ? "" : " --word-diff-regex=.") << " -U0 -- " << expected
+         << " " << actual << " 2>&1")
             .str();
 
     // Need to ignore exit status because the implied --exit-code will return an error sttatus when
