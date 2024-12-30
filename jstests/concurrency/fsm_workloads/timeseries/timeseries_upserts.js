@@ -1,5 +1,5 @@
 /**
- * Tests time-series concurrent arbirary update commands with the upsert option.
+ * Tests time-series concurrent arbitrary update commands with the upsert option.
  *
  * @tags: [
  *   requires_timeseries,
@@ -14,13 +14,9 @@ import {
 } from 'jstests/concurrency/fsm_workloads/timeseries/timeseries_updates_and_inserts.js';
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
-    // TODO (SERVER-96700): Allow the collection to be sharded.
-    TestData.shardCollectionProbability = 0;
-
     $config.data.dateTime = new ISODate();
 
-    // Update 'readingNo' for each sensor. If 'readingNo' doesn't exist yet, upsert one
-    // measurement without a sensorId.
+    // Update 'readingNo' for each sensor.
     $config.states.updateMany = function updateMany(db, collName) {
         const readingNo = Random.randInt(this.nTotalReadings);
         retryOnRetryableError(() => {
@@ -28,9 +24,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 update: collName,
                 updates: [{
                     q: {readingNo: readingNo},
-                    u: {$set: {ts: this.dateTime, updatedMany: 1}},
+                    u: {$inc: {updatedMany: 1}},
                     multi: true,
-                    upsert: true,
                 }]
             }));
         }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
