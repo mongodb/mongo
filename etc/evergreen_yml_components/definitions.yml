@@ -7194,10 +7194,27 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/buildscripts/package_test_register.sh"
+      - "-a"
+      - "add"
+      env:
+        RHN_USER: ${REDHAT_PARTNER_SERVICE_ACCOUNT_USERNAME}
+        RHN_PASS: ${REDHAT_PARTNER_SERVICE_ACCOUNT_PASSWORD}
   - func: "run package test"
     vars:
       docker_username: ${dockerhub_username}
       docker_password: ${dockerhub_password}
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/buildscripts/package_test_register.sh"
+      - "-a"
+      - "remove"
 
 - name: package
   tags: []
