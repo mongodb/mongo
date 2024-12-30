@@ -3,6 +3,7 @@
  * response from a command even if "not master" doesn't appear in the message.
  * @tags: [
  *   requires_replication,
+ *   grpc_incompatible,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

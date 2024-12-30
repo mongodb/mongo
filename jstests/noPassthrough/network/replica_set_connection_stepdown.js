@@ -1,7 +1,10 @@
 /**
  * Tests that DBClientRS doesn't do any re-targeting on replica set member state changes until it
  * sees a "not master" error response from a command.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   grpc_incompatible
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
