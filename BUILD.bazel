@@ -3292,16 +3292,6 @@ mongo_unittest_install(
 )
 
 mongo_unittest_install(
-    name = "processing_time_windows_test",
-    srcs = ["//src/mongo/db/modules/enterprise/src/streams/exec/tests:processing_time_windows_test"],
-)
-
-mongo_unittest_install(
-    name = "processing_time_windows_test-processing_time_windows_test",
-    srcs = ["//src/mongo/db/modules/enterprise/src/streams/exec/tests:processing_time_windows_test"],
-)
-
-mongo_unittest_install(
     name = "rate_limiter_test",
     srcs = ["//src/mongo/db/modules/enterprise/src/streams/exec/tests:rate_limiter_test"],
 )
