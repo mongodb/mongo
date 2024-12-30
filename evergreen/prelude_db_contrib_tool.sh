@@ -15,5 +15,5 @@ function setup_db_contrib_tool {
     exit $RET
   fi
 
-  timeout_and_retry 180 python -m pipx install --force "db-contrib-tool==0.8.5" --pip-args="--no-cache-dir"
+  timeout_and_retry 180 python -m pipx install -vv --force "db-contrib-tool==0.8.5" --pip-args="--no-cache-dir"
 }
