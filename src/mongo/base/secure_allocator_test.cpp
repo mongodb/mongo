@@ -150,23 +150,21 @@ TEST(SecureAllocator, secureAllocBytesCount) {
     void* ptr0 = allocate(pageSize, alignof(uint8_t));
     uint32_t initAllocCnt = gSecureAllocCountInfo().getSecureAllocByteCount();
     uint32_t allocCnt = initAllocCnt;
-    uint32_t expectedPageBytesCnt, pageBytesCnt;
+    uint32_t expectedPageBytesCnt;
     uint32_t initPageBytesCnt = gSecureAllocCountInfo().getSecureAllocBytesInPages();
 
     ASSERT_EQUALS(initAllocCnt, pageSize);
-    pageBytesCnt = initPageBytesCnt;
 
     // The first allocation: allocating half a page.
     auto halfPageSize = pageSize / 2;
     void* ptr1 = allocate(halfPageSize, alignof(uint8_t));
 
-    // pageBytesCnt is the current count in paged byte allocation.
+    // initPageBytesCnt is the current count in paged byte allocation.
     // If we have sufficient bytes for the current allocation, we do not need to allocate more
     // pages. If we do not have enough bytes, we should allocate a new page.
     expectedPageBytesCnt = initPageBytesCnt + pageSize;
 
     // Checking the correctness of the paged byte accocation count and byte allocation count.
-    pageBytesCnt = gSecureAllocCountInfo().getSecureAllocBytesInPages();
     allocCnt = gSecureAllocCountInfo().getSecureAllocByteCount();
     ASSERT_EQUALS(halfPageSize + initAllocCnt, allocCnt);
     ASSERT_EQUALS(expectedPageBytesCnt, gSecureAllocCountInfo().getSecureAllocBytesInPages());
