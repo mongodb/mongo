@@ -859,6 +859,19 @@ functions:
     - *fetch_benchmarks
     - *extract_benchmarks
 
+  "do benchmark setup no fetch":
+    - command: manifest.load
+    - *git_get_shallow_project
+    - *f_expansions_write
+    - *restore_git_history_and_tags
+    - *add_git_tag
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
+    - *upload_pip_requirements
+    - *f_expansions_write
+    - *set_up_credentials
+
   "f_multiversion_setup_exec": &do_multiversion_setup
     command: subprocess.exec
     display_name: "multiversion setup"

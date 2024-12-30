@@ -2,11 +2,7 @@
 test_kind: benchmark_test
 
 selector:
-  root: build/benchmarks.txt
-  include_files:
-    # The trailing asterisk is for handling the .exe extension on Windows.
-    - build/install/bin/service_entry_point_shard_role_bm*
-    - build/install/bin/service_entry_point_router_role_bm*
+  root: build/sep_bm.txt
 
 executor:
   config: {}

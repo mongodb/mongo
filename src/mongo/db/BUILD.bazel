@@ -4222,6 +4222,7 @@ mongo_cc_benchmark(
         "service_entry_point_bm_fixture.h",
         "service_entry_point_shard_role_bm.cpp",
     ],
+    tags = ["sep_bm"],
     deps = [
         ":dbdirectclient",
         ":mongod_options_init",

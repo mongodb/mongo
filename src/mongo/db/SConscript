@@ -273,9 +273,7 @@ env.CppUnitTest(
 )
 
 env.Benchmark(
-    target="service_entry_point_shard_role_bm",
-    source=[],
-    LIBDEPS=[],
+    target="service_entry_point_shard_role_bm", source=[], LIBDEPS=[], BAZEL_BENCHMARK_TAG="sep_bm"
 )
 
 env.Benchmark(

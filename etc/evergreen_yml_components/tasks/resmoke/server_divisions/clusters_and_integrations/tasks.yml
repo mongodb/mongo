@@ -60,6 +60,19 @@ variables:
           resmoke_jobs_max: 1
           suite: benchmark_suite
 
+  - &benchmark_no_deps_template
+    name: benchmark_no_deps_template
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do benchmark setup no fetch"
+      - func: "run benchmark tests"
+        vars:
+          resmoke_args: --help
+          resmoke_jobs_max: 1
+          suite: benchmark_suite
+
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
@@ -299,7 +312,7 @@ tasks:
           content_type: application/tar
           display_name: Benchmarks
 
-  - <<: *benchmark_template
+  - <<: *benchmark_no_deps_template
     name: benchmarks_sep
     tags:
       [
@@ -308,12 +321,39 @@ tasks:
         "benchmarks_sep",
       ]
     commands:
-      - func: "do benchmark setup"
+      - func: "do benchmark setup no fetch"
+      - func: "get engflow creds"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-sep_bm
+            archive-sep_bm
+          bazel_build_tags: --bazel-build-tag=sep_bm
+          compiling_for_test: true
+      # scons compile resets install_dir
+      - command: expansions.update
+        display_name: "expansions fix install_dir"
+        params:
+          updates:
+            - key: install_dir
+              value: build/install/bin
+      - func: "f_expansions_write"
       - func: "run benchmark tests"
         vars:
           suite: benchmarks_sep
           exec_timeout_secs: 28800 # 8 hour timeout.
           resmoke_jobs_max: 1
+          install_dir: build/install/bin
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/sep_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/sep_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Benchmarks
 
   - <<: *gen_task_template
     name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen

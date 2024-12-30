@@ -35,6 +35,7 @@ BAZEL_BENCHMARK_TAGS["first_half_bm"] = []
 BAZEL_BENCHMARK_TAGS["second_half_bm"] = []
 BAZEL_BENCHMARK_TAGS["storage_bm"] = []
 BAZEL_BENCHMARK_TAGS["sharding_bm"] = []
+BAZEL_BENCHMARK_TAGS["sep_bm"] = []
 
 
 def exists(env):

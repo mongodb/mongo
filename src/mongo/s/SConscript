@@ -72,6 +72,7 @@ env.Benchmark(
     target="service_entry_point_router_role_bm",
     source=[],
     LIBDEPS=[],
+    BAZEL_BENCHMARK_TAG="sep_bm",
 )
 
 env.CppUnitTest(

@@ -686,6 +686,7 @@ BENCHMARK_SUITE_TEST_LISTS = [
     "build/second_half_bm.txt",
     "build/storage_bm.txt",
     "build/sharding_bm.txt",
+    "build/sep_bm.txt",
 ]
 # External files or executables, used as suite selectors, that are created during the build and
 # therefore might not be available when creating a test membership map.
