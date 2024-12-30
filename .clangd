@@ -8,7 +8,7 @@ If:
     ]
 CompileFlags:
   CompilationDatabase: ./
-  Add: [-Isrc/third_party/asio-master/asio/include, -Wall]
+  Add: [-Isrc/third_party/asio-master/asio/include, -Wall, -I/usr/lib/gcc/x86_64-linux-gnu/13/include]
 Diagnostics:
   Suppress: builtin_definition
   UnusedIncludes: Strict
@@ -36,7 +36,7 @@ If:
     ]
 CompileFlags:
   CompilationDatabase: src/mongo/db/modules/monograph/build
-  Add: [-Wall]
+  Add: [-Wall, -I/usr/lib/gcc/x86_64-linux-gnu/13/include]
 Diagnostics:
   Suppress: builtin_definition
   UnusedIncludes: Strict

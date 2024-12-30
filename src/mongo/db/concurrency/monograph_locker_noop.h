@@ -53,7 +53,8 @@ public:
     }
 
     ClientState getClientState() const override {
-        // MONGO_UNREACHABLE;
+        // Return fake data
+        return ClientState::kInactive;
     }
 
     LockerId getId() const override {
@@ -268,10 +269,14 @@ public:
         return true;
     }
 
+private:
     LockMode _lockMode{LockMode::MODE_NONE};
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
     int _wuowNestingLevel{0};
+
+    // Indicates whether the client is active reader/writer or is queued.
+    AtomicWord<ClientState> _clientState{kInactive};
 };
 
 }  // namespace mongo
