@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 
 namespace mongo {
 namespace mutablebson {

@@ -33,8 +33,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/update/arithmetic_node.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/str.h"

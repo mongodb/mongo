@@ -47,7 +47,7 @@ mongo_cc_unit_test(
         "mutable_bson_algo_test.cpp",
         "mutable_bson_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":mutable_bson",
         ":mutable_bson_test_utils",
@@ -57,7 +57,7 @@ mongo_cc_unit_test(
     ],
 )
 
-# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/bson/mutable:element.h to //src/mongo/bson/mutable:mutable_bson
+# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/db/exec/mutable_bson:element.h to //src/mongo/db/exec/mutable_bson:mutable_bson
 filegroup(
     name = "element_hdrs",
     srcs = [":element.h"],

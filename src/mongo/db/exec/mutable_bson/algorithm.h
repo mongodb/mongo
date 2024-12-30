@@ -34,8 +34,8 @@
 #include <vector>
 
 #include "mongo/base/string_data_comparator.h"
-#include "mongo/bson/mutable/const_element.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

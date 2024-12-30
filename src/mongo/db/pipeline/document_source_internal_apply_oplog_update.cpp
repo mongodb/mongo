@@ -33,8 +33,8 @@
 #include <utility>
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update_gen.h"

@@ -33,7 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 
 namespace mongo {
 

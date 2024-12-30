@@ -38,7 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/const_element.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/update/pullall_node.h"
 #include "mongo/util/assert_util_core.h"

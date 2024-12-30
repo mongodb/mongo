@@ -236,7 +236,6 @@ mongo_cc_library(
     ],
     deps = [
         # TODO SERVER-78809 - remove dependencies
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:auth_options",
         "//src/mongo/db/auth:authentication_session",
@@ -244,6 +243,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:cluster_auth_mode",
         "//src/mongo/db/auth:sasl_commands",
         "//src/mongo/db:commands",
+        "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/db:server_base",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/util/net:ssl_manager",
@@ -1121,7 +1121,6 @@ mongo_cc_library(
     deps = [
         ":server_status_core",
         ":test_commands_enabled",
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/crypto:fle_crypto",
         "//src/mongo/db:commands",
@@ -1134,6 +1133,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands/query_cmd:update_metrics",
         "//src/mongo/db/commands/query_cmd:write_commands_common",
+        "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
         "//src/mongo/db/query/search:search_index_options",
         "//src/mongo/db/query/write_ops:write_ops_parsers",

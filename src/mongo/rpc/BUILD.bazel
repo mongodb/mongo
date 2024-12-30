@@ -180,10 +180,10 @@ mongo_cc_library(
     deps = [
         ":message",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/util:pcre_wrapper",
     ],
 )

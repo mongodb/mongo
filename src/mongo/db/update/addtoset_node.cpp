@@ -34,7 +34,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/update/addtoset_node.h"
 #include "mongo/util/assert_util.h"

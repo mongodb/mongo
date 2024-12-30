@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/bson/mutable/api.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/api.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 
 namespace mongo {
 namespace mutablebson {

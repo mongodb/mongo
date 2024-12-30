@@ -31,8 +31,8 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/object_transform_executor.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"

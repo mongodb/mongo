@@ -1017,9 +1017,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/bson/column/OWNERS.yml
 /src/mongo/bson/column/**/* @10gen/server-bsoncolumn @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/bson/mutable/OWNERS.yml
-/src/mongo/bson/mutable/**/* @10gen/query-execution @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/client/OWNERS.yml
 /src/mongo/client/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/client/**/authenticate* @10gen/server-security @svc-auto-approve-bot
@@ -1218,6 +1215,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_period_utils* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_run_tracker.h @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_stage* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/exec/mutable_bson/OWNERS.yml
+/src/mongo/db/exec/mutable_bson/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/src/mongo/db/exec/mutable_bson/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/exec/sbe/OWNERS.yml
 /src/mongo/db/exec/sbe/**/* @10gen/query-execution-sbe @svc-auto-approve-bot

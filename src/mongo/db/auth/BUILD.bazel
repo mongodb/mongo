@@ -356,9 +356,9 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/idl:idl_parser",
     ],
 )
@@ -578,10 +578,10 @@ mongo_cc_library(
         ":address_restriction",  # TODO(SERVER-93876): Remove.
         ":auth",
         ":authprivilege",
-        "//src/mongo/bson/mutable:mutable_bson",  # TODO(SERVER-93876): Remove.
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/mutable_bson",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:metadata_impersonated_user",
     ],
 )

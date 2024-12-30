@@ -83,8 +83,6 @@ mongo_cc_library(
     hdrs = [
         "//src/mongo/bson:bson_duration.h",
         "//src/mongo/bson:bson_time_support.h",
-        "//src/mongo/bson/mutable:api.h",
-        "//src/mongo/bson/mutable:element_hdrs",
         "//src/mongo/client:connection_string_hdrs",
         "//src/mongo/crypto:hash_block.h",
         "//src/mongo/db:basic_types.h",
@@ -138,6 +136,8 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value:document_metadata_fields_hdrs",
         "//src/mongo/db/exec/document_value:value_hdrs",
         "//src/mongo/db/exec/document_value:value_internal.h",
+        "//src/mongo/db/exec/mutable_bson:api.h",
+        "//src/mongo/db/exec/mutable_bson:element_hdrs",
         "//src/mongo/db/index_builds:index_builds.h",
         "//src/mongo/db/index_builds:resumable_index_builds_gen",
         "//src/mongo/db/pipeline:field_path_hdrs",

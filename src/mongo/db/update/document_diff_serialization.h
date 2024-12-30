@@ -48,8 +48,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/itoa.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep

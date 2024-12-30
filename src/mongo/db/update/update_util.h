@@ -29,7 +29,7 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"

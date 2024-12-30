@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"  // IWYU pragma: keep
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"  // IWYU pragma: keep
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/bit_node.h"
 #include "mongo/db/update/update_executor.h"

@@ -323,17 +323,17 @@ mongo_unittest_install(
 
 mongo_unittest_install(
     name = "bson_mutable_test",
-    srcs = ["//src/mongo/bson/mutable:bson_mutable_test"],
+    srcs = ["//src/mongo/db/exec/mutable_bson:bson_mutable_test"],
 )
 
 mongo_unittest_install(
     name = "bson_mutable_test-mutable_bson_algo_test",
-    srcs = ["//src/mongo/bson/mutable:bson_mutable_test"],
+    srcs = ["//src/mongo/db/exec/mutable_bson:bson_mutable_test"],
 )
 
 mongo_unittest_install(
     name = "bson_mutable_test-mutable_bson_test",
-    srcs = ["//src/mongo/bson/mutable:bson_mutable_test"],
+    srcs = ["//src/mongo/db/exec/mutable_bson:bson_mutable_test"],
 )
 
 mongo_unittest_install(

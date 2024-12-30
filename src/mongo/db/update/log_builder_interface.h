@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 
 namespace mongo {
 class RuntimeUpdatePath;

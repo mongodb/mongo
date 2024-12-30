@@ -36,7 +36,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"

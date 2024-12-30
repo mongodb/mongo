@@ -33,7 +33,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/current_date_node.h"
 #include "mongo/db/update/update_executor.h"

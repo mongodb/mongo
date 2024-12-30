@@ -36,7 +36,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_operation_source.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"

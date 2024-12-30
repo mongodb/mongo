@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/ftdc/metadata_compressor.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/unittest/assert.h"

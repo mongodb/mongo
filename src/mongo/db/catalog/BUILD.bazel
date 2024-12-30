@@ -260,7 +260,7 @@ mongo_cc_library(
         "//src/mongo/util/version:releases_header",
     ],
     header_deps = [
-        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db/exec/mutable_bson:mutable_bson",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
         "//src/mongo/db/query:hint_parser",
         "//src/mongo/db/repl:oplog_buffer_batched_queue",

@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/const_element.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"

@@ -36,10 +36,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/tenant_id.h"
 
 namespace mongo {

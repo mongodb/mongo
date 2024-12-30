@@ -39,11 +39,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"

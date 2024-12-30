@@ -28,8 +28,8 @@
  */
 
 #include "mongo/db/update/delta_executor.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/object_replace_executor.h"
 

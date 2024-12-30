@@ -40,7 +40,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/update/modifier_node.h"

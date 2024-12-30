@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"

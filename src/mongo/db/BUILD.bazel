@@ -985,7 +985,6 @@ mongo_cc_library(
         ":profile_settings",
         ":server_base",  # TODO(SERVER-93876): Remove.
         ":server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/admission:ingress_admission_context",
         "//src/mongo/db/admission:ticketholder_manager",
@@ -997,6 +996,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/db/query:command_diagnostic_printer",
         "//src/mongo/db/query:common_query_enums_and_helpers",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
@@ -2190,7 +2190,7 @@ mongo_cc_library(
         "keys_collection_client_sharded.h",
     ],
     header_deps = [
-        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db/exec/mutable_bson:mutable_bson",
         "//src/mongo/db/commands:server_status_core",
     ],
     deps = [

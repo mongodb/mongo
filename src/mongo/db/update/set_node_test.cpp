@@ -33,8 +33,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/runtime_update_path.h"
 #include "mongo/db/update/set_node.h"

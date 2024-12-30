@@ -34,8 +34,8 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/const_element.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/update/modifier_node.h"

@@ -49,12 +49,12 @@ mongo_cc_library(
     deps = [
         ":query_stats_parse",  # TODO(SERVER-93876): Remove.
         ":rate_limiting",
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/db/query:command_request_response",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:memory_util",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
