@@ -227,11 +227,10 @@ public:
 
     // repr() now just for Format::kLong
     int64_t repr() const {
-        if (_format == Format::kNull) {
-            return 0;
-        }
-        invariant(isLong());
-        return _getLongNoCheck();
+        // In the monograph engine, the RecordId is equivalent to the "_id" field and is stored as a
+        // string. Therefore, the repr() function is meaningless.
+        // Returning 0 ensures compatibility with the existing API.
+        return 0;
     }
 
     /**
