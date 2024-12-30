@@ -359,6 +359,15 @@ add_option(
 )
 
 add_option(
+    "skip-archive",
+    choices=["on", "off"],
+    default="off",
+    help="Enable runtime debugging checks",
+    nargs="?",
+    type="choice",
+)
+
+add_option(
     "disable-ref-track",
     help="Disables runtime tracking of REF state changes for pages within wiredtiger. "
     "Tracking the REF state changes is useful for debugging but there is a small performance cost.",

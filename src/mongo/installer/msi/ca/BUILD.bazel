@@ -46,6 +46,7 @@ mongo_cc_library(
     # As part of install, we may need to install the CRT DLL but if it is not installed, we cannot run
     # the installer if we dynamically linked against it.
     skip_windows_crt_flags = True,
+    tags = ["dist_test"],
     target_compatible_with = select({
         "@platforms//os:windows": [],
         "//conditions:default": ["@platforms//:incompatible"],

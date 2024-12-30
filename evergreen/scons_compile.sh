@@ -15,7 +15,7 @@ rm -rf ${install_directory}
 # links we are likely to OOM or thrash the machine. Dynamic
 # builds, where htis is not a concern, override this value.
 echo "Changing SCons to run with --jlink=${num_scons_link_jobs_available}"
-extra_args="$extra_args --jlink=${num_scons_link_jobs_available} --separate-debug=${separate_debug}"
+extra_args="$extra_args --jlink=${num_scons_link_jobs_available} --separate-debug=${separate_debug} --skip-archive=${skip_archive}"
 
 echo "Changing SCons to run with UNITTESTS_COMPILE_CONCURRENCY=${num_scons_unit_cc_jobs_available}"
 extra_args="$extra_args UNITTESTS_COMPILE_CONCURRENCY=${num_scons_unit_cc_jobs_available}"

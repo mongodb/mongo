@@ -861,6 +861,7 @@ tasks:
           targets: install-sdam-json-test
           compiling_for_test: true
           install_dir: build/install/bin
+          skip_archive: on
           bazel_build_tags: --bazel-build-tag=sdam_json_test
       - func: "run tests"
         vars:
@@ -885,6 +886,7 @@ tasks:
           targets: install-server-selection-json-test
           compiling_for_test: true
           install_dir: build/install/bin
+          skip_archive: on
           bazel_build_tags: --bazel-build-tag=server_selection_json_test
       - func: "run tests"
 
