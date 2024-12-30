@@ -362,8 +362,9 @@ config_fuzzer_params = {
             "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
             "fuzz_at": ["startup"],
         },
+        # TODO(SERVER-98867): re-enable config fuzzer signal testing.
         "failpoint.enableSignalTesting": {
-            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "choices": [{"mode": "off"}],
             "fuzz_at": ["startup"],
         },
         "enableDetailedConnectionHealthMetricLogLines": {
@@ -424,8 +425,9 @@ config_fuzzer_params = {
             "period": 10,
             "fuzz_at": ["startup", "runtime"],
         },
+        # TODO(SERVER-98867): re-enable config fuzzer signal testing.
         "failpoint.enableSignalTesting": {
-            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "choices": [{"mode": "off"}],
             "fuzz_at": ["startup"],
         },
     },
