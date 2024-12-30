@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,54 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
-
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/crypto/mongocrypt_definitions.h"
-
-typedef struct _mongocrypt_status_t mongocrypt_status_t;
-
-namespace mongo {
-
-/**
- * C++ friendly wrapper around libmongocrypt's public mongocrypt_status_t* and its associated
- * functions.
- */
-class MongoCryptStatus {
-public:
-    MongoCryptStatus();
-    ~MongoCryptStatus();
-
-    MongoCryptStatus(MongoCryptStatus&) = delete;
-    MongoCryptStatus(MongoCryptStatus&&) = default;
-
-    /**
-     * Get a libmongocrypt specific error code
-     */
-    uint32_t getCode() const;
-
-    /**
-     * Returns true if there are no errors
-     */
-    bool isOK() const;
-
-    operator mongocrypt_status_t*() {
-        return _status;
-    }
-
-    std::string reason() const;
-
-    /**
-     * Convert a mongocrypt_status_t to a mongo::Status.
-     */
-    Status toStatus() const;
-
-private:
-    mongocrypt_status_t* _status;
-};
-
-}  // namespace mongo
+// Forward declarations of our mongocrypt dependencies. Required because we don't want
+// mongocrypt headers transitively included by other targets, polluting the global namespace.
+extern "C" {
+struct _mc_FLE2IndexedEncryptedValueV2_t;
+struct _mc_FLE2TagAndEncryptedMetadataBlock_t;
+struct _mongocrypt_t;
+void mc_FLE2IndexedEncryptedValueV2_destroy(struct _mc_FLE2IndexedEncryptedValueV2_t*);
+}  // extern "C"

@@ -23,43 +23,9 @@
 #include "mc-reader-private.h"
 #include "mc-tokens-private.h"
 #include "mc-writer-private.h"
+#include <mongocrypt-util-private.h>
 #include <stdint.h>
 
-typedef enum {
-    kTypeInit,
-    kTypeEquality,
-    kTypeRange,
-} _mc_fle2_iev_v2_type;
-
-struct _mc_FLE2IndexedEncryptedValueV2_t {
-    // Raw payload values
-    uint8_t fle_blob_subtype;
-    uint8_t bson_value_type;
-    uint8_t edge_count;
-    _mongocrypt_buffer_t S_KeyId;
-    _mongocrypt_buffer_t ServerEncryptedValue;
-
-    // Decode State
-    _mc_fle2_iev_v2_type type;
-    bool ClientEncryptedValueDecoded;
-    bool ClientValueDecoded;
-
-    // Populated during _add_S_Key
-    // DecryptedServerEncryptedValue := DecryptCTR(S_Key, ServerEncryptedValue)
-    _mongocrypt_buffer_t DecryptedServerEncryptedValue;
-
-    // Views on DecryptedServerEncryptedValue (DSEV)
-    _mongocrypt_buffer_t K_KeyId;              // First 16 octets, UUID
-    _mongocrypt_buffer_t ClientEncryptedValue; // Remainder of DSEV
-
-    // Populated during _add_K_Key
-    // ClientValue := DecryptCBCAEAD(K_Key, ClientEncryptedValue, AD=K_KeyId)
-    _mongocrypt_buffer_t ClientValue;
-
-    mc_FLE2TagAndEncryptedMetadataBlock_t *metadata;
-};
-
-#define kMetadataLen 96U                // encCount(32) + tag(32) + encZeros(32)
 #define kMinServerEncryptedValueLen 17U // IV(16) + EncryptCTR(1byte)
 #define kMinSEVAndMetadataLen (kMinServerEncryptedValueLen + kMetadataLen)
 
@@ -76,7 +42,7 @@ bson_type_t mc_FLE2IndexedEncryptedValueV2_get_bson_value_type(const mc_FLE2Inde
                                                                mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(iev);
 
-    if (iev->type == kTypeInit) {
+    if (iev->type == kFLE2IEVTypeInitV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_bson_value_type "
                    "must be called after "
                    "mc_FLE2IndexedEncryptedValueV2_parse");
@@ -90,7 +56,7 @@ const _mongocrypt_buffer_t *mc_FLE2IndexedEncryptedValueV2_get_S_KeyId(const mc_
                                                                        mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(iev);
 
-    if (iev->type == kTypeInit) {
+    if (iev->type == kFLE2IEVTypeInitV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_S_KeyId "
                    "must be called after "
                    "mc_FLE2IndexedEncryptedValueV2_parse");
@@ -109,7 +75,7 @@ bool mc_FLE2IndexedEncryptedValueV2_add_S_Key(_mongocrypt_crypto_t *crypto,
     BSON_ASSERT_PARAM(S_Key);
     BSON_ASSERT_PARAM(status);
 
-    if (iev->type == kTypeInit) {
+    if (iev->type == kFLE2IEVTypeInitV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_add_S_Key must "
                    "be called after "
                    "mc_FLE2IndexedEncryptedValueV2_parse");
@@ -315,14 +281,14 @@ uint8_t mc_FLE2IndexedEncryptedValueV2_get_edge_count(const mc_FLE2IndexedEncryp
                                                       mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(iev);
 
-    if (iev->type == kTypeInit) {
+    if (iev->type == kFLE2IEVTypeInitV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_edge_count "
                    "must be called after "
                    "mc_FLE2IndexedEncryptedValueV2_parse");
         return 0;
     }
 
-    if (iev->type != kTypeRange) {
+    if (iev->type != kFLE2IEVTypeRangeV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_edge_count must be called with type range");
         return 0;
     }
@@ -337,20 +303,21 @@ bool mc_FLE2IndexedEncryptedValueV2_get_edge(const mc_FLE2IndexedEncryptedValueV
     BSON_ASSERT_PARAM(iev);
     BSON_ASSERT_PARAM(out);
 
-    if (iev->type == kTypeInit) {
+    if (iev->type == kFLE2IEVTypeInitV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_edge "
                    "must be called after "
                    "mc_FLE2IndexedEncryptedValueV2_parse");
         return false;
     }
 
-    if (iev->type != kTypeRange) {
+    if (iev->type != kFLE2IEVTypeRangeV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_edge must be called with type range");
         return false;
     }
 
     if (edge_index >= iev->edge_count) {
-        CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_edge must be called with index edge_index less than edge count");
+        CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_edge must be called with index edge_index less "
+                   "than edge count");
         return false;
     }
 
@@ -365,14 +332,14 @@ bool mc_FLE2IndexedEncryptedValueV2_get_metadata(const mc_FLE2IndexedEncryptedVa
     BSON_ASSERT_PARAM(iev);
     BSON_ASSERT_PARAM(out);
 
-    if (iev->type == kTypeInit) {
+    if (iev->type == kFLE2IEVTypeInitV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_metadata "
                    "must be called after "
                    "mc_FLE2IndexedEncryptedValueV2_parse");
         return false;
     }
 
-    if (iev->type != kTypeEquality) {
+    if (iev->type != kFLE2IEVTypeEqualityV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_get_metadata must be called with type equality");
         return false;
     }
@@ -393,7 +360,7 @@ bool mc_FLE2IndexedEncryptedValueV2_parse(mc_FLE2IndexedEncryptedValueV2_t *iev,
         return false;
     }
 
-    if (iev->type != kTypeInit) {
+    if (iev->type != kFLE2IEVTypeInitV2) {
         CLIENT_ERR("mc_FLE2IndexedRangeEncryptedValueV2_parse must not be "
                    "called twice");
         return false;
@@ -405,9 +372,9 @@ bool mc_FLE2IndexedEncryptedValueV2_parse(mc_FLE2IndexedEncryptedValueV2_t *iev,
     CHECK_AND_RETURN(mc_reader_read_u8(&reader, &iev->fle_blob_subtype, status));
 
     if (iev->fle_blob_subtype == MC_SUBTYPE_FLE2IndexedEqualityEncryptedValueV2) {
-        iev->type = kTypeEquality;
+        iev->type = kFLE2IEVTypeEqualityV2;
     } else if (iev->fle_blob_subtype == MC_SUBTYPE_FLE2IndexedRangeEncryptedValueV2) {
-        iev->type = kTypeRange;
+        iev->type = kFLE2IEVTypeRangeV2;
     } else {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_parse expected "
                    "fle_blob_subtype MC_SUBTYPE_FLE2Indexed(Equality|Range)EncryptedValueV2 got: %" PRIu8,
@@ -424,7 +391,7 @@ bool mc_FLE2IndexedEncryptedValueV2_parse(mc_FLE2IndexedEncryptedValueV2_t *iev,
     /* Read edge_count */
     // Set equality edge_count to 1 as it doesn't technically exist but
     // there will be a singular metadata block
-    if (iev->type == kTypeEquality) {
+    if (iev->type == kFLE2IEVTypeEqualityV2) {
         iev->edge_count = 1;
     } else {
         CHECK_AND_RETURN(mc_reader_read_u8(&reader, &iev->edge_count, status));
@@ -462,18 +429,31 @@ bool mc_FLE2IndexedEncryptedValueV2_parse(mc_FLE2IndexedEncryptedValueV2_t *iev,
     return true;
 }
 
+static inline uint32_t mc_FLE2IndexedEncryptedValueV2_serialized_length(const mc_FLE2IndexedEncryptedValueV2_t *iev) {
+    // fle_blob_subtype: 1 byte
+    // S_KeyId: UUID_LEN bytes
+    // bson_value_type: 1 byte
+    // if range: edge_count: 1 byte
+    // ServerEncryptedValue: ServerEncryptedValue.len bytes
+    // metadata: edge_count * kMetadataLen bytes
+    return iev->ServerEncryptedValue.len + 1 + UUID_LEN + 1 + (iev->type == kFLE2IEVTypeRangeV2 ? 1 : 0)
+         + iev->edge_count * kMetadataLen;
+}
+
 bool mc_FLE2IndexedEncryptedValueV2_serialize(const mc_FLE2IndexedEncryptedValueV2_t *iev,
                                               _mongocrypt_buffer_t *buf,
                                               mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(iev);
     BSON_ASSERT_PARAM(buf);
 
-    if (iev->type != kTypeRange && iev->type != kTypeEquality) {
+    if (iev->type != kFLE2IEVTypeRangeV2 && iev->type != kFLE2IEVTypeEqualityV2) {
         CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_serialize must be called with type equality or range");
         return false;
     }
 
+    uint32_t expected_len = mc_FLE2IndexedEncryptedValueV2_serialized_length(iev);
     mc_writer_t writer;
+    _mongocrypt_buffer_resize(buf, expected_len);
     mc_writer_init_from_buffer(&writer, buf, __FUNCTION__);
 
     // Serialize fle_blob_subtype
@@ -486,7 +466,7 @@ bool mc_FLE2IndexedEncryptedValueV2_serialize(const mc_FLE2IndexedEncryptedValue
     CHECK_AND_RETURN(mc_writer_write_u8(&writer, iev->bson_value_type, status));
 
     // Serialize edge_count (only serialized for type range)
-    if (iev->type == kTypeRange) {
+    if (iev->type == kFLE2IEVTypeRangeV2) {
         CHECK_AND_RETURN(mc_writer_write_u8(&writer, iev->edge_count, status));
     }
 
@@ -497,7 +477,7 @@ bool mc_FLE2IndexedEncryptedValueV2_serialize(const mc_FLE2IndexedEncryptedValue
     // Serialize metadata
     for (int i = 0; i < iev->edge_count; ++i) {
         _mongocrypt_buffer_t tmp_buf;
-        _mongocrypt_buffer_init_size(&tmp_buf, kMetadataLen);
+        _mongocrypt_buffer_init(&tmp_buf);
 
         CHECK_AND_RETURN(mc_FLE2TagAndEncryptedMetadataBlock_serialize(&iev->metadata[i], &tmp_buf, status));
         CHECK_AND_RETURN(mc_writer_write_buffer(&writer, &tmp_buf, kMetadataLen, status));
@@ -506,4 +486,69 @@ bool mc_FLE2IndexedEncryptedValueV2_serialize(const mc_FLE2IndexedEncryptedValue
     }
 
     return true;
+}
+
+bool is_fle2_equality_indexed_supported_type(int bson_type) {
+    switch (bson_type) {
+    case BSON_TYPE_BINARY:
+    case BSON_TYPE_CODE:
+    case BSON_TYPE_REGEX:
+    case BSON_TYPE_UTF8:
+
+    case BSON_TYPE_INT32:
+    case BSON_TYPE_INT64:
+    case BSON_TYPE_BOOL:
+    case BSON_TYPE_TIMESTAMP:
+    case BSON_TYPE_DATE_TIME:
+    case BSON_TYPE_OID:
+
+    case BSON_TYPE_SYMBOL:
+    case BSON_TYPE_DBPOINTER: return true;
+    default: // All other defined types are non-deterministic or singletons.
+        return false;
+    }
+}
+
+#define CHECK(condition, msg)                                                                                          \
+    do {                                                                                                               \
+        if (!(condition)) {                                                                                            \
+            CLIENT_ERR("mc_FLE2IndexedEncryptedValueV2_validate failed: " msg);                                        \
+            return false;                                                                                              \
+        }                                                                                                              \
+    } while (0)
+
+bool mc_FLE2IndexedEncryptedValueV2_validate(const mc_FLE2IndexedEncryptedValueV2_t *iev, mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(iev);
+    CHECK(iev->type == kFLE2IEVTypeEqualityV2, "validate only supports type equality");
+    CHECK(iev->fle_blob_subtype == MC_SUBTYPE_FLE2IndexedEqualityEncryptedValueV2,
+          "fle_blob_subtype does not match type");
+    CHECK(is_fle2_equality_indexed_supported_type(iev->bson_value_type), "bson_value_type is invalid");
+    CHECK(iev->edge_count == 1, "edge_count must be 1 for equality");
+
+    CHECK(iev->ServerEncryptedValue.len >= kMinServerEncryptedValueLen, "SEV.len is less than minimum");
+    CHECK(iev->S_KeyId.len == UUID_LEN, "S_KeyId is not the correct length for a UUID");
+
+    CHECK(!iev->ClientValueDecoded || iev->ClientEncryptedValueDecoded,
+          "Found decrypted client value without encrypted client value");
+    if (iev->ClientEncryptedValueDecoded) {
+        const _mongocrypt_value_encryption_algorithm_t *fle2alg = _mcFLE2Algorithm();
+        const uint32_t DecryptedServerEncryptedValueLen =
+            fle2alg->get_plaintext_len(iev->ServerEncryptedValue.len, status);
+        if (!mongocrypt_status_ok(status)) {
+            return false;
+        }
+        CHECK(iev->DecryptedServerEncryptedValue.len == DecryptedServerEncryptedValueLen, "DSEV.len was unexpected");
+        CHECK(iev->ClientEncryptedValue.len == iev->DecryptedServerEncryptedValue.len - UUID_LEN,
+              "CEV.len was unexpected");
+        CHECK(iev->K_KeyId.len == UUID_LEN, "K_KeyId is not the correct length for a UUID");
+    }
+    if (iev->ClientValueDecoded) {
+        const _mongocrypt_value_encryption_algorithm_t *fle2v2aead = _mcFLE2v2AEADAlgorithm();
+        const uint32_t ClientValueLen = fle2v2aead->get_plaintext_len(iev->ClientEncryptedValue.len, status);
+        if (!mongocrypt_status_ok(status)) {
+            return false;
+        }
+        CHECK(iev->ClientValue.len == ClientValueLen, "ClientValue.len was unexpected");
+    }
+    return mc_FLE2TagAndEncryptedMetadataBlock_validate(iev->metadata, status);
 }

@@ -29,24 +29,17 @@
 
 #include "mongo/crypto/fle_tokens.h"
 
-// TODO: Remove after SERVER-95889
-#include "mongo/base/init.h"
-
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/fle_key_types.h"
+#include "mongo/crypto/fle_util.h"
 #include "mongo/crypto/mongocryptbuffer.h"
 #include "mongo/crypto/mongocryptstatus.h"
 #include "mongo/crypto/symmetric_crypto.h"
 
 extern "C" {
 #include <mc-tokens-private.h>
-#include <mongocrypt-crypto-private.h>
+#include <mongocrypt-private.h>
 }
-
-// A dummy mongocrypt_crypto_t object has to be created in order to call mc_##TokenType##_new from
-// libmongocrypt. This can be removed once a mongocrypt_t object exists on ServiceContext (see
-// SERVER-95889).
-typedef _mongocrypt_crypto_t mongocrypt_crypto_t;
 
 namespace mongo {
 
@@ -152,7 +145,6 @@ auto kEmptyPrfBlock = MongoCryptBuffer::copy(ConstDataRange(PrfBlock{}));
     TokenType TokenType::deriveFrom(__VA_ARGS__) {                                                \
         /* The beginning of ::deriveFrom is the same for each token. */                           \
         MongoCryptStatus status;                                                                  \
-        mongocrypt_crypto_t crypto = {0};                                                         \
         FLE_TOKEN_TYPE_MC(TokenType) * token;
 
 
@@ -175,15 +167,15 @@ auto kEmptyPrfBlock = MongoCryptBuffer::copy(ConstDataRange(PrfBlock{}));
 // FLE_TOKEN_CLASS_IMPL_END
 // ```
 // This is to ensure that the open ended ::deriveFrom function gets properly cleaned up and closed.
-#define FLE_TOKEN_IMPL_FROM_ROOT(TokenType)                                    \
-    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const FLEIndexKey& rootKey)          \
-    MongoCryptBuffer argMCB = MongoCryptBuffer::borrow(hmacKey(rootKey.data)); \
-    token = mc_##TokenType##_new(&crypto, argMCB.get(), status);               \
+#define FLE_TOKEN_IMPL_FROM_ROOT(TokenType)                                            \
+    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const FLEIndexKey& rootKey)                  \
+    MongoCryptBuffer argMCB = MongoCryptBuffer::borrow(hmacKey(rootKey.data));         \
+    token = mc_##TokenType##_new(getGlobalMongoCrypt()->crypto, argMCB.get(), status); \
     FLE_TOKEN_CLASS_IMPL_END(TokenType)
 
-#define FLE_TOKEN_IMPL_FROM_TOKEN(TokenType, ParentToken)            \
-    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const ParentToken& parent) \
-    token = mc_##TokenType##_new(&crypto, parent.get(), status);     \
+#define FLE_TOKEN_IMPL_FROM_TOKEN(TokenType, ParentToken)                              \
+    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const ParentToken& parent)                   \
+    token = mc_##TokenType##_new(getGlobalMongoCrypt()->crypto, parent.get(), status); \
     FLE_TOKEN_CLASS_IMPL_END(TokenType)
 
 #define FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR(TokenType, ParentToken)                                \
@@ -191,12 +183,13 @@ auto kEmptyPrfBlock = MongoCryptBuffer::copy(ConstDataRange(PrfBlock{}));
     /* mc_##TokenType##_new for these tokens takes in a _mongocrypt_buffer_t, requiring an extra \
      * conversion step. */                                                                       \
     MongoCryptBuffer argMCB = MongoCryptBuffer::borrow(cdr);                                     \
-    token = mc_##TokenType##_new(&crypto, parent.get(), argMCB.get(), status);                   \
+    token =                                                                                      \
+        mc_##TokenType##_new(getGlobalMongoCrypt()->crypto, parent.get(), argMCB.get(), status); \
     FLE_TOKEN_CLASS_IMPL_END(TokenType)
 
-#define FLE_TOKEN_IMPL_FROM_TOKEN_AND_INT(TokenType, ParentToken)                       \
-    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const ParentToken& parent, std::uint64_t arg) \
-    token = mc_##TokenType##_new(&crypto, parent.get(), arg, status);                   \
+#define FLE_TOKEN_IMPL_FROM_TOKEN_AND_INT(TokenType, ParentToken)                           \
+    FLE_TOKEN_CLASS_IMPL_BEGIN(TokenType, const ParentToken& parent, std::uint64_t arg)     \
+    token = mc_##TokenType##_new(getGlobalMongoCrypt()->crypto, parent.get(), arg, status); \
     FLE_TOKEN_CLASS_IMPL_END(TokenType)
 
 #define FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR_AND_INT(TokenType, ParentToken)                        \
@@ -205,7 +198,8 @@ auto kEmptyPrfBlock = MongoCryptBuffer::copy(ConstDataRange(PrfBlock{}));
     /* mc_##TokenType##_new for these tokens takes in a _mongocrypt_buffer_t, requiring an extra \
      * conversion step. */                                                                       \
     MongoCryptBuffer argMCB = MongoCryptBuffer::borrow(cdr);                                     \
-    token = mc_##TokenType##_new(&crypto, parent.get(), argMCB.get(), arg, status);              \
+    token = mc_##TokenType##_new(                                                                \
+        getGlobalMongoCrypt()->crypto, parent.get(), argMCB.get(), arg, status);                 \
     FLE_TOKEN_CLASS_IMPL_END(TokenType)
 
 // See comments in fle_tokens.h for token derivation details.
@@ -282,13 +276,4 @@ FLE_TOKEN_IMPL_FROM_TOKEN_AND_CDR(ServerTextPrefixDerivedFromDataToken, ServerTe
 #undef FLE_TOKEN_IMPL_FROM_TOKEN
 #undef FLE_TOKEN_IMPL_FROM_TOKEN_AND_BUFFER
 #undef FLE_TOKEN_IMPL_FROM_TOKEN_AND_BUFFER
-
-// Initialize and immediately destroy a mongocrypt object to ensure that _native_crypto_init gets
-// called once in libmongocrypt. This can be removed once a mongocrypt_t object gets attached to
-// ServiceContext in SERVER-95889.
-MONGO_INITIALIZER(createDestroyMongocrypt_t)(InitializerContext* initializer) {
-    mongocrypt_t* tmp_mongocrypt = mongocrypt_new();
-    mongocrypt_destroy(tmp_mongocrypt);
-}
-
 }  // namespace mongo

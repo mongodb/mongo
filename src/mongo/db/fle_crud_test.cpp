@@ -1447,7 +1447,7 @@ BSONObj makeInsertUpdatePayload(StringData path, const UUID& uuid) {
     return bob.obj();
 }
 
-TEST(FleCrudTest, validateIndexKeyValid) {
+TEST_F(FleCrudTest, validateIndexKeyValid) {
     // This test assumes we have at least one field in EFC.
     auto fields = getTestEncryptedFieldConfig().getFields();
     ASSERT_GTE(fields.size(), 1);
@@ -1458,7 +1458,7 @@ TEST(FleCrudTest, validateIndexKeyValid) {
     validateInsertUpdatePayloads(fields, validPayload);
 }
 
-TEST(FleCrudTest, validateIndexKeyInvalid) {
+TEST_F(FleCrudTest, validateIndexKeyInvalid) {
     // This test assumes we have at least one field in EFC.
     auto fields = getTestEncryptedFieldConfig().getFields();
     ASSERT_GTE(fields.size(), 1);

@@ -60,6 +60,8 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/crypto/fle_stats_gen.h"
+#include "mongo/crypto/fle_util.h"
+#include "mongo/crypto/mongocrypt_definitions.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
@@ -682,46 +684,45 @@ struct FLE2TagAndEncryptedMetadataBlock {
  *
  * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
  */
-struct FLE2IndexedEqualityEncryptedValueV2 {
-    FLE2IndexedEqualityEncryptedValueV2(const FLE2InsertUpdatePayloadV2& payload,
-                                        PrfBlock tag,
-                                        uint64_t counter);
-    FLE2IndexedEqualityEncryptedValueV2(BSONType typeParam,
-                                        UUID indexKeyIdParam,
-                                        std::vector<uint8_t> clientEncryptedValueParam,
-                                        FLE2TagAndEncryptedMetadataBlock metadataBlockParam);
+using UniqueMCFLE2IndexedEncryptedValueV2 =
+    libmongocrypt_support_detail::libmongocrypt_unique_ptr<_mc_FLE2IndexedEncryptedValueV2_t,
+                                                           mc_FLE2IndexedEncryptedValueV2_destroy>;
 
-    struct ParsedFields {
-        UUID keyId;
-        BSONType bsonType;
-        ConstDataRange ciphertext;
-        ConstDataRange metadataBlock;
-    };
-    static StatusWith<ParsedFields> parseAndValidateFields(ConstDataRange serializedServerValue);
-
-    static StatusWith<std::vector<uint8_t>> parseAndDecryptCiphertext(
+class FLE2IndexedEqualityEncryptedValueV2 {
+public:
+    FLE2IndexedEqualityEncryptedValueV2(ConstDataRange cdr);
+    static FLE2IndexedEqualityEncryptedValueV2 fromUnencrypted(
+        const FLE2InsertUpdatePayloadV2& payload,
+        PrfBlock tag,
+        uint64_t counter,
         ServerDataEncryptionLevel1Token serverEncryptionToken,
-        ConstDataRange serializedServerValue);
-
-    static StatusWith<FLE2TagAndEncryptedMetadataBlock> parseAndDecryptMetadataBlock(
-        ServerDerivedFromDataToken serverDataDerivedToken, ConstDataRange serializedServerValue);
-
-    static StatusWith<PrfBlock> parseMetadataBlockTag(ConstDataRange serializedServerValue);
-
-    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
-
-    static StatusWith<BSONType> readBsonType(ConstDataRange serializedServerValue);
-
-    StatusWith<std::vector<uint8_t>> serialize(
+        ServerDerivedFromDataToken serverDataDerivedToken);
+    static FLE2IndexedEqualityEncryptedValueV2 fromUnencrypted(
+        BSONType typeParam,
+        UUID indexKeyIdParam,
+        std::vector<uint8_t> clientEncryptedValueParam,
+        FLE2TagAndEncryptedMetadataBlock metadataBlockParam,
         ServerDataEncryptionLevel1Token serverEncryptionToken,
         ServerDerivedFromDataToken serverDataDerivedToken);
 
-    BSONType bsonType;
-    UUID indexKeyId;
-    std::vector<uint8_t> clientEncryptedValue;
-    FLE2TagAndEncryptedMetadataBlock metadataBlock;
-};
+    StatusWith<std::vector<uint8_t>> serialize() const;
 
+    ConstDataRange getServerEncryptedValue() const;
+    ConstDataRange getRawMetadataBlock() const;
+    PrfBlock getMetadataBlockTag() const;
+    UUID getKeyId() const;
+    BSONType getBsonType() const;
+
+private:
+    FLE2IndexedEqualityEncryptedValueV2();
+    UniqueMCFLE2IndexedEncryptedValueV2 _value;
+    // Cached parsed values
+    mutable boost::optional<UUID> _cachedKeyId;
+    mutable boost::optional<ConstDataRange> _cachedServerEncryptedValue;
+    mutable boost::optional<std::vector<uint8_t>> _cachedRawMetadata;
+    mutable boost::optional<PrfBlock> _cachedMetadataBlockTag;
+    mutable boost::optional<std::vector<uint8_t>> _cachedSerializedPayload;
+};
 
 /**
  * Class to read/write FLE2 Unindexed Encrypted Values (for protocol version 2)

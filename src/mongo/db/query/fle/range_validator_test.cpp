@@ -58,7 +58,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo::fle {
-class RangeValidatorTest : public unittest::Test {
+class RangeValidatorTest : public ServiceContextTest {
 public:
     void setUp() override {}
 

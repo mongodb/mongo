@@ -36,6 +36,7 @@
 #include "mongo/db/query/fle/equality_predicate.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/query/fle/range_predicate.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/overloaded_visitor.h"
 
@@ -76,7 +77,7 @@ private:
     boost::optional<NamespaceString> _mockOptionalNss;
 };
 
-class EncryptedPredicateRewriteTest : public unittest::Test {
+class EncryptedPredicateRewriteTest : public ServiceContextTest {
 public:
     EncryptedPredicateRewriteTest();
     ~EncryptedPredicateRewriteTest() override;

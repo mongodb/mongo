@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,51 +29,17 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/crypto/mongocrypt_definitions.h"
-
-typedef struct _mongocrypt_status_t mongocrypt_status_t;
+#include "mongo/crypto/fle_crypto.h"
 
 namespace mongo {
-
-/**
- * C++ friendly wrapper around libmongocrypt's public mongocrypt_status_t* and its associated
- * functions.
- */
-class MongoCryptStatus {
+// Testing-only helpers for decrypting IEVs.
+class IndexedEqualityEncryptedValueV2Helpers {
 public:
-    MongoCryptStatus();
-    ~MongoCryptStatus();
+    static StatusWith<std::vector<uint8_t>> parseAndDecryptCiphertext(
+        ServerDataEncryptionLevel1Token serverEncryptionToken,
+        ConstDataRange serializedServerValue);
 
-    MongoCryptStatus(MongoCryptStatus&) = delete;
-    MongoCryptStatus(MongoCryptStatus&&) = default;
-
-    /**
-     * Get a libmongocrypt specific error code
-     */
-    uint32_t getCode() const;
-
-    /**
-     * Returns true if there are no errors
-     */
-    bool isOK() const;
-
-    operator mongocrypt_status_t*() {
-        return _status;
-    }
-
-    std::string reason() const;
-
-    /**
-     * Convert a mongocrypt_status_t to a mongo::Status.
-     */
-    Status toStatus() const;
-
-private:
-    mongocrypt_status_t* _status;
+    static StatusWith<FLE2TagAndEncryptedMetadataBlock> parseAndDecryptMetadataBlock(
+        ServerDerivedFromDataToken serverDataDerivedToken, ConstDataRange serializedServerValue);
 };
-
 }  // namespace mongo

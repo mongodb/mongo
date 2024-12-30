@@ -80,7 +80,39 @@
  *
  */
 
-typedef struct _mc_FLE2IndexedEncryptedValueV2_t mc_FLE2IndexedEncryptedValueV2_t;
+typedef enum {
+    kFLE2IEVTypeInitV2,
+    kFLE2IEVTypeEqualityV2,
+    kFLE2IEVTypeRangeV2,
+} _mc_fle2_iev_v2_type;
+
+typedef struct _mc_FLE2IndexedEncryptedValueV2_t {
+    // Raw payload values
+    uint8_t fle_blob_subtype;
+    uint8_t bson_value_type;
+    uint8_t edge_count;
+    _mongocrypt_buffer_t S_KeyId;
+    _mongocrypt_buffer_t ServerEncryptedValue;
+
+    // Decode State
+    _mc_fle2_iev_v2_type type;
+    bool ClientEncryptedValueDecoded;
+    bool ClientValueDecoded;
+
+    // Populated during _add_S_Key
+    // DecryptedServerEncryptedValue := DecryptCTR(S_Key, ServerEncryptedValue)
+    _mongocrypt_buffer_t DecryptedServerEncryptedValue;
+
+    // Views on DecryptedServerEncryptedValue (DSEV)
+    _mongocrypt_buffer_t K_KeyId;              // First 16 octets, UUID
+    _mongocrypt_buffer_t ClientEncryptedValue; // Remainder of DSEV
+
+    // Populated during _add_K_Key
+    // ClientValue := DecryptCBCAEAD(K_Key, ClientEncryptedValue, AD=K_KeyId)
+    _mongocrypt_buffer_t ClientValue;
+
+    mc_FLE2TagAndEncryptedMetadataBlock_t *metadata;
+} mc_FLE2IndexedEncryptedValueV2_t;
 
 mc_FLE2IndexedEncryptedValueV2_t *mc_FLE2IndexedEncryptedValueV2_new(void);
 bson_type_t mc_FLE2IndexedEncryptedValueV2_get_bson_value_type(const mc_FLE2IndexedEncryptedValueV2_t *iev,
@@ -117,6 +149,12 @@ bool mc_FLE2IndexedEncryptedValueV2_parse(mc_FLE2IndexedEncryptedValueV2_t *iev,
 bool mc_FLE2IndexedEncryptedValueV2_serialize(const mc_FLE2IndexedEncryptedValueV2_t *iev,
                                               _mongocrypt_buffer_t *buf,
                                               mongocrypt_status_t *status);
+
+/**
+ * Validates that a mc_FLE2IndexedEncryptedValueV2_t is well-formed, i.e. values are in their valid
+ * ranges and buffers are correctly sized. Returns an error if the input structure is invalid.
+ */
+bool mc_FLE2IndexedEncryptedValueV2_validate(const mc_FLE2IndexedEncryptedValueV2_t *iev, mongocrypt_status_t *status);
 
 const _mongocrypt_buffer_t *mc_FLE2IndexedEncryptedValueV2_get_S_KeyId(const mc_FLE2IndexedEncryptedValueV2_t *iev,
                                                                        mongocrypt_status_t *status);

@@ -2959,13 +2959,16 @@ Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* vari
         return Value(BSONNULL);
     }
 
+    // Hang on to the FLE2IndexedEqualityEncryptedValueV2 object, because getRawMetadataBlock
+    // returns a view on its member.
+    boost::optional<FLE2IndexedEqualityEncryptedValueV2> value;
     return Value(_evaluatorV2.evaluate(
-        fieldValue, EncryptedBinDataType::kFLE2EqualityIndexedValueV2, [](auto serverValue) {
-            auto swParsedFields =
-                FLE2IndexedEqualityEncryptedValueV2::parseAndValidateFields(serverValue);
-            uassertStatusOK(swParsedFields.getStatus());
+        fieldValue, EncryptedBinDataType::kFLE2EqualityIndexedValueV2, [&value](auto serverValue) {
+            // extractMetadataBlocks should only be run once.
+            tassert(9588901, "extractMetadataBlocks should only be run once by evaluate", !value);
+            value.emplace(serverValue);
             std::vector<ConstDataRange> metadataBlocks;
-            metadataBlocks.push_back(swParsedFields.getValue().metadataBlock);
+            metadataBlocks.push_back(value->getRawMetadataBlock());
             return metadataBlocks;
         }));
 }
@@ -3034,10 +3037,9 @@ Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* va
 
     return Value(_evaluatorV2.evaluate(
         fieldValue, EncryptedBinDataType::kFLE2RangeIndexedValueV2, [](auto serverValue) {
-            auto swParsedFields =
-                FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(serverValue);
-            uassertStatusOK(swParsedFields.getStatus());
-            return swParsedFields.getValue().metadataBlocks;
+            auto [subType, data] = fromEncryptedConstDataRange(serverValue);
+            return uassertStatusOK(FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(data))
+                .metadataBlocks;
         }));
 }
 

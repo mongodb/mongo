@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/service_context_test_fixture.h"
 #include <algorithm>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -64,6 +65,7 @@
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_numeric.h"
+#include "mongo/crypto/fle_testing_util.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/idl/idl_parser.h"
@@ -237,7 +239,7 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
     return makeKeyStoreRecord(uuid, ciphertext).toBSON();
 }
 
-TEST(FLETokens, TestVectors) {
+TEST_F(ServiceContextTest, FLETokens_TestVectors) {
     std::vector<uint8_t> sampleValue = {0xc0, 0x7c, 0x0d, 0xf5, 0x12, 0x57, 0x94, 0x8e,
                                         0x1a, 0x0f, 0xc7, 0x0d, 0xd4, 0x56, 0x8e, 0x3a,
                                         0xf9, 0x9b, 0x23, 0xb3, 0x43, 0x4c, 0x98, 0x58,
@@ -467,7 +469,7 @@ TEST(FLETokens, TestVectors) {
                   serverTextPrefixDerivedFromDataToken);
 }
 
-TEST(FLETokens, TestVectorUnindexedValueDecryption) {
+TEST_F(ServiceContextTest, FLETokens_TestVectorUnindexedValueDecryption) {
     // Unindexed field decryption
     // Encryption can not be generated using test vectors because IV is random
     TestKeyVault keyVault;
@@ -485,7 +487,7 @@ TEST(FLETokens, TestVectorUnindexedValueDecryption) {
 }
 
 
-TEST(FLETokens, TestVectorESCCollectionDecryptDocument) {
+TEST_F(ServiceContextTest, FLETokens_TestVectorESCCollectionDecryptDocument) {
     ESCTwiceDerivedTagToken escTwiceTag(
         decodePrf("B1C4E1C67F4AB83DE7632B801BDD198D65401B17EC633EB4D608DE97FAFCE02B"_sd));
     ESCTwiceDerivedValueToken escTwiceValue(
@@ -518,7 +520,7 @@ TEST(FLETokens, TestVectorESCCollectionDecryptDocument) {
     ASSERT_EQ(swDoc.getValue().count, 123456789);
 }
 
-TEST(FLE_ESC, RoundTrip) {
+TEST_F(ServiceContextTest, FLE_ESC_RoundTrip) {
     TestKeyVault keyVault;
 
     ConstDataRange value(testValue);
@@ -638,7 +640,7 @@ private:
 };
 
 // Test Empty Collection
-TEST(FLE_ESC, EmuBinary_Empty) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinary_Empty) {
     TestKeyVault keyVault;
 
     TestDocumentCollection coll;
@@ -728,7 +730,7 @@ EmuBinaryResult EmuBinaryV2Test(boost::optional<std::pair<uint64_t, uint64_t>> n
 }  // namespace
 
 // Test EmuBinaryV2 on empty collection
-TEST(FLE_ESC, EmuBinaryV2_Empty) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_Empty) {
     auto res = EmuBinaryV2Test(boost::none, 0, 0, 0, 0, 0, 0);
     ASSERT_TRUE(res.apos.has_value());
     ASSERT_EQ(res.apos.value(), 0);
@@ -737,7 +739,7 @@ TEST(FLE_ESC, EmuBinaryV2_Empty) {
 }
 
 // Test EmuBinaryV2 on ESC containing non-anchors only
-TEST(FLE_ESC, EmuBinaryV2_NonAnchorsOnly) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_NonAnchorsOnly) {
     auto res = EmuBinaryV2Test(boost::none, 0, 0, 0, 0, 1, 5);
     ASSERT_TRUE(res.apos.has_value());
     ASSERT_EQ(res.apos.value(), 0);
@@ -746,7 +748,7 @@ TEST(FLE_ESC, EmuBinaryV2_NonAnchorsOnly) {
 }
 
 // Test EmuBinaryV2 on ESC containing non-null anchors only
-TEST(FLE_ESC, EmuBinaryV2_RegularAnchorsOnly) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_RegularAnchorsOnly) {
     // insert anchors 1-10, with cpos all at 0
     auto res = EmuBinaryV2Test(boost::none, 1, 10, 0, 0, 0, 0);
     ASSERT_FALSE(res.cpos.has_value());
@@ -761,7 +763,7 @@ TEST(FLE_ESC, EmuBinaryV2_RegularAnchorsOnly) {
 }
 
 // Test EmuBinaryV2 on ESC containing both non-anchors and regular (non-null) anchors only
-TEST(FLE_ESC, EmuBinaryV2_NonAnchorsAndRegularAnchorsOnly) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_NonAnchorsAndRegularAnchorsOnly) {
 
     // insert regular anchors 1-7, with cpos all at 0; non-anchors 1-20
     auto res = EmuBinaryV2Test(boost::none, 1, 7, 0, 0, 1, 20);
@@ -791,7 +793,7 @@ TEST(FLE_ESC, EmuBinaryV2_NonAnchorsAndRegularAnchorsOnly) {
 }
 
 // Test EmuBinaryV2 on ESC containing the null anchor only
-TEST(FLE_ESC, EmuBinaryV2_NullAnchorOnly) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_NullAnchorOnly) {
     std::vector<std::pair<uint64_t, uint64_t>> nullAnchors = {
         {0, 0}, {0, 10}, {10, 0}, {10, 10}, {5, 10}, {10, 5}};
 
@@ -803,7 +805,7 @@ TEST(FLE_ESC, EmuBinaryV2_NullAnchorOnly) {
 }
 
 // Test EmuBinaryV2 on ESC containing null anchor and non-anchors only
-TEST(FLE_ESC, EmuBinaryV2_NullAnchorAndNonAnchorsOnly) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_NullAnchorAndNonAnchorsOnly) {
 
     // insert null anchor with apos = 0, cpos = 23; non-anchors 1-20
     auto res = EmuBinaryV2Test({{0, 23}}, 0, 0, 0, 0, 1, 20);
@@ -835,7 +837,7 @@ TEST(FLE_ESC, EmuBinaryV2_NullAnchorAndNonAnchorsOnly) {
 }
 
 // Test EmuBinaryV2 on ESC containing null and non-null anchors only
-TEST(FLE_ESC, EmuBinaryV2_NullAndRegularAnchorsOnly) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_NullAndRegularAnchorsOnly) {
 
     // insert null anchor with apos = 47, cpos = 123; regular anchors 1-20
     auto res = EmuBinaryV2Test({{47, 123}}, 1, 20, 41, 60, 0, 0);
@@ -857,7 +859,7 @@ TEST(FLE_ESC, EmuBinaryV2_NullAndRegularAnchorsOnly) {
 // Test EmuBinaryV2 on ESC containing all kinds of records, where the positions in the
 // null anchor are ahead of all existing anchor positions.
 // e.g. (null_apos > last_apos && null_cpos >= last_anchor_cpos)
-TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasNewerPositions) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_AllRecordTypes_NullAnchorHasNewerPositions) {
     // all tests have null anchor with null_apos=40 and null_cpos=60
     auto nullAnchor = std::make_pair<uint64_t, uint64_t>(40, 60);
 
@@ -902,7 +904,7 @@ TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasNewerPositions) {
 // Test EmuBinaryV2 on ESC containing all kinds of records, where the positions in the
 // null anchor are similar to the most recent regular anchor's positions.
 // e.g. (null_apos == last_apos && null_cpos == last_anchor_cpos)
-TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasLastAnchorPositions) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_AllRecordTypes_NullAnchorHasLastAnchorPositions) {
     // all tests have null anchor with null_apos=40 and null_cpos=60
     auto nullAnchor = std::make_pair<uint64_t, uint64_t>(40, 60);
 
@@ -926,7 +928,7 @@ TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasLastAnchorPositions) {
 // Test EmuBinaryV2 on ESC containing all kinds of records, where the positions in the null
 // anchor are less than the most recent regular anchor's positions.
 // e.g. (null_apos < last_apos && null_cpos <= last_anchor_cpos)
-TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasOldAnchorPositions) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_AllRecordTypes_NullAnchorHasOldAnchorPositions) {
     // all tests have null anchor with null_apos=40 and null_cpos=60
     auto nullAnchor = std::make_pair<uint64_t, uint64_t>(40, 60);
 
@@ -970,7 +972,7 @@ TEST(FLE_ESC, EmuBinaryV2_AllRecordTypes_NullAnchorHasOldAnchorPositions) {
 }
 
 // Test one new field in esc
-TEST(FLE_ESC, EmuBinary) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinary) {
     TestKeyVault keyVault;
 
     TestDocumentCollection coll;
@@ -1009,7 +1011,7 @@ TEST(FLE_ESC, EmuBinary) {
 
 
 // Test two new fields in esc
-TEST(FLE_ESC, EmuBinary2) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinary2) {
     TestKeyVault keyVault;
 
     TestDocumentCollection coll;
@@ -1066,7 +1068,7 @@ TEST(FLE_ESC, EmuBinary2) {
 }
 
 // Test Emulated Binary with null record
-TEST(FLE_ESC, EmuBinary_NullRecord) {
+TEST_F(ServiceContextTest, FLE_ESC_EmuBinary_NullRecord) {
     TestKeyVault keyVault;
 
     TestDocumentCollection coll;
@@ -1263,7 +1265,6 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
     ASSERT_EQ(finalDoc["encrypted"].type(), BinData);
     ASSERT_TRUE(finalDoc["encrypted"].isBinData(BinDataType::Encrypt));
 
-
     // Decrypt document
     auto decryptedDoc = FLEClientCrypto::decryptDocument(finalDoc, &keyVault);
 
@@ -1319,7 +1320,7 @@ void roundTripMultiencrypted(BSONObj doc1,
 }
 
 // Used to generate the test data for the ExpressionFLETest in expression_test.cpp
-TEST(FLE_EDC, PrintTest) {
+TEST_F(ServiceContextTest, FLE_EDC_PrintTest) {
     auto doc = BSON("value" << 1);
     auto element = doc.firstElement();
 
@@ -1353,7 +1354,7 @@ TEST(FLE_EDC, PrintTest) {
     }
 }
 
-TEST(FLE_EDC, Allowed_Types) {
+TEST_F(ServiceContextTest, FLE_EDC_Allowed_Types) {
     const std::vector<std::pair<BSONObj, BSONType>> universallyAllowedObjects{
         {BSON("sample"
               << "value123"),
@@ -1412,7 +1413,7 @@ TEST(FLE_EDC, Allowed_Types) {
     }
 }
 
-TEST(FLE_EDC, Range_Allowed_Types) {
+TEST_F(ServiceContextTest, FLE_EDC_Range_Allowed_Types) {
 
     const std::vector<std::pair<BSONObj, BSONType>> rangeAllowedObjects{
         {BSON("sample" << 123.456), NumberDouble},
@@ -1452,7 +1453,7 @@ void illegalBSONType(BSONObj doc, BSONType type, Fle2AlgorithmInt algorithm) {
     illegalBSONType(doc, type, algorithm, expectCode);
 }
 
-TEST(FLE_EDC, Disallowed_Types) {
+TEST_F(ServiceContextTest, FLE_EDC_Disallowed_Types) {
     illegalBSONType(BSON("sample" << 123.456), NumberDouble, Fle2AlgorithmInt::kEquality);
     illegalBSONType(BSON("sample" << Decimal128()), NumberDecimal, Fle2AlgorithmInt::kEquality);
 
@@ -1481,7 +1482,7 @@ void illegalRangeBSONType(BSONObj doc, BSONType type) {
     illegalBSONType(doc, type, Fle2AlgorithmInt::kRange, ErrorCodes::TypeMismatch);
 }
 
-TEST(FLE_EDC, Range_Disallowed_Types) {
+TEST_F(ServiceContextTest, FLE_EDC_Range_Disallowed_Types) {
 
     const std::vector<std::pair<BSONObj, BSONType>> disallowedObjects{
         {BSON("sample"
@@ -1639,7 +1640,7 @@ void disallowedEqualityPayloadType(BSONType type) {
     ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(result), DBException, 6373504);
 }
 
-TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
+TEST_F(ServiceContextTest, FLE_EDC_Disallowed_Types_FLE2InsertUpdatePayload) {
     disallowedEqualityPayloadType(NumberDouble);
     disallowedEqualityPayloadType(NumberDecimal);
 
@@ -1659,7 +1660,7 @@ TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
     disallowedEqualityPayloadType(static_cast<BSONType>(fakeBSONType));
 }
 
-TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     TestKeyVault keyVault;
 
     auto doc = BSON("sample" << 123456);
@@ -1707,44 +1708,36 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
 
     auto tag = EDCServerCollection::generateTag(edcTwiceDerived, 123456);
 
-    FLE2IndexedEqualityEncryptedValueV2 serverPayload(iupayload, tag, 123456);
+    auto serverPayload = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
+        iupayload, tag, 123456, serverEncryptToken, serverDerivedFromDataToken);
 
-    auto swBuf = serverPayload.serialize(serverEncryptToken, serverDerivedFromDataToken);
-    ASSERT_OK(swBuf.getStatus());
+    auto buf = uassertStatusOK(serverPayload.serialize());
 
-    auto swParsedType = FLE2IndexedEqualityEncryptedValueV2::readBsonType(swBuf.getValue());
-    ASSERT_OK(swParsedType.getStatus());
-    ASSERT_EQ(swParsedType.getValue(), iupayload.getType());
+    auto parsedType = serverPayload.getBsonType();
+    ASSERT_EQ(parsedType, iupayload.getType());
 
-    auto swParsedUuid = FLE2IndexedEqualityEncryptedValueV2::readKeyId(swBuf.getValue());
-    ASSERT_OK(swParsedUuid.getStatus());
-    ASSERT_EQ(swParsedUuid.getValue(), iupayload.getIndexKeyId());
+    auto parsedUuid = serverPayload.getKeyId();
+    ASSERT_EQ(parsedUuid, iupayload.getIndexKeyId());
 
-    auto swDecryptedValue = FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(
-        serverEncryptToken, swBuf.getValue());
-    ASSERT_OK(swDecryptedValue.getStatus());
-    auto& clientEncryptedValue = swDecryptedValue.getValue();
-    ASSERT(clientEncryptedValue == serverPayload.clientEncryptedValue);
-    ASSERT_EQ(serverPayload.clientEncryptedValue.size(), value.length());
-    ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
-                      serverPayload.clientEncryptedValue.end(),
-                      value.data<uint8_t>()));
+    auto clientEncryptedValue = uassertStatusOK(
+        IndexedEqualityEncryptedValueV2Helpers::parseAndDecryptCiphertext(serverEncryptToken, buf));
+    ASSERT_EQ(clientEncryptedValue.size(), value.length());
+    ASSERT(std::equal(
+        clientEncryptedValue.begin(), clientEncryptedValue.end(), value.data<uint8_t>()));
 
-    auto swMetadata = FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptMetadataBlock(
-        serverDerivedFromDataToken, swBuf.getValue());
-    ASSERT_OK(swMetadata.getStatus());
-    auto& metadataBlock = swMetadata.getValue();
+    auto metadataBlock =
+        uassertStatusOK(IndexedEqualityEncryptedValueV2Helpers::parseAndDecryptMetadataBlock(
+            serverDerivedFromDataToken, buf));
     ASSERT_EQ(metadataBlock.contentionFactor, counter);
     ASSERT_EQ(metadataBlock.count, 123456);
     ASSERT(metadataBlock.tag == tag);
     ASSERT_TRUE(metadataBlock.isValidZerosBlob(metadataBlock.zeros));
 
-    auto swTag = FLE2IndexedEqualityEncryptedValueV2::parseMetadataBlockTag(swBuf.getValue());
-    ASSERT_OK(swTag.getStatus());
-    ASSERT_EQ(swTag.getValue(), tag);
+    auto pTag = serverPayload.getMetadataBlockTag();
+    ASSERT_EQ(pTag, tag);
 }
 
-TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_InvalidArgs) {
     TestKeyVault keyVault;
     auto value = ConstDataRange(0, 0);
     PrfBlock bogusTag;
@@ -1775,15 +1768,19 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
 
     // Test bogus client encrypted value fails for FLE2 indexed equality value v2
     ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2(iupayload, bogusTag, 0), DBException, 7290804);
-
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2(BSONType::NumberLong,
-                                            indexKeyId,
-                                            std::vector<uint8_t>(),
-                                            FLE2TagAndEncryptedMetadataBlock(0, 0, bogusTag)),
+        FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0, {{}}, {{}}),
         DBException,
-        7290804);
+        ErrorCodes::LibmongocryptError);
+
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
+                           BSONType::NumberLong,
+                           indexKeyId,
+                           std::vector<uint8_t>(),
+                           FLE2TagAndEncryptedMetadataBlock(0, 0, bogusTag),
+                           {{}},
+                           {{}}),
+                       DBException,
+                       ErrorCodes::LibmongocryptError);
 
     // Test bogus client encrypted value fails for FLE2 indexed range value v2
     ASSERT_THROWS_CODE(
@@ -1796,7 +1793,9 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
 
     // Test setting bogus type byte throws
     ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2(iupayload, bogusTag, 0), DBException, 7290803);
+        FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0, {{}}, {{}}),
+        DBException,
+        ErrorCodes::LibmongocryptError);
 
     ASSERT_THROWS_CODE(
         FLE2IndexedRangeEncryptedValueV2(iupayload, {bogusTag}, {0}), DBException, 7290901);
@@ -1807,7 +1806,7 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
                        7290900);
 }
 
-TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
     ConstDataRange empty(0, 0);
     auto serverToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
     ServerDerivedFromDataToken serverDataDerivedToken(serverToken.asPrfBlock());
@@ -1821,24 +1820,10 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
     shortInput.at(edgeCountOffset) = 1;
 
     // test short input for equality payload
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndValidateFields(shortInput),
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2(shortInput),
                        DBException,
-                       7290802);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::readKeyId(shortInput), DBException, 7290802);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::readBsonType(shortInput), DBException, 7290802);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(serverToken, shortInput),
-        DBException,
-        7290802);
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptMetadataBlock(
-                           serverDataDerivedToken, shortInput),
-                       DBException,
-                       7290802);
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseMetadataBlockTag(shortInput),
-                       DBException,
-                       7290802);
+                       ErrorCodes::LibmongocryptError);
+
 
     // test short input for range payload
     ASSERT_THROWS_CODE(
@@ -1864,24 +1849,9 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
     badTypeInput.at(typeOffset) = 124;  // bad bsonType
     badTypeInput.at(edgeCountOffset) = 1;
 
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndValidateFields(badTypeInput),
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2(badTypeInput),
                        DBException,
-                       7290801);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::readKeyId(badTypeInput), DBException, 7290801);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::readBsonType(badTypeInput), DBException, 7290801);
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(serverToken, badTypeInput),
-        DBException,
-        7290801);
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptMetadataBlock(
-                           serverDataDerivedToken, badTypeInput),
-                       DBException,
-                       7290801);
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::parseMetadataBlockTag(badTypeInput),
-                       DBException,
-                       7290801);
+                       ErrorCodes::LibmongocryptError);
 
     // test bad bson type for range payload
     ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(badTypeInput),
@@ -1907,7 +1877,7 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
     std::vector<uint8_t> emptyEqualityCipherText(
         typeOffset + 1 + sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
     emptyEqualityCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::Bool);
-    auto swDecryptedData = FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(
+    auto swDecryptedData = IndexedEqualityEncryptedValueV2Helpers::parseAndDecryptCiphertext(
         serverToken, emptyEqualityCipherText);
     ASSERT_NOT_OK(swDecryptedData.getStatus());
 
@@ -1921,7 +1891,7 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_ParseInvalidInput) {
     ASSERT_NOT_OK(swDecryptedData.getStatus());
 }
 
-TEST(FLE_EDC, ServerSide_Payloads_V2_IsValidZerosBlob) {
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_IsValidZerosBlob) {
     FLE2TagAndEncryptedMetadataBlock::ZerosBlob zeros;
     zeros.fill(0);
     ASSERT_TRUE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
@@ -1931,7 +1901,7 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_IsValidZerosBlob) {
 }
 
 
-TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     TestKeyVault keyVault;
 
     auto doc = BSON("sample" << 3);
@@ -2060,7 +2030,7 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
     ASSERT(swTags.getValue()[1] == tag);
 }
 
-TEST(FLE_EDC, DuplicateSafeContent_CompatibleType) {
+TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_CompatibleType) {
 
     TestKeyVault keyVault;
 
@@ -2094,7 +2064,7 @@ TEST(FLE_EDC, DuplicateSafeContent_CompatibleType) {
 }
 
 
-TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
+TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_IncompatibleType) {
 
     TestKeyVault keyVault;
 
@@ -2185,7 +2155,7 @@ std::vector<char> generateRangeIntPlaceholder(BSONElement value,
     return v;
 }
 
-TEST(FLE_EDC, RangeParamtersFlow_Insert) {
+TEST_F(ServiceContextTest, FLE_EDC_RangeParamtersFlow_Insert) {
 
     TestKeyVault keyVault;
     auto obj = BSON("encrypted" << 1.23);
@@ -2212,7 +2182,7 @@ TEST(FLE_EDC, RangeParamtersFlow_Insert) {
         payload.payload.getIndexMax().get().getElement().binaryEqual(maxExpected.firstElement()));
 }
 
-TEST(FLE_EDC, RangeParamtersFlow_Find) {
+TEST_F(ServiceContextTest, FLE_EDC_RangeParamtersFlow_Find) {
 
     TestKeyVault keyVault;
     auto obj = BSON("encrypted" << 123456.7);
@@ -2235,7 +2205,7 @@ TEST(FLE_EDC, RangeParamtersFlow_Find) {
 }
 
 
-TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
+TEST_F(ServiceContextTest, FLE_ECOC_EncryptedTokensRoundTrip) {
     std::vector<uint8_t> value(4);
 
     auto collectionToken = CollectionsLevel1Token::deriveFrom(getIndexKey());
@@ -2310,7 +2280,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
     return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
 }
 
-TEST(EncryptionInformation, RoundTrip) {
+TEST_F(ServiceContextTest, EncryptionInformation_RoundTrip) {
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
@@ -2323,7 +2293,7 @@ TEST(EncryptionInformation, RoundTrip) {
     ASSERT_BSONOBJ_EQ(efc.toBSON(), efc2.toBSON());
 }
 
-TEST(EncryptionInformation, BadSchema) {
+TEST_F(ServiceContextTest, EncryptionInformation_BadSchema) {
     EncryptionInformation ei;
     ei.setType(1);
 
@@ -2339,7 +2309,7 @@ TEST(EncryptionInformation, BadSchema) {
                        6371205);
 }
 
-TEST(EncryptionInformation, MissingStateCollection) {
+TEST_F(ServiceContextTest, EncryptionInformation_MissingStateCollection) {
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
     {
@@ -2362,7 +2332,7 @@ TEST(EncryptionInformation, MissingStateCollection) {
     }
 }
 
-TEST(IndexedFields, FetchTwoLevels) {
+TEST_F(ServiceContextTest, IndexedFields_FetchTwoLevels) {
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
@@ -2410,7 +2380,7 @@ TEST(IndexedFields, FetchTwoLevels) {
 }
 
 // Error if the user tries to reuse the same index key across fields
-TEST(IndexedFields, DuplicateIndexKeyIds) {
+TEST_F(ServiceContextTest, IndexedFields_DuplicateIndexKeyIds) {
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
@@ -2432,7 +2402,7 @@ TEST(IndexedFields, DuplicateIndexKeyIds) {
 
 
 // Verify we can compare two list of tags correctly
-TEST(TagDelta, Basic) {
+TEST_F(ServiceContextTest, TagDelta_Basic) {
     auto empty = ConstDataRange(nullptr, nullptr);
     auto v1 = ConstDataRange(testValue);
     auto v2 = ConstDataRange(testValue2);
@@ -2508,7 +2478,7 @@ TEST(TagDelta, Basic) {
     }
 }
 
-TEST(EDC, UnindexedEncryptDecrypt) {
+TEST_F(ServiceContextTest, EDC_UnindexedEncryptDecrypt) {
     TestKeyVault keyVault;
     FLEUserKeyAndId userKey = keyVault.getUserKeyById(indexKey2Id);
 
@@ -2534,7 +2504,7 @@ TEST(EDC, UnindexedEncryptDecrypt) {
     }
 }
 
-TEST(EDC, NonMatchingSchema) {
+TEST_F(ServiceContextTest, EDC_NonMatchingSchema) {
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
     TestKeyVault keyVault;
@@ -2550,7 +2520,7 @@ TEST(EDC, NonMatchingSchema) {
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault, &efc), DBException, 6373601);
 }
 
-TEST(EDC, EncryptAlreadyEncryptedData) {
+TEST_F(ServiceContextTest, EDC_EncryptAlreadyEncryptedData) {
     constexpr StringData testVectors[] = {
         "07b347ede7329f41729dd4004b9d950ff102de64b1925159d2100d58c8d1d0a77bf23a52d30e8861d659e85de2ff96bf8326b3a57134efe5938f439936721dbfa22b02df9df0f63c6453fb2e30ee21b8bab39d4dfb3566926c650fe6995e6caeec025dac818c5a472653876b4a30711c141187236ab5d3dce403aa917d50e432a0ed6f8a685be18af3e2cd21f6b1aeee0e835de13b33fa76eace42527207db517b9e3dce5d0a0d9e25853f612e198a34b37adfce8cfeb673ef779c81c80412a96460e53fb65b0504651d55a4f329a8dc72aaeee93d1b62bf0b9564a71a"_sd,
         "07"_sd,
@@ -2580,7 +2550,7 @@ TEST(EDC, EncryptAlreadyEncryptedData) {
     }
 }
 
-TEST(FLE1, EncryptAlreadyEncryptedDataLegacy) {
+TEST_F(ServiceContextTest, FLE1_EncryptAlreadyEncryptedDataLegacy) {
     BSONObjBuilder builder;
     builder.append("plainText", "sample");
 
@@ -2625,7 +2595,7 @@ BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {
 }
 
 // Test update with no $push
-TEST(FLE_Update, Basic) {
+TEST_F(ServiceContextTest, FLE_Update_Basic) {
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
@@ -2646,7 +2616,7 @@ TEST(FLE_Update, Basic) {
 }
 
 // Test update with no crypto
-TEST(FLE_Update, Empty) {
+TEST_F(ServiceContextTest, FLE_Update_Empty) {
     TestKeyVault keyVault;
 
     auto inputDoc = BSON("$set" << BSON("count" << 1));
@@ -2658,7 +2628,7 @@ TEST(FLE_Update, Empty) {
     ASSERT(finalDoc["$push"].eoo());
 }
 
-TEST(FLE_Update, BadPush) {
+TEST_F(ServiceContextTest, FLE_Update_BadPush) {
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
@@ -2672,7 +2642,7 @@ TEST(FLE_Update, BadPush) {
     ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
 }
 
-TEST(FLE_Update, PushToSafeContent) {
+TEST_F(ServiceContextTest, FLE_Update_PushToSafeContent) {
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
@@ -2686,7 +2656,7 @@ TEST(FLE_Update, PushToSafeContent) {
     ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
 }
 
-TEST(FLE_Update, PushToOtherfield) {
+TEST_F(ServiceContextTest, FLE_Update_PushToOtherfield) {
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
@@ -2708,7 +2678,7 @@ TEST(FLE_Update, PushToOtherfield) {
         finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
 }
 
-TEST(FLE_Update, GetRemovedTags) {
+TEST_F(ServiceContextTest, FLE_Update_GetRemovedTags) {
     PrfBlock tag1 = decodePrf("BD53ACAC665EDD01E0CA30CB648B2B8F4967544047FD4E7D12B1A9BF07339928");
     PrfBlock tag2 = decodePrf("C17FDF249DE234F9AB15CD95137EA7EC82AE4E5B51F6BFB0FC1B8FEB6800F74C");
     ServerDerivedFromDataToken serverDerivedFromDataToken(
@@ -2718,20 +2688,27 @@ TEST(FLE_Update, GetRemovedTags) {
 
     std::vector<uint8_t> clientBlob(64);
 
-    FLE2IndexedEqualityEncryptedValueV2 value1(
-        BSONType::String, indexKeyId, clientBlob, FLE2TagAndEncryptedMetadataBlock(1, 0, tag1));
-    FLE2IndexedEqualityEncryptedValueV2 value2(
-        BSONType::String, indexKeyId, clientBlob, FLE2TagAndEncryptedMetadataBlock(1, 0, tag2));
+    auto value1 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
+        BSONType::String,
+        indexKeyId,
+        clientBlob,
+        FLE2TagAndEncryptedMetadataBlock(1, 0, tag1),
+        serverToken,
+        serverDerivedFromDataToken);
+    auto value2 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
+        BSONType::String,
+        indexKeyId,
+        clientBlob,
+        FLE2TagAndEncryptedMetadataBlock(1, 0, tag2),
+        serverToken,
+        serverDerivedFromDataToken);
 
-    auto swValue1Blob = value1.serialize(serverToken, serverDerivedFromDataToken);
-    ASSERT_OK(swValue1Blob.getStatus());
-    auto swValue2Blob = value2.serialize(serverToken, serverDerivedFromDataToken);
-    ASSERT_OK(swValue2Blob.getStatus());
+    auto value1Blob = uassertStatusOK(value1.serialize());
+    auto value2Blob = uassertStatusOK(value2.serialize());
 
-    auto value1Blob = toEncryptedVector(EncryptedBinDataType::kFLE2EqualityIndexedValueV2,
-                                        ConstDataRange(swValue1Blob.getValue()));
-    auto value2Blob = toEncryptedVector(EncryptedBinDataType::kFLE2EqualityIndexedValueV2,
-                                        ConstDataRange(swValue2Blob.getValue()));
+    auto typeByte = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
+    ASSERT_EQ(value1Blob[0], typeByte);
+    ASSERT_EQ(value2Blob[0], typeByte);
 
     std::vector<EDCIndexedFields> oldFields = {{value1Blob, "a"}, {value2Blob, "b"}};
     std::vector<EDCIndexedFields> swappedFields = {{value2Blob, "a"}, {value1Blob, "b"}};
@@ -2775,7 +2752,7 @@ TEST(FLE_Update, GetRemovedTags) {
 
     // Test exception if old fields contain deprecated FLE2 subtype...
     auto v1ValueBlob = toEncryptedVector(EncryptedBinDataType::kFLE2EqualityIndexedValue,
-                                         ConstDataRange(swValue1Blob.getValue()));
+                                         ConstDataRange(value1Blob));
     std::vector<EDCIndexedFields> v1Fields = {{v1ValueBlob, "a"}};
     ASSERT_THROWS_CODE(EDCServerCollection::getRemovedTags(v1Fields, empty), DBException, 7293204);
 
@@ -2784,7 +2761,7 @@ TEST(FLE_Update, GetRemovedTags) {
     ASSERT_EQ(tagsToPull.size(), 0);
 }
 
-TEST(FLE_Update, GenerateUpdateToRemoveTags) {
+TEST_F(ServiceContextTest, FLE_Update_GenerateUpdateToRemoveTags) {
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
@@ -2825,12 +2802,12 @@ TEST(FLE_Update, GenerateUpdateToRemoveTags) {
     ASSERT_THROWS_CODE(EDCServerCollection::generateUpdateToRemoveTags({}), DBException, 7293203);
 }
 
-TEST(CompactionHelpersTest, parseCompactionTokensTestEmpty) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestEmpty) {
     const auto result = CompactionHelpers::parseCompactionTokens(BSONObj());
     ASSERT(result.empty());
 }
 
-TEST(CompactionHelpersTest, parseCompactionTokensTest) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTest) {
     const ECOCToken token1(
         decodePrf("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb347"_sd));
     const ECOCToken token2(
@@ -2870,14 +2847,14 @@ TEST(CompactionHelpersTest, parseCompactionTokensTest) {
     }
 }
 
-TEST(CompactionHelpersTest, parseCompactionTokensTestInvalidType) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestInvalidType) {
     ASSERT_THROWS_CODE(CompactionHelpers::parseCompactionTokens(BSON("foo"
                                                                      << "bar")),
                        DBException,
                        6346801);
 }
 
-TEST(CompactionHelpersTest, parseCompactionTokensTestInvalidSubType) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestInvalidSubType) {
     const std::array<std::uint8_t, 16> kUUID = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
     BSONObjBuilder builder;
@@ -2886,7 +2863,7 @@ TEST(CompactionHelpersTest, parseCompactionTokensTestInvalidSubType) {
         CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, 6346801);
 }
 
-TEST(CompactionHelpersTest, parseCompactionTokensTestTooShort) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestTooShort) {
     const auto kBadToken =
         hexblob::decode("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb3"_sd);
     constexpr auto kInvalidPrfLength = 9616300;
@@ -2897,7 +2874,7 @@ TEST(CompactionHelpersTest, parseCompactionTokensTestTooShort) {
         CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, kInvalidPrfLength);
 }
 
-TEST(CompactionHelpersTest, parseCompactionTokensTestTooLong) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestTooLong) {
     const auto kBadToken =
         hexblob::decode("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb34701"_sd);
     constexpr auto kInvalidPrfLength = 9616300;
@@ -2908,7 +2885,7 @@ TEST(CompactionHelpersTest, parseCompactionTokensTestTooLong) {
         CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, kInvalidPrfLength);
 }
 
-TEST(CompactionHelpersTest, validateCompactionTokensTest) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_validateCompactionTokensTest) {
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
     BSONObjBuilder builder;
@@ -2928,7 +2905,7 @@ TEST(CompactionHelpersTest, validateCompactionTokensTest) {
     CompactionHelpers::validateCompactionTokens(efc, builder.obj());
 }
 
-TEST(EDCServerCollectionTest, GenerateEDCTokens) {
+TEST_F(ServiceContextTest, EDCServerCollectionTest_GenerateEDCTokens) {
 
     auto doc = BSON("sample" << 123456);
     auto element = doc.firstElement();
@@ -2947,7 +2924,7 @@ TEST(EDCServerCollectionTest, GenerateEDCTokens) {
     ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 3).size(), 4);
 }
 
-TEST(EDCServerCollectionTest, ValidateModifiedDocumentCompatibility) {
+TEST_F(ServiceContextTest, EDCServerCollectionTest_ValidateModifiedDocumentCompatibility) {
     std::vector<uint8_t> blob;
     std::vector<EncryptedBinDataType> badTypes = {
         EncryptedBinDataType::kFLE2EqualityIndexedValue,
@@ -2974,7 +2951,7 @@ TEST(EDCServerCollectionTest, ValidateModifiedDocumentCompatibility) {
     }
 }
 
-TEST(RangeTest, Int32_NoBounds) {
+TEST_F(ServiceContextTest, RangeTest_Int32_NoBounds) {
 #define ASSERT_EI(x, y) ASSERT_EQ(getTypeInfo32((x), boost::none, boost::none).value, (y));
 
     ASSERT_EI(2147483647, 4294967295);
@@ -2999,7 +2976,7 @@ std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const OSTType
     return os << "(" << lhs.value << ", " << lhs.min << ", " << lhs.max << ")";
 }
 
-TEST(RangeTest, Int32_Bounds) {
+TEST_F(ServiceContextTest, RangeTest_Int32_Bounds) {
 #define ASSERT_EIB(x, y, z, e)                   \
     {                                            \
         auto _ti = getTypeInfo32((x), (y), (z)); \
@@ -3027,7 +3004,7 @@ TEST(RangeTest, Int32_Bounds) {
 #undef ASSERT_EIB
 }
 
-TEST(RangeTest, Int32_Errors) {
+TEST_F(ServiceContextTest, RangeTest_Int32_Errors) {
     ASSERT_THROWS_CODE(getTypeInfo32(1, boost::none, 2), AssertionException, 6775001);
     ASSERT_THROWS_CODE(getTypeInfo32(1, 0, boost::none), AssertionException, 6775001);
     ASSERT_THROWS_CODE(getTypeInfo32(1, 2, 1), AssertionException, 6775002);
@@ -3039,7 +3016,7 @@ TEST(RangeTest, Int32_Errors) {
 }
 
 
-TEST(RangeTest, Int64_NoBounds) {
+TEST_F(ServiceContextTest, RangeTest_Int64_NoBounds) {
 #define ASSERT_EI(x, y) ASSERT_EQ(getTypeInfo64((x), boost::none, boost::none).value, (y));
 
     ASSERT_EI(9223372036854775807LL, 18446744073709551615ULL);
@@ -3065,7 +3042,7 @@ std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const OSTType
 }
 
 
-TEST(RangeTest, Int64_Bounds) {
+TEST_F(ServiceContextTest, RangeTest_Int64_Bounds) {
 #define ASSERT_EIB(x, y, z, e)                   \
     {                                            \
         auto _ti = getTypeInfo64((x), (y), (z)); \
@@ -3099,7 +3076,7 @@ TEST(RangeTest, Int64_Bounds) {
 #undef ASSERT_EIB
 }
 
-TEST(RangeTest, Int64_Errors) {
+TEST_F(ServiceContextTest, RangeTest_Int64_Errors) {
     ASSERT_THROWS_CODE(getTypeInfo64(1, boost::none, 2), AssertionException, 6775004);
     ASSERT_THROWS_CODE(getTypeInfo64(1, 0, boost::none), AssertionException, 6775004);
     ASSERT_THROWS_CODE(getTypeInfo64(1, 2, 1), AssertionException, 6775005);
@@ -3110,7 +3087,7 @@ TEST(RangeTest, Int64_Errors) {
     ASSERT_THROWS_CODE(getTypeInfo64(4, LLONG_MIN, LLONG_MIN), AssertionException, 6775005);
 }
 
-TEST(RangeTest, Double_Bounds) {
+TEST_F(ServiceContextTest, RangeTest_Double_Bounds) {
 #define ASSERT_EIB(x, z) \
     ASSERT_EQ(getTypeInfoDouble((x), boost::none, boost::none, boost::none).value, (z));
 
@@ -3159,7 +3136,7 @@ TEST(RangeTest, Double_Bounds) {
 #undef ASSERT_EIB
 }
 
-TEST(RangeTest, Double_Bounds_Precision) {
+TEST_F(ServiceContextTest, RangeTest_Double_Bounds_Precision) {
 #define ASSERT_EIBP(x, y, z) ASSERT_EQ(getTypeInfoDouble((x), -100000, 100000, y).value, (z));
 
     ASSERT_EIBP(3.141592653589, 1, 1000031);
@@ -3227,7 +3204,7 @@ TEST(RangeTest, Double_Bounds_Precision) {
 #undef ASSERT_EIBB_OVERFLOW
 }
 
-TEST(RangeTest, Double_Bounds_Precision_Errors) {
+TEST_F(ServiceContextTest, RangeTest_Double_Bounds_Precision_Errors) {
 
     ASSERT_THROWS_CODE(
         getTypeInfoDouble(1, boost::none, boost::none, 1), AssertionException, 6966803);
@@ -3235,7 +3212,7 @@ TEST(RangeTest, Double_Bounds_Precision_Errors) {
     ASSERT_THROWS_CODE(getTypeInfoDouble(1, 1, 2, -1), AssertionException, 9125503);
 }
 
-TEST(RangeTest, Double_Errors) {
+TEST_F(ServiceContextTest, RangeTest_Double_Errors) {
     ASSERT_THROWS_CODE(getTypeInfoDouble(1, boost::none, 2, 5), AssertionException, 6775007);
     ASSERT_THROWS_CODE(getTypeInfoDouble(1, 0, boost::none, 5), AssertionException, 6775007);
     ASSERT_THROWS_CODE(getTypeInfoDouble(1, 2, 1, 5), AssertionException, 6775009);
@@ -3256,7 +3233,7 @@ TEST(RangeTest, Double_Errors) {
 }
 
 
-TEST(EdgeCalcTest, SparsityConstraints) {
+TEST_F(ServiceContextTest, EdgeCalcTest_SparsityConstraints) {
     ASSERT_THROWS_CODE(getEdgesInt32(1, 0, 8, 0, 0), AssertionException, 6775101);
     ASSERT_THROWS_CODE(getEdgesInt32(1, 0, 8, -1, 0), AssertionException, 6775101);
     ASSERT_THROWS_CODE(getEdgesInt64(1, 0, 8, 0, 0), AssertionException, 6775101);
@@ -3265,7 +3242,7 @@ TEST(EdgeCalcTest, SparsityConstraints) {
     ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, 5, -1, 0), AssertionException, 6775101);
 }
 
-TEST(EdgeCalcTest, TrimFactorConstraints) {
+TEST_F(ServiceContextTest, EdgeCalcTest_TrimFactorConstraints) {
     ASSERT_THROWS_CODE(getEdgesInt32(1, 0, 7, 1, -1), AssertionException, 8574105);
     ASSERT_THROWS_CODE(getEdgesInt32(1, 0, 7, 1, 3), AssertionException, 8574105);
     ASSERT_THROWS_CODE(getEdgesInt64(1, 0, 7, 1, -1), AssertionException, 8574105);
@@ -3285,7 +3262,7 @@ void doEdgeCalcTestIdentifyLeaf(std::unique_ptr<Edges> edges, StringData expectL
               1);
 }
 
-TEST(EdgeCalcTest, IdentifyLeaf) {
+TEST_F(ServiceContextTest, EdgeCalcTest_IdentifyLeaf) {
     constexpr auto k42Leaf64 =
         "1000000000000000000000000000000000000000000000000000000000101010"_sd;
     doEdgeCalcTestIdentifyLeaf(getEdgesInt64(42, {}, {}, 1, 0), k42Leaf64);
@@ -3316,7 +3293,7 @@ TEST(EdgeCalcTest, IdentifyLeaf) {
                                k42LeafDecimal128);
 }
 
-TEST(MinCoverCalcTest, MinCoverConstraints) {
+TEST_F(ServiceContextTest, MinCoverCalcTest_MinCoverConstraints) {
     ASSERT(minCoverInt32(2, true, 1, true, 0, 7, 1, 0).empty());
     ASSERT(minCoverInt64(2, true, 1, true, 0, 7, 1, 0).empty());
     ASSERT(minCoverDouble(2, true, 1, true, 0, 7, boost::none, 1, 0).empty());
@@ -3325,7 +3302,7 @@ TEST(MinCoverCalcTest, MinCoverConstraints) {
                .empty());
 }
 
-TEST(RangeTest, Decimal128_Bounds) {
+TEST_F(ServiceContextTest, RangeTest_Decimal128_Bounds) {
 #define ASSERT_EIB(x, z)                                                                        \
     ASSERT_EQ(                                                                                  \
         boost::multiprecision::to_string(                                                       \
@@ -3414,7 +3391,7 @@ TEST(RangeTest, Decimal128_Bounds) {
 }
 
 
-TEST(RangeTest, Decimal128_Bounds_Precision) {
+TEST_F(ServiceContextTest, RangeTest_Decimal128_Bounds_Precision) {
 
 #define ASSERT_EIBP(x, y, z)                                                                    \
     ASSERT_EQ(                                                                                  \
@@ -3535,7 +3512,7 @@ TEST(RangeTest, Decimal128_Bounds_Precision) {
 #undef ASSERT_EIBB_OVERFLOW
 }
 
-TEST(RangeTest, Decimal128_Errors) {
+TEST_F(ServiceContextTest, RangeTest_Decimal128_Errors) {
     ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), boost::none, Decimal128(2), 5),
                        AssertionException,
                        6854201);
@@ -3576,7 +3553,7 @@ TEST(RangeTest, Decimal128_Errors) {
 }
 
 
-TEST(RangeTest, Decimal128_Bounds_Precision_Errors) {
+TEST_F(ServiceContextTest, RangeTest_Decimal128_Bounds_Precision_Errors) {
 
     ASSERT_THROWS_CODE(getTypeInfoDecimal128(Decimal128(1), boost::none, boost::none, 1),
                        AssertionException,
@@ -3596,7 +3573,7 @@ void roundTripDecimal128_Int128(std::string dec_str) {
     ASSERT(roundTrip == dec);
 }
 
-TEST(RangeTest, Decimal128_to_Int128) {
+TEST_F(ServiceContextTest, RangeTest_Decimal128_to_Int128) {
     roundTripDecimal128_Int128("0");
     roundTripDecimal128_Int128("123");
     roundTripDecimal128_Int128("40000000");
@@ -3695,7 +3672,7 @@ void assertMinCoverResultPrecision(A lb,
     }
 }
 
-TEST(MinCoverInterfaceTest, Int32_Basic) {
+TEST_F(ServiceContextTest, MinCoverInterfaceTest_Int32_Basic) {
     assertMinCoverResult(7, true, 32, true, 0, 32, 1, 0, {"000111", "001", "01", "100000"});
     assertMinCoverResult(7, false, 32, false, 0, 32, 1, 0, {"001", "01"});
     assertMinCoverResult(7, true, 32, false, 0, 32, 1, 0, {"000111", "001", "01"});
@@ -3728,7 +3705,7 @@ TEST(MinCoverInterfaceTest, Int32_Basic) {
                           "01111"});
 }
 
-TEST(MinCoverInterfaceTest, Int64_Basic) {
+TEST_F(ServiceContextTest, MinCoverInterfaceTest_Int64_Basic) {
     assertMinCoverResult(0LL,
                          true,
                          823LL,
@@ -3877,7 +3854,7 @@ TEST(MinCoverInterfaceTest, Int64_Basic) {
                          });
 }
 
-TEST(MinCoverInterfaceTest, Double_Basic) {
+TEST_F(ServiceContextTest, MinCoverInterfaceTest_Double_Basic) {
     assertMinCoverResult(23.5,
                          true,
                          35.25,
@@ -4066,7 +4043,7 @@ TEST(MinCoverInterfaceTest, Double_Basic) {
                          });
 }
 
-TEST(MinCoverInterfaceTest, Decimal_Basic) {
+TEST_F(ServiceContextTest, MinCoverInterfaceTest_Decimal_Basic) {
     assertMinCoverResult(
         Decimal128(23.5),
         true,
@@ -4947,7 +4924,7 @@ TEST(MinCoverInterfaceTest, Decimal_Basic) {
         });
 }
 
-TEST(MinCoverInterfaceTest, InfiniteRangeBounds) {
+TEST_F(ServiceContextTest, MinCoverInterfaceTest_InfiniteRangeBounds) {
     assertMinCoverResult(7.0,
                          true,
                          std::numeric_limits<double>::infinity(),
@@ -5003,7 +4980,7 @@ TEST(MinCoverInterfaceTest, InfiniteRangeBounds) {
                          });
 }
 
-TEST(MinCoverInteraceTest, InvalidBounds) {
+TEST_F(ServiceContextTest, MinCoverInteraceTest_InvalidBounds) {
     assertMinCoverResult(7, true, 7, false, 0, 32, 1, 0, {});
     assertMinCoverResult(7LL, true, 7LL, false, 0LL, 32LL, 1, 0, {});
     assertMinCoverResult(7.0, true, 7.0, false, 0.0, 32.0, 1, 0, {});
@@ -5024,7 +5001,7 @@ TEST(MinCoverInteraceTest, InvalidBounds) {
 }
 
 // Test point queries and that trimming bitstrings is correct in precision mode
-TEST(MinCoverInteraceTest, Precision_Equal) {
+TEST_F(ServiceContextTest, MinCoverInteraceTest_Precision_Equal) {
     assertMinCoverResultPrecision(
         3.14159, true, 3.14159, true, 0.0, 10.0, 1, 2, 0, {"00100111010"});
     assertMinCoverResultPrecision(Decimal128(3.14159),
@@ -5426,7 +5403,7 @@ TEST_F(EdgeTestFixture, getEdgesLengthDate) {
     }
 }
 
-class AnchorPaddingFixture : public unittest::Test {
+class AnchorPaddingFixture : public ServiceContextTest {
 public:
     static constexpr auto kAnchorPaddingRootHex =
         "4312890F621FE3CA7497C3405DFD8AAF46A578C77F7404D28C12BA853A4D3327"_sd;

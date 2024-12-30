@@ -21,7 +21,9 @@
 #include "mc-writer-private.h"
 #include "mongocrypt-private.h"
 
-typedef struct {
+#define kMetadataLen 96U // encCount(32) + tag(32) + encZeros(32)
+
+typedef struct _mc_FLE2TagAndEncryptedMetadataBlock_t {
     _mongocrypt_buffer_t encryptedCount;
     _mongocrypt_buffer_t tag;
     _mongocrypt_buffer_t encryptedZeros;
@@ -40,5 +42,8 @@ bool mc_FLE2TagAndEncryptedMetadataBlock_parse(mc_FLE2TagAndEncryptedMetadataBlo
 bool mc_FLE2TagAndEncryptedMetadataBlock_serialize(const mc_FLE2TagAndEncryptedMetadataBlock_t *metadata,
                                                    _mongocrypt_buffer_t *buf,
                                                    mongocrypt_status_t *status);
+
+bool mc_FLE2TagAndEncryptedMetadataBlock_validate(const mc_FLE2TagAndEncryptedMetadataBlock_t *metadata,
+                                                  mongocrypt_status_t *status);
 
 #endif /* MC_FLE2_TAG_AND_ENCRYPTED_METADATA_BLOCK_H */

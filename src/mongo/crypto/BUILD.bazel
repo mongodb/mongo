@@ -74,20 +74,27 @@ mongo_cc_library(
 mongo_cc_library(
     name = "mongocryptutil",
     srcs = [
+        "fle_util.cpp",
         "libbsonvalue.cpp",
         "mongocryptbuffer.cpp",
         "mongocryptstatus.cpp",
     ],
     hdrs = [
+        "fle_util.h",
         "libbsonvalue.h",
+        "mongocrypt_definitions.h",
         "mongocryptbuffer.h",
         "mongocryptstatus.h",
         "//src/mongo/base:data_type_validated.h",  # Validated<BSONObj>
         "//src/mongo/rpc:object_check.h",  # Validated<BSONObj>
     ],
+    local_defines = [
+        "MLIB_USER",
+    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",  # Validated<BSONObj>
+        "//src/mongo/db:service_context",
         "//src/third_party/libmongocrypt:mongocrypt",
     ],
 )
@@ -109,6 +116,9 @@ mongo_cc_library(
         "fle_crypto_types.h",
         "fle_stats.h",
         "fle_tags.h",
+    ],
+    local_defines = [
+        "MLIB_USER",
     ],
     deps = [
         # TODO(SERVER-93876): Remove many of these.
@@ -171,6 +181,9 @@ mongo_cc_library(
         "fle_key_types.h",
         "fle_tokens.h",
         "//src/mongo:core_headers",
+    ],
+    local_defines = [
+        "MLIB_USER",
     ],
     deps = [
         ":mongocryptutil",
@@ -381,6 +394,19 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "fle_testing_util",
+    srcs = [
+        "fle_testing_util.cpp",
+    ],
+    hdrs = [
+        "fle_testing_util.h",
+    ],
+    deps = [
+        ":fle_crypto",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "crypto_test",
     srcs = [
@@ -416,6 +442,7 @@ mongo_cc_unit_test(
         ":aead_encryption",
         ":encrypted_field_config",
         ":fle_crypto",
+        ":fle_testing_util",
         ":jwk_manager_test_framework",
         ":jwt",
         ":mongocryptutil",
