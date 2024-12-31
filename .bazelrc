@@ -7,10 +7,6 @@ info --config=local
 # Don't use legacy toolchain resolution.
 build --incompatible_enable_cc_toolchain_resolution
 
-# Improves build performance after first clean pull by
-# about 1 minute on developer machines
-build --experimental_remote_merkle_tree_cache
-
 # This makes builds more hermetic by preventing environment variables from leaking into the execution of rules
 build --incompatible_strict_action_env=true
 
@@ -112,8 +108,6 @@ build --flag_alias=dbg_level=//bazel/config:dbg_level
 
 # The 'default' build profile - should match all the settings of a profile, currently fastbuild
 build -c fastbuild
-build --fission=yes
-build --remote_download_regex=.*\.dwo$
 build --//bazel/config:opt=off
 build --//bazel/config:dbg=True
 build --//bazel/config:dbg_level=1
@@ -128,8 +122,6 @@ build --enable_platform_specific_config=true
 
 # Profile for building fast with minimal debuggability - the build is fast ##################################################
 build:fastbuild -c fastbuild
-build:fastbuild --fission=yes
-build:fastbuild --remote_download_regex=.*\.dwo$
 build:fastbuild --//bazel/config:opt=off
 build:fastbuild --//bazel/config:dbg=True
 build:fastbuild --//bazel/config:dbg_level=1
@@ -144,9 +136,7 @@ build:fastbuild --enable_platform_specific_config=true
 
 # Profile for building highly debuggable code - the build is slow, the code is slow, the binaries are large #################
 build:dbg -c dbg
-build:dbg --fission=yes
-build:dbg --remote_download_regex=.*\.dwo$
-build:dbg --//bazel/config:opt=off
+build:dbg --//bazel/config:opt=debug
 build:dbg --//bazel/config:dbg=True
 build:dbg --//bazel/config:dbg_level=2
 build:dbg --//bazel/config:debug_symbols=True
@@ -160,15 +150,15 @@ build:dbg --enable_platform_specific_config=true
 
 # Build with address and undefined sanitizers
 build:dbg_aubsan --config=dbg
-build:dbg_aubsan --//bazel/config:opt=debug
+build:dbg_aubsan --//bazel/config:linkstatic=False
 build:dbg_aubsan --//bazel/config:allocator=system
 build:dbg_aubsan --//bazel/config:asan=True
 build:dbg_aubsan --//bazel/config:ubsan=True
+build:dbg_aubsan --//bazel/config:skip_archive=False
 build:dbg_aubsan --enable_platform_specific_config=true
 
 # Build with thread sanitizers
 build:dbg_tsan --config=dbg
-build:dbg_tsan --//bazel/config:opt=debug
 build:dbg_tsan --//bazel/config:linkstatic=False
 build:dbg_tsan --//bazel/config:allocator=system
 build:dbg_tsan --//bazel/config:tsan=True
@@ -179,8 +169,6 @@ build:dbg_tsan --enable_platform_specific_config=true
 
 # Profile for building optimized code - the build is slow, the code is fast #################################################
 build:opt -c opt
-build:opt --fission=yes
-build:opt --remote_download_regex=.*\.dwo$
 build:opt --//bazel/config:opt=on
 build:opt --//bazel/config:dbg=False
 build:opt --//bazel/config:dbg_level=2
@@ -326,7 +314,7 @@ build:public-release --legacy_important_outputs
 
 --config=fission
 build:fission --fission=yes
-build:fission --remote_download_regex=.*\.dwo$
+build:fission --remote_download_all
 
 # Avoid failing builds when BES metadata fails to upload.
 common --bes_upload_mode=fully_async
