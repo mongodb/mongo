@@ -154,6 +154,38 @@ returned from functions. Using `StatusWith` to indicate exceptions, instead of t
 `uassert` and `iassert`, makes it very difficult to identify that an error has occurred, and
 could lead to the wrong error being propagated.
 
+## Using noexcept
+
+One must only use `noexcept` in accordance to specific and conservative criteria that will be
+subsequently enumerated. Using `noexcept` when these criteria do not apply is strongly advised
+against. Ignoring these criteria risks server crashes.
+
+Separately, due to a bug in GCC that exists in v4 and earlier versions of the toolchain,
+information from exceptions that escape from `noexcept` functions may be lost under subtle and
+unpredictable circumstances. See SERVER-70148 for context.
+
+Valid `noexcept` use criteria:
+
+- Absolute certainty that there is no risk at all of an exception happening. This certainty should
+  not be thought of as an invariant, but instead an absolute correctness contract. This contract
+  would imply that receiving an exception violates the assumed laws of physics and C++ compilers.
+
+- Implementing a move operator. Using `noexcept` with move operations allows operations to skip
+  generating exception handling code. It is strictly worse not to use `noexcept` with a move
+  operation, and as such using `noexcept` can be considered a requirement.
+
+Invalid `noexcept` use criteria:
+
+- As a method of modeling the same behavior one would receive with an invariant or rethrowing an
+  exception. In cases where you want to model such behavior, directly invoke that behavior instead.
+
+- As a form of documentation to readers that a particular function "should not" throw an exception.
+  If you would like to indicate to readers that a function is not exception-safe, indicate as such
+  using other forms of documentation.
+
+Please reach out to the Server Programmability team if you wish to use `noexcept` for situations that
+do not match the valid criteria listed above.
+
 ## Gotchas
 
 Gotchas to watch out for:
