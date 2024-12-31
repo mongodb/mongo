@@ -359,11 +359,11 @@ buildvariants:
 
 - &macos-debug-template
   name: &macos-debug-suggested macos-debug-suggested
-  display_name: "* macOS DEBUG"
+  display_name: "* macOS arm64 DEBUG"
   tags: ["suggested"]
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-  - macos-1100
+  - macos-14-arm64
   expansions: &macos-debug-expansions
     compile_variant: *macos-debug-suggested
     test_flags: >-
@@ -371,14 +371,14 @@ buildvariants:
       --enableEnterpriseTests=off
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     resmoke_jobs_max: 6
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
     compile_flags: >-
       --ssl
       --dbg=on
       --opt=on
       -j$(sysctl -n hw.logicalcpu)
       --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
+      --variables-files=etc/scons/xcode_macosx_arm.vars
       --use-diagnostic-latches=on
       --modules=
     num_scons_link_jobs_available: 0.99
@@ -389,24 +389,24 @@ buildvariants:
   - name: .release_critical !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
 
 - name: &enterprise-macos enterprise-macos
-  display_name: "Enterprise macOS DEBUG"
+  display_name: "Enterprise macOS arm64 DEBUG"
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100
+  - macos-14-arm64
   expansions:
     compile_variant: *enterprise-macos
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
     compile_flags: >-
       --ssl
       --dbg=on
       --opt=on
       -j$(sysctl -n hw.logicalcpu)
       --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
+      --variables-files=etc/scons/xcode_macosx_arm.vars
       --use-diagnostic-latches=on
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99

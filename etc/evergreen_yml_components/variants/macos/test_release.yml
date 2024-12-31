@@ -5,41 +5,12 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-- name: macos
-  display_name: macOS
-  tags: []
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - macos-1100
-  expansions:
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
-      --enableEnterpriseTests=off
-    push_path: osx
-    push_bucket: downloads.mongodb.org
-    push_name: macos
-    push_arch: x86_64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
-      --modules=
-    resmoke_jobs_max: 6
-    compile_variant: macos
-  tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: .development_critical !.incompatible_community !.incompatible_mac
-  - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
-
 - name: macos-arm64
   display_name: macOS arm64
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-14-arm64
   expansions:
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
@@ -48,7 +19,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: macos
     push_arch: arm64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
     compile_flags: >-
       --ssl
       -j$(sysctl -n hw.logicalcpu)
@@ -63,41 +34,12 @@ buildvariants:
   - name: .development_critical !.incompatible_community !.incompatible_mac
   - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
 
-- name: enterprise-macos
-  display_name: Enterprise macOS
-  tags: ["bazel_check"]
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - macos-1100
-  expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    push_path: osx
-    push_bucket: downloads.10gen.com
-    push_name: macos
-    push_arch: x86_64-enterprise
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: >-
-      --ssl
-      -j$(sysctl -n hw.logicalcpu)
-      --libc++
-      --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 6
-    compile_variant: enterprise-macos
-  tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: .development_critical !.incompatible_mac
-  - name: .release_critical !.incompatible_mac !publish_packages
-
 - name: enterprise-macos-arm64
   display_name: Enterprise macOS arm64
   tags: ["bazel_check"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-14-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
@@ -107,7 +49,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: arm64-enterprise
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode15.app
     compile_flags: >-
       --ssl
       -j$(sysctl -n hw.logicalcpu)
