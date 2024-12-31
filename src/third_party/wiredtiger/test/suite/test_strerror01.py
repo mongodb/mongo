@@ -30,12 +30,30 @@
 # session_api
 # [END_TAGS]
 
-import wttest
+import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 
 # test_strerror01.py
 #     Test generation of sub-level error codes when using calling strerror.
 class test_strerror(wttest.WiredTigerTestCase, suite_subprocess):
+    sub_errors = [
+        (wiredtiger.WT_NONE, "WT_NONE: No additional context"),
+        (wiredtiger.WT_COMPACTION_ALREADY_RUNNING, "WT_COMPACTION_ALREADY_RUNNING: Compaction is already running"),
+        (wiredtiger.WT_SESSION_MAX, "WT_SESSION_MAX: Max capacity of configured sessions reached"),
+        (wiredtiger.WT_CACHE_OVERFLOW, "WT_CACHE_OVERFLOW: Cache capacity has overflown"),
+        (wiredtiger.WT_WRITE_CONFLICT, "WT_WRITE_CONFLICT: Write conflict between concurrent operations"),
+        (wiredtiger.WT_OLDEST_FOR_EVICTION, "WT_OLDEST_FOR_EVICTION: Transaction has the oldest pinned transaction ID"),
+        (wiredtiger.WT_CONFLICT_BACKUP, "WT_CONFLICT_BACKUP: Conflict performing operation due to running backup"),
+        (wiredtiger.WT_CONFLICT_DHANDLE, "WT_CONFLICT_DHANDLE: Another thread currently holds the data handle of the table"),
+        (wiredtiger.WT_CONFLICT_SCHEMA_LOCK, "WT_CONFLICT_SCHEMA_LOCK: Conflict performing schema operation"),
+        (wiredtiger.WT_UNCOMMITTED_DATA, "WT_UNCOMMITTED_DATA: Table has uncommitted data"),
+        (wiredtiger.WT_DIRTY_DATA, "WT_DIRTY_DATA: Table has dirty data"),
+        (wiredtiger.WT_CONFLICT_TABLE_LOCK, "WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock"),
+    ]
+
+    def check_error_code(self, error, expected):
+        assert self.session.strerror(error) == expected
 
     def test_strerror(self):
-        assert self.session.strerror(-32000) == "WT_NONE: last API call was successful"
+       for code, expected in self.sub_errors:
+           self.check_error_code(code, expected)

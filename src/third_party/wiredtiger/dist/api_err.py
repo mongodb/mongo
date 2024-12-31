@@ -132,12 +132,58 @@ errors = [
         setting.'''),
 ]
 
+# To ensure our sub-level error returns do not conflict with any other
+# package or the error returns, we use the range -32,000 to -32,199.
+#
+# These numbers cannot change without breaking backward compatibility,
+# and are listed in error value order.
 sub_errors = [
     Error('WT_NONE', -32000,
-        'last API call was successful', '''
-        This is the default sub-level error code that should be used when there is no
-        sub-level error to pair with an error. It indicates that no further context
-        exists or is necessary.'''),
+        'No additional context', '''
+        This sub-level error code is returned by default and indicates that no
+        further context exists or is necessary.'''),
+    Error('WT_COMPACTION_ALREADY_RUNNING', -32001,
+        "Compaction is already running", '''
+        This sub-level error returns when the user tries to reconfigure compaction
+        while it is already running.'''),
+    Error('WT_SESSION_MAX', -32002,
+        "Max capacity of configured sessions reached", '''
+        This sub-level error returns when the user has created more than the maximum
+        number of sessions configured (including internal sessions).'''),
+    Error('WT_CACHE_OVERFLOW', -32003,
+        "Cache capacity has overflown", '''
+        This sub-level error indicates that the configured cache has exceeded full
+        capacity.'''),
+    Error('WT_WRITE_CONFLICT', -32004,
+        "Write conflict between concurrent operations", '''
+        This sub-level error indicates that there is a write conflict on the same
+        page between concurrent operations.'''),
+    Error('WT_OLDEST_FOR_EVICTION', -32005,
+        "Transaction has the oldest pinned transaction ID", '''
+        This sub-level error indicates that a given transaction has the oldest
+        transaction ID and needs to be rolled back.'''),
+    Error('WT_CONFLICT_BACKUP', -32006,
+        "Conflict performing operation due to running backup", '''
+        This sub-level error indicates that there is conflict perform the operation
+        because of a running backup in the system.'''),
+    Error('WT_CONFLICT_DHANDLE', -32007,
+        "Another thread currently holds the data handle of the table", '''
+        This sub-level error indicates that a concurrent operation is holding the data
+        handle of the table.'''),
+    Error('WT_CONFLICT_SCHEMA_LOCK', -32008,
+        "Conflict performing schema operation", '''
+        This sub-level error indicates that a concurrent operation is performing a schema
+        type operation or currently holds the schema lock.'''),
+    Error('WT_UNCOMMITTED_DATA', -32009,
+        "Table has uncommitted data", '''
+        This sub-level error returns when the table has uncommitted data.'''),
+    Error('WT_DIRTY_DATA', -32010,
+        "Table has dirty data", '''
+        This sub-level error returns when the table has dirty content.'''),
+    Error('WT_CONFLICT_TABLE_LOCK', -32011,
+        "Another thread currently holds the table lock", '''
+        This sub-level error indicates that a concurrent operation is performing
+        a table operation.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.

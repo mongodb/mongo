@@ -92,8 +92,47 @@ inclusive. The following is a list of the WiredTiger-specific return values:
 @endif
 
 @par \c WT_NONE
-This is the default sub-level error code that should be used when there is no sub-level error to
-pair with an error. It indicates that no further context exists or is necessary.
+This sub-level error code is returned by default and indicates that no further context exists or is
+necessary.
+
+@par \c WT_COMPACTION_ALREADY_RUNNING
+This sub-level error returns when the user tries to reconfigure compaction while it is already
+running.
+
+@par \c WT_SESSION_MAX
+This sub-level error returns when the user has created more than the maximum number of sessions
+configured (including internal sessions).
+
+@par \c WT_CACHE_OVERFLOW
+This sub-level error indicates that the configured cache has exceeded full capacity.
+
+@par \c WT_WRITE_CONFLICT
+This sub-level error indicates that there is a write conflict on the same page between concurrent
+operations.
+
+@par \c WT_OLDEST_FOR_EVICTION
+This sub-level error indicates that a given transaction has the oldest transaction ID and needs to
+be rolled back.
+
+@par \c WT_CONFLICT_BACKUP
+This sub-level error indicates that there is conflict perform the operation because of a running
+backup in the system.
+
+@par \c WT_CONFLICT_DHANDLE
+This sub-level error indicates that a concurrent operation is holding the data handle of the table.
+
+@par \c WT_CONFLICT_SCHEMA_LOCK
+This sub-level error indicates that a concurrent operation is performing a schema type operation or
+currently holds the schema lock.
+
+@par \c WT_UNCOMMITTED_DATA
+This sub-level error returns when the table has uncommitted data.
+
+@par \c WT_DIRTY_DATA
+This sub-level error returns when the table has dirty content.
+
+@par \c WT_CONFLICT_TABLE_LOCK
+This sub-level error indicates that a concurrent operation is performing a table operation.
 
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif

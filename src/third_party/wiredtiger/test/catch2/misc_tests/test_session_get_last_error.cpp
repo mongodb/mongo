@@ -39,6 +39,6 @@ TEST_CASE("Session get last error - test getting verbose info about the last err
         /* Test that the API returns expected default values. */
         CHECK(err == 0);
         CHECK(sub_level_err == WT_NONE);
-        CHECK(strcmp(err_msg, "WT_NONE: last API call was successful") == 0);
+        CHECK(strcmp(err_msg, "WT_NONE: No additional context") == 0);
     }
 }
