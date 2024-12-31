@@ -238,6 +238,9 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
                     "add_index_error": "Could not find dwarf version in file",
                 }
             )
+            # The file has no debug info if stdout ends like this
+            if process.stdout.strip().endswith(".debug_info contents:"):
+                return
             raise RuntimeError(f"Could not find dwarf version in file {file_path}")
 
         version = int(regex.group(1))
@@ -259,17 +262,26 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
                     ],
                     check=True,
                 )
+
+                # objcopy overwrites the input executable when only given one positional argument.
+                # /dev/null is specified as the second positional argument to simultaneously prevent
+                # the debug symbol file from being overwritten and to discard the generated copy.
                 subprocess.run(
                     [
                         f"{TOOLCHAIN_ROOT}/bin/objcopy",
                         "--dump-section",
                         f".debug_str={file_path}.debug_str.new",
                         file_path,
-                    ]
+                        "/dev/null",
+                    ],
+                    check=True,
                 )
                 with open(f"{file_path}.debug_str", "r") as file1:
                     with open(f"{file_path}.debug_str.new", "a") as file2:
                         file2.write(file1.read())
+
+                # Ensure the file is writable, we have seen the uploaded binaries be non-writable.
+                os.chmod(file_path, 0o775)
                 subprocess.run(
                     [
                         f"{TOOLCHAIN_ROOT}/bin/objcopy",
@@ -329,10 +341,10 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             current_span.set_attributes(
                 {
                     "add_index_status": "failed",
-                    "add_index_error": ex,
+                    "add_index_error": str(ex),
                 }
             )
-            return
+            raise ex
 
         current_span.set_attribute("add_index_changed_file_size", os.path.getsize(file_path))
 
@@ -360,6 +372,8 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             current_span.set_attribute("recalc_debuglink_status", "skipped")
             return
         try:
+            # Ensure the file is writable, we have seen the uploaded binaries be non-writable.
+            os.chmod(file_path, 0o775)
             subprocess.run(
                 [f"{TOOLCHAIN_ROOT}/bin/objcopy", "--remove-section", ".gnu_debuglink", file_path],
                 check=True,
@@ -379,10 +393,10 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             current_span.set_attributes(
                 {
                     "recalc_debuglink_status": "failed",
-                    "recalc_debuglink_error": ex,
+                    "recalc_debuglink_error": str(ex),
                 }
             )
-            return
+            raise ex
 
         root_looger.debug("Finished recalculating the debuglink for %s", file_path)
 
@@ -400,12 +414,19 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             futures = []
             current_span.set_status(StatusCode.OK)
             for file_path in lib_files:
+                # If a debug file exists for this file, then the debug symbols are
+                # over in that other file and we can skip this file.
+                if os.path.exists(f"{file_path}.debug"):
+                    continue
+
                 # When we add the .gdb_index section to binaries being ran with gdb
                 # it makes gdb not longer recognize them as the binary that generated
                 # the core dumps
                 futures.append(executor.submit(add_index, file_path=file_path))
 
-            concurrent.futures.wait(futures)
+            for future in concurrent.futures.as_completed(futures):
+                # raise any exceptions that were thrown in child processes
+                future.result()
 
         with TRACER.start_as_current_span(
             "core_analyzer.post_install_gdb_optimization.recalc_debuglink"
@@ -416,10 +437,13 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
                 # There will be no debuglinks in the separate debug files
                 # We do not want to edit any of the binary files that gdb might directly run
                 # so we skip the bin directory
-                if file_path.endswith(".debug"):
+                if file_path.endswith(".debug") or not os.path.exists(f"{file_path}.debug"):
                     continue
                 futures.append(executor.submit(recalc_debuglink, file_path=file_path))
-            concurrent.futures.wait(futures)
+
+            for future in concurrent.futures.as_completed(futures):
+                # raise any exceptions that were thrown in child processes
+                future.result()
 
 
 @TRACER.start_as_current_span("core_analyzer.download_task_artifacts")
