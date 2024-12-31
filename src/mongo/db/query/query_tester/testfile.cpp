@@ -266,6 +266,29 @@ void QueryFile::loadCollections(DBClientConnection* const conn,
         dropStaleCollections(conn, prevFileCollections);
     }
 
+    // Set optimization flags if needed.
+    if (_optimizationsOff) {
+        const auto disablePipeOpt =
+            fromFuzzerJson("{configureFailPoint: 'disablePipelineOptimization', mode: 'alwaysOn'}");
+        const auto disableMatchOpt = fromFuzzerJson(
+            "{configureFailPoint: 'disableMatchExpressionOptimization', mode: 'alwaysOn'}");
+
+        try {
+            runCommandAssertOK(conn, disablePipeOpt, "admin");
+            runCommandAssertOK(conn, disableMatchOpt, "admin");
+        } catch (AssertionException& ex) {
+            uassert(9816700,
+                    (std::stringstream()
+                     << "Setting optimization inhibiting failpoints failed. "
+                     << "You may need to restart your server with  --setParameter "
+                        "\"enableTestCommands=true\". "
+                     << "Or you may need to run with optimizations enabled.\n"
+                     << "Failed to disable optimizations. Reason: " << ex.reason())
+                        .str(),
+                    false);
+        }
+    }
+
     if (loadData) {
         // Load collections.
         uassert(9670419,
@@ -451,7 +474,7 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
     bool partialTestRun = false;
     for (size_t testNum = 0; !fs.eof(); ++testNum) {
         try {
-            auto test = Test::parseTest(fs, mode, testNum);
+            auto test = Test::parseTest(fs, mode, _optimizationsOff, testNum);
             test.setDB(_databaseNeeded);
             if (testNum >= startRange && testNum <= endRange) {
                 _tests.push_back(test);
@@ -473,7 +496,7 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
         const auto narrowedPath = std::filesystem::path{_expectedPath}.concat(".narrowed");
         auto narrowedStream = std::fstream{narrowedPath, std::ios::out | std::ios::trunc};
 
-        auto testsWithResults = QueryFile{_expectedPath};
+        auto testsWithResults = QueryFile{_expectedPath, false};
         testsWithResults.readInEntireFile(ModeOption::Normalize, startRange, endRange);
         testsWithResults.writeOutAndNumber(narrowedStream, WriteOutOptions::kResult);
         narrowedStream.close();

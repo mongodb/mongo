@@ -72,6 +72,7 @@ def run_mongotest(
     drop: bool = True,
     load: bool = True,
     minimal_index: bool = False,
+    opt_off: bool = False,
     out_result: bool = False,
     extract_features: bool = False,
 ) -> tuple[ExitCode, bytes]:
@@ -107,6 +108,8 @@ def run_mongotest(
     if load:
         cmd.append("--load")
     cmd.extend(("--mode", mode.value))
+    if opt_off:
+        cmd.append("--opt-off")
     if out_result:
         cmd.extend(("--out", "result"))
     if minimal_index:

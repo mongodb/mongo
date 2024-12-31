@@ -46,6 +46,7 @@ ModeOption stringToModeOption(const std::string&);
 class Test {
 public:
     Test(const std::string& testLine,
+         const bool optimizationsOff,
          const size_t testNum,
          boost::optional<std::string> testName,
          std::vector<std::string>&& preTestComments,
@@ -54,6 +55,7 @@ public:
          std::vector<std::string>&& postTestComments,
          std::vector<BSONObj>&& expectedResult = {})
         : _testLine(testLine),
+          _optimizationsOff(optimizationsOff),
           _testNum(testNum),
           _testName(testName),
           _comments({preTestComments, preQueryComments, postQueryComments, postTestComments}),
@@ -88,7 +90,7 @@ public:
     <result if result file>
     <----- End Test Format ----->
      */
-    static Test parseTest(std::fstream&, ModeOption, size_t testNum);
+    static Test parseTest(std::fstream&, ModeOption, bool optimizationsOff, size_t testNum);
 
     /**
      * Runs the test and records the result returned by the server.
@@ -102,6 +104,7 @@ public:
 private:
     void parseTestQueryLine();
     std::string _testLine;
+    const bool _optimizationsOff;
     size_t _testNum;
     boost::optional<std::string> _testName;
     struct {
