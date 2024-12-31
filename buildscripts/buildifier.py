@@ -1,19 +1,22 @@
 import argparse
 import json
 import os
+import pathlib
 import platform
 import subprocess
 import sys
 
-from buildscripts import download_buildifier
-from buildscripts.simple_report import make_report, put_report, try_combine_reports
-from buildscripts.unittest_grouper import validate_bazel_groups
+import download_buildifier
+from simple_report import make_report, put_report, try_combine_reports
+from unittest_grouper import validate_bazel_groups
+
+mongo_dir = pathlib.Path(__file__).parents[1]
 
 
 def find_all_failed(bin_path: str) -> list[str]:
     # TODO(SERVER-81039): Remove once third_party libs can be compiled from the root directory.
     ignored_paths = []
-    with open(os.path.join(os.curdir, ".bazelignore"), "r", encoding="utf-8") as file:
+    with open(os.path.join(mongo_dir, ".bazelignore"), "r") as file:
         for line in file.readlines():
             contents = line.split("#")[0].strip()
             if contents:
@@ -40,9 +43,8 @@ def find_all_failed(bin_path: str) -> list[str]:
 
 def lint_all(bin_path: str, generate_report: bool):
     files = find_all_failed(bin_path)
-    result = lint(bin_path, files, generate_report)
+    lint(bin_path, files, generate_report)
     validate_bazel_groups(generate_report=generate_report, fix=False, quick=False)
-    return result
 
 
 def fix_all(bin_path: str):
@@ -58,7 +60,6 @@ def fix_unittests(bin_path: str):
 
 
 def lint(bin_path: str, files: list[str], generate_report: bool):
-    found_errors = False
     for file in files:
         process = subprocess.run(
             [bin_path, "--format=json", "--mode=check", file], check=True, capture_output=True
@@ -75,7 +76,6 @@ def lint(bin_path: str, files: list[str], generate_report: bool):
         diff = process.stdout
         print(f"{file} has linting errors")
         print(diff)
-        found_errors = True
 
         if generate_report:
             header = (
@@ -91,7 +91,6 @@ def lint(bin_path: str, files: list[str], generate_report: bool):
             put_report(report)
 
     print("Done linting files")
-    return not found_errors
 
 
 def fix(bin_path: str, files: list[str]):
@@ -102,14 +101,6 @@ def fix(bin_path: str, files: list[str]):
 
 
 def main():
-    default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
-    if not default_dir:
-        print("This script must be run though bazel. Please run 'bazel run //:format' instead")
-        print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
-        print("python buildscripts/install_bazel.py")
-        return 1
-    os.chdir(default_dir)
-
     parser = argparse.ArgumentParser(description="buildifier wrapper")
     parser.add_argument(
         "--binary-dir",
@@ -148,6 +139,9 @@ def main():
     lint_parser.set_defaults(subcommand="fix")
 
     args = parser.parse_args()
+    assert os.path.abspath(os.curdir) == str(
+        mongo_dir.absolute()
+    ), "buildifier.py must be run from the root of the mongo repo"
     binary_name = "buildifier.exe" if platform.system() == "Windows" else "buildifier"
     if args.binary_dir:
         binary_path = os.path.join(args.binary_dir, binary_name)

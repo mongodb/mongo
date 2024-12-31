@@ -21,7 +21,4 @@ py_binary(
     data = [":prettier"],
     main = "format.py",
     visibility = ["//visibility:public"],
-    deps = [
-        "//buildscripts:buildifier",
-    ],
 )

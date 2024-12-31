@@ -10,7 +10,7 @@ import time
 import urllib.request
 from typing import Dict, List
 
-from buildscripts.simple_report import make_report, put_report, try_combine_reports
+from simple_report import make_report, put_report, try_combine_reports
 
 sys.path.append(".")
 
