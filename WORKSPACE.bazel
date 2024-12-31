@@ -186,9 +186,9 @@ poetry(
     name = "poetry",
     lockfile = "//:poetry.lock",
     pyproject = "//:pyproject.toml",
-    python_interpreter_target_default = "@py_host//:bin/python3",
-    python_interpreter_target_mac = "@py_host//:bin/python3",
-    python_interpreter_target_win = "@py_host//:python.exe",
+    python_interpreter_target_default = "@py_host//:dist/bin/python3",
+    python_interpreter_target_mac = "@py_host//:dist/bin/python3",
+    python_interpreter_target_win = "@py_host//:dist/python.exe",
 )
 
 http_archive(
