@@ -39,6 +39,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -53,7 +54,7 @@ boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::c
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    FieldPath distanceField,
+    boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier) {
     return {new DocumentSourceGeoNearCursor(collections,
@@ -68,7 +69,7 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    FieldPath distanceField,
+    boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier)
     : DocumentSourceCursor(
@@ -93,7 +94,9 @@ Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
                   << output.peek().toString());
     const auto distance = output.peek().metadata().getGeoNearDistance() * _distanceMultiplier;
 
-    output.setNestedField(_distanceField, Value(distance));
+    if (_distanceField) {
+        output.setNestedField(*_distanceField, Value(distance));
+    }
     if (_locationField) {
         invariant(
             output.peek().metadata().hasGeoNearPoint(),

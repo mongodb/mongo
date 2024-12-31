@@ -72,7 +72,7 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
     let query = {loc: {}};
     query.loc[opts.sphere ? '$nearSphere' : '$near'] = pt;
     const proj = {dis: {$meta: "geoNearDistance"}};
-    const runQuery = (limit) => this.t.find(query, proj).limit(opts.nToTest).toArray();
+    const runQuery = (limit) => this.t.find(query, proj).limit(limit).toArray();
 
     let last = runQuery(1);
     for (var i = 2; i <= opts.nToTest; i++) {
