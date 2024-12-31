@@ -213,6 +213,9 @@ def mongo_install_rule_impl(ctx):
         )
 
     runfiles = ctx.runfiles(files = outputs)
+    for input_bin in ctx.attr.srcs:
+        runfiles = runfiles.merge(input_bin[DefaultInfo].data_runfiles)
+
     if unittest_bin:
         outputs = depset([unittest_bin])
     else:
@@ -266,9 +269,8 @@ def mongo_install(
 
     """
     compressor = select({
-        "@platforms//os:linux": "@pigz//:pigz_bin",
-        "@platforms//os:windows": None,
-        "@platforms//os:macos": None,
+        "@pigz//:pigz_tool_available": "@pigz//:bin",
+        "//conditions:default": None,
     })
 
     ext = select({

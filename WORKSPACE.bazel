@@ -299,8 +299,8 @@ load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 
 rules_pkg_dependencies()
 
-new_local_repository(
+load("//bazel/install_rules:pigz.bzl", "setup_pigz")
+
+setup_pigz(
     name = "pigz",
-    build_file = "//bazel:BUILD.pigz",
-    path = "/usr/bin",
 )
