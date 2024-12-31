@@ -10,6 +10,40 @@ bazel_real="$BAZEL_REAL"
 echo $BAZEL_REAL > ".bazel_real"
 bazelrc_xcode_lines=()
 
+
+
+# If disk space becomes an issue, this block can be used to clean up configs
+# when disk space is getting low. It is commented out because "bazel info output_path"
+# takes .5 seconds, and no need to add that extra time unless disk space becomes a large
+# problem
+
+#if [ $# -eq 2 ] || [ $# -eq 3 ]; then
+#    if [ "$1" = "build" ]; then
+#        output_path=$($bazel_real info output_path)
+#        remaining_kb=$(df --output=avail $output_path | tail -n 1)
+#        remaining_gb=$(($remaining_kb / 1024 / 1024))
+#        fastbuild_dir=${output_path}/aarch64-fastbuild
+#        dbg_dir=${output_path}/aarch64-dbg
+#        opt_dir=${output_path}/aarch64-opt
+#        if [ "$remaining_gb" -lt 40 ]; then
+#          echo "Disk space is getting low (under 40GB) - cleaning up other config outputs"
+#          if [ $# -eq 2 ]; then
+#            rm -rf "$dbg_dir" &>/dev/null
+#            rm -rf "$opt_dir" &>/dev/null
+#          elif [[ "$2" == "--config=fastbuild"* ]]; then
+#            rm -rf "$dbg_dir" &>/dev/null
+#            rm -rf "$opt_dir" &>/dev/null
+#          elif [[ "$2" == "--config=dbg"* ]]; then
+#            rm -rf "$fastbuild_dir" &>/dev/null
+#            rm -rf "$opt_dir" &>/dev/null
+#          elif [[ "$2" == "--config=opt"* ]]; then
+#            rm -rf "$fastbuild_dir" &>/dev/null
+#            rm -rf "$dbg_dir" &>/dev/null
+#          fi
+#        fi
+#    fi
+#fi
+
 if [[ -z "${BAZELISK_SKIP_WRAPPER}" ]]; then
     echo "You're not using Bazelisk, which is recommended for a consistent build environment." >&2
     echo "Your version of Bazel may be mismatched with the version intended to be used to build MongoDB." >&2

@@ -1411,6 +1411,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f"MONGO_DISTMOD={env['MONGO_DISTMOD']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
         "--dynamic_mode=off",
+        "--fission=no",
     ]
 
     # Timeout linking at 8 minutes to retry with a lower concurrency.
