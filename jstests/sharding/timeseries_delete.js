@@ -232,6 +232,10 @@ function runTest(collConfig, reqConfig, insert) {
     assert.eq(1, counts[primaryShard.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 
+    // Ensure shards have known filtering metadata in order to avoid spurious StaleConfig errors
+    // later in the test.
+    assert.eq(documents.length, coll.countDocuments({}));
+
     const isBulkOperation = !reqConfig.deleteQuery;
     if (!isBulkOperation) {
         // If sharded updates and deletes feature flag is disabled, we only test that the delete

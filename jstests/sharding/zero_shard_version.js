@@ -15,10 +15,17 @@ assert.commandWorked(testDB_s0.adminCommand({shardCollection: 'test.user', key: 
 var checkShardMajorVersion = function(conn, expectedMajorVersion) {
     const shardVersion =
         assert.commandWorked(conn.adminCommand({getShardVersion: 'test.user'})).global;
-    assert.eq(shardVersion.getTime(),
-              expectedMajorVersion,
-              "Node " + conn + " expected to have major version " + expectedMajorVersion +
-                  " but has version " + tojson(shardVersion));
+    if (expectedMajorVersion === "UNKNOWN") {
+        assert.eq(shardVersion,
+                  "UNKNOWN",
+                  "Node " + conn + " expected to have UNKNOWN shard version, but has version " +
+                      tojson(shardVersion));
+    } else {
+        assert.eq(shardVersion.getTime(),
+                  expectedMajorVersion,
+                  "Node " + conn + " expected to have major version " + expectedMajorVersion +
+                      " but has version " + tojson(shardVersion));
+    }
 };
 
 ///////////////////////////////////////////////////////
@@ -40,11 +47,11 @@ st.configRS.awaitLastOpCommitted();
 // shard1: 0|0|a
 //
 // Shard metadata:
-// shard0: 0|0|a
+// shard0: UNKNOWN
 // shard1: 0|0|a
 // mongos0: 1|0|a
 
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
+checkShardMajorVersion(st.rs0.getPrimary(), "UNKNOWN");
 checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
 // mongos0 still thinks that { x: 1 } belong to st.shard1.shardName, but should be able to
@@ -104,12 +111,12 @@ st.configRS.awaitLastOpCommitted();
 // shard1: 2|1|b, [0, inf)
 //
 // Shard metadata:
-// shard0: 0|0|b
+// shard0: UNKNOWN
 // shard1: 2|1|b
 //
 // mongos2: 2|0|a
 
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
+checkShardMajorVersion(st.rs0.getPrimary(), "UNKNOWN");
 checkShardMajorVersion(st.rs1.getPrimary(), 2);
 
 // mongos2 still thinks that { x: 1 } belong to st.shard0.shardName, but should be able to
@@ -164,12 +171,12 @@ st.configRS.awaitLastOpCommitted();
 // shard1: 0|0|c
 //
 // Shard metadata:
-// shard0: 0|0|c
+// shard0: UNKNOWN
 // shard1: 0|0|c
 //
 // mongos0: 0|0|0
 
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
+checkShardMajorVersion(st.rs0.getPrimary(), "UNKNOWN");
 checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
 // 1st mongos thinks that collection is unshareded and will attempt to query primary shard.

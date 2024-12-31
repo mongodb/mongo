@@ -70,15 +70,21 @@ public:
 
     /**
      * Instantiating this object on the stack indicates to the storage execution subsystem that it
-     * is allowed to create a collection in this context and that the caller is responsible for
-     * notifying the shard Sharding sybsystem of the collection creation.
+     * is allowed to create any collection in this context and that the caller will be responsible
+     * for notifying the shard Sharding subsystem of the collection creation. Note that in most of
+     * cases the CollectionShardingRuntime associated to that nss will be set as UNSHARDED. However,
+     * there are some scenarios in which it is required to set is as UNKNOWN: that's the reason why
+     * the constructor has the 'forceCSRAsUnknownAfterCollectionCreation' parameter. You can find
+     * more information about how the CSR is modified in ShardServerOpObserver::onCreateCollection.
      *
      * DO NOT add any new usages of this class without including someone from the Sharding Team on
      * the code review.
      */
     class ScopedAllowImplicitCollectionCreate_UNSAFE {
     public:
-        ScopedAllowImplicitCollectionCreate_UNSAFE(OperationContext* opCtx);
+        /* Please read the comment associated to this class */
+        ScopedAllowImplicitCollectionCreate_UNSAFE(
+            OperationContext* opCtx, bool forceCSRAsUnknownAfterCollectionCreation = false);
         ~ScopedAllowImplicitCollectionCreate_UNSAFE();
 
     private:
@@ -188,6 +194,9 @@ private:
 
     // Specifies whether the request is allowed to create database/collection implicitly
     bool _allowCollectionCreation{false};
+    // Specifies whether the CollectionShardingRuntime should be set as unknown after collection
+    // creation
+    bool _forceCSRAsUnknownAfterCollectionCreation{false};
 
     // The OperationShardingState class supports storing shardVersions for multiple namespaces (and
     // databaseVersions for multiple databases), even though client code has not been written yet to

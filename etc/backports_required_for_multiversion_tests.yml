@@ -169,6 +169,10 @@ last-continuous:
     ticket: SERVER-91339
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
+  - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
+    ticket: SERVER-76489
+  - test_file: jstests/sharding/zero_shard_version.js
+    ticket: SERVER-76489
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -402,6 +406,10 @@ last-lts:
     ticket: SERVER-91339
   - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
     ticket: SERVER-86674
+  - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
+    ticket: SERVER-76489
+  - test_file: jstests/sharding/zero_shard_version.js
+    ticket: SERVER-76489
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
