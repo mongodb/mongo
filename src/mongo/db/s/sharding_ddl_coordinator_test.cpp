@@ -40,9 +40,11 @@ namespace mongo {
 class ShardingDDLCoordinatorTest : public ShardServerTestFixture {
 public:
     void setUp() override {
-        ShardServerTestFixture::setUp();
-
+        // Registering a client observer must happen before calling the base class setup, as
+        // that may spawn threads which attempt to create a client, and create a race condition.
         getServiceContext()->registerClientObserver(std::make_unique<ClientObserver>());
+
+        ShardServerTestFixture::setUp();
 
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _network = network.get();
