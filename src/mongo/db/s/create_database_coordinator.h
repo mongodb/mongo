@@ -78,6 +78,8 @@ private:
                                std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                const CancellationToken& token);
 
+    void _storeDBVersion(OperationContext* opCtx, const DatabaseType& db);
+
     void _exitCriticalSection(OperationContext* opCtx,
                               std::shared_ptr<executor::ScopedTaskExecutor> executor,
                               const CancellationToken& token,

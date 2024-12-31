@@ -137,6 +137,16 @@ void CreateDatabaseCoordinator::_enterCriticalSection(
         opCtx, opts, {_doc.getPrimaryShard().get()});
 }
 
+void CreateDatabaseCoordinator::_storeDBVersion(OperationContext* opCtx, const DatabaseType& db) {
+    if (_doc.getDatabaseVersion()) {
+        return;
+    }
+
+    StateDoc newDoc(_doc);
+    newDoc.setDatabaseVersion(db.getVersion());
+    _updateStateDocument(opCtx, std::move(newDoc));
+}
+
 void CreateDatabaseCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -195,6 +205,8 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                     return ShardingCatalogManager::get(opCtx)->commitCreateDatabase(
                         opCtx, dbName, _doc.getPrimaryShard().get(), _doc.getUserSelectedPrimary());
                 }();
+                // Persists the metadata of the created database on the coordinator doc.
+                _storeDBVersion(opCtx, returnDatabase);
                 _result = ConfigsvrCreateDatabaseResponse(returnDatabase.getVersion());
             }))
         .then(_buildPhaseHandler(
@@ -205,15 +217,11 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 const auto& dbName = nss().dbName();
-                const auto& dbNameStr =
-                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
                 // Populates the result if the coordinator was rebuilt after the commit phase.
-                // This needs to be done before releasing the critical section.
                 if (!_result.is_initialized()) {
-                    const auto& createdDatabase = create_database_util::findDatabaseExactMatch(
-                        opCtx, dbNameStr, _doc.getPrimaryShard());
-                    invariant(createdDatabase.is_initialized());
-                    _result = ConfigsvrCreateDatabaseResponse(createdDatabase->getVersion());
+                    const auto& dbVersion = getDatabaseVersion();
+                    invariant(dbVersion.is_initialized());
+                    _result = ConfigsvrCreateDatabaseResponse(dbVersion.get());
                 }
                 _exitCriticalSection(opCtx, executor, token, false /* throwIfReasonDiffers */);
                 refreshDatabaseCache(opCtx, dbName, _doc.getPrimaryShard().get());
