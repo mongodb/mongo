@@ -89,6 +89,15 @@ export function copyBackupCursorFiles(
     return copyThread;
 }
 
+export function copyBackupCursorFilesForIncremental(
+    backupCursor, namespacesToSkip, dbpath, destinationDirectory) {
+    // Remove any existing journal files from previous incremental backups.
+    resetDbpath(destinationDirectory + "/journal");
+
+    return copyBackupCursorExtendFiles(
+        backupCursor, namespacesToSkip, dbpath, destinationDirectory, /*async=*/ true);
+}
+
 export function copyBackupCursorExtendFiles(
     cursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
     let files = _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback);
