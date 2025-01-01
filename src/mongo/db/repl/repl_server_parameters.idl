@@ -284,6 +284,14 @@ server_parameters:
         default: false
         redact: false
 
+    skipOplogSampling:
+        description: Tells the server whether or not to skip oplog sampling.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: skipOplogSampling
+        default: false
+        redact: false
+
     maxSyncSourceLagSecs:
         description: ''
         set_at: startup

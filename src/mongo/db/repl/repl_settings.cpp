@@ -76,6 +76,10 @@ bool ReplSettings::shouldRecoverFromOplogAsStandalone() {
     return recoverFromOplogAsStandalone;
 }
 
+bool ReplSettings::shouldSkipOplogSampling() {
+    return skipOplogSampling;
+}
+
 bool ReplSettings::shouldAutoInitiate() const {
     return _shouldAutoInitiate;
 }

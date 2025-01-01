@@ -1602,7 +1602,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
         // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
         // in this instance.
         if (opCtx->getServiceContext()->userWritesAllowed() && !storageGlobalParams.repair &&
-            !storageGlobalParams.restore) {
+            !repl::ReplSettings::shouldSkipOplogSampling()) {
             static_cast<WiredTigerRecordStore::Oplog*>(ret.get())->setTruncateMarkers(
                 WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx, ret.get()));
         }
