@@ -3,7 +3,6 @@
 #
 # Required environment variables:
 # * ${targets} - List of build targets
-# * ${compiler} - One of [clang|gcc]
 #
 # Optional environment variable(s):
 # * ${args} - List of additional Bazel arguments (e.g.: "--config=clang-tidy")
@@ -18,7 +17,7 @@ set -o errexit
 set -o verbose
 
 # Use `eval` to force evaluation of the environment variables in the echo statement:
-eval echo "Execution environment: Compiler: ${compiler} Targets: ${targets}"
+eval echo "Execution environment: Targets: ${targets}"
 
 source ./evergreen/bazel_RBE_supported.sh
 
@@ -55,7 +54,7 @@ else
 fi
 
 for i in {1..5}; do
-  eval $BAZEL_BINARY build --verbose_failures $LOCAL_ARG --//bazel/config:compiler_type=${compiler} ${args} ${targets} && RET=0 && break || RET=$? && sleep 1
+  eval $BAZEL_BINARY build --verbose_failures $LOCAL_ARG ${args} ${targets} && RET=0 && break || RET=$? && sleep 1
   echo "Bazel failed to execute, retrying..."
 done
 

@@ -36,3 +36,27 @@ buildvariants:
       - name: compile_bazel_TG
       - name: run_bazel_TG
       - name: compile_bazel_ninja_TG
+
+  - name: &workstation_bazel_cache_hydration_arm64 workstation_bazel_cache_hydration_arm64
+    display_name: "~ Workstation Bazel Cache Hydration arm64"
+    tags: ["bazel_cache_hydration"]
+    cron: "0 * * * *" # Every hour
+    run_on:
+      - ubuntu2204-arm64-large
+    stepback: false
+    expansions:
+      compile_variant: *workstation_bazel_cache_hydration_arm64
+    tasks:
+      - name: hydrate_bazel_profile_TG
+
+  - name: &workstation_bazel_cache_hydration_x86_64 workstation_bazel_cache_hydration_x86_64
+    display_name: "~ Workstation Bazel Cache Hydration x86_64"
+    tags: ["bazel_cache_hydration"]
+    cron: "30 * * * *" # Every hour, 30 min offset
+    run_on:
+      - ubuntu2204-large
+    stepback: false
+    expansions:
+      compile_variant: *workstation_bazel_cache_hydration_x86_64
+    tasks:
+      - name: hydrate_bazel_profile_TG

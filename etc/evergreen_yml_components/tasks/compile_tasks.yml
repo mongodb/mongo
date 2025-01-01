@@ -248,7 +248,7 @@ tasks:
           target: >-
             //src/mongo/platform:visibility1_test
 
-  - name: bazel_install_dist_test
+  - name: bazel_archive_and_run_dist_test
     tags: ["assigned_to_jira_team_devprod_build", "bazel_check", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
@@ -257,7 +257,6 @@ tasks:
       - func: "fetch bazel"
       - func: "bazel compile"
         vars:
-          compiler: clang
           targets: archive-dist-test
           args: --config=opt --separate_debug=True
       - func: "run tests"
@@ -266,6 +265,106 @@ tasks:
           install_dir: bazel-bin/install/bin
           resmoke_jobs_max: 4 # No cap on number of jobs.
 
+  - name: hydrate_bazel_profile_fastbuild
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "fetch bazel"
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          args: >-
+            --config=fastbuild
+            --define GIT_COMMIT_HASH=nogitversion
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: hydrate_bazel_profile_opt
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "fetch bazel"
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          args: >-
+            --config=opt
+            --define GIT_COMMIT_HASH=nogitversion
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: hydrate_bazel_profile_dbg
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "fetch bazel"
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          args: >-
+            --config=dbg
+            --define GIT_COMMIT_HASH=nogitversion
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: hydrate_bazel_profile_dbg_aubsan
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "fetch bazel"
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          args: >-
+            --config=dbg_aubsan
+            --define GIT_COMMIT_HASH=nogitversion
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: hydrate_bazel_profile_dbg_tsan
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "fetch bazel"
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          args: >-
+            --config=dbg_tsan
+            --define GIT_COMMIT_HASH=nogitversion
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
   - <<: *clang_tidy_task_template
     name: run_bazel_clang_tidy
     commands:
@@ -273,10 +372,9 @@ tasks:
       - func: "fetch bazel"
       - func: "bazel compile (clang)"
         vars:
-          compiler: clang
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
           targets: //src/mongo/...
-          args: --config=clang-tidy
+          args: --config=clang-tidy --compiler_type=clang
 
   - name: run_bazel_program_windows
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
@@ -2073,12 +2171,22 @@ task_groups:
     name: run_bazel_TG
     tasks:
       - run_bazel_program
-      - bazel_install_dist_test
+      - bazel_archive_and_run_dist_test
 
   - <<: *compile_task_group_template
     name: bazel_workstation_TG
     tasks:
       - bazel_workstation_unittests
+
+  # We want to run these sequentially to put less load on the cluster
+  - <<: *compile_task_group_template
+    name: hydrate_bazel_profile_TG
+    tasks:
+      - hydrate_bazel_profile_fastbuild
+      - hydrate_bazel_profile_opt
+      - hydrate_bazel_profile_dbg
+      - hydrate_bazel_profile_dbg_aubsan
+      - hydrate_bazel_profile_dbg_tsan
 
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_ninja_TG

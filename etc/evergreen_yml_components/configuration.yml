@@ -40,6 +40,10 @@ parameters:
     value: "--remote_download_outputs=all --config=no-remote-exec"
     description: "Default coverage bazel tags"
 
+  - key: bazel_filters_for_cache_hydration
+    value: "compiledb,gen_source,mongo-tidy-tests,mongo-tidy-checks,dist_test,mongo_library,mongo_unittest,mongo_benchmark,mongo_integration_test,mongo_binary"
+    description: "Filters to pass Bazel to be built for the purpose of hydrating remote cache"
+
   - key: run_covered_tests
     description: >-
       When set to `true`, patch builds will run all tests compatible with some suite_A even if a more complex suite_A_B will
