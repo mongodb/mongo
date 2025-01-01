@@ -575,7 +575,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/api_version/**/* @10gen/query-optimization-parsers @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/backup_restore/OWNERS.yml
-/jstests/noPassthrough/backup_restore/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
+/jstests/noPassthrough/backup_restore/**/* @10gen/server-backup-restore @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/balancer/OWNERS.yml
 /jstests/noPassthrough/balancer/**/* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -1313,11 +1313,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/jstests/fle2_query_analysis/**/* @10gen/query-integration-fle @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hot_backups/OWNERS.yml
-/src/mongo/db/modules/enterprise/jstests/hot_backups/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
+/src/mongo/db/modules/enterprise/jstests/hot_backups/**/* @10gen/server-backup-restore @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/jstests/hot_backups/**/magic_restore* @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/OWNERS.yml
-/src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
+/src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/**/* @10gen/server-backup-restore @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/live_import/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/live_import/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
@@ -1351,7 +1351,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/src/fle/**/query_analysis @10gen/query-integration-fle @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/hot_backups/OWNERS.yml
-/src/mongo/db/modules/enterprise/src/hot_backups/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
+/src/mongo/db/modules/enterprise/src/hot_backups/**/* @10gen/server-backup-restore @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/inmemory/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/inmemory/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
