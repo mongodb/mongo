@@ -63,11 +63,20 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
                     "Sparsity must be defined for range placeholders.",
                     placeholder->getSparsity());
         }
-    } else {
-        uassert(6832500,
-                "Hypergraph sparsity can only be set for range placeholders.",
-                !placeholder->getSparsity());
+    } else if (placeholder->getAlgorithm() == Fle2AlgorithmInt::kTextSearch) {
+        // TODO: SERVER-98690 implement find placeholders for text search
+        uassert(9783506,
+                "Text search find is not yet supported",
+                placeholder->getType() == Fle2PlaceholderType::kInsert);
+        auto val = placeholder->getValue().getElement();
+        uassert(
+            9783505, "Text Search Insert placeholder value must be an object.", val.isABSONObj());
+        FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"), val.Obj());
     }
+
+    uassert(6832500,
+            "Hypergraph sparsity can only be set for range placeholders.",
+            placeholder->getAlgorithm() == Fle2AlgorithmInt::kRange || !placeholder->getSparsity());
 }
 
 bool isInfinite(ImplicitValue val) {
@@ -208,6 +217,35 @@ void validateIDLFLE2RangeInsertSpec(const FLE2RangeInsertSpec* spec) {
         uassert(8574102,
                 "Precision can only be set if type is floating point",
                 valueType == BSONType::NumberDecimal || valueType == BSONType::NumberDouble);
+    }
+}
+
+void validateIDLFLE2TextSearchInsertSpec(const FLE2TextSearchInsertSpec* spec) {
+    uassert(9783500,
+            "Text search insert placeholder must have a substring, suffix, or prefix index "
+            "specification",
+            spec->getSuffixSpec() || spec->getSubstringSpec() || spec->getPrefixSpec());
+
+    if (spec->getSubstringSpec()) {
+        auto subspec = spec->getSubstringSpec().value();
+        uassert(9783501,
+                "Substring query upper bound length cannot be less than the lower bound",
+                subspec.getMinQueryLength() <= subspec.getMaxQueryLength());
+        uassert(9783502,
+                "Substring maximum indexed length cannot be less than the upper bound",
+                subspec.getMaxQueryLength() <= subspec.getMaxLength());
+    }
+    if (spec->getSuffixSpec()) {
+        auto subspec = spec->getSuffixSpec().value();
+        uassert(9783503,
+                "Suffix query upper bound length cannot be less than the lower bound",
+                subspec.getMinQueryLength() <= subspec.getMaxQueryLength());
+    }
+    if (spec->getPrefixSpec()) {
+        auto subspec = spec->getPrefixSpec().value();
+        uassert(9783504,
+                "Prefix query upper bound length cannot be less than the lower bound",
+                subspec.getMinQueryLength() <= subspec.getMaxQueryLength());
     }
 }
 }  // namespace mongo

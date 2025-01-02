@@ -518,3 +518,86 @@ structs:
             type: safeInt
             optional: true
             validator: { gte: 0 }
+
+    FLE2SubstringInsertSpec:
+        description: "Holds parameters applicable to substring indexed fields."
+        strict: true
+        fields:
+          mlen:
+            description: "max substring code point length to be indexed"
+            type: safeInt
+            validator: { gt: 0 }
+            cpp_name: maxLength
+          ub:
+            description: "upper bound code point length of valid substring queries"
+            type: safeInt
+            validator: { gt: 0 }
+            cpp_name: maxQueryLength
+          lb:
+            description: "lower bound code point length of valid substring queries"
+            type: safeInt
+            validator: { gt: 0 }
+            cpp_name: minQueryLength
+
+    FLE2SuffixInsertSpec:
+        description: "Holds parameters applicable to suffix indexed fields."
+        strict: true
+        fields:
+          ub:
+            description: "upper bound code point length of valid suffix queries"
+            type: safeInt
+            validator: { gt: 0 }
+            cpp_name: maxQueryLength
+          lb:
+            description: "lower bound length of valid suffix queries"
+            type: safeInt
+            validator: { gt: 0 }
+            cpp_name: minQueryLength
+
+    FLE2PrefixInsertSpec:
+        description: "Holds parameters applicable to prefix indexed fields."
+        strict: true
+        fields:
+          ub:
+            description: "upper bound code point length of valid prefix queries"
+            type: safeInt
+            validator: { gt: 0 }
+            cpp_name: maxQueryLength
+          lb:
+            description: "lower bound code point length of valid prefix queries"
+            type: safeInt
+            validator: { gt: 0 }
+            cpp_name: minQueryLength
+
+    FLE2TextSearchInsertSpec:
+        description: "Text search struct that is encoded inside of a FLE2EncryptionPlaceholder."
+        strict: true
+        cpp_validator_func: "validateIDLFLE2TextSearchInsertSpec"
+        fields:
+          v:
+            description: "value to encrypt"
+            type: string
+            cpp_name: value
+          casef:
+            description: "case folding enabled?"
+            type: bool
+            cpp_name: caseFold
+          diacf:
+            description: "diacritic folding enabled?"
+            type: bool
+            cpp_name: diacriticFold
+          substr:
+            description: "parameters for substring indexing"
+            type: FLE2SubstringInsertSpec
+            optional: true
+            cpp_name: substringSpec
+          suffix:
+            description: "parameters for suffix indexing"
+            type: FLE2SuffixInsertSpec
+            optional: true
+            cpp_name: suffixSpec
+          prefix:
+            description: "parameters for prefix indexing"
+            type: FLE2PrefixInsertSpec
+            optional: true
+            cpp_name: prefixSpec
