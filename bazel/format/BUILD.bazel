@@ -17,8 +17,13 @@ py_binary(
     args = [
         "--prettier",
         "$(location :prettier)",
+        "--shellscripts-linters",
+        "$(location //buildscripts:shellscripts_linters)",
     ],
-    data = [":prettier"],
+    data = [
+        ":prettier",
+        "//buildscripts:shellscripts_linters",
+    ],
     main = "format.py",
     visibility = ["//visibility:public"],
     deps = [

@@ -1,6 +1,10 @@
 #!/bin/bash
 set +o errexit
 
+if [ -n "$BUILD_WORKSPACE_DIRECTORY" ]; then
+  cd $BUILD_WORKSPACE_DIRECTORY
+fi
+
 if ! command -v shfmt &>/dev/null; then
   echo "Could not find the 'shfmt' command"
   echo ""
