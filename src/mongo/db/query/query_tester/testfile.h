@@ -150,7 +150,7 @@ protected:
     std::vector<CollectionSpec> _collectionsNeeded;
     std::string _databaseNeeded;
     std::vector<Test> _tests;
-    size_t _testsRun;
+    size_t _testsRun = 0;
     const bool _optimizationsOff;
     std::filesystem::path _expectedPath;
     std::filesystem::path _actualPath;
