@@ -34,5 +34,10 @@ BAZEL_BINARY=bazel
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
 
+# TODO(SERVER-98912): Remove when bazel test is better integrated with evergreen
+set +e
+
 echo "       bazel coverage $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
-$BAZEL_BINARY coverage $LOCAL_ARG ${args} ${target}
+eval $BAZEL_BINARY coverage $LOCAL_ARG ${args} ${target}
+
+exit 0
