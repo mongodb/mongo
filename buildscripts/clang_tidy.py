@@ -110,12 +110,13 @@ def _combine_errors(fixes_filename: str, files_to_parse: List[str]) -> int:
                     },
                 )
             )
+            for replacement in fix_data["replacements"]:
+                if replacement.get("FilePath") and os.path.exists(replacement.get("FilePath")):
+                    with open(replacement.get("FilePath"), "rb") as contents:
+                        replacement["FileContentsMD5"] = hashlib.md5(contents.read()).hexdigest()
+
             fix_data["count"] += 1
             fix_data["source_files"].append(fixes["MainSourceFile"])
-            if fix_msg.get("FilePath") and os.path.exists(fix_msg.get("FilePath")):
-                all_fixes[fix["DiagnosticName"]][fix_msg.get("FilePath")]["md5"] = hashlib.md5(
-                    open(fix_msg.get("FilePath"), "rb").read()
-                ).hexdigest()
 
     with open(fixes_filename, "w") as files_file:
         json.dump(all_fixes, files_file, indent=4, sort_keys=True)
