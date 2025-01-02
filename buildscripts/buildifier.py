@@ -5,6 +5,8 @@ import platform
 import subprocess
 import sys
 
+sys.path.append(".")
+
 from buildscripts import download_buildifier
 from buildscripts.simple_report import make_report, put_report, try_combine_reports
 from buildscripts.unittest_grouper import validate_bazel_groups
@@ -102,12 +104,7 @@ def fix(bin_path: str, files: list[str]):
 
 
 def main():
-    default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
-    if not default_dir:
-        print("This script must be run though bazel. Please run 'bazel run //:format' instead")
-        print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
-        print("python buildscripts/install_bazel.py")
-        return 1
+    default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY", ".")
     os.chdir(default_dir)
 
     parser = argparse.ArgumentParser(description="buildifier wrapper")
