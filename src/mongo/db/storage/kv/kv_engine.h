@@ -65,9 +65,22 @@ public:
     }
     // ---------
 
-    virtual void listDatabases(std::vector<std::string>& out) const {}
-    virtual void listCollections(std::string_view dbName, std::vector<std::string>& out) const {}
-    virtual void listCollections(std::string_view dbName, std::set<std::string>& out) const {}
+    virtual void listDatabases(std::vector<std::string>& out) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual bool databaseExists(std::string_view dbName) const {
+        MONGO_UNREACHABLE;
+        return false;
+    }
+
+    virtual void listCollections(std::string_view dbName, std::vector<std::string>& out) const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual void listCollections(std::string_view dbName, std::set<std::string>& out) const {
+        MONGO_UNREACHABLE;
+    }
     /**
      * Having multiple out for the same ns is a rules violation; Calling on a non-created ident is
      * invalid and may crash.

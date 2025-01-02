@@ -176,8 +176,16 @@ public:
      * XXX: why doesn't this take OpCtx?
      */
     virtual void listDatabases(std::vector<std::string>* out) const = 0;
-    virtual void listCollections(std::string_view dbName, std::vector<std::string>* out) const {};
-    virtual void listCollections(std::string_view dbName, std::set<std::string>& out) const {};
+    virtual bool databaseExists(std::string_view dbName) const {
+        MONGO_UNREACHABLE;
+        return false;
+    }
+    virtual void listCollections(std::string_view dbName, std::vector<std::string>* out) const {
+        MONGO_UNREACHABLE;
+    }
+    virtual void listCollections(std::string_view dbName, std::set<std::string>& out) const {
+        MONGO_UNREACHABLE;
+    }
     /**
      * Return the DatabaseCatalogEntry that describes the database indicated by 'db'.
      *

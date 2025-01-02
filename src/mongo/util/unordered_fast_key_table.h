@@ -32,6 +32,7 @@
 #include <iterator>
 #include <memory>
 #include <type_traits>
+#include <utility>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/util/assert_util.h"
@@ -263,7 +264,7 @@ public:
     }
 
     template <typename AreaPtr,
-              typename reference = decltype(AreaPtr()->begin()->getData()),
+              typename reference = decltype(std::declval<AreaPtr>()->begin()->getData()),
               typename pointer = typename std::add_pointer<reference>::type>
     class iterator_impl
         : public std::
@@ -428,6 +429,6 @@ private:
     size_t _size = 0;
     Area _area;
 };
-}
+}  // namespace mongo
 
 #include "mongo/util/unordered_fast_key_table_internal.h"

@@ -154,7 +154,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
         log() << "dropDatabase " << dbName << " - dropping " << numCollectionsToDrop
               << " collections";
-        for (auto nss : collectionsToDrop) {
+        for (const auto& nss : collectionsToDrop) {
             log() << "dropDatabase " << dbName << " - dropping collection: " << nss;
             if (!opCtx->writesAreReplicated()) {
                 // Dropping a database on a primary replicates individual collection drops

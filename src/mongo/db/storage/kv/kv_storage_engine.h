@@ -92,6 +92,7 @@ public:
                                            bool isForWrite) override;
 
     void listDatabases(std::vector<std::string>* out) const override;
+    bool databaseExists(std::string_view dbName) const override;
     void listCollections(std::string_view dbName, std::vector<std::string>* out) const override;
     void listCollections(std::string_view dbName, std::set<std::string>& out) const override;
     KVDatabaseCatalogEntryBase* getDatabaseCatalogEntry(OperationContext* opCtx,

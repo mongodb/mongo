@@ -365,8 +365,7 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
             continue;
         }
 
-        if (_catalog->isSystemDataIdent(it))
-        {
+        if (_catalog->isSystemDataIdent(it)) {
             continue;
         }
 
@@ -519,6 +518,10 @@ void KVStorageEngine::listDatabases(std::vector<std::string>* out) const {
     //         continue;
     //     out->push_back(it->first);
     // }
+}
+
+bool KVStorageEngine::databaseExists(std::string_view dbName) const {
+    return _engine->databaseExists(dbName);
 }
 
 void KVStorageEngine::listCollections(std::string_view dbName,
