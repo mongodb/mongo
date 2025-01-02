@@ -39,6 +39,7 @@
 #include "mongo/util/debugger.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 
@@ -349,5 +350,28 @@ Status exceptionToStatus() noexcept {
         LOGV2_FATAL_CONTINUE(23097, "Caught unknown exception in exceptionToStatus()");
         std::terminate();
     }
+}
+
+std::vector<std::string> ScopedDebugInfoStack::getAll() {
+    if (_loggingDepth > 0) {
+        return {};  // Re-entry detected.
+    }
+
+    _loggingDepth++;
+    ScopeGuard updateDepth = [&] {
+        _loggingDepth--;
+    };
+
+    try {
+        std::vector<std::string> r;
+        r.reserve(_stack.size());
+        std::transform(_stack.begin(), _stack.end(), std::back_inserter(r), [](auto&& e) {
+            return e->toString();
+        });
+        return r;
+    } catch (...) {
+        LOGV2(9513400, "ScopedDebugInfo failed", "error"_attr = describeActiveException());
+    }
+    return {};
 }
 }  // namespace mongo

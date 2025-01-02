@@ -859,17 +859,18 @@ public:
         _stack.pop_back();
     }
 
-    std::vector<std::string> getAll() const {
-        std::vector<std::string> r;
-        r.reserve(_stack.size());
-        std::transform(_stack.begin(), _stack.end(), std::back_inserter(r), [](auto&& e) {
-            return e->toString();
-        });
-        return r;
-    }
+    /**
+     * Returns the result of calling `toString` on every element in the stack in a way that prevents
+     * re-entry by keeping track of how many times we have recursively called this function. This
+     * prevents an infinite loop from occurring during a call to `getAll` via any exceptions thrown.
+     * Note that it is not correct to write a `ScopedDebugInfo` that throws an exception, and that
+     * the behavior described here is just a failsafe backstop against buggy formatters.
+     */
+    std::vector<std::string> getAll();
 
 private:
     std::vector<const Rec*> _stack;
+    int _loggingDepth = 0;
 };
 
 /** Each thread has its own stack of scoped debug info. */
@@ -892,6 +893,9 @@ inline ScopedDebugInfoStack& scopedDebugInfoStack() {
  *         ScopedDebugInfo userIdDbg("userId", currentUser.id());
  *         somethingThatMightCrash(currentUser);
  *     }
+ *
+ * ScopedDebugInfo must only be used with trivially formattable values. Since it's diagnostic
+ * information, formattted during error handling, formatting must not itself fail.
  */
 template <typename T>
 class ScopedDebugInfo {

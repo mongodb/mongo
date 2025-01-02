@@ -425,6 +425,24 @@ private:
 };
 
 /**
+ * Matches a container `x` when `x.empty()` is true.
+ * Example:
+ *     std::vector<int> vec{};
+ *     ASSERT_THAT(vec, IsEmpty());
+ */
+class IsEmpty : public Matcher {
+public:
+    std::string describe() const {
+        return "IsEmpty()";
+    }
+
+    template <typename X>
+    MatchResult match(X&& x) const {
+        return x.empty();
+    }
+};
+
+/**
  * Match the tuple elements of an expression.
  *
  * Example:
