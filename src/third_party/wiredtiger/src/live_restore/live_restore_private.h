@@ -32,32 +32,27 @@ struct __wt_live_restore_hole_node {
 };
 
 /*
- * WT_LIVE_RESTORE_DESTINATION_METADATA --
- *     Metadata kept along side a file handle to track holes in the destination file.
- */
-typedef struct {
-    WT_FILE_HANDLE *fh;
-    bool complete;
-
-    /* We need to get back to the file system when checking for tombstone files. */
-    WT_LIVE_RESTORE_FS *back_pointer;
-
-    /*
-     * The hole list tracks which ranges in the destination file are holes. As the migration
-     * continues the holes will be gradually filled by either data from the source or new writes.
-     * Holes in these extents should only shrink and never grow.
-     */
-    WT_LIVE_RESTORE_HOLE_NODE *hole_list_head;
-} WT_LIVE_RESTORE_DESTINATION_METADATA;
-
-/*
  * __wt_live_restore_file_handle --
  *     A file handle in a live restore file system.
  */
 struct __wt_live_restore_file_handle {
     WT_FILE_HANDLE iface;
     WT_FILE_HANDLE *source;
-    WT_LIVE_RESTORE_DESTINATION_METADATA destination;
+    /* Metadata kept along side a file handle to track holes in the destination file. */
+    struct {
+        WT_FILE_HANDLE *fh;
+        bool complete;
+
+        /* We need to get back to the file system when checking for tombstone files. */
+        WT_LIVE_RESTORE_FS *back_pointer;
+
+        /*
+         * The hole list tracks which ranges in the destination file are holes. As the migration
+         * continues the holes will be gradually filled by either data from the source or new
+         * writes. Holes in these extents should only shrink and never grow.
+         */
+        WT_LIVE_RESTORE_HOLE_NODE *hole_list_head;
+    } destination;
 
     WT_FS_OPEN_FILE_TYPE file_type;
 };
@@ -93,6 +88,29 @@ struct __wt_live_restore_fs {
 #define WT_LIVE_RESTORE_DEBUG_FILL_HOLES_ON_CLOSE 0x1u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t debug_flags;
+};
+
+/*
+ * WT_LIVE_RESTORE_WORK_ITEM --
+ *     A single item of work to be worked on by a thread.
+ */
+struct __wt_live_restore_work_item {
+    char *uri;
+    TAILQ_ENTRY(__wt_live_restore_work_item) q; /* List of URIs queued for background migration. */
+};
+
+/*
+ * WT_LIVE_RESTORE_SERVER --
+ *     The live restore server object that is kept on the connection. Holds a thread group and the
+ *     work queue, with some additional info.
+ */
+struct __wt_live_restore_server {
+    WT_THREAD_GROUP threads;
+    wt_shared uint32_t threads_working;
+    WT_SPINLOCK queue_lock;
+    uint64_t queue_size;
+
+    TAILQ_HEAD(__wt_live_restore_work_queue, __wt_live_restore_work_item) work_queue;
 };
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */

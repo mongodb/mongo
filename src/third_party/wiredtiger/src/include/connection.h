@@ -410,7 +410,7 @@ struct __wt_connection_impl {
 
     WT_BACKGROUND_COMPACT background_compact; /* Background compaction server */
 
-    WT_LIVE_RESTORE_SERVER live_restore_server; /* Live restore server. */
+    WT_LIVE_RESTORE_SERVER *live_restore_server; /* Live restore server. */
 
     WT_HEURISTIC_CONTROLS heuristic_controls; /* Heuristic controls configuration */
 
