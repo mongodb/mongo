@@ -107,7 +107,8 @@ expectedEvents.push({operationType: "delete", documentKey: {_id: "b", shard: 2}}
 assert.commandWorked(
     st.s.adminCommand({refineCollectionShardKey: testColl.getFullName(), key: {shard: 1, _id: 1}}));
 
-assert.commandWorked(st.s.adminCommand({reshardCollection: testColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(st.s.adminCommand(
+    {reshardCollection: testColl.getFullName(), key: {_id: 1}, numInitialChunks: 1}));
 expectedEvents.push({operationType: "reshardCollection"});
 
 assert.commandWorked(testColl.dropIndex({largeField: 1}));
