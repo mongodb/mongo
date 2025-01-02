@@ -41,13 +41,15 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
         cq(),
         plan_cache_util::ClassicPlanCacheWriter{
             opCtx(), collections().getMainCollectionPtrOrAcquisition(), false /* executeInSbe */});
-    _multiplanStage = stage.get();
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams().indexFiltersApplied;
         auto executableTree = buildExecutableTree(*solution);
         stage->addPlan(std::move(solution), std::move(executableTree), ws());
     }
     setRoot(std::move(stage));
+    // Need to do this after the move to make the static analyzer happy. The pointer is
+    // stored as a PlanStage pointer, so we need to reinterpret cast during retrieval.
+    _multiplanStage = reinterpret_cast<MultiPlanStage*>(getRoot());
 }
 
 Status MultiPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {

@@ -263,6 +263,10 @@ std::unique_ptr<PlanStage> ClassicPlannerInterface::buildExecutableTree(const Qu
         &_planStageQsnMap);
 }
 
+PlanStage* ClassicPlannerInterface::getRoot() const {
+    return _root.get();
+}
+
 void ClassicPlannerInterface::setRoot(std::unique_ptr<PlanStage> root) {
     _root = std::move(root);
 }

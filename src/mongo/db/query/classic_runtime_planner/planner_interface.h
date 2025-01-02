@@ -96,6 +96,7 @@ public:
 protected:
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);
 
+    PlanStage* getRoot() const;
     void setRoot(std::unique_ptr<PlanStage> root);
 
     OperationContext* opCtx();
