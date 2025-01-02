@@ -1598,6 +1598,12 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
         }
     }
 
+    // See https://www.mongodb.com/docs/v6.0/reference/command/create/
+    // `autoIndexId` field has been deprecated.
+    if (collectionOptions.autoIndexId == CollectionOptions::NO) {
+        return {ErrorCodes::BadValue, "Unsupported value for autoIndexId field: false."};
+    }
+
     if (collectionOptions.isView()) {
         uassertStatusOK(db->createView(opCtx, ns, collectionOptions));
     } else {
