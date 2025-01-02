@@ -1235,6 +1235,7 @@ mongo_cc_library(
         "//src/mongo/db/s/config:configsvr_reset_placement_history_command.cpp",
         "//src/mongo/db/s/config:configsvr_reshard_collection_cmd.cpp",
         "//src/mongo/db/s/config:configsvr_run_restore_command.cpp",
+        "//src/mongo/db/s/config:configsvr_run_restore_gen",
         "//src/mongo/db/s/config:configsvr_set_allow_migrations_command.cpp",
         "//src/mongo/db/s/config:configsvr_set_cluster_parameter_command.cpp",
         "//src/mongo/db/s/config:configsvr_set_user_write_block_mode_command.cpp",

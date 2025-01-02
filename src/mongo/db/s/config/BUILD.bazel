@@ -37,3 +37,12 @@ idl_generator(
         "//src/mongo/db/session:logical_session_id_gen",
     ],
 )
+
+idl_generator(
+    name = "configsvr_run_restore_gen",
+    src = "configsvr_run_restore.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
