@@ -27,6 +27,7 @@ const kDb2 = "db2_agg_list_cluster_catalog";
 const kNotExistent = 'notExistent_agg_list_cluster_catalog';
 const kSpecsList = ["shards", "tracked", "balancingConfiguration"];
 const adminDB = db.getSiblingDB("admin");
+const configDB = db.getSiblingDB("config");
 
 // Test all the combination of specs. Every spec can be true or false. The total number of
 // combinations will be 2^n where n is number of specs.
@@ -228,5 +229,35 @@ jsTest.log("The stage must work under any combination of specs.");
         jsTest.log("Verify the stage reports the correct result for specs " + tojson(specs));
         let stageResult = adminDB.aggregate([{$listClusterCatalog: specs}]).toArray();
         verifyAgainstListCollections(listCollectionResult, stageResult, specs);
+    });
+}
+
+jsTest.log("The stage must return the admin collections.");
+{
+    let listCollectionResult = runListCollectionsOnDbs(db, ["admin"]);
+    let stageResult = adminDB.aggregate([{$listClusterCatalog: {}}]).toArray();
+
+    verifyAgainstListCollections(listCollectionResult, stageResult, {});
+}
+
+jsTest.log("The stage must return the same config collections from admin and config databases.");
+{
+    assert.soon(() => {
+        let listCollectionResult = runListCollectionsOnDbs(db, ["config"]);
+        let stageResultAdmin =
+            adminDB
+                .aggregate([
+                    {$listClusterCatalog: {}},
+                    {$match: {$and: [{db: "config"}, {ns: {$not: /system.profile/}}]}}
+                ])
+                .toArray();
+        let stageResultConfig = configDB.aggregate([{$listClusterCatalog: {}}]).toArray();
+        if (listCollectionResult.length != stageResultAdmin.length ||
+            listCollectionResult.length != stageResultConfig.length) {
+            return false;
+        }
+        verifyAgainstListCollections(listCollectionResult, stageResultAdmin, {});
+        verifyAgainstListCollections(listCollectionResult, stageResultConfig, {});
+        return true;
     });
 }

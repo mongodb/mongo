@@ -15,6 +15,10 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+const kOnlyUserDbsMatch = {
+    "$match": {"$and": [{"db": {"$ne": "config"}}, {"db": {"$ne": "admin"}}]}
+};
+
 // nss => { shardinginfo: {}, shards: []}
 let cachedCatalog = {};
 
@@ -425,13 +429,46 @@ jsTest.log("The stage must run collectionless.");
         9621301);
 }
 
-jsTest.log("The stage must return an empty result if the cluster has no user collections.");
+jsTest.log("The stage must not return any user collection if the cluster has no user collections.");
 {
     let result = assert
-                     .commandWorked(mongos.getDB("admin").runCommand(
-                         {aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}))
+                     .commandWorked(mongos.getDB("admin").runCommand({
+                         aggregate: 1,
+                         pipeline: [{$listClusterCatalog: {}}, kOnlyUserDbsMatch],
+                         cursor: {}
+                     }))
                      .cursor.firstBatch;
     assert.eq(0, result.length, result);
+}
+
+jsTest.log("The stage must return not empty result for admin collections.");
+{
+    let result = assert
+                     .commandWorked(mongos.getDB("admin").runCommand({
+                         aggregate: 1,
+                         pipeline: [{$listClusterCatalog: {}}, {"$match": {"db": "admin"}}],
+                         cursor: {}
+                     }))
+                     .cursor.firstBatch;
+    assert.gt(result.length, 0, result);
+}
+
+jsTest.log("The stage must return not empty result for config collections.");
+{
+    let result = assert
+                     .commandWorked(mongos.getDB("admin").runCommand({
+                         aggregate: 1,
+                         pipeline: [{$listClusterCatalog: {}}, {"$match": {"db": "config"}}],
+                         cursor: {}
+                     }))
+                     .cursor.firstBatch;
+    assert.gt(result.length, 0, result);
+
+    result = assert
+                 .commandWorked(mongos.getDB("config").runCommand(
+                     {aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}))
+                 .cursor.firstBatch;
+    assert.gt(result.length, 0, result);
 }
 
 jsTest.log("The stage must return the collection for the specified user db. Case unsharded.");
@@ -497,8 +534,11 @@ jsTest.log("The stage must return every database if run against the admin db.");
         runListCollectionsOnDbs(mongos, [kUnshardedDB, kShardedDB, kTrackedUnshardedDB]);
 
     let stageResult = assert
-                          .commandWorked(mongos.getDB("admin").runCommand(
-                              {aggregate: 1, pipeline: [{$listClusterCatalog: {}}], cursor: {}}))
+                          .commandWorked(mongos.getDB("admin").runCommand({
+                              aggregate: 1,
+                              pipeline: [{$listClusterCatalog: {}}, kOnlyUserDbsMatch],
+                              cursor: {}
+                          }))
                           .cursor.firstBatch;
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
@@ -512,11 +552,13 @@ jsTest.log("The stage must work under any combination of specs.");
     let allSpecs = generateSpecCombinations(kSpecsList);
     allSpecs.forEach((specs) => {
         jsTest.log("Verify the stage reports the correct result for specs " + tojson(specs));
-        let stageResult =
-            assert
-                .commandWorked(mongos.getDB("admin").runCommand(
-                    {aggregate: 1, pipeline: [{$listClusterCatalog: specs}], cursor: {}}))
-                .cursor.firstBatch;
+        let stageResult = assert
+                              .commandWorked(mongos.getDB("admin").runCommand({
+                                  aggregate: 1,
+                                  pipeline: [{$listClusterCatalog: specs}, kOnlyUserDbsMatch],
+                                  cursor: {}
+                              }))
+                              .cursor.firstBatch;
 
         verifyAgainstListCollections(listCollectionResult, stageResult, specs);
     });
@@ -535,8 +577,11 @@ jsTest.log("The stage must report the correct default chunk size if changed.");
 
     const spec = {balancingConfiguration: true};
     let stageResult = assert
-                          .commandWorked(mongos.getDB("admin").runCommand(
-                              {aggregate: 1, pipeline: [{$listClusterCatalog: spec}], cursor: {}}))
+                          .commandWorked(mongos.getDB("admin").runCommand({
+                              aggregate: 1,
+                              pipeline: [{$listClusterCatalog: spec}, kOnlyUserDbsMatch],
+                              cursor: {}
+                          }))
                           .cursor.firstBatch;
 
     verifyAgainstListCollections(listCollectionResult, stageResult, spec);

@@ -323,6 +323,10 @@ std::vector<DatabaseName> CommonProcessInterface::_getAllDatabasesOnAShardedClus
                    std::back_inserter(databases),
                    [](const DatabaseType& dbType) -> DatabaseName { return dbType.getDbName(); });
 
+    // Add internal databases.
+    databases.push_back(DatabaseName::kAdmin);
+    databases.push_back(DatabaseName::kConfig);
+
     return databases;
 }
 

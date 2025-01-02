@@ -165,8 +165,42 @@ function runTestOnDb(dbTest) {
     compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
 }
 
+function runInternalCollectionsTest(dbTest) {
+    // Check that $_internalListCollections returns collections for "admin" db.
+    assert.soon(() => {
+        let adminCollectionInfos = dbTest.getSiblingDB("admin").getCollectionInfos();
+        let adminCollections = dbTest.getSiblingDB("admin").aggregate([
+            {$_internalListCollections: {}},
+            {$match: {$and: [{db: "admin"}, {ns: {$not: /system.profile/}}]}}
+        ]);
+        return adminCollectionInfos.length == adminCollections.toArray().length;
+    });
+
+    // Check that $_internalListCollections returns "config" collections if called against "admin"
+    // db.
+    assert.soon(() => {
+        let configCollectionInfos = dbTest.getSiblingDB("config").getCollectionInfos();
+        let configCollectionsFromAdmin = dbTest.getSiblingDB("admin").aggregate([
+            {$_internalListCollections: {}},
+            {$match: {$and: [{db: "config"}, {ns: {$not: /system.profile/}}]}}
+        ]);
+        return configCollectionInfos.length == configCollectionsFromAdmin.toArray().length;
+    });
+
+    // Check that $_internalListCollections returns "config" collections if called against "config"
+    // db.
+    assert.soon(() => {
+        let configCollectionInfos = dbTest.getSiblingDB("config").getCollectionInfos();
+        let configCollectionsFromConfig = dbTest.getSiblingDB("config").aggregate(
+            [{$_internalListCollections: {}}, {$match: {ns: {$not: /system.profile/}}}]);
+        return configCollectionInfos.length == configCollectionsFromConfig.toArray().length;
+    });
+}
+
 assert.commandWorked(dbTest1.dropDatabase());
 assert.commandWorked(dbTest2.dropDatabase());
 
 runTestOnDb(dbTest1);
 runTestOnDb(dbTest2);
+
+runInternalCollectionsTest(dbTest1);
