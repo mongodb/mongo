@@ -86,7 +86,7 @@ export const $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: 0,  // TODO SERVER-80143: Re-enable with 100 iterations.
+        iterations: 100,
         setup: setup,
         states: states,
         transitions: transitions,
