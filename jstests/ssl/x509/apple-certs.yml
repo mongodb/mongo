@@ -1,0 +1,48 @@
+# Definition for testing certificates to be created and installed into the MacOS trusted keychain upon provision.
+
+global:
+  # On MacOS provision, these certificates will be copied from jstests/libs/ to /opt/x509.
+  output_path: "jstests/libs/"
+  Subject:
+    C: "US"
+    ST: "New York"
+    L: "New York City"
+    O: "MongoDB"
+    OU: "Kernel"
+
+certs:
+  - name: "macos-trusted-ca.pem"
+    description: CA for trusted MacOS client/server certificate chain.
+    Subject: {CN: "Trusted MacOS Kernel Test CA"}
+    Issuer: self
+    extensions:
+      basicConstraints: {CA: true}
+      subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+
+  - name: "macos-trusted-client.pem"
+    description: Client certificate for trusted MacOS chain.
+    Subject: {CN: "Trusted MacOS Kernel Test Client"}
+    Issuer: "macos-trusted-ca.pem"
+    pkcs12:
+      passphrase: "qwerty"
+      name: "macos-trusted-client.pfx"
+    extensions:
+      extendedKeyUsage: [clientAuth]
+      subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+
+  - name: "macos-trusted-server.pem"
+    description: Server certificate for trusted MacOS chain.
+    Subject: {CN: "Trusted MacOS Kernel Test Server"}
+    Issuer: "macos-trusted-ca.pem"
+    pkcs12:
+      passphrase: "qwerty"
+      name: "macos-trusted-server.pfx"
+    extensions:
+      extendedKeyUsage: [serverAuth]
+      subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
