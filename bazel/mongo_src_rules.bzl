@@ -1631,6 +1631,17 @@ def mongo_cc_library(
             "//conditions:default": {},
         })
 
+    if "compile_requires_large_memory_gcc_fission" in tags:
+        exec_properties |= select({
+            "//bazel/config:linux_gcc_fission_x86_64": {
+                "Pool": "large_mem_x86_64",
+            },
+            "//bazel/config:linux_gcc_fission_aarch64": {
+                "Pool": "large_memory_arm64",
+            },
+            "//conditions:default": {},
+        })
+
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     package_specific_copts = package_specific_copt(native.package_name())
@@ -1911,6 +1922,17 @@ def _mongo_cc_binary_and_program(
                 "Pool": "large_mem_x86_64",
             },
             "//bazel/config:any_sanitizer_aarch64": {
+                "Pool": "large_memory_arm64",
+            },
+            "//conditions:default": {},
+        })
+
+    if "compile_requires_large_memory_gcc_fission" in tags:
+        exec_properties |= select({
+            "//bazel/config:linux_gcc_fission_x86_64": {
+                "Pool": "large_mem_x86_64",
+            },
+            "//bazel/config:linux_gcc_fission_aarch64": {
                 "Pool": "large_memory_arm64",
             },
             "//conditions:default": {},

@@ -280,9 +280,13 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
           args: >-
             --config=fastbuild
             --define GIT_COMMIT_HASH=nogitversion
+            --linkopt="-s"
+            --jobs 32
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_bazel_profile_opt
@@ -300,9 +304,13 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
           args: >-
             --config=opt
             --define GIT_COMMIT_HASH=nogitversion
+            --linkopt="-s"
+            --jobs 32
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_bazel_profile_dbg
@@ -320,9 +328,13 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
           args: >-
             --config=dbg
             --define GIT_COMMIT_HASH=nogitversion
+            --linkopt="-s"
+            --jobs 32
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_bazel_profile_dbg_aubsan
@@ -340,9 +352,13 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
           args: >-
             --config=dbg_aubsan
             --define GIT_COMMIT_HASH=nogitversion
+            --linkopt="-s"
+            --jobs 32
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - name: hydrate_bazel_profile_dbg_tsan
@@ -360,9 +376,13 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
           args: >-
             --config=dbg_tsan
             --define GIT_COMMIT_HASH=nogitversion
+            --linkopt="-s"
+            --jobs 32
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
   - <<: *clang_tidy_task_template
@@ -1873,6 +1893,7 @@ task_groups:
   # We want to run these sequentially to put less load on the cluster
   - <<: *compile_task_group_template
     name: hydrate_bazel_profile_TG
+    max_hosts: -1
     tasks:
       - hydrate_bazel_profile_fastbuild
       - hydrate_bazel_profile_opt

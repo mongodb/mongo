@@ -602,7 +602,10 @@ mongo_cc_unit_test(
         "//src/mongo/unittest:join_thread.h",
         "//src/mongo/util:executor_test_util.h",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = [
+        "compile_requires_large_memory_gcc_fission",
+        "mongo_unittest_third_group",
+    ],
     deps = [
         "async_rpc",
         "async_rpc_util",
