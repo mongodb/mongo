@@ -386,6 +386,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/timeseries/ddl/**/timeseries_index* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/core/timeseries/ddl/**/timeseries_index_build_failure.js @10gen/server-index-builds @svc-auto-approve-bot
 /jstests/core/timeseries/ddl/**/timeseries_index_spec.js @10gen/server-collection-write-path @svc-auto-approve-bot
+/jstests/core/timeseries/ddl/**/timeseries_index_spec_with_originalSpec.js @10gen/server-collection-write-path @svc-auto-approve-bot
 /jstests/core/timeseries/ddl/**/timeseries_index_ttl_partial.js @10gen/query-integration-timeseries @svc-auto-approve-bot
 /jstests/core/timeseries/ddl/**/timeseries_index_use.js @10gen/query-integration-timeseries @svc-auto-approve-bot
 /jstests/core/timeseries/ddl/**/timeseries_user_system_buckets.js @10gen/server-catalog-and-routing @svc-auto-approve-bot

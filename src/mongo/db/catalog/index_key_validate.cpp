@@ -815,9 +815,31 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
     return Status::OK();
 }
 
+void validateOriginalSpecCollation(OperationContext* opCtx,
+                                   BSONObj originalSpecCollation,
+                                   BSONObj newIndexSpec,
+                                   const CollatorInterface* defaultCollator) {
+    auto indexSpecCollation = (newIndexSpec.hasField(IndexDescriptor::kCollationFieldName)
+                                   ? newIndexSpec[IndexDescriptor::kCollationFieldName].Obj()
+                                   : (defaultCollator ? defaultCollator->getSpec().toBSON()
+                                                      : CollationSpec::kSimpleSpec));
+    auto indexSpecCollator =
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(indexSpecCollation);
+    auto originalSpecCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                    ->makeFromBSON(originalSpecCollation);
+    uassert(ErrorCodes::InvalidIndexSpecificationOption,
+            str::stream() << "The collation of the originalSpec must be the same as the "
+                             "collation of the outer index spec. originalSpec's collation: "
+                          << originalSpecCollation
+                          << ", indexSpec's collation: " << indexSpecCollation,
+            CollatorInterface::collatorsMatch(indexSpecCollator.getValue().get(),
+                                              originalSpecCollator.getValue().get()));
+}
+
 StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
                                                const BSONObj& indexSpec,
-                                               const CollatorInterface* defaultCollator) {
+                                               const CollatorInterface* defaultCollator,
+                                               const boost::optional<BSONObj>& newIndexSpec) {
     if (auto collationElem = indexSpec[IndexDescriptor::kCollationFieldName]) {
         // validateIndexSpec() should have already verified that 'collationElem' is an object.
         invariant(collationElem.type() == BSONType::Object);
@@ -829,6 +851,9 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
         }
 
         if (collator.getValue()) {
+            if (newIndexSpec)
+                validateOriginalSpecCollation(
+                    opCtx, collationElem.Obj(), *newIndexSpec, defaultCollator);
             // If the collator factory returned a non-null collator, then inject the entire
             // collation specification into the index specification. This is necessary to fill
             // in any options that the user omitted.
@@ -840,17 +865,27 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
                 }
             }
             bob.append(IndexDescriptor::kCollationFieldName,
-                       collator.getValue()->getSpec().toBSON());
+                       collator.getValue().get()->getSpec().toBSON());
 
             return bob.obj();
-        } else {
-            // If the collator factory returned a null collator (representing the "simple"
-            // collation), then we simply omit the "collation" from the index specification.
-            // This is desirable to make the representation for the "simple" collation
-            // consistent between v=1 and v=2 indexes.
-            return indexSpec.removeField(IndexDescriptor::kCollationFieldName);
         }
+
+        if (newIndexSpec)
+            validateOriginalSpecCollation(opCtx,
+                                          defaultCollator ? defaultCollator->getSpec().toBSON()
+                                                          : CollationSpec::kSimpleSpec,
+                                          *newIndexSpec,
+                                          defaultCollator);
+        // If the collator factory returned a null collator (representing the "simple"
+        // collation), then we simply omit the "collation" from the index specification.
+        // This is desirable to make the representation for the "simple" collation
+        // consistent between v=1 and v=2 indexes.
+        return indexSpec.removeField(IndexDescriptor::kCollationFieldName);
     } else if (defaultCollator) {
+        if (newIndexSpec)
+            validateOriginalSpecCollation(
+                opCtx, defaultCollator->getSpec().toBSON(), *newIndexSpec, defaultCollator);
+
         // validateIndexSpec() should have added the "v" field if it was not present and
         // verified that 'versionElem' is a number.
         auto versionElem = indexSpec[IndexDescriptor::kIndexVersionFieldName];
@@ -869,6 +904,10 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
             return bob.obj();
         }
     }
+
+    if (newIndexSpec)
+        validateOriginalSpecCollation(
+            opCtx, CollationSpec::kSimpleSpec, *newIndexSpec, defaultCollator);
     return indexSpec;
 }
 

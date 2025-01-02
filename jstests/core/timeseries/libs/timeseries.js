@@ -5,6 +5,51 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export var TimeseriesTest = class {
+    static verifyAndDropIndex(coll, bucketsColl, shouldHaveOriginalSpec, indexName) {
+        const checkIndexSpec = function(spec, userIndex) {
+            assert(spec.hasOwnProperty("v"));
+            assert(spec.hasOwnProperty("name"));
+            assert(spec.hasOwnProperty("key"));
+
+            if (userIndex) {
+                assert(!spec.hasOwnProperty("originalSpec"));
+                return;
+            }
+
+            if (shouldHaveOriginalSpec) {
+                assert(spec.hasOwnProperty("originalSpec"));
+                assert.eq(spec.v, spec.originalSpec.v);
+                assert.eq(spec.name, spec.originalSpec.name);
+                assert.neq(spec.key, spec.originalSpec.key);
+                assert.eq(spec.collation, spec.originalSpec.collation);
+            } else {
+                assert(!spec.hasOwnProperty("originalSpec"));
+            }
+        };
+        let sawIndex = false;
+
+        let userIndexes = coll.getIndexes();
+        for (const index of userIndexes) {
+            if (index.name === indexName) {
+                sawIndex = true;
+                checkIndexSpec(index, /*userIndex=*/ true);
+            }
+        }
+
+        let bucketIndexes = bucketsColl.getIndexes();
+        for (const index of bucketIndexes) {
+            if (index.name === indexName) {
+                sawIndex = true;
+                checkIndexSpec(index, /*userIndex=*/ false);
+            }
+        }
+
+        assert(sawIndex,
+               `Index with name: ${indexName} is missing: ${tojson({userIndexes, bucketIndexes})}`);
+
+        assert.commandWorked(coll.dropIndexes(indexName));
+    }
+
     static insertManyDocs(coll) {
         jsTestLog("Inserting documents to a bucket.");
         coll.insertMany(

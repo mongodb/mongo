@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -146,9 +147,11 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec);
  * collation spec. If 'collation' is missing, fills it in with the spec for 'defaultCollator'.
  * Returns the index specification with 'collation' filled in.
  */
-StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
-                                               const BSONObj& indexSpec,
-                                               const CollatorInterface* defaultCollator);
+StatusWith<BSONObj> validateIndexSpecCollation(
+    OperationContext* opCtx,
+    const BSONObj& indexSpec,
+    const CollatorInterface* defaultCollator,
+    const boost::optional<BSONObj>& newIndexSpec = boost::none);
 
 /**
  * Validates the the 'expireAfterSeconds' value for a TTL index or clustered collection.

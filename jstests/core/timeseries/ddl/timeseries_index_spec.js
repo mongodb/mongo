@@ -11,7 +11,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run(() => {
@@ -27,86 +26,48 @@ TimeseriesTest.run(() => {
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-    const checkIndexSpec = function(spec, userIndex, shouldHaveOriginalSpec) {
-        assert(spec.hasOwnProperty("v"));
-        assert(spec.hasOwnProperty("name"));
-        assert(spec.hasOwnProperty("key"));
-
-        if (userIndex) {
-            assert(!spec.hasOwnProperty("originalSpec"));
-            return;
-        }
-
-        if (shouldHaveOriginalSpec) {
-            assert(spec.hasOwnProperty("originalSpec"));
-            assert.eq(spec.v, spec.originalSpec.v);
-            assert.eq(spec.name, spec.originalSpec.name);
-            assert.neq(spec.key, spec.originalSpec.key);
-        } else {
-            assert(!spec.hasOwnProperty("originalSpec"));
-        }
-    };
-
-    const verifyAndDropIndex = function(shouldHaveOriginalSpec, indexName) {
-        let sawIndex = false;
-
-        let userIndexes = coll.getIndexes();
-        for (const index of userIndexes) {
-            if (index.name === indexName) {
-                sawIndex = true;
-                checkIndexSpec(index, /*userIndex=*/ true, shouldHaveOriginalSpec);
-            }
-        }
-
-        let bucketIndexes = bucketsColl.getIndexes();
-        for (const index of bucketIndexes) {
-            if (index.name === indexName) {
-                sawIndex = true;
-                checkIndexSpec(index, /*userIndex=*/ false, shouldHaveOriginalSpec);
-            }
-        }
-
-        assert(sawIndex,
-               `Index with name: ${indexName} is missing: ${tojson({userIndexes, bucketIndexes})}`);
-
-        assert.commandWorked(coll.dropIndexes(indexName));
-    };
-
     // If the collection is sharded, we expect an implicitly-created index on time. This index will
     // be the same index as the result of createIndex({timeField: 1}). Therefore we cannot create
     // nor drop an identical index with a different name.
     if (!FixtureHelpers.isSharded(bucketsColl)) {
         assert.commandWorked(
             coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
+        TimeseriesTest.verifyAndDropIndex(
+            coll, bucketsColl, /*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
     }
 
     assert.commandWorked(coll.createIndex({[metaFieldName]: 1}, {name: "metafield_downgradable"}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "metafield_downgradable");
+    TimeseriesTest.verifyAndDropIndex(
+        coll, bucketsColl, /*shouldHaveOriginalSpec=*/ false, "metafield_downgradable");
 
     assert.commandWorked(coll.createIndex({[timeFieldName]: 1, [metaFieldName]: 1},
                                           {name: "time_meta_field_downgradable"}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "time_meta_field_downgradable");
+    TimeseriesTest.verifyAndDropIndex(
+        coll, bucketsColl, /*shouldHaveOriginalSpec=*/ false, "time_meta_field_downgradable");
 
     assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_1");
+    TimeseriesTest.verifyAndDropIndex(coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "x_1");
 
     assert.commandWorked(
         coll.createIndex({x: 1}, {name: "x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_partial");
+    TimeseriesTest.verifyAndDropIndex(
+        coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "x_partial");
 
     assert.commandWorked(coll.createIndex(
         {[timeFieldName]: 1}, {name: "time_partial", partialFilterExpression: {x: {$gt: 5}}}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "time_partial");
+    TimeseriesTest.verifyAndDropIndex(
+        coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "time_partial");
 
     assert.commandWorked(coll.createIndex(
         {[metaFieldName]: 1}, {name: "meta_partial", partialFilterExpression: {x: {$gt: 5}}}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_partial");
+    TimeseriesTest.verifyAndDropIndex(
+        coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "meta_partial");
 
     assert.commandWorked(
         coll.createIndex({[metaFieldName]: 1, x: 1},
                          {name: "meta_x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_x_partial");
+    TimeseriesTest.verifyAndDropIndex(
+        coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "meta_x_partial");
 
     // Creating an index directly on the buckets collection is permitted. However, these types of
     // index creations will not have an "originalSpec" field and rely on the reverse mapping

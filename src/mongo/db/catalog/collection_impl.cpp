@@ -1447,10 +1447,12 @@ StatusWith<BSONObj> addCollationToIndexSpec(OperationContext* opCtx,
 
     if (originalIndexSpec.hasField(IndexDescriptor::kOriginalSpecFieldName)) {
         // Validation was already performed above.
-        BSONObj newOriginalIndexSpec = invariant(index_key_validate::validateIndexSpecCollation(
-            opCtx,
-            originalIndexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
-            collator));
+        BSONObj newOriginalIndexSpec =
+            uassertStatusOK(index_key_validate::validateIndexSpecCollation(
+                opCtx,
+                originalIndexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
+                collator,
+                newIndexSpec));
 
         BSONObj specToAdd = BSON(IndexDescriptor::kOriginalSpecFieldName << newOriginalIndexSpec);
         newIndexSpec = newIndexSpec.addField(specToAdd.firstElement());

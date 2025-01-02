@@ -12,6 +12,9 @@ filters:
   - "timeseries_index_spec.js":
     approvers:
       - 10gen/server-collection-write-path
+  - "timeseries_index_spec_with_originalSpec.js":
+    approvers:
+      - 10gen/server-collection-write-path
   - "timeseries_index_ttl_partial.js":
     approvers:
       - 10gen/query-integration-timeseries
