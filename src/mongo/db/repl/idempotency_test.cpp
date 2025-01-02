@@ -242,6 +242,14 @@ void RandomizedIdempotencyTest::runUpdateV2IdempotencyTestCase() {
             auto diffOutput = doc_diff::computeOplogDiff(
                 oldDoc, *generatedDoc, update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
             ASSERT(diffOutput);
+            if (diffOutput->isEmpty()) {
+                // The computeOplogDiff function returns an empty diff object when the size of the
+                // computed diff is larger than the 'post' image. Retrying because the diff field
+                // can't be empty in an update oplog.
+                LOGV2(9873500, "Retrying because the diff field can't be empty.");
+                i--;
+                continue;
+            }
             oplogDiff = BSON("$v" << 2 << "diff" << *diffOutput);
             auto op = update(kDocId, oplogDiff);
             ASSERT_OK(runOpInitialSync(op));
