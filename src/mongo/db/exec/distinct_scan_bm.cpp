@@ -287,7 +287,6 @@ public:
 
         std::vector<ChunkDesc> chunkMap;
         auto it = sortedValues.begin();
-        int i = 0;
         while (it != sortedValues.end()) {
             auto& min = *it;
             // Make the chunk include 'chunkSize' ndvs.
@@ -295,7 +294,6 @@ public:
             auto& max =
                 it == sortedValues.end() ? BSONObjBuilder().appendMaxKey(fieldName).obj() : *it;
             chunkMap.push_back({{min, max}, onCurrentShard});
-            i++;
         }
         return chunkMap;
     }

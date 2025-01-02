@@ -240,7 +240,7 @@ BENCHMARK(BM_UPDATE_ONE_OP_MSG)->Arg(10)->Arg(100)->Unit(benchmark::kNanosecond)
 void BM_IS_GENERIC_ARG(benchmark::State& state) {
     // Perform setup here
     auto arg = "lsid"_sd;
-    int i = 0;
+    [[maybe_unused]] int i = 0;
 
     for (auto _ : state) {
         // This code gets timed

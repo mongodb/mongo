@@ -1677,7 +1677,7 @@ public:
             Timer t;
             for (int i = 0; i < 10000; i++) {
                 BSONObjIteratorSorted j(o);
-                int l = 0;
+                [[maybe_unused]] int l = 0;
                 while (j.more())
                     l += strlen(j.next().fieldName());
             }
