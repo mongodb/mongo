@@ -45,7 +45,10 @@ namespace mongo {
 
 namespace {
 template <typename CommandType>
-std::tuple<const UUID, const NamespaceString, boost::optional<StringData>>
+std::tuple<const UUID,
+           const NamespaceString,
+           boost::optional<StringData>,
+           boost::optional<std::vector<BSONObj>>>
 retrieveCollectionUUIDAndResolveView(OperationContext* opCtx, CommandType& cmd) {
     const auto& currentOperationNss = cmd.getNamespace();
     auto role = opCtx->getService()->role();
@@ -53,40 +56,46 @@ retrieveCollectionUUIDAndResolveView(OperationContext* opCtx, CommandType& cmd) 
     // views can support all search commands.
     if (role.hasExclusively(ClusterRole::ShardServer)) {
         // If the index management command is being run on a view, this call will return the
-        // underlying source collection UUID and NSS. If not, it will just return a UUID.
-        auto collUUIDresolvedNSSpair =
+        // underlying source collection UUID and ResolvedView. If not, it will just return a UUID.
+        auto collUUIDResolvedViewPair =
             SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
                 opCtx, currentOperationNss);
         // If the query is on a normal collection, the source collection will be the same as
         // the current NS.
         auto sourceCollectionNss = currentOperationNss;
         boost::optional<StringData> viewNss;
-        auto collUUID = collUUIDresolvedNSSpair.first;
-        if (auto resolvedNss = collUUIDresolvedNSSpair.second) {
+        auto collUUID = collUUIDResolvedViewPair.first;
+        boost::optional<std::vector<BSONObj>> viewPipeline;
+        if (auto resolvedView = collUUIDResolvedViewPair.second) {
             // The request is on a view! Therefore, currentOperationNss refers to the view
-            // NS and resolvedNss refers to the underlying source collection.
-            sourceCollectionNss = *resolvedNss;
+            // NS and the namespace on resolvedView refers to the underlying source collection.
+            sourceCollectionNss = resolvedView.value().getNamespace();
             viewNss.emplace(currentOperationNss.coll());
+
+            viewPipeline.emplace(resolvedView.value().getPipeline());
         }
-        return std::make_tuple(collUUID, sourceCollectionNss, viewNss);
+
+        return std::make_tuple(collUUID, sourceCollectionNss, viewNss, viewPipeline);
     } else if (role.hasExclusively(ClusterRole::RouterServer)) {
         auto collectionUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(
             opCtx, currentOperationNss);
         // Run the search index command against the remote search index management server.
-        return std::make_tuple(collectionUUID, currentOperationNss, boost::none);
+        return std::make_tuple(collectionUUID, currentOperationNss, boost::none, boost::none);
     }
     MONGO_UNREACHABLE;
 }
 
 template <typename CommandType>
 BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, CommandType& cmd) {
-    const auto [collUUID, resolvedNss, viewName] = retrieveCollectionUUIDAndResolveView(opCtx, cmd);
+    const auto [collUUID, resolvedNss, viewName, viewPipeline] =
+        retrieveCollectionUUIDAndResolveView(opCtx, cmd);
 
     search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(
         opCtx, resolvedNss, cmd.toBSON(), viewName);
 
     // Run the search index command against the remote search index management server.
-    return getSearchIndexManagerResponse(opCtx, resolvedNss, collUUID, cmd.toBSON(), viewName);
+    return getSearchIndexManagerResponse(
+        opCtx, resolvedNss, collUUID, cmd.toBSON(), viewName, viewPipeline);
 }
 
 }  // namespace

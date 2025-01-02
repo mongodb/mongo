@@ -96,14 +96,14 @@ UUID SearchIndexProcessRouter::fetchCollectionUUIDOrThrow(OperationContext* opCt
     return *uuid;
 }
 
-std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
+std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
 SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                                             const NamespaceString& nss) {
     // TODO SERVER-93637 must implement to support running search queries on sharded views.
     MONGO_UNREACHABLE_TASSERT(9292000);
 }
 
-std::pair<UUID, boost::optional<NamespaceString>>
+std::pair<UUID, boost::optional<ResolvedView>>
 SearchIndexProcessRouter::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
                                                                    const NamespaceString& nss) {
     // TODO SERVER-93637 must implement to support running search queries on sharded views.

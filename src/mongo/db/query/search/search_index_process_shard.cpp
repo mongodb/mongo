@@ -60,7 +60,7 @@ UUID SearchIndexProcessShard::fetchCollectionUUIDOrThrow(OperationContext* opCtx
     return optUuid.get();
 }
 
-std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
+std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
 SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
 
@@ -69,23 +69,23 @@ SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opC
     if (!view) {
         return std::make_pair(catalog->lookupUUIDByNSS(opCtx, nss), boost::none);
     } else {
-        auto resolvedNamespace =
-            view_catalog_helpers::findSourceCollectionNamespace(opCtx, catalog, nss);
+        auto resolvedView =
+            view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none).getValue();
 
-        return std::make_pair(catalog->lookupUUIDByNSS(opCtx, resolvedNamespace),
-                              boost::make_optional(resolvedNamespace));
+        return std::make_pair(catalog->lookupUUIDByNSS(opCtx, resolvedView.getNamespace()),
+                              boost::make_optional(resolvedView));
     }
 }
 
-std::pair<UUID, boost::optional<NamespaceString>>
+std::pair<UUID, boost::optional<ResolvedView>>
 SearchIndexProcessShard::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {
-    auto uuidResolvdNssPair = fetchCollectionUUIDAndResolveView(opCtx, nss);
+    auto uuidResolvedViewPair = fetchCollectionUUIDAndResolveView(opCtx, nss);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
-            uuidResolvdNssPair.first);
+            uuidResolvedViewPair.first);
 
-    return std::make_pair(*uuidResolvdNssPair.first, uuidResolvdNssPair.second);
+    return std::make_pair(*uuidResolvedViewPair.first, uuidResolvedViewPair.second);
 }
 
 }  // namespace mongo

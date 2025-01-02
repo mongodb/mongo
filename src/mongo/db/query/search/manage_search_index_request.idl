@@ -33,6 +33,18 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
+    SearchIndexRequestView:
+        description: "If the query is on a view, the request to mongot will include this struct that contains the name of the view and the effective pipeline"
+        strict: true
+        fields:
+            name:
+                description: "The name of the view"
+                type: string
+                optional: false
+            effectivePipeline:
+                description: "An array of pipelines gathered from the current and associated views. This field is only required for createSearchIndexes commands, though it is being added to all search index command requests for easier debugability."
+                type: array<object>
+                optional: true
     ManageSearchIndexRequest:
         description: "Command request for search index management host"
         # Not being strict because this is used to parse a command object that
@@ -51,7 +63,12 @@ structs:
                 description: "The original user search index command request"
                 type: object
                 optional: false
+            # TODO SERVER-98368: remove `viewName` as the view name is passed through the `view` object below.
             viewName:
                 description: "If the command is being run on a view namespace, this field must be set to the name of the view"
                 type: string
+                optional: true
+            view:
+                description: "If the command is being run on a view namespace, this field must be set to SearchIndexRequestView"
+                type: SearchIndexRequestView
                 optional: true

@@ -38,11 +38,13 @@ namespace mongo {
  * Passes the remote command response data back to the caller if the status is OK, otherwise throws
  * if the command failed.
  */
-BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const UUID& uuid,
-                                      const BSONObj& userCmd,
-                                      boost::optional<StringData> viewName = boost::none);
+BSONObj getSearchIndexManagerResponse(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    const BSONObj& userCmd,
+    boost::optional<StringData> viewName = boost::none,
+    boost::optional<std::vector<BSONObj>> viewPipeline = boost::none);
 
 /**
  * Runs the given command against the remote search index management server, if the remote host

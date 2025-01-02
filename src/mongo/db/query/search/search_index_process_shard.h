@@ -35,9 +35,9 @@ class SearchIndexProcessShard : public SearchIndexProcessInterface {
 public:
     boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
                                               const NamespaceString& nss) override;
-    std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
+    std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
     fetchCollectionUUIDAndResolveView(OperationContext* opCtx, const NamespaceString& nss) override;
-    std::pair<UUID, boost::optional<NamespaceString>> fetchCollectionUUIDAndResolveViewOrThrow(
+    std::pair<UUID, boost::optional<ResolvedView>> fetchCollectionUUIDAndResolveViewOrThrow(
         OperationContext* opCtx, const NamespaceString& nss) override;
     UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx, const NamespaceString& nss) override;
 };

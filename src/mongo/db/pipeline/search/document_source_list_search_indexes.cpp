@@ -110,10 +110,16 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
                 opCtx, pExpCtx->getNamespaceString());
         } else {
             // If the query is on a view, this call will return the
-            // underlying source collection UUID and NSS. If not, it will just return a UUID.
-            std::tie(_collectionUUID, _resolvedNamespace) =
+            // underlying source collection UUID and ResolvedView. If not, it will just return a
+            // UUID.
+            boost::optional<ResolvedView> resolvedView;
+            std::tie(_collectionUUID, resolvedView) =
                 SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
                     opCtx, pExpCtx->getNamespaceString());
+
+            if (resolvedView) {
+                _resolvedNamespace = resolvedView.value().getNamespace();
+            }
         }
     }
 
