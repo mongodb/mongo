@@ -84,11 +84,6 @@ DocumentSource::GetNextResult DocumentSourceInternalListCollections::doGetNext()
             return GetNextResult::makeEOF();
         }
 
-        if (_databases->back().isInternalDb()) {
-            _databases->pop_back();
-            continue;
-        }
-
         _buildCollectionsToReplyForDb(_databases->back(), _collectionsToReply);
         _databases->pop_back();
     }
