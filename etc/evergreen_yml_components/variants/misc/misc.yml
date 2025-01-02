@@ -176,3 +176,25 @@ buildvariants:
       - name: compile_ninja_TG
         distros:
           - rhel8.8-xlarge
+
+  - name: build-bazel-from-source-s390x
+    display_name: "~ Build Bazel from Source s390x"
+    tags: []
+    activate: false
+    run_on:
+      - rhel83-zseries-large
+    expansions:
+      has_packages: false
+    tasks:
+      - name: build_bazel_from_source
+
+  - name: build-bazel-from-source-ppc64le
+    display_name: "~ Build Bazel from Source ppc64le"
+    tags: []
+    activate: false
+    run_on:
+      - rhel81-power8-large
+    expansions:
+      has_packages: false
+    tasks:
+      - name: build_bazel_from_source

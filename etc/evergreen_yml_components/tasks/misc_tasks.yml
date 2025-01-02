@@ -1624,3 +1624,37 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "generate version validation"
+
+  - name: build_bazel_from_source
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    commands:
+      - command: timeout.update
+        params:
+          # 6 hours
+          exec_timeout_secs: 21600
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "bazel/build_bazel/build_bazel.py"
+            - "--version=7.4.1"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel_binary
+          remote_file: ${project}/${build_variant}/${revision}/bazel
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: bazel

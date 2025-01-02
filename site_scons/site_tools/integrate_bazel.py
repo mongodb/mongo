@@ -79,8 +79,8 @@ _DISTRO_PATTERN_MAP = {
 }
 
 _S3_HASH_MAPPING = {
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-ppc64le": "4ecc7f1396b8d921c6468b34cc8ed356c4f2dbe8a154c25d681a61ccb5dfc9cb",
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-s390x": "2f5f7fd747620d96e885766a4027347c75c0f455c68219211a00e72fc6413be9",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.4.1-ppc64le": "f8e95c5a840f18bcec9de689bdeb7c3a4409b0580cbeadf0266534c09332b8d8",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.4.1-s390x": "3c48f892520eeeab5a706238c2aaccdb9afd3ed49a3757c23187d4ba089ecb58",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64": "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64": "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64": "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
