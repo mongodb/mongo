@@ -278,6 +278,9 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
         while (idxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
             if (++numScannedKeys >= maxDocsPerChunk) {
                 currentKey = orderShardKeyFields(keyPattern, currentKey);
+                if (!ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(currentKey).isOK()) {
+                    continue;
+                }
 
                 const auto compareWithPreviousSplitPoint = currentKey.woCompare(lastSplitPoint);
                 if (forward) {
@@ -368,6 +371,10 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                 while (idxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
                     if (++numScannedKeys >= maxDocsPerNewChunk) {
                         currentKey = orderShardKeyFields(keyPattern, currentKey);
+                        if (!ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(currentKey)
+                                 .isOK()) {
+                            continue;
+                        }
 
                         const auto compareWithPreviousSplitPoint =
                             currentKey.woCompare(previousSplitPoint);
