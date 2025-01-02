@@ -1596,8 +1596,6 @@ private:
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
-extern SSLManagerCoordinator* theSSLManagerCoordinator;
-
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {

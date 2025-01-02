@@ -74,8 +74,6 @@ namespace mongo {
 
 using transport::SSLConnectionContext;
 
-extern SSLManagerCoordinator* theSSLManagerCoordinator;
-
 namespace {
 
 // This failpoint is a no-op on Windows.

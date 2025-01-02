@@ -1905,9 +1905,6 @@ SSLInformationToLog SSLManagerApple::getSSLInformationToLog() const {
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
-extern SSLManagerInterface* theSSLManager;
-extern SSLManagerCoordinator* theSSLManagerCoordinator;
-
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     const SSLParams& params,
     const boost::optional<TransientSSLParams>& transientSSLParams,

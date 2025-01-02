@@ -437,6 +437,8 @@ private:
     synchronized_value<std::shared_ptr<SSLManagerInterface>> _manager;
 };
 
+extern SSLManagerCoordinator* theSSLManagerCoordinator;
+
 extern bool isSSLServer;
 
 /**
