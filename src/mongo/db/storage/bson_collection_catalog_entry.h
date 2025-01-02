@@ -51,7 +51,7 @@ public:
     virtual ~BSONCollectionCatalogEntry() {}
 
     // virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const = 0;
-     MetaData getMetaData(OperationContext* opCtx) const override;
+    MetaData getMetaData(OperationContext* opCtx) const override;
 
     virtual int getTotalIndexCount(OperationContext* opCtx) const;
 
@@ -87,8 +87,6 @@ public:
     // }
 
     // ------ for implementors
-
-
 
 protected:
     virtual MetaData _getMetaData(OperationContext* opCtx) const = 0;

@@ -259,6 +259,7 @@ private:
     Collection* _createCollectionHandler(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          bool createIdIndex,
+                                         const BSONObj& idIndexSpec = BSONObj{},
                                          bool forView = false);
 
     /**

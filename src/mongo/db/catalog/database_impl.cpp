@@ -30,7 +30,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include <algorithm>
-
 #include <memory>
 #include <tuple>
 #include <utility>
@@ -51,30 +50,21 @@
 #include "mongo/db/catalog/database_impl.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_legacy.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/sessions_collection.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
@@ -86,6 +76,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/represent_as.h"
 
 namespace mongo {
 MONGO_REGISTER_SHIM(Database::makeImpl)
@@ -262,6 +253,7 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
 Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    bool createIdIndex,
+                                                   const BSONObj& idIndexSpec,
                                                    bool forView) {
     MONGO_LOG(1) << "DatabaseImpl::_createCollectionHandler";
     if (!forView) {
@@ -276,7 +268,6 @@ Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
     }
     CollectionCatalogEntry::MetaData metadata = cce->getMetaData(opCtx);
     auto uuid = metadata.options.uuid;
-    BSONObj idIndexSpec = metadata.getIndexSpec("_id_");
     auto rs = cce->getRecordStore();
     auto collection =
         std::make_unique<Collection>(opCtx, nss.toStringData(), uuid, cce, rs, _dbEntry);
@@ -305,8 +296,8 @@ Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
                 // createCollection() may be called before the in-memory fCV parameter is
                 // initialized, so use the unsafe fCV getter here.
                 IndexCatalog* ic = collection->getIndexCatalog();
-                fullIdIndexSpec =
-                    uassertStatusOK(ic->createIndexOnEmptyCollection(opCtx, idIndexSpec));
+                fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
+                    opCtx, !idIndexSpec.isEmpty() ? idIndexSpec : ic->getDefaultIdIndexSpec()));
             } else {
                 // autoIndexId: false is only allowed on unreplicated collections.
                 uassert(50001,
@@ -958,6 +949,378 @@ BSONObj buildDefaultIdIndexSpec(OperationContext* opCtx,
     return b.obj();
 }
 
+namespace index_check {
+using IndexVersion = IndexDescriptor::IndexVersion;
+
+Status checkValidFilterExpressions(MatchExpression* expression, int level = 0) {
+    if (!expression)
+        return Status::OK();
+
+    switch (expression->matchType()) {
+        case MatchExpression::AND:
+            if (level > 0)
+                return Status(ErrorCodes::CannotCreateIndex,
+                              "$and only supported in partialFilterExpression at top level");
+            for (size_t i = 0; i < expression->numChildren(); i++) {
+                Status status = checkValidFilterExpressions(expression->getChild(i), level + 1);
+                if (!status.isOK())
+                    return status;
+            }
+            return Status::OK();
+        case MatchExpression::EQ:
+        case MatchExpression::LT:
+        case MatchExpression::LTE:
+        case MatchExpression::GT:
+        case MatchExpression::GTE:
+        case MatchExpression::EXISTS:
+        case MatchExpression::TYPE_OPERATOR:
+            return Status::OK();
+        default:
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "unsupported expression in partial index: "
+                                        << expression->toString());
+    }
+}
+
+Status isSpecOk(OperationContext* opCtx,
+                const NamespaceString& nss,
+                const BSONObj& spec,
+                const CollatorInterface* collectionCollator) {
+    BSONElement vElt = spec["v"];
+    if (!vElt) {
+        return {ErrorCodes::InternalError,
+                str::stream()
+                    << "An internal operation failed to specify the 'v' field, which is a required "
+                       "property of an index specification: "
+                    << spec};
+    }
+
+    if (!vElt.isNumber()) {
+        return Status(ErrorCodes::CannotCreateIndex,
+                      str::stream() << "non-numeric value for \"v\" field: " << vElt);
+    }
+
+    auto vEltAsInt = representAs<int>(vElt.number());
+    if (!vEltAsInt) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "Index version must be representable as a 32-bit integer, but got "
+                              << vElt.toString(false, false)};
+    }
+
+    auto indexVersion = static_cast<IndexVersion>(*vEltAsInt);
+
+    if (indexVersion >= IndexVersion::kV2) {
+        auto status = index_key_validate::validateIndexSpecFieldNames(spec);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
+    if (indexVersion == IndexVersion::kV0 &&
+        !opCtx->getServiceContext()->getStorageEngine()->isMmapV1()) {
+        return Status(ErrorCodes::CannotCreateIndex,
+                      str::stream() << "use of v0 indexes is only allowed with the "
+                                    << "mmapv1 storage engine");
+    }
+
+    if (!IndexDescriptor::isIndexVersionSupported(indexVersion)) {
+        return Status(ErrorCodes::CannotCreateIndex,
+                      str::stream() << "this version of mongod cannot build new indexes "
+                                    << "of version number " << static_cast<int>(indexVersion));
+    }
+
+    if (nss.isSystemDotIndexes())
+        return Status(ErrorCodes::CannotCreateIndex,
+                      "cannot have an index on the system.indexes collection");
+
+    if (nss.isOplog())
+        return Status(ErrorCodes::CannotCreateIndex, "cannot have an index on the oplog");
+
+    if (nss.coll() == "$freelist") {
+        // this isn't really proper, but we never want it and its not an error per se
+        return Status(ErrorCodes::IndexAlreadyExists, "cannot index freelist");
+    }
+
+    const BSONElement specNamespace = spec["ns"];
+    if (specNamespace.type() != String)
+        return Status(ErrorCodes::CannotCreateIndex,
+                      "the index spec is missing a \"ns\" string field");
+
+    if (nss.ns() != specNamespace.valueStringData())
+        return Status(ErrorCodes::CannotCreateIndex,
+                      str::stream() << "the \"ns\" field of the index spec '"
+                                    << specNamespace.valueStringData()
+                                    << "' does not match the collection name '" << nss.ns() << "'");
+
+    // logical name of the index
+    const BSONElement nameElem = spec["name"];
+    if (nameElem.type() != String)
+        return Status(ErrorCodes::CannotCreateIndex, "index name must be specified as a string");
+
+    const StringData name = nameElem.valueStringData();
+    if (name.find('\0') != std::string::npos)
+        return Status(ErrorCodes::CannotCreateIndex, "index name cannot contain NUL bytes");
+
+    if (name.empty())
+        return Status(ErrorCodes::CannotCreateIndex, "index name cannot be empty");
+
+    // Drop pending collections are internal to the server and will not be exported to another
+    // storage engine. The indexes contained in these collections are not subject to the same
+    // namespace length constraints as the ones in created by users.
+    if (!nss.isDropPendingNamespace()) {
+        auto indexNamespace = IndexDescriptor::makeIndexNamespace(nss.ns(), name);
+        if (indexNamespace.length() > NamespaceString::MaxNsLen)
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "namespace name generated from index name \""
+                                        << indexNamespace << "\" is too long (127 byte max)");
+    }
+
+    const BSONObj key = spec.getObjectField("key");
+    const Status keyStatus = index_key_validate::validateKeyPattern(key, indexVersion);
+    if (!keyStatus.isOK()) {
+        return Status(ErrorCodes::CannotCreateIndex,
+                      str::stream()
+                          << "bad index key pattern " << key << ": " << keyStatus.reason());
+    }
+
+    std::unique_ptr<CollatorInterface> collator;
+    BSONElement collationElement = spec.getField("collation");
+    if (collationElement) {
+        if (collationElement.type() != BSONType::Object) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "\"collation\" for an index must be a document");
+        }
+        auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                      ->makeFromBSON(collationElement.Obj());
+        if (!statusWithCollator.isOK()) {
+            return statusWithCollator.getStatus();
+        }
+        collator = std::move(statusWithCollator.getValue());
+
+        if (!collator) {
+            return {ErrorCodes::InternalError,
+                    str::stream() << "An internal operation specified the collation "
+                                  << CollationSpec::kSimpleSpec
+                                  << " explicitly, which should instead be implied by omitting the "
+                                     "'collation' field from the index specification"};
+        }
+
+        if (static_cast<IndexVersion>(vElt.numberInt()) < IndexVersion::kV2) {
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "Index version " << vElt.fieldNameStringData() << "="
+                                  << vElt.numberInt() << " does not support the '"
+                                  << collationElement.fieldNameStringData() << "' option"};
+        }
+
+        string pluginName = IndexNames::findPluginName(key);
+        if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2DSPHERE) &&
+            (pluginName != IndexNames::HASHED)) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream()
+                              << "Index type '" << pluginName
+                              << "' does not support collation: " << collator->getSpec().toBSON());
+        }
+    }
+
+    const bool isSparse = spec["sparse"].trueValue();
+
+    // Ensure if there is a filter, its valid.
+    BSONElement filterElement = spec.getField("partialFilterExpression");
+    if (filterElement) {
+        if (isSparse) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "cannot mix \"partialFilterExpression\" and \"sparse\" options");
+        }
+
+        if (filterElement.type() != Object) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "\"partialFilterExpression\" for an index must be a document");
+        }
+
+        // The collator must outlive the constructed MatchExpression.
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContext(opCtx, collator.get()));
+
+        // Parsing the partial filter expression is not expected to fail here since the
+        // expression would have been successfully parsed upstream during index creation.
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filterElement.Obj(),
+                                         std::move(expCtx),
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kBanAllSpecialFeatures);
+        if (!statusWithMatcher.isOK()) {
+            return statusWithMatcher.getStatus();
+        }
+        const std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
+
+        Status status = checkValidFilterExpressions(filterExpr.get());
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    if (IndexDescriptor::isIdIndexPattern(key)) {
+        BSONElement uniqueElt = spec["unique"];
+        if (uniqueElt && !uniqueElt.trueValue()) {
+            return Status(ErrorCodes::CannotCreateIndex, "_id index cannot be non-unique");
+        }
+
+        if (filterElement) {
+            return Status(ErrorCodes::CannotCreateIndex, "_id index cannot be a partial index");
+        }
+
+        if (isSparse) {
+            return Status(ErrorCodes::CannotCreateIndex, "_id index cannot be sparse");
+        }
+
+        if (collationElement &&
+            !CollatorInterface::collatorsMatch(collator.get(), collectionCollator)) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "_id index must have the collection default collation");
+        }
+    } else {
+        // for non _id indexes, we check to see if replication has turned off all indexes
+        // we _always_ created _id index
+        if (!repl::ReplicationCoordinator::get(opCtx)->buildsIndexes()) {
+            // this is not exactly the right error code, but I think will make the most sense
+            return Status(ErrorCodes::IndexAlreadyExists, "no indexes per repl");
+        }
+    }
+
+    // --- only storage engine checks allowed below this ----
+
+    BSONElement storageEngineElement = spec.getField("storageEngine");
+    if (storageEngineElement.eoo()) {
+        return Status::OK();
+    }
+    if (storageEngineElement.type() != mongo::Object) {
+        return Status(ErrorCodes::CannotCreateIndex,
+                      "\"storageEngine\" options must be a document if present");
+    }
+    BSONObj storageEngineOptions = storageEngineElement.Obj();
+    if (storageEngineOptions.isEmpty()) {
+        return Status(ErrorCodes::CannotCreateIndex,
+                      "Empty \"storageEngine\" options are invalid. "
+                      "Please remove the field or include valid options.");
+    }
+    Status storageEngineStatus = validateStorageOptions(
+        opCtx->getServiceContext(), storageEngineOptions, [](const auto& x, const auto& y) {
+            return x->validateIndexStorageOptions(y);
+        });
+    if (!storageEngineStatus.isOK()) {
+        return storageEngineStatus;
+    }
+
+    return Status::OK();
+}
+
+const BSONObj _idObj = BSON("_id" << 1);
+
+BSONObj fixIndexKey(const BSONObj& key) {
+    if (IndexDescriptor::isIdIndexPattern(key)) {
+        return _idObj;
+    }
+    if (key["_id"].type() == Bool && key.nFields() == 1) {
+        return _idObj;
+    }
+    return key;
+}
+
+StatusWith<BSONObj> fixIndexSpec(OperationContext* opCtx,
+
+                                 const BSONObj& spec) {
+    auto statusWithSpec = IndexLegacy::adjustIndexSpecObject(spec);
+    if (!statusWithSpec.isOK()) {
+        return statusWithSpec;
+    }
+    BSONObj o = statusWithSpec.getValue();
+
+    BSONObjBuilder b;
+
+    // We've already verified in IndexCatalog::_isSpecOk() that the index version is present and
+    // that it is representable as a 32-bit integer.
+    auto vElt = o["v"];
+    invariant(vElt);
+
+    b.append("v", vElt.numberInt());
+
+    if (o["unique"].trueValue())
+        b.appendBool("unique", true);  // normalize to bool true in case was int 1 or something...
+
+    BSONObj key = fixIndexKey(o["key"].Obj());
+    b.append("key", key);
+
+    string name = o["name"].String();
+    if (IndexDescriptor::isIdIndexPattern(key)) {
+        name = "_id_";
+    }
+    b.append("name", name);
+
+    {
+        BSONObjIterator i(o);
+        while (i.more()) {
+            BSONElement e = i.next();
+            string s = e.fieldName();
+
+            if (s == "_id") {
+                // skip
+            } else if (s == "dropDups") {
+                // dropDups is silently ignored and removed from the spec as of SERVER-14710.
+            } else if (s == "v" || s == "unique" || s == "key" || s == "name") {
+                // covered above
+            } else {
+                b.append(e);
+            }
+        }
+    }
+
+    return b.obj();
+}
+
+// Refer to src/mongo/db/catalog/index_catalog_impl.cpp `IndexCatalogImpl::prepareSpecForCreate`.
+//
+// MongoDB processes the createCollection command in two distinct steps:
+// 1. creates the collection.
+// 2. creates the _id index.
+// In contrast, Monograph handles the createCollection command in a single step, consolidating the
+// process into the initial "create the collection" phase.
+//
+// However, during the creation of the _id index, MongoDB performs several validation checks that
+// may alter the original index specification. To ensure consistency and avoid potential conflicts,
+// it is advisable to perform these checks before the collection creation stage.
+StatusWith<BSONObj> prepareSpecForCreate(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const BSONObj& collationObj,
+                                         const BSONObj& original) {
+
+    std::unique_ptr<CollatorInterface> collator = parseCollation(opCtx, nss, collationObj);
+
+    Status status = isSpecOk(opCtx, nss, original, collator.get());
+    if (!status.isOK()) {
+        return {status};
+    }
+
+    auto fixed = fixIndexSpec(opCtx, original);
+    if (!fixed.isOK()) {
+        return fixed;
+    }
+
+    // we double check with new index spec
+    status = isSpecOk(opCtx, nss, fixed.getValue(), collator.get());
+    if (!status.isOK()) {
+        return {status};
+    }
+
+    // The _doesSpecConflictWithExisting method may not be necessary during the "Create Collection"
+    // operation, as there are no existing indexes to conflict with. status =
+    // _doesSpecConflictWithExisting(opCtx, fixed.getValue()); if (!status.isOK())
+    //     return StatusWith<BSONObj>(status);
+
+    return fixed;
+}
+
+}  // namespace index_check
 
 Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            StringData ns,
@@ -1010,14 +1373,23 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     BSONObj idIndexSpec =
         !idIndex.isEmpty() ? idIndex : buildDefaultIdIndexSpec(opCtx, nss, options);
 
+    StatusWith<BSONObj> statusWithSpec =
+        index_check::prepareSpecForCreate(opCtx, nss, options.collation, idIndexSpec);
+    Status status = statusWithSpec.getStatus();
+    uassertStatusOK(status);
+
+
+    BSONObj specAfterCheck = statusWithSpec.getValue();
+
     // txservice create table here.
-    Status status = _dbEntry->createCollection(opCtx, nss, optionsWithUUID, idIndexSpec);
+    status = _dbEntry->createCollection(opCtx, nss, optionsWithUUID, specAfterCheck);
+    uassertStatusOK(status);
 
     _dbEntry->createKVCollectionCatalogEntry(opCtx, nss.toStringData());
 
     // opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns));
 
-    Collection* collection = _createCollectionHandler(opCtx, nss, createIdIndex);
+    Collection* collection = _createCollectionHandler(opCtx, nss, createIdIndex, specAfterCheck);
     invariant(collection);
     return collection;
 }
@@ -1124,7 +1496,7 @@ DatabaseImpl::CollectionMapView& DatabaseImpl::collections(OperationContext* opC
     for (auto& collectionName : collectionInStorageEngine) {
         NamespaceString nss{std::move(collectionName)};
         MONGO_LOG(1) << "nss: " << nss;
-        _createCollectionHandler(opCtx, nss, true, true);
+        _createCollectionHandler(opCtx, nss, true, BSONObj{}, true);
     }
 
     return _collectionsView;

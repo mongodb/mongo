@@ -151,8 +151,8 @@ Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
         }
         localThreadId = threadGroupId;
 
-        // std::string threadName("thread_group_" + std::to_string(threadGroupId));
-        std::string threadName("thread_group");
+        std::string threadName("thread_group_" + std::to_string(threadGroupId));
+        // std::string threadName("thread_group");
         StringData threadNameSD(threadName);
         setThreadName(threadNameSD);
 
