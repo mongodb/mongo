@@ -195,6 +195,12 @@ private:
     std::unique_ptr<CollatorInterface> _collator;
 
     bool _canHaveNoopMatchNodes = false;
+
+    template <typename T>
+    friend void deinit(T* ptr);
 };
+
+template <>
+void deinit(CanonicalQuery* ptr);
 
 }  // namespace mongo

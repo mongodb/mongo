@@ -491,4 +491,9 @@ std::string CanonicalQuery::toStringShort() const {
     return ss;
 }
 
+template <>
+void deinit(CanonicalQuery* ptr) {
+    // Release 'QueryRequest::UPtr _qr' and return it to ObjectPool<QueryRequest>.
+    ptr->reset();
+}
 }  // namespace mongo

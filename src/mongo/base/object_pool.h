@@ -7,6 +7,9 @@
 
 namespace mongo {
 template <typename T>
+void deinit(T* ptr) {}
+
+template <typename T>
 class ObjectPool {
 public:
     ObjectPool() = default;
@@ -17,6 +20,7 @@ public:
     class Deleter {
     public:
         void operator()(T* ptr) {
+            deinit(ptr);
             _localPool.Enqueue(std::unique_ptr<T>(ptr));
         }
     };
@@ -27,7 +31,9 @@ public:
     */
     template <typename Base>
     static void PolyDeleter(Base* ptr) {
-        _localPool.Enqueue(std::unique_ptr<T>(static_cast<T*>(ptr)));
+        T* dptr = static_cast<T*>(ptr);
+        deinit(dptr);
+        _localPool.Enqueue(std::unique_ptr<T>(dptr));
     }
 
     template <typename... Args>
@@ -97,6 +103,7 @@ public:
       need call this function to recycle object manually.
     */
     static void recycleObject(T* ptr) {
+        deinit(ptr);
         _localPool.Enqueue(std::unique_ptr<T>(ptr));
     }
 
@@ -109,8 +116,6 @@ template <typename T>
 thread_local CircularQueue<std::unique_ptr<T>> ObjectPool<T>::_localPool = {};
 
 }  // namespace mongo
-
-
 
 
 // namespace mongo {
@@ -210,13 +215,14 @@ thread_local CircularQueue<std::unique_ptr<T>> ObjectPool<T>::_localPool = {};
 
 // private:
 //     static constexpr size_t kDefaultCapacity{32};
-//     static thread_local std::stack<std::unique_ptr<T>, std::vector<std::unique_ptr<T>>> _localPool;
+//     static thread_local std::stack<std::unique_ptr<T>, std::vector<std::unique_ptr<T>>>
+//     _localPool;
 // };
 
 // template <typename T>
-// thread_local std::stack<std::unique_ptr<T>, std::vector<std::unique_ptr<T>>> ObjectPool<T>::_localPool = {};
+// thread_local std::stack<std::unique_ptr<T>, std::vector<std::unique_ptr<T>>>
+// ObjectPool<T>::_localPool = {};
 
 
 // }  // namespace mongo
-
 

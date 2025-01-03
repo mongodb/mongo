@@ -7,7 +7,7 @@ If:
       src/mongo/db/modules/monograph/mono_metrics/.*,
     ]
 CompileFlags:
-  CompilationDatabase: ./
+  CompilationDatabase: ./build
   Add: [-Isrc/third_party/asio-master/asio/include, -Wall, -I/usr/lib/gcc/x86_64-linux-gnu/13/include]
 Diagnostics:
   Suppress: builtin_definition
