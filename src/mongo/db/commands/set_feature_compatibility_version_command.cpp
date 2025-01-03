@@ -787,13 +787,14 @@ private:
         if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
             collValidationFunctions.emplace_back([](const Collection* collection) {
-                uassert(ErrorCodes::CannotUpgrade,
-                        fmt::format("Bucket collection '{}' does not have timeseries options, "
-                                    "which is not allowed in new FCV version. Please rename or "
-                                    "drop this collection before upgrading FCV.",
-                                    collection->ns().toStringForErrorMsg()),
-                        !collection->ns().isTimeseriesBucketsCollection() ||
-                            collection->getTimeseriesOptions());
+                uassert(
+                    ErrorCodes::CannotUpgrade,
+                    fmt::format("Bucket collection '{}' metadata is missing timeseries options, "
+                                "which are required for bucket namespaces in the new FCV version. "
+                                "Please manually fix the collection metadata to match the data.",
+                                collection->ns().toStringForErrorMsg()),
+                    !collection->ns().isTimeseriesBucketsCollection() ||
+                        collection->getTimeseriesOptions());
             });
         }
 
