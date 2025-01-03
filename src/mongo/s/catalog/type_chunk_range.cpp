@@ -80,23 +80,41 @@ ChunkRange ChunkRange::fromBSON(const BSONObj& obj) {
 }
 
 Status ChunkRange::validate(const ChunkRange& range) {
-    if (range.getMin().isEmpty()) {
+    return validate(range.getMin(), range.getMax());
+}
+
+Status ChunkRange::validate(const BSONObj& minKey, const BSONObj& maxKey) {
+    if (minKey.isEmpty()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << ChunkRange::kMinFieldName << " field is empty");
     }
 
-    if (range.getMax().isEmpty()) {
+    if (maxKey.isEmpty()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << ChunkRange::kMaxFieldName << " field is empty");
     }
 
-    if (SimpleBSONObjComparator::kInstance.evaluate(range.getMin() >= range.getMax())) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(minKey >= maxKey)) {
         return {ErrorCodes::BadValue,
-                str::stream() << "min: " << range.getMin()
-                              << " should be less than max: " << range.getMax()};
+                str::stream() << "min: " << minKey << " should be less than max: " << maxKey};
     }
 
     return Status::OK();
+}
+
+Status ChunkRange::validate(const std::vector<BSONObj>& bounds) {
+    if (bounds.size() == 0) {
+        return Status(ErrorCodes::BadValue, "no bounds were specified");
+    }
+
+    if (bounds.size() != 2) {
+        return Status(ErrorCodes::BadValue, "only a min and max bound may be specified");
+    }
+
+    BSONObj minKey = bounds[0];
+    BSONObj maxKey = bounds[1];
+
+    return validate(minKey, maxKey);
 }
 
 Status ChunkRange::validateStrict(const ChunkRange& range) {

@@ -281,7 +281,7 @@ StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
         }
 
         auto range = ChunkRange(minKey.Obj().getOwned(), maxKey.Obj().getOwned());
-        auto rangeValidateStatus = ChunkRange::validate(range);
+        auto rangeValidateStatus = ChunkRange::validate(range.getMin(), range.getMax());
         if (!rangeValidateStatus.isOK()) {
             return rangeValidateStatus;
         }

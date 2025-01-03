@@ -64,7 +64,9 @@ public:
 
     static ChunkRange fromBSON(const BSONObj& obj);
 
-    static Status validate(const ChunkRange& range);
+    static Status validate(const ChunkRange& chunkRange);
+    static Status validate(const BSONObj& minKey, const BSONObj& maxKey);
+    static Status validate(const std::vector<BSONObj>& bounds);
     static Status validateStrict(const ChunkRange& range);
 
     /**

@@ -93,11 +93,46 @@ commands:
                 cpp_name: "chunkRange"
                 description: "Chunk bounds to merge."
             epoch:
-                description: "The expected epoch of the collection that is being committed"
+                description: "The expected epoch of the collection that is being committed."
                 type: objectid
                 optional: true
             timestamp:
-                description: "The expected timestamp of the collection that is being committed"
+                description: "The expected timestamp of the collection that is being committed."
+                type: timestamp
+                optional: true
+    
+    clusterMergeChunks:
+        command_name: mergeChunks
+        cpp_name: ClusterMergeChunks
+        description: "The public mergeChunks command to merge chunks in a collection on mongos."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: true
+        fields:
+            bounds:
+                description: "Chunk bounds to merge."
+                type: array<object_owned>
+    
+    #TODO (SERVER-98960): Set the command_name to _shardsvrMergeChunks and command_alias to mergeChunks instead.
+    _shardsvrMergeChunks:
+        command_name: mergeChunks
+        command_alias: _shardsvrMergeChunks
+        cpp_name: ShardsvrMergeChunks
+        description: "The internal _shardsvrMergeChunks command on a shard."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        fields:
+            bounds:
+                description: "Chunk bounds to merge."
+                type: array<object_owned>
+            epoch:
+                description: "The expected epoch of the collection for the chunks being merged."
+                type: objectid
+            timestamp:
+                description: "The expected timestamp of the collection that is being committed."
                 type: timestamp
                 optional: true
     

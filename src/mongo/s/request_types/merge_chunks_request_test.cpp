@@ -34,6 +34,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_id.h"
@@ -50,8 +52,9 @@
 namespace mongo {
 namespace {
 
-
-ChunkRange chunkRange(BSON("a" << 1), BSON("a" << 10));
+mongo::BSONObj min = BSON("a" << 1);
+mongo::BSONObj max = BSON("a" << 10);
+ChunkRange chunkRange(min, max);
 IDLParserContext ctx("_configsvrCommitChunksMerge");
 
 TEST(ConfigSvrMergeChunks, BasicValidConfigCommand) {
@@ -114,7 +117,7 @@ TEST(ConfigSvrMergeChunks, MissingNameSpaceErrors) {
         ErrorCodes::IDLFailedToParse);
 }
 
-TEST(ConfigSvrMergeChunks, MissingcollUUIDErrors) {
+TEST(ConfigSvrMergeChunks, MissingCollUUIDErrors) {
     ASSERT_THROWS_CODE(
         ConfigSvrMergeChunks::parse(ctx,
                                     BSON("_configsvrCommitChunksMerge"
@@ -169,7 +172,7 @@ TEST(ConfigSvrMergeChunks, WrongNamespaceTypeErrors) {
         ErrorCodes::TypeMismatch);
 }
 
-TEST(ConfigSvrMergeChunks, WrongcollUUIDTypeErrors) {
+TEST(ConfigSvrMergeChunks, WrongCollUUIDTypeErrors) {
     ASSERT_THROWS_CODE(ConfigSvrMergeChunks::parse(ctx,
                                                    BSON("_configsvrCommitChunksMerge"
                                                         << "TestDB.TestColl"
@@ -208,6 +211,173 @@ TEST(ConfigSvrMergeChunks, WrongShardIdTypeErrors) {
                                          << "admin")),
         DBException,
         ErrorCodes::TypeMismatch);
+}
+
+TEST(ShardsvrMergeChunks, BasicValidConfigCommand) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    OID epoch = OID::gen();
+    auto request =
+        ShardsvrMergeChunks::parse(ctx,
+                                   BSON("mergeChunks"
+                                        << "TestDB.TestColl"
+                                        << "bounds" << bounds << "epoch" << epoch << "$db"
+                                        << "admin"));
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+              request.getCommandParameter());
+
+    const auto requestBounds = request.getBounds();
+    ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(min == requestBounds[0]));
+    ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(max == requestBounds[1]));
+}
+
+TEST(ShardsvrMergeChunks, MissingNameSpaceErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    OID epoch = OID::gen();
+    ASSERT_THROWS_CODE(
+        ShardsvrMergeChunks::parse(ctx,
+                                   BSON("bounds" << bounds << "epoch" << epoch << "$db"
+                                                 << "admin")),
+        mongo::DBException,
+        ErrorCodes::IDLFailedToParse);
+}
+
+TEST(ShardsvrMergeChunks, MissingBoundErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    OID epoch = OID::gen();
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
+                                                  BSON("mergeChunks"
+                                                       << "TestDB.TestColl"
+                                                       << "epoch" << epoch << "$db"
+                                                       << "admin")),
+                       DBException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
+TEST(ShardsvrMergeChunks, MissingEpochErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
+                                                  BSON("mergeChunks"
+                                                       << "TestDB.TestColl"
+                                                       << "bounds" << bounds << "$db"
+                                                       << "admin")),
+                       DBException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
+TEST(ShardsvrMergeChunks, WrongNamespaceTypeErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    OID epoch = OID::gen();
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
+                                                  BSON("mergeChunks" << 12345 << "bounds" << bounds
+                                                                     << "epoch" << epoch << "$db"
+                                                                     << "admin")),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST(ShardsvrMergeChunks, WrongBoundTypeErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    OID epoch = OID::gen();
+    ASSERT_THROWS_CODE(
+        ShardsvrMergeChunks::parse(ctx,
+                                   BSON("mergeChunks"
+                                        << "TestDB.TestColl"
+                                        << "bounds" << 1234 << "epoch" << epoch << "$db"
+                                        << "admin")),
+        DBException,
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(ClusterMergeChunks, BasicValidConfigCommand) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    auto request = ClusterMergeChunks::parse(ctx,
+                                             BSON("mergeChunks"
+                                                  << "TestDB.TestColl"
+                                                  << "bounds" << bounds << "$db"
+                                                  << "admin"));
+
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+              request.getCommandParameter());
+
+    const auto requestBounds = request.getBounds();
+    ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(min == requestBounds[0]));
+    ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(max == requestBounds[1]));
+}
+
+
+TEST(ClusterMergeChunks, MissingNameSpaceErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
+                                                 BSON("bounds" << bounds << "$db"
+                                                               << "admin")),
+                       mongo::DBException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
+
+TEST(ClusterMergeChunks, MissingBoundErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
+                                                 BSON("mergeChunks"
+                                                      << "TestDB.TestColl"
+                                                      << "$db"
+                                                      << "admin")),
+                       DBException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
+TEST(ClusterMergeChunks, WrongNamespaceTypeErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    ASSERT_THROWS_CODE(
+        ClusterMergeChunks::parse(ctx,
+                                  BSON("mergeChunks" << 12345 << "bounds" << bounds << "$db"
+                                                     << "admin")),
+        DBException,
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(ClusterMergeChunks, WrongBoundTypeErrors) {
+    std::vector<mongo::BSONObj> bounds;
+    bounds.push_back(min);
+    bounds.push_back(max);
+
+    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
+                                                 BSON("mergeChunks"
+                                                      << "TestDB.TestColl"
+                                                      << "bounds" << 1234 << "$db"
+                                                      << "admin")),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
 }  // namespace

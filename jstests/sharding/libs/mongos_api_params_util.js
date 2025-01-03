@@ -935,7 +935,7 @@ export let MongosAPIParametersUtil = (function() {
             commandName: "mergeChunks",
             run: {
                 inAPIVersion1: false,
-                shardCommandName: "mergeChunks",
+                shardCommandName: "_shardsvrMergeChunks",
                 configServerCommandName: "_configsvrCommitChunksMerge",
                 runsAgainstAdminDb: true,
                 permittedInTxn: false,
