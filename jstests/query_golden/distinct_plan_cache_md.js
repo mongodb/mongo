@@ -5,27 +5,14 @@
  *   featureFlagShardFilteringDistinctScan,
  * ]
  */
+import {section} from "jstests/libs/pretty_md.js";
 import {
-    code,
-    outputPlanCacheStats,
-    section,
-    subSection,
-} from "jstests/libs/pretty_md.js";
+    runDistinctAndOutputPlanCacheStats,
+    validateAggPlanCacheUse,
+    validateDistinctPlanCacheUse,
+} from "jstests/libs/query/golden_test_utils.js";
 
 const coll = db[jsTestName()];
-
-function runDistinctAndOutputPlanCacheStats(key, filter) {
-    subSection(`Distinct on "${key}", with filter: ${tojson(filter)}`);
-    coll.distinct(key, filter);
-    outputPlanCacheStats(coll);
-}
-
-function runAggAndOutputPlanCacheStats(pipeline) {
-    subSection("Pipeline:");
-    code(tojson(pipeline));
-    coll.aggregate(pipeline);
-    outputPlanCacheStats(coll);
-}
 
 {
     section("Distinct command utilizes plan cache");
@@ -48,11 +35,7 @@ function runAggAndOutputPlanCacheStats(pipeline) {
         {x: 9, y: 5, z: 4},
     ]);
 
-    subSection("Distinct plan stored as inactive plan");
-    runDistinctAndOutputPlanCacheStats("x", {x: {$gt: 3}, y: 5});
-
-    subSection("Distinct plan used and stored as active plan");
-    runDistinctAndOutputPlanCacheStats("x", {x: {$gt: 3}, y: 5});
+    validateDistinctPlanCacheUse(coll, "x", {x: {$gt: 3}, y: 5});
 }
 
 {
@@ -66,8 +49,8 @@ function runAggAndOutputPlanCacheStats(pipeline) {
     coll.createIndex({y: 1, z: 1});
     coll.createIndex({x: 1, y: 1, z: 1});
 
-    runDistinctAndOutputPlanCacheStats("x", {x: {$gt: 12}, y: {$lt: 200}});
-    runDistinctAndOutputPlanCacheStats("x", {x: {$gt: 12}, y: {$lt: 250}});
+    runDistinctAndOutputPlanCacheStats(coll, "x", {x: {$gt: 12}, y: {$lt: 200}});
+    runDistinctAndOutputPlanCacheStats(coll, "x", {x: {$gt: 12}, y: {$lt: 250}});
 }
 
 {
@@ -79,8 +62,7 @@ function runAggAndOutputPlanCacheStats(pipeline) {
     coll.createIndex({x: 1, y: 1});
     coll.createIndex({y: 1, z: 1});
 
-    runDistinctAndOutputPlanCacheStats("x", {x: {$gt: -1}, y: {$lt: 105}});
-    runDistinctAndOutputPlanCacheStats("x", {x: {$gt: -1}, y: {$lt: 105}});
+    validateDistinctPlanCacheUse(coll, "x", {x: {$gt: -1}, y: {$lt: 105}});
 }
 
 {
@@ -106,17 +88,17 @@ function runAggAndOutputPlanCacheStats(pipeline) {
         {a: 5, b: 4, c: 7, d: [1, 2, 3]}
     ]);
 
-    coll.getPlanCache().clear();
-    subSection("DISTINCT_SCAN stored as inactive plan");
-    let pipeline = [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}];
-    runAggAndOutputPlanCacheStats(pipeline);
-    subSection("DISTINCT_SCAN used as active plan");
-    runAggAndOutputPlanCacheStats(pipeline);
+    validateAggPlanCacheUse(coll,
+                            [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}]);
 
-    coll.getPlanCache().clear();
-    subSection("DISTINCT_SCAN stored as inactive plan");
-    pipeline = [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}];
-    runAggAndOutputPlanCacheStats(pipeline);
-    subSection("DISTINCT_SCAN used as active plan");
-    runAggAndOutputPlanCacheStats(pipeline);
+    validateAggPlanCacheUse(
+        coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
+
+    section("DISTINCT_SCAN with embedded FETCH utilizes plan cache");
+
+    validateAggPlanCacheUse(
+        coll, [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}}]);
+
+    validateAggPlanCacheUse(
+        coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
 }

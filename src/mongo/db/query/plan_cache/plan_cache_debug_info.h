@@ -49,19 +49,22 @@ struct CreatedFromQuery {
         size += sort.objsize();
         size += projection.objsize();
         size += collation.objsize();
+        size += distinct.objsize();
         return size;
     }
 
     std::string debugString() const {
         return str::stream() << "query: " << filter.toString() << "; sort: " << sort.toString()
                              << "; projection: " << projection.toString()
-                             << "; collation: " << collation.toString();
+                             << "; collation: " << collation.toString()
+                             << "; distinct: " << distinct.toString();
     }
 
     BSONObj filter;
     BSONObj sort;
     BSONObj projection;
     BSONObj collation;
+    BSONObj distinct;
 };
 
 /**

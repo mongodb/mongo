@@ -6,13 +6,11 @@
  *   featureFlagShardFilteringDistinctScan,
  * ]
  */
-
+import {section, subSection} from "jstests/libs/pretty_md.js";
 import {
     outputAggregationPlanAndResults,
-    outputDistinctPlanAndResults,
-    section,
-    subSection
-} from "jstests/libs/pretty_md.js";
+    outputDistinctPlanAndResults
+} from "jstests/libs/query/golden_test_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();

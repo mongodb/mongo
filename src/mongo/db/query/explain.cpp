@@ -527,6 +527,9 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
             if (!createdFromQuery.collation.isEmpty()) {
                 shapeBuilder.append("collation", createdFromQuery.collation);
             }
+            if (!createdFromQuery.distinct.isEmpty()) {
+                shapeBuilder.append("distinct", createdFromQuery.distinct);
+            }
         }
 
         auto plannerStats = getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);

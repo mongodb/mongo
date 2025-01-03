@@ -1,5 +1,5 @@
 ## 1. Distinct command utilizes plan cache
-### Distinct plan stored as inactive plan
+### DISTINCT_SCAN stored as inactive plan
 ### Distinct on "x", with filter: { "x" : { "$gt" : 3 }, "y" : 5 }
 ```json
 [
@@ -39,6 +39,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "x"
+			},
 			"projection" : {
 				
 			},
@@ -52,12 +55,13 @@
 				
 			}
 		},
-		"isActive" : false
+		"isActive" : false,
+		"planCacheKey" : "8183BF5E"
 	}
 ]
 ```
 
-### Distinct plan used and stored as active plan
+### DISTINCT_SCAN used as active plan
 ### Distinct on "x", with filter: { "x" : { "$gt" : 3 }, "y" : 5 }
 ```json
 [
@@ -97,6 +101,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "x"
+			},
 			"projection" : {
 				
 			},
@@ -110,7 +117,8 @@
 				
 			}
 		},
-		"isActive" : true
+		"isActive" : true,
+		"planCacheKey" : "8183BF5E"
 	}
 ]
 ```
@@ -155,6 +163,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "x"
+			},
 			"projection" : {
 				
 			},
@@ -170,7 +181,8 @@
 				
 			}
 		},
-		"isActive" : false
+		"isActive" : false,
+		"planCacheKey" : "46B19BA5"
 	}
 ]
 ```
@@ -214,6 +226,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "x"
+			},
 			"projection" : {
 				
 			},
@@ -229,12 +244,14 @@
 				
 			}
 		},
-		"isActive" : true
+		"isActive" : true,
+		"planCacheKey" : "46B19BA5"
 	}
 ]
 ```
 
 ## 3. Prefer cached IXSCAN over DISTINCT_SCAN for no duplicate values in the collection
+### DISTINCT_SCAN stored as inactive plan
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 105 } }
 ```json
 [
@@ -274,6 +291,9 @@
 			"stage" : "FETCH"
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "x"
+			},
 			"projection" : {
 				
 			},
@@ -289,11 +309,13 @@
 				
 			}
 		},
-		"isActive" : false
+		"isActive" : false,
+		"planCacheKey" : "A1774C84"
 	}
 ]
 ```
 
+### DISTINCT_SCAN used as active plan
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 105 } }
 ```json
 [
@@ -333,6 +355,9 @@
 			"stage" : "FETCH"
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "x"
+			},
 			"projection" : {
 				
 			},
@@ -348,7 +373,8 @@
 				
 			}
 		},
-		"isActive" : true
+		"isActive" : true,
+		"planCacheKey" : "A1774C84"
 	}
 ]
 ```
@@ -412,6 +438,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
 			"projection" : {
 				"_id" : 0,
 				"a" : 1,
@@ -425,7 +454,8 @@
 				"b" : 1
 			}
 		},
-		"isActive" : false
+		"isActive" : false,
+		"planCacheKey" : "14A742E7"
 	}
 ]
 ```
@@ -488,6 +518,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
 			"projection" : {
 				"_id" : 0,
 				"a" : 1,
@@ -501,7 +534,8 @@
 				"b" : 1
 			}
 		},
-		"isActive" : true
+		"isActive" : true,
+		"planCacheKey" : "14A742E7"
 	}
 ]
 ```
@@ -569,6 +603,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
 			"projection" : {
 				"_id" : 0,
 				"a" : 1,
@@ -582,7 +619,8 @@
 				
 			}
 		},
-		"isActive" : false
+		"isActive" : false,
+		"planCacheKey" : "F6FD5B13"
 	}
 ]
 ```
@@ -650,6 +688,9 @@
 			}
 		},
 		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
 			"projection" : {
 				"_id" : 0,
 				"a" : 1,
@@ -663,7 +704,349 @@
 				
 			}
 		},
-		"isActive" : true
+		"isActive" : true,
+		"planCacheKey" : "F6FD5B13"
+	}
+]
+```
+
+## 5. DISTINCT_SCAN with embedded FETCH utilizes plan cache
+### DISTINCT_SCAN stored as inactive plan
+### Pipeline:
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$top" : {
+					"sortBy" : {
+						"a" : 1,
+						"b" : 1
+					},
+					"output" : "$c"
+				}
+			}
+		}
+	}
+]
+```
+```json
+[
+	{
+		"cachedPlan" : {
+			"inputStage" : {
+				"direction" : "forward",
+				"indexBounds" : {
+					"a" : [
+						"[MinKey, MaxKey]"
+					],
+					"b" : [
+						"[MinKey, MaxKey]"
+					],
+					"c" : [
+						"[MinKey, MaxKey]"
+					]
+				},
+				"indexName" : "a_1_b_1_c_1",
+				"indexVersion" : 2,
+				"isFetching" : false,
+				"isMultiKey" : false,
+				"isPartial" : false,
+				"isShardFiltering" : false,
+				"isSparse" : false,
+				"isUnique" : false,
+				"keyPattern" : {
+					"a" : 1,
+					"b" : 1,
+					"c" : 1
+				},
+				"multiKeyPaths" : {
+					"a" : [ ],
+					"b" : [ ],
+					"c" : [ ]
+				},
+				"stage" : "DISTINCT_SCAN"
+			},
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				
+			}
+		},
+		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
+			"projection" : {
+				"_id" : 0,
+				"a" : 1,
+				"b" : 1,
+				"c" : 1
+			},
+			"query" : {
+				
+			},
+			"sort" : {
+				
+			}
+		},
+		"isActive" : false,
+		"planCacheKey" : "F6FD5B13"
+	}
+]
+```
+
+### DISTINCT_SCAN used as active plan
+### Pipeline:
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$top" : {
+					"sortBy" : {
+						"a" : 1,
+						"b" : 1
+					},
+					"output" : "$c"
+				}
+			}
+		}
+	}
+]
+```
+```json
+[
+	{
+		"cachedPlan" : {
+			"inputStage" : {
+				"direction" : "forward",
+				"indexBounds" : {
+					"a" : [
+						"[MinKey, MaxKey]"
+					],
+					"b" : [
+						"[MinKey, MaxKey]"
+					],
+					"c" : [
+						"[MinKey, MaxKey]"
+					]
+				},
+				"indexName" : "a_1_b_1_c_1",
+				"indexVersion" : 2,
+				"isFetching" : false,
+				"isMultiKey" : false,
+				"isPartial" : false,
+				"isShardFiltering" : false,
+				"isSparse" : false,
+				"isUnique" : false,
+				"keyPattern" : {
+					"a" : 1,
+					"b" : 1,
+					"c" : 1
+				},
+				"multiKeyPaths" : {
+					"a" : [ ],
+					"b" : [ ],
+					"c" : [ ]
+				},
+				"stage" : "DISTINCT_SCAN"
+			},
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				
+			}
+		},
+		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
+			"projection" : {
+				"_id" : 0,
+				"a" : 1,
+				"b" : 1,
+				"c" : 1
+			},
+			"query" : {
+				
+			},
+			"sort" : {
+				
+			}
+		},
+		"isActive" : true,
+		"planCacheKey" : "F6FD5B13"
+	}
+]
+```
+
+### DISTINCT_SCAN stored as inactive plan
+### Pipeline:
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$bottom" : {
+					"sortBy" : {
+						"a" : -1,
+						"b" : -1
+					},
+					"output" : "$c"
+				}
+			}
+		}
+	}
+]
+```
+```json
+[
+	{
+		"cachedPlan" : {
+			"inputStage" : {
+				"direction" : "forward",
+				"indexBounds" : {
+					"a" : [
+						"[MinKey, MaxKey]"
+					],
+					"b" : [
+						"[MinKey, MaxKey]"
+					],
+					"c" : [
+						"[MinKey, MaxKey]"
+					]
+				},
+				"indexName" : "a_1_b_1_c_1",
+				"indexVersion" : 2,
+				"isFetching" : false,
+				"isMultiKey" : false,
+				"isPartial" : false,
+				"isShardFiltering" : false,
+				"isSparse" : false,
+				"isUnique" : false,
+				"keyPattern" : {
+					"a" : 1,
+					"b" : 1,
+					"c" : 1
+				},
+				"multiKeyPaths" : {
+					"a" : [ ],
+					"b" : [ ],
+					"c" : [ ]
+				},
+				"stage" : "DISTINCT_SCAN"
+			},
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				
+			}
+		},
+		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
+			"projection" : {
+				"_id" : 0,
+				"a" : 1,
+				"b" : 1,
+				"c" : 1
+			},
+			"query" : {
+				
+			},
+			"sort" : {
+				
+			}
+		},
+		"isActive" : false,
+		"planCacheKey" : "F6FD5B13"
+	}
+]
+```
+
+### DISTINCT_SCAN used as active plan
+### Pipeline:
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$bottom" : {
+					"sortBy" : {
+						"a" : -1,
+						"b" : -1
+					},
+					"output" : "$c"
+				}
+			}
+		}
+	}
+]
+```
+```json
+[
+	{
+		"cachedPlan" : {
+			"inputStage" : {
+				"direction" : "forward",
+				"indexBounds" : {
+					"a" : [
+						"[MinKey, MaxKey]"
+					],
+					"b" : [
+						"[MinKey, MaxKey]"
+					],
+					"c" : [
+						"[MinKey, MaxKey]"
+					]
+				},
+				"indexName" : "a_1_b_1_c_1",
+				"indexVersion" : 2,
+				"isFetching" : false,
+				"isMultiKey" : false,
+				"isPartial" : false,
+				"isShardFiltering" : false,
+				"isSparse" : false,
+				"isUnique" : false,
+				"keyPattern" : {
+					"a" : 1,
+					"b" : 1,
+					"c" : 1
+				},
+				"multiKeyPaths" : {
+					"a" : [ ],
+					"b" : [ ],
+					"c" : [ ]
+				},
+				"stage" : "DISTINCT_SCAN"
+			},
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				
+			}
+		},
+		"createdFromQuery" : {
+			"distinct" : {
+				"key" : "a"
+			},
+			"projection" : {
+				"_id" : 0,
+				"a" : 1,
+				"b" : 1,
+				"c" : 1
+			},
+			"query" : {
+				
+			},
+			"sort" : {
+				
+			}
+		},
+		"isActive" : true,
+		"planCacheKey" : "F6FD5B13"
 	}
 ]
 ```

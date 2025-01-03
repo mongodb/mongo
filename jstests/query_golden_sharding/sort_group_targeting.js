@@ -7,7 +7,8 @@
  * ]
  */
 
-import {outputAggregationPlanAndResults, section} from "jstests/libs/pretty_md.js";
+import {section} from "jstests/libs/pretty_md.js";
+import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const shardingTest = new ShardingTest({shards: 2});

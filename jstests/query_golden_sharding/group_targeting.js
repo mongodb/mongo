@@ -6,13 +6,8 @@
  *   featureFlagShardFilteringDistinctScan,
  * ]
  */
-
-import {
-    line,
-    outputAggregationPlanAndResults,
-    section,
-    subSection
-} from "jstests/libs/pretty_md.js";
+import {line, section, subSection} from "jstests/libs/pretty_md.js";
+import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const shardingTest = new ShardingTest({shards: 2});

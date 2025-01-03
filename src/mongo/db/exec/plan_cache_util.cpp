@@ -294,7 +294,10 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
             findCommand.getFilter().getOwned(),
             findCommand.getSort().getOwned(),
             projBuilder.obj().getOwned(),
-            query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj()};
+            query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj(),
+            query.getDistinct()
+                ? BSONObjBuilder{}.append("key", query.getDistinct()->getKey()).obj()
+                : BSONObj()};
 
     return {std::move(createdFromQuery), std::move(decision)};
 }
