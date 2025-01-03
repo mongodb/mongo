@@ -1425,6 +1425,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             not is_local_execution(env)
             and normalized_os == "linux"
             and os.environ.get("evergreen_remote_exec") != "on"
+            and os.environ.get("CI") is not None
         ):
             cache_silo = "_cache_silo"
             bazel_internal_flags += [
