@@ -159,7 +159,7 @@ buildvariants:
   - name: compile_test_parallel_core_stream_TG
   - name: compile_test_parallel_unittest_stream_TG
   - name: compile_test_parallel_dbtest_stream_TG
-  - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
+  - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt !.incompatible_aubsan
 
 - &linux-64-debug-required-template
   <<: *linux_x86_dynamic_debug_compile_variant_dependency
@@ -529,15 +529,15 @@ buildvariants:
   - name: .auth
   - name: buildscripts_test
   - name: unittest_shell_hang_analyzer_gen
-  - name: .config_fuzzer
-  - name: config_fuzzer_jsCore
+  - name: .config_fuzzer !.incompatible_tsan
+  - name: config_fuzzer_jsCore !.incompatible_tsan
   - name: .causally_consistent !.sharding
   - name: .change_streams
   # TODO SERVER-82766: change_stream fuzzers had been timing out on TSAN builds.
   # - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.no_txns !.feature_flag_guarded
-  - name: .concurrency .large !.no_txns !.feature_flag_guarded
+  - name: .concurrency !.large !.no_txns !.feature_flag_guarded !.incompatible_tsan
+  - name: .concurrency .large !.no_txns !.feature_flag_guarded !.incompatible_tsan
     distros:
     - rhel8.8-xlarge
   - name: disk_wiredtiger
