@@ -44,12 +44,24 @@ enum stream_errors
 {
 #if defined(GENERATING_DOCUMENTATION)
   /// The underlying stream closed before the ssl stream gracefully shut down.
-  stream_truncated
-#elif (OPENSSL_VERSION_NUMBER < 0x10100000L) && !defined(OPENSSL_IS_BORINGSSL)
-  stream_truncated = ERR_PACK(ERR_LIB_SSL, 0, SSL_R_SHORT_READ)
-#else
-  stream_truncated = 1
-#endif
+  stream_truncated,
+
+  /// The underlying SSL library returned a system error without providing
+  /// further information.
+  unspecified_system_error,
+
+  /// The underlying SSL library generated an unexpected result from a function
+  /// call.
+  unexpected_result
+#else // defined(GENERATING_DOCUMENTATION)
+# if (OPENSSL_VERSION_NUMBER < 0x10100000L) && !defined(OPENSSL_IS_BORINGSSL)
+  stream_truncated = ERR_PACK(ERR_LIB_SSL, 0, SSL_R_SHORT_READ),
+# else
+  stream_truncated = 1,
+# endif
+  unspecified_system_error = 2,
+  unexpected_result = 3
+#endif // defined(GENERATING_DOCUMENTATION)
 };
 
 extern ASIO_DECL
