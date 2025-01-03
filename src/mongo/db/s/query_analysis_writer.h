@@ -140,6 +140,10 @@ public:
             return _docs[index];
         }
 
+        std::vector<BSONObj> getDocuments() const {
+            return _docs;
+        }
+
     private:
         NamespaceString _nss;
 
@@ -233,6 +237,11 @@ public:
         return _queries.getCount();
     }
 
+    std::vector<BSONObj> getQueriesForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _queries.getDocuments();
+    }
+
     void flushQueriesForTest(OperationContext* opCtx) {
         _flushQueries(opCtx);
     }
@@ -240,6 +249,11 @@ public:
     int getDiffsCountForTest() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _diffs.getCount();
+    }
+
+    std::vector<BSONObj> getDiffsForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _diffs.getDocuments();
     }
 
     void flushDiffsForTest(OperationContext* opCtx) {

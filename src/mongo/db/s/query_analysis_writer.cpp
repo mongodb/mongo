@@ -99,6 +99,7 @@ static ReplicaSetAwareServiceRegistry::Registerer<QueryAnalysisWriter>
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisWriter);
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisWriterFlusher);
+MONGO_FAIL_POINT_DEFINE(queryAnalysisWriterMockInsertCommandResponse);
 MONGO_FAIL_POINT_DEFINE(queryAnalysisWriterSkipActiveSamplingCheck);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -553,16 +554,45 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
                     uasserted(ErrorCodes::FailedToParse, errMsg);
                 }
 
+                queryAnalysisWriterMockInsertCommandResponse.executeIf(
+                    [&](const BSONObj& data) {
+                        if (data.hasField("errorDetails")) {
+                            auto mockErrDetailsObj = data["errorDetails"].Obj();
+                            res.addToErrDetails(write_ops::WriteError::parse(mockErrDetailsObj));
+                        } else {
+                            uasserted(9881700,
+                                      str::stream() << "Expected the failpoint to specify "
+                                                       "'errorDetails'"
+                                                    << data);
+                        }
+                    },
+                    [&](const BSONObj& data) {
+                        for (const auto& doc : docsToInsert) {
+                            auto docId = doc["_id"].wrap();
+                            auto docIdToMatch = data["_id"].wrap();
+                            if (docId.woCompare(docIdToMatch) == 0) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+
                 if (res.isErrDetailsSet() && res.sizeErrDetails() > 0) {
                     boost::optional<write_ops::WriteError> firstWriteErr;
 
                     for (const auto& err : res.getErrDetails()) {
                         if (err.getStatus() == ErrorCodes::DuplicateKey ||
                             err.getStatus() == ErrorCodes::BadValue) {
+                            int actualIndex = baseIndex - err.getIndex();
                             LOGV2(7075402,
                                   "Ignoring insert error",
+                                  "actualIndex"_attr = actualIndex,
                                   "error"_attr = redact(err.getStatus()));
-                            invalid.insert(baseIndex - err.getIndex());
+                            dassert(actualIndex >= 0,
+                                    str::stream() << "Found an invalid index " << actualIndex);
+                            dassert(actualIndex < tmpBuffer.getCount(),
+                                    str::stream() << "Found an invalid index " << actualIndex);
+                            invalid.insert(actualIndex);
                             continue;
                         }
                         if (!firstWriteErr) {
@@ -581,7 +611,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
             });
 
         tmpBuffer.truncate(lastIndex, objSize);
-        baseIndex -= lastIndex;
+        baseIndex = tmpBuffer.getCount() - 1;
     }
 
     backSwapper.dismiss();

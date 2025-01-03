@@ -200,6 +200,19 @@ void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
     ASSERT_EQ(comparator.compare(lhs, rhs), 0);
 }
 
+struct SampledReadQuery {
+    UUID sampleId;
+    BSONObj filter;
+    BSONObj collation;
+};
+
+struct SampledDiff {
+    UUID sampleId;
+    BSONObj preImage;
+    BSONObj postImage;
+    BSONObj diff;
+};
+
 struct QueryAnalysisWriterTest : service_context_test::WithSetupTransportLayer,
                                  public ShardServerTestFixture {
 public:
@@ -401,8 +414,7 @@ protected:
     }
 
     void deleteSampledQueryDocuments() const {
-        DBDirectClient client(operationContext());
-        client.remove(NamespaceString::kConfigSampledQueriesNamespace, BSONObj());
+        _deleteConfigDocuments(NamespaceString::kConfigSampledQueriesNamespace);
     }
 
     /**
@@ -466,6 +478,10 @@ protected:
         ASSERT_BSONOBJ_EQ(parsedCmd.toBSON(), expectedCmd.toBSON());
     }
 
+    void deleteSampledDiffDocuments() const {
+        _deleteConfigDocuments(NamespaceString::kConfigSampledQueriesDiffNamespace);
+    }
+
     /*
      * Returns the number of the documents for the collection 'nss' in the config.sampledQueriesDiff
      * collection.
@@ -496,6 +512,22 @@ protected:
      * The helper for testing that samples are discarded.
      */
     void assertNoSampling(const NamespaceString& nss, const UUID& collUuid);
+
+    /*
+     * Turns on the failpoint to mock an error for the insert statement for the sample with the
+     * given id. Returns the failpoint.
+     */
+    FailPoint* configureMockErrorInsertResponseFailPoint(const UUID& sampleId, int errorIndex) {
+        auto failpoint =
+            globalFailPointRegistry().find("queryAnalysisWriterMockInsertCommandResponse");
+        failpoint->setMode(FailPoint::Mode::alwaysOn,
+                           0,
+                           BSON("_id" << sampleId << "errorDetails"
+                                      << BSON("index" << errorIndex << "code"
+                                                      << ErrorCodes::InternalError << "errmsg"
+                                                      << "Mock error")));
+        return failpoint;
+    }
 
     // Test with both empty and non-empty filter and collation to verify that the
     // QueryAnalysisWriter doesn't require filter or collation to be non-empty.
@@ -538,6 +570,14 @@ private:
         auto cursor = client.find(std::move(findRequest));
         ASSERT(cursor->more());
         return cursor->next();
+    }
+
+    /**
+     * Removes all the documents in the config collection 'configNss'.
+     */
+    void _deleteConfigDocuments(const NamespaceString configNss) const {
+        DBDirectClient client(operationContext());
+        client.remove(configNss, {} /* filter */, true /*removeMany=*/);
     }
 
     // This fixture manually flushes sampled queries and diffs.
@@ -917,7 +957,8 @@ TEST_F(QueryAnalysisWriterTest, MultipleQueriesAndCollections) {
                                    originalCountCollation);
 }
 
-TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
+// Test that the QueryAnalysisWriter correctly discards a duplicate query.
+TEST_F(QueryAnalysisWriterTest, RemoveDuplicateQueriesBasic) {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto findSampleId = UUID::gen();
@@ -981,17 +1022,103 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
                                    originalCountCollation);
 }
 
+// Test that the QueryAnalysisWriter correctly discards a duplicate query even when there is some
+// other error in the same or subsequent insert batch.
+TEST_F(QueryAnalysisWriterTest, RemoveDuplicateQueriesAfterOtherWriteError) {
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+
+    for (auto batchSize : {2, 3, 5}) {
+        LOGV2(9881701,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "batchSize"_attr = batchSize);
+
+        RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize",
+                                                          batchSize};
+
+        auto sampleId0 = UUID::gen();
+        auto filter0 = makeNonEmptyFilter();
+        auto collation0 = makeNonEmptyCollation();
+
+        writer.addFindQuery(sampleId0, nss0, filter0, collation0, boost::none /* letParameters */)
+            .get();
+        ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+
+        writer.flushQueriesForTest(operationContext());
+        ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+        ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
+        assertSampledReadQueryDocument(
+            sampleId0, nss0, SampledCommandNameEnum::kFind, filter0, collation0);
+
+        auto numQueries = 7;
+        std::vector<SampledReadQuery> expectedSampledCmds;
+        expectedSampledCmds.push_back({sampleId0, filter0, collation0});
+        for (auto i = 1; i < numQueries; i++) {
+            auto sampleId = UUID::gen();
+            auto filter = makeNonEmptyFilter();
+            auto collation = makeNonEmptyCollation();
+
+            writer.addFindQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
+                .get();
+            if (i == 2) {
+                // This is a duplicate.
+                writer
+                    .addFindQuery(
+                        sampleId0, nss0, filter0, collation0, boost::none /* letParameters */)
+                    .get();
+            }
+            expectedSampledCmds.push_back({sampleId, filter, collation});
+        }
+        ASSERT_EQ(writer.getQueriesCountForTest(), numQueries);
+
+        // Set a failpoint to mock an error for the insert statement for query2 and then verify that
+        // the duplicate query0 did not get added back. Please note that the queries in the buffer
+        // are flushed from the back.
+        // - When the batch size is 2, query0 is in the same insert batch as query2 (3rd batch).
+        // - When the batch size is 3, query0 is also in the same insert batch as query2 (2nd
+        //   batch).
+        // - When the batch size is 5, query0 is in the insert batch before the one that query2 is
+        //   in (1st batch).
+        auto failingSampleId = expectedSampledCmds[2].sampleId;
+        // The index of the insert statement for query2 depends on the batch size but it is not used
+        // so just set it to a placeholder integer.
+        auto failingIndex = 1;
+        auto failpoint = configureMockErrorInsertResponseFailPoint(failingSampleId, failingIndex);
+
+        writer.flushQueriesForTest(operationContext());
+        auto docs = writer.getQueriesForTest();
+        ASSERT_GT(docs.size(), 0);
+        for (const auto& doc : docs) {
+            auto queryDoc = SampledQueryDocument::parse(
+                IDLParserContext("RemoveDuplicateQueriesOtherWriteError"), doc);
+            ASSERT_NE(queryDoc.getSampleId(), sampleId0);
+        }
+
+        failpoint->setMode(FailPoint::Mode::off);
+        writer.flushQueriesForTest(operationContext());
+        ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+        ASSERT_EQ(getSampledQueryDocumentsCount(nss0), numQueries);
+        for (const auto& [sampleId, filter, collation] : expectedSampledCmds) {
+            assertSampledReadQueryDocument(
+                sampleId, nss0, SampledCommandNameEnum::kFind, filter, collation);
+        }
+
+        deleteSampledQueryDocuments();
+    }
+}
+
 TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize", 2};
     auto numQueries = 5;
 
-    std::vector<std::tuple<UUID, BSONObj, BSONObj>> expectedSampledCmds;
+    std::vector<SampledReadQuery> expectedSampledCmds;
     for (auto i = 0; i < numQueries; i++) {
         auto sampleId = UUID::gen();
         auto filter = makeNonEmptyFilter();
         auto collation = makeNonEmptyCollation();
+
         writer.addAggregateQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
             .get();
         expectedSampledCmds.push_back({sampleId, filter, collation});
@@ -1011,11 +1138,12 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatchesFewQueries_MaxBSONObjSize)
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto numQueries = 3;
-    std::vector<std::tuple<UUID, BSONObj, BSONObj>> expectedSampledCmds;
+    std::vector<SampledReadQuery> expectedSampledCmds;
     for (auto i = 0; i < numQueries; i++) {
         auto sampleId = UUID::gen();
         auto filter = BSON(std::string(BSONObjMaxUserSize / 2, 'a') << 1);
         auto collation = makeNonEmptyCollation();
+
         writer.addAggregateQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
             .get();
         expectedSampledCmds.push_back({sampleId, filter, collation});
@@ -1035,11 +1163,12 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatchesManyQueries_MaxBSONObjSize
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto numQueries = 75'000;
-    std::vector<std::tuple<UUID, BSONObj, BSONObj>> expectedSampledCmds;
+    std::vector<SampledReadQuery> expectedSampledCmds;
     for (auto i = 0; i < numQueries; i++) {
         auto sampleId = UUID::gen();
         auto filter = makeNonEmptyFilter();
         auto collation = makeNonEmptyCollation();
+
         writer.addAggregateQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
             .get();
         expectedSampledCmds.push_back({sampleId, filter, collation});
@@ -1392,7 +1521,8 @@ TEST_F(QueryAnalysisWriterTest, DiffsMultipleQueriesAndCollections) {
     assertDiffDocument(sampleId2, nss1, *doc_diff::computeInlineDiff(preImage2, postImage2));
 }
 
-TEST_F(QueryAnalysisWriterTest, DuplicateDiffs) {
+// Test that the QueryAnalysisWriter correctly discards a duplicate diff.
+TEST_F(QueryAnalysisWriterTest, RemoveDuplicateDiffsBasic) {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto collUuid0 = getCollectionUUID(nss0);
@@ -1431,6 +1561,87 @@ TEST_F(QueryAnalysisWriterTest, DuplicateDiffs) {
     assertDiffDocument(sampleId2, nss0, *doc_diff::computeInlineDiff(preImage2, postImage2));
 }
 
+// Test that the QueryAnalysisWriter correctly discards a duplicate diff even when there is some
+// other error in the same or subsequent insert batch.
+TEST_F(QueryAnalysisWriterTest, RemoveDuplicateDiffsAfterOtherWriteError) {
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto collUuid0 = getCollectionUUID(nss0);
+
+    for (auto batchSize : {2, 3, 5}) {
+        LOGV2(9881702,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "batchSize"_attr = batchSize);
+
+        RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize",
+                                                          batchSize};
+
+        auto sampleId0 = UUID::gen();
+        auto preImage0 = BSON("a0" << 0);
+        auto postImage0 = BSON("a0" << 1);
+        auto diff0 = *doc_diff::computeInlineDiff(preImage0, postImage0);
+
+        writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0).get();
+        ASSERT_EQ(writer.getDiffsCountForTest(), 1);
+
+        writer.flushDiffsForTest(operationContext());
+        ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+        ASSERT_EQ(getDiffDocumentsCount(nss0), 1);
+        assertDiffDocument(sampleId0, nss0, diff0);
+
+        auto numDiffs = 7;
+        std::vector<SampledDiff> expectedSampledDiffs;
+        expectedSampledDiffs.push_back({sampleId0, preImage0, postImage0, diff0});
+        for (auto i = 1; i < numDiffs; i++) {
+            auto sampleId = UUID::gen();
+            auto fieldName = "a" + std::to_string(i);
+            auto preImage = BSON(fieldName << 0);
+            auto postImage = BSON(fieldName << 1);
+            auto diff = *doc_diff::computeInlineDiff(preImage, postImage);
+
+            writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
+            if (i == 2) {
+                // This is a duplicate.
+                writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0).get();
+            }
+            expectedSampledDiffs.push_back(
+                {sampleId, std::move(preImage), std::move(postImage), std::move(diff)});
+        }
+        ASSERT_EQ(writer.getDiffsCountForTest(), numDiffs);
+
+        // Set a failpoint to mock an error for the insert statement for diff2 and then verify that
+        // the duplicate diff0 did not get added back. Please note that the diffs in the buffer are
+        // flushed from the back.
+        // - When the batch size is 2, diff0 is in the same insert batch as diff2 (3rd batch).
+        // - When the batch size is 3, diff0 is also in the same insert batch as diff2 (2nd batch).
+        // - When the batch size is 5, diff0 is in the insert batch before the one that diff2 is in
+        //   (1st batch).
+        auto failingSampleId = expectedSampledDiffs[2].sampleId;
+        // The index of the insert statement for diff2 depends on the batch size but it is not used
+        // so just set it to a placeholder integer.
+        auto failingIndex = 1;
+        auto failpoint = configureMockErrorInsertResponseFailPoint(failingSampleId, failingIndex);
+
+        writer.flushDiffsForTest(operationContext());
+        auto docs = writer.getDiffsForTest();
+        ASSERT_GT(docs.size(), 0);
+        for (const auto& doc : docs) {
+            auto diffDoc = SampledQueryDiffDocument::parse(
+                IDLParserContext("RemoveDuplicateDiffsAfterOtherWriteError"), doc);
+            ASSERT_NE(diffDoc.getSampleId(), sampleId0);
+        }
+
+        failpoint->setMode(FailPoint::Mode::off);
+        writer.flushDiffsForTest(operationContext());
+        ASSERT_EQ(getDiffDocumentsCount(nss0), numDiffs);
+        for (const auto& [sampleId, _, __, diff] : expectedSampledDiffs) {
+            assertDiffDocument(sampleId, nss0, diff);
+        }
+
+        deleteSampledDiffDocuments();
+    }
+}
+
 TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBatchSize) {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
@@ -1438,21 +1649,22 @@ TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBatchSize) {
     auto numDiffs = 5;
     auto collUuid0 = getCollectionUUID(nss0);
 
-    std::vector<std::pair<UUID, BSONObj>> expectedSampledDiffs;
+    std::vector<SampledDiff> expectedSampledDiffs;
     for (auto i = 0; i < numDiffs; i++) {
         auto sampleId = UUID::gen();
         auto preImage = BSON("a" << 0);
         auto postImage = BSON(("a" + std::to_string(i)) << 1);
+        auto diff = *doc_diff::computeInlineDiff(preImage, postImage);
+
         writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
-        expectedSampledDiffs.push_back(
-            {sampleId, *doc_diff::computeInlineDiff(preImage, postImage)});
+        expectedSampledDiffs.push_back({sampleId, preImage, postImage, diff});
     }
     ASSERT_EQ(writer.getDiffsCountForTest(), numDiffs);
     writer.flushDiffsForTest(operationContext());
     ASSERT_EQ(writer.getDiffsCountForTest(), 0);
 
     ASSERT_EQ(getDiffDocumentsCount(nss0), numDiffs);
-    for (const auto& [sampleId, diff] : expectedSampledDiffs) {
+    for (const auto& [sampleId, _, __, diff] : expectedSampledDiffs) {
         assertDiffDocument(sampleId, nss0, diff);
     }
 }
@@ -1463,21 +1675,22 @@ TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBSONObjSize) {
     auto numDiffs = 3;
     auto collUuid0 = getCollectionUUID(nss0);
 
-    std::vector<std::pair<UUID, BSONObj>> expectedSampledDiffs;
+    std::vector<SampledDiff> expectedSampledDiffs;
     for (auto i = 0; i < numDiffs; i++) {
         auto sampleId = UUID::gen();
         auto preImage = BSON("a" << 0);
         auto postImage = BSON(std::string(BSONObjMaxUserSize / 2, 'a') << 1);
+        auto diff = *doc_diff::computeInlineDiff(preImage, postImage);
+
         writer.addDiff(sampleId, nss0, collUuid0, preImage, postImage).get();
-        expectedSampledDiffs.push_back(
-            {sampleId, *doc_diff::computeInlineDiff(preImage, postImage)});
+        expectedSampledDiffs.push_back({sampleId, preImage, postImage, diff});
     }
     ASSERT_EQ(writer.getDiffsCountForTest(), numDiffs);
     writer.flushDiffsForTest(operationContext());
     ASSERT_EQ(writer.getDiffsCountForTest(), 0);
 
     ASSERT_EQ(getDiffDocumentsCount(nss0), numDiffs);
-    for (const auto& [sampleId, diff] : expectedSampledDiffs) {
+    for (const auto& [sampleId, _, __, diff] : expectedSampledDiffs) {
         assertDiffDocument(sampleId, nss0, diff);
     }
 }
