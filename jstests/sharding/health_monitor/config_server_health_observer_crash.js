@@ -12,7 +12,7 @@ import {reconfig} from "jstests/replsets/rslib.js";
 const kActiveFaultDurationSec = 12;
 
 // Crashed mongos will remain holding its socket as a zombie for some time.
-TestData.failIfUnterminatedProcesses = false;
+TestData.ignoreUnterminatedProcesses = true;
 
 // Checking index consistency involves talking to the primary config server which is blackholed from
 // the mongos in this test.

@@ -1012,24 +1012,61 @@ int mongo_main(int argc, char* argv[]) {
                     pids.begin(), pids.end(), std::ostream_iterator<ProcessId>(std::cout, " "));
                 std::cout << std::endl;
 
-                if (mongo::shell_utils::KillMongoProgramInstances() !=
-                    static_cast<int>(ExitCode::clean)) {
-                    std::cout << "one more more child processes exited with an error during "
-                              << shellGlobalParams.files[i] << std::endl;
-                    std::cout << "exiting with code " << static_cast<int>(kProcessTerminationError)
+                // Some tests spawn child server processes that are expected to crash or otherwise
+                // terminate uncleanly. These tests should set the
+                // TestData.ignoreChildProcessErrorCode flag to true so that any nonzero error
+                // codes do not cause the test to fail.
+                //
+                // The shell checks this flag here by executing a bit of JS to inspect
+                // TestData.ignoreChildProcessErrorCode and return its value. If TestData is null or
+                // does not have the ignoreChildProcessErrorCode field, then the JS returns false.
+                // If TestData.ignoreChildProcessErrorCode has been explicitly set to true, then it
+                // returns true; otherwise it returns false.
+                //
+                // TestData.ignoreChildProcessErrorCode is set to false by default.
+                bool ignoreChildProcessErrorCode = false;
+                StringData code =
+                    "function() { return typeof TestData === 'object' && TestData !== null && "
+                    "TestData.hasOwnProperty('ignoreChildProcessErrorCode') && "
+                    "TestData.ignoreChildProcessErrorCode === true; }"_sd;
+                shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
+                ignoreChildProcessErrorCode = shellMainScope->getBoolean("__returnValue");
+                auto childProcessErrorCode = mongo::shell_utils::KillMongoProgramInstances();
+
+                if (!ignoreChildProcessErrorCode) {
+                    if (childProcessErrorCode != static_cast<int>(ExitCode::clean)) {
+                        std::cout << "one or more child processes exited with an error during "
+                                  << shellGlobalParams.files[i] << std::endl;
+                        std::cout << "exiting with code "
+                                  << static_cast<int>(kProcessTerminationError) << std::endl;
+                        return kProcessTerminationError;
+                    }
+                } else {
+                    std::cout << "Ignoring child process exit codes since "
+                                 "TestData.ignoreChildProcessErrorCode is true"
                               << std::endl;
-                    return kProcessTerminationError;
                 }
 
-                bool failIfUnterminatedProcesses = false;
-                const StringData code =
+                // Similarly, some tests spawn child server processes that are expected to not
+                // terminate at all. These tests should set the TestData.ignoreUnterminatedProcesses
+                // flag to true so that zombie processes do not cause the test to fail.
+                //
+                // The shell checks this flag here by executing a bit of JS to inspect
+                // TestData.ignoreUnterminatedProcesses and return its value. If TestData is null or
+                // does not have the ignoreUnterminatedProcesses field, then the JS returns false.
+                // If TestData.ignoreUnterminatedProcesses has been explicitly set to true, then it
+                // returns true; otherwise it returns false.
+                //
+                // TestData.ignoreUnterminatedProcesses is set to false by default.
+                bool ignoreUnterminatedProcesses = false;
+                code =
                     "function() { return typeof TestData === 'object' && TestData !== null && "
-                    "TestData.hasOwnProperty('failIfUnterminatedProcesses') && "
-                    "TestData.failIfUnterminatedProcesses; }"_sd;
+                    "TestData.hasOwnProperty('ignoreUnterminatedProcesses') && "
+                    "TestData.ignoreUnterminatedProcesses === true; }"_sd;
                 shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
-                failIfUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
+                ignoreUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
 
-                if (failIfUnterminatedProcesses) {
+                if (!ignoreUnterminatedProcesses) {
                     std::cout << "exiting with a failure due to unterminated processes, "
                                  "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
                                  "ShardingTest#stop() may be missing from the test"
@@ -1037,6 +1074,10 @@ int mongo_main(int argc, char* argv[]) {
                     std::cout << "exiting with code " << static_cast<int>(kUnterminatedProcess)
                               << std::endl;
                     return kUnterminatedProcess;
+                } else {
+                    std::cout << "Ignoring unterminated processes since "
+                                 "TestData.ignoreUnterminatedProcesses is true"
+                              << std::endl;
                 }
             }
         }

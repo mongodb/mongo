@@ -4,7 +4,7 @@ import {detectDefaultTLSProtocol} from "jstests/ssl/libs/ssl_helpers.js";
 
 // There will be cases where a connect is impossible,
 // let the test runner clean those up.
-TestData.failIfUnterminatedProcesses = false;
+TestData.ignoreUnterminatedProcesses = true;
 
 const supportsTLS1_1 = (function() {
     const openssl = getBuildInfo().openssl || {};

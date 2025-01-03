@@ -89,7 +89,7 @@ assert.throws(function() {
 
 // stopSet will also fail because we cannot authenticate to stop it properly.
 // Ignore the error around unterminated processes.
-TestData.failIfUnterminatedProcesses = false;
+TestData.ignoreUnterminatedProcesses = true;
 
 assert.throws(function() {
     replTest.stopSet();
