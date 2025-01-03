@@ -6,9 +6,8 @@
  * @tags: [
  *  requires_fcv_72,
  *  does_not_support_causal_consistency,
+ *  does_not_support_stepdowns,
  *  requires_getmore,
- *  # TODO (SERVER-95174): Re-enable this test on txn concurrency suites.
- *  does_not_support_transactions,
  * ]
  *
  *
