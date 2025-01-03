@@ -50,16 +50,29 @@ struct Printer {
     static constexpr char kOmitUnrecognizedCommandMsg[] = "omitted: unrecognized command";
     static constexpr char kOmitUnsupportedCommandMsg[] =
         "omitted: command does not support diagnostic printing";
+    static constexpr char kOpCtxIsNullMsg[] = "opCtx is null";
+    static constexpr char kCurOpIsNullMsg[] = "the opCtx's curOp is null";
 
     auto format(auto& fc) const {
-        // All operations have an OperationContext, and all OpContexts are decorated with a
-        // CurOpStack. This access should always be valid while 'opCtx' is a valid pointer.
-        auto& curOp = *CurOp::get(opCtx);
         auto out = fc.out();
 
+        if (!opCtx) {
+            out = format_to(out, FMT_STRING(kOpCtxIsNullMsg));
+            return out;
+        }
+
+        // All operations have an OperationContext, and all OpContexts are decorated with a
+        // CurOpStack. This access should always be valid while 'opCtx' is a valid pointer.
+        CurOp* curOp = CurOp::get(opCtx);
+
+        if (!curOp) {
+            out = format_to(out, FMT_STRING(kCurOpIsNullMsg));
+            return out;
+        }
+
         // Do not log any information if asked to omit it.
-        const Command* curCommand = curOp.getCommand();
-        if (CurOp::shouldCurOpStackOmitDiagnosticInformation(&curOp)) {
+        const Command* curCommand = curOp->getCommand();
+        if (CurOp::shouldCurOpStackOmitDiagnosticInformation(curOp)) {
             out = format_to(out, FMT_STRING(kOmitUnsupportedCurOpMsg));
             return out;
         } else if (!curCommand) {
@@ -74,20 +87,20 @@ struct Printer {
         // TODO SERVER-74604: When the implementations of OpDebug::append() and OpDebug::report()
         // are merged, we should be able to remove the duplicated logic here that handles
         // 'snipForLogging()' and 'redact()'.
-        mutablebson::Document cmdToLog(curOp.opDescription(),
+        mutablebson::Document cmdToLog(curOp->opDescription(),
                                        mutablebson::Document::kInPlaceDisabled);
         curCommand->snipForLogging(&cmdToLog);
         BSONObj cmd = cmdToLog.getObject();
 
         auto opDesc = redact(cmd).toString();
-        auto opDebug = redact(serializeOpDebug(curOp)).toString();
-        auto origCommand = redact(curOp.originatingCommand()).toString();
+        auto opDebug = redact(serializeOpDebug(*curOp)).toString();
+        auto origCommand = redact(curOp->originatingCommand()).toString();
         out = format_to(
             out,
             FMT_STRING("{{'currentOp': {}, 'opDescription': {}{}}}"),
             opDebug,
             opDesc,
-            curOp.originatingCommand().isEmpty() ? "" : ", 'originatingCommand': " + origCommand);
+            curOp->originatingCommand().isEmpty() ? "" : ", 'originatingCommand': " + origCommand);
         return out;
     }
 
