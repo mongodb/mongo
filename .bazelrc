@@ -167,6 +167,7 @@ build:dbg --enable_platform_specific_config=true
 # Build with address and undefined sanitizers
 build:dbg_aubsan --config=dbg
 build:dbg_aubsan --//bazel/config:opt=debug
+build:dbg_aubsan --//bazel/config:linkstatic=False
 build:dbg_aubsan --//bazel/config:allocator=system
 build:dbg_aubsan --//bazel/config:asan=True
 build:dbg_aubsan --//bazel/config:ubsan=True

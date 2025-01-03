@@ -1153,6 +1153,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
+        "compile_requires_large_memory_sanitizer",
         "mongo_unittest_third_group",
     ],
     deps = [
