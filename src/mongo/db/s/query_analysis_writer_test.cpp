@@ -1107,6 +1107,82 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicateQueriesAfterOtherWriteError) {
     }
 }
 
+TEST_F(QueryAnalysisWriterTest, RemoveBadQueriesTopLevelError) {
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+
+    for (const auto& errorCode : QueryAnalysisWriter::kNonRetryableInsertErrorCodes) {
+        if (errorCode == ErrorCodes::DuplicateKey) {
+            // The DuplicateKey error is a write error and is tested separately in other unit tests.
+            continue;
+        }
+
+        LOGV2(9885201,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "errorCode"_attr = errorCode);
+
+        auto sampleId0 = UUID::gen();
+        auto filter0 = makeNonEmptyFilter();
+        auto collation0 = makeNonEmptyCollation();
+
+        writer.addFindQuery(sampleId0, nss0, filter0, collation0, boost::none /* letParameters */)
+            .get();
+        ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+
+        auto failpoint = globalFailPointRegistry().find("failCommand");
+        failpoint->setMode(FailPoint::alwaysOn,
+                           0,
+                           BSON("failCommands" << BSON_ARRAY("insert") << "namespace"
+                                               << NamespaceString::kConfigSampledQueriesNamespace
+                                                      .toStringForErrorMsg()
+                                               << "errorCode" << errorCode << "failInternalCommands"
+                                               << true << "failLocalClients" << true));
+
+        writer.flushQueriesForTest(operationContext());
+        ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+        ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 0);
+
+        failpoint->setMode(FailPoint::off);
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, RemoveBadQueriesWriteError) {
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+
+    for (const auto& errorCode : QueryAnalysisWriter::kNonRetryableInsertErrorCodes) {
+        if (errorCode == ErrorCodes::DuplicateKey) {
+            // The DuplicateKey error is a write error and is tested separately in other unit tests.
+            continue;
+        }
+
+        LOGV2(9885202,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "errorCode"_attr = errorCode);
+
+        auto sampleId0 = UUID::gen();
+        auto filter0 = makeNonEmptyFilter();
+        auto collation0 = makeNonEmptyCollation();
+
+        writer.addFindQuery(sampleId0, nss0, filter0, collation0, boost::none /* letParameters */)
+            .get();
+        ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+
+        auto failpoint =
+            globalFailPointRegistry().find("queryAnalysisWriterMockInsertCommandResponse");
+        failpoint->setMode(FailPoint::Mode::alwaysOn,
+                           0,
+                           BSON("_id" << sampleId0 << "errorDetails"
+                                      << BSON("index" << 0 << "code" << errorCode << "errmsg"
+                                                      << "Mock error")));
+
+        writer.flushQueriesForTest(operationContext());
+        ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+        failpoint->setMode(FailPoint::off);
+    }
+}
+
 TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
@@ -1639,6 +1715,83 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicateDiffsAfterOtherWriteError) {
         }
 
         deleteSampledDiffDocuments();
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, RemoveBadDiffsTopLevelError) {
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto collUuid0 = getCollectionUUID(nss0);
+
+    for (auto errorCode : QueryAnalysisWriter::kNonRetryableInsertErrorCodes) {
+        if (errorCode == ErrorCodes::DuplicateKey) {
+            // The DuplicateKey error is a write error and is tested separately in other unit tests.
+            continue;
+        }
+
+        LOGV2(9881703,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "errorCode"_attr = errorCode);
+
+        auto sampleId0 = UUID::gen();
+        auto preImage0 = BSON("a0" << 0);
+        auto postImage0 = BSON("a0" << 1);
+
+        writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0).get();
+        ASSERT_EQ(writer.getDiffsCountForTest(), 1);
+
+        auto failpoint = globalFailPointRegistry().find("failCommand");
+        failpoint->setMode(
+            FailPoint::alwaysOn,
+            0,
+            BSON("failCommands"
+                 << BSON_ARRAY("insert") << "namespace"
+                 << NamespaceString::kConfigSampledQueriesDiffNamespace.toStringForErrorMsg()
+                 << "errorCode" << errorCode << "failInternalCommands" << true << "failLocalClients"
+                 << true));
+
+        writer.flushDiffsForTest(operationContext());
+        ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+        ASSERT_EQ(getDiffDocumentsCount(nss0), 0);
+
+        failpoint->setMode(FailPoint::off);
+    }
+}
+
+TEST_F(QueryAnalysisWriterTest, RemoveBadDiffsWriteError) {
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto collUuid0 = getCollectionUUID(nss0);
+
+    for (const auto& errorCode : QueryAnalysisWriter::kNonRetryableInsertErrorCodes) {
+        if (errorCode == ErrorCodes::DuplicateKey) {
+            // The DuplicateKey error is a write error and is tested separately in other unit tests.
+            continue;
+        }
+
+        LOGV2(9885204,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "errorCode"_attr = errorCode);
+
+        auto sampleId0 = UUID::gen();
+        auto preImage0 = BSON("a0" << 0);
+        auto postImage0 = BSON("a0" << 1);
+
+        writer.addDiff(sampleId0, nss0, collUuid0, preImage0, postImage0).get();
+        ASSERT_EQ(writer.getDiffsCountForTest(), 1);
+
+        auto failpoint =
+            globalFailPointRegistry().find("queryAnalysisWriterMockInsertCommandResponse");
+        failpoint->setMode(FailPoint::Mode::alwaysOn,
+                           0,
+                           BSON("_id" << sampleId0 << "errorDetails"
+                                      << BSON("index" << 0 << "code" << errorCode << "errmsg"
+                                                      << "Mock error")));
+
+        writer.flushDiffsForTest(operationContext());
+        ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+        failpoint->setMode(FailPoint::off);
     }
 }
 

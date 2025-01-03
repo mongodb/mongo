@@ -312,6 +312,11 @@ const std::map<NamespaceString, BSONObj> QueryAnalysisWriter::kTTLIndexes = {
     {NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
      kAnalyzeShardKeySplitPointsTTLIndexSpec}};
 
+// Do not retry upon getting an error indicating that the documents are invalid since the inserts
+// are not going to succeed in the next try anyway.
+const std::set<ErrorCodes::Error> QueryAnalysisWriter::kNonRetryableInsertErrorCodes = {
+    ErrorCodes::BSONObjectTooLarge, ErrorCodes::BadValue, ErrorCodes::DuplicateKey};
+
 QueryAnalysisWriter* QueryAnalysisWriter::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
@@ -581,8 +586,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
                     boost::optional<write_ops::WriteError> firstWriteErr;
 
                     for (const auto& err : res.getErrDetails()) {
-                        if (err.getStatus() == ErrorCodes::DuplicateKey ||
-                            err.getStatus() == ErrorCodes::BadValue) {
+                        if (_isNonRetryableInsertError(err.getStatus().code())) {
                             int actualIndex = baseIndex - err.getIndex();
                             LOGV2(7075402,
                                   "Ignoring insert error",
@@ -606,6 +610,9 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
                         uassertStatusOK(firstWriteErr->getStatus());
                     }
                 } else {
+                    if (_isNonRetryableInsertError(res.toStatus().code())) {
+                        return;
+                    }
                     uassertStatusOK(res.toStatus());
                 }
             });
@@ -647,6 +654,10 @@ void QueryAnalysisWriter::Buffer::truncate(size_t index, long long numBytes) {
 bool QueryAnalysisWriter::_exceedsMaxSizeBytes() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _queries.getSize() + _diffs.getSize() >= gQueryAnalysisWriterMaxMemoryUsageBytes.load();
+}
+
+bool QueryAnalysisWriter::_isNonRetryableInsertError(const ErrorCodes::Error& errorCode) {
+    return kNonRetryableInsertErrorCodes.find(errorCode) != kNonRetryableInsertErrorCodes.end();
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addFindQuery(

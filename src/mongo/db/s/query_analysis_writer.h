@@ -99,6 +99,8 @@ public:
 
     static const std::map<NamespaceString, BSONObj> kTTLIndexes;
 
+    static const std::set<ErrorCodes::Error> kNonRetryableInsertErrorCodes;
+
     /**
      * Temporarily stores documents to be written to disk.
      */
@@ -306,6 +308,12 @@ private:
      * amount of memory that the writer is allowed to use.
      */
     bool _exceedsMaxSizeBytes();
+
+    /**
+     * Returns true if the writer should not retry inserting the document(s) that failed with the
+     * given error again.
+     */
+    bool _isNonRetryableInsertError(const ErrorCodes::Error& errorCode);
 
     mutable stdx::mutex _mutex;
 
