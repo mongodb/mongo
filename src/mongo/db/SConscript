@@ -1978,10 +1978,12 @@ env.Library(
         'update/pattern_cmp',
     ],
     LIBDEPS_PRIVATE=[
-        'mongohasher',
-        'server_base',
-        'service_context',
-        'vector_clock',
+        "$BUILD_DIR/mongo/util/elapsed_tracker",
+        "curop_failpoint_helpers",
+        "mongohasher",
+        "server_base",
+        "service_context",
+        "vector_clock",
     ],
 )
 

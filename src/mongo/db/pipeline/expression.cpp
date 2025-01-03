@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
@@ -68,6 +67,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
@@ -96,6 +96,7 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
@@ -117,6 +118,8 @@ using std::pair;
 using std::string;
 using std::vector;
 
+MONGO_FAIL_POINT_DEFINE(mapReduceFilterPauseBeforeLoop);
+
 Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
                                             Value val,
                                             bool wrapRepresentativeValue) {
@@ -137,6 +140,33 @@ Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
 
     return opts.serializeLiteral(val);
 }
+
+namespace {
+
+void mapReduceFilterWaitBeforeLoop(OperationContext* opCtx) {
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &mapReduceFilterPauseBeforeLoop, opCtx, "mapReduceFilterPauseBeforeLoop", []() {
+            LOGV2(9006800, "waiting due to 'mapReduceFilterPauseBeforeLoop' failpoint");
+        });
+}
+
+std::function<void()> getExpressionInterruptChecker(OperationContext* opCtx) {
+    if (opCtx) {
+        ElapsedTracker et(opCtx->getServiceContext()->getFastClockSource(),
+                          internalQueryExpressionInterruptIterations.load(),
+                          Milliseconds{internalQueryExpressionInterruptPeriodMS.load()});
+        return [=]() mutable {
+            if (MONGO_unlikely(et.intervalHasElapsed())) {
+                opCtx->checkForInterrupt();
+            }
+        };
+    } else {
+        return []() {
+        };
+    }
+}
+
+}  // namespace
 
 /* --------------------------- Expression ------------------------------ */
 
@@ -2873,9 +2903,13 @@ Value ExpressionFilter::evaluate(const Document& root, Variables* variables) con
         }
     }
 
+    auto checkForInterrupt = getExpressionInterruptChecker(getExpressionContext()->opCtx);
+    mapReduceFilterWaitBeforeLoop(getExpressionContext()->opCtx);
+
     vector<Value> output;
     output.reserve(approximateOutputSize);
     for (const auto& elem : input) {
+        checkForInterrupt();
         variables->setValue(_varId, elem);
 
         if (_children[_kCond]->evaluate(root, variables).coerceToBool()) {
@@ -3122,9 +3156,15 @@ Value ExpressionMap::evaluate(const Document& root, Variables* variables) const 
     if (input.empty())
         return inputVal;
 
+    auto checkForInterrupt = getExpressionInterruptChecker(getExpressionContext()->opCtx);
+    mapReduceFilterWaitBeforeLoop(getExpressionContext()->opCtx);
+
+    size_t memUsed = 0;
     vector<Value> output;
     output.reserve(input.size());
+    const size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
     for (size_t i = 0; i < input.size(); i++) {
+        checkForInterrupt();
         variables->setValue(_varId, input[i]);
 
         Value toInsert = _children[_kEach]->evaluate(root, variables);
@@ -3132,6 +3172,11 @@ Value ExpressionMap::evaluate(const Document& root, Variables* variables) const 
             toInsert = Value(BSONNULL);  // can't insert missing values into array
 
         output.push_back(toInsert);
+        memUsed += toInsert.getApproximateSize();
+        if (MONGO_unlikely(memUsed > memLimit)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      "$map would use too much memory and cannot spill");
+        }
     }
 
     return Value(std::move(output));
@@ -4691,13 +4736,23 @@ Value ExpressionReduce::evaluate(const Document& root, Variables* variables) con
                           << inputVal.toString(),
             inputVal.isArray());
 
+    auto checkForInterrupt = getExpressionInterruptChecker(getExpressionContext()->opCtx);
+    mapReduceFilterWaitBeforeLoop(getExpressionContext()->opCtx);
+
+    size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
     Value accumulatedValue = _children[_kInitial]->evaluate(root, variables);
 
     for (auto&& elem : inputVal.getArray()) {
+        checkForInterrupt();
+
         variables->setValue(_thisVar, elem);
         variables->setValue(_valueVar, accumulatedValue);
 
         accumulatedValue = _children[_kIn]->evaluate(root, variables);
+        if (MONGO_unlikely(accumulatedValue.getApproximateSize() > memLimit)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      "$reduce would use too much memory and cannot spill");
+        }
     }
 
     return accumulatedValue;

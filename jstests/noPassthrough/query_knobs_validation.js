@@ -36,6 +36,8 @@ const expectedParamDefaults = {
     internalQueryMaxBlockingSortMemoryUsageBytes: 100 * 1024 * 1024,
     internalQueryExecYieldIterations: -1,
     internalQueryExecYieldPeriodMS: 10,
+    internalQueryExpressionInterruptIterations: 10,
+    internalQueryExpressionInterruptPeriodMS: 1000,
     internalQueryFacetBufferSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024,
     internalDocumentSourceCursorInitialBatchSize: 32,
@@ -46,6 +48,7 @@ const expectedParamDefaults = {
     internalQueryMaxJsEmitBytes: 100 * 1024 * 1024,
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
     internalQueryMaxRangeBytes: 100 * 1024 * 1024,
+    internalQueryMaxMapReduceExpressionBytes: 100 * 1024 * 1024,
     internalQueryMaxAddToSetBytes: 100 * 1024 * 1024,
     internalQueryPlannerGenerateCoveredWholeIndexScans: false,
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
@@ -173,9 +176,17 @@ assertSetParameterSucceeds("internalQueryExecYieldPeriodMS", 1);
 assertSetParameterSucceeds("internalQueryExecYieldPeriodMS", 0);
 assertSetParameterFails("internalQueryExecYieldPeriodMS", -1);
 
+assertSetParameterSucceeds("internalQueryExpressionInterruptIterations", 10);
+assertSetParameterSucceeds("internalQueryExpressionInterruptIterations", 0);
+assertSetParameterSucceeds("internalQueryExpressionInterruptIterations", -1);
+
 assertSetParameterSucceeds("internalQueryExecYieldPeriodMS", 11);
 assertSetParameterSucceeds("internalQueryExecYieldPeriodMS", 0);
 assertSetParameterFails("internalQueryExecYieldPeriodMS", -1);
+
+assertSetParameterSucceeds("internalQueryExpressionInterruptPeriodMS", 11);
+assertSetParameterSucceeds("internalQueryExpressionInterruptPeriodMS", 0);
+assertSetParameterFails("internalQueryExpressionInterruptPeriodMS", -1);
 
 assertSetParameterSucceeds("internalQueryFacetBufferSizeBytes", 1);
 assertSetParameterFails("internalQueryFacetBufferSizeBytes", 0);
@@ -196,6 +207,14 @@ assertSetParameterFails("internalQueryMaxJsEmitBytes", -1);
 assertSetParameterSucceeds("internalQueryMaxPushBytes", 10);
 assertSetParameterFails("internalQueryMaxPushBytes", 0);
 assertSetParameterFails("internalQueryMaxPushBytes", -1);
+
+assertSetParameterSucceeds("internalQueryMaxRangeBytes", 10);
+assertSetParameterFails("internalQueryMaxRangeBytes", 0);
+assertSetParameterFails("internalQueryMaxRangeBytes", -1);
+
+assertSetParameterSucceeds("internalQueryMaxMapReduceExpressionBytes", 10);
+assertSetParameterFails("internalQueryMaxMapReduceExpressionBytes", 0);
+assertSetParameterFails("internalQueryMaxMapReduceExpressionBytes", -1);
 
 assertSetParameterSucceeds("internalQueryMaxAddToSetBytes", 10);
 assertSetParameterFails("internalQueryMaxAddToSetBytes", 0);
