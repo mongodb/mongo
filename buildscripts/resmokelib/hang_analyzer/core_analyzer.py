@@ -20,6 +20,7 @@ class CoreAnalyzer(Subcommand):
         self.options = options
         self.task_id = options.failed_task_id
         self.execution = options.execution
+        self.gdb_index_cache = options.gdb_index_cache
         self.root_logger = self.setup_logging(logger)
 
     @TRACER.start_as_current_span("core_analyzer.execute")
@@ -63,7 +64,7 @@ class CoreAnalyzer(Subcommand):
 
         analysis_dir = os.path.join(base_dir, "analysis")
         report = dumpers.dbg.analyze_cores(core_dump_dir, install_dir, analysis_dir,
-                                           multiversion_dir)
+                                           multiversion_dir, self.gdb_index_cache)
 
         if self.options.generate_report:
             with open("report.json", "w") as file:
@@ -130,5 +131,15 @@ class CoreAnalyzerPlugin(PluginInterface):
         parser.add_argument(
             "--generate-report", '-r', action="store_true", default=False,
             help="Whether to generate a report used to log individual tests in evergreen.")
+
+        parser.add_argument(
+            "--gdb-index-cache",
+            "-g",
+            action="store",
+            default="on",
+            choices=["on", "off"],
+            metavar="ON|OFF",
+            help="Set core analyzer GDB index cache enabled state (default: on)",
+        )
 
         configure_resmoke.add_otel_args(parser)
