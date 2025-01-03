@@ -80,6 +80,7 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInBatchedDeleteStage);
 MONGO_FAIL_POINT_DEFINE(batchedDeleteStageSleepAfterNDocuments);
+MONGO_FAIL_POINT_DEFINE(batchedDeleteStageThrowTemporarilyUnavailableException);
 
 namespace {
 
@@ -250,13 +251,20 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
         _commitStagedDeletes = _passStagingComplete || !_stagedDeletesBuffer.empty();
     }
 
+    // We need to check if 'planStateStage' is 'NEED_YIELD' earlier than we check 'isEOF()'.
+    // The reason is that 'isEOF()' returns true if we have completed staging and have an empty
+    // buffer of staged deletes. However, even if 'isEOF()' returns true, the 'planStateStage' can
+    // be 'NEED_YIELD' here if inside 'restoreState()' in '_deleteBatch()' a
+    // 'StorageEngineException' was thrown and caught. In this case, the 'planStateStage' is
+    // 'NEED_YIELD' and 'isEOF()' already returns true.
+    if (planStageState == PlanStage::NEED_YIELD) {
+        *out = idToReturn;
+        return PlanStage::NEED_YIELD;
+    }
+
     if (isEOF()) {
         invariant(planStageState != PlanStage::NEED_YIELD);
         return PlanStage::IS_EOF;
-    }
-
-    if (planStageState == PlanStage::NEED_YIELD) {
-        *out = idToReturn;
     }
 
     return planStageState;
@@ -512,6 +520,13 @@ PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
         expCtx(),
         "BatchedDeleteStage::_tryRestoreState",
         [&] {
+            if (MONGO_unlikely(
+                    batchedDeleteStageThrowTemporarilyUnavailableException.shouldFail())) {
+                throwTemporarilyUnavailableException(
+                    str::stream()
+                    << "Hit failpoint '"
+                    << batchedDeleteStageThrowTemporarilyUnavailableException.getName() << "'.");
+            }
             child()->restoreState(&collectionPtr());
             return PlanStage::NEED_TIME;
         },

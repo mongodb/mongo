@@ -118,7 +118,8 @@ void PlanYieldPolicy::resetTimer() {
 }
 
 Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
-                                         std::function<void()> whileYieldingFn) {
+                                         std::function<void()> whileYieldingFn,
+                                         RestoreContext::RestoreType restoreType) {
     invariant(opCtx);
 
     // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
@@ -181,17 +182,13 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             }
 
             // This copies 'yieldable' back to '_yieldable' where needed.
-            restoreState(opCtx,
-                         holds_alternative<const Yieldable*>(yieldable)
-                             ? get<const Yieldable*>(yieldable)
-                             : nullptr);
+            auto yieldablePtr = get_if<const Yieldable*>(&yieldable);
+            restoreState(opCtx, yieldablePtr ? *yieldablePtr : nullptr, restoreType);
             return Status::OK();
         } catch (const StorageUnavailableException& e) {
             // This copies 'yieldable' back to '_yieldable' where needed.
-            restoreState(opCtx,
-                         holds_alternative<const Yieldable*>(yieldable)
-                             ? get<const Yieldable*>(yieldable)
-                             : nullptr);
+            auto yieldablePtr = get_if<const Yieldable*>(&yieldable);
+            restoreState(opCtx, yieldablePtr ? *yieldablePtr : nullptr, restoreType);
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }

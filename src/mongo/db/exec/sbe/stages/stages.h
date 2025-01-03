@@ -659,7 +659,8 @@ public:
             // for interrupt checking, but when disabled we do it ourselves.
             checkForInterruptNoYield(opCtx);
         } else if (_yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
-            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(opCtx));
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(
+                opCtx, nullptr, RestoreContext::RestoreType::kYield));
         }
     }
 

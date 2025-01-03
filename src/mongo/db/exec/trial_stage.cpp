@@ -82,7 +82,8 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                 throwWriteConflictException(
                     "Write conflict during TrialStage plan selection and yielding is disabled.");
             }
-            auto yieldStatus = yieldPolicy->yieldOrInterrupt(expCtx()->getOperationContext());
+            auto yieldStatus = yieldPolicy->yieldOrInterrupt(
+                expCtx()->getOperationContext(), nullptr, RestoreContext::RestoreType::kYield);
             if (!yieldStatus.isOK()) {
                 return yieldStatus;
             }

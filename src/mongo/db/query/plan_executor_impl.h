@@ -258,7 +258,8 @@ private:
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
         if (_yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
-            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(_opCtx, whileYieldingFn));
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(
+                _opCtx, whileYieldingFn, RestoreContext::RestoreType::kYield));
         }
     }
 
