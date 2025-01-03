@@ -106,6 +106,8 @@ build --flag_alias=dbg_level=//bazel/config:dbg_level
 
 # Should a profile modify another profile, it should be named {original_profile}_{modifier_name} - example fast_static
 
+# You can use .bazelrc.local to modify the default build type you want to use locally
+
 # Current Profiles:
 # fastbuild
 # dbg
@@ -113,7 +115,8 @@ build --flag_alias=dbg_level=//bazel/config:dbg_level
 # dbg_tsan
 # opt
 
-# The 'default' build profile - should match all the settings of a profile, currently fastbuild
+# Current default profile - fastbuild - this matches the config options of fastbuild. It does not just set --config=fastbuild
+# To avoid the bazel warning about passing multiple configs
 build -c fastbuild
 build --fission=yes
 build --remote_download_regex=.*\.dwo$
@@ -127,12 +130,18 @@ build --//bazel/config:linkstatic=True
 build --//bazel/config:build_enterprise=True
 build --//bazel/config:release=False
 build --//bazel/config:skip_archive=True
+build --//bazel/config:allocator=auto
+build --//bazel/config:asan=False
+build --//bazel/config:tsan=False
+build --//bazel/config:ubsan=False
+build --//bazel/config:libunwind=auto
 build --enable_platform_specific_config=true
 build --jobs=200
 build:macos --jobs=auto
 build:windows --jobs=auto
 
 # Profile for building fast with minimal debuggability - the build is fast ##################################################
+--config=fastbuild
 build:fastbuild -c fastbuild
 build:fastbuild --fission=yes
 build:fastbuild --remote_download_regex=.*\.dwo$
@@ -146,9 +155,15 @@ build:fastbuild --//bazel/config:linkstatic=True
 build:fastbuild --//bazel/config:build_enterprise=True
 build:fastbuild --//bazel/config:release=False
 build:fastbuild --//bazel/config:skip_archive=True
+build:fastbuild --//bazel/config:allocator=auto
+build:fastbuild --//bazel/config:asan=False
+build:fastbuild --//bazel/config:tsan=False
+build:fastbuild --//bazel/config:ubsan=False
+build:fastbuild --//bazel/config:libunwind=auto
 build:fastbuild --enable_platform_specific_config=true
 
 # Profile for building highly debuggable code - the build is slow, the code is slow, the binaries are large #################
+--config=dbg
 build:dbg -c dbg
 build:dbg --fission=yes
 build:dbg --remote_download_regex=.*\.dwo$
@@ -162,9 +177,15 @@ build:dbg --//bazel/config:linkstatic=True
 build:dbg --//bazel/config:build_enterprise=True
 build:dbg --//bazel/config:release=False
 build:dbg --//bazel/config:skip_archive=True
+build:dbg --//bazel/config:allocator=auto
+build:dbg --//bazel/config:asan=False
+build:dbg --//bazel/config:tsan=False
+build:dbg --//bazel/config:ubsan=False
+build:dbg --//bazel/config:libunwind=auto
 build:dbg --enable_platform_specific_config=true
 
 # Build with address and undefined sanitizers
+--config=dbg_aubsan
 build:dbg_aubsan --config=dbg
 build:dbg_aubsan --//bazel/config:opt=debug
 build:dbg_aubsan --//bazel/config:linkstatic=False
@@ -174,6 +195,7 @@ build:dbg_aubsan --//bazel/config:ubsan=True
 build:dbg_aubsan --enable_platform_specific_config=true
 
 # Build with thread sanitizers
+--config=dbg_tsan
 build:dbg_tsan --config=dbg
 build:dbg_tsan --//bazel/config:opt=debug
 build:dbg_tsan --//bazel/config:linkstatic=False
@@ -185,6 +207,7 @@ build:dbg_tsan --local_resources=cpu=HOST_CPUS
 build:dbg_tsan --enable_platform_specific_config=true
 
 # Profile for building optimized code - the build is slow, the code is fast #################################################
+--config=opt
 build:opt -c opt
 build:opt --fission=yes
 build:opt --remote_download_regex=.*\.dwo$
@@ -198,6 +221,11 @@ build:opt --//bazel/config:linkstatic=True
 build:opt --//bazel/config:build_enterprise=True
 build:opt --//bazel/config:release=False
 build:opt --//bazel/config:skip_archive=True
+build:opt --//bazel/config:allocator=auto
+build:opt --//bazel/config:asan=False
+build:opt --//bazel/config:tsan=False
+build:opt --//bazel/config:ubsan=False
+build:opt --//bazel/config:libunwind=auto
 build:opt --enable_platform_specific_config=true
 
 # TODO: Build the code as we would release it
@@ -351,9 +379,6 @@ build --define=MONGO_DISTMOD=""
 # Default if .git directory is not present
 build --define=GIT_COMMIT_HASH="nogitversion"
 
-# try to import the bazelrc files if available
-try-import %workspace%/.bazelrc.local
-
 # TODO(WT-12780): delete this once wiredtiger switches to /.bazelrc.evergreen.
 try-import %workspace%/.bazelrc.evergreen_engflow_creds
 
@@ -368,3 +393,6 @@ try-import %workspace%/.bazelrc.workstation
 
 # local git version info
 try-import %workspace%/.bazelrc.gitinfo
+
+# Used for build profiles and any settings a user wants to consistently use
+try-import %workspace%/.bazelrc.local

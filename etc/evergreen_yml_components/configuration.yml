@@ -37,7 +37,7 @@ parameters:
     description: "Default build tags"
 
   - key: coverage_bazel_tags
-    value: "--remote_download_outputs=all --config=no-remote-exec"
+    value: "--remote_download_outputs=all --config=no-remote-exec --fission=no"
     description: "Default coverage bazel tags"
 
   - key: bazel_filters_for_cache_hydration
