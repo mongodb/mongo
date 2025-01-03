@@ -67,7 +67,6 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
                                 WriteBatch& batch,
                                 Bucket& bucket,
                                 const StringDataComparator* comparator) {
-    invariant(batch.commitRights.load());
     batch.numPreviouslyCommittedMeasurements = bucket.numCommittedMeasurements;
 
     // Filter out field names that were new at the time of insertion, but have since been committed
@@ -113,7 +112,6 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
  * Must have commit rights. Inactive batches only.
  */
 void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
-    invariant(batch.commitRights.load());
     batch.promise.emplaceValue(info);
 }
 
@@ -655,7 +653,6 @@ boost::optional<ClosedBucket> finish(
 
 void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Status& status) {
     invariant(batch);
-    invariant(batch->commitRights.load());
 
     if (isWriteBatchFinished(*batch)) {
         return;
