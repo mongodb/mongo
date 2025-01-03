@@ -469,6 +469,10 @@ void BackgroundSync::_produce() {
             LOGV2(21089,
                   "Failed to find sync source",
                   "error"_attr = syncSourceResp.syncSourceStatus.getStatus());
+            // The code above makes the ReplicationCoordinator set its sync source, we clear it
+            // again here. Not doing this would give the impression that this node has a sync
+            // source, delaying other nodes switching away from it.
+            _replCoord->clearSyncSource();
         }
 
         long long sleepMS = _getRetrySleepMS();

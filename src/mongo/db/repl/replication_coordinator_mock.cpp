@@ -913,5 +913,9 @@ boost::optional<UUID> ReplicationCoordinatorMock::getInitialSyncId(OperationCont
     return uassertStatusOK(UUID::parse("00000000-0000-0000-0000-000000000000"));
 }
 
+void ReplicationCoordinatorMock::clearSyncSource() {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

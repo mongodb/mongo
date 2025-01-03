@@ -3,6 +3,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 /**
  * Asserts that the node is allowed to sync from 'syncSource'. The node is unable to sync from
@@ -74,6 +75,38 @@ export const assertSyncSourceMatchesSoon = (node, syncSourceName, ...assertSoonA
         return res.syncSourceHost === syncSourceName;
     }, ...assertSoonArgs);
 };
+
+/**
+ * Pauses replication, inserts a document, unpause replication and calls
+ * assertSyncSourceMatchesSoon.
+ *
+ * Warning: Works only if `expectedSyncSource` is the only voting node other than `secondary`.
+ */
+export function assertSyncSourceChangesTo(rst, secondary, expectedSyncSource) {
+    // We need to wait for a heartbeat from the secondary to the sync source, then run sync
+    // source selection, because:
+    // 1) The sync source changes only after retrieving a batch and
+    // 2) The sync source won't change if the secondary isn't behind the expected sync source, as
+    //    determined by heartbeats.
+
+    // Insert a document while 'secondary' is not replicating to force it to run
+    // shouldChangeSyncSource.
+    stopServerReplication(secondary);
+    assert.commandWorked(
+        rst.getPrimary().getDB("testSyncSourceChangesDb").getCollection("coll").insert({a: 1}, {
+            writeConcern: {w: 1}
+        }));
+    const sourceId = rst.getNodeId(expectedSyncSource);
+    // Waits for the secondary to see the expected sync source advance beyond it.
+    assert.soon(function() {
+        const status = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+        const appliedTimestamp = status.optimes.appliedOpTime.ts;
+        const sourceMember = status.members.find((x) => x._id == sourceId);
+        return timestampCmp(sourceMember.optime.ts, appliedTimestamp) > 0;
+    });
+    restartServerReplication(secondary);
+    assertSyncSourceMatchesSoon(secondary, expectedSyncSource.host);
+}
 
 export const DataCenter = class {
     constructor(name, nodes) {

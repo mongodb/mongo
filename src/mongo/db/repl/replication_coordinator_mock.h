@@ -513,6 +513,8 @@ public:
 
     void setOplogSyncState(const OplogSyncState& newState);
 
+    void clearSyncSource() override;
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);

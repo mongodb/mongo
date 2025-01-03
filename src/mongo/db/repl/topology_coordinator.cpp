@@ -258,7 +258,7 @@ HostAndPort TopologyCoordinator::getSyncSourceAddress() const {
     return _syncSource;
 }
 
-void TopologyCoordinator::_clearSyncSource() {
+void TopologyCoordinator::clearSyncSource() {
     _syncSource = HostAndPort();
     _replSetSyncFromSet = false;
 }
@@ -2419,7 +2419,7 @@ void TopologyCoordinator::_updateHeartbeatDataForReconfig(const ReplSetConfig& n
         // We don't need data for the other nodes (which no longer know about us, or soon won't)
         _memberData.clear();
         // We're not in the config, we can't sync any more.
-        _clearSyncSource();
+        clearSyncSource();
         // We shouldn't get a sync source until we've received pings for our new config.
         pingsInConfig = 0;
         MemberData newHeartbeatData;
@@ -2759,7 +2759,7 @@ void TopologyCoordinator::processWinElection(Timestamp electionOpTime) {
     _electionIdTerm = _term;
     _electionTime = electionOpTime;
     _currentPrimaryIndex = _selfIndex;
-    _clearSyncSource();
+    clearSyncSource();
     _forceSyncSourceIndex = -1;
     // Prevent last committed optime from updating until we finish draining.
     _firstOpTimeOfMyTerm =

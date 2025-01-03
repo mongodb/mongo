@@ -490,6 +490,8 @@ public:
 
     SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
+    void clearSyncSource() override;
+
     // ==================== Private API ===================
     // Called by AutoGetRstlForStepUpStepDown before taking RSTL when making stepdown transitions
     void autoGetRstlEnterStepDown();

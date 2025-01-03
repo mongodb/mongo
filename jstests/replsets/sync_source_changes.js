@@ -4,34 +4,8 @@
  * (eventually).
  */
 
-import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
-import {assertSyncSourceMatchesSoon} from "jstests/replsets/libs/sync_source.js";
+import {assertSyncSourceChangesTo} from "jstests/replsets/libs/sync_source.js";
 import {reconfig} from "jstests/replsets/rslib.js";
-
-// We need to wait for a heartbeat from the secondary to the sync source, then run sync
-// source selection, because:
-// 1) The sync source changes only after retrieving a batch and
-// 2) The sync source won't change if the secondary isn't behind the expected sync source, as
-//    determined by heartbeats.
-function assertSyncSourceChangesTo(rst, secondary, expectedSyncSource) {
-    // Insert a document while 'secondary' is not replicating to force it to run
-    // shouldChangeSyncSource.
-    stopServerReplication(secondary);
-    assert.commandWorked(
-        rst.getPrimary().getDB("testSyncSourceChangesDb").getCollection("coll").insert({a: 1}, {
-            writeConcern: {w: 1}
-        }));
-    const sourceId = rst.getNodeId(expectedSyncSource);
-    // Waits for the secondary to see the expected sync source advance beyond it.
-    assert.soon(function() {
-        const status = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-        const appliedTimestamp = status.optimes.appliedOpTime.ts;
-        const sourceMember = status.members.find((x) => x._id == sourceId);
-        return timestampCmp(sourceMember.optime.ts, appliedTimestamp) > 0;
-    });
-    restartServerReplication(secondary);
-    assertSyncSourceMatchesSoon(secondary, expectedSyncSource.host);
-}
 
 // Replication verbosity 2 includes the sync source change debug logs.
 TestData["setParameters"]["logComponentVerbosity"]["replication"]["verbosity"] = 2;

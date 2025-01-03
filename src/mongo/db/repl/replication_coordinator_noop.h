@@ -407,6 +407,8 @@ public:
 
     boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
 
+    void clearSyncSource() override;
+
 private:
     ServiceContext* const _service;
     ReplSettings const _settings;

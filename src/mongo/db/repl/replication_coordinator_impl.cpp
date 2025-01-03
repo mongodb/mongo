@@ -6680,6 +6680,11 @@ SplitPrepareSessionManager* ReplicationCoordinatorImpl::getSplitPrepareSessionMa
     return &_splitSessionManager;
 }
 
+void ReplicationCoordinatorImpl::clearSyncSource() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _topCoord->clearSyncSource();
+}
+
 bool ReplicationCoordinatorImpl::isRetryableWrite(OperationContext* opCtx) const {
     if (!opCtx->writesAreReplicated() || !opCtx->isRetryableWrite()) {
         return false;

@@ -55,6 +55,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -63,6 +64,8 @@
 
 namespace mongo {
 namespace repl {
+
+MONGO_FAIL_POINT_DEFINE(failfirstOplogEntryFetcherCallback);
 
 const Seconds SyncSourceResolver::kFetcherTimeout(30);
 const Seconds SyncSourceResolver::kFetcherErrorDenylistDuration(10);
@@ -306,7 +309,8 @@ void SyncSourceResolver::_firstOplogEntryFetcherCallback(
     const StatusWith<Fetcher::QueryResponse>& queryResult,
     HostAndPort candidate,
     OpTime earliestOpTimeSeen) {
-    if (_isShuttingDown()) {
+
+    if (_isShuttingDown() || MONGO_unlikely(failfirstOplogEntryFetcherCallback.shouldFail())) {
         _finishCallback(Status(ErrorCodes::CallbackCanceled,
                                str::stream()
                                    << "sync source resolver shut down while probing candidate: "
