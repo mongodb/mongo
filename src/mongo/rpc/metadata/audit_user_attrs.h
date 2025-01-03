@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,31 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#pragma once
 
-namespace mongo {
-class OperationContext;
+#include <boost/optional.hpp>
+#include <vector>
+
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/operation_context.h"
+
+namespace mongo::rpc {
 
 /**
- * RAII class to optionally set an impersonated username list into the authorization session
- * for the duration of the life of this object.
+ * An OperationContext decoration that contains username and roles data for the currently
+ * authenticated user or currently impersonated user. This is used to audit correct user
+ * information for an operation.
  */
-class ImpersonationSessionGuard {
-    ImpersonationSessionGuard(const ImpersonationSessionGuard&) = delete;
-    ImpersonationSessionGuard& operator=(const ImpersonationSessionGuard&) = delete;
-
+class AuditUserAttrs {
 public:
-    ImpersonationSessionGuard(OperationContext* opCtx);
-    ~ImpersonationSessionGuard();
+    AuditUserAttrs(boost::optional<UserName> userName, std::vector<RoleName> roleNames)
+        : userName(std::move(userName)), roleNames(std::move(roleNames)){};
 
-    bool isActive() const {
-        return _active;
-    }
+    static AuditUserAttrs* get(OperationContext* opCtx);
+    static void set(OperationContext* opCtx, std::unique_ptr<AuditUserAttrs> auditUserAttrs);
 
-private:
-    OperationContext* _opCtx;
-    bool _active{false};
+    boost::optional<UserName> userName;
+    std::vector<RoleName> roleNames;
 };
 
-}  // namespace mongo
+}  // namespace mongo::rpc

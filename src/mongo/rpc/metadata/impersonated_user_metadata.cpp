@@ -41,12 +41,10 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/role_name.h"
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/synchronized_value.h"
@@ -54,30 +52,51 @@
 namespace mongo {
 namespace rpc {
 namespace {
-
-static const auto getForOpCtx =
-    OperationContext::declareDecoration<synchronized_value<MaybeImpersonatedUserMetadata>>();
+const auto auditUserAttrsDecoration =
+    OperationContext::declareDecoration<std::unique_ptr<AuditUserAttrs>>();
 }  // namespace
 
-MaybeImpersonatedUserMetadata getImpersonatedUserMetadata(OperationContext* opCtx) {
-    return opCtx ? getForOpCtx(opCtx).get() : boost::none;
+AuditUserAttrs* AuditUserAttrs::get(OperationContext* opCtx) {
+    return auditUserAttrsDecoration(opCtx).get();
+}
+
+void AuditUserAttrs::set(OperationContext* opCtx, std::unique_ptr<AuditUserAttrs> auditUserAttrs) {
+    auditUserAttrsDecoration(opCtx) = std::move(auditUserAttrs);
+}
+
+boost::optional<ImpersonatedUserMetadata> getImpersonatedUserMetadata(OperationContext* opCtx) {
+    if (!opCtx) {
+        return boost::none;
+    }
+    auto* auditUserAttrs = AuditUserAttrs::get(opCtx);
+    if (!auditUserAttrs) {
+        return boost::none;
+    }
+    auto userName = auditUserAttrs->userName;
+    auto roleNames = auditUserAttrs->roleNames;
+    if (!userName && roleNames.empty()) {
+        return boost::none;
+    }
+    ImpersonatedUserMetadata metadata;
+    if (userName) {
+        metadata.setUser(userName.value());
+    }
+    metadata.setRoles(std::move(roleNames));
+    return metadata;
 }
 
 void setImpersonatedUserMetadata(OperationContext* opCtx,
                                  const boost::optional<ImpersonatedUserMetadata>& data) {
-    // Always reset the current impersonation data to boost::none.
-    boost::optional<ImpersonatedUserMetadata> newData;
-    if (data) {
-        auto newImpersonatedUser = data->getUser();
-
-        // Set the impersonation data only if there are actually impersonated
-        // users/roles.
-        if (newImpersonatedUser.has_value() || !data->getRoles().empty()) {
-            newData = data;
-        }
+    if (!data) {
+        // Reset username / rolenames to boost::none / empty vector if data is absent.
+        AuditUserAttrs::set(opCtx,
+                            std::make_unique<AuditUserAttrs>(boost::none, std::vector<RoleName>()));
+        return;
     }
-
-    *getForOpCtx(opCtx) = std::move(newData);
+    auto userName = data->getUser();
+    auto roleNames = data->getRoles();
+    AuditUserAttrs::set(
+        opCtx, std::make_unique<AuditUserAttrs>(std::move(userName), std::move(roleNames)));
 }
 
 boost::optional<ImpersonatedUserMetadata> getAuthDataToImpersonatedUserMetadata(
