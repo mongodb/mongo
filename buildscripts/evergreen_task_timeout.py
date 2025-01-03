@@ -21,6 +21,7 @@ from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, parse_evergr
 from buildscripts.resmoke_proxy.resmoke_proxy import ResmokeProxyService
 from buildscripts.timeouts.timeout_service import TimeoutParams, TimeoutService
 from buildscripts.util.cmdutils import enable_logging
+from buildscripts.util.expansions import get_expansion
 from buildscripts.util.taskname import determine_task_base_name
 from evergreen import EvergreenApi, RetryingEvergreenApi
 
@@ -28,7 +29,7 @@ LOGGER = structlog.get_logger(__name__)
 DEFAULT_TIMEOUT_OVERRIDES = "etc/evergreen_timeouts.yml"
 DEFAULT_EVERGREEN_CONFIG = "etc/evergreen.yml"
 DEFAULT_EVERGREEN_AUTH_CONFIG = "~/.evergreen.yml"
-COMMIT_QUEUE_ALIAS = "__commit_queue"
+COMMIT_QUEUE_EXPANSION = "is_commit_queue"
 IGNORED_SUITES = {
     "integration_tests_replset",
     "integration_tests_replset_ssl_auth",
@@ -41,7 +42,7 @@ IGNORED_SUITES = {
 }
 HISTORY_LOOKBACK = timedelta(weeks=2)
 
-COMMIT_QUEUE_TIMEOUT = timedelta(minutes=20)
+COMMIT_QUEUE_TIMEOUT = timedelta(minutes=30)
 DEFAULT_REQUIRED_BUILD_TIMEOUT = timedelta(hours=1, minutes=20)
 DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
 
@@ -231,6 +232,15 @@ class TaskTimeoutOrchestrator:
             determined_timeout = override
 
         elif (
+            get_expansion(COMMIT_QUEUE_EXPANSION)  # commit queue patch
+        ):
+            LOGGER.info(
+                "Overriding commit-queue timeout",
+                exec_timeout_secs=COMMIT_QUEUE_TIMEOUT.total_seconds(),
+            )
+            determined_timeout = COMMIT_QUEUE_TIMEOUT
+
+        elif (
             self._is_required_build_variant(variant)
             and determined_timeout > DEFAULT_REQUIRED_BUILD_TIMEOUT
         ):
@@ -239,13 +249,6 @@ class TaskTimeoutOrchestrator:
                 exec_timeout_secs=DEFAULT_REQUIRED_BUILD_TIMEOUT.total_seconds(),
             )
             determined_timeout = DEFAULT_REQUIRED_BUILD_TIMEOUT
-
-        elif evg_alias == COMMIT_QUEUE_ALIAS:
-            LOGGER.info(
-                "Overriding commit-queue timeout",
-                exec_timeout_secs=COMMIT_QUEUE_TIMEOUT.total_seconds(),
-            )
-            determined_timeout = COMMIT_QUEUE_TIMEOUT
 
         # The timeout needs to be at least as large as the idle timeout.
         if idle_timeout and determined_timeout.total_seconds() < idle_timeout.total_seconds():

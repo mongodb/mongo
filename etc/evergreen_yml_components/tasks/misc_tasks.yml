@@ -709,8 +709,8 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          # 2 hours
-          exec_timeout_secs: 7200
+          # 20 mins
+          exec_timeout_secs: 1200
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -739,8 +739,8 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          # 2 hours
-          exec_timeout_secs: 7200
+          # 20 mins
+          exec_timeout_secs: 1200
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -767,6 +767,11 @@ tasks:
         "lint",
       ]
     commands:
+      - command: timeout.update
+        params:
+          # 20 mins
+          exec_timeout_secs: 1200
+      - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
       - func: "f_expansions_write"
@@ -794,8 +799,8 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          # 2 hours
-          exec_timeout_secs: 7200
+          # 20 mins
+          exec_timeout_secs: 1200
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -884,6 +889,11 @@ tasks:
         "lint",
       ]
     commands:
+      - command: timeout.update
+        params:
+          # 20 mins
+          exec_timeout_secs: 1200
+      - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
       - func: "f_expansions_write"
@@ -910,8 +920,8 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          # 40 minutes
-          exec_timeout_secs: 2400
+          # 20 mins
+          exec_timeout_secs: 1200
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -961,8 +971,8 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          # 40 minutes
-          exec_timeout_secs: 2400
+          # 20 mins
+          exec_timeout_secs: 1200
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -988,8 +998,8 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          # 2 hours
-          exec_timeout_secs: 7200
+          # 20 mins
+          exec_timeout_secs: 1200
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -1018,8 +1028,8 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          # 2 hours
-          exec_timeout_secs: 7200
+          # 20 mins
+          exec_timeout_secs: 1200
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -1046,6 +1056,11 @@ tasks:
         "lint",
       ]
     commands:
+      - command: timeout.update
+        params:
+          # 20 mins
+          exec_timeout_secs: 1200
+      - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
       - func: "f_expansions_write"
@@ -1069,6 +1084,11 @@ tasks:
       ]
     depends_on: []
     commands:
+      - command: timeout.update
+        params:
+          # 20 mins
+          exec_timeout_secs: 1200
+      - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
       - func: "f_expansions_write"

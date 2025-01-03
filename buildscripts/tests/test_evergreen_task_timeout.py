@@ -128,6 +128,8 @@ class TestDetermineExecTimeout(unittest.TestCase):
         display_name,
         timeout_override,
         expected_timeout,
+        is_commit_queue=False,
+        is_pr_patch=False,
     ):
         task_name = "task_name"
         variant = build_variant
@@ -136,6 +138,15 @@ class TestDetermineExecTimeout(unittest.TestCase):
             overrides[variant] = [{"task": task_name, "exec_timeout": timeout_override}]
 
         mock_timeout_overrides = under_test.TimeoutOverrides(overrides=overrides)
+
+        def get_expansion_override(expansion: str):
+            if expansion == under_test.COMMIT_QUEUE_EXPANSION:
+                return is_commit_queue
+            elif expansion == under_test.PR_PATCH_EXPANSION:
+                return "123" if is_pr_patch else None
+            raise RuntimeError(f"Unmocked expansion: {expansion}")
+
+        under_test.get_expansion = MagicMock(side_effect=get_expansion_override)
 
         orchestrator = under_test.TaskTimeoutOrchestrator(
             timeout_service=MagicMock(spec_set=TimeoutService),
@@ -229,11 +240,12 @@ class TestDetermineExecTimeout(unittest.TestCase):
             idle_timeout=None,
             exec_timeout=None,
             historic_timeout=None,
-            evg_alias=under_test.COMMIT_QUEUE_ALIAS,
+            evg_alias=None,
             build_variant="variant",
             display_name="not required",
             timeout_override=None,
             expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT,
+            is_commit_queue=True,
         )
 
     def test_use_idle_timeout_if_greater_than_exec_timeout(self):
@@ -265,11 +277,12 @@ class TestDetermineExecTimeout(unittest.TestCase):
             idle_timeout=None,
             exec_timeout=None,
             historic_timeout=timedelta(minutes=15),
-            evg_alias=under_test.COMMIT_QUEUE_ALIAS,
+            evg_alias=None,
             build_variant="variant",
             display_name="not required",
             timeout_override=None,
             expected_timeout=under_test.COMMIT_QUEUE_TIMEOUT,
+            is_commit_queue=True,
         )
 
     def test_override_should_override_historic_timeouts(self):
