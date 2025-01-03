@@ -44,6 +44,7 @@
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/version.h"
 
+#include "command_helpers.h"
 #include "mock_version_info.h"
 #include "testfile.h"
 
@@ -134,6 +135,12 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     // Run the tests.
     auto versionInfo = MockVersionInfo{};
     auto conn = buildConn(uriString, &versionInfo, mode);
+
+    // Append _id to setWindowFields sort to make queries deterministic.
+    auto deterministicSetWindowFields =
+        fromFuzzerJson("{setParameter: 1, internalQueryAppendIdToSetWindowFieldsSort: true}");
+    runCommandAssertOK(conn.get(), deterministicSetWindowFields, "admin");
+
     // Track collections loaded in the previous test file.
     auto prevFileCollections = std::set<CollectionSpec>{};
     auto failedTestFiles = std::vector<std::filesystem::path>{};

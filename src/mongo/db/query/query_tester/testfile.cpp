@@ -46,11 +46,6 @@ namespace {
 static const auto kAlwaysIncludedIndex =
     std::regex{R"-([{,]\s*("?)[^":,]+\1\s*:\s*"(2d|2dsphere|text)"\s*[},])-"};
 
-void runCommandAssertOK(DBClientConnection*,
-                        const BSONObj& command,
-                        const std::string& db,
-                        std::vector<ErrorCodes::Error> acceptableErrorCodes = {});
-
 void dropCollections(DBClientConnection* const conn,
                      const std::string& dbName,
                      const std::vector<std::string>& collections) {
@@ -207,24 +202,6 @@ bool readAndLoadCollFile(DBClientConnection* const conn,
         verifyFileStreamGood(collFile, filePath, "Failed to read batch");
     }
     return true;
-}
-
-void runCommandAssertOK(DBClientConnection* const conn,
-                        const BSONObj& command,
-                        const std::string& db,
-                        const std::vector<ErrorCodes::Error> acceptableErrorCodes) {
-    auto cmdResponse = runCommand(conn, db, command);
-    if (cmdResponse.getField("ok").trueValue()) {
-        return;
-    }
-    for (const auto& error : acceptableErrorCodes) {
-        if (error == cmdResponse.getField("code").safeNumberInt()) {
-            return;
-        }
-    }
-    uasserted(9670420,
-              str::stream{} << "Expected OK command result from " << command << " but got "
-                            << cmdResponse);
 }
 }  // namespace
 

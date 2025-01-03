@@ -36,4 +36,9 @@ namespace mongo::query_tester {
 BSONObj getResultsFromCommandResponse(const BSONObj& cmdResponse, size_t);
 
 BSONObj runCommand(DBClientConnection* conn, const std::string& db, const BSONObj& commandToRun);
+
+void runCommandAssertOK(DBClientConnection*,
+                        const BSONObj& command,
+                        const std::string& db,
+                        std::vector<ErrorCodes::Error> acceptableErrorCodes = {});
 }  // namespace mongo::query_tester

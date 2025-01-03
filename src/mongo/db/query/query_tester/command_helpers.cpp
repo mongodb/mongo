@@ -57,4 +57,22 @@ BSONObj runCommand(DBClientConnection* const conn,
     auto [reply, clientBase] = conn->runCommandWithTarget(opMsgQuery);
     return reply->getCommandReply().getOwned();
 }
+
+void runCommandAssertOK(DBClientConnection* const conn,
+                        const BSONObj& command,
+                        const std::string& db,
+                        const std::vector<ErrorCodes::Error> acceptableErrorCodes) {
+    auto cmdResponse = runCommand(conn, db, command);
+    if (cmdResponse.getField("ok").trueValue()) {
+        return;
+    }
+    for (const auto& error : acceptableErrorCodes) {
+        if (error == cmdResponse.getField("code").safeNumberInt()) {
+            return;
+        }
+    }
+    uasserted(9670420,
+              str::stream{} << "Expected OK command result from " << command << " but got "
+                            << cmdResponse);
+}
 }  // namespace mongo::query_tester
