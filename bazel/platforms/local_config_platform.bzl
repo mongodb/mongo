@@ -44,6 +44,7 @@ def _setup_local_config_platform(ctx):
             toolchain_exists = True
             break
 
+    cache_silo = '"cache-silo-key": "' + toolchain_key + '",' if ctx.os.environ.get("evergreen_remote_exec") == "off" else ""
     if ctx.os.environ.get("USE_NATIVE_TOOLCHAIN"):
         exec_props = ""
         result = {"USE_NATIVE_TOOLCHAIN": "1"}
@@ -58,8 +59,9 @@ def _setup_local_config_platform(ctx):
         "container-image": "%s",
         "dockerNetwork": "standard",
         "Pool": "%s",
+        %s
     },
-""" % (container_url, remote_execution_pool)
+""" % (container_url, remote_execution_pool, cache_silo)
         result = {"DISTRO": distro}
     elif distro != None and toolchain_exists:
         constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
@@ -95,7 +97,7 @@ def _setup_local_config_platform(ctx):
         substitutions = substitutions,
     )
 
-    return None
+    return result
 
 setup_local_config_platform = repository_rule(
     implementation = _setup_local_config_platform,

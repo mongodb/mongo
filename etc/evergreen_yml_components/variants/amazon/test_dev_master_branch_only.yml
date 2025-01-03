@@ -121,8 +121,6 @@ buildvariants:
     stepback: false
     expansions:
       compile_variant: *amazon-linux-2023-arm64-bazel-compile
-      compile_flags: >-
-        BAZEL_FLAGS="--config=remote_link"
     tasks:
       - name: compile_bazel_TG
       - name: run_bazel_TG
@@ -256,6 +254,7 @@ buildvariants:
         --debug-symbols=minimal
       separate_debug: off
       scons_cache_scope: shared
+      evergreen_remote_exec: on
       compile_variant: *al2023-arm64-sep-benchmark
     tasks:
       - name: .benchmarks_sep

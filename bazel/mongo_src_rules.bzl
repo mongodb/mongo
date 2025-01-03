@@ -1303,6 +1303,7 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/SafeInt:headers",
     "//src/third_party/sasl:windows_sasl",
     "//src/third_party/valgrind:headers",
+    "//src/third_party/abseil-cpp:absl_local_repo_deps",
 ]
 
 MONGO_GLOBAL_DEFINES = (

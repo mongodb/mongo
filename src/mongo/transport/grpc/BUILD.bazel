@@ -70,11 +70,6 @@ mongo_cc_library(
         "util.h",
         "wire_version_provider.h",
     ],
-    # At the moment, server.cpp depends directly on the gRPC-internal header
-    # "src/core/lib/security/credentials/ssl/ssl_credentials.h".
-    # Instead of adding it to the grpc overlay we explicitly add the include
-    # path for the header so that we don't leak the include globally.
-    copts = ["-Isrc/third_party/grpc/dist"],
     target_compatible_with = select({
         "//bazel/config:build_grpc_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -203,6 +198,9 @@ mongo_cc_unit_test(
         "//src/mongo/transport:reactor_test_fixture.h",
         "//src/mongo/transport:session_workflow_test_util.h",
         "//src/mongo/transport:transport_layer_manager_grpc_test.cpp",
+    ],
+    data = [
+        "//jstests/libs:server_SAN.pem",
     ],
     tags = ["mongo_unittest_first_group"],
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,

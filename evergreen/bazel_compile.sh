@@ -27,6 +27,10 @@ else
   LOCAL_ARG="--config=local"
 fi
 
+if [[ "${evergreen_remote_exec}" != "on" ]]; then
+  LOCAL_ARG="$LOCAL_ARG --jobs=auto"
+fi
+
 ARCH=$(uname -m)
 if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
   ARCH="arm64"

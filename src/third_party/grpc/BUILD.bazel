@@ -3154,11 +3154,13 @@ mongo_cc_library(
         "dist/src/cpp/ext/proto_server_reflection.cc",
         "dist/src/cpp/ext/proto_server_reflection_plugin.cc",
     ],
-    copts = GRPC_COPTS + [
-        "-Isrc/third_party/grpc/dist",
-        "-I$(BINDIR)/src/third_party/grpc/dist",
+    hdrs = [
+        "dist/src/core/lib/security/credentials/ssl/ssl_credentials.h",
+        "dist/src/cpp/ext/proto_server_reflection.h",
     ],
+    copts = GRPC_COPTS,
     features = GRPC_FEATURES,
+    includes = ["dist"],
     linkopts = ["-lssl"],
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [

@@ -1353,6 +1353,8 @@ functions:
       type: test
       params:
         binary: bash
+        env:
+          evergreen_remote_exec: ${evergreen_remote_exec|off}
         args:
           - "src/evergreen/scons_compile.sh"
     - command: expansions.update
@@ -1442,6 +1444,8 @@ functions:
     type: test
     params:
       binary: bash
+      env:
+        evergreen_remote_exec: ${evergreen_remote_exec|off}
       args:
         - "src/evergreen/bazel_compile.sh"
 
