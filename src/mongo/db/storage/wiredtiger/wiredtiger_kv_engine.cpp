@@ -463,7 +463,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     if constexpr (kThreadSanitizerEnabled) {
         // TSAN builds may take longer for certain operations, increase or disable the relevant
         // timeouts.
-        ss << "cache_stuck_timeout_ms=600000,";
+        ss << "cache_stuck_timeout_ms=900000,";
         ss << "generation_drain_timeout_ms=0,";
     }
     if (TestingProctor::instance().isEnabled()) {
