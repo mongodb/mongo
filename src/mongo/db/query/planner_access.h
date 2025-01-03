@@ -526,12 +526,12 @@ private:
     static void handleFilter(ScanBuildingState* scanState);
 
     /**
-     * Implements handleFilter(...) for OR queries.
+     * Implements handleFilter(...) for AND queries.
      */
     static void handleFilterAnd(ScanBuildingState* scanState);
 
     /**
-     * Implements handleFilter(...) for AND queries.
+     * Implements handleFilter(...) for OR queries.
      */
     static void handleFilterOr(ScanBuildingState* scanState);
 };
