@@ -59,8 +59,11 @@ public:
      * object.
      */
     void threadUnsafeIncRefCountTo(uint32_t count) const {
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
         dassert(_count.load(std::memory_order_relaxed) == (count - 1));
         _count.store(count, std::memory_order_relaxed);
+        MONGO_COMPILER_DIAGNOSTIC_POP
     }
 
     friend void intrusive_ptr_add_ref(const RefCountable* ptr) {

@@ -76,7 +76,10 @@ public:
             // Hold the lock for as long as the Guard is around. This forces other consumers to
             // queue behind the Guard.
             _strand->_mutex.lock();
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
             _strand->_isBound.store(true);
+            MONGO_COMPILER_DIAGNOSTIC_POP
 
             _strand->_setCurrent();
         }

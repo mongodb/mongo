@@ -76,7 +76,10 @@ public:
     }
 
     void setEnabled(bool b) {
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
         _enabled.store(b);
+        MONGO_COMPILER_DIAGNOSTIC_POP
     }
 
 private:

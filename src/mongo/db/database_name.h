@@ -467,7 +467,10 @@ protected:
         constexpr ~Storage() {
             if (!std::is_constant_evaluated()) {
                 if (isDynamicAlloc() && _data != nullptr) {
+                    MONGO_COMPILER_DIAGNOSTIC_PUSH
+                    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wfree-nonheap-object")
                     delete[] _data;
+                    MONGO_COMPILER_DIAGNOSTIC_POP
                 }
             }
         }
@@ -709,7 +712,10 @@ protected:
 
         void deallocate() {
             if (isDynamicAlloc() && _data != nullptr) {
+                MONGO_COMPILER_DIAGNOSTIC_PUSH
+                MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wfree-nonheap-object")
                 delete[] _data;
+                MONGO_COMPILER_DIAGNOSTIC_POP
                 reset();
             }
         }

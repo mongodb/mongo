@@ -416,7 +416,7 @@ public:
     // Only called by future side, but may be called multiple times if waiting times out and is
     // retried.
     void wait(Interruptible* interruptible) {
-        if (state.load(std::memory_order_acquire) == SSBState::kFinished)
+        if (loadState(std::memory_order_acquire) == SSBState::kFinished)
             return;
 
         stdx::unique_lock lk(mx);
@@ -439,13 +439,13 @@ public:
             // Someone has already created the cv and put us in the waiting state. The promise may
             // also have completed after we checked above, so we can't assume we aren't at
             // kFinished.
-            dassert(state.load() != SSBState::kInit);
+            dassert(loadState() != SSBState::kInit);
         }
 
         interruptible->waitForConditionOrInterrupt(*cv, lk, [&] {
             // The mx locking above is insufficient to establish an acquire if state transitions to
             // kFinished before we get here, but we aquire mx before the producer does.
-            return state.load(std::memory_order_acquire) == SSBState::kFinished;
+            return loadState(std::memory_order_acquire) == SSBState::kFinished;
         });
     }
 
@@ -470,7 +470,7 @@ public:
 
             size_t depth = 0;
             for (auto ssb = continuation.get(); ssb;
-                 ssb = ssb->state.load(std::memory_order_acquire) == SSBState::kHaveCallback
+                 ssb = ssb->loadState(std::memory_order_acquire) == SSBState::kHaveCallback
                      ? ssb->continuation.get()
                      : nullptr) {
                 depth++;
@@ -505,9 +505,16 @@ public:
 
     void setError(Status statusArg) noexcept {
         invariant(!statusArg.isOK());
-        dassert(state.load() < SSBState::kFinished, statusArg.toString());
+        dassert(loadState() < SSBState::kFinished, statusArg.toString());
         status = std::move(statusArg);
         transitionToFinished();
+    }
+
+    SSBState loadState(std::memory_order memoryOrder = std::memory_order_seq_cst) const {
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_READ
+        return state.load(memoryOrder);
+        MONGO_COMPILER_DIAGNOSTIC_POP
     }
 
     //
@@ -565,14 +572,14 @@ struct SharedStateImpl final : SharedStateBase {
         invariant(!callback);
 
         auto out = make_intrusive<SharedState<T>>();
-        if (state.load(std::memory_order_acquire) == SSBState::kFinished) {
+        if (loadState(std::memory_order_acquire) == SSBState::kFinished) {
             out->fillFromConst(*this);
             return out;
         }
 
         auto lk = stdx::unique_lock(mx);
 
-        auto oldState = state.load(std::memory_order_acquire);
+        auto oldState = loadState(std::memory_order_acquire);
         if (oldState == SSBState::kInit) {
             // On the success path, our reads and writes to children are protected by the mutex
             //
@@ -604,8 +611,8 @@ struct SharedStateImpl final : SharedStateBase {
 
     // fillFromConst and fillFromMove are identical other than using as_const() vs move().
     void fillFromConst(const SharedState<T>& other) {
-        dassert(state.load() < SSBState::kFinished);
-        dassert(other.state.load() == SSBState::kFinished);
+        dassert(loadState() < SSBState::kFinished);
+        dassert(other.loadState() == SSBState::kFinished);
         if (other.status.isOK()) {
             data.emplace(std::as_const(*other.data));
         } else {
@@ -614,8 +621,8 @@ struct SharedStateImpl final : SharedStateBase {
         transitionToFinished();
     }
     void fillFromMove(SharedState<T>&& other) {
-        dassert(state.load() < SSBState::kFinished);
-        dassert(other.state.load() == SSBState::kFinished);
+        dassert(loadState() < SSBState::kFinished);
+        dassert(other.loadState() == SSBState::kFinished);
         if (other.status.isOK()) {
             data.emplace(std::move(*other.data));
         } else {
@@ -626,7 +633,7 @@ struct SharedStateImpl final : SharedStateBase {
 
     template <typename... Args>
     void emplaceValue(Args&&... args) noexcept {
-        dassert(state.load() < SSBState::kFinished);
+        dassert(loadState() < SSBState::kFinished);
         try {
             data.emplace(std::forward<Args>(args)...);
         } catch (const DBException& ex) {
@@ -696,7 +703,7 @@ public:
 
     bool isReady() const {
         invariant(_shared);
-        return _shared->state.load(std::memory_order_acquire) == SSBState::kFinished;
+        return _shared->loadState(std::memory_order_acquire) == SSBState::kFinished;
     }
 
     bool valid() const {
@@ -1289,7 +1296,7 @@ private:
             return success(*std::exchange(_immediate, {}));
         }
 
-        auto oldState = _shared->state.load(std::memory_order_acquire);
+        auto oldState = _shared->loadState(std::memory_order_acquire);
         dassert(oldState != SSBState::kHaveCallback);
         if (oldState == SSBState::kFinished) {
             auto sharedState = std::move(_shared);
@@ -1386,7 +1393,6 @@ private:
         ResetOnMoveOptional(ResetOnMoveOptional&& other) noexcept(
             std::is_nothrow_move_constructible_v<Base>)
             : Base(std::exchange(other._base(), {})) {}
-        MONGO_COMPILER_DIAGNOSTIC_POP
 
         ResetOnMoveOptional& operator=(ResetOnMoveOptional&& other) noexcept(
             std::is_nothrow_move_assignable_v<Base>) {
@@ -1394,6 +1400,7 @@ private:
                 _base() = std::exchange(other._base(), {});
             return *this;
         }
+        MONGO_COMPILER_DIAGNOSTIC_POP
 
     private:
         Base& _base() {

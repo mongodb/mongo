@@ -232,10 +232,7 @@ TEST(FutureValid, ShareTransfersValid) {
 }
 
 DEATH_TEST(FutureValid, ShareCrashesOnInvalidFuture, "Invariant failure") {
-    MONGO_COMPILER_DIAGNOSTIC_PUSH
-    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     callWithInvalidFuture([](auto&& fut) { return std::move(fut).share(); });
-    MONGO_COMPILER_DIAGNOSTIC_POP
 }
 
 /** Asserts that the SemiFuture is invalid() after `func`. */

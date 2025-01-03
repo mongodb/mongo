@@ -161,7 +161,10 @@ private:
 
         // The length prefix should include the terminating null byte.
         DataView(storage).write<LittleEndian<int32_t>>(data.size() + 1);
+        MONGO_COMPILER_DIAGNOSTIC_PUSH
+        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Warray-bounds")
         memcpy(storage + sizeof(int32_t), data.data(), data.size());
+        MONGO_COMPILER_DIAGNOSTIC_POP
 
         DataView(storage).write<char>('\0', sizeof(int32_t) + data.size());
         return value::bitcastFrom<char*>(storage);
