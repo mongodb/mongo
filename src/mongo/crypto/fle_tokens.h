@@ -77,6 +77,34 @@
  *  d = 136 bit blob of zero = 17 octets of 0
  * AnchorPaddingKeyToken = HMAC(AnchorPaddingRootToken, 1) = S1_d = F^(S^esc_fd)(1)
  * AnchorPaddingValueToken = HMAC(AnchorPaddingRootToken, 2) =  S2_d = F^(S^esc_fd)(2)
+ *
+ * Prefix/Suffix/Substring Tokens
+ * EDCTextExactToken = HMAC(EDCToken, 1) = Fs[f,1,1,1]
+ * EDCTextSubstringToken = HMAC(EDCToken, 2) = Fs[f,1,1,2]
+ * EDCTextSuffixToken = HMAC(EDCToken, 3) = Fs[f,1,1,3]
+ * EDCTextPrefixToken = HMAC(EDCToken, 4) = Fs[f,1,1,4]
+ * ESCTextExactToken = HMAC(EDCToken, 1) = Fs[f,1,2,1]
+ * ESCTextSubstringToken = HMAC(EDCToken, 1) = Fs[f,1,2,2]
+ * ESCTextSuffixToken = HMAC(EDCToken, 1) = Fs[f,1,2,3]
+ * ESCTextPrefixToken = HMAC(EDCToken, 1) = Fs[f,1,2,4]
+ * ServerTextExactToken = HMAC(ServerTokenDerivationLevel1Token, 1)
+ * ServerTextSubstringToken = HMAC(ServerTokenDerivationLevel1Token, 2)
+ * ServerTextSuffixToken = HMAC(ServerTokenDerivationLevel1Token, 3)
+ * ServerTextPrefixToken = HMAC(ServerTokenDerivationLevel1Token, 4)
+ * EDCTextExactDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(EDCTextExactToken, v), u)
+ * EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(EDCTextSubstringToken, v), u)
+ * EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(EDCTextSuffixToken, v), u)
+ * EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(EDCTextPrefixToken, v), u)
+ * ESCTextExactDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(ESCTextExactToken, v), u)
+ * ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken =
+ *     HMAC(HMAC(ESCTextSubstringToken, v), u)
+ * ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(ESCTextSuffixToken, v), u)
+ * ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(ESCTextPrefixToken, v), u)
+ * ServerTextExactDerivedFromDataToken = HMAC(ServerTextExactToken, v)
+ * ServerTextSubstringDerivedFromDataToken = HMAC(ServerTextSubstringToken, v)
+ * ServerTextSuffixDerivedFromDataToken = HMAC(ServerTextSuffixToken, v)
+ * ServerTextPrefixDerivedFromDataToken = HMAC(ServerTextPrefixToken, v)
  */
 
 namespace mongo {
