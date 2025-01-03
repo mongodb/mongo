@@ -190,7 +190,7 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
 
     RecordData record;
-    bool found;
+    bool found = false;
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
     storageUnavailableRetry(opCtx, "SpillingStore::readFromRecordStore", [&] {
@@ -207,7 +207,7 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
 bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out) {
     switchToSpilling(opCtx);
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
-    bool found;
+    bool found = false;
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
     storageUnavailableRetry(
