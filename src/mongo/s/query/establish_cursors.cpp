@@ -142,14 +142,17 @@ public:
                                std::set<HostAndPort> remotes) noexcept;
 
 private:
-    void _handleFailure(const AsyncRequestsSender::Response& response, Status status) noexcept;
-    void _handleFailure(Status status) noexcept;
+    void _handleFailure(const boost::optional<AsyncRequestsSender::Response>& response,
+                        Status status,
+                        bool isInterruption = false) noexcept;
+    bool _canSkipForPartialResults(const AsyncRequestsSender::Response& response,
+                                   const Status& status);
 
     /**
-     * Favors the status with 'CollectionUUIDMismatch' error to be saved in '_maybeFailure' to be
-     * returned to caller.
+     * Favors interruption/unyield failures > UUID mismatch error with actual ns > UUID mismatch
+     * error > other errors > retargeting errors
      */
-    void _favorCollectionUUIDMismatchError(Status newError) noexcept;
+    void _prioritizeFailures(Status newError, bool isInterruption) noexcept;
 
     OperationContext* const _opCtx;
     const std::shared_ptr<executor::TaskExecutor> _executor;
@@ -164,6 +167,7 @@ private:
 
     boost::optional<MultiStatementTransactionRequestsSender> _ars;
 
+    bool _wasInterrupted = false;
     boost::optional<Status> _maybeFailure;
     std::vector<RemoteCursor> _remoteCursors;
     std::vector<HostAndPort> _remotesToClean;
@@ -216,52 +220,45 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
 }
 
 void CursorEstablisher::waitForResponse() noexcept {
-    // '_ars->next()' can throw while getting the response. We use a nested try-catch because if
-    // '_allowPartialResults' is true then we need information from 'response' to swallow retriable
-    // errors.
+    boost::optional<AsyncRequestsSender::Response> maybeResponse;
+    BSONObj responseData;
     try {
-        auto response = _ars->next();
-        if (response.shardHostAndPort)
-            _remotesToClean.push_back(*response.shardHostAndPort);
+        maybeResponse = _ars->next();
+        if (maybeResponse->shardHostAndPort)
+            _remotesToClean.push_back(*maybeResponse->shardHostAndPort);
+        responseData = uassertStatusOK(std::move(maybeResponse->swResponse)).data;
+    } catch (const DBException& ex) {
+        _handleFailure(maybeResponse, ex.toStatus(), /* isInterruption */ true);
+        return;
+    }
+    auto response = *maybeResponse;
+    try {
+        auto cursors = CursorResponse::parseFromBSONMany(std::move(responseData));
 
-        try {
-            // Note the shardHostAndPort may not be populated if there was an error, so be sure
-            // to do this after parsing the cursor response to ensure the response was ok.
-            // Additionally, be careful not to push into 'remoteCursors' until we are sure we
-            // have a valid cursor, since the error handling path will attempt to clean up
-            // anything in 'remoteCursors'
-            auto responseData = uassertStatusOK(std::move(response.swResponse)).data;
-            auto cursors = CursorResponse::parseFromBSONMany(std::move(responseData));
-
-            bool hadValidCursor = false;
-            for (auto& cursor : cursors) {
-                if (!cursor.isOK()) {
-                    _handleFailure(response, cursor.getStatus());
-                    continue;
-                }
-
-                hadValidCursor = true;
-
-                auto& cursorValue = cursor.getValue();
-                if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
-                    CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(
-                        *cursorMetrics);
-                }
-
-                _remoteCursors.emplace_back(RemoteCursor(response.shardId.toString(),
-                                                         *response.shardHostAndPort,
-                                                         std::move(cursorValue)));
+        bool hadValidCursor = false;
+        for (auto& cursor : cursors) {
+            if (!cursor.isOK()) {
+                _handleFailure(response, cursor.getStatus());
+                continue;
             }
 
-            if (response.shardHostAndPort && !hadValidCursor) {
-                // If we never got a valid cursor, we do not need to clean the host.
-                _remotesToClean.pop_back();
+            hadValidCursor = true;
+
+            auto& cursorValue = cursor.getValue();
+            if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
+                CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
             }
-        } catch (const DBException& ex) {
-            _handleFailure(response, ex.toStatus());
+
+            _remoteCursors.emplace_back(RemoteCursor(
+                response.shardId.toString(), *response.shardHostAndPort, std::move(cursorValue)));
+        }
+
+        if (response.shardHostAndPort && !hadValidCursor) {
+            // If we never got a valid cursor, we do not need to clean the host.
+            _remotesToClean.pop_back();
         }
     } catch (const DBException& ex) {
-        _handleFailure(ex.toStatus());
+        _handleFailure(response, ex.toStatus());
     }
 }
 
@@ -325,9 +322,27 @@ void CursorEstablisher::checkForFailedRequests() {
     uassertStatusOK(*_maybeFailure);
 }
 
-void CursorEstablisher::_favorCollectionUUIDMismatchError(Status newError) noexcept {
+void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption) noexcept {
     invariant(!newError.isOK());
     invariant(!_maybeFailure->isOK());
+
+    // Prefer interruptions above all else.
+    if (_wasInterrupted) {
+        return;
+    }
+    if (isInterruption) {
+        _wasInterrupted = true;
+        _maybeFailure = newError;
+        return;
+    }
+
+    // Prefer other non-retargeting related errors that could be operation-fatal.
+    if (_maybeFailure->isA<ErrorCategory::StaleShardVersionError>() ||
+        _maybeFailure->code() == ErrorCodes::StaleDbVersion ||
+        _maybeFailure->code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+        _maybeFailure = std::move(newError);
+        return;
+    }
 
     if (newError.code() != ErrorCodes::CollectionUUIDMismatch) {
         return;
@@ -346,15 +361,31 @@ void CursorEstablisher::_favorCollectionUUIDMismatchError(Status newError) noexc
     }
 }
 
-void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& response,
-                                       Status status) noexcept {
+void CursorEstablisher::_handleFailure(
+    const boost::optional<AsyncRequestsSender::Response>& response,
+    Status status,
+    bool isInterruption) noexcept {
     LOGV2_DEBUG(
-        4674000, 3, "Experienced a failure while establishing cursors", "error"_attr = status);
-    if (_maybeFailure) {
-        _favorCollectionUUIDMismatchError(std::move(status));
+        8846900, 3, "Experienced a failure while establishing cursors", "error"_attr = status);
+    if (_wasInterrupted) {
         return;
     }
+    if (_maybeFailure) {
+        _prioritizeFailures(std::move(status), isInterruption);
+        return;
+    }
+    if (response && _canSkipForPartialResults(*response, status)) {
+        return;
+    }
+    if (isInterruption) {
+        _wasInterrupted = true;
+    }
+    _maybeFailure = status;
+    _ars->stopRetrying();
+}
 
+bool CursorEstablisher::_canSkipForPartialResults(const AsyncRequestsSender::Response& response,
+                                                  const Status& status) {
     // If '_allowPartialResults' is true then swallow retriable errors, maxTimeMSExpired, and
     // FailedToSatisfyReadPreference errors we might get when targeting shard replica sets.
     bool isEligibleException = (isMongosRetriableError(status.code()) ||
@@ -375,25 +406,9 @@ void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& resp
                                    boost::none,
                                    boost::none,
                                    true}});
-        return;
+        return true;
     }
-
-    // Do not schedule any new requests.
-    _ars->stopRetrying();
-    _maybeFailure = std::move(status);
-}
-
-void CursorEstablisher::_handleFailure(Status status) noexcept {
-    LOGV2_DEBUG(
-        8846900, 3, "Experienced a failure while establishing cursors", "error"_attr = status);
-    if (_maybeFailure) {
-        _favorCollectionUUIDMismatchError(std::move(status));
-        return;
-    }
-
-    // Do not schedule any new requests.
-    _ars->stopRetrying();
-    _maybeFailure = std::move(status);
+    return false;
 }
 
 void CursorEstablisher::killOpOnShards(ServiceContext* srvCtx,

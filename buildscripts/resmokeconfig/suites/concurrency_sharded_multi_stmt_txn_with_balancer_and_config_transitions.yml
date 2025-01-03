@@ -96,9 +96,6 @@ selector:
   - jstests/concurrency/fsm_workloads/create_index_background_unique.js
   - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
 
-  # TODO SERVER-91413: Enable test.
-  - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
-
   # TODO SERVER-92349: Re-enable this test once completed.
   - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
 
