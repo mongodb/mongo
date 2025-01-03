@@ -168,6 +168,11 @@ TEST_F(CommandDiagnosticPrinterTest, OmitsAllFieldsWhenCommandDoesNotEnableDiagn
     ASSERT_EQ(command_diagnostics::Printer::kOmitUnsupportedCommandMsg, printCommandDiagnostics());
 }
 
+TEST_F(CommandDiagnosticPrinterTest, FormattingGracefullyExitsWhenOpCtxIsNull) {
+    command_diagnostics::Printer printer{nullptr};
+    ASSERT_EQ(command_diagnostics::Printer::kOpCtxIsNullMsg, "{}"_format(printer));
+}
+
 TEST_F(CommandDiagnosticPrinterTest, CreateIndexCommandIsEligibleForDiagnosticLog) {
     auto command = CommandHelpers::findCommand(opCtx(), "createIndexes");
     auto createIndexesReq =
