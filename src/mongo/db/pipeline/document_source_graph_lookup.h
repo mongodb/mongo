@@ -219,6 +219,10 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
+    const NamespaceString& getFromNs() const {
+        return _from;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
