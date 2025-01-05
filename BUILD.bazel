@@ -2807,6 +2807,11 @@ mongo_unittest_install(
 )
 
 mongo_unittest_install(
+    name = "audit_test-audit_client_attrs_test",
+    srcs = ["//src/mongo/db/modules/enterprise/src/audit:audit_test"],
+)
+
+mongo_unittest_install(
     name = "audit_test-audit_enc_comp_manager_test",
     srcs = ["//src/mongo/db/modules/enterprise/src/audit:audit_test"],
 )
@@ -8524,9 +8529,4 @@ mongo_unittest_install(
 mongo_unittest_install(
     name = "db_query_test-gen_filter_test",
     srcs = ["//src/mongo/db/query:db_query_test"],
-)
-
-mongo_unittest_install(
-    name = "audit_test-audit_client_observer_test",
-    srcs = ["//src/mongo/db/modules/enterprise/src/audit:audit_test"],
 )

@@ -50,6 +50,7 @@ public:
     }
 
 private:
+    rpc::MaybeImpersonatedUserMetadata _oldImpersonationData;
     OperationContext* _opCtx;
     bool _active{false};
 };
