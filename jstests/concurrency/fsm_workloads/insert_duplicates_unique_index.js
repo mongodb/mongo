@@ -8,6 +8,15 @@
  *     does_not_support_transactions
  * ]
  */
+
+// This workload generates a lot of dirty data and results in cache pressure on the primary.
+// In-memory variants do not cope well with this, resulting in a lot of cache eviction work
+// causing the workload to timeout.
+if (jsTest.options().storageEngine == "inMemory" && _isWindows()) {
+    print("Skipping test on in-memory mode and windows.");
+    quit();
+}
+
 export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
