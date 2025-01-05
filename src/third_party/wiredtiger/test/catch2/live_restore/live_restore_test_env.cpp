@@ -60,4 +60,11 @@ live_restore_test_env::source_file_path(const std::string &file_name)
     return DB_SOURCE + "/" + file_name;
 }
 
+std::string
+live_restore_test_env::tombstone_file_path(const std::string &file_name)
+{
+    // Tombstone files only exist in the destination folder.
+    return DB_DEST + "/" + file_name + WT_LIVE_RESTORE_FS_TOMBSTONE_SUFFIX;
+}
+
 } // namespace utils.

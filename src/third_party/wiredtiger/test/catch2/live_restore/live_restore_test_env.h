@@ -36,6 +36,7 @@ public:
 
     std::string dest_file_path(const std::string &file_name);
     std::string source_file_path(const std::string &file_name);
+    std::string tombstone_file_path(const std::string &file_name);
 };
 
 } // namespace utils.

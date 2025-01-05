@@ -320,7 +320,7 @@ FLD_AREALLSET(uint64_t field, uint64_t mask)
 
 /* Check if a string matches a suffix. */
 #define WT_SUFFIX_MATCH(str, sfx) \
-    (strlen(str) >= strlen(sfx) && strcmp(&str[strlen(str) - strlen(sfx)], sfx) == 0)
+    (strlen(str) >= strlen(sfx) && strcmp(&(str)[strlen(str) - strlen(sfx)], sfx) == 0)
 
 /* Check if a string matches a prefix, and move past it. */
 #define WT_PREFIX_SKIP(str, pfx) (WT_PREFIX_MATCH(str, pfx) ? ((str) += strlen(pfx), 1) : 0)

@@ -288,6 +288,8 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
     uint32_t count_dest = 0, count_src = 0;
     char **dirlist_dest, **dirlist_src, **entries, **namep, *path_dest, *path_src, *temp_path;
     bool dest_exist = false, have_tombstone = false;
+    bool dest_folder_exists = false, source_folder_exists = false;
+    uint32_t num_src_files = 0, num_dest_files = 0;
 
     *dirlistp = dirlist_dest = dirlist_src = entries = NULL;
     path_dest = path_src = temp_path = NULL;
@@ -298,45 +300,77 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
     /* Get files from destination. */
     WT_ERR(__live_restore_fs_backing_filename(
       &lr_fs->destination, session, lr_fs->destination.home, directory, &path_dest));
-    WT_ERR_ERROR_OK(lr_fs->os_file_system->fs_directory_list(
-                      lr_fs->os_file_system, wt_session, path_dest, prefix, &dirlist_dest, countp),
-      ENOENT, false);
 
-    for (namep = dirlist_dest; namep != NULL && *namep != NULL; namep++)
-        if (!WT_SUFFIX_MATCH(*namep, WT_LIVE_RESTORE_FS_TOMBSTONE_SUFFIX)) {
-            WT_ERR(__wt_realloc_def(session, &dirallocsz, count_dest + 1, &entries));
-            WT_ERR(__wt_strdup(session, *namep, &entries[count_dest]));
-            ++count_dest;
+    WT_ERR(lr_fs->os_file_system->fs_exist(
+      lr_fs->os_file_system, wt_session, path_dest, &dest_folder_exists));
 
-            if (single)
-                goto done;
-        }
+    if (dest_folder_exists) {
+        WT_ERR(lr_fs->os_file_system->fs_directory_list(
+          lr_fs->os_file_system, wt_session, path_dest, prefix, &dirlist_dest, &num_dest_files));
+
+        for (namep = dirlist_dest; namep != NULL && *namep != NULL; namep++)
+            if (!WT_SUFFIX_MATCH(*namep, WT_LIVE_RESTORE_FS_TOMBSTONE_SUFFIX)) {
+                WT_ERR(__wt_realloc_def(session, &dirallocsz, count_dest + 1, &entries));
+                WT_ERR(__wt_strdup(session, *namep, &entries[count_dest]));
+                ++count_dest;
+
+                if (single)
+                    goto done;
+            }
+    }
 
     /* Get files from source. */
     WT_ERR(__live_restore_fs_backing_filename(
       &lr_fs->source, session, lr_fs->destination.home, directory, &path_src));
-    WT_ERR_ERROR_OK(lr_fs->os_file_system->fs_directory_list(
-                      lr_fs->os_file_system, wt_session, path_src, prefix, &dirlist_src, countp),
-      ENOENT, false);
 
-    for (namep = dirlist_src; namep != NULL && *namep != NULL; namep++) {
-        /* Create file path for the file from the source directory. */
-        WT_ERR(__live_restore_create_file_path(session, &lr_fs->source, *namep, &temp_path));
-        WT_ERR_NOTFOUND_OK(
-          __live_restore_fs_has_file(lr_fs, &lr_fs->destination, session, temp_path, &dest_exist),
-          false);
-        WT_ERR(__dest_has_tombstone(lr_fs, temp_path, session, &have_tombstone));
+    WT_ERR(lr_fs->os_file_system->fs_exist(
+      lr_fs->os_file_system, wt_session, path_src, &source_folder_exists));
 
-        if (!dest_exist && !have_tombstone) {
-            WT_ERR(__wt_realloc_def(session, &dirallocsz, count_dest + count_src + 1, &entries));
-            WT_ERR(__wt_strdup(session, *namep, &entries[count_dest + count_src]));
-            ++count_src;
+    if (source_folder_exists) {
+        WT_ERR(lr_fs->os_file_system->fs_directory_list(
+          lr_fs->os_file_system, wt_session, path_src, prefix, &dirlist_src, &num_src_files));
+
+        for (namep = dirlist_src; namep != NULL && *namep != NULL; namep++) {
+            /*
+             * If a file in source hasn't been background migrated yet we need to add it to the
+             * list.
+             */
+            bool add_source_file = false;
+
+            if (!dest_folder_exists)
+                add_source_file = true;
+            else {
+                /*
+                 * We're iterating files in the source, but we want to check if they exist in the
+                 * destination, so create the file path to the backing destination file.
+                 */
+                WT_ERR(__live_restore_create_file_path(
+                  session, &lr_fs->destination, *namep, &temp_path));
+                WT_ERR_NOTFOUND_OK(__live_restore_fs_has_file(
+                                     lr_fs, &lr_fs->destination, session, temp_path, &dest_exist),
+                  false);
+                WT_ERR(__dest_has_tombstone(lr_fs, temp_path, session, &have_tombstone));
+                __wt_free(session, temp_path);
+
+                add_source_file = !dest_exist && !have_tombstone;
+            }
+
+            if (add_source_file) {
+                WT_ERR(
+                  __wt_realloc_def(session, &dirallocsz, count_dest + count_src + 1, &entries));
+                WT_ERR(__wt_strdup(session, *namep, &entries[count_dest + count_src]));
+                ++count_src;
+            }
+
+            if (single)
+                goto done;
         }
-
-        __wt_free(session, temp_path);
-        if (single)
-            goto done;
     }
+
+    if (!dest_folder_exists && !source_folder_exists)
+        WT_ERR_MSG(session, ENOENT,
+          "Cannot report contents of '%s'. Folder does not exist in the source or destination.",
+          directory);
 
 done:
 err:
@@ -344,9 +378,10 @@ err:
     __wt_free(session, path_src);
     __wt_free(session, temp_path);
     if (dirlist_dest != NULL)
-        WT_TRET(__live_restore_fs_directory_list_free(fs, wt_session, dirlist_dest, count_dest));
+        WT_TRET(
+          __live_restore_fs_directory_list_free(fs, wt_session, dirlist_dest, num_dest_files));
     if (dirlist_src != NULL)
-        WT_TRET(__live_restore_fs_directory_list_free(fs, wt_session, dirlist_src, count_src));
+        WT_TRET(__live_restore_fs_directory_list_free(fs, wt_session, dirlist_src, num_src_files));
 
     *dirlistp = entries;
     *countp = count_dest + count_src;
