@@ -656,3 +656,24 @@ buildvariants:
         depends_on:
           - name: archive_dist_test
             variant: al2023-arm64-compile
+
+  - name: al2023-x86-compile
+    display_name: "* Compile for Al2023 x86 NEW"
+    modules: *modules
+    expansions:
+      <<: *shared_compile_expansions
+      compile_variant: al2023-x86-compile
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel82
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - amazon2023.3-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_new_compile
+        depends_on:
+          - name: archive_dist_test
+            variant: al2023-x86-compile
