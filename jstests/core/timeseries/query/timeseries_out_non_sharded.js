@@ -255,14 +255,8 @@ function createTimeseriesOutCollection() {
     const timeseriesPipeline =
         [{$out: {db: destDB.getName(), coll: outColl.getName(), timeseries: {timeField: "time"}}}];
 
-    // TODO (SERVER-75856): Support implicit database creation for $merge and $out when running
-    // aggregate on a mongos.
-    try {
-        inColl.aggregate(timeseriesPipeline);
-        assert.eq(300, destDB[outColl.getName()].find().itcount());
-    } catch (e) {
-        assert.eq(e.code, ErrorCodes.NamespaceNotFound, e);
-    }
+    inColl.aggregate(timeseriesPipeline);
+    assert.eq(300, destDB[outColl.getName()].find().itcount());
 })();
 
 (function testCannotCreateTimeseriesCollFromNonTimeseriesColl() {
