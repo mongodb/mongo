@@ -3,7 +3,7 @@
  * caught.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_80
  * ]
  */
 

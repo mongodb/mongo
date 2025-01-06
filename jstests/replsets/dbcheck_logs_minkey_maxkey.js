@@ -3,7 +3,9 @@
  * user-specified 'start' field, and the last 'end' field should be either maxKey or the
  * user-specified 'end' field.
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *  # We need persistence as we temporarily restart nodes as standalones.
+ *   requires_persistence,
+ *   requires_fcv_80
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

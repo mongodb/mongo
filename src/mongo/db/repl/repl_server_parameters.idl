@@ -873,7 +873,7 @@ server_parameters:
         cpp_varname: dbCheckSecondaryBatchMaxTimeMs
         default: 5000
         validator:
-            gte: 10
+            gte: 1
             lte: 50000
         redact: false
 
@@ -911,7 +911,8 @@ feature_flags:
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
         cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck
-        default: false
+        default: true
+        version: 8.0
         shouldBeFCVGated: true
 
     featureFlagReduceMajorityWriteLatency:

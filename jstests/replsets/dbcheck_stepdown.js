@@ -1,7 +1,7 @@
 /**
  * Tests stepdown while dbcheck is running.
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_80
  * ]
  */
 

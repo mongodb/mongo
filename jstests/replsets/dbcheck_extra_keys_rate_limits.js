@@ -2,7 +2,7 @@
  * Tests that the dbCheck command's extra index keys check follows the rate and overall limits.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_80
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

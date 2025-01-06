@@ -4,7 +4,7 @@
  * exist in the index. The healthlog entry contains a list of all missing index keys.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_80
  * ]
  */
 
@@ -79,10 +79,14 @@ function checkMissingIndexKeys(doc, collOpts, numDocs = 1, maxDocsPerBatch = 100
                                    true /*doSecondary*/,
                                    collOpts);
 
-    runDbCheck(replSet, primary.getDB(dbName), collName, {
-        maxDocsPerBatch: maxDocsPerBatch,
-        validateMode: "dataConsistencyAndMissingIndexKeysCheck"
-    });
+    runDbCheck(replSet,
+               primary.getDB(dbName),
+               collName,
+               {
+                   maxDocsPerBatch: maxDocsPerBatch,
+                   validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+               },
+               true);
 
     let missingIndexKeysQuery = {
         ...getMissingIndexKeysQuery(Object.keys(doc).length),

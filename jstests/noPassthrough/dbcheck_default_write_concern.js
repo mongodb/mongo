@@ -1,7 +1,7 @@
 /**
  * Tests that dbcheck correctly applies default write concern if no write concern is set.
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_80
  * ]
  */
 

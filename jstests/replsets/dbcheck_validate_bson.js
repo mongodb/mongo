@@ -2,7 +2,7 @@
  * Test BSON validation in the dbCheck command.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck,
+ *   requires_fcv_80,
  *   corrupts_data,
  * ]
  */

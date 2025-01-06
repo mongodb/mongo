@@ -5,9 +5,7 @@
  *   # We need persistence as we temporarily restart nodes as standalones.
  *   requires_persistence,
  *   assumes_against_mongod_not_mongos,
- *   # snapshotRead:false behavior has been removed in 6.2
- *   requires_fcv_62,
- *   featureFlagSecondaryIndexChecksInDbCheck,
+ *   requires_fcv_80,
  * ]
  */
 
