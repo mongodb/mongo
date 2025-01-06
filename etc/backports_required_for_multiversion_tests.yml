@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
+    ticket: SERVER-95869
   - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
     ticket: SERVER-92668
   - test_file: jstests/core/query/query_settings/query_settings_strictness.js
@@ -782,6 +784,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
+    ticket: SERVER-95869
   - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
     ticket: SERVER-92668
   - test_file: jstests/core/query/query_settings/query_settings_strictness.js

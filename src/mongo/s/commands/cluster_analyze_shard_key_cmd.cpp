@@ -146,18 +146,21 @@ public:
                     buildVersionedRequests(expCtx, nss, cri, {shardId}, unversionedCmdObj);
                 invariant(requests.size() == 1);
 
-                auto response = std::move(gatherResponses(opCtx,
-                                                          DatabaseName::kAdmin,
-                                                          request().getReadPreference(),
-                                                          Shard::RetryPolicy::kIdempotent,
-                                                          requests)
-                                              .front());
-                auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
-
-                if (status == ErrorCodes::CollectionIsEmptyLocally) {
+                try {
+                    auto response = gatherResponses(opCtx,
+                                                    DatabaseName::kAdmin,
+                                                    request().getReadPreference(),
+                                                    Shard::RetryPolicy::kIdempotent,
+                                                    requests)
+                                        .front();
+                    uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+                    return AnalyzeShardKeyResponse::parse(
+                        IDLParserContext("clusterAnalyzeShardKey"),
+                        response.swResponse.getValue().data);
+                } catch (const ExceptionFor<ErrorCodes::CollectionIsEmptyLocally>& ex) {
                     uassert(ErrorCodes::IllegalOperation,
                             str::stream() << "Cannot analyze a shard key for an empty collection: "
-                                          << redact(status),
+                                          << redact(ex),
                             !candidateShardIds.empty());
 
                     LOGV2(6875300,
@@ -167,22 +170,14 @@ public:
                           logAttrs(nss),
                           "shardKey"_attr = request().getKey(),
                           "shardId"_attr = shardId,
-                          "error"_attr = status);
-                    continue;
-                }
-
-                // Don't propagate CommandOnShardedViewNotSupportedOnMongod errors for clarity. This
-                // command doesn't support any kind of view, whether or not it's sharded.
-                if (status == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+                          "error"_attr = ex.toString());
+                } catch (
+                    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
+                    // Don't propagate CommandOnShardedViewNotSupportedOnMongod errors for clarity,
+                    // even for the cases where this is thrown as an exception.
                     uasserted(ErrorCodes::CommandNotSupportedOnView,
                               "Operation not supported for a view");
                 }
-
-                uassertStatusOK(status);
-                auto parsedResponse =
-                    AnalyzeShardKeyResponse::parse(IDLParserContext("clusterAnalyzeShardKey"),
-                                                   response.swResponse.getValue().data);
-                return parsedResponse;
             }
         }
 
