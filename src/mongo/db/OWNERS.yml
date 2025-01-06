@@ -163,3 +163,6 @@ filters:
   - "yieldable.h":
     approvers:
       - 10gen/query-execution-yielding
+  - "mirror*":
+    approvers:
+      - 10gen/server-networking-and-observability
