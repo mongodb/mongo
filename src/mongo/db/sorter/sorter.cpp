@@ -82,6 +82,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
+#include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/db/stats/counters.h"
@@ -735,7 +736,7 @@ protected:
 
         while (iterators.size() > numTargetedSpills) {
             std::shared_ptr<File> newSpillsFile = std::make_shared<File>(
-                this->_opts.tempDir + "/" + nextFileName(), this->_opts.sorterFileStats);
+                nextFileName(this->_opts.tempDir), this->_opts.sorterFileStats);
 
             LOGV2_DEBUG(6033103,
                         1,
@@ -1409,7 +1410,7 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts)
     : SorterBase(opts.sorterTracker),
       _opts(opts),
       _file(opts.extSortAllowed ? std::make_shared<Sorter<Key, Value>::File>(
-                                      opts.tempDir + "/" + nextFileName(), opts.sorterFileStats)
+                                      sorter::nextFileName(opts.tempDir), opts.sorterFileStats)
                                 : nullptr) {
     if (opts.useMemPool) {
         _memPool.emplace(makeMemPool());
@@ -1734,7 +1735,7 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptio
       _opts(opts),
       _heap(Greater{&compare}),
       _file(opts.extSortAllowed ? std::make_shared<typename Sorter<Key, Value>::File>(
-                                      opts.tempDir + "/" + nextFileName(), opts.sorterFileStats)
+                                      sorter::nextFileName(opts.tempDir), opts.sorterFileStats)
                                 : nullptr) {}
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>

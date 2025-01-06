@@ -36,7 +36,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cmath>
 #include <cstddef>
-#include <deque>
 #include <string>
 
 #include "mongo/bson/bsonmisc.h"
@@ -49,8 +48,6 @@
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/sorter/sorter_stats.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -85,21 +82,6 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
               str::stream() << "The $bucketAuto 'groupBy' field must be defined as a $-prefixed "
                                "path or an expression object, but found: "
                             << groupByField.toString(false, false));
-}
-
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> documentSourceBucketAutoFileCounter;
-    return "extsort-doc-bucket." +
-        std::to_string(documentSourceBucketAutoFileCounter.fetchAndAdd(1));
 }
 
 }  // namespace

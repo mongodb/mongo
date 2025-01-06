@@ -47,7 +47,6 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -56,10 +55,8 @@
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -729,22 +726,6 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     // would generally require merging the streams before producing output.
     return false;
 }
-
-namespace {
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> sortExecutorFileCounter;
-    return "extsort-time-sorter." + std::to_string(sortExecutorFileCounter.fetchAndAdd(1));
-}
-}  // namespace
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"

@@ -301,12 +301,6 @@ protected:
  * handle deleting the data file used for spills. Otherwise, if done() is called, responsibility for
  * file deletion moves to the returned Iterator object, which must then delete the file upon its own
  * destruction.
- *
- * All users of Sorter implementations must define their own nextFileName() function to generate
- * unique file names for spills to disk. This is necessary because the sorter.cpp file is separately
- * directly included in multiple places, rather than compiled in one place and linked, and so cannot
- * itself provide a globally unique ID for file names. See existing function implementations of
- * nextFileName() for example.
  */
 template <typename Key, typename Value>
 class Sorter : public SorterBase {

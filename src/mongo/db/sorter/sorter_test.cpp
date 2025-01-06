@@ -51,24 +51,6 @@
 #include "mongo/unittest/temp_dir.h"
 
 
-namespace mongo {
-
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> sorterTestFileCounter;
-    return "extsort-sorter-test." + std::to_string(sorterTestFileCounter.fetchAndAdd(1));
-}
-
-}  // namespace mongo
-
 // Need access to internal classes
 #include "mongo/db/sorter/sorter.cpp"
 
@@ -308,7 +290,7 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter, const unittest::T
     SorterFileStats sorterFileStats(nullptr /* sorterTracker */);
     const SortOptions opts = SortOptions().TempDir(tempDir.path());
     auto spillFile = std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-        opts.tempDir + "/" + nextFileName(), opts.sorterFileStats);
+        sorter::nextFileName(opts.tempDir), opts.sorterFileStats);
     SortedFileWriter<IntWrapper, IntWrapper> writer(opts, spillFile);
     while (inputIter->more()) {
         auto pair = inputIter->next();
@@ -417,7 +399,7 @@ private:
     int _appendToFile(const SortOptions* opts, int currentFileSize, int range) {
         auto makeFile = [&] {
             return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-                opts->tempDir + "/" + nextFileName(), opts->sorterFileStats);
+                sorter::nextFileName(opts->tempDir), opts->sorterFileStats);
         };
 
         int currentBufSize = 0;
@@ -1285,7 +1267,7 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
     IWPair pair1(1, 100);
     IWPair pair2(2, 200);
     auto spillFile = std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-        opts.tempDir + "/" + nextFileName(), opts.sorterFileStats);
+        sorter::nextFileName(opts.tempDir), opts.sorterFileStats);
     SortedFileWriter<IntWrapper, IntWrapper> writer(opts, spillFile);
     writer.addAlreadySorted(pair1.first, pair1.second);
     writer.addAlreadySorted(pair2.first, pair2.second);

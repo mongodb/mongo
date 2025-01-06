@@ -87,13 +87,11 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -1384,23 +1382,6 @@ bool SortedDataIndexAccessMethod::shouldMarkIndexAsMultikey(
 void SortedDataIndexAccessMethod::validateDocument(const CollectionPtr& collection,
                                                    const BSONObj& obj,
                                                    const BSONObj& keyPattern) const {}
-
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number. Each name is suffixed with a random number generated at startup, to prevent name
- * collisions when the index build external sort files are preserved across restarts.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> indexAccessMethodFileCounter;
-    static const uint64_t randomSuffix = SecureRandom().nextUInt64();
-    return str::stream() << "extsort-index." << indexAccessMethodFileCounter.fetchAndAdd(1) << '-'
-                         << randomSuffix;
-}
 
 Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     OperationContext* opCtx,

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/db/exec/sort_executor.h"
-#include "mongo/db/exec/working_set.h"
+#include "mongo/base/string_data.h"
 
-#include "mongo/db/sorter/sorter.cpp"
+#include <string>
 
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::Document,
-                    mongo::SortExecutor<mongo::Document>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::SortableWorkingSetMember,
-                    mongo::SortExecutor<mongo::SortableWorkingSetMember>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value, mongo::BSONObj, mongo::SortExecutor<mongo::BSONObj>::Comparator);
+namespace mongo::sorter {
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number. Each name is suffixed with a random number generated at startup, to prevent name
+ * collisions when the index build external sort files are preserved across restarts.
+ */
+std::string nextFileName(StringData path);
+}  // namespace mongo::sorter

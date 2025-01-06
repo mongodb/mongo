@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/db/sorter/sorter_file_name.h"
 
-#include "mongo/db/exec/sort_executor.h"
-#include "mongo/db/exec/working_set.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/str.h"
 
-#include "mongo/db/sorter/sorter.cpp"
-
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::Document,
-                    mongo::SortExecutor<mongo::Document>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::SortableWorkingSetMember,
-                    mongo::SortExecutor<mongo::SortableWorkingSetMember>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value, mongo::BSONObj, mongo::SortExecutor<mongo::BSONObj>::Comparator);
+namespace mongo::sorter {
+std::string nextFileName(StringData path) {
+    static AtomicWord<unsigned> fileCounter;
+    static const uint64_t randomSuffix = SecureRandom().nextUInt64();
+    return str::stream() << path << "/extsort." << fileCounter.fetchAndAdd(1) << '-'
+                         << randomSuffix;
+}
+}  // namespace mongo::sorter

@@ -35,12 +35,14 @@ mongo_cc_library(
     name = "sorter_base",
     srcs = [
         "sorter_checksum_calculator.cpp",
+        "sorter_file_name.cpp",
         "sorter_gen",
     ],
     hdrs = [
         "sorter.cpp",  # Intentionally in hdrs.
         "sorter.h",
         "sorter_checksum_calculator.h",
+        "sorter_file_name.h",
         "//src/mongo/db/query/util:spill_util.h",
     ],
     deps = [

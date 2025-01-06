@@ -35,27 +35,10 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/spill_util.h"
+#include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
-
-namespace {
-
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> documentSourceGroupFileCounter;
-    return "extsort-doc-group." + std::to_string(documentSourceGroupFileCounter.fetchAndAdd(1));
-}
-
-}  // namespace
 
 GroupProcessor::GroupProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                int64_t maxMemoryUsageBytes)
@@ -255,7 +238,7 @@ void GroupProcessor::spill() {
     if (!_file) {
         _spillStats = std::make_unique<SorterFileStats>(nullptr /* sorterTracker */);
         _file = std::make_shared<Sorter<Value, Value>::File>(
-            _expCtx->getTempDir() + "/" + nextFileName(), _spillStats.get());
+            sorter::nextFileName(_expCtx->getTempDir()), _spillStats.get());
     }
     SortedFileWriter<Value, Value> writer(SortOptions().TempDir(_expCtx->getTempDir()), _file);
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
