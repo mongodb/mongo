@@ -301,6 +301,16 @@ bool _collectionMustExistLocallyButDoesnt(OperationContext* opCtx,
             logAttrs(nss));
         return false;
     }
+    auto criticalSectionSignal =
+        scopedCsr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
+    if (criticalSectionSignal) {
+        LOGV2_DEBUG(9461000,
+                    1,
+                    "Ignoring missing collection inconsistencies because collection metadata is "
+                    "unknown when a critical section is active",
+                    logAttrs(nss));
+        return false;
+    }
 
     return optCollDescr->hasRoutingTable() && optCollDescr->currentShardHasAnyChunks();
 }
