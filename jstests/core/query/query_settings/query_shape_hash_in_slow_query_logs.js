@@ -1,7 +1,10 @@
 // Tests that query shape hash is logged for slow queries.
 //
 // @tags: [
-//   requires_profiling,
+//   assumes_read_preference_unchanged,
+//   # Cowardly refusing to run test that interacts with the system profiler as the 'system.profile'
+//   # collection is not replicated.
+//   does_not_support_causal_consistency,
 //   # Uses $where operation.
 //   requires_scripting,
 //   directly_against_shardsvrs_incompatible,
@@ -17,7 +20,7 @@ const qsutils = new QuerySettingsUtils(db, collName);
 qsutils.removeAllQuerySettings();
 
 // Make sure all queries are logged as being slow.
-assert.commandWorked(db.runCommand({profile: 1, slowms: -1}));
+assert.commandWorked(db.runCommand({profile: 0, slowms: -1}));
 
 // Insert some data for $where: 'sleep(...)' to wait upon.
 db.test.insert({x: 4});
@@ -31,21 +34,18 @@ function getQueryShapeHashFromSlowQueryLog(queryComment) {
                               })
                               .filter((entry) => {
                                   return entry.msg == "Slow query" && entry.attr &&
-                                      entry.attr.command &&
+                                      entry.attr.command && entry.attr.queryShapeHash &&
                                       entry.attr.command.comment == queryComment;
                               });
-    assert.gt(slowQueryLogs.length, 0, "Didn't get any logs");
-    return slowQueryLogs.pop().attr.queryShapeHash;
-}
 
-// Finds the query shape hash from profiler output where the query has comment 'queryComment'.
-function getQueryShapeHashFromQueryProfiler(queryComment) {
-    const profiles =
-        db.system.profile.find({"command.comment": queryComment}).sort({ts: -1}).limit(1).toArray();
-    assert.eq(profiles.length, 1, "Couldn't find any profiling data");
-    const profile = profiles[0];
-    assert.eq(typeof profile.queryShapeHash, "string", "No query shape hash found");
-    return profile.queryShapeHash;
+    // Assert that there is exactly one slow query log with given 'queryComment':
+    // - for replica set, only the node that executes the query reports one log.
+    // - for sharded cluster, only the mongos reports one log.
+    assert.eq(slowQueryLogs.length,
+              1,
+              "Expected exactly one slow query log with 'queryShapeHash' and this query comment: " +
+                  tojson(queryComment));
+    return slowQueryLogs.pop().attr.queryShapeHash;
 }
 
 function testQueryShapeHash(query) {
@@ -59,23 +59,16 @@ function testQueryShapeHash(query) {
         }
     };
 
-    // Run command to hit slow query logs and the profiler.
+    // Run command to hit slow query logs.
     assert.commandWorked(db.runCommand(qsutils.withoutDollarDB(query)));
 
     // Get query shape hash from slow query log.
     const slowLogQueryShapeHash = getQueryShapeHashFromSlowQueryLog(query.comment);
     assert(slowLogQueryShapeHash, "Couldn't find query shape hash in slow queries log");
 
-    // Get query shape hash from query profiler.
-    const queryProfilerQueryShapeHash = getQueryShapeHashFromQueryProfiler(query.comment);
-    assert(queryProfilerQueryShapeHash, "Couldn't find query shape hash in query profiler's data");
-
-    // Expect the same shape hash in both cases.
-    assert.eq(slowLogQueryShapeHash, queryProfilerQueryShapeHash, "Query shape hashes don't match");
-
     qsutils.withQuerySettings(query, querySettings, () => {
         // Make sure query settings are applied.
-        const querySettingsQueryShapeHash = qsutils.getQueryHashFromQuerySettings(query);
+        const querySettingsQueryShapeHash = qsutils.getQueryShapeHashFromQuerySettings(query);
         assert(querySettingsQueryShapeHash,
                `Couldn't find query settings for provided query: ${JSON.stringify(query)}`);
 

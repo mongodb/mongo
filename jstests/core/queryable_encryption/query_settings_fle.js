@@ -79,7 +79,7 @@ const queries = {
             assert.commandFailedWithCode(db.runCommand(queryToRun),
                                          ErrorCodes.QueryRejectedBySettings);
 
-            return qsutils.getQueryHashFromQuerySettings(query);
+            return qsutils.getQueryShapeHashFromQuerySettings(query);
         });
 
         // Repeat the same test while rejecting the base query by the query shape hash.

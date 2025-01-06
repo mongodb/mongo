@@ -81,7 +81,7 @@ const querySettings = {
 jsTestLog("Make sure query shape hash from '$currentOp' matches the one from query settings.");
 qsutils.withQuerySettings(findQueryRepresentative, querySettings, () => {
     const queryShapeHashFromQuerySettings =
-        qsutils.getQueryHashFromQuerySettings(findQueryRepresentative);
+        qsutils.getQueryShapeHashFromQuerySettings(findQueryRepresentative);
     assert.eq(queryShapeHashFromCurrentOp,
               queryShapeHashFromQuerySettings,
               "Query shape hash from the '$currentOp' doesn't match the one from query settings.");
