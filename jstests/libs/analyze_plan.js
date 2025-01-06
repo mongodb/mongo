@@ -1177,7 +1177,7 @@ export function getNumberOfColumnScans(explain) {
 export function isIxscanMultikey(winningPlan) {
     // SERVER-77719: Update to expected this method to allow also use with CQF optimizer.
     let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
-    return ixscanStage.isMultiKey;
+    return ixscanStage && ixscanStage.isMultiKey;
 }
 
 /**

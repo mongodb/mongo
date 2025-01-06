@@ -1,11 +1,16 @@
 /**
  * Make sure that $gt and $lt queries return the same results regardless of whether there is a
  * multikey index.
- * @tags: [
- * ]
+ * @tags: [ requires_fcv_80 ]
  */
 
 import {arrayDiff, arrayEq} from "jstests/aggregation/extras/utils.js";
+import {
+    getWinningPlanFromExplain,
+    isCollscan,
+    isIxscanMultikey
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 function buildErrorString(q, indexed, nonIndexed) {
     const arrDiff = arrayDiff(indexed, nonIndexed);
@@ -18,51 +23,37 @@ function buildErrorString(q, indexed, nonIndexed) {
         arrDiff.right.length + "/" + nonIndexed.length + "): " + tojson(arrDiff.right);
     return errStr;
 }
-const indexColl = db.indexColl;
-const nonIndexedColl = db.nonIndexedColl;
-indexColl.drop();
-nonIndexedColl.drop();
+const coll = assertDropAndRecreateCollection(db, "array_index_and_nonIndex_consistent");
 
-db.indexColl.createIndex({val: 1});
-const collList = [indexColl, nonIndexedColl];
+assert.commandWorked(coll.createIndex({val: 1}));
 
-collList.forEach(function(collObj) {
-    assert.commandWorked(collObj.insert([
-        {val: [1, 2]},
-        {val: [3, 4]},
-        {val: [3, 1]},
-        {val: {"test": 5}},
-        {val: [{"test": 7}]},
-        {val: [true, false]},
-        {val: 2},
-        {val: 3},
-        {val: 4},
-        {val: [2]},
-        {val: [3]},
-        {val: [4]},
-        {val: [1, true]},
-        {val: [true, 1]},
-        {val: [1, 4]},
-        {val: [null]},
-        {val: null},
-        {val: MinKey},
-        {val: [MinKey]},
-        {val: [MinKey, 3]},
-        {val: [3, MinKey]},
-        {val: MaxKey},
-        {val: [MaxKey]},
-        {val: [MaxKey, 3]},
-        {val: [3, MaxKey]},
-        {val: []},
-    ]));
-});
+const singleValues = [
+    [1, 2],      [3, 4], [3, 1],   {"test": 5}, [{"test": 7}], [true, false], 2,        3,
+    4,           [2],    [3],      [4],         [1, true],     [true, 1],     [1, 4],   [null],
+    null,        MinKey, [MinKey], [MinKey, 3], [3, MinKey],   MaxKey,        [MaxKey], [MaxKey, 3],
+    [3, MaxKey], []
+];
+const nestedValues = singleValues.map(value => [value]);
+const doubleNestedValues = nestedValues.map(value => [value]);
+const insertDocs =
+    singleValues.concat(nestedValues).concat(doubleNestedValues).map(value => ({val: value}));
 
-const queryList = [
+assert.commandWorked(coll.insert(insertDocs));
+
+assert.eq(
+    coll.find({}).toArray().length, singleValues.length * 3, "Wrong number of documents found!");
+
+const flattenPredicates = [
     [2, 2],      [0, 3],      [3, 0],      [1, 3],      [3, 1],       [1, 5],      [5, 1], [1],
     [3],         [5],         {"test": 2}, {"test": 6}, [true, true], [true],      true,   1,
     3,           5,           [],          [MinKey],    [MinKey, 2],  [MinKey, 4], MinKey, [MaxKey],
     [MaxKey, 2], [MaxKey, 4], MaxKey,      [],          false,        null,        [null],
 ];
+const nestedPredicates = flattenPredicates.map(predicate => [predicate]);
+const doubleNestedPreds = nestedPredicates.map(predicate => [predicate]);
+const queryList = flattenPredicates.concat(nestedPredicates).concat(doubleNestedPreds);
+
+assert.eq(queryList.length, flattenPredicates.length * 3, "Wrong number of predicates");
 
 queryList.forEach(function(q) {
     const queryPreds = [
@@ -81,12 +72,19 @@ queryList.forEach(function(q) {
         {$elemMatch: {$not: {$eq: q}}},
         {$elemMatch: {$not: {$gte: q}}},
         {$elemMatch: {$not: {$lte: q}}},
-    ];
+    ].map(predicate => ({predicate, isArray: Array.isArray(q)}));
     const projOutId = {_id: 0, val: 1};
     queryPreds.forEach(function(pred) {
-        const query = {val: pred};
-        const indexRes = indexColl.find(query, projOutId).sort({val: 1}).toArray();
-        const nonIndexedRes = nonIndexedColl.find(query, projOutId).sort({val: 1}).toArray();
+        const query = {val: pred.predicate};
+        const indexRes = coll.find(query, projOutId).toArray().sort();
+        if (pred.isArray && !pred.predicate.$elemMatch && !pred.predicate.$not) {
+            // This is a non negative query against an array. It should use the index.
+            const indexPlan = coll.find(query, projOutId).explain();
+            assert(isIxscanMultikey(getWinningPlanFromExplain(indexPlan)), indexPlan);
+        }
+        const nonIndexedRes = coll.find(query, projOutId).hint({$natural: 1}).toArray().sort();
+        const nonIndexedPlan = coll.find(query, projOutId).hint({$natural: 1}).explain();
+        assert(isCollscan(db, nonIndexedPlan), nonIndexedPlan);
         assert(arrayEq(indexRes, nonIndexedRes), buildErrorString(query, indexRes, nonIndexedRes));
     });
 });
@@ -104,7 +102,7 @@ const multiIntQueryList = [
 ];
 multiIntQueryList.forEach(function(q) {
     const projOutId = {_id: 0, val: 1};
-    const indexRes = indexColl.find(q, projOutId).sort({val: 1}).toArray();
-    const nonIndexedRes = nonIndexedColl.find(q, projOutId).sort({val: 1}).toArray();
+    const indexRes = coll.find(q, projOutId).toArray().sort();
+    const nonIndexedRes = coll.find(q, projOutId).hint({$natural: 1}).toArray().sort();
     assert(arrayEq(indexRes, nonIndexedRes), buildErrorString(q, indexRes, nonIndexedRes));
 });

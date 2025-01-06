@@ -214,6 +214,7 @@ selector:
   - jstests/core/query/type/null_undefined.js
   - jstests/core/query/type/type_array.js
   - jstests/core/write/update/update_numeric_field_name.js
+  - jstests/core/query/array/array_index_and_nonIndex_consistent.js
   # Time-series collections have different indexes from regular collections.
   - jstests/core/query/array/arrayfind4.js
   - jstests/core/query/array/arrayfind9.js
