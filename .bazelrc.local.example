@@ -2,16 +2,16 @@
 # most commands like 'test' or 'run' inherit from build so they will also get applied
 
 # Fastest build, some debug information
-build --config=fastbuild
+common --config=fastbuild
 
 # Slower and larger build, best for using debugger
-#build --config=dbg
+#common --config=dbg
 
 # Debug with thread sanitizers, dynamic instead of static build
-#build --config=dbg_tsan
+#common --config=dbg_tsan
 
 # Debug with address and undefined sanitizers
-#build --config=dbg_aubsan
+#common --config=dbg_aubsan
 
 # Fastest runtime, has debug info, no debug asserts
-#build --config=opt
+#common --config=opt

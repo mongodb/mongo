@@ -22,8 +22,8 @@ if [ -z "$LOCAL" ]; then
   ssh ${REMOTE_USER}@${REMOTE_HOST} "chown ${REMOTE_USER}:${REMOTE_USER} /home/${REMOTE_USER}/.engflow/creds/engflow.crt /home/${REMOTE_USER}/.engflow/creds/engflow.key"
   ssh ${REMOTE_USER}@${REMOTE_HOST} "chmod 600 /home/${REMOTE_USER}/.engflow/creds/engflow.crt /home/${REMOTE_USER}/.engflow/creds/engflow.key"
 
-  ssh ${REMOTE_USER}@${REMOTE_HOST} "echo \"build --tls_client_certificate=/home/${REMOTE_USER}/.engflow/creds/engflow.crt\" >> ~/.bazelrc"
-  ssh ${REMOTE_USER}@${REMOTE_HOST} "echo \"build --tls_client_key=/home/${REMOTE_USER}/.engflow/creds/engflow.key\" >> ~/.bazelrc"
+  ssh ${REMOTE_USER}@${REMOTE_HOST} "echo \"common --tls_client_certificate=/home/${REMOTE_USER}/.engflow/creds/engflow.crt\" >> ~/.bazelrc"
+  ssh ${REMOTE_USER}@${REMOTE_HOST} "echo \"common --tls_client_key=/home/${REMOTE_USER}/.engflow/creds/engflow.key\" >> ~/.bazelrc"
 else
   mkdir -p $HOME/.engflow/creds
   unzip -o "$ZIP_FILE"
@@ -32,6 +32,6 @@ else
   mv engflow.key $HOME/.engflow/creds
   chown $USER $HOME/.engflow/creds/engflow.crt $HOME/.engflow/creds/engflow.key 
   chmod 600 $HOME/.engflow/creds/engflow.crt $HOME/.engflow/creds/engflow.key 
-  echo "build --tls_client_certificate=$HOME/.engflow/creds/engflow.crt" >> $HOME/.bazelrc
-  echo "build --tls_client_key=$HOME/.engflow/creds/engflow.key" >> $HOME/.bazelrc
+  echo "common --tls_client_certificate=$HOME/.engflow/creds/engflow.crt" >> $HOME/.bazelrc
+  echo "common --tls_client_key=$HOME/.engflow/creds/engflow.key" >> $HOME/.bazelrc
 fi

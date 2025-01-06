@@ -60,9 +60,9 @@ if [[ $OSTYPE == darwin* ]]; then
   xcode_build_number=$(/usr/bin/xcodebuild -version 2>/dev/null | tail -1 | cut -d " " -f3) >&2
 
   bazelrc_lines+=("startup --host_jvm_args=-Xdock:name=$xcode_path") >&2
-  bazelrc_lines+=("build --xcode_version=$xcode_version") >&2
-  bazelrc_lines+=("build --repo_env=USE_CLANG_CL=$xcode_version") >&2
-  bazelrc_lines+=("build --repo_env=DEVELOPER_DIR=$xcode_path") >&2
+  bazelrc_lines+=("common --xcode_version=$xcode_version") >&2
+  bazelrc_lines+=("common --repo_env=USE_CLANG_CL=$xcode_version") >&2
+  bazelrc_lines+=("common --repo_env=DEVELOPER_DIR=$xcode_path") >&2
 fi
 
 printf '%s\n' "${bazelrc_xcode_lines[@]}" > .bazelrc.xcode

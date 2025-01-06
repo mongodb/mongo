@@ -115,13 +115,13 @@ functions:
 
           uri="https://spruce.mongodb.com/task/${task_id}?execution=${execution}"
 
-          echo "build --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
-          echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
+          echo "common --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
+          echo "common --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
+          echo "common --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
+          echo "common --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
+          echo "common --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
+          echo "common --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
+          echo "common --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
         fi
   "get project":
     command: git.get_project
