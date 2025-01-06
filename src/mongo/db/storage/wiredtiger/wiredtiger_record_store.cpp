@@ -428,7 +428,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                                              Params params)
     : RecordStoreBase(params.uuid, params.ident),
       _uri(WiredTigerKVEngine::kTableUriPrefix + params.ident),
-      _tableId(WiredTigerSession::genTableId()),
+      _tableId(WiredTigerUtil::genTableId()),
       _engineName(params.engineName),
       _keyFormat(params.keyFormat),
       _overwrite(params.overwrite),

@@ -129,7 +129,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit
     WT_CURSOR* cursor = nullptr;
     try {
         const std::string metadataURI = "metadata:create";
-        cursor = session->getCachedCursor(WiredTigerSession::kMetadataCreateTableId, "");
+        cursor = session->getCachedCursor(kMetadataCreateTableId, "");
         if (!cursor) {
             cursor = session->getNewCursor(metadataURI);
         }
@@ -138,7 +138,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit
     }
     invariant(cursor);
     ScopeGuard releaser = [&] {
-        session->releaseCursor(WiredTigerSession::kMetadataCreateTableId, cursor, "");
+        session->releaseCursor(kMetadataCreateTableId, cursor, "");
     };
 
     return _getMetadata(cursor, uri);
@@ -158,7 +158,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerRecoveryUnit& ru, 
     WT_CURSOR* cursor = nullptr;
     try {
         const std::string metadataURI = "metadata:";
-        cursor = session->getCachedCursor(WiredTigerSession::kMetadataTableId, "");
+        cursor = session->getCachedCursor(kMetadataTableId, "");
         if (!cursor) {
             cursor = session->getNewCursor(metadataURI);
         }
@@ -167,7 +167,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerRecoveryUnit& ru, 
     }
     invariant(cursor);
     ScopeGuard releaser = [&] {
-        session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor, "");
+        session->releaseCursor(kMetadataTableId, cursor, "");
     };
 
     return _getMetadata(cursor, uri);
@@ -1269,6 +1269,12 @@ Status WiredTigerUtil::canRunAutoCompact(bool isEphemeral) {
                       "autoCompact() can only be executed when checkpoints are enabled");
     }
     return Status::OK();
+}
+
+// static
+uint64_t WiredTigerUtil::genTableId() {
+    static AtomicWord<unsigned long long> nextTableId(WiredTigerUtil::kLastTableId);
+    return nextTableId.fetchAndAdd(1);
 }
 
 boost::optional<bool> WiredTigerConfigParser::isTableLoggingEnabled() const {

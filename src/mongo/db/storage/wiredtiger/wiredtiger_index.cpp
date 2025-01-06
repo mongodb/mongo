@@ -278,7 +278,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                           desc->ordering(),
                           rsKeyFormat),
       _uri(uri),
-      _tableId(WiredTigerSession::genTableId()),
+      _tableId(WiredTigerUtil::genTableId()),
       _collectionUUID(collectionUUID),
       _indexName(desc->indexName()),
       _isLogged(isLogged) {}

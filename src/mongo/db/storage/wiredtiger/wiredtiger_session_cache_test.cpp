@@ -35,7 +35,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
@@ -125,7 +127,7 @@ TEST(WiredTigerSessionCacheTest, ReleaseCursorDuringShutdown) {
     sessionCache->shuttingDown();
     ASSERT(sessionCache->isShuttingDown());
 
-    auto tableIdWeDontCareAbout = WiredTigerSession::genTableId();
+    auto tableIdWeDontCareAbout = WiredTigerUtil::genTableId();
     // Skips actually trying to release the cursor to avoid the segmentation fault.
     session->releaseCursor(tableIdWeDontCareAbout, cursor, "");
 }
@@ -149,7 +151,7 @@ TEST(WiredTigerSessionCacheTest, ReleaseSessionAfterShutdown) {
         // After the sessionCache shut down, the outstanding session's epoch should be older than
         // the cache's current epoch. So, when we go to release it, we should see this and not
         // release it back into the cache. We should also not release its cursor.
-        auto tableIdWeDontCareAbout = WiredTigerSession::genTableId();
+        auto tableIdWeDontCareAbout = WiredTigerUtil::genTableId();
         session->releaseCursor(tableIdWeDontCareAbout, cursor, "");
     }
     // Check that the session was not added back into the cache.

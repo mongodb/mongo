@@ -323,6 +323,21 @@ public:
      */
     static Status canRunAutoCompact(bool isEphemeral);
 
+
+    static uint64_t genTableId();
+
+    /**
+     * For special cursors. Guaranteed never to collide with genTableId() ids.
+     */
+    enum TableId {
+        /* For "metadata:" cursors */
+        kMetadataTableId,
+        /* For "metadata:create" cursors */
+        kMetadataCreateTableId,
+        /* The start of non-special table ids for genTableId() */
+        kLastTableId
+    };
+
 private:
     /**
      * Casts unsigned 64-bit statistics value to T.
