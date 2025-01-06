@@ -2,7 +2,7 @@
  * Tests dbCheck health log entries are consistent for all nodes in the replica sets.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_81
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

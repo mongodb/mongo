@@ -3,7 +3,7 @@
  * detects the inconsistency.
  *
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_81
  * ]
  */
 

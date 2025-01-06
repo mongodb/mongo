@@ -1,7 +1,7 @@
 /**
  * Tests the dbCheckSecondaryBatchMaxTimeMs parameter.
  * @tags: [
- *   featureFlagSecondaryIndexChecksInDbCheck
+ *   requires_fcv_81
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -39,7 +39,7 @@ function runTest(validateMode) {
     const secondaryDB = secondary.getDB(dbName);
 
     assert.commandWorked(
-        secondary.adminCommand({"setParameter": 1, "dbCheckSecondaryBatchMaxTimeMs": 10}));
+        secondary.adminCommand({"setParameter": 1, "dbCheckSecondaryBatchMaxTimeMs": 1}));
     const writeConcern = {w: 'majority'};
 
     resetAndInsert(rst, primaryDB, collName, nDocs);
