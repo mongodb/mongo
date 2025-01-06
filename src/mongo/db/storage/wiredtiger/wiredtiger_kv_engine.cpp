@@ -816,15 +816,8 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     auto startTime = Date_t::now();
     LOGV2(4795902, "Closing WiredTiger", "closeConfig"_attr = closeConfig);
-    int ret = _conn->close(_conn, closeConfig.c_str());
-    if (ret == EBUSY) {
-        LOGV2(9513600,
-              "Encountered EBUSY trying to close WiredTiger",
-              "duration"_attr = Date_t::now() - startTime);
-    } else {
-        fassert(9513601, ret == 0);
-        LOGV2(4795901, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
-    }
+    invariantWTOK(_conn->close(_conn, closeConfig.c_str()), nullptr);
+    LOGV2(4795901, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
     _conn = nullptr;
 }
 
