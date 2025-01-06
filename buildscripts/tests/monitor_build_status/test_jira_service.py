@@ -24,37 +24,40 @@ class TestBfIssue(unittest.TestCase):
         bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_3)
         self.assertEqual(bf_issue.assigned_team, under_test.UNASSIGNED_LABEL)
 
-    def test_parse_evergreen_projects_from_jira_issue(self):
-        evergreen_projects = ["evg-project"]
-        jira_issue_1 = MagicMock(
-            fields=MagicMock(customfield_14278=evergreen_projects, created=self.created)
-        )
-        bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_1)
-        self.assertEqual(bf_issue.evergreen_projects, evergreen_projects)
-
-        jira_issue_2 = MagicMock(fields=MagicMock(customfield_14278=[], created=self.created))
-        bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_2)
-        self.assertEqual(bf_issue.evergreen_projects, [])
-
-        jira_issue_3 = MagicMock(fields=MagicMock(created=self.created))
-        bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_3)
-        self.assertEqual(bf_issue.evergreen_projects, [])
-
     def test_parse_bf_temperature_from_jira_issue(self):
-        bf_temperature = "hot"
-        jira_issue_1 = MagicMock(
-            fields=MagicMock(customfield_24859=bf_temperature, created=self.created)
-        )
+        jira_issue_1 = MagicMock(fields=MagicMock(customfield_24859="hot", created=self.created))
         bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_1)
         self.assertEqual(bf_issue.temperature, under_test.BfTemperature.HOT)
 
-        bf_temperature = "cold"
-        jira_issue_2 = MagicMock(
-            fields=MagicMock(customfield_24859=bf_temperature, created=self.created)
-        )
+        jira_issue_2 = MagicMock(fields=MagicMock(customfield_24859="cold", created=self.created))
         bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_2)
         self.assertEqual(bf_issue.temperature, under_test.BfTemperature.COLD)
 
         jira_issue_3 = MagicMock(fields=MagicMock(created=self.created))
         bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_3)
         self.assertEqual(bf_issue.temperature, under_test.BfTemperature.NONE)
+
+    def test_parse_performance_change_type_from_jira_issue(self):
+        jira_issue_1 = MagicMock(
+            fields=MagicMock(
+                customfield_22850=[MagicMock(value="Improvement")], created=self.created
+            )
+        )
+        bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_1)
+        self.assertEqual(
+            bf_issue.performance_change_type, under_test.PerformanceChangeType.IMPROVEMENT
+        )
+
+        jira_issue_2 = MagicMock(
+            fields=MagicMock(
+                customfield_22850=[MagicMock(value="Regression")], created=self.created
+            )
+        )
+        bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_2)
+        self.assertEqual(
+            bf_issue.performance_change_type, under_test.PerformanceChangeType.REGRESSION
+        )
+
+        jira_issue_3 = MagicMock(fields=MagicMock(created=self.created))
+        bf_issue = under_test.BfIssue.from_jira_issue(jira_issue_3)
+        self.assertEqual(bf_issue.performance_change_type, under_test.PerformanceChangeType.NONE)

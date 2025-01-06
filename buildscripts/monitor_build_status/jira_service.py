@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, List, NamedTuple, Optional
@@ -11,32 +10,34 @@ from jira import Issue
 from buildscripts.client.jiraclient import JiraClient
 
 UNASSIGNED_LABEL = "~ Unassigned"
-CORRECTNESS_EVG_PROJECT_REGEX = re.compile(r"mongodb-mongo.*")
-PERFORMANCE_EVG_PROJECT_REGEX = re.compile(r"sys-perf.*")
+NOISE_FAILURE_LABEL = "noise-failure"
 
 
-class JiraCustomFieldIds(str, Enum):
+class JiraCustomFieldId(str, Enum):
     ASSIGNED_TEAMS = "customfield_12751"
-    EVERGREEN_PROJECT = "customfield_14278"
     TEMPERATURE = "customfield_24859"
+    PERFORMANCE_CHANGE_TYPE = "customfield_22850"
 
 
-class JiraCustomFieldNames(str, Enum):
+class JiraCustomFieldName(str, Enum):
     EVERGREEN_PROJECT = "Evergreen Project"
 
 
-class TestType(str, Enum):
-    CORRECTNESS = "correctness"
+class BfType(str, Enum):
     PERFORMANCE = "performance"
-    UNKNOWN = "unknown"
+    HOT = "hot"
+    COLD = "cold"
 
     @classmethod
-    def from_evg_project_name(cls, name: str) -> TestType:
-        if CORRECTNESS_EVG_PROJECT_REGEX.match(name):
-            return cls.CORRECTNESS
-        if PERFORMANCE_EVG_PROJECT_REGEX.match(name):
+    def from_bf_issue(cls, bf_issue: BfIssue) -> BfType:
+        if (
+            bf_issue.performance_change_type != PerformanceChangeType.NONE
+            or NOISE_FAILURE_LABEL in bf_issue.labels
+        ):
             return cls.PERFORMANCE
-        return cls.UNKNOWN
+        if bf_issue.temperature == BfTemperature.HOT:
+            return cls.HOT
+        return cls.COLD
 
 
 class BfTemperature(str, Enum):
@@ -45,22 +46,33 @@ class BfTemperature(str, Enum):
     NONE = "none"
 
     @classmethod
-    def from_str(cls, temperature: Optional[str]) -> BfTemperature:
-        match temperature:
-            case "hot":
-                return cls.HOT
-            case "cold":
-                return cls.COLD
-            case _:
-                return cls.NONE
+    def from_str(cls, value: Optional[str]) -> BfTemperature:
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.NONE
+
+
+class PerformanceChangeType(str, Enum):
+    IMPROVEMENT = "Improvement"
+    REGRESSION = "Regression"
+    NONE = "None"
+
+    @classmethod
+    def from_str(cls, value: Optional[str]) -> PerformanceChangeType:
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.NONE
 
 
 class BfIssue(NamedTuple):
     key: str
     assigned_team: str
-    evergreen_projects: List[str]
     temperature: BfTemperature
     created_time: datetime
+    labels: List[str]
+    performance_change_type: PerformanceChangeType
 
     @classmethod
     def from_jira_issue(cls, issue: Issue) -> BfIssue:
@@ -70,29 +82,37 @@ class BfIssue(NamedTuple):
         :param issue: Jira issue object.
         :return: BF issue object.
         """
-        assigned_team = UNASSIGNED_LABEL
-        assigned_teams_field = getattr(issue.fields, JiraCustomFieldIds.ASSIGNED_TEAMS)
-        if isinstance(assigned_teams_field, list) and len(assigned_teams_field) > 0:
-            assigned_teams_values = [getattr(item, "value") for item in assigned_teams_field]
-            assigned_team = assigned_teams_values[0]
-
-        evergreen_projects = getattr(issue.fields, JiraCustomFieldIds.EVERGREEN_PROJECT)
-        if not isinstance(evergreen_projects, list):
-            evergreen_projects = []
-
-        temperature_value = getattr(issue.fields, JiraCustomFieldIds.TEMPERATURE)
-        if isinstance(temperature_value, str):
-            temperature = BfTemperature.from_str(temperature_value)
-        else:
-            temperature = BfTemperature.NONE
+        assigned_team = (
+            cls._get_first_value(issue, JiraCustomFieldId.ASSIGNED_TEAMS) or UNASSIGNED_LABEL
+        )
+        temperature = BfTemperature.from_str(
+            cls._get_first_value(issue, JiraCustomFieldId.TEMPERATURE)
+        )
+        performance_change_type = PerformanceChangeType.from_str(
+            cls._get_first_value(issue, JiraCustomFieldId.PERFORMANCE_CHANGE_TYPE)
+        )
 
         return cls(
             key=issue.key,
             assigned_team=assigned_team,
-            evergreen_projects=evergreen_projects,
             temperature=temperature,
             created_time=dateutil.parser.parse(issue.fields.created),
+            labels=issue.fields.labels,
+            performance_change_type=performance_change_type,
         )
+
+    @staticmethod
+    def _get_first_value(issue: Issue, field_id: JiraCustomFieldId) -> Optional[str]:
+        field_data = getattr(issue.fields, field_id)
+
+        if isinstance(field_data, list) and len(field_data) > 0:
+            values = [getattr(item, "value") for item in field_data]
+            return values[0]
+
+        if isinstance(field_data, str):
+            return field_data
+
+        return None
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, self.__class__) and self.key == other.key

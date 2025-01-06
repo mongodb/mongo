@@ -28,7 +28,7 @@ from buildscripts.monitor_build_status.evergreen_service import (
     TaskStatusCounts,
 )
 from buildscripts.monitor_build_status.jira_service import (
-    JiraCustomFieldNames,
+    JiraCustomFieldName,
     JiraService,
 )
 from buildscripts.resmokelib.utils.evergreen_conn import get_evergreen_api
@@ -142,7 +142,7 @@ class MonitorBuildStatusOrchestrator:
 
     def _make_bfs_report(self, evg_projects_info: EvgProjectsInfo) -> BFsReport:
         query = (
-            f'{ACTIVE_BFS_QUERY} AND "{JiraCustomFieldNames.EVERGREEN_PROJECT}" in'
+            f'{ACTIVE_BFS_QUERY} AND "{JiraCustomFieldName.EVERGREEN_PROJECT}" in'
             f" ({iterable_to_jql(evg_projects_info.active_project_names)})"
         )
         LOGGER.info("Getting active BFs from Jira", query=query)
@@ -152,7 +152,7 @@ class MonitorBuildStatusOrchestrator:
 
         bfs_report = BFsReport.empty()
         for bf in active_bfs:
-            bfs_report.add_bf_data(bf, evg_projects_info)
+            bfs_report.add_bf_data(bf)
 
         return bfs_report
 

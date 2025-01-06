@@ -4,8 +4,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, NamedTuple, Optional, Set
 
-from buildscripts.monitor_build_status.evergreen_service import EvgProjectsInfo
-from buildscripts.monitor_build_status.jira_service import BfIssue, BfTemperature, TestType
+from buildscripts.monitor_build_status.jira_service import BfIssue, BfType
 
 
 class BfCategory(str, Enum):
@@ -23,27 +22,20 @@ class CategorizedBFs(NamedTuple):
     def empty(cls) -> CategorizedBFs:
         return cls(hot_bfs=set(), cold_bfs=set(), perf_bfs=set())
 
-    def add_bf_data(self, bf: BfIssue, evg_projects_info: EvgProjectsInfo) -> None:
+    def add_bf_data(self, bf: BfIssue) -> None:
         """
         Add BF data to report.
 
         :param bf: BF issue.
-        :param evg_projects_info: Evergreen project information.
         """
-        for evg_project in bf.evergreen_projects:
-            if evg_project not in evg_projects_info.active_project_names:
-                continue
+        bf_type = BfType.from_bf_issue(bf)
 
-            test_type = TestType.from_evg_project_name(evg_project)
-
-            if test_type == TestType.PERFORMANCE:
-                self.perf_bfs.add(bf)
-
-            if test_type == TestType.CORRECTNESS:
-                if bf.temperature == BfTemperature.HOT:
-                    self.hot_bfs.add(bf)
-                if bf.temperature in [BfTemperature.COLD, BfTemperature.NONE]:
-                    self.cold_bfs.add(bf)
+        if bf_type == BfType.PERFORMANCE:
+            self.perf_bfs.add(bf)
+        if bf_type == BfType.HOT:
+            self.hot_bfs.add(bf)
+        if bf_type == BfType.COLD:
+            self.cold_bfs.add(bf)
 
     def add(self, more_bfs: CategorizedBFs) -> None:
         """
@@ -63,16 +55,15 @@ class BFsReport(NamedTuple):
     def empty(cls) -> BFsReport:
         return cls(team_reports={})
 
-    def add_bf_data(self, bf: BfIssue, evg_projects_info: EvgProjectsInfo) -> None:
+    def add_bf_data(self, bf: BfIssue) -> None:
         """
         Add BF data to report.
 
         :param bf: BF issue.
-        :param evg_projects_info: Evergreen project information.
         """
         if bf.assigned_team not in self.team_reports:
             self.team_reports[bf.assigned_team] = CategorizedBFs.empty()
-        self.team_reports[bf.assigned_team].add_bf_data(bf, evg_projects_info)
+        self.team_reports[bf.assigned_team].add_bf_data(bf)
 
     def get_bf_count(
         self,
