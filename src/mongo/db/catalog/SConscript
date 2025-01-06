@@ -109,6 +109,17 @@ env.Library(
 )
 
 env.Library(
+    target='health_log_mock',
+    source=[
+        'health_log_mock.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        'health_log_interface',
+    ],
+)
+
+env.Library(
     target='index_repair',
     source=[
         'index_repair.cpp',

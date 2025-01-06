@@ -326,6 +326,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/catalog/health_log_interface',
+        '$BUILD_DIR/mongo/db/catalog/health_log_mock',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/shard_role_api',
