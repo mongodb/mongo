@@ -32,7 +32,6 @@
 #include <functional>
 #include <wiredtiger.h>
 
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/prepare_conflict_tracker.h"
@@ -57,8 +56,6 @@ void wiredTigerPrepareConflictLog(int attempt);
  * Logs a message to confirm we've hit the WTPrintPrepareConflictLog fail point.
  */
 void wiredTigerPrepareConflictFailPointLog();
-
-void wiredTigerPrepareConflictOplogResourceLog();
 
 /**
  * Runs the argument function f as many times as needed for f to return an error other than

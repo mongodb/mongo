@@ -30,7 +30,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -54,17 +53,12 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 
 namespace mongo {
-
-namespace {
-std::once_flag logPrepareWithTimestampOnce;
-}
 
 MONGO_FAIL_POINT_DEFINE(WTSkipPrepareConflictRetries);
 
@@ -82,13 +76,6 @@ void wiredTigerPrepareConflictFailPointLog() {
     LOGV2(22380, "WTPrintPrepareConflictLog fail point enabled.");
 }
 
-void wiredTigerPrepareConflictOplogResourceLog() {
-    std::call_once(logPrepareWithTimestampOnce, [] {
-        LOGV2(5739901, "Hit a prepare conflict while holding a resource on the oplog");
-        printStackTrace();
-    });
-}
-
 int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<int()> func) {
     if (shard_role_details::getRecoveryUnit(opCtx)->isTimestamped()) {
         // This transaction is holding a resource in the form of an oplog slot. Committed
@@ -97,8 +84,8 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<in
         // choose to abort our transaction and retry instead of blocking. It's possible that we can
         // be blocking on a prepared update that requires replication to make progress, creating a
         // stall in the MDB cluster.
-        wiredTigerPrepareConflictOplogResourceLog();
-        throwWriteConflictException("Holding a resource (oplog slot).");
+        throwWriteConflictException(
+            "Hit a prepare conflict while holding a resource on the oplog slot.");
     }
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
