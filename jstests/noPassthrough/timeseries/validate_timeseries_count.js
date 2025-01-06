@@ -32,13 +32,7 @@ coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 
 // Inserts documents into a bucket. Checks no issues are found.
-jsTestLog("Inserting documents into a bucket and checking that no issues are found.");
-coll.insertMany([...Array(1010).keys()].map(i => ({
-                                                "metadata": {"sensorId": 1, "type": "temperature"},
-                                                "timestamp": ISODate(),
-                                                "temp": i
-                                            })),
-                {ordered: false});
+TimeseriesTest.insertManyDocs(coll);
 let res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);

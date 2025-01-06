@@ -126,8 +126,17 @@ public:
     bool isTimeseriesDataInconsistent() const {
         return _timeseriesDataInconsistency;
     }
+
     void setTimeseriesDataInconsistent() {
         _timeseriesDataInconsistency = true;
+    }
+
+    bool isTimeseriesBucketingParametersChangedInconsistent() const {
+        return _timeseriesBucketingParametersChangedInconsistent;
+    }
+
+    void setTimeseriesBucketingParametersChangedInconsistent() {
+        _timeseriesBucketingParametersChangedInconsistent = true;
     }
 
     bool isBSONDataNonConformant() const {
@@ -229,6 +238,7 @@ private:
     RepairMode _repairMode;
     bool _collectionSchemaViolated = false;
     bool _timeseriesDataInconsistency = false;
+    bool _timeseriesBucketingParametersChangedInconsistent = false;
     bool _BSONDataNonConformant = false;
     bool _enforceTimeseriesBucketsAreAlwaysCompressed = false;
     ValidationVersion _validationVersion = currentValidationVersion;

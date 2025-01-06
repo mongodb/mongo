@@ -117,7 +117,7 @@ namespace {
 // This fail point allows collections to be given malformed validator. A malformed validator
 // will not (and cannot) be enforced but it will be persisted.
 MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
-
+MONGO_FAIL_POINT_DEFINE(timeseriesBucketingParametersChangedInputValue);
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 
 Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
@@ -833,6 +833,12 @@ boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged()
         return boost::none;
     }
 
+    if (auto sfp = timeseriesBucketingParametersChangedInputValue.scoped();
+        MONGO_unlikely(sfp.isActive())) {
+        const auto& data = sfp.getData();
+        return data["value"].Bool();
+    }
+
     if (!feature_flags::gTSBucketingParametersUnchanged.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Pessimistically return true because v7.1+ versions may have missed cloning this catalog
@@ -849,7 +855,7 @@ boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged()
         return *optBackwardsCompatibleFlag;
     }
 
-    // Else, fallback to legacy parameter
+    // Else, fallback to legacy parameter.
     return _metadata->timeseriesBucketingParametersHaveChanged;
 }
 

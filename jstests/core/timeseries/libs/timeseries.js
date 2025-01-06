@@ -5,6 +5,16 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export var TimeseriesTest = class {
+    static insertManyDocs(coll) {
+        jsTestLog("Inserting documents to a bucket.");
+        coll.insertMany(
+            [...Array(10).keys()].map(i => ({
+                                          "metadata": {"sensorId": 1, "type": "temperature"},
+                                          "timestamp": ISODate(),
+                                          "temp": i
+                                      })),
+            {ordered: false});
+    }
     static getBucketMaxSpanSecondsFromGranularity(granularity) {
         switch (granularity) {
             case 'seconds':
