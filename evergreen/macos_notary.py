@@ -57,6 +57,7 @@ for archive in archives:
         '-k', 'server',
         '--entitlements', 'etc/macos_entitlements.xml',
         '--verify',
+        "--timeout", "30",
         '-b', 'server.mongodb.com',
         '-i', f'{os.environ["task_id"]}',
         '-c', f'{os.environ["project"]}',
