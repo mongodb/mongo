@@ -56,7 +56,8 @@ public:
                           SamplingStyle samplingStyle,
                           CardinalityEstimate collectionCard,
                           SamplingConfidenceIntervalEnum ci,
-                          double marginOfError);
+                          double marginOfError,
+                          boost::optional<int> numChunks);
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -68,6 +69,7 @@ public:
                           const MultipleCollectionAccessor& collections,
                           size_t sampleSize,
                           SamplingStyle samplingStyle,
+                          boost::optional<int> numChunks,
                           CardinalityEstimate collectionCard);
     ~SamplingEstimatorImpl() override;
 
@@ -194,6 +196,12 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
     generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy);
 
+    /**
+     * Constructs a sampling SBE plan using the chunk-based method.
+     */
+    std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
+    generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy);
+
     /*
      * The SamplingEstimator calculates the size of a sample based on the confidence level and
      * margin of error required.
@@ -205,6 +213,7 @@ private:
     // optimized.
     const MultipleCollectionAccessor& _collections;
     size_t _sampleSize;
+    boost::optional<int> _numChunks;
 
     CardinalityEstimate _collectionCard;
 };

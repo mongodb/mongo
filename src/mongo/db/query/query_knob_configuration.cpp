@@ -54,6 +54,10 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
             ->get<SamplingConfidenceInterval>("samplingConfidenceInterval")
             ->_data.get();
 
+    _samplingCEMethod = ServerParameterSet::getNodeParameterSet()
+                            ->get<SamplingCEMethod>("internalQuerySamplingCEMethod")
+                            ->_data.get();
+
     _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
 }
@@ -68,6 +72,10 @@ QueryPlanRankerModeEnum QueryKnobConfiguration::getPlanRankerMode() const {
 
 SamplingConfidenceIntervalEnum QueryKnobConfiguration::getConfidenceInterval() const {
     return _samplingConfidenceInterval;
+}
+
+SamplingCEMethodEnum QueryKnobConfiguration::getInternalQuerySamplingCEMethod() const {
+    return _samplingCEMethod;
 }
 
 bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() const {

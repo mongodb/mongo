@@ -208,15 +208,20 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             }
             return MultipleCollectionAccessor{collection().getCollectionPtr()};
         }();
+        auto samplingMode =
+            _query->getExpCtx()->getQueryKnobConfiguration().getInternalQuerySamplingCEMethod();
         samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
             _query->getOpCtx(),
             multiCollectionAccessor,
-            ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
+            samplingMode == SamplingCEMethodEnum::kRandom
+                ? ce::SamplingEstimatorImpl::SamplingStyle::kRandom
+                : ce::SamplingEstimatorImpl::SamplingStyle::kChunk,
             CardinalityEstimate{
                 CardinalityType{plannerParams.mainCollectionInfo.collStats->getCardinality()},
                 EstimationSource::Metadata},
             SamplingConfidenceIntervalEnum::k95,
-            samplingMarginOfError.load());
+            samplingMarginOfError.load(),
+            internalQueryNumChunksForChunkBasedSampling.load());
     }
 
     // Plan each branch of the $or.

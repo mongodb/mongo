@@ -50,6 +50,7 @@ using namespace mongo::cost_based_ranker;
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const size_t kSampleSize = 5;
+const int numChunks = 10;
 
 class SamplingEstimatorForTesting : public SamplingEstimatorImpl {
 public:
@@ -190,10 +191,65 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
                                                   colls,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
                                                   makeCardinalityEstimate(10));
 
     auto sample = samplingEstimator.getSample();
     ASSERT_EQUALS(sample.size(), kSampleSize);
+}
+
+TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
+    insertDocuments(kTestNss, createDocuments(2000));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    auto optCtx = operationContext();
+    auto testChunkBasedSampling = [&](int chunkNum, int sampleSize) {
+        const size_t kChunkSize = sampleSize / chunkNum;
+        SamplingEstimatorForTesting samplingEstimator(optCtx,
+                                                      colls,
+                                                      sampleSize,
+                                                      SamplingEstimatorImpl::SamplingStyle::kChunk,
+                                                      chunkNum,
+                                                      makeCardinalityEstimate(2000));
+
+        auto sample = samplingEstimator.getSample();
+        bool chunkHitEOF = false;
+        auto preId = sample[0].getField("_id").numberInt();
+        // Exam all the documents of the sample and make sure documents are chunked. Documents in a
+        // same chunk have an incremental int value, the difference of two adjacent documents within
+        // a same chunk must be 1.
+        for (size_t i = 0, chunkSize = kChunkSize; i < sample.size(); i++) {
+            auto id = sample[i].getField("_id").numberInt();
+            if (chunkSize != kChunkSize) {
+                // Test two adjacent documents are in the same chunk if we are not at the first doc
+                // of a new chunk.
+                ASSERT_EQUALS(id - preId, 1);
+            }
+            chunkSize -= 1;
+            // Starting a new chunk.
+            chunkSize = chunkSize == 0 || id == 1999 ? kChunkSize : chunkSize;
+            chunkHitEOF |= (id == 1999);
+            preId = id;
+        }
+        // No chunk hits the end of the collection, the sample should have 'sampleSize' documents.
+        if (!chunkHitEOF) {
+            ASSERT_EQUALS(sample.size(), sampleSize);
+        } else {
+            // If any chunk hits EOF, the chunk could be smaller than expected.
+            ASSERT_LTE(sample.size(), sampleSize);
+        }
+    };
+
+    // Test the chunk-based sampling method with different number of chunks and sampleSize.
+    testChunkBasedSampling(10, 400);
+    testChunkBasedSampling(20, 500);
+    testChunkBasedSampling(30, 600);
 }
 
 TEST_F(SamplingEstimatorTest, DrawANewSample) {
@@ -212,6 +268,7 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
         colls,
         kSampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
         makeCardinalityEstimate(10));
 
     auto sample = samplingEstimator.getSample();
@@ -255,6 +312,7 @@ TEST_F(SamplingEstimatorTest, SampleSizeError) {
                                              colls,
                                              sampleSize,
                                              SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                             numChunks,
                                              makeCardinalityEstimate(card)),
                        DBException,
                        9406300);
@@ -277,6 +335,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
         colls,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
         makeCardinalityEstimate(card));
 
     {  // All documents in the collection satisfy the predicate.
@@ -331,6 +390,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
         colls,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
         makeCardinalityEstimate(card));
 
     {  // Range predicate on "a" with 20% selectivity: a > 40 && a < 60.
@@ -411,6 +471,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
         colls,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
         makeCardinalityEstimate(card));
 
     auto operand1 = BSON("$lt" << 30);
@@ -458,6 +519,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
         colls,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
         makeCardinalityEstimate(card));
 
     // Test IndexBounds with single field.
@@ -534,6 +596,7 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
         colls,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
         makeCardinalityEstimate(card));
 
     // Test IndexBounds with single field.
@@ -580,6 +643,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
         colls,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
         makeCardinalityEstimate(card));
 
     auto operand1 = BSON("$lt" << 20);

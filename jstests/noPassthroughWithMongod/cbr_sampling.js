@@ -52,6 +52,17 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}));
     assertCollscanUsesSampling({a: {$lt: 100}});
     assertCollscanUsesSampling({b: {$elemMatch: {$gt: 100, $lt: 200}}});
+    // Test the chunk-based sampling method.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}));
+    assertCollscanUsesSampling({a: {$lt: 1000}});
+
+    // Switch back to the random sampling method because the CE could be 0 for some of the filters
+    // below, for example, the ce of 'b: {$lt: 500}' is 0 if all the chunks picked happen to fall
+    // into the first half of the collection.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}));
+
     // TODO SERVER-97790: Enable rooted $or test
     // assertCollscanUsesSampling({$or: [{a: {$lt: 100}}, {b: {$gt: 900}}]});
 
