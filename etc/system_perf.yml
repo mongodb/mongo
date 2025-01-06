@@ -22,7 +22,7 @@ include:
   - filename: evergreen/system_perf/shared_tasks.yml
     module: dsi
   - filename: evergreen/system_perf/8.0/genny_tasks.yml
-    module: genny
+    module: dsi
   ### lint_yaml trim end ###
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
