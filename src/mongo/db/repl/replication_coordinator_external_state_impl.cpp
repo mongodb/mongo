@@ -120,6 +120,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -687,6 +688,11 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);
+
+    // Temporarily enable write blocking bypass to allow the dropping of temporary collections,
+    // even when user writes are blocked. This bypass is specific to the current opCtx and will
+    // remain active for the duration of this short-lived operation.
+    WriteBlockBypass::get(opCtx).set(true);
 
     _shardingOnTransitionToPrimaryHook(opCtx);
 
