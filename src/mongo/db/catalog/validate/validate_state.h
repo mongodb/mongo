@@ -144,9 +144,10 @@ public:
 private:
     ValidateState() = delete;
 
+    // To avoid racing with shutdown/rollback, this lock must be initialized early.
+    Lock::GlobalLock _globalLock;
+
     NamespaceString _nss;
-    // To avoid racing with shutdown.
-    boost::optional<Lock::GlobalLock> _globalLock;
 
     // Locks for foreground validation only.
     boost::optional<AutoGetDb> _databaseLock;
