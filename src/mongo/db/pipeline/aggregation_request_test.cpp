@@ -700,7 +700,7 @@ TEST(AggregationRequestTest, ParseNSShouldRejectNumericNSIfAggregateFieldIsNotOn
 TEST(AggregationRequestTest, ParseNSShouldRejectNonStringNonNumericNS) {
     const BSONObj validRequest = fromjson("{aggregate: 1, pipeline: [], $db: 'a', cursor: {}}");
     BSONObj nonStringNonNumericNS = fromjson("{aggregate: {}}");
-    parseNSHelper(validRequest, nonStringNonNumericNS, ErrorCodes::TypeMismatch);
+    parseNSHelper(validRequest, nonStringNonNumericNS, ErrorCodes::InvalidNamespace);
 }
 
 TEST(AggregationRequestTest, ParseNSShouldRejectAggregateOneStringAsCollectionName) {

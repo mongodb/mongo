@@ -237,13 +237,12 @@ void IDLParserContext::throwBadType(const BSONElement& element,
 
 StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& element,
                                                           bool allowGlobalCollectionName) {
-    const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
-                         element.binDataType() == BinDataType::newUUID);
-    uassert(ErrorCodes::BadValue,
+    const bool isUUID =
+        (element.type() == BinData && element.binDataType() == BinDataType::newUUID);
+    uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Collection name must be provided. UUID is not valid in this "
                           << "context",
             !isUUID);
-
     if (allowGlobalCollectionName && element.isNumber()) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Invalid command format: the '" << element.fieldNameStringData()
@@ -251,11 +250,11 @@ StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& ele
                 element.number() == 1);
         return collectionlessAggregateCursorCol;
     }
-
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "collection name has invalid type " << typeName(element.type()),
-            element.canonicalType() == canonicalizeBSONType(mongo::String));
-
+    // Accepts both BSON String and Symbol for collection name per SERVER-16260.
+    // TODO SERVER-98383 remove Symbol support
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Collection name has invalid type " << typeName(element.type()),
+            element.type() == Symbol || element.type() == String);
     return element.valueStringData();
 }
 

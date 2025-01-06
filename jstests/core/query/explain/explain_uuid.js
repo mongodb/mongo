@@ -28,7 +28,7 @@ assert.commandFailedWithCode(explainDB.runCommand({explain: {find: uuid}}),
 // different error.
 assert.commandFailedWithCode(
     explainDB.runCommand({explain: {aggregate: uuid, cursor: {}, pipeline: []}}),
-    [ErrorCodes.BadValue, ErrorCodes.TypeMismatch]);
+    [ErrorCodes.BadValue, ErrorCodes.TypeMismatch, ErrorCodes.InvalidNamespace]);
 
 assert.commandFailedWithCode(explainDB.runCommand({explain: {count: uuid}}),
                              ErrorCodes.InvalidNamespace);
@@ -41,11 +41,11 @@ assert.commandFailedWithCode(explainDB.runCommand({explain: {distinct: uuid, key
 const expectedCode = TestData.auth ? 17137 : ErrorCodes.InvalidNamespace;
 assert.commandFailedWithCode(
     explainDB.runCommand({explain: {findAndModify: uuid, query: {a: 1}, remove: true}}),
-    [expectedCode, ErrorCodes.BadValue]);
+    [expectedCode, ErrorCodes.BadValue, ErrorCodes.InvalidNamespace]);
 
 assert.commandFailedWithCode(
     explainDB.runCommand({explain: {delete: uuid, deletes: [{q: {}, limit: 1}]}}),
-    ErrorCodes.BadValue);
+    [ErrorCodes.BadValue, ErrorCodes.InvalidNamespace]);
 
 assert.commandFailedWithCode(explainDB.runCommand({
     explain: {
@@ -56,4 +56,4 @@ assert.commandFailedWithCode(explainDB.runCommand({
         }]
     }
 }),
-                             ErrorCodes.BadValue);
+                             [ErrorCodes.BadValue, ErrorCodes.InvalidNamespace]);

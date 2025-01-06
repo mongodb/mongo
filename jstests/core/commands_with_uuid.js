@@ -55,7 +55,10 @@ cmd = {
 };
 res = db.runCommand(cmd);
 assert.commandFailed(res, 'expected ' + tojson(cmd) + ' to fail.');
-assert(res.errmsg.includes('collection name has invalid type double'),
+// In newer versions, the error message starts with "Collection name...", while in older versions it
+// start with "collection name...". In order to accommodate multi-version configurations, we can
+// ignore the first letter when asserting.
+assert(res.errmsg.includes('ollection name has invalid type double'),
        'expected the error message of ' + tojson(res) + ' to include string type');
 
 // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.

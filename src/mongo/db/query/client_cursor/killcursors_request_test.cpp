@@ -76,7 +76,7 @@ TEST(KillCursorsRequestTest, parseFirstFieldNotString) {
                            << "db");
     ASSERT_THROWS_CODE(KillCursorsCommandRequest::parse(ctxt, bsonObj),
                        AssertionException,
-                       ErrorCodes::TypeMismatch);
+                       ErrorCodes::InvalidNamespace);
 }
 
 TEST(KillCursorsRequestTest, parseInvalidNamespace) {

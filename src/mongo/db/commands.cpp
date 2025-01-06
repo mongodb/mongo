@@ -338,11 +338,7 @@ void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
 }
 
 std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
-    BSONElement first = cmdObj.firstElement();
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "collection name has invalid type " << typeName(first.type()),
-            first.canonicalType() == canonicalizeBSONType(mongo::String));
-    const auto ns = first.valueStringData();
+    const auto ns = IDLParserContext::checkAndAssertCollectionName(cmdObj.firstElement(), false);
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << ns << "'",
             NamespaceString::isValid(ns));
@@ -351,19 +347,8 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
 
 NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& dbName,
                                                           const BSONObj& cmdObj) {
-    // Accepts both BSON String and Symbol for collection name per SERVER-16260
-    // TODO(kangas) remove Symbol support in MongoDB 3.0 after Ruby driver audit
-    BSONElement first = cmdObj.firstElement();
-    const bool isUUID = (first.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
-                         first.binDataType() == BinDataType::newUUID);
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Collection name must be provided. UUID is not valid in this "
-                          << "context",
-            !isUUID);
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "collection name has invalid type " << typeName(first.type()),
-            first.canonicalType() == canonicalizeBSONType(mongo::String));
-    NamespaceString nss(NamespaceStringUtil::deserialize(dbName, first.valueStringData()));
+    const auto coll = IDLParserContext::checkAndAssertCollectionName(cmdObj.firstElement(), false);
+    NamespaceString nss(NamespaceStringUtil::deserialize(dbName, coll));
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg() << "'",
             nss.isValid());
