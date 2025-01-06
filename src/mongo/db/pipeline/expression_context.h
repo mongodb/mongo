@@ -367,9 +367,9 @@ public:
      */
     const ResolvedNamespace& getResolvedNamespace(const NamespaceString& nss) const {
         auto it = _resolvedNamespaces.find(nss.coll());
-        invariant(it != _resolvedNamespaces.end(),
-                  str::stream() << "No resolved namespace provided for "
-                                << nss.toStringForErrorMsg());
+        tassert(9453000,
+                str::stream() << "No resolved namespace provided for " << nss.toStringForErrorMsg(),
+                it != _resolvedNamespaces.end());
         return it->second;
     };
 
