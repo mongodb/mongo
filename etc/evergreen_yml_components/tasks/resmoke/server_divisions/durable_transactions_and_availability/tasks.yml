@@ -798,6 +798,16 @@ tasks:
       replica_sets_jscore_passthrough_last_lts_new_new_old: last_lts
       replica_sets_jscore_passthrough_last_lts_new_old_new: last_lts
       replica_sets_jscore_passthrough_last_lts_old_new_new: last_lts
+  - func: "generate resmoke tasks"
+    vars:
+      run_no_feature_flag_tests: "true"
+
+- <<: *gen_task_template
+  name: replica_sets_kill_primary_jscore_multiversion_gen
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "multiversion", "multiversion_passthrough"]
+  commands:
+  - func: "initialize multiversion tasks"
+    vars:
       replica_sets_kill_primary_jscore_passthrough_last_lts_new_new_old: last_lts
       replica_sets_kill_primary_jscore_passthrough_last_lts_new_old_old: last_lts
   - func: "generate resmoke tasks"
