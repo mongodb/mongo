@@ -695,6 +695,7 @@ env.CppUnitTest(
         'chunk_test.cpp',
         'chunk_version_test.cpp',
         'client/config_shard_wrapper_test.cpp',
+        "client/shard_registry_test.cpp",
         'client/shard_remote_test.cpp',
         'cluster_identity_loader_test.cpp',
         'collection_routing_info_targeter_test.cpp',

@@ -171,43 +171,45 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
             "Can't perform ShardRegistry lookup while holding locks",
             !shard_role_details::getLocker(opCtx)->isLocked());
 
-
-    auto lastForcedReloadIncrement = _forceReloadIncrement.load();
-
     LOGV2_DEBUG(4620250,
                 2,
                 "Starting ShardRegistry::_lookup",
                 "cachedData"_attr = cachedData ? cachedData->toBSON() : BSONObj{},
                 "cachedData.getTime()"_attr = cachedData ? cachedData.getTime() : Time{},
-                "timeInStore"_attr = timeInStore,
-                "lastForcedReloadIncrement"_attr = lastForcedReloadIncrement);
+                "timeInStore"_attr = timeInStore);
 
-    // Check if we need to refresh from the configsvrs.  If so, then do that and get the results,
-    // otherwise (this is a lookup only to incorporate updated connection strings from the RSM),
-    // then get the equivalent values from the previously cached data.
-    auto [returnData, returnTopologyTime, removedShards] =
-        [&]() -> std::tuple<ShardRegistryData, Timestamp, ShardRegistryData::ShardMap> {
+    auto [returnData, returnTime, removedShards] =
+        [&]() -> std::tuple<ShardRegistryData, Time, ShardRegistryData::ShardMap> {
+        ShardRegistryData lookupData;
+
+        // If the latest _forceReloadIncrement before the lookup is greater than the one in
+        // timeInStore, at least one force reload request sneaked in while the lookup was started.
+        // This lookup will be causally consistent with any force reload requests up to this point,
+        // so it is fine to merge the requests to avoid extra lookups.
+
+        // This also covers the case where no cachedData was available (null timeInStore). Using the
+        // timeInStore._forceReloadIncrement (0) for the lookup result would cause an unnecessary
+        // additional lookup on the next get request if the current lookup was in fact caused by a
+        // forceReload (meaning _forceReloadIncrement >= 1).
+        auto returnTime = Time::makeWithLookup([&] {
+            Timestamp maxTopologyTime;
+            std::tie(lookupData, maxTopologyTime) =
+                ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
+            return maxTopologyTime;
+        });
+
         if (!cachedData) {
-            auto [reloadedData, maxTopologyTime] =
-                ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
-
-            return {std::move(reloadedData), std::move(maxTopologyTime), {}};
-        } else if (timeInStore.topologyTime > cachedData.getTime().topologyTime ||
-                   lastForcedReloadIncrement > cachedData.getTime().forceReloadIncrement) {
-            auto [reloadedData, maxTopologyTime] =
-                ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
-
-            auto [mergedData, removedShards] =
-                ShardRegistryData::mergeExisting(*cachedData, reloadedData);
-
-            return {std::move(mergedData), std::move(maxTopologyTime), std::move(removedShards)};
-        } else {
-            return {*cachedData, cachedData.getTime().topologyTime, {}};
+            return {lookupData, returnTime, {}};
         }
+
+        // If there was cached data, merge connection strings of new and old data.
+        auto [mergedData, removedShards] =
+            ShardRegistryData::mergeExisting(*cachedData, lookupData);
+        return {mergedData, returnTime, removedShards};
     }();
 
     // Always apply the latest conn strings.
-    auto [latestConnStrings, rsmIncrementForConnStrings] = _getLatestConnStrings();
+    auto latestConnStrings = _getLatestConnStrings();
 
     for (const auto& latestConnString : latestConnStrings) {
         auto shard = returnData.findByRSName(latestConnString.first.toString());
@@ -239,7 +241,6 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
         }
     }
 
-    Time returnTime{returnTopologyTime, rsmIncrementForConnStrings, lastForcedReloadIncrement};
     LOGV2_DEBUG(4620251,
                 2,
                 "Finished ShardRegistry::_lookup",
@@ -264,14 +265,33 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
     _executor->startup();
 
     AsyncTry([this] {
-        LOGV2_DEBUG(22726, 1, "Reloading shardRegistry");
-        return _reloadAsync();
+        ThreadClient tc("Periodic ShardRegistry pinger", getGlobalServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+
+        LOGV2_DEBUG(9112100, 2, "Periodic ping to CSRS for ShardRegistry topology time update");
+        uassertStatusOK(_pingForNewTopologyTime(opCtx.get()));
+
+        const auto time = VectorClock::get(opCtx.get())->getTime();
+        LOGV2_DEBUG(9112101,
+                    2,
+                    "VectorClock after periodic ShardRegistry ping",
+                    "clusterTime"_attr = time.clusterTime(),
+                    "configTime"_attr = time.configTime(),
+                    "topologyTime"_attr = time.topologyTime());
+
+        // Schedule a lookup if the topologyTime has been advanced. This is only necessary because
+        // the "connPoolStats" command depends on replica set monitors being instantiated. Even if
+        // a node becomes aware of a newer topologyTime, if there are no calls to ShardRegistry
+        // functions no lookup is done, and the RSMs are not instantiated. There are some tests
+        // which hang due to this, so presumably some users might already be relying on this
+        // behaviour.
+        _scheduleLookupIfRequired();
     })
-        .until([](auto&& sw) {
-            if (!sw.isOK()) {
+        .until([](auto&& status) {
+            if (!status.isOK()) {
                 LOGV2(22727,
                       "Error running periodic reload of shard registry",
-                      "error"_attr = redact(sw.getStatus()),
+                      "error"_attr = redact(status),
                       "shardRegistryReloadInterval"_attr = kRefreshPeriod);
             }
             // Continue until the _executor will shutdown
@@ -279,11 +299,11 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
         })
         .withDelayBetweenIterations(kRefreshPeriod)  // This call is optional.
         .on(_executor, CancellationToken::uncancelable())
-        .getAsync([](auto&& sw) {
+        .getAsync([](auto&& status) {
             LOGV2_DEBUG(22725,
                         1,
                         "Exiting periodic shard registry reloader",
-                        "reason"_attr = redact(sw.getStatus()));
+                        "reason"_attr = redact(status));
         });
 }
 
@@ -401,10 +421,10 @@ int ShardRegistry::getNumShards(OperationContext* opCtx) {
     return getAllShardIds(opCtx).size();
 }
 
-std::pair<std::vector<ShardRegistry::LatestConnStrings::value_type>, ShardRegistry::Increment>
-ShardRegistry::_getLatestConnStrings() const {
+std::vector<ShardRegistry::LatestConnStrings::value_type> ShardRegistry::_getLatestConnStrings()
+    const {
     stdx::unique_lock<Latch> lock(_mutex);
-    return {{_latestConnStrings.begin(), _latestConnStrings.end()}, _rsmIncrement.load()};
+    return {_latestConnStrings.begin(), _latestConnStrings.end()};
 }
 
 void ShardRegistry::_removeReplicaSet(const std::string& setName) {
@@ -445,16 +465,15 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
                 _configShardData, newConnString, _shardFactory.get());
             _configShardData = newData;
         }
-        auto value = _rsmIncrement.addAndFetch(1);
-        LOGV2_DEBUG(4620252,
+
+        LOGV2_DEBUG(9310104,
                     2,
-                    "Incrementing the RSM timestamp after receiving updated connection string",
-                    "newConnString"_attr = newConnString,
-                    "newRSMIncrement"_attr = value);
+                    "Forcing a reload after receiving updated connection string",
+                    "newConnString"_attr = newConnString);
     }
 
     // Schedule a lookup, to incorporate the new connection string.
-    _scheduleLookup();
+    _scheduleForcedLookup();
 }
 
 std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
@@ -489,12 +508,18 @@ void ShardRegistry::reload(OperationContext* opCtx) {
 }
 
 SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsync() {
-    // Make the next acquire do a lookup.
-    auto value = _forceReloadIncrement.addAndFetch(1);
-    LOGV2_DEBUG(4620253, 2, "Forcing ShardRegistry reload", "newForceReloadIncrement"_attr = value);
+    _updateTimeInStore(/*forceReload=*/true);
+    return _getDataAsyncCommon();
+}
 
-    // Force it to actually happen now.
-    return _getDataAsync();
+Status ShardRegistry::_pingForNewTopologyTime(OperationContext* opCtx) {
+    return getConfigShard()
+        ->runCommand(opCtx,
+                     ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+                     DatabaseName::kAdmin,
+                     BSON("ping" << 1),
+                     Shard::RetryPolicy::kNoRetry)
+        .getStatus();
 }
 
 void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
@@ -580,19 +605,27 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
 }
 
 SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_getDataAsync() {
-    shard_registry_stats::blockedOpsGauge.increment();
-    // Update the time the cache should be aiming for.
-    auto now = VectorClock::get(_service)->getTime();
-    // The topologyTime should be advanced to the gossiped topologyTime.
-    Timestamp topologyTime = now.topologyTime().asTimestamp();
-    _cache->advanceTimeInStore(
-        _kSingleton, Time(topologyTime, _rsmIncrement.load(), _forceReloadIncrement.load()));
+    _updateTimeInStore();
+    return _getDataAsyncCommon();
+}
 
+SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_getDataAsyncCommon() {
+    shard_registry_stats::blockedOpsGauge.increment();
     return _cache->acquireAsync(_kSingleton, CacheCausalConsistency::kLatestKnown)
         .thenRunOn(Grid::get(_service)->getExecutorPool()->getFixedExecutor())
         .unsafeToInlineFuture()
         .tapAll([this](auto status) { shard_registry_stats::blockedOpsGauge.decrement(); })
         .share();
+}
+
+void ShardRegistry::_updateTimeInStore(bool forceReload) {
+    auto newTime = forceReload ? Time::makeForForcedReload() : Time::makeLatestKnown(_service);
+    LOGV2_DEBUG(9310103,
+                2,
+                "Advancing ShardRegistry timeInStore",
+                "forceReload"_attr = forceReload,
+                "newTime"_attr = newTime);
+    _cache->advanceTimeInStore(_kSingleton, newTime);
 }
 
 ShardRegistry::Cache::ValueHandle ShardRegistry::_getData(OperationContext* opCtx) {
@@ -636,8 +669,8 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
     return data->findByHostAndPort(host);
 }
 
-void ShardRegistry::_scheduleLookup() {
-    _getDataAsync()
+void ShardRegistry::_scheduleForcedLookup() {
+    _reloadAsync()
         .thenRunOn(Grid::get(_service)->getExecutorPool()->getFixedExecutor())
         .ignoreValue()
         .getAsync([](const Status& status) {
@@ -645,6 +678,17 @@ void ShardRegistry::_scheduleLookup() {
                 LOGV2(4620201,
                       "Error running reload of ShardRegistry for RSM update",
                       "error"_attr = redact(status));
+            }
+        });
+}
+
+void ShardRegistry::_scheduleLookupIfRequired() {
+    _getDataAsync()
+        .thenRunOn(Grid::get(_service)->getExecutorPool()->getFixedExecutor())
+        .ignoreValue()
+        .getAsync([](const Status& status) {
+            if (!status.isOK()) {
+                LOGV2(9310100, "Error during scheduled lookup", "error"_attr = redact(status));
             }
         });
 }
@@ -667,7 +711,7 @@ void ShardRegistry::initConfigShardIfNecessary(const ConnectionString& configCS)
     }
 
     // Lookup can succeed now that the registry has a real config shard, so schedule one right away.
-    _scheduleLookup();
+    _scheduleForcedLookup();
 }
 
 ////////////// ShardRegistryData //////////////////
@@ -699,7 +743,8 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
     // Do this before re-taking the mutex to avoid deadlock with the ReplicaSetMonitor updating
     // hosts for a given shard.
     std::vector<std::tuple<std::string, ConnectionString>> shardsInfo;
-    Timestamp maxTopologyTime;
+    // Ensure Timestamp is initialised to the min TopologyTime.
+    Timestamp maxTopologyTime{VectorClock::kInitialComponentTime.asTimestamp()};
     for (const auto& shardType : shards) {
         // This validation should ideally go inside the ShardType::validate call. However, doing
         // it there would prevent us from loading previously faulty shard hosts, which might have
@@ -757,6 +802,12 @@ std::pair<ShardRegistryData, ShardRegistryData::ShardMap> ShardRegistryData::mer
         }
     }
 
+    LOGV2_DEBUG(9310101,
+                2,
+                "Merge ShardRegistryData",
+                "cached"_attr = alreadyCachedData.toBSON(),
+                "lookup"_attr = configServerData.toBSON(),
+                "merged"_attr = mergedData.toBSON());
     return {mergedData, removedShards};
 }
 
@@ -764,6 +815,12 @@ ShardRegistryData ShardRegistryData::createFromExisting(const ShardRegistryData&
                                                         const ConnectionString& newConnString,
                                                         ShardFactory* shardFactory) {
     ShardRegistryData data(existingData);
+
+    LOGV2_DEBUG(9310102,
+                2,
+                "ShardRegistryData::createFromExisting",
+                "existing"_attr = existingData.toBSON(),
+                "newConnString"_attr = newConnString);
 
     auto it = data._rsLookup.find(newConnString.getSetName());
     if (it == data._rsLookup.end()) {
@@ -937,5 +994,34 @@ BSONObj ShardRegistryData::toBSON() const {
     toBSON(&bob);
     return bob.obj();
 }
+
+////////////// ShardRegistry::Time
+AtomicWord<ShardRegistry::Increment> ShardRegistry::Time::_forceReloadIncrementSource{0};
+
+ShardRegistry::Time ShardRegistry::Time::makeForForcedReload() {
+    // An empty topologyTime signifies that the refresh was due to a forced reload. This is
+    // just for diagnostics. Once the lookup is finished, the proper topology time from the
+    // CSRS response is used to update the timeInStore.
+    const auto newForceReload = _forceReloadIncrementSource.addAndFetch(1);
+    return Time{newForceReload, Timestamp{}};
+}
+
+ShardRegistry::Time ShardRegistry::Time::makeLatestKnown(ServiceContext* svcCtx) {
+    // Make a Time from the latest known topologyTime.
+    auto now = VectorClock::get(svcCtx)->getTime();
+    Timestamp latestKnownTopologyTime = now.topologyTime().asTimestamp();
+    return Time{_forceReloadIncrementSource.load(), latestKnownTopologyTime};
+}
+
+ShardRegistry::Time ShardRegistry::Time::makeWithLookup(std::function<Timestamp(void)>&& lookupFn) {
+    // It is important that this value is loaded before the lookup to ensure force reload requests
+    // are not incorrectly merged.
+    const auto forceReloadBeforeLookup = _forceReloadIncrementSource.load();
+
+    auto topologyTime = lookupFn();
+
+    return Time{forceReloadBeforeLookup, topologyTime};
+}
+
 
 }  // namespace mongo
