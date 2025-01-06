@@ -192,7 +192,9 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         // If the record still exists, get a potentially new version of the document to index.
         auto collCursor = collection->getCursor(opCtx);
         auto skippedRecord = collCursor->seekExact(skippedRecordId);
-        if (skippedRecord) {
+        if (keyGenerationOnly && !skippedRecord) {
+            continue;
+        } else if (skippedRecord) {
             const auto skippedDoc = skippedRecord->data.toBson();
             LOGV2_DEBUG(23882,
                         2,
