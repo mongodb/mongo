@@ -444,4 +444,59 @@ void closeOpenBucket(BucketCatalog& catalog,
  */
 void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId);
 
+/**
+ * Inserts measurements into the provided eligible bucket. On success of all measurements being
+ * inserted into the provided bucket, returns std::monostate. Otherwise, returns the rollover reason
+ * along with the index of the measurement 'currentPosition' where insertion stopped.
+ */
+std::variant<std::monostate, RolloverReason> insertBatchIntoEligibleBucket(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    const Collection* bucketsColl,
+    const StringDataComparator* comparator,
+    const std::vector<BSONObj>& batchOfMeasurements,
+    InsertContext& insertContext,
+    Bucket& bucketToInsertInto,
+    Stripe& stripe,
+    WithLock stripeLock,
+    size_t& currentPosition,
+    std::vector<std::shared_ptr<WriteBatch>>& writeBatches,
+    std::function<uint64_t(OperationContext*)> functionToGetStorageCacheBytes);
+
+/**
+ * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, we return
+ * the reason for why attempting to insert the measurement into the bucket would result in the
+ * bucket being rolled over.
+ */
+std::variant<std::shared_ptr<WriteBatch>, RolloverReason> tryToInsertIntoBucketWithoutRollover(
+    BucketCatalog& catalog,
+    Stripe& stripe,
+    WithLock stripeLock,
+    const BSONObj& doc,
+    OperationId opId,
+    AllowBucketCreation mode,
+    InsertContext& insertContext,
+    Bucket& bucketToInsertInto,
+    const Date_t& time,
+    uint64_t storageCacheSizeBytes,
+    const StringDataComparator* comparator);
+
+/**
+ * Given a bucket 'bucket' and a measurement 'doc', updates the WriteBatch corresponding to the
+ * inputted bucket as well as the bucket itself to reflect the addition of the measurement. This
+ * includes updating the batch/bucket estimated sizes and the bucket's schema.
+ * Returns the WriteBatch for the bucket.
+ */
+std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
+    BucketCatalog& catalog,
+    const BSONObj& doc,
+    OperationId opId,
+    InsertContext& insertContext,
+    Bucket& bucket,
+    const StringDataComparator* comparator,
+    Bucket::NewFieldNames& newFieldNamesToBeInserted,
+    Sizes& sizesToBeAdded,
+    bool isNewlyOpenedBucket,
+    bool openedDueToMetadata);
+
 }  // namespace mongo::timeseries::bucket_catalog::internal

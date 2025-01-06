@@ -747,4 +747,20 @@ getPostCommitDebugChecks(OperationContext* opCtx, const NamespaceString& ns) {
     };
 }
 
+TimeseriesBatches insertBatchOfMeasurements(OperationContext* opCtx,
+                                            bucket_catalog::BucketCatalog& catalog,
+                                            const Collection* bucketsColl,
+                                            const StringDataComparator* comparator,
+                                            const std::vector<BSONObj>& measurements,
+                                            bucket_catalog::InsertContext& insertContext) {
+
+    return bucket_catalog::insertBatch(opCtx,
+                                       catalog,
+                                       bucketsColl,
+                                       comparator,
+                                       measurements,
+                                       insertContext,
+                                       getStorageCacheSizeBytes);
+}
+
 }  // namespace mongo::timeseries

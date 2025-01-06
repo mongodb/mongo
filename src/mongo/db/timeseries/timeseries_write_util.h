@@ -234,4 +234,11 @@ void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions&
 std::function<void(const timeseries::bucket_catalog::WriteBatch&, StringData timeField)>
 getPostCommitDebugChecks(OperationContext*, const NamespaceString&);
 
+TimeseriesBatches insertBatchOfMeasurements(OperationContext* opCtx,
+                                            bucket_catalog::BucketCatalog& catalog,
+                                            const Collection* bucketsColl,
+                                            const StringDataComparator* comparator,
+                                            const std::vector<BSONObj>& measurements,
+                                            bucket_catalog::InsertContext& insertContext);
+
 }  // namespace mongo::timeseries

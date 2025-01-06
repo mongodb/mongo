@@ -799,4 +799,71 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
     return {std::make_pair(std::move(insertContext), std::move(time))};
 }
 
+std::vector<std::shared_ptr<WriteBatch>> insertBatch(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    const Collection* bucketsColl,
+    const StringDataComparator* comparator,
+    const std::vector<BSONObj>& batchOfMeasurements,
+    InsertContext& insertContext,
+    std::function<uint64_t(OperationContext*)> functionToGetStorageCacheBytes) {
+
+    size_t currentPosition = 0;
+    std::vector<std::shared_ptr<WriteBatch>> writeBatches;
+    auto& stripe = *catalog.stripes[insertContext.stripeNumber];
+    stdx::unique_lock stripeLock{stripe.mutex};
+
+    // Let's acquire a bucket to insert into.
+    auto currentMeasurementTime = batchOfMeasurements[currentPosition]
+                                      .getField(bucketsColl->getTimeseriesOptions()->getTimeField())
+                                      .Date();
+    bucket_catalog::Bucket* bucket =
+        bucket_catalog::internal::useBucket(catalog,
+                                            stripe,
+                                            stripeLock,
+                                            insertContext,
+                                            bucket_catalog::internal::AllowBucketCreation::kYes,
+                                            currentMeasurementTime,
+                                            comparator);
+
+    while (currentPosition < batchOfMeasurements.size()) {
+        auto result = internal::insertBatchIntoEligibleBucket(opCtx,
+                                                              catalog,
+                                                              bucketsColl,
+                                                              comparator,
+                                                              batchOfMeasurements,
+                                                              insertContext,
+                                                              *bucket,
+                                                              stripe,
+                                                              stripeLock,
+                                                              currentPosition,
+                                                              writeBatches,
+                                                              functionToGetStorageCacheBytes);
+        if (std::get_if<std::monostate>(&result)) {
+            invariant(currentPosition == batchOfMeasurements.size());
+            // We've finished inserting all our measurements. On the next iteration we'll return
+            // the vector of writeBatches.
+        } else if (std::get_if<RolloverReason>(&result)) {
+            auto currentMeasurementTime =
+                batchOfMeasurements[currentPosition]
+                    .getField(bucketsColl->getTimeseriesOptions()->getTimeField())
+                    .Date();
+
+            // Let's roll over our bucket and allocate a new one.
+            bucket = &internal::rollover(catalog,
+                                         stripe,
+                                         stripeLock,
+                                         *bucket,
+                                         insertContext,
+                                         RolloverAction::kHardClose,
+                                         currentMeasurementTime,
+                                         comparator,
+                                         nullptr,
+                                         boost::none);
+        }
+    }
+    return writeBatches;
+}
+
+
 }  // namespace mongo::timeseries::bucket_catalog

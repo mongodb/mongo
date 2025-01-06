@@ -722,6 +722,12 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     bool isNewlyOpenedBucket = (existingBucket.size == 0);
     std::reference_wrapper<Bucket> bucketToUse{existingBucket};
     bool openedDueToMetadata = true;
+    calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
+                                       bucketToUse.get(),
+                                       doc,
+                                       insertContext.options.getMetaField(),
+                                       newFieldNamesToBeInserted,
+                                       sizesToBeAdded);
     if (!isNewlyOpenedBucket) {
         auto [action, reason] =
             determineRolloverAction(catalog.trackingContexts,
@@ -752,45 +758,82 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                    excludedBucket,
                                    excludedAction);
             isNewlyOpenedBucket = true;
+            // Recalculate the fields and size change for the newly opened bucket we got from
+            // rolling over our original one.
+            calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
+                                               bucketToUse.get(),
+                                               doc,
+                                               insertContext.options.getMetaField(),
+                                               newFieldNamesToBeInserted,
+                                               sizesToBeAdded);
         }
     }
-    Bucket& bucket = bucketToUse.get();
+    return addMeasurementToBatchAndBucket(catalog,
+                                          doc,
+                                          opId,
+                                          insertContext,
+                                          bucketToUse.get(),
+                                          comparator,
+                                          newFieldNamesToBeInserted,
+                                          sizesToBeAdded,
+                                          isNewlyOpenedBucket,
+                                          openedDueToMetadata);
+}
 
-    if (isNewlyOpenedBucket) {
-        calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
-                                           bucket,
-                                           doc,
-                                           insertContext.options.getMetaField(),
-                                           newFieldNamesToBeInserted,
-                                           sizesToBeAdded);
-    }
+std::variant<std::shared_ptr<WriteBatch>, RolloverReason> tryToInsertIntoBucketWithoutRollover(
+    BucketCatalog& catalog,
+    Stripe& stripe,
+    WithLock stripeLock,
+    const BSONObj& doc,
+    OperationId opId,
+    AllowBucketCreation mode,
+    InsertContext& insertContext,
+    Bucket& bucketToInsertInto,
+    const Date_t& time,
+    uint64_t storageCacheSizeBytes,
+    const StringDataComparator* comparator) {
+    Bucket::NewFieldNames newFieldNamesToBeInserted;
+    Sizes sizesToBeAdded;
 
-    auto batch = activeBatch(
-        catalog.trackingContexts, bucket, opId, insertContext.stripeNumber, insertContext.stats);
-    batch->measurements.push_back(doc);
-    for (auto&& field : newFieldNamesToBeInserted) {
-        batch->newFieldNamesToBeInserted[field] = field.hash();
-        bucket.uncommittedFieldNames.emplace(tracking::StringMapHashedKey{
-            getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
-            field.key(),
-            field.hash()});
-    }
+    bool isNewlyOpenedBucket = (bucketToInsertInto.size == 0);
+    bool openedDueToMetadata = true;
+    calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
+                                       bucketToInsertInto,
+                                       doc,
+                                       insertContext.options.getMetaField(),
+                                       newFieldNamesToBeInserted,
+                                       sizesToBeAdded);
 
-    bucket.numMeasurements++;
-    batch->sizes.uncommittedMeasurementEstimate += sizesToBeAdded.uncommittedMeasurementEstimate;
-    bucket.size +=
-        sizesToBeAdded.uncommittedVerifiedSize + sizesToBeAdded.uncommittedMeasurementEstimate;
-    if (isNewlyOpenedBucket) {
-        if (openedDueToMetadata) {
-            batch->openedDueToMetadata = true;
+    if (!isNewlyOpenedBucket) {
+        auto [action, reason] =
+            determineRolloverAction(catalog.trackingContexts,
+                                    doc,
+                                    insertContext,
+                                    bucketToInsertInto,
+                                    catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
+                                    newFieldNamesToBeInserted,
+                                    sizesToBeAdded,
+                                    mode,
+                                    time,
+                                    storageCacheSizeBytes,
+                                    comparator);
+        if (action != RolloverAction::kNone) {
+            // We would not be able to insert this measurement without rolling over the bucket.
+            // Return the reason for rolling over.
+            return reason;
         }
-
-        auto updateStatus =
-            bucket.schema.update(doc, insertContext.options.getMetaField(), comparator);
-        invariant(updateStatus == Schema::UpdateStatus::Updated);
     }
 
-    return batch;
+    return addMeasurementToBatchAndBucket(catalog,
+                                          doc,
+                                          opId,
+                                          insertContext,
+                                          bucketToInsertInto,
+                                          comparator,
+                                          newFieldNamesToBeInserted,
+                                          sizesToBeAdded,
+                                          isNewlyOpenedBucket,
+                                          openedDueToMetadata);
 }
 
 void waitToCommitBatch(BucketStateRegistry& registry,
@@ -1349,13 +1392,6 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     // We restrict the ceiling of the bucket max size under cache pressure.
     int32_t absoluteMaxSize =
         std::min(Bucket::kLargeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
-
-    calculateBucketFieldsAndSizeChange(trackingContexts,
-                                       bucket,
-                                       doc,
-                                       info.options.getMetaField(),
-                                       newFieldNamesToBeInserted,
-                                       sizesToBeAdded);
     if (bucket.size + sizesToBeAdded.total() > effectiveMaxSize) {
         bool keepBucketOpenForLargeMeasurements =
             bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount);
@@ -1499,6 +1535,87 @@ void closeOpenBucket(BucketCatalog& catalog,
 void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId) {
     // Remove the bucket from the bucket state registry.
     stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
+}
+
+std::variant<std::monostate, RolloverReason> insertBatchIntoEligibleBucket(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    const Collection* bucketsColl,
+    const StringDataComparator* comparator,
+    const std::vector<BSONObj>& batchOfMeasurements,
+    InsertContext& insertContext,
+    Bucket& bucketToInsertInto,
+    Stripe& stripe,
+    WithLock stripeLock,
+    size_t& currentPosition,
+    std::vector<std::shared_ptr<WriteBatch>>& writeBatches,
+    std::function<uint64_t(OperationContext*)> functionToGetStorageCacheBytes) {
+
+    while (currentPosition < batchOfMeasurements.size()) {
+        auto insertionResult = tryToInsertIntoBucketWithoutRollover(
+            catalog,
+            stripe,
+            stripeLock,
+            batchOfMeasurements[currentPosition],
+            opCtx->getOpID(),
+            bucket_catalog::internal::AllowBucketCreation::kNo,
+            insertContext,
+            bucketToInsertInto,
+            batchOfMeasurements[currentPosition]
+                .getField(bucketsColl->getTimeseriesOptions()->getTimeField())
+                .Date(),
+            functionToGetStorageCacheBytes(opCtx),
+            comparator);
+        if (auto* batch = std::get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
+            // Successfully inserted a measurement.
+            ++currentPosition;
+            writeBatches.emplace_back(*batch);
+            continue;
+        } else if (auto* rolloverReason = std::get_if<RolloverReason>(&insertionResult)) {
+            // Return the reason for rollover to the caller, which must rollover the bucket.
+            return *rolloverReason;
+        }
+    }
+    return std::monostate{};
+}
+
+std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
+    BucketCatalog& catalog,
+    const BSONObj& doc,
+    OperationId opId,
+    InsertContext& insertContext,
+    Bucket& bucket,
+    const StringDataComparator* comparator,
+    Bucket::NewFieldNames& newFieldNamesToBeInserted,
+    Sizes& sizesToBeAdded,
+    bool isNewlyOpenedBucket,
+    bool openedDueToMetadata) {
+    auto batch = activeBatch(
+        catalog.trackingContexts, bucket, opId, insertContext.stripeNumber, insertContext.stats);
+    batch->measurements.push_back(doc);
+    for (auto&& field : newFieldNamesToBeInserted) {
+        batch->newFieldNamesToBeInserted[field] = field.hash();
+        bucket.uncommittedFieldNames.emplace(tracking::StringMapHashedKey{
+            getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
+            field.key(),
+            field.hash()});
+    }
+
+    bucket.numMeasurements++;
+    batch->sizes.uncommittedMeasurementEstimate += sizesToBeAdded.uncommittedMeasurementEstimate;
+    bucket.size +=
+        sizesToBeAdded.uncommittedVerifiedSize + sizesToBeAdded.uncommittedMeasurementEstimate;
+    if (isNewlyOpenedBucket) {
+        if (openedDueToMetadata) {
+            batch->openedDueToMetadata = true;
+        }
+
+        auto updateStatus =
+            bucket.schema.update(doc, insertContext.options.getMetaField(), comparator);
+        invariant(updateStatus == Schema::UpdateStatus::Updated);
+    }
+
+    return batch;
 }
 
 }  // namespace mongo::timeseries::bucket_catalog::internal
