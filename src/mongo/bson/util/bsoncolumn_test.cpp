@@ -2216,11 +2216,11 @@ TEST_F(BSONColumnTest, DoubleRescalingPreserveRLE) {
 
     std::vector<BSONElement> elems;
     uint64_t value = 0xbea6a6a6a6e78efc;
-    elems.push_back(createElementDouble(std::bit_cast<double>(value)));
+    elems.push_back(createElementDouble(absl::bit_cast<double>(value)));
     elems.push_back(BSONElement());
-    elems.push_back(createElementDouble(std::bit_cast<double>(value += kLargeDelta)));
-    elems.push_back(createElementDouble(std::bit_cast<double>(value += kLargeDelta)));
-    elems.push_back(createElementDouble(std::bit_cast<double>(value += kLargeDelta)));
+    elems.push_back(createElementDouble(absl::bit_cast<double>(value += kLargeDelta)));
+    elems.push_back(createElementDouble(absl::bit_cast<double>(value += kLargeDelta)));
+    elems.push_back(createElementDouble(absl::bit_cast<double>(value += kLargeDelta)));
 
     // One of the values are scalable, this will trigger rescaling.
     ASSERT_TRUE(Simple8bTypeUtil::encodeDouble(elems.at(2).Double(), 0).has_value());
