@@ -576,6 +576,7 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(stdx::unique_lock<stdx::mute
     const auto timeout = op.getRequest().timeout;
     auto cbh = op.getCallbackHandle();
     auto token = op.getCancellationSource().token();
+    auto diagnosticString = op.getDiagnosticString();
 
     _operations.emplace_back(std::forward<NetworkOperation>(op));
 
@@ -599,7 +600,7 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(stdx::unique_lock<stdx::mute
 
     lk.unlock();
     token.onCancel().unsafeToInlineFuture().getAsync(
-        [this, cbh, requestString = op.getDiagnosticString()](Status status) {
+        [this, cbh, requestString = std::move(diagnosticString)](Status status) {
             if (!status.isOK()) {
                 return;
             }
