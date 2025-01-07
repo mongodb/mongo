@@ -362,16 +362,19 @@ std::vector<std::string> ScopedDebugInfoStack::getAll() {
         _loggingDepth--;
     };
 
-    try {
-        std::vector<std::string> r;
-        r.reserve(_stack.size());
-        std::transform(_stack.begin(), _stack.end(), std::back_inserter(r), [](auto&& e) {
-            return e->toString();
-        });
-        return r;
-    } catch (...) {
-        LOGV2(9513400, "ScopedDebugInfo failed", "error"_attr = describeActiveException());
+    std::vector<std::string> r;
+    r.reserve(_stack.size());
+    for (const auto& e : _stack) {
+        try {
+            r.push_back(e->toString());
+        } catch (...) {
+            LOGV2(9513400,
+                  "ScopedDebugInfo failed",
+                  "label"_attr = e->label(),
+                  "error"_attr = describeActiveException());
+        }
     }
-    return {};
+
+    return r;
 }
 }  // namespace mongo

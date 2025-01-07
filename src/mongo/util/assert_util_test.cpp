@@ -590,20 +590,19 @@ TEST(ScopedDebugInfo, FormattingCanBeCalledMoreThanOnce) {
     ASSERT_THAT(infoStack.getAll(), ElementsAre(Eq("greeting: hello")));
 }
 
-// Test that if there is a correct `ScopedDebugInfo` on the stack (i.e. one that does not throw
-// any exceptions or hit invariants) followed by one that has a problem (i.e. in this case,
-// it tasserts) then we will correctly not surface the issue caused by the problematic one. Note
-// that a stacktrace will be printed to the logs, but we will not return the error to the user.
+// Test that we are able to incrementally log ScopedDebugInfos from the stack (if one throws an
+// exception, we are able to attempt to print the next one).
 DEATH_TEST_REGEX(ScopedDebugInfo,
-                 CorrectAndIncorrectScopedDebugInfosOnStack,
+                 CorrectScopedDebugInfosOnStackAfterIncorrectOne,
                  "(?s)tasserting in mock printer.*BACKTRACE"
-                 ".*ScopedDebugInfo failed.*9513401") {
+                 ".*ScopedDebugInfo failed.*test.*9513401") {
     ScopedDebugInfoStack infoStack{};
     ScopedDebugInfo greetingGuard("greeting", "hello", &infoStack);
     ScopedDebugInfo guardTasserts("test", PrinterMockTassert(), &infoStack);
+    ScopedDebugInfo anotherGreetingGuard("greeting", "hey there", &infoStack);
 
     using namespace unittest::match;
-    ASSERT_THAT(infoStack.getAll(), IsEmpty());
+    ASSERT_THAT(infoStack.getAll(), ElementsAre(Eq("greeting: hello"), Eq("greeting: hey there")));
 }
 
 // Test that if we log the `ScopedDebugInfoStack` due to a tassert, and we hit a tassert during
@@ -612,7 +611,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
                  TassertAndTassertDuringLogging,
                  "(?s)tasserting in test.*BACKTRACE"
                  ".*tasserting in mock printer.*BACKTRACE"
-                 ".*ScopedDebugInfo failed.*9513401") {
+                 ".*ScopedDebugInfo failed.*test.*9513401") {
     ScopedDebugInfo guardTasserts("test", PrinterMockTassert());
     tasserted(9513403, "tasserting in test");
 }
@@ -621,7 +620,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 DEATH_TEST_REGEX(ScopedDebugInfo,
                  TassertAndUassertDuringLogging,
                  "(?s)tasserting in test.*BACKTRACE"
-                 ".*ScopedDebugInfo failed.*9513402") {
+                 ".*ScopedDebugInfo failed.*test.*9513402") {
     ScopedDebugInfo guardUasserts("test", PrinterMockUassert());
     tasserted(9513404, "tasserting in test");
 }
@@ -632,7 +631,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
                  InvariantAndTassertDuringLogging,
                  "(?s)ouch.*abruptQuit"
                  ".*tasserting in mock printer.*mongo::tassertFailed"
-                 ".*ScopedDebugInfo failed.*9513401") {
+                 ".*ScopedDebugInfo failed.*test.*9513401") {
     ScopedDebugInfo guardTasserts("test", PrinterMockTassert());
     someRiskyBusiness();
 }
@@ -641,7 +640,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 DEATH_TEST_REGEX(ScopedDebugInfo,
                  InvariantAndUassertDuringLogging,
                  "(?s)ouch.*abruptQuit"
-                 ".*ScopedDebugInfo failed.*9513402") {
+                 ".*ScopedDebugInfo failed.*test.*9513402") {
     ScopedDebugInfo guardUasserts("test", PrinterMockUassert());
     someRiskyBusiness();
 }
@@ -654,7 +653,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
                  SignalAndTassertDuringLogging,
                  "(?s)Invalid access at address.*abruptQuit"
                  ".*tasserting in mock printer.*BACKTRACE"
-                 ".*ScopedDebugInfo failed.*9513401") {
+                 ".*ScopedDebugInfo failed.*test.*9513401") {
     ScopedDebugInfo guardTasserts("test", PrinterMockTassert());
     raise(SIGSEGV);
 }
@@ -663,7 +662,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 DEATH_TEST_REGEX(ScopedDebugInfo,
                  SignalAndUassertDuringLogging,
                  "(?s)Invalid access at address.*abruptQuit"
-                 ".*ScopedDebugInfo failed.*9513402") {
+                 ".*ScopedDebugInfo failed.*test.*9513402") {
     ScopedDebugInfo guardUasserts("test", PrinterMockUassert());
     raise(SIGSEGV);
 }

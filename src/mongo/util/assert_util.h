@@ -850,6 +850,7 @@ public:
     struct Rec {
         virtual ~Rec() = default;
         virtual std::string toString() const = 0;
+        virtual StringData label() const = 0;
     };
 
     void push(const Rec* rec) {
@@ -916,6 +917,9 @@ private:
         std::string toString() const override {
             using namespace fmt::literals;
             return "{}: {}"_format(owner->label, owner->v);
+        }
+        StringData label() const override {
+            return owner->label;
         }
         const ScopedDebugInfo* owner;
     };
