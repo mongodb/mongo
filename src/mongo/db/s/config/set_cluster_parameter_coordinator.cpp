@@ -82,7 +82,19 @@ namespace {
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout};
+
+/*
+ * Returns the "clusterParameterTime" attribute value in 'parameterDoc'.
+ */
+Timestamp parseClusterParameterTime(const BSONObj& parameterDoc) {
+    BSONElement clusterParameterTimeElem = parameterDoc.getField(
+        SetClusterParameterCoordinatorDocument::kClusterParameterTimeFieldName);
+    dassert(!clusterParameterTimeElem.eoo() && !clusterParameterTimeElem.isNull());
+    return clusterParameterTimeElem.timestamp();
 }
+
+const int kNumberOfSystemFieldsInParameterDocument = 2;
+}  // namespace
 
 bool SetClusterParameterCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     const auto otherDoc =
@@ -120,7 +132,46 @@ boost::optional<BSONObj> SetClusterParameterCoordinator::reportForCurrentOp(
     return bob.obj();
 }
 
-boost::optional<Timestamp> SetClusterParameterCoordinator::_getPersistedClusterParameterTime(
+bool SetClusterParameterCoordinator::_parameterValuesEqual(const BSONObj& parameter,
+                                                           const BSONObj& persistedParameter) {
+    // Check if the number of fields in 'parameter' match the number of fields in the persisted
+    // cluster-wide parameter document while ignoring "_id" and "clusterParameterTime" fields.
+    if (persistedParameter.nFields() !=
+        parameter.nFields() + kNumberOfSystemFieldsInParameterDocument) {
+        return false;
+    }
+    for (auto&& element : parameter) {
+        if (!element.binaryEqualValues(
+                persistedParameter.getField(element.fieldNameStringData()))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SetClusterParameterCoordinator::_isPersistedStateConflictingWithPreviousTime(
+    const boost::optional<LogicalTime>& previousTime,
+    const boost::optional<BSONObj>& currentClusterParameterValue) {
+    // If optimistic locking is not used, there is no update conflict.
+    if (!previousTime) {
+        return false;
+    }
+
+    // "previousTime" is provided, thus check whether the cluster parameter value was modified (by a
+    // concurrent update) since 'previousTime' by comparing "clusterParameterTime" stored on disk
+    // with 'previousTime'. The 'previousTime' equal to 'LogicalTime::kUninitialized' denotes a
+    // special case when the cluster parameter value is still unset. In such a case, we expect that
+    // 'currentClusterParameterValue' does not have a value.
+    if (*previousTime == LogicalTime::kUninitialized) {
+        return currentClusterParameterValue.has_value();
+    }
+    if (!currentClusterParameterValue) {
+        return true;
+    }
+    return parseClusterParameterTime(*currentClusterParameterValue) != previousTime->asTimestamp();
+}
+
+boost::optional<BSONObj> SetClusterParameterCoordinator::_getPersistedClusterParameter(
     OperationContext* opCtx) const {
     auto parameterName = _doc.getParameter().firstElement().fieldName();
     const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
@@ -140,12 +191,13 @@ boost::optional<Timestamp> SetClusterParameterCoordinator::_getPersistedClusterP
     }
 
     BSONObj& parameterDoc = configsvrParameters.docs.front();
-    BSONElement clusterParameterTimeElem = parameterDoc.getField(
-        SetClusterParameterCoordinatorDocument::kClusterParameterTimeFieldName);
-
-    dassert(!clusterParameterTimeElem.eoo() && !clusterParameterTimeElem.isNull());
-
-    return clusterParameterTimeElem.timestamp();
+    LOGV2_DEBUG(9469100,
+                1,
+                "loaded cluster parameter",
+                "coordinatorState"_attr = _doc.toBSON(),
+                "document"_attr = parameterDoc,
+                "parameterName"_attr = parameterName);
+    return boost::optional<BSONObj>(parameterDoc.getOwned());
 }
 
 void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
@@ -220,37 +272,34 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                // Get 'clusterParameterTime' stored on disk.
-                auto persistedClusterParameterTime = _getPersistedClusterParameterTime(opCtx);
+                // Get cluster parameter value stored on disk.
+                const auto persistedClusterParameter = _getPersistedClusterParameter(opCtx);
 
-                // If the parameter was already set on the config server, there is
-                // nothing else to do.
-                if (persistedClusterParameterTime &&
-                    *persistedClusterParameterTime == *_doc.getClusterParameterTime()) {
-                    return;
+                // If the parameter is already set on the config server, do a no-op.
+                if (persistedClusterParameter) {
+                    bool isClusterTimeEqual =
+                        parseClusterParameterTime(*persistedClusterParameter) ==
+                        *_doc.getClusterParameterTime();
+                    if (isClusterTimeEqual)
+                        return;
+
+                    bool isParameterValueEqual = _parameterValuesEqual(
+                        _doc.getParameter().firstElement().Obj(), *persistedClusterParameter);
+                    if (isParameterValueEqual)
+                        return;
                 }
 
-                // If 'previousTime' is provided, check whether the cluster parameter value was
-                // modified (by a concurrent update) since 'previousTime' by comparing
-                // 'clusterParameterTime' stored on disk with 'previousTime'. The 'previousTime'
-                // equal to 'LogicalTime::kUninitialized' denotes a special case when the cluster
-                // parameter value is still unset. In such a case, we expect that
-                // 'persistedClusterParameterTime' does not have a value.
-                if (auto previousTime = _doc.getPreviousTime()) {
-                    _detectedConcurrentUpdate = (*previousTime == LogicalTime::kUninitialized)
-                        ? persistedClusterParameterTime.has_value()
-                        : !(persistedClusterParameterTime &&
-                            *persistedClusterParameterTime == previousTime->asTimestamp());
+                // If the cluster parameter value was modified since 'previousTime', do not proceed
+                // with updating server cluster parameter.
+                if (_isPersistedStateConflictingWithPreviousTime(_doc.getPreviousTime(),
+                                                                 persistedClusterParameter)) {
+                    _detectedConcurrentUpdate = true;
+                    LOGV2_DEBUG(7880300,
+                                1,
+                                "encountered unexpected 'clusterParameterTime'",
+                                "previousTime"_attr = _doc.getPreviousTime()->asTimestamp());
 
-                    // If the cluster parameter value was modified since 'previousTime' (detected
-                    // concurrent update), do not proceed with updating server cluster parameter.
-                    if (_detectedConcurrentUpdate) {
-                        LOGV2_DEBUG(7880300,
-                                    1,
-                                    "encountered unexpected 'clusterParameterTime'",
-                                    "previousTime"_attr = previousTime->asTimestamp());
-                        return;
-                    }
+                    return;
                 }
 
                 auto catalogManager = ShardingCatalogManager::get(opCtx);
