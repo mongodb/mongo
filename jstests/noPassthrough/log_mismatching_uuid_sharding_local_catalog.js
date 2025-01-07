@@ -2,8 +2,6 @@
  * Verifies a uuid mismatch between the sharding and the local catalog is correctly logged.
  */
 
-import {ShardingTest} from "jstests/libs/shardingtest.js";
-
 TestData.skipCheckMetadataConsistency = true;
 
 const st = new ShardingTest({shards: 2, config: 1});
