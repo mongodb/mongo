@@ -1172,6 +1172,7 @@ def exists(env: SCons.Environment.Environment) -> bool:
     # === Bazelisk ===
 
     write_workstation_bazelrc()
+    cleanup_gitinfo_bazelrc()
     env.AddMethod(prefetch_toolchain, "PrefetchToolchain")
     env.AddMethod(bazel_execroot, "BazelExecroot")
     env.AddMethod(load_bazel_builders, "LoadBazelBuilders")
@@ -1232,6 +1233,16 @@ def handle_bazel_program_exception(env, target, outputs):
                     "bazel_output": bazel_output_file.replace("\\", "/"),
                 }
     return bazel_program
+
+
+def cleanup_gitinfo_bazelrc():
+    if os.environ.get("CI") is None:
+        gitinfo_bazelrc_file = ".bazelrc.gitinfo"
+        if os.path.exists(gitinfo_bazelrc_file):
+            try:
+                os.remove(gitinfo_bazelrc_file)
+            except:
+                pass
 
 
 def write_workstation_bazelrc():

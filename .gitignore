@@ -278,6 +278,7 @@ bazelisk
 buildifier
 buildozer
 .bazelrc.local
+.bazelrc.git
 .bazelrc.gitinfo
 .bazelrc.workstation
 .bazelrc.xcode

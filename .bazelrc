@@ -392,7 +392,7 @@ try-import %workspace%/.bazelrc.xcode
 try-import %workspace%/.bazelrc.workstation
 
 # local git version info
-try-import %workspace%/.bazelrc.gitinfo
+try-import %workspace%/.bazelrc.git
 
 # Used for build profiles and any settings a user wants to consistently use
 try-import %workspace%/.bazelrc.local
