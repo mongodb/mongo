@@ -61,7 +61,7 @@ unw_init_local (unw_cursor_t *cursor, unw_context_t *uc)
 }
 
 int
-unw_init_local2 (unw_cursor_t *cursor, unw_tdep_context_t *uc, int flag)
+unw_init_local2 (unw_cursor_t *cursor, unw_context_t *uc, int flag)
 {
   if (!flag)
     {

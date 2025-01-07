@@ -1063,7 +1063,7 @@
         "name": "Organization: github"
       },
       "name": "libunwind/libunwind",
-      "version": "v1.6.2",
+      "version": "v1.8.1",
       "licenses": [
         {
           "license": {
@@ -1071,7 +1071,7 @@
           }
         }
       ],
-      "purl": "pkg:github/libunwind/libunwind@v1.6.2",
+      "purl": "pkg:github/libunwind/libunwind@v1.8.1",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1083,7 +1083,7 @@
         },
         {
           "name": "info_link",
-          "value": "http://www.nongnu.org/libunwind/"
+          "value": "http://www.github.com/libunwind/libunwind"
         },
         {
           "name": "import_script_path",

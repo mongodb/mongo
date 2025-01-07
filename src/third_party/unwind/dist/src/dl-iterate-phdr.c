@@ -39,17 +39,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
                       (ehdr).e_ident[EI_MAG3] == ELFMAG3)
 #endif
 
-typedef int (*unw_iterate_phdr_impl) (int (*callback) (
-                                        struct dl_phdr_info *info,
-                                        size_t size, void *data),
-                                      void *data);
-
 HIDDEN int
-dl_iterate_phdr (int (*callback) (struct dl_phdr_info *info, size_t size, void *data),
+dl_iterate_phdr (unw_iterate_phdr_callback_t callback,
                  void *data)
 {
   static int initialized = 0;
-  static unw_iterate_phdr_impl libc_impl;
+  static unw_iterate_phdr_func_t libc_impl;
   int rc = 0;
   struct map_iterator mi;
   unsigned long start, end, offset, flags;

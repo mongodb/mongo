@@ -28,7 +28,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "libunwind_i.h"
 
 int
-unw_is_fpreg (int regnum)
+unw_is_fpreg (int regnum UNUSED)
 {
 #if 0
   return ((regnum >= UNW_X86_ST0 && regnum <= UNW_X86_ST7)

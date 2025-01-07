@@ -30,10 +30,15 @@ extern "C" {
 #endif
 
 #include <inttypes.h>
+#include <stdint.h>
 #include <ucontext.h>
 
 #ifdef mips
 # undef mips
+#endif
+
+#ifndef UNW_EMPTY_STRUCT
+#  define UNW_EMPTY_STRUCT uint8_t unused;
 #endif
 
 #define UNW_TARGET      mips
@@ -55,8 +60,10 @@ extern "C" {
    ABIs, and 64-bit wide for N64 ABI. */
 #if _MIPS_SIM == _ABI64
 typedef uint64_t unw_word_t;
+# define UNW_WORD_MAX UINT64_MAX
 #else
 typedef uint32_t unw_word_t;
+# define UNW_WORD_MAX UINT32_MAX
 #endif
 typedef int32_t unw_sword_t;
 
@@ -127,6 +134,7 @@ mips_abi_t;
 typedef struct unw_tdep_save_loc
   {
     /* Additional target-dependent info on a save location.  */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_save_loc_t;
 
@@ -139,6 +147,7 @@ typedef ucontext_t unw_tdep_context_t;
 typedef struct
   {
     /* no mips-specific auxiliary proc-info */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_proc_info_t;
 

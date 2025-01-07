@@ -23,10 +23,10 @@
 # include "tdep-x86/dwarf-config.h"
 #elif defined __x86_64__ || defined __amd64__
 # include "tdep-x86_64/dwarf-config.h"
-#elif defined __tilegx__
-# include "tdep-tilegx/dwarf-config.h"
 #elif defined __riscv || defined __riscv__
 # include "tdep-riscv/dwarf-config.h"
+#elif defined __loongarch64
+# include "tdep-loongarch64/dwarf-config.h"
 #else
 # error "Unsupported arch"
 #endif
