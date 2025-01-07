@@ -40,7 +40,6 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -101,14 +100,8 @@ PartitionIterator::PartitionIterator(ExpressionContext* expCtx,
       _partitionExpr(std::move(partitionExpr)),
       _sortExpr(exprFromSort(_expCtx, sortPattern)),
       _state(IteratorState::kNotInitialized),
-      _cache(_expCtx, tracker),
+      _cache(std::make_unique<SpillableCache>(_expCtx, tracker)),
       _memoryToken(0, &(*tracker)["PartitionIterator"]) {}
-
-PartitionIterator::~PartitionIterator() {
-    const auto& stats = _cache.getSpillingStats();
-    setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
-        stats.spills, stats.spilledBytes, stats.spilledRecords);
-}
 
 optional<Document> PartitionIterator::operator[](int index) {
     auto docDesired = _indexOfCurrentInPartition + index;
@@ -121,8 +114,8 @@ optional<Document> PartitionIterator::operator[](int index) {
     if (docDesired < 0)
         return boost::none;
     // Case 1: Document is in the cache already.
-    if (_cache.isIdInCache(docDesired)) {
-        return _cache.getDocumentById(docDesired);
+    if (_cache->isIdInCache(docDesired)) {
+        return _cache->getDocumentById(docDesired);
     }
 
     // Case 2: Attempting to access index greater than what the cache currently holds. If we've
@@ -132,7 +125,7 @@ optional<Document> PartitionIterator::operator[](int index) {
         _state == IteratorState::kAwaitingAdvanceToEOF) {
         return boost::none;
     }
-    for (int i = _cache.getHighestIndex(); i < docDesired; i++) {
+    for (int i = _cache->getHighestIndex(); i < docDesired; i++) {
         // Pull in document from prior stage.
         getNextDocument();
         // Check whether the next document is available.
@@ -141,7 +134,7 @@ optional<Document> PartitionIterator::operator[](int index) {
             return boost::none;
         }
     }
-    return _cache.getDocumentById(docDesired);
+    return _cache->getDocumentById(docDesired);
 }
 
 void PartitionIterator::releaseExpired() {
@@ -159,7 +152,7 @@ void PartitionIterator::releaseExpired() {
         minIndex = std::min(minIndex, cacheIndex);
     }
 
-    _cache.freeUpTo(minIndex);
+    _cache->freeUpTo(minIndex);
 }
 
 PartitionIterator::AdvanceResult PartitionIterator::advance() {
@@ -172,7 +165,7 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
 
 PartitionIterator::AdvanceResult PartitionIterator::advanceInternal() {
     // Check if the next document is in the cache.
-    if ((_indexOfCurrentInPartition + 1) <= _cache.getHighestIndex()) {
+    if ((_indexOfCurrentInPartition + 1) <= _cache->getHighestIndex()) {
         // Same partition, update the current index.
         _indexOfCurrentInPartition++;
         return AdvanceResult::kAdvanced;
@@ -231,7 +224,7 @@ void PartitionIterator::advanceToNextPartition() {
             _nextPartitionDoc != boost::none);
     resetCache();
     // Cache is cleared, and we are moving the _nextPartitionDoc value to different positions.
-    _cache.addDocument(std::move(*_nextPartitionDoc));
+    _cache->addDocument(std::move(*_nextPartitionDoc));
     _nextPartitionDoc.reset();
     _state = IteratorState::kIntraPartition;
     updateNextPartitionStateSize();
@@ -462,7 +455,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsDocumentBased(
     }
 
     // Valid offsets into the cache are any 'i' such that
-    // '_cache.getDocumentById(_indexOfCurrentInPartition + i)' is valid. We know the cache is
+    // '_cache->getDocumentById(_indexOfCurrentInPartition + i)' is valid. We know the cache is
     // nonempty because it contains the current document.
     int cacheOffsetMin = getMinCachedOffset();
     int cacheOffsetMax = getMaxCachedOffset();
@@ -535,10 +528,10 @@ void PartitionIterator::getNextDocument() {
             _state = IteratorState::kAwaitingAdvanceToNext;
             updateNextPartitionStateSize();
         } else {
-            _cache.addDocument(std::move(doc));
+            _cache->addDocument(std::move(doc));
         }
     } else {
-        _cache.addDocument(std::move(doc));
+        _cache->addDocument(std::move(doc));
         _state = IteratorState::kIntraPartition;
     }
 }

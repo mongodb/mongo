@@ -45,10 +45,12 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/partition_key_comparator.h"
-#include "mongo/db/pipeline/spilling/spillable_deque.h"
+#include "mongo/db/pipeline/window_function/spillable_cache.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
@@ -71,8 +73,6 @@ public:
                       MemoryUsageTracker* tracker,
                       boost::optional<boost::intrusive_ptr<Expression>> partitionExpr,
                       const boost::optional<SortPattern>& sortPattern);
-
-    ~PartitionIterator();
 
     using SlotId = unsigned int;
     SlotId newSlot() {
@@ -133,7 +133,7 @@ public:
      * structures.
      */
     auto getApproximateSize() const {
-        return _cache.getApproximateSize() + getNextPartitionStateSize();
+        return _cache->getApproximateSize() + getNextPartitionStateSize();
     }
 
     /**
@@ -141,11 +141,11 @@ public:
      * allowed.
      */
     void spillToDisk() {
-        _cache.spillToDisk();
+        _cache->spillToDisk();
     }
 
     bool usedDisk() const {
-        return _cache.usedDisk();
+        return _cache->usedDisk();
     }
 
     /**
@@ -153,7 +153,7 @@ public:
      * are invalid after calling this.
      */
     void finalize() {
-        _cache.finalize();
+        _cache->finalize();
     }
 
     /**
@@ -205,7 +205,7 @@ private:
      * This value is negative or zero, because the current document is always in '_cache'.
      */
     auto getMinCachedOffset() const {
-        return -_indexOfCurrentInPartition + _cache.getLowestIndex();
+        return -_indexOfCurrentInPartition + _cache->getLowestIndex();
     }
 
     /**
@@ -218,7 +218,7 @@ private:
      * This value is positive or zero, because the current document is always in '_cache'.
      */
     auto getMaxCachedOffset() const {
-        return _cache.getHighestIndex() - _indexOfCurrentInPartition;
+        return _cache->getHighestIndex() - _indexOfCurrentInPartition;
     }
 
     /**
@@ -261,7 +261,7 @@ private:
     void getNextDocument();
 
     void resetCache() {
-        _cache.clear();
+        _cache->clear();
         _indexOfCurrentInPartition = 0;
         for (int slot = 0; slot < (int)_slots.size(); slot++) {
             _slots[slot] = -1;
@@ -330,8 +330,8 @@ private:
     int _indexOfCurrentInPartition = 0;
 
     // The actual cache of the PartitionIterator. Holds documents and spills documents that exceed
-    // the memory limit given to PartitionIterator to disk.
-    SpillableDeque _cache;
+    // the memory limit given to PartitionIterator to disk. Behaves like a deque.
+    std::unique_ptr<SpillableCache> _cache = nullptr;
 
     // Memory token, used to track memory consumption of PartitionIterator. Needed to avoid problems
     // when getNextPartitionStateSize() changes value between invocations.

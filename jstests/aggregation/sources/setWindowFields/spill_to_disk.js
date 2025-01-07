@@ -21,7 +21,7 @@ import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-// Doc size was found through logging the size in the SpillableDeque. Partition sizes were chosen
+// Doc size was found through logging the size in the SpillableCache. Partition sizes were chosen
 // arbitrarily.
 const avgDocSize = 171;
 const smallPartitionSize = 6;

@@ -219,17 +219,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "stub_mongo_process_interface",
-    srcs = [],
-    hdrs = [
-        "stub_mongo_process_interface.h",
-    ],
-    deps = [
-        "mongo_process_interface",
-    ],
-)
-
-mongo_cc_library(
     name = "common_process_interface",
     srcs = [
         "common_process_interface.cpp",

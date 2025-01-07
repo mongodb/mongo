@@ -32,10 +32,11 @@
 #include <cstddef>
 #include <deque>
 #include <memory>
+#include <vector>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/spilling/spilling_stats.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/memory_usage_tracker.h"
 
@@ -47,10 +48,10 @@ namespace mongo {
  * the server crashes with data still present. Ids are not indexes into the deque but rather the
  * document number of the Documents inserted into the cache.
  */
-class SpillableDeque {
+class SpillableCache {
 public:
-    SpillableDeque(ExpressionContext* expCtx, MemoryUsageTracker* tracker)
-        : _memTracker((*tracker)["SpillableDeque"]), _expCtx(expCtx) {}
+    SpillableCache(ExpressionContext* expCtx, MemoryUsageTracker* tracker)
+        : _memTracker((*tracker)["SpillableCache"]), _expCtx(expCtx) {}
 
     /**
      * Adds 'input' to the in-memory cache and spills to disk if the document size puts us over the
@@ -82,25 +83,24 @@ public:
     void clear();
 
     /**
-     * Destroy the SpillableDeque. No other functions should be called after finalize.
+     * Destroy the SpillableCache. No other functions should be called after finalize.
      * This function acquires a lock and can throw, and therefore should not be called in a
      * destructor (or any environment where it is not safe to throw). If this is not called before
-     * the SpillableDeque is destructed the temporary table will eventually be cleaned up by the
+     * the SpillableCache is destructed the temporary table will eventually be cleaned up by the
      * storage engine.
      */
     void finalize() {
         if (_diskCache) {
-            updateStorageSizeStat();
             _diskCache = nullptr;
         }
         _memCache.clear();
     }
 
-    size_t getApproximateSize() const {
+    size_t getApproximateSize() {
         return _memTracker.currentMemoryBytes();
     }
 
-    int getNumDocs() const {
+    int getNumDocs() {
         if (_diskWrittenIndex == 0 || _nextFreedIndex > _diskWrittenIndex) {
             return _memCache.size();
         }
@@ -108,19 +108,19 @@ public:
     }
 
     bool usedDisk() const {
-        return _stats.spills > 0;
+        return _usedDisk;
     }
 
     /**
      * Returns the id of the last document inserted.
      */
-    int getHighestIndex() const {
+    int getHighestIndex() {
         return _nextIndex - 1;
     }
     /**
      * Returns the lowest id in the cache.
      */
-    int getLowestIndex() const {
+    int getLowestIndex() {
         return _nextFreedIndex;
     }
 
@@ -131,16 +131,11 @@ public:
      */
     void spillToDisk();
 
-    const SpillingStats& getSpillingStats() const {
-        return _stats;
-    }
-
 private:
     Document readDocumentFromDiskById(int desired);
     Document readDocumentFromMemCacheById(int desired);
     void verifyInCache(int desired);
-
-    void updateStorageSizeStat();
+    void writeBatchToDisk(std::vector<Record>& records);
 
     MemoryUsageTracker::Impl _memTracker;
 
@@ -160,7 +155,10 @@ private:
     // When spilling to disk, only write batches smaller than 16MB.
     static constexpr size_t kMaxWriteSize = 16 * 1024 * 1024;
 
-    SpillingStats _stats;
+    // Be able to report that disk was used after the cache has been finalized.
+    bool _usedDisk = false;
+    // Total data storage size used with spilling.
+    int64_t _spilledDataStorageSize = 0;
 };
 
 }  // namespace mongo
