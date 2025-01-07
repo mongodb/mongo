@@ -1452,6 +1452,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/search/**/* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/search/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/pipeline/spilling/OWNERS.yml
+/src/mongo/db/pipeline/spilling/**/* @10gen/query-execution-aggregation @svc-auto-approve-bot
+/src/mongo/db/pipeline/spilling/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/pipeline/visitors/OWNERS.yml
 /src/mongo/db/pipeline/visitors/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/visitors/**/*docs_needed_bounds* @10gen/query-integration-search @svc-auto-approve-bot

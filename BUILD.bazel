@@ -4202,11 +4202,6 @@ mongo_unittest_install(
 )
 
 mongo_unittest_install(
-    name = "db_pipeline_test-spillable_cache_test",
-    srcs = ["//src/mongo/db/pipeline:db_pipeline_test"],
-)
-
-mongo_unittest_install(
     name = "db_pipeline_test-window_function_add_to_set_test",
     srcs = ["//src/mongo/db/pipeline:db_pipeline_test"],
 )
@@ -8529,4 +8524,19 @@ mongo_unittest_install(
 mongo_unittest_install(
     name = "db_query_test-gen_filter_test",
     srcs = ["//src/mongo/db/query:db_query_test"],
+)
+
+mongo_unittest_install(
+    name = "db_spilling_test",
+    srcs = ["//src/mongo/db/pipeline/spilling:db_spilling_test"],
+)
+
+mongo_unittest_install(
+    name = "db_spilling_test-spillable_deque_test",
+    srcs = ["//src/mongo/db/pipeline/spilling:db_spilling_test"],
+)
+
+mongo_unittest_install(
+    name = "db_spilling_test-spillable_map_test",
+    srcs = ["//src/mongo/db/pipeline/spilling:db_spilling_test"],
 )
