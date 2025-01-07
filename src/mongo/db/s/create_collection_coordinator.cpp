@@ -2125,6 +2125,22 @@ void CreateCollectionCoordinator::_checkPreconditions() {
                   str::stream() << "The collection" << originalNss().toStringForErrorMsg()
                                 << "is already tracked from a past request");
     }
+
+    // When running on a configsvr, make sure that we are indeed a data-bearing shard (config
+    // shard).
+    // This is important in order to fix a race where create collection for 'config.system.session',
+    // which is sent to a random shard, could otherwise execute on a config server that is no longer
+    // a data-bearing shard.
+    // TODO: SERVER-86949 Remove this.
+    if (ShardingState::get(opCtx)->pollClusterRole()->has(ClusterRole::ConfigServer)) {
+        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        bool amIAConfigShard = std::find(allShardIds.begin(),
+                                         allShardIds.end(),
+                                         ShardingState::get(opCtx)->shardId()) != allShardIds.end();
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Cannot run CreateCollectionCoordinator on a non data bearing config server",
+                amIAConfigShard);
+    }
 }
 
 void CreateCollectionCoordinator::_enterWriteCriticalSectionOnCoordinator() {
