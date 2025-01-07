@@ -412,6 +412,7 @@ public:
     }
 
 private:
+    friend class WiredTigerSession;
     /**
      * Looks up the journal listener under a mutex along.
      * Returns JournalListener along with an optional token if requested

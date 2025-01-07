@@ -152,8 +152,9 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::strin
     // and prevent the race condition that the shutdown starts after the check.
     WiredTigerSessionCache::BlockShutdown blockShutdown(_cache);
 
-    // Avoids the cursor already being destroyed during the shutdown.
-    if (_cache->isShuttingDown()) {
+    // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
+    // cursor from an earlier epoch.
+    if (_cache->isShuttingDown() || _getEpoch() < _cache->_epoch.load()) {
         return;
     }
 
@@ -473,12 +474,12 @@ UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
 
 void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     invariant(session);
-    // We might have skipped releasing some cursors during the shutdown.
-    invariant(session->cursorsOut() == 0 || isShuttingDown());
 
     BlockShutdown blockShutdown(this);
 
-    if (isShuttingDown()) {
+    uint64_t currentEpoch = _epoch.load();
+    if (isShuttingDown() || session->_getEpoch() != currentEpoch) {
+        invariant(session->_getEpoch() < currentEpoch);
         // There is a race condition with clean shutdown, where the storage engine is ripped from
         // underneath OperationContexts, which are not "active" (i.e., do not have any locks), but
         // are just about to delete the recovery unit. See SERVER-16031 for more information. Since
@@ -488,6 +489,8 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         delete session;
         return;
     }
+
+    invariant(session->cursorsOut() == 0);
 
     {
         WT_SESSION* ss = session->getSession();
@@ -508,23 +511,12 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         invariantWTOK(ss->reset(ss), ss);
     }
 
-    bool returnedToCache = false;
-    uint64_t currentEpoch = _epoch.load();
-
     // Set the time this session got idle at.
     session->setIdleExpireTime(_clockSource->now());
-
-    if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
+    {
         stdx::lock_guard<Latch> lock(_cacheLock);
-        if (session->_getEpoch() == _epoch.load()) {  // recheck inside the lock for correctness
-            returnedToCache = true;
-            _sessions.push_back(session);
-        }
-    } else
-        invariant(session->_getEpoch() < currentEpoch);
-
-    if (!returnedToCache)
-        delete session;
+        _sessions.push_back(session);
+    }
 
     if (_engine) {
         _engine->sizeStorerPeriodicFlush();
