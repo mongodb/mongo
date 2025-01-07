@@ -38,6 +38,7 @@ mongo_cc_library(
         "framework.h",
         "golden_test.h",
         "inline_auto_update.h",
+        "join_thread.h",
         "log_test.h",
         "matcher.h",
         "matcher_core.h",

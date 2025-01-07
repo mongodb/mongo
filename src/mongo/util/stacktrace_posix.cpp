@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <dlfcn.h>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
@@ -50,6 +49,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_somap.h"
 
@@ -73,7 +74,9 @@
 
 #if MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND
 #define UNW_LOCAL_ONLY
-#include <libunwind.h>  // IWYU pragma: keep
+#include <elf.h>
+#include <libunwind.h>
+#include <link.h>
 #elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO
 #include <execinfo.h>
 #endif
@@ -478,5 +481,95 @@ void printStackTrace() {
     const bool withHumanReadable = true;
     getStackTraceImpl(options).log(withHumanReadable);
 }
+
+#if defined(MONGO_CONFIG_USE_LIBUNWIND)
+namespace {
+
+/**
+ * Stashes the results of a `dl_iterate_phdr`
+ * so that it can be accessed in signal handlers.
+ */
+class DlPhdrStore {
+public:
+    int initCb(dl_phdr_info* info, size_t sz) {
+        _entries.push_back(Entry{
+            .addr = info->dlpi_addr,
+            .name = std::string{info->dlpi_name},
+            .phdr = info->dlpi_phdr,
+            .phnum = info->dlpi_phnum,
+            .adds = info->dlpi_adds,
+            .subs = info->dlpi_subs,
+            .tls_modid = info->dlpi_tls_modid,
+            .tls_data = info->dlpi_tls_data,
+        });
+        return 0;
+    }
+
+    int iterate(unw_iterate_phdr_callback_t cb, void* cbData) {
+        for (auto&& e : _entries) {
+            dl_phdr_info info{
+                .dlpi_addr = e.addr,
+                .dlpi_name = e.name.c_str(),
+                .dlpi_phdr = e.phdr,
+                .dlpi_phnum = e.phnum,
+                .dlpi_adds = e.adds,
+                .dlpi_subs = e.subs,
+                .dlpi_tls_modid = e.tls_modid,
+                .dlpi_tls_data = e.tls_data,
+            };
+            if (int r = cb(&info, sizeof(info), cbData))
+                return r;
+        }
+        return 0;
+    }
+
+    void initialize();
+
+private:
+    struct Entry {
+        ElfW(Addr) addr;
+        std::string name;
+        const ElfW(Phdr) * phdr;
+        ElfW(Half) phnum;
+        unsigned long long int adds;
+        unsigned long long int subs;
+        size_t tls_modid;
+        void* tls_data;
+    };
+
+    std::vector<Entry> _entries;
+};
+
+DlPhdrStore dlPhdrStore;
+
+extern "C" int initCb_C(dl_phdr_info* info, size_t sz, void* cbData) {
+    auto store = static_cast<DlPhdrStore*>(cbData);
+    invariant(store == &dlPhdrStore);
+    return store->initCb(info, sz);
+}
+
+extern "C" int iterateCb_C(unw_iterate_phdr_callback_t cb, void* cbData) {
+    return dlPhdrStore.iterate(cb, cbData);
+}
+
+void DlPhdrStore::initialize() {
+    dl_iterate_phdr(&initCb_C, this);
+    unw_set_iterate_phdr_function(unw_local_addr_space, &iterateCb_C);
+
+    for (auto&& e : _entries) {
+        LOGV2_DEBUG(9077500,
+                    5,
+                    "Preloaded dl_iterate_phdr entry",
+                    "name"_attr = e.name,
+                    "addr"_attr = unsignedHex(e.addr));
+    }
+}
+
+MONGO_INITIALIZER(LibunwindPrefetch)(InitializerContext*) {
+    dlPhdrStore.initialize();
+}
+
+}  // namespace
+#endif  // MONGO_CONFIG_USE_LIBUNWIND
 
 }  // namespace mongo

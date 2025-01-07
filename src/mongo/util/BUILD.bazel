@@ -1209,6 +1209,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "stacktrace_libunwind_test",
     srcs = [
+        "stacktrace_libunwind_deadlock_test.cpp",
         "stacktrace_libunwind_test.cpp",
         "stacktrace_libunwind_test_functions.cpp",
         "stacktrace_libunwind_test_functions.h",

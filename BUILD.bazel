@@ -8457,6 +8457,11 @@ mongo_unittest_install(
 )
 
 mongo_unittest_install(
+    name = "stacktrace_libunwind_test-stacktrace_libunwind_deadlock_test",
+    srcs = ["//src/mongo/util:stacktrace_libunwind_test"],
+)
+
+mongo_unittest_install(
     name = "stacktrace_libunwind_test-stacktrace_libunwind_test",
     srcs = ["//src/mongo/util:stacktrace_libunwind_test"],
 )
