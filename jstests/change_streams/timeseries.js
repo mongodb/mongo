@@ -99,8 +99,9 @@ let expectedChanges = [
                 "metaField": "meta",
                 "granularity": "seconds",
                 "bucketMaxSpanSeconds": 3600
-            }
-        }
+            },
+        },
+        "nsType": "collection",
     },
     {
         // Only seen if time series scalability improvements enabled
@@ -122,8 +123,9 @@ let expectedChanges = [
             "pipeline": [{
                 "$_internalUnpackBucket":
                     {"timeField": "ts", "metaField": "meta", "bucketMaxSpanSeconds": 3600}
-            }]
-        }
+            }],
+        },
+        "nsType": "timeseries",
     },
     {
         "operationType": "createIndexes",
@@ -338,7 +340,7 @@ const assertNoMoreBucketsEvents = (cur) => {
             return true;
         let event = cur.next();
         assert(event.ns.coll !== bucketsCollName,
-               "shouldn't have seen without showSystemEvents" + tojson(event));
+               "shouldn't have seen without showSystemEvents: " + tojson(event));
         return !cur.hasNext();
     });
 };

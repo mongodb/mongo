@@ -34,7 +34,8 @@ const viewPipeline = [{$match: {a: 2}}, {$project: {a: 1}}];
     assertChangeStreamEventEq(event, {
         operationType: "create",
         ns: {db: dbName, coll: "view"},
-        operationDescription: {viewOn: "base", pipeline: viewPipeline}
+        operationDescription: {viewOn: "base", pipeline: viewPipeline},
+        nsType: "view",
     });
 
     // Ensure that we can resume the change stream using a resuming token from the create view
@@ -51,7 +52,8 @@ const viewPipeline = [{$match: {a: 2}}, {$project: {a: 1}}];
     assertChangeStreamEventEq(createEvent, {
         operationType: "create",
         ns: {db: dbName, coll: "viewOnView"},
-        operationDescription: {viewOn: "view", pipeline: viewPipeline}
+        operationDescription: {viewOn: "view", pipeline: viewPipeline},
+        nsType: "view",
     });
 
     // Test 'collMod' command on views.
@@ -96,8 +98,9 @@ const viewPipeline = [{$match: {a: 2}}, {$project: {a: 1}}];
         ns: {db: dbName, coll: "timeseries_coll"},
         operationDescription: {
             viewOn: "system.buckets.timeseries_coll",
-            pipeline: [{$_internalUnpackBucket: {timeField: "time", bucketMaxSpanSeconds: 3600}}]
-        }
+            pipeline: [{$_internalUnpackBucket: {timeField: "time", bucketMaxSpanSeconds: 3600}}],
+        },
+        nsType: "timeseries",
     });
 
     assert.commandWorked(
@@ -185,7 +188,8 @@ assert(event.collectionUUID, event);
 assertChangeStreamEventEq(event, {
     operationType: "create",
     ns: {db: dbName, coll: "view"},
-    operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}}
+    operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+    nsType: "collection",
 });
 
 // Change stream on a single collection does not produce view events.

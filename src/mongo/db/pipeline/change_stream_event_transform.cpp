@@ -33,6 +33,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
+#include <initializer_list>
 #include <utility>
 #include <vector>
 
@@ -40,7 +41,6 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/namespace_string.h"
@@ -58,7 +58,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -76,7 +75,47 @@ const StringDataSet kOpsWithoutNs = {
     DocumentSourceChangeStream::kEndOfTransactionOpType,
 };
 
-Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
+// Possible collection types, for the "type" field returned by collection / view create events.
+enum class CollectionType {
+    kCollection,
+    kView,
+    kTimeseries,
+};
+
+// Stringification for CollectionType.
+StringData toString(CollectionType type) {
+    switch (type) {
+        case CollectionType::kCollection:
+            return "collection"_sd;
+        case CollectionType::kView:
+            return "view"_sd;
+        case CollectionType::kTimeseries:
+            return "timeseries"_sd;
+    }
+    MONGO_UNREACHABLE_TASSERT(8814200);
+}
+
+// Determine type of collection / view created, based on oplog entry payload.
+// Defaults to 'kCollection', and is changed to kView if "viewOn" field is set, except if "viewOn"
+// indicates that it is a timeseries collection. In the latter case kTimeseries is returned.
+CollectionType determineCollectionType(const Document& data, const DatabaseName& dbName) {
+    Value viewOn = data.getField("viewOn");
+    tassert(8814203,
+            "'viewOn' should either be missing or a non-empty string",
+            viewOn.missing() || viewOn.getType() == BSONType::String);
+    if (viewOn.missing()) {
+        return CollectionType::kCollection;
+    }
+    StringData viewOnNss = viewOn.getStringData();
+    tassert(8814204, "'viewOn' should be a non-empty string", !viewOnNss.empty());
+    if (NamespaceString nss = NamespaceStringUtil::deserialize(dbName, viewOnNss);
+        nss.isTimeseriesBucketsCollection()) {
+        return CollectionType::kTimeseries;
+    }
+    return CollectionType::kView;
+}
+
+Document copyDocExceptFields(const Document& source, std::initializer_list<StringData> fieldNames) {
     MutableDocument doc(source);
     for (auto fieldName : fieldNames) {
         doc.remove(fieldName);
@@ -211,8 +250,14 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     Value fullDocument;
     Value updateDescription;
     Value documentKey;
+    // Used to populate the 'operationDescription' output field and also to build the resumeToken
+    // for some events. Note that any change to the 'operationDescription' for existing events can
+    // break changestream resumability between different mongod versions and should thus be avoided!
     Value operationDescription;
     Value stateBeforeChange;
+    // Optional value containing the namespace type for changestream create events. This will be
+    // emitted as 'nsType' field.
+    Value nsType;
 
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
@@ -318,7 +363,18 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             } else if (auto nssField = oField.getField("create"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
-                operationDescription = Value(copyDocExceptFields(oField, {"create"_sd}));
+                Document opDesc = copyDocExceptFields(oField, {"create"_sd});
+                operationDescription = Value(opDesc);
+
+                if (_changeStreamSpec.getShowExpandedEvents()) {
+                    // Populate 'nsType' field with collection type (always "collection" here).
+                    auto collectionType = determineCollectionType(oField, nss.dbName());
+                    tassert(8814201,
+                            "'operationDescription.type' should always resolve to 'collection' for "
+                            "collection create events",
+                            collectionType == CollectionType::kCollection);
+                    nsType = Value(toString(collectionType));
+                }
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
@@ -505,6 +561,10 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // For a 'modify' event we add the state before modification if appropriate.
     doc.addField(DocumentSourceChangeStream::kStateBeforeChangeField, stateBeforeChange);
 
+    if (!nsType.missing()) {
+        doc.addField(DocumentSourceChangeStream::kNsTypeField, nsType);
+    }
+
     return doc.freeze();
 }
 
@@ -531,13 +591,38 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     Value tenantId = input[repl::OplogEntry::kTidFieldName];
 
     StringData operationType;
+    // Used to populate the 'operationDescription' output field and also to build the resumeToken
+    // for some events. Note that any change to the 'operationDescription' for existing events can
+    // break changestream resumability between different mongod versions and should thus be avoided!
     Value operationDescription;
+    // Optional value containing the namespace type for changestream create events. This will be
+    // emitted as 'nsType' field.
+    Value nsType;
 
+    // For views, we are transforming the DML operation on the system.views
+    // collection into a DDL event as follows:
+    // - insert into system.views is turned into a create (collection) event.
+    // - update in system.views is turned into a (collection) modify event.
+    // - delete in system.views is turned into a drop (collection) event.
     Document oField = input[repl::OplogEntry::kObjectFieldName].getDocument();
+
+    // The 'o._id' is the full namespace string of the view.
+    const auto nss = createNamespaceStringFromOplogEntry(tenantId, oField["_id"].getStringData());
+
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
             operationType = DocumentSourceChangeStream::kCreateOpType;
-            operationDescription = Value(copyDocExceptFields(oField, {"_id"_sd}));
+            Document opDesc = copyDocExceptFields(oField, {"_id"_sd});
+            operationDescription = Value(opDesc);
+
+            // Populate 'nsType' field with either "view" or "timeseries".
+            auto collectionType = determineCollectionType(oField, nss.dbName());
+            tassert(8814202,
+                    "'operationDescription.type' should always resolve to 'view' or 'timeseries' "
+                    "for view creation event",
+                    collectionType == CollectionType::kView ||
+                        collectionType == CollectionType::kTimeseries);
+            nsType = Value(toString(collectionType));
             break;
         }
         case repl::OpTypeEnum::kUpdate: {
@@ -573,10 +658,12 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     doc.addField(DocumentSourceChangeStream::kWallTimeField,
                  input[repl::OplogEntry::kWallClockTimeFieldName]);
 
-    // The 'o._id' is the full namespace string of the view.
-    const auto nss = createNamespaceStringFromOplogEntry(tenantId, oField["_id"].getStringData());
     doc.addField(DocumentSourceChangeStream::kNamespaceField, makeChangeStreamNsField(nss));
     doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
+
+    if (!nsType.missing()) {
+        doc.addField(DocumentSourceChangeStream::kNsTypeField, nsType);
+    }
 
     return doc.freeze();
 }

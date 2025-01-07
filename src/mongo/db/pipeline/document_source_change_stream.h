@@ -166,6 +166,10 @@ public:
 
     // The name of the field where the operation description of the non-CRUD operations will be
     // located. This is complementary to the 'documentKey' for CRUD operations.
+    // Note that the operation description of an event will be part of the event's resume token.
+    // Thus the operation description for an existing event should never be changed, because
+    // otherwise the changestream resumability between different versions of MongoDB may be
+    // jeopardized.
     static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
 
     // The name of the field where the pre-image document will be found, if requested and available.
@@ -218,6 +222,10 @@ public:
     // transformation. The cluster time will be located inside the change identifier, so the full
     // path to the cluster time will be kIdField + "." + kClusterTimeField.
     static constexpr StringData kClusterTimeField = "clusterTime"_sd;
+
+    // The name of the field with the nsType of a changestream create event. Will contain
+    // "collection", "view" or "timeseries". Will only be exposed if 'showExpandedEvents' is used.
+    static constexpr StringData kNsTypeField = "nsType"_sd;
 
     // The name of this stage.
     static constexpr StringData kStageName = "$changeStream"_sd;

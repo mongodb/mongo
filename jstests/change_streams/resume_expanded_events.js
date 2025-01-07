@@ -36,7 +36,8 @@ function runTest(collNameForChangeStream) {
         expectedChanges: {
             operationType: "create",
             ns: ns,
-            operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}}
+            operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
+            nsType: "collection",
         }
     })[0];
 
