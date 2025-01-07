@@ -34,15 +34,13 @@
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
-#include <exception>
 #include <fstream>  // IWYU pragma: keep
 #include <functional>
 #include <iterator>
 #include <memory>
 #include <queue>
+#include <span>
 #include <string>
-#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -54,7 +52,6 @@
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/shared_buffer_fragment.h"
@@ -263,8 +260,8 @@ public:
 
     // Returns an iterator that merges the passed in iterators
     template <typename Comparator>
-    static SortIteratorInterface* merge(
-        const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,
+    static std::unique_ptr<SortIteratorInterface> merge(
+        std::span<std::shared_ptr<SortIteratorInterface>> iters,
         const SortOptions& opts,
         const Comparator& comp);
 
@@ -288,37 +285,6 @@ public:
     const SorterStats& stats() const {
         return _stats;
     }
-
-protected:
-    SorterStats _stats;
-};
-
-/**
- * This is the way to input data to the sorting framework.
- *
- * Each instance of this class will generate a file name and spill sorted data ranges to that file
- * if allowed in its given Settings. If the instance destructs before done() is called, it will
- * handle deleting the data file used for spills. Otherwise, if done() is called, responsibility for
- * file deletion moves to the returned Iterator object, which must then delete the file upon its own
- * destruction.
- */
-template <typename Key, typename Value>
-class Sorter : public SorterBase {
-    Sorter(const Sorter&) = delete;
-    Sorter& operator=(const Sorter&) = delete;
-
-public:
-    typedef std::pair<Key, Value> Data;
-    typedef std::function<Value()> ValueProducer;
-    typedef SortIteratorInterface<Key, Value> Iterator;
-    typedef std::pair<typename Key::SorterDeserializeSettings,
-                      typename Value::SorterDeserializeSettings>
-        Settings;
-
-    struct PersistedState {
-        std::string fileName;
-        std::vector<SorterRange> ranges;
-    };
 
     /**
      * Represents the file that a Sorter uses to spill to disk. Supports reading and writing
@@ -379,6 +345,37 @@ public:
         SorterFileStats* _stats;
     };
 
+protected:
+    SorterStats _stats;
+};
+
+/**
+ * This is the way to input data to the sorting framework.
+ *
+ * Each instance of this class will generate a file name and spill sorted data ranges to that file
+ * if allowed in its given Settings. If the instance destructs before done() is called, it will
+ * handle deleting the data file used for spills. Otherwise, if done() is called, responsibility for
+ * file deletion moves to the returned Iterator object, which must then delete the file upon its own
+ * destruction.
+ */
+template <typename Key, typename Value>
+class Sorter : public SorterBase {
+    Sorter(const Sorter&) = delete;
+    Sorter& operator=(const Sorter&) = delete;
+
+public:
+    typedef std::pair<Key, Value> Data;
+    typedef std::function<Value()> ValueProducer;
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+    struct PersistedState {
+        std::string fileName;
+        std::vector<SorterRange> ranges;
+    };
+
     explicit Sorter(const SortOptions& opts);
 
     /**
@@ -387,24 +384,25 @@ public:
     Sorter(const SortOptions& opts, const std::string& fileName);
 
     template <typename Comparator>
-    static Sorter* make(const SortOptions& opts,
-                        const Comparator& comp,
-                        const Settings& settings = Settings());
+    static std::unique_ptr<Sorter> make(const SortOptions& opts,
+                                        const Comparator& comp,
+                                        const Settings& settings = Settings());
 
     template <typename Comparator>
-    static Sorter* makeFromExistingRanges(const std::string& fileName,
-                                          const std::vector<SorterRange>& ranges,
-                                          const SortOptions& opts,
-                                          const Comparator& comp,
-                                          const Settings& settings = Settings());
+    static std::unique_ptr<Sorter> makeFromExistingRanges(const std::string& fileName,
+                                                          const std::vector<SorterRange>& ranges,
+                                                          const SortOptions& opts,
+                                                          const Comparator& comp,
+                                                          const Settings& settings = Settings());
 
     virtual void add(const Key&, const Value&) = 0;
     virtual void emplace(Key&&, ValueProducer) = 0;
 
     /**
-     * Cannot add more data after calling done().
+     * Finishes inserting data and returns an iterator over the sorted results. Cannot add more data
+     * after calling done().
      */
-    virtual Iterator* done() = 0;
+    virtual std::unique_ptr<Iterator> done() = 0;
 
     /**
      * Pauses loading and returns the iterator that can be used to get the current state. Clients of
@@ -412,8 +410,10 @@ public:
      * read-only mode for storing it to a persistent storage which is used by streaming query use
      * cases. New documents cannot be added until resume is called. The iterator returned is
      * reflecting current in memory state and is not guaranteed to be sorted.
+     *
+     * This cannot be called on sorters which have spilled state to disk.
      */
-    virtual Iterator* pause() = 0;
+    virtual std::unique_ptr<Iterator> pause() = 0;
 
     /**
      * Resumes loading and cleans up internal state created during pause().
@@ -422,6 +422,13 @@ public:
 
     virtual ~Sorter() {}
 
+    /**
+     * Spills all of the sorted data to disk, preserves the temporary file, and then returns
+     * metadata which can be passed to makeFromExistingRanges() to use the spill file later. May be
+     * called before or after calling done().
+     *
+     * Only applicable to sorters with limit = 0.
+     */
     PersistedState persistDataForShutdown();
 
     SharedBufferFragmentBuilder& memPool() {
@@ -594,8 +601,8 @@ private:
     using KV = std::pair<Key, Value>;
     std::priority_queue<KV, std::vector<KV>, Greater> _heap;
 
-    std::shared_ptr<typename Sorter<Key, Value>::File> _file;
-    std::shared_ptr<SpillIterator> _spillIter;
+    std::shared_ptr<SorterBase::File> _file;
+    std::unique_ptr<SpillIterator> _spillIter;
 
     boost::optional<Key> _min;
     bool _done = false;
@@ -617,7 +624,7 @@ public:
         Settings;
 
     explicit SortedFileWriter(const SortOptions& opts,
-                              std::shared_ptr<typename Sorter<Key, Value>::File> file,
+                              std::shared_ptr<SorterBase::File> file,
                               const Settings& settings = Settings());
 
     void addAlreadySorted(const Key&, const Value&);
@@ -628,31 +635,22 @@ public:
      *
      * No more data can be added via addAlreadySorted() after calling done().
      */
-    Iterator* done();
+    std::shared_ptr<Iterator> done();
 
     /**
      * The SortedFileWriter organizes data into chunks, with a chunk getting written to the output
-     * file when it exceends a maximum chunks size. A SortedFilerWriter client can produce a short
+     * file when it exceeds a maximum chunks size. A SortedFilerWriter client can produce a short
      * chunk by manually calling this function.
      *
      * If no new data has been added since the last chunk was written, this function is a no-op.
      */
     void writeChunk();
 
-    static std::shared_ptr<Iterator> createFileIteratorForResume(
-        std::shared_ptr<typename Sorter<Key, Value>::File> file,
-        std::streamoff fileStartOffset,
-        std::streamoff fileEndOffset,
-        const Settings& settings,
-        const boost::optional<DatabaseName>& dbName,
-        size_t checksum,
-        SorterChecksumVersion checksumVersion);
-
 private:
     SorterChecksumVersion _getSorterChecksumVersion() const;
 
     const Settings _settings;
-    std::shared_ptr<typename Sorter<Key, Value>::File> _file;
+    std::shared_ptr<SorterBase::File> _file;
     BufBuilder _buffer;
 
     // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
@@ -671,29 +669,32 @@ private:
  * #include "mongo/db/sorter/sorter.cpp" and call this in a single translation
  * unit once for each unique set of template parameters.
  */
-#define MONGO_CREATE_SORTER(Key, Value, Comparator)                                            \
-    /* public classes */                                                                       \
-    template class ::mongo::Sorter<Key, Value>;                                                \
-    template class ::mongo::SortIteratorInterface<Key, Value>;                                 \
-    template class ::mongo::SortedFileWriter<Key, Value>;                                      \
-    /* internal classes */                                                                     \
-    template class ::mongo::sorter::NoLimitSorter<Key, Value, Comparator>;                     \
-    template class ::mongo::sorter::LimitOneSorter<Key, Value, Comparator>;                    \
-    template class ::mongo::sorter::TopKSorter<Key, Value, Comparator>;                        \
-    template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>;                     \
-    template class ::mongo::sorter::InMemIterator<Key, Value>;                                 \
-    template class ::mongo::sorter::FileIterator<Key, Value>;                                  \
-    /* factory functions */                                                                    \
-    template ::mongo::SortIteratorInterface<Key, Value>* ::mongo::                             \
-        SortIteratorInterface<Key, Value>::merge<Comparator>(                                  \
-            const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,                  \
-            const SortOptions& opts,                                                           \
-            const Comparator& comp);                                                           \
-    template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::make<Comparator>(       \
-        const SortOptions& opts, const Comparator& comp, const Settings& settings);            \
-    template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::makeFromExistingRanges< \
-        Comparator>(const std::string& fileName,                                               \
-                    const std::vector<SorterRange>& ranges,                                    \
-                    const SortOptions& opts,                                                   \
-                    const Comparator& comp,                                                    \
-                    const Settings& settings);
+#define MONGO_CREATE_SORTER(Key, Value, Comparator)                                                \
+    namespace mongo {                                                                              \
+                                                                                                   \
+    /* public classes */                                                                           \
+    template class Sorter<Key, Value>;                                                             \
+    template class SortIteratorInterface<Key, Value>;                                              \
+    template class SortedFileWriter<Key, Value>;                                                   \
+    /* internal classes */                                                                         \
+    template class sorter::NoLimitSorter<Key, Value, Comparator>;                                  \
+    template class sorter::LimitOneSorter<Key, Value, Comparator>;                                 \
+    template class sorter::TopKSorter<Key, Value, Comparator>;                                     \
+    template class sorter::MergeIterator<Key, Value, Comparator>;                                  \
+    template class sorter::InMemIterator<Key, Value>;                                              \
+    template class sorter::FileIterator<Key, Value>;                                               \
+    /* factory functions */                                                                        \
+    template std::unique_ptr<SortIteratorInterface<Key, Value>>                                    \
+    SortIteratorInterface<Key, Value>::merge<Comparator>(                                          \
+        std::span<std::shared_ptr<SortIteratorInterface>> iters,                                   \
+        const SortOptions& opts,                                                                   \
+        const Comparator& comp);                                                                   \
+    template std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make<Comparator>(             \
+        const SortOptions& opts, const Comparator& comp, const Settings& settings);                \
+    template std::unique_ptr<Sorter<Key, Value>>                                                   \
+    Sorter<Key, Value>::makeFromExistingRanges<Comparator>(const std::string& fileName,            \
+                                                           const std::vector<SorterRange>& ranges, \
+                                                           const SortOptions& opts,                \
+                                                           const Comparator& comp,                 \
+                                                           const Settings& settings);              \
+    }

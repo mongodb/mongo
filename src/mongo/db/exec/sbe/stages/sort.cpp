@@ -316,7 +316,7 @@ void SortStage::SortImpl<KeyRow, ValueRow>::makeSorter() {
         return 0;
     };
 
-    _sorter.reset(Sorter<KeyRow, ValueRow>::make(opts, comp, {}));
+    _sorter = Sorter<KeyRow, ValueRow>::make(opts, comp, {});
     _mergeIt.reset();
 }
 
@@ -359,7 +359,7 @@ void SortStage::SortImpl<KeyRow, ValueRow>::open(bool reOpen) {
     }
 
     _stage._specificStats.totalDataSizeBytes += _sorter->stats().bytesSorted();
-    _mergeIt.reset(_sorter->done());
+    _mergeIt = _sorter->done();
     _stage._specificStats.spills += _sorter->stats().spilledRanges();
     _stage._specificStats.keysSorted += _sorter->stats().numSorted();
     if (_stage._sorterFileStats) {

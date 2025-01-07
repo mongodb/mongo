@@ -169,8 +169,8 @@ void GroupProcessor::readyGroups() {
 
         _groups = _expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
 
-        _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
-            _sortedFiles, SortOptions(), SorterComparator(_expCtx->getValueComparator())));
+        _sorterIterator = Sorter<Value, Value>::Iterator::merge(
+            _sortedFiles, SortOptions(), SorterComparator(_expCtx->getValueComparator()));
 
         // prepare current to accumulate data
         _currentAccumulators.reserve(_accumulatedFields.size());

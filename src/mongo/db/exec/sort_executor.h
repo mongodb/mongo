@@ -161,7 +161,7 @@ public:
      */
     void loadingDone() {
         ensureSorter();
-        _output.reset(_sorter->done());
+        _output = _sorter->done();
         _stats.keysSorted += _sorter->stats().numSorted();
         _stats.spills += _sorter->stats().spilledRanges();
         _stats.totalDataSizeBytes += _sorter->stats().bytesSorted();
@@ -211,7 +211,7 @@ public:
         invariant(!_paused);
         _paused = true;
         ensureSorter();
-        _output.reset(_sorter->pause());
+        _output = _sorter->pause();
     }
 
     /**
@@ -259,7 +259,7 @@ private:
     void ensureSorter() {
         // This conditional should only pass if no documents were added to the sorter.
         if (!_sorter) {
-            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
+            _sorter = DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern));
         }
     }
 

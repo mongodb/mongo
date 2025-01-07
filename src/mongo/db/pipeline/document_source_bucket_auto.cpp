@@ -164,7 +164,7 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
             return valueCmp.compare(lhs, rhs);
         };
 
-        _sorter.reset(Sorter<Value, Document>::make(opts, comparator));
+        _sorter = Sorter<Value, Document>::make(opts, comparator);
     }
 
     long long position = 0;
@@ -241,7 +241,7 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
 void DocumentSourceBucketAuto::initializeBucketIteration() {
     // Initialize the iterator on '_sorter'.
     invariant(_sorter);
-    _sortedInput.reset(_sorter->done());
+    _sortedInput = _sorter->done();
 
     _sorter.reset();
 

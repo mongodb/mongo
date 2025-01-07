@@ -935,7 +935,7 @@ public:
 private:
     void _insertMultikeyMetadataKeysIntoSorter();
 
-    Sorter* _makeSorter(
+    std::unique_ptr<Sorter> _makeSorter(
         size_t maxMemoryUsageBytes,
         const DatabaseName& dbName,
         boost::optional<StringData> fileName = boost::none,
@@ -1099,7 +1099,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
         {});
 }
 
-SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter*
+std::unique_ptr<SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter>
 SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
     size_t maxMemoryUsageBytes,
     const DatabaseName& dbName,
@@ -1120,7 +1120,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
 std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
 SortedDataIndexAccessMethod::BulkBuilderImpl::finalizeSort() {
     _insertMultikeyMetadataKeysIntoSorter();
-    return std::unique_ptr<Sorter::Iterator>(_sorter->done());
+    return _sorter->done();
 }
 
 void SortedDataIndexAccessMethod::BulkBuilderImpl::debugEnsureSorted(const Sorter::Data& data) {
