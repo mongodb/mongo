@@ -79,3 +79,16 @@ assert.eq(50,
           coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).batchSize(50).itcount());
 assert.eq(1, coll.find().addOption(DBQuery.Option.exhaust).limit(-1).itcount());
 }());
+
+// Ensure that hasNext() on the closed exhausted cursor does not crash the shell.
+(function() {
+const cursor = coll.find().addOption(DBQuery.Option.exhaust);
+cursor.hasNext();
+cursor.close();
+
+// Ensure assertions are thrown when operating on the closed cursor.
+assert.throws(() => cursor.hasNext());
+assert.throws(() => cursor._hasMoreToCome());
+assert.throws(() => cursor.objsLeftInBatch());
+assert.throws(() => cursor.next());
+}());

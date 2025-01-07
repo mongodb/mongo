@@ -68,6 +68,7 @@
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -115,13 +116,13 @@ Message DBClientCursor::assembleInit() {
     }
 
     // We haven't gotten a cursorId yet so we need to issue the initial find command.
-    invariant(_findRequest);
+    tassert(9279705, "Find request is invalid", _findRequest);
     return assembleCommandRequest<FindCommandRequest>(
         _client, _ns.dbName(), *_findRequest, _readPref);
 }
 
 Message DBClientCursor::assembleGetMore() {
-    invariant(_cursorId);
+    tassert(9279706, "CursorId is unexpectedly zero", _cursorId);
     auto getMoreRequest = GetMoreCommandRequest(_cursorId, _ns.coll().toString());
     getMoreRequest.setBatchSize(
         boost::make_optional(_batchSize != 0, static_cast<int64_t>(_batchSize)));
@@ -143,7 +144,8 @@ Message DBClientCursor::assembleGetMore() {
 }
 
 bool DBClientCursor::init() {
-    invariant(!_connectionHasPendingReplies);
+    tassert(
+        9279707, "Connection should not have any pending replies", !_connectionHasPendingReplies);
     Message toSend = assembleInit();
     MONGO_verify(_client);
     Message reply;
@@ -172,7 +174,8 @@ void DBClientCursor::requestMore() {
         return exhaustReceiveMore();
     }
 
-    invariant(!_connectionHasPendingReplies);
+    tassert(
+        9279708, "Connection should not have any pending replies", !_connectionHasPendingReplies);
     MONGO_verify(_cursorId && _batch.pos == _batch.objs.size());
 
     auto doRequestMore = [&] {
@@ -183,7 +186,7 @@ void DBClientCursor::requestMore() {
     if (_client)
         return doRequestMore();
 
-    invariant(_scopedHost.size());
+    tassert(9279709, "Scoped host size can not be zero", _scopedHost.size());
     DBClientBase::withConnection_do_not_use(_scopedHost, [&](DBClientBase* conn) {
         ON_BLOCK_EXIT([&, origClient = _client] { _client = origClient; });
         _client = conn;
@@ -210,8 +213,11 @@ void DBClientCursor::exhaustReceiveMore() {
 }
 
 BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
-    int op = reply.operation();
-    invariant(op == opReply || op == dbMsg);
+    NetworkOp op = reply.operation();
+    tassert(9279710,
+            str::stream() << "Operation should either be 'opReply' or 'dbMsg', but got "
+                          << networkOpToString(op),
+            op == opReply || op == dbMsg);
 
     // Check if the reply indicates that it is part of an exhaust stream.
     const auto isExhaustReply = OpMsg::isFlagSet(reply, OpMsg::kMoreToCome);
@@ -258,7 +264,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
 
 /** If true, safe to call next().  Requests more from server if necessary. */
 bool DBClientCursor::more() {
-    invariant(_isInitialized);
+    tassert(9279711, "Cursor is not initialized", _isInitialized);
     if (!_putBack.empty())
         return true;
 
@@ -273,7 +279,7 @@ bool DBClientCursor::more() {
 }
 
 BSONObj DBClientCursor::next() {
-    invariant(_isInitialized);
+    tassert(9279712, "Cursor is not initialized", _isInitialized);
     if (!_putBack.empty()) {
         BSONObj ret = _putBack.top();
         _putBack.pop();
@@ -299,7 +305,7 @@ BSONObj DBClientCursor::nextSafe() {
 }
 
 void DBClientCursor::peek(vector<BSONObj>& v, int atMost) {
-    invariant(_isInitialized);
+    tassert(9279713, "Cursor is not initialized", _isInitialized);
     auto end = atMost >= static_cast<int>(_batch.objs.size() - _batch.pos)
         ? _batch.objs.end()
         : _batch.objs.begin() + _batch.pos + atMost;
@@ -317,7 +323,7 @@ BSONObj DBClientCursor::peekFirst() {
 }
 
 bool DBClientCursor::peekError(BSONObj* error) {
-    invariant(_isInitialized);
+    tassert(9279714, "Cursor is not initialized", _isInitialized);
     if (!_wasError)
         return false;
 
