@@ -93,7 +93,8 @@ assert.commandFailed(conn.getDB("config").clusterParameters.insert({
 
 // Assert that the results of getClusterParameter: '*' all have an _id element, and that they are
 // consistent with individual gets.
-{
+for (var retry = 0, completed = 0; retry < 2 && completed == 0; retry++) {
+    completed = 1;
     const allParameters =
         assert.commandWorked(adminDB.runCommand({getClusterParameter: '*'})).clusterParameters;
     jsTest.log(allParameters);
@@ -101,6 +102,16 @@ assert.commandFailed(conn.getDB("config").clusterParameters.insert({
         assert(param.hasOwnProperty("_id"),
                'Entry in {getClusterParameter: "*"} result is missing _id key:\n' + tojson(param));
         const name = param["_id"];
-        checkGetClusterParameterMatch(conn, name, param);
+        try {
+            checkGetClusterParameterMatch(conn, name, param);
+        } catch (err) {
+            // Retry for certain races with downgrade, but only once,
+            // as the fact that we saw the race means we're now in
+            // a stable state.
+            if (retry != 0 || !err.toString().match(/Server parameter: .* is disabled/)) {
+                throw err;
+            }
+            completed = 0;
+        }
     }
 }
