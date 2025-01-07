@@ -48,6 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -61,9 +62,72 @@ namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
-class TransitionToDedicatedConfigServerCmd : public BasicCommand {
+class TransitionToDedicatedConfigServerCmd
+    : public TypedCommand<TransitionToDedicatedConfigServerCmd> {
 public:
-    TransitionToDedicatedConfigServerCmd() : BasicCommand("transitionToDedicatedConfigServer") {}
+    using Request = TransitionToDedicatedConfigServer;
+    using Response = RemoveShardResponse;
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        Response typedRun(OperationContext* opCtx) {
+            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+            uassert(7368401,
+                    "The transition to config shard feature is disabled",
+                    gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
+
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+
+            ConfigsvrTransitionToDedicatedConfig transitionToDedicatedConfigServer;
+            transitionToDedicatedConfigServer.setGenericArguments(
+                CommandInvocation::get(opCtx)->getGenericArguments());
+            transitionToDedicatedConfigServer.setDbName(DatabaseName::kAdmin);
+            generic_argument_util::setMajorityWriteConcern(transitionToDedicatedConfigServer,
+                                                           &opCtx->getWriteConcern());
+
+
+            // Force a reload of this node's shard list cache at the end of this command.
+            auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                kPrimaryOnlyReadPreference,
+                DatabaseName::kAdmin,
+                CommandHelpers::filterCommandRequestForPassthrough(
+                    transitionToDedicatedConfigServer.toBSON()),
+                Shard::RetryPolicy::kIdempotent);
+
+            Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponseWithStatus));
+
+            BSONObjBuilder filteredResponse;
+            CommandHelpers::filterCommandReplyForPassthrough(
+                cmdResponseWithStatus.getValue().response, &filteredResponse);
+
+            return Response::parse(IDLParserContext("TransitionToDedicatedConfigServerCmd"),
+                                   filteredResponse.obj());
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return {};
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::transitionToDedicatedConfigServer));
+        }
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -73,61 +137,8 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
     std::string help() const override {
-        return "transition to dedicated config server";
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj&) const override {
-        auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(dbName.tenantId()),
-                ActionType::transitionToDedicatedConfigServer)) {
-            return {ErrorCodes::Unauthorized, "unauthorized"};
-        }
-
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-        uassert(7368401,
-                "The transition to config shard feature is disabled",
-                gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
-
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-        ConfigsvrTransitionToDedicatedConfig transitionToDedicatedConfigServer;
-        transitionToDedicatedConfigServer.setGenericArguments(
-            CommandInvocation::get(opCtx)->getGenericArguments());
-        transitionToDedicatedConfigServer.setDbName(DatabaseName::kAdmin);
-        generic_argument_util::setMajorityWriteConcern(transitionToDedicatedConfigServer,
-                                                       &opCtx->getWriteConcern());
-
-        // Force a reload of this node's shard list cache at the end of this command.
-        auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            kPrimaryOnlyReadPreference,
-            DatabaseName::kAdmin,
-            CommandHelpers::filterCommandRequestForPassthrough(
-                transitionToDedicatedConfigServer.toBSON()),
-            Shard::RetryPolicy::kIdempotent);
-
-        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponseWithStatus));
-        CommandHelpers::filterCommandReplyForPassthrough(cmdResponseWithStatus.getValue().response,
-                                                         &result);
-
-        return true;
+        return "Transition to dedicated config server.";
     }
 };
 MONGO_REGISTER_COMMAND(TransitionToDedicatedConfigServerCmd).forRouter();

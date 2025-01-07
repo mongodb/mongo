@@ -304,6 +304,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/s:remove_shard_gen",
     ],
 )
 

@@ -143,6 +143,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/remove_shard_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
@@ -1716,14 +1717,14 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
     switch (shardDrainingStatus.status) {
         case RemoveShardProgress::STARTED:
             result.append("msg", "draining started successfully");
-            result.append("state", "started");
+            result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kStarted));
             result.append("shard", shardId);
             result.appendElements(dbInfo);
             break;
         case RemoveShardProgress::ONGOING: {
             const auto& remainingCounts = shardDrainingStatus.remainingCounts;
             result.append("msg", "draining ongoing");
-            result.append("state", "ongoing");
+            result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kOngoing));
             result.append("remaining",
                           BSON("chunks" << remainingCounts->totalChunks << "dbs"
                                         << remainingCounts->databases << "jumboChunks"
@@ -1733,7 +1734,9 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
         }
         case RemoveShardProgress::PENDING_DATA_CLEANUP: {
             result.append("msg", "waiting for data to be cleaned up");
-            result.append("state", "pendingDataCleanup");
+            result.append(
+                "state",
+                ShardDrainingState_serializer(ShardDrainingStateEnum::kPendingDataCleanup));
             result.append("pendingRangeDeletions", *shardDrainingStatus.pendingRangeDeletions);
             if (shardDrainingStatus.firstNonEmptyCollection) {
                 // We only check for non-empty collections if there are no pending range deletions,
@@ -1747,7 +1750,8 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
         }
         case RemoveShardProgress::COMPLETED:
             result.append("msg", "removeshard completed successfully");
-            result.append("state", "completed");
+            result.append("state",
+                          ShardDrainingState_serializer(ShardDrainingStateEnum::kCompleted));
             result.append("shard", shardId);
             break;
     }

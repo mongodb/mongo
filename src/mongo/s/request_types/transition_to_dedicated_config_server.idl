@@ -31,20 +31,23 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-
+    - "mongo/s/remove_shard.idl"
+            
 commands:
     transitionToDedicatedConfigServer:
         command_name: transitionToDedicatedConfigServer
         cpp_name: TransitionToDedicatedConfigServer
         strict: true
-        description: "mongos command for transitioning to dedicated config server"
+        description: "The public transitionToDedicatedConfigServer command on mongos for transitioning a config shard to a dedicated config server."
         namespace: ignored
         api_version: ""
+        reply_type: RemoveShardResponse
 
     _configsvrTransitionToDedicatedConfigServer:
         command_name: _configsvrTransitionToDedicatedConfigServer
         cpp_name: ConfigsvrTransitionToDedicatedConfig
         strict: false
-        description: "mongos command for transitioning to dedicated config server"
+        description: "The internal _configsvrTransitionToDedicatedConfigServer command for transitioning a config shard to a dedicated config server."
         namespace: ignored
         api_version: ""
+        reply_type: RemoveShardResponse

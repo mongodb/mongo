@@ -53,10 +53,12 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/s/request_types/transition_to_dedicated_config_server_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -71,20 +73,94 @@ namespace {
  * Internal sharding command run on config servers for transitioning from config shard to
  * dedicated config server.
  */
-class ConfigSvrTransitionToDedicatedConfigCommand : public BasicCommand {
+class ConfigsvrTransitionToDedicatedConfigCommand
+    : public TypedCommand<ConfigsvrTransitionToDedicatedConfigCommand> {
 public:
-    ConfigSvrTransitionToDedicatedConfigCommand()
-        : BasicCommand("_configsvrTransitionToDedicatedConfigServer") {}
+    using Request = ConfigsvrTransitionToDedicatedConfig;
+    using Response = RemoveShardResponse;
 
-    bool skipApiVersionCheck() const override {
-        // Internal command (server to server).
-        return true;
-    }
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
 
-    std::string help() const override {
-        return "Internal command, which is exported by the sharding config server. Do not call "
-               "directly. Transitions a cluster to use dedicated config server.";
-    }
+        Response typedRun(OperationContext* opCtx) {
+            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+            uassert(7368402,
+                    "The transition to config shard feature is disabled",
+                    gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrTransitionToDedicatedConfigServer can only be run on config servers",
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
+            CommandHelpers::uassertCommandRunWithMajority(
+                ConfigsvrTransitionToDedicatedConfig::kCommandName, opCtx->getWriteConcern());
+            ON_BLOCK_EXIT([&opCtx] {
+                try {
+                    repl::ReplClientInfo::forClient(opCtx->getClient())
+                        .setLastOpToSystemLastOpTime(opCtx);
+                } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+                    // This can throw if the opCtx was interrupted. Catch to prevent crashing.
+                }
+            });
+
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            auto shardingState = ShardingState::get(opCtx);
+            shardingState->assertCanAcceptShardedCommands();
+            const auto shardId = shardingState->shardId();
+
+            const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
+
+            const auto shardDrainingStatus = [&] {
+                try {
+                    return shardingCatalogManager->removeShard(opCtx, shardId);
+                } catch (const DBException& ex) {
+                    LOGV2(7470500,
+                          "Failed to remove shard",
+                          "shardId"_attr = shardId,
+                          "error"_attr = redact(ex));
+                    throw;
+                }
+            }();
+
+            BSONObjBuilder result;
+            shardingCatalogManager->appendShardDrainingStatus(
+                opCtx, result, shardDrainingStatus, shardId);
+
+            if (shardDrainingStatus.status == RemoveShardProgress::COMPLETED) {
+                ShardingStatistics::get(opCtx)
+                    .countTransitionToDedicatedConfigServerCompleted.addAndFetch(1);
+            } else if (shardDrainingStatus.status == RemoveShardProgress::STARTED) {
+                ShardingStatistics::get(opCtx)
+                    .countTransitionToDedicatedConfigServerStarted.addAndFetch(1);
+            }
+
+            return Response::parse(IDLParserContext("ConfigsvrTransitionToDedicatedConfigCommand"),
+                                   result.obj());
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return {};
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
+        }
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -94,82 +170,17 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
+    std::string help() const override {
+        return "Internal command, which is exported by the sharding config server. Do not call "
+               "directly. Transitions a cluster to use dedicated config server.";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj&) const override {
-        if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(
-                     ResourcePattern::forClusterResource(dbName.tenantId()),
-                     ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-        uassert(7368402,
-                "The transition to config shard feature is disabled",
-                gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
-
-        uassert(ErrorCodes::IllegalOperation,
-                "_configsvrTransitionToDedicatedConfigServer can only be run on config servers",
-                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-        CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
-
-        ON_BLOCK_EXIT([&opCtx] {
-            try {
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-                // This can throw if the opCtx was interrupted. Catch to prevent crashing.
-            }
-        });
-
-        // Set the operation context read concern level to local for reads into the config database.
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-        auto shardingState = ShardingState::get(opCtx);
-        shardingState->assertCanAcceptShardedCommands();
-        const auto shardId = shardingState->shardId();
-
-        const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
-
-        const auto shardDrainingStatus = [&] {
-            try {
-                return shardingCatalogManager->removeShard(opCtx, shardId);
-            } catch (const DBException& ex) {
-                LOGV2(7470500,
-                      "Failed to remove shard",
-                      "shardId"_attr = shardId,
-                      "error"_attr = redact(ex));
-                throw;
-            }
-        }();
-
-        shardingCatalogManager->appendShardDrainingStatus(
-            opCtx, result, shardDrainingStatus, shardId);
-
-        if (shardDrainingStatus.status == RemoveShardProgress::COMPLETED) {
-            ShardingStatistics::get(opCtx)
-                .countTransitionToDedicatedConfigServerCompleted.addAndFetch(1);
-        } else if (shardDrainingStatus.status == RemoveShardProgress::STARTED) {
-            ShardingStatistics::get(opCtx)
-                .countTransitionToDedicatedConfigServerStarted.addAndFetch(1);
-        }
-
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigSvrTransitionToDedicatedConfigCommand).forShard();
+MONGO_REGISTER_COMMAND(ConfigsvrTransitionToDedicatedConfigCommand).forShard();
 
 }  // namespace
 }  // namespace mongo
