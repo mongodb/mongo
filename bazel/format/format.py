@@ -63,6 +63,12 @@ def run_prettier(prettier: pathlib.Path, check: bool) -> bool:
         print("Found formatting errors. Run 'bazel run //:format' to fix")
         print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
+
+        if os.path.exists("external"):
+            print(
+                "\nexternal exists which may be causing issues in the linter, please try running:\n"
+            )
+            print("\tunlink external")
         return False
 
     if check:
