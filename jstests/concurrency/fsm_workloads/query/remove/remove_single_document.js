@@ -3,11 +3,7 @@
  *
  * Repeatedly remove a document from the collection.
  *
- * @tags: [
- *   assumes_balancer_off,
- *   # TODO SERVER-84348: allow this test to run in concurrency_sharded_* suites.
- *   assumes_unsharded_collection,
- * ]
+ * @tags: [assumes_balancer_off]
  */
 export const $config = (function() {
     var states = {
