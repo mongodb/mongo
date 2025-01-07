@@ -324,3 +324,12 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+idl_generator(
+    name = "repair_sharded_collection_chunks_history_gen",
+    src = "repair_sharded_collection_chunks_history.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

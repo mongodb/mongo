@@ -419,6 +419,7 @@ mongo_cc_library(
         "//src/mongo/s/request_types:placement_history_commands_gen",
         "//src/mongo/s/request_types:remove_shard_from_zone_request_type.cpp",
         "//src/mongo/s/request_types:remove_shard_gen",
+        "//src/mongo/s/request_types:repair_sharded_collection_chunks_history_gen",
         "//src/mongo/s/request_types:reshard_collection_gen",
         "//src/mongo/s/request_types:resharding_operation_time_gen",
         "//src/mongo/s/request_types:set_allow_migrations_gen",

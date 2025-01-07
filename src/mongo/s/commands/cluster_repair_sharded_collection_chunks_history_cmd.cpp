@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
-#include <memory>
 #include <string>
 
 #include "mongo/base/error_codes.h"
@@ -51,16 +48,63 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/repair_sharded_collection_chunks_history_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
+
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 
 namespace mongo {
 namespace {
 
-class RepairShardedCollectionChunksHistoryCommand : public BasicCommand {
+class RepairShardedCollectionChunksHistoryCommand
+    : public TypedCommand<RepairShardedCollectionChunksHistoryCommand> {
 public:
-    RepairShardedCollectionChunksHistoryCommand()
-        : BasicCommand("repairShardedCollectionChunksHistory") {}
+    using Request = RepairShardedCollectionChunksHistory;
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+
+            BSONObjBuilder cmdBuilder;
+            ConfigsvrRepairShardedCollectionChunksHistory cmd(ns());
+            cmd.setForce(request().getForce());
+            cmd.setDbName(DatabaseName::kAdmin);
+            cmd.serialize(&cmdBuilder);
+
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                DatabaseName::kAdmin,
+                CommandHelpers::appendMajorityWriteConcern(cmdBuilder.obj(),
+                                                           opCtx->getWriteConcern()),
+                Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(cmdResponse.commandStatus);
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return request().getCommandParameter();
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        // The command intentionally uses the permission control of split/mergeChunks since it only
+        // modifies the contents of chunk entries and increments the collection/shard placement
+        // versions without causing any data placement changes
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
+                                                           ActionType::splitChunk));
+        }
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -68,10 +112,6 @@ public:
 
     bool adminOnly() const override {
         return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
     }
 
     std::string help() const override {
@@ -83,54 +123,6 @@ public:
                "the routing information. In rare cases where the history entries are missing due "
                "to corrupted restore, the 'force:true' parameter can be passed which will force "
                "all history entries to be re-added.";
-    }
-
-    // The command intentionally uses the permission control of split/mergeChunks since it only
-    // modifies the contents of chunk entries and increments the collection/shard placement versions
-    // without causing any data placement changes
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(
-                     ResourcePattern::forExactNamespace(parseNs(dbName, cmdObj)),
-                     ActionType::splitChunk)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
-        return NamespaceStringUtil::deserialize(dbName.tenantId(),
-                                                CommandHelpers::parseNsFullyQualified(cmdObj),
-                                                SerializationContext::stateDefault());
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        const NamespaceString nss{parseNs(dbName, cmdObj)};
-
-        BSONObjBuilder cmdBuilder(
-            BSON("_configsvrRepairShardedCollectionChunksHistory"
-                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
-        if (cmdObj["force"].booleanSafe())
-            cmdBuilder.appendBool("force", true);
-
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            CommandHelpers::appendMajorityWriteConcern(cmdBuilder.obj(), opCtx->getWriteConcern()),
-            Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponse.commandStatus);
-
-        // Append any return value from the response, which the config server returned
-        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
-
-        return true;
     }
 };
 MONGO_REGISTER_COMMAND(RepairShardedCollectionChunksHistoryCommand).forRouter();
