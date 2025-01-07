@@ -145,6 +145,8 @@ struct __wt_ckpt_snapshot;
 typedef struct __wt_ckpt_snapshot WT_CKPT_SNAPSHOT;
 struct __wt_ckpt_thread;
 typedef struct __wt_ckpt_thread WT_CKPT_THREAD;
+struct __wt_ckpt_timer;
+typedef struct __wt_ckpt_timer WT_CKPT_TIMER;
 struct __wt_col;
 typedef struct __wt_col WT_COL;
 struct __wt_col_fix_auxiliary_header;

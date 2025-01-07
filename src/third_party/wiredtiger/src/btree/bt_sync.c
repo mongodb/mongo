@@ -362,7 +362,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             /*
              * Update checkpoint IO tracking data if configured to log verbose progress messages.
              */
-            if (conn->ckpt.timer_start.tv_sec > 0) {
+            if (conn->ckpt.ckpt_api.timer_start.tv_sec > 0) {
                 conn->ckpt.write_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++conn->ckpt.write_pages;
 

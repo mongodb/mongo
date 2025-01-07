@@ -66,42 +66,43 @@ struct __wt_ckpt_thread {
 };
 
 /*
+ * WT_CKPT_TIMER --
+ *     Time-related statistics.
+ */
+struct __wt_ckpt_timer {
+    struct timespec timer_end;
+    struct timespec timer_start;
+    uint64_t max;
+    uint64_t min;
+    uint64_t recent;
+    uint64_t total;
+};
+
+/*
  * WT_CKPT_CONNECTION --
  *     Checkpoint information.
  */
 struct __wt_ckpt_connection {
-    WT_CKPT_THREAD server; /* Checkpoint thread.*/
-
-    wt_shared uint64_t most_recent; /* Clock value of most recent checkpoint */
 
     WT_CKPT_HANDLE_STATS handle_stats;
 
-    uint64_t scrub_max; /* Checkpoint scrub time min/max */
-    uint64_t scrub_min;
-    uint64_t scrub_recent; /* Checkpoint scrub time recent/total */
-    uint64_t scrub_total;
+    /* Checkpoint thread. */
+    WT_CKPT_THREAD server;
 
-    uint64_t prep_max; /* Checkpoint prepare time min/max */
-    uint64_t prep_min;
-    uint64_t prep_recent; /* Checkpoint prepare time recent/total */
-    uint64_t prep_total;
-    uint64_t time_max; /* Checkpoint time min/max */
-    uint64_t time_min;
-    uint64_t time_recent; /* Checkpoint time recent/total */
-    uint64_t time_total;
+    /* Time-related stats. */
+    WT_CKPT_TIMER ckpt_api;
+    WT_CKPT_TIMER prepare;
+    WT_CKPT_TIMER scrub;
 
-    /* Checkpoint stats and verbosity timers */
-    struct timespec prep_end;
-    struct timespec prep_start;
-    struct timespec timer_start;
-    struct timespec timer_scrub_end;
+    /* Clock value of most recent checkpoint. */
+    wt_shared uint64_t most_recent;
 
-    /* Checkpoint progress message data */
+    /* Checkpoint progress message data. */
     uint64_t progress_msg_count;
     uint64_t write_bytes;
     uint64_t write_pages;
 
-    /* Last checkpoint connection's base write generation */
+    /* Last checkpoint connection's base write generation. */
     uint64_t last_base_write_gen;
 };
 
