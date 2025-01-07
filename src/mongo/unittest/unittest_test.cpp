@@ -167,6 +167,17 @@ TEST(UnitTestSelfTest, TestAssertStringOmits) {
     ASSERT_TEST_FAILS_MATCH(ASSERT_STRING_OMITS("abcdef", "bcd") << "XmsgX", "XmsgX");
 }
 
+TEST(UnitTestSelfTest, TestAssertStringSearchRegex) {
+    ASSERT_STRING_SEARCH_REGEX("abcdef", "^abcdef$");
+    ASSERT_STRING_SEARCH_REGEX("abcdef", "cd");
+    ASSERT_STRING_SEARCH_REGEX("abcdef", ".*");
+    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("abcdef", "ce"));
+    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("abcdef", ".z."));
+    // A regex starting with ? is invalid and shouldn't match.
+    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("?", "?"));
+    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("abcdef", "?.*"));
+}
+
 TEST(UnitTestSelfTest, TestAssertIdentity) {
     auto intIdentity = [](int x) {
         return x;

@@ -53,6 +53,7 @@
 #include "mongo/unittest/stringify.h"
 #include "mongo/unittest/test_info.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/str.h"
 
 /**
@@ -294,22 +295,27 @@
                           haystack);                                               \
         }()))
 
-#define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX)                                           \
-    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(REGEX));                    \
-        ::mongo::unittest::searchRegex(std::get<1>(tup_), std::get<0>(tup_))) {                 \
-    } else                                                                                      \
-        FAIL(([&] {                                                                             \
-            const auto& [haystack, sub] = tup_;                                                 \
-            return format(FMT_STRING("Expected to find regular expression {} /{}/ in {} ({})"), \
-                          #REGEX,                                                               \
-                          sub,                                                                  \
-                          #BIG_STRING,                                                          \
-                          haystack);                                                            \
+#define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX)                                          \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), mongo::pcre::Regex(REGEX));            \
+        ::mongo::unittest::searchRegex(std::get<1>(tup_), std::get<0>(tup_))) {                \
+    } else                                                                                     \
+        FAIL(([&] {                                                                            \
+            const auto& [haystack, regex] = tup_;                                              \
+            std::string sub(REGEX);                                                            \
+            if (regex)                                                                         \
+                return format(                                                                 \
+                    FMT_STRING("Expected to find regular expression {} /{}/ in {} ({})"),      \
+                    #REGEX,                                                                    \
+                    sub,                                                                       \
+                    #BIG_STRING,                                                               \
+                    haystack);                                                                 \
+            else                                                                               \
+                return format(FMT_STRING("Invalid regular expression: {} /{}/"), #REGEX, sub); \
         }()))
 
 namespace mongo::unittest {
 
-bool searchRegex(const std::string& pattern, const std::string& string);
+bool searchRegex(const pcre::Regex& pattern, const std::string& string);
 
 class Result;
 

@@ -78,7 +78,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/pcre.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
@@ -102,8 +101,8 @@ auto& suitesMap() {
 
 }  // namespace
 
-bool searchRegex(const std::string& pattern, const std::string& string) {
-    return !!pcre::Regex(pattern).matchView(string);
+bool searchRegex(const pcre::Regex& pattern, const std::string& string) {
+    return pattern && !!pattern.matchView(string);
 }
 
 class Result {
