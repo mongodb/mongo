@@ -55,6 +55,8 @@
 
 namespace mongo {
 
+extern FailPoint sleepWhileMultiplanning;
+
 /**
  * A PlanStage for performing runtime plan selection. The caller is expected to construct a
  * 'MultiPlanStage', add candidate plans using the 'addPlan()' method, and then trigger runtime plan

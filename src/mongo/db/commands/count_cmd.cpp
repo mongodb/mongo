@@ -222,6 +222,8 @@ public:
             return exceptionToStatus();
         }
 
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
+
         if (shouldDoFLERewrite(request)) {
             if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                 processFLECountD(opCtx, nss, &request);

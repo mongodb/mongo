@@ -3384,6 +3384,8 @@ void explainUpdate(OperationContext* opCtx,
                               isTimeseriesViewRequest);
     uassertStatusOK(parsedUpdate.parseRequest());
 
+    CurOp::get(opCtx)->beginQueryPlanningTimer();
+
     auto exec = uassertStatusOK(
         getExecutorUpdate(&CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
     auto bodyBuilder = result->getBodyBuilder();
@@ -3422,6 +3424,8 @@ void explainDelete(OperationContext* opCtx,
     ParsedDelete parsedDelete(
         opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
     uassertStatusOK(parsedDelete.parseRequest());
+
+    CurOp::get(opCtx)->beginQueryPlanningTimer();
 
     // Explain the plan tree.
     auto exec = uassertStatusOK(

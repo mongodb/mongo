@@ -460,6 +460,8 @@ public:
             auto respSc =
                 SerializationContext::stateCommandReply(_cmdRequest->getSerializationContext());
 
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
             const auto& collectionPtr = collectionOrView->getCollectionPtr();

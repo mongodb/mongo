@@ -328,6 +328,8 @@ public:
         auto canonicalDistinct = parseDistinctCmd(
             opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollator, verbosity);
 
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
+
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
