@@ -78,7 +78,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/query/util/spill_util.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
@@ -1566,7 +1565,7 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
                                                const Settings& settings)
     : _settings(settings),
       _file(std::move(file)),
-      _checksumCalculator(_getSorterChecksumVersion()),
+      _checksumCalculator(opts.checksumVersion),
       _fileStartOffset(_file->currentOffset()),
       _opts(opts) {
     // This should be checked by consumers, but if we get here don't allow writes.
@@ -1663,18 +1662,6 @@ std::shared_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>:
                                                               _opts.dbName,
                                                               _checksumCalculator.checksum(),
                                                               _checksumCalculator.version());
-}
-
-template <typename Key, typename Value>
-SorterChecksumVersion SortedFileWriter<Key, Value>::_getSorterChecksumVersion() const {
-    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
-    // this could run during currentOp which is allowed during initial sync while the FCV is still
-    // uninitialized.
-    if (gFeatureFlagUseSorterChecksumV2.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return SorterChecksumVersion::v2;
-    }
-    return SorterChecksumVersion::v1;
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>

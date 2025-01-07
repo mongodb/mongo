@@ -27,25 +27,15 @@
  *    it in the license file.
  */
 
-#include <boost/container/container_fwd.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/move/algo/move.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
 #include <algorithm>
+#include <boost/container/container_fwd.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -73,20 +63,15 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sorter/sorter.h"
-#include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/fail_point.h"

@@ -1280,6 +1280,100 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
     iter->closeSource();
 }
 
+TEST_F(SorterMakeFromExistingRangesTest, ChecksumVersion) {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+
+    // By default checksum version should be v2
+    {
+        auto sorter = IWSorter::make(opts, IWComparator(ASC));
+        sorter->add(1, -1);
+        auto state = sorter->persistDataForShutdown();
+        ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), SorterChecksumVersion::v2);
+        ASSERT_EQUALS(state.ranges[0].getChecksum(), 1921809301);
+    }
+
+    // Setting checksum version to v1 results in using v1 but getChecksumVersion() returning none
+    // because v1 did not persist a version.
+    {
+        opts.ChecksumVersion(SorterChecksumVersion::v1);
+        auto sorter = IWSorter::make(opts, IWComparator(ASC));
+        sorter->add(1, -1);
+        auto state = sorter->persistDataForShutdown();
+        ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), boost::none);
+        ASSERT_EQUALS(state.ranges[0].getChecksum(), 4121002018);
+    }
+}
+
+struct SpillFileState {
+    std::string fileName;
+    std::vector<SorterRange> ranges;
+    SortOptions opts;
+    IWComparator comp{ASC};
+};
+
+SpillFileState makeSpillFile(unittest::TempDir& tempDir) {
+    SpillFileState ret;
+    ret.opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+
+    auto sorter = IWSorter::make(ret.opts, ret.comp);
+    for (int i = 0; i < 10; ++i)
+        sorter->add(i, -i);
+    auto state = sorter->persistDataForShutdown();
+    ret.fileName = std::move(state.fileName);
+    ret.ranges = std::move(state.ranges);
+    return ret;
+}
+
+void corruptChecksum(SpillFileState& state) {
+    auto& range = state.ranges[0];
+    range.setChecksum(range.getChecksum() ^ 1);
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, ValidChecksumValidation) {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto state = makeSpillFile(tempDir);
+    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+                  ->done();
+    ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, IncompleteReadDoesNotReportChecksumError) {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto state = makeSpillFile(tempDir);
+    corruptChecksum(state);
+    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+                  ->done();
+    // Read the first (and only) block of data, but don't deserialize any of it
+    ASSERT(it->more());
+    // it's destructor doesn't check the checksum since we didn't use everything
+}
+
+DEATH_TEST_F(SorterMakeFromExistingRangesTest,
+             CompleteReadReportsChecksumError,
+             "Data read from disk does not match what was written to disk.") {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto state = makeSpillFile(tempDir);
+    corruptChecksum(state);
+    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+                  ->done();
+    ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
+    // it's destructor ends up checking the checksum and aborts due to it being wrong
+}
+
+DEATH_TEST_F(SorterMakeFromExistingRangesTest,
+             CompleteReadReportsChecksumErrorFromIncorrectChecksumVersion,
+             "Data read from disk does not match what was written to disk.") {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto state = makeSpillFile(tempDir);
+    state.ranges[0].setChecksumVersion(boost::none);
+    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+                  ->done();
+    ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
+    // it's destructor ends up checking the checksum and aborts due to it being wrong (because we
+    // used the wrong checksum algorithm)
+}
+
 class BoundedSorterTest : public unittest::Test {
 public:
     using Key = IntWrapper;

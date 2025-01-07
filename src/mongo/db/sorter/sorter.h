@@ -144,6 +144,9 @@ struct SortOptions {
     // instead of copying.
     bool moveSortedDataIntoIterator;
 
+    // Checksum version to use for spill files. Only applicable if extSortAllowed = true.
+    SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2;
+
     SortOptions()
         : limit(0),
           maxMemoryUsageBytes(DefaultMaxMemoryUsageBytes),
@@ -197,6 +200,11 @@ struct SortOptions {
 
     SortOptions& UseMemoryPool(bool usePool) {
         useMemPool = usePool;
+        return *this;
+    }
+
+    SortOptions& ChecksumVersion(SorterChecksumVersion version) {
+        checksumVersion = version;
         return *this;
     }
 };
@@ -647,8 +655,6 @@ public:
     void writeChunk();
 
 private:
-    SorterChecksumVersion _getSorterChecksumVersion() const;
-
     const Settings _settings;
     std::shared_ptr<SorterBase::File> _file;
     BufBuilder _buffer;
