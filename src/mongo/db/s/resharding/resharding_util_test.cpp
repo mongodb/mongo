@@ -42,6 +42,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -49,12 +51,15 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/assert.h"
@@ -62,6 +67,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -346,6 +353,40 @@ TEST_F(ReshardingUtilTest, ValidateIndexSpecsMatch) {
                                                     << "v" << 3)};
 
     validateIndexes(sourceSpecs2, recipientSpecs2, ErrorCodes::OK);
+}
+
+TEST_F(ReshardingUtilTest, SetNumSamplesPerChunkThroughConfigsvrReshardCollectionRequest) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReshardingNumSamplesPerChunk", true);
+
+    int numInitialChunks = 1;
+    int numSamplesPerChunk = 10;
+
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+
+    ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+    configsvrReshardCollection.setDbName(nss().dbName());
+    configsvrReshardCollection.setUnique(true);
+    const auto collationObj = BSON("locale"
+                                   << "en_US");
+    configsvrReshardCollection.setCollation(collationObj);
+    configsvrReshardCollection.setNumInitialChunks(numInitialChunks);
+
+    boost::optional<ProvenanceEnum> provenance(ProvenanceEnum::kReshardCollection);
+    configsvrReshardCollection.setProvenance(provenance);
+    configsvrReshardCollection.setNumSamplesPerChunk(numSamplesPerChunk);
+
+
+    ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
+        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+    auto numSamplesPerChunkOptional = coordinatorDoc.getNumSamplesPerChunk();
+    ASSERT_TRUE(numSamplesPerChunkOptional.has_value());
+    ASSERT_EQ(*numSamplesPerChunkOptional, numSamplesPerChunk);
 }
 
 class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {

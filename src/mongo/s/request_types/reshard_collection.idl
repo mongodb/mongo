@@ -97,6 +97,10 @@ commands:
           "Runs the cloner aggregation without specifying a collection
           uuid to avoid errors in a scenario where the collection UUIDs
           are inconsistent among shards."
+      numSamplesPerChunk:
+        type: safeInt64
+        description: "The number of documents to sample on new chunks"
+        optional: true
 
   _configsvrReshardCollection:
     command_name: _configsvrReshardCollection
@@ -168,7 +172,10 @@ commands:
           "Runs the cloner aggregation without specifying a collection
           uuid to avoid errors in a scenario where the collection UUIDs
           are inconsistent among shards."
-
+      numSamplesPerChunk:
+        type: safeInt64
+        description: "The number of documents to sample on new chunks"
+        optional: true
 
   moveCollection:
     description: "The public command on mongos that moves one unsharded collection from source to destination shard."

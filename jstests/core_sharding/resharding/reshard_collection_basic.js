@@ -210,6 +210,15 @@ reshardCmdTest.assertReshardCollOk({
 },
                                    1);
 
+const featureFlagReshardingNumSamplesPerChunkEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingNumSamplesPerChunk");
+if (featureFlagReshardingNumSamplesPerChunkEnabled) {
+    jsTest.log("Succeed if small numInitialChunks and large numSamplesPerChunk are provided.");
+
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1, numSamplesPerChunk: 10}, 1);
+}
+
 jsTest.log("Succeed if zones are not empty.");
 assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: existingZoneName}));
 assert.commandWorked(db.adminCommand(

@@ -129,6 +129,11 @@ public:
             }
             reshardCollectionRequest.setImplicitlyCreateIndex(request().getImplicitlyCreateIndex());
 
+            if (resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                reshardCollectionRequest.setNumSamplesPerChunk(request().getNumSamplesPerChunk());
+            }
+
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));
 

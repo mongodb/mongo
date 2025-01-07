@@ -46,9 +46,11 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -61,6 +63,8 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -539,6 +543,74 @@ void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& sh
                               << "' false when resharding on a hashed shard key",
                 shardKeyPattern.isHashedPattern());
     }
+}
+
+ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
+    OperationContext* opCtx,
+    const ConfigsvrReshardCollection& request,
+    const CollectionType& collEntry,
+    const NamespaceString& nss,
+    const bool& setProvenance) {
+
+    auto coordinatorDoc = ReshardingCoordinatorDocument(
+        std::move(CoordinatorStateEnum::kUnused), {} /* donorShards */, {} /* recipientShards */);
+
+    // Generate the resharding metadata for the ReshardingCoordinatorDocument.
+    auto reshardingUUID = UUID::gen();
+    auto existingUUID = collEntry.getUuid();
+    auto shardKeySpec = request.getKey();
+
+    // moveCollection/unshardCollection are called with _id as the new shard key since
+    // that's an acceptable value for tracked unsharded collections so we can skip this.
+    if (collEntry.getTimeseriesFields() &&
+        (!setProvenance || (*request.getProvenance() == ProvenanceEnum::kReshardCollection))) {
+        auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
+        shardkeyutil::validateTimeseriesShardKey(
+            tsOptions.getTimeField(), tsOptions.getMetaField(), request.getKey());
+        shardKeySpec =
+            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+                tsOptions, request.getKey()));
+    }
+
+    auto tempReshardingNss = resharding::constructTemporaryReshardingNss(nss, collEntry.getUuid());
+
+    auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
+                                                   nss,
+                                                   std::move(existingUUID),
+                                                   std::move(tempReshardingNss),
+                                                   shardKeySpec);
+    commonMetadata.setStartTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    if (request.getReshardingUUID()) {
+        commonMetadata.setUserReshardingUUID(*request.getReshardingUUID());
+    }
+    if (setProvenance && request.getProvenance()) {
+        commonMetadata.setProvenance(*request.getProvenance());
+    }
+
+    coordinatorDoc.setSourceKey(collEntry.getKeyPattern().toBSON());
+    coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
+    coordinatorDoc.setZones(request.getZones());
+    coordinatorDoc.setPresetReshardedChunks(request.get_presetReshardedChunks());
+    coordinatorDoc.setNumInitialChunks(request.getNumInitialChunks());
+    coordinatorDoc.setShardDistribution(request.getShardDistribution());
+    coordinatorDoc.setForceRedistribution(request.getForceRedistribution());
+    coordinatorDoc.setUnique(request.getUnique());
+    coordinatorDoc.setCollation(request.getCollation());
+    coordinatorDoc.setImplicitlyCreateIndex(request.getImplicitlyCreateIndex());
+
+    coordinatorDoc.setRecipientOplogBatchTaskCount(request.getRecipientOplogBatchTaskCount());
+    coordinatorDoc.setRelaxed(request.getRelaxed());
+
+    if (!resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Resharding with numSamplesPerChunk is not enabled, reject numSamplesPerChunk "
+                "parameter",
+                !request.getNumSamplesPerChunk().has_value());
+    }
+    coordinatorDoc.setNumSamplesPerChunk(request.getNumSamplesPerChunk());
+
+    return coordinatorDoc;
 }
 
 }  // namespace resharding

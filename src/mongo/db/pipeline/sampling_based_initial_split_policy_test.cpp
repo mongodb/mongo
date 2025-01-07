@@ -360,5 +360,75 @@ TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsWithLimitedMemoryForSortOpe
     ASSERT(!pipelineDocSource->getNext());
 }
 
+TEST_F(SamplingBasedSplitPolicyTest, SetNumSamplesPerChunkSucceedsOnOneChunk) {
+    const int numInitialChunks = 1;
+    const int numSamplesPerChunk = 10;
+
+    auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(
+        {
+            "{_id: 10, a: 15}",
+            "{_id: 3, a: 5}",
+            "{_id: 1, a: 1}",
+            "{_id: 2, a: 2}",
+            "{_id: 3, a: 3}",
+            "{_id: 50, a: 50}",
+            "{_id: 9, a: 14}",
+            "{_id: 11, a: 12}",
+            "{_id: 18, a: 13}",
+            "{_id: 6, a: 6}",
+            "{_id: 8, a: 30}",
+            "{_id: 17, a: 21}",
+        },
+        expCtx());
+    pipeline->addInitialSource(mockSource.get());
+
+    int numSamples = 0;
+    auto next = pipeline->getNext();
+    while (next) {
+        ++numSamples;
+        next = pipeline->getNext();
+    }
+    ASSERT_EQ(numSamplesPerChunk * numInitialChunks, numSamples);
+}
+
+TEST_F(SamplingBasedSplitPolicyTest, SetNumSamplesPerChunkSucceedsOnMultipleChunks) {
+    const int numInitialChunks = 3;
+    const int numSamplesPerChunk = 3;
+
+    auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(
+        {
+            "{_id: 10, a: 15}",
+            "{_id: 3, a: 5}",
+            "{_id: 1, a: 1}",
+            "{_id: 2, a: 2}",
+            "{_id: 3, a: 3}",
+            "{_id: 50, a: 50}",
+            "{_id: 9, a: 14}",
+            "{_id: 11, a: 12}",
+            "{_id: 18, a: 13}",
+            "{_id: 6, a: 6}",
+        },
+        expCtx());
+    pipeline->addInitialSource(mockSource.get());
+
+    int numSamples = 0;
+    auto next = pipeline->getNext();
+    while (next) {
+        ++numSamples;
+        next = pipeline->getNext();
+    }
+    ASSERT_EQ(numSamplesPerChunk * numInitialChunks, numSamples);
+}
+
 }  // namespace
 }  // namespace mongo

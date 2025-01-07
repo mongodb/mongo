@@ -177,3 +177,7 @@ structs:
                 type: date
                 description: "When to timeout after the critical session is initiated."
                 optional: true
+            numSamplesPerChunk:
+                type: long
+                description: "The number of documents to sample on new chunks"
+                optional: true
