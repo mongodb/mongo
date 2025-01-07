@@ -94,6 +94,20 @@ export function canonicalizeEventForTesting(event, expected) {
 }
 
 /**
+ * Helper function that sets a global variable to `true`, runs the callback and then sets back the
+ * global variable to `false`. The global variable can be checked by command overrides to check if
+ * the command was executed from inside the ChangeStreamTest fixture or not.
+ */
+function runInFixture(callback) {
+    globalThis.isInsideChangeStreamTestFixture = true;
+    try {
+        return callback();
+    } finally {
+        globalThis.isInsideChangeStreamTestFixture = false;
+    }
+}
+
+/**
  * Returns true if a change stream event matches the given expected event, false otherwise. Ignores
  * the resume token, clusterTime, and other unknowable fields unless they are explicitly listed in
  * the expected event.
@@ -164,13 +178,15 @@ export function ChangeStreamTest(_db, options) {
                collection === 1);
         const collName = (collection instanceof DBCollection ? collection.getName() : collection);
 
-        let res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
-            _db,
-            Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
-            doNotModifyInPassthroughs));
-        assert.neq(res.cursor.id, 0);
-        _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
-        return res.cursor;
+        return runInFixture(() => {
+            let res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
+                _db,
+                Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
+                doNotModifyInPassthroughs));
+            assert.neq(res.cursor.id, 0);
+            _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
+            return res.cursor;
+        });
     };
 
     /**
@@ -506,17 +522,19 @@ export function ChangeStreamTest(_db, options) {
 ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode(
     {db, collName, pipeline, expectedCode, doNotModifyInPassthroughs}) {
     try {
-        // Run a passthrough-aware initial 'aggregate' command to open the change stream.
-        const res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
-            db,
-            {aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}},
-            doNotModifyInPassthroughs));
+        runInFixture(() => {
+            // Run a passthrough-aware initial 'aggregate' command to open the change stream.
+            const res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
+                db,
+                {aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}},
+                doNotModifyInPassthroughs));
 
-        // Create a cursor using the command response, and begin issuing getMores. We expect
-        // csCursor.hasNext() to throw the expected code before assert.soon() times out.
-        const csCursor = new DBCommandCursor(db, res, 1);
-        assert.soon(() => csCursor.hasNext());
-        assert(false, `Unexpected result from cursor: ${tojsonMaybeTruncate(csCursor.next())}`);
+            // Create a cursor using the command response, and begin issuing getMores. We expect
+            // csCursor.hasNext() to throw the expected code before assert.soon() times out.
+            const csCursor = new DBCommandCursor(db, res, 1);
+            assert.soon(() => csCursor.hasNext());
+            assert(false, `Unexpected result from cursor: ${tojsonMaybeTruncate(csCursor.next())}`);
+        });
     } catch (error) {
         assert.eq(
             error.code, expectedCode, `Caught unexpected error: ${tojsonMaybeTruncate(error)}`);
@@ -542,9 +560,11 @@ ChangeStreamTest.getDBForChangeStream = function(watchMode, dbObj) {
 export function assertChangeStreamNssBehaviour(dbName, collName = "test", options, assertFunc) {
     const testDb = db.getSiblingDB(dbName);
     options = (options || {});
-    const res = testDb.runCommand(
-        Object.assign({aggregate: collName, pipeline: [{$changeStream: options}], cursor: {}}));
-    return assertFunc(res);
+    return runInFixture(() => {
+        const res = testDb.runCommand(
+            Object.assign({aggregate: collName, pipeline: [{$changeStream: options}], cursor: {}}));
+        return assertFunc(res);
+    });
 }
 
 export function assertValidChangeStreamNss(dbName, collName = "test", options) {
