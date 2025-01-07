@@ -1,0 +1,1036 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/add_skip_stage_before_fetch.js
+  - jstests/core/agg_hint.js
+  - jstests/core/aggregation_getmore_batchsize.js
+  - jstests/core/all.js
+  # - jstests/core/all2.js # MultiKey indexes
+  - jstests/core/all3.js
+  - jstests/core/all4.js
+  - jstests/core/all5.js
+  # - jstests/core/and.js # MultiKey indexes
+  - jstests/core/and2.js
+  - jstests/core/and3.js
+  - jstests/core/andor.js
+  # - jstests/core/apitest_db.js # 51: var storageEngineName = db.serverStatus().storageEngine.name;
+  - jstests/core/apitest_db_profile_level.js
+  # - jstests/core/apitest_dbcollection.js # 160: capped collection
+  # - jstests/core/apply_ops1.js # 65: metadata lock assert
+  # - jstests/core/apply_ops2.js # 21: metadata lock assert
+  # - jstests/core/apply_ops_dups.js # 17: metadata lock assert
+  # - jstests/core/apply_ops_index_collation.js # 28: metadata lock assert
+  # - jstests/core/apply_ops_invalid_index_spec.js # 38: replTest
+  # - jstests/core/apply_ops_without_ns.js #12: metadata lock assert
+  - jstests/core/array1.js
+  - jstests/core/array3.js
+  - jstests/core/array4.js
+  - jstests/core/array_match1.js
+  - jstests/core/array_match2.js
+  - jstests/core/array_match3.js
+  - jstests/core/array_match4.js
+  - jstests/core/arrayfind1.js
+  - jstests/core/arrayfind2.js
+  # - jstests/core/arrayfind3.js # 14: index scan outputs wrong counts. multikey index.
+  - jstests/core/arrayfind4.js
+  - jstests/core/arrayfind5.js
+  - jstests/core/arrayfind6.js
+  # - jstests/core/arrayfind7.js # 39: create index over exists data
+  # - jstests/core/arrayfind8.js # 111:->56:->27 Error: [1] != [0] are not equal : unexpected count in single key index standard query
+  # - jstests/core/arrayfind9.js # 33: index scan outputs wrong results. multikey index.
+  - jstests/core/arrayfinda.js
+  - jstests/core/arrayfindb.js
+  - jstests/core/auth1.js
+  - jstests/core/auth2.js
+  # - jstests/core/auth_copydb.js # 24: a.copyDatabase()
+  - jstests/core/autocomplete.js
+  - jstests/core/autoid.js
+  - jstests/core/automation_setparameter.js
+  # - jstests/core/awaitdata_getmore_cmd.js # 55: metadata lock assert
+  - jstests/core/background_index_multikey.js
+  - jstests/core/bad_index_plugin.js
+  - jstests/core/basic1.js
+  - jstests/core/basic2.js
+  - jstests/core/basic4.js
+  - jstests/core/basic5.js
+  - jstests/core/basic6.js
+  - jstests/core/basic7.js
+  - jstests/core/basic8.js
+  - jstests/core/basica.js
+  - jstests/core/batch_size.js
+  - jstests/core/batch_write_collation_estsize.js
+  # - jstests/core/batch_write_command_delete.js # run too long time
+  # - jstests/core/batch_write_command_insert.js # run too long time
+  # - jstests/core/batch_write_command_update.js # run too long time
+  - jstests/core/batch_write_command_wc.js
+  # - jstests/core/bench_test1.js # 32: Error: 3362.0468597152712 is not less than or eq 2005.5
+  - jstests/core/bench_test2.js
+  # - jstests/core/bench_test3.js # 33: table scan return wrong items
+  - jstests/core/binData.js
+  - jstests/core/bindata_indexonly.js
+  - jstests/core/bittest.js
+  - jstests/core/bson.js
+  - jstests/core/bulk_api_ordered.js
+  - jstests/core/bulk_api_unordered.js
+  - jstests/core/bulk_insert.js
+  # - jstests/core/bulk_insert_capped.js // Unsupport capped collections
+  - jstests/core/bulk_legacy_enforce_gle.js
+  # - jstests/core/bypass_doc_validation.js # 54: metadata lock assert
+  - jstests/core/cannot_create_system_dot_indexes.js
+  #- jstests/core/capped.js
+  # - jstests/core/capped1.js
+  # - jstests/core/capped5.js
+  # - jstests/core/capped6.js
+  # - jstests/core/capped_convertToCapped1.js
+  # - jstests/core/capped_empty.js
+  # - jstests/core/capped_max1.js
+  # - jstests/core/capped_queries_and_id_index.js
+  # - jstests/core/capped_update.js
+  # - jstests/core/cappeda.js
+  # - jstests/core/check_shard_index.js # 66: f.reIndex()
+  - jstests/core/cleanup_orphaned.js
+  - jstests/core/client_metadata_ismaster.js
+  # - jstests/core/clone_as_capped_nonexistant.js
+  # - jstests/core/collation.js # 673: crash at executing reIndex cmd
+  # - jstests/core/collation_convert_to_capped.js
+  # - jstests/core/collation_plan_cache.js # 19: create index on exists document.
+  - jstests/core/collation_update.js
+  # - jstests/core/collation_with_reverse_index.js # 7: create index on exists document.
+  # - jstests/core/collection_truncate.js # 10: CommandNotFound
+  - jstests/core/collmod.js
+  - jstests/core/collmod_bad_spec.js
+  # - jstests/core/collmod_without_uuid.js # 25: metadata lock assert
+  # - jstests/core/commands_namespace_parsing.js  # 164: no such command: 'godinsert'
+  - jstests/core/commands_that_do_not_write_do_not_accept_wc.js
+  # - jstests/core/commands_with_uuid.js # 91: Unimplemented parallelCollectionScan.
+  # - jstests/core/compact_keeps_indexes.js # 21: Unimplemented compact
+  - jstests/core/compare_timestamps.js
+  - jstests/core/connection_status.js
+  - jstests/core/connection_string_validation.js
+  # - jstests/core/constructors.js # crash
+  # - jstests/core/convert_to_capped.js
+  # - jstests/core/convert_to_capped_nonexistant.js
+  # - jstests/core/copydb.js
+  - jstests/core/count.js
+  # - jstests/core/count10.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/count11.js
+  - jstests/core/count2.js
+  - jstests/core/count3.js
+  - jstests/core/count4.js
+  - jstests/core/count5.js
+  - jstests/core/count6.js
+  - jstests/core/count7.js
+  - jstests/core/count9.js
+  # - jstests/core/count_hint.js # 33: sparse index
+  # - jstests/core/count_plan_summary.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/counta.js
+  - jstests/core/countb.js
+  - jstests/core/countc.js
+  - jstests/core/covered_index_compound_1.js
+  # - jstests/core/covered_index_negative_1.js # 49: Test query and projection on a multi-key index
+  - jstests/core/covered_index_simple_1.js
+  - jstests/core/covered_index_simple_2.js
+  # - jstests/core/covered_index_simple_3.js # 22: multikey index
+  - jstests/core/covered_index_simple_id.js
+  - jstests/core/covered_index_sort_1.js
+  - jstests/core/covered_index_sort_2.js
+  - jstests/core/covered_index_sort_3.js
+  # - jstests/core/covered_multikey.js
+  - jstests/core/coveredIndex1.js
+  - jstests/core/coveredIndex2.js
+  - jstests/core/coveredIndex3.js
+  - jstests/core/coveredIndex4.js
+  # - jstests/core/create_collection.js # 62: db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "a_1"}})
+  - jstests/core/create_collection_fail_cleanup.js
+  - jstests/core/create_indexes.js
+  # - jstests/core/crud_api.js
+  # - jstests/core/currentop.js # 16: The current storage engine doesn't support backup mode
+  - jstests/core/currentop_predicate.js
+  - jstests/core/cursor1.js
+  - jstests/core/cursor2.js
+  - jstests/core/cursor3.js
+  - jstests/core/cursor4.js
+  - jstests/core/cursor5.js
+  - jstests/core/cursor6.js
+  - jstests/core/cursor7.js
+  # - jstests/core/cursora.js # 45: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/datasize2.js
+  - jstests/core/date1.js
+  - jstests/core/date2.js
+  - jstests/core/date3.js
+  - jstests/core/db.js
+  # - jstests/core/dbadmin.js # 28: db.runCommand("serverStatus")
+  - jstests/core/dbcase.js
+  - jstests/core/dbcase2.js
+  # - jstests/core/dbhash.js # 43: dbhash()
+  # - jstests/core/dbhash2.js
+  - jstests/core/dbref1.js
+  - jstests/core/dbref2.js
+  - jstests/core/dbref3.js
+  - jstests/core/dbref4.js
+  # - jstests/core/dbstats.js # 22: serverStatus cmd
+  - jstests/core/delx.js
+  - jstests/core/depth_limit.js
+  # - jstests/core/diagdata.js # 15: etDiagnosticData failed to return a non-empty command, is FTDC running? 
+  - jstests/core/distinct1.js
+  - jstests/core/distinct2.js
+  # - jstests/core/distinct3.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/distinct4.js
+  - jstests/core/distinct_array1.js
+  - jstests/core/distinct_compound_index.js
+  # - jstests/core/distinct_index1.js # 72: hash index
+  - jstests/core/distinct_index2.js
+  - jstests/core/distinct_multikey.js
+  - jstests/core/doc_validation.js
+  - jstests/core/doc_validation_invalid_validators.js
+  - jstests/core/doc_validation_options.js
+  - jstests/core/drop.js
+  - jstests/core/drop3.js
+  - jstests/core/drop_index.js
+  # - jstests/core/dropdb.js # 29: dropDatabase()
+  - jstests/core/dropdb_race.js
+  - jstests/core/elemmatch_or_pushdown.js
+  # - jstests/core/elemMatchProjection.js # 158: virtual bool txservice::PostReadCc::ValidTermCheck(): Assertion `ccm_ != nullptr' failed.
+  - jstests/core/ensure_sorted.js
+  # - jstests/core/error2.js # server crash at CircularQueue<std::unique_ptr<mongo::QueryRequest, std::default_delete<mongo::QueryRequest> > >::Enqueue
+  - jstests/core/error5.js
+  # - jstests/core/eval0.js # server crash at CircularQueue<std::unique_ptr<mongo::QueryRequest, std::default_delete<mongo::QueryRequest> > >::Enqueue
+  # - jstests/core/eval1.js
+  # - jstests/core/eval2.js
+  # - jstests/core/eval3.js
+  # - jstests/core/eval4.js
+  # - jstests/core/eval5.js
+  # - jstests/core/eval6.js
+  # - jstests/core/eval7.js
+  # - jstests/core/eval8.js
+  # - jstests/core/eval9.js
+  # - jstests/core/eval_mr.js
+  # - jstests/core/eval_nolock.js
+  # - jstests/core/eval_wait_for_read_write_concern.js
+  # - jstests/core/evala.js
+  # - jstests/core/evalb.js
+  # - jstests/core/evald.js
+  # - jstests/core/evale.js
+  # - jstests/core/evalg.js
+  # - jstests/core/evalh.js
+  # - jstests/core/evalj.js
+  - jstests/core/exhaust.js
+  - jstests/core/exists.js
+  - jstests/core/exists2.js
+  - jstests/core/exists3.js
+  - jstests/core/exists4.js
+  - jstests/core/exists5.js
+  - jstests/core/exists6.js
+  - jstests/core/exists7.js
+  - jstests/core/exists8.js
+  - jstests/core/exists9.js
+  # - jstests/core/existsa.js # 22: sparse index
+  # - jstests/core/existsb.js # 65: sparse index
+  - jstests/core/explain1.js
+  - jstests/core/explain2.js
+  - jstests/core/explain4.js
+  - jstests/core/explain5.js
+  - jstests/core/explain6.js
+  # - jstests/core/explain_agg_write_concern.js # 26: invariant(uuidCatalog.lookupCollectionByUUID(_uuid.get()) != _this);
+  - jstests/core/explain_batch_size.js
+  - jstests/core/explain_count.js
+  - jstests/core/explain_db_mismatch.js
+  - jstests/core/explain_delete.js
+  - jstests/core/explain_distinct.js
+  - jstests/core/explain_execution_error.js
+  - jstests/core/explain_find.js
+  # - jstests/core/explain_find_and_modify.js # 34: Explaining findAndModify on a non-existent database should return an error.
+  - jstests/core/explain_large_bounds.js
+  - jstests/core/explain_missing_collection.js
+  - jstests/core/explain_missing_database.js
+  - jstests/core/explain_multi_plan.js
+  - jstests/core/explain_multikey.js
+  # - jstests/core/explain_shell_helpers.js # 255: sparse index
+  - jstests/core/explain_upsert.js
+  # - jstests/core/expr.js # 181: geo
+  # - jstests/core/expr_index_use.js # explain
+  - jstests/core/expr_or_pushdown.js
+  - jstests/core/expr_valid_positions.js
+  - jstests/core/field_name_validation.js
+  - jstests/core/filemd5.js
+  - jstests/core/find2.js
+  - jstests/core/find3.js
+  - jstests/core/find4.js
+  - jstests/core/find5.js
+  - jstests/core/find6.js
+  - jstests/core/find7.js
+  - jstests/core/find8.js
+  - jstests/core/find9.js
+  - jstests/core/find_and_modify.js
+  - jstests/core/find_and_modify2.js
+  - jstests/core/find_and_modify3.js
+  - jstests/core/find_and_modify4.js
+  # - jstests/core/find_and_modify_concurrent_update.js # 33: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/find_and_modify_empty_coll.js
+  - jstests/core/find_and_modify_empty_update.js
+  - jstests/core/find_and_modify_server6226.js
+  - jstests/core/find_and_modify_server6254.js
+  - jstests/core/find_and_modify_server6582.js
+  - jstests/core/find_and_modify_server6588.js
+  - jstests/core/find_and_modify_server6659.js
+  - jstests/core/find_and_modify_server6865.js
+  - jstests/core/find_and_modify_server6909.js
+  - jstests/core/find_and_modify_server6993.js
+  - jstests/core/find_and_modify_server7660.js
+  - jstests/core/find_and_modify_where.js
+  - jstests/core/find_dedup.js
+  - jstests/core/find_getmore_bsonsize.js
+  - jstests/core/find_getmore_cmd.js
+  - jstests/core/find_size.js
+  # - jstests/core/finda.js # hang
+  - jstests/core/fm1.js
+  - jstests/core/fm2.js
+  - jstests/core/fm3.js
+  - jstests/core/fm4.js
+  # - jstests/core/fsync.js # 20: db.serverStatus()
+  # - jstests/core/fts1.js
+  # - jstests/core/fts2.js # Full-Text Search # 12: [js] Error: [[ 1, 2 ]] != [[ ]] are not equal
+  # - jstests/core/fts3.js
+  # - jstests/core/fts4.js
+  # - jstests/core/fts5.js
+  # - jstests/core/fts6.js
+  # - jstests/core/fts_array.js
+  # - jstests/core/fts_blog.js
+  # - jstests/core/fts_blogwild.js
+  # - jstests/core/fts_casesensitive.js
+  # - jstests/core/fts_diacritic_and_caseinsensitive.js
+  # - jstests/core/fts_diacritic_and_casesensitive.js
+  # - jstests/core/fts_diacriticsensitive.js
+  # - jstests/core/fts_dotted_prefix_fields.js
+  # - jstests/core/fts_explain.js
+  # - jstests/core/fts_index.js
+  # - jstests/core/fts_index2.js
+  # - jstests/core/fts_index3.js
+  # - jstests/core/fts_index_version1.js
+  # - jstests/core/fts_index_version2.js
+  # - jstests/core/fts_mix.js
+  # - jstests/core/fts_partition1.js
+  # - jstests/core/fts_partition_no_multikey.js
+  # - jstests/core/fts_phrase.js
+  # - jstests/core/fts_proj.js
+  # - jstests/core/fts_projection.js
+  # - jstests/core/fts_querylang.js
+  # - jstests/core/fts_score_sort.js
+  # - jstests/core/fts_spanish.js
+  # - jstests/core/fts_trailing_fields.js
+  # - jstests/core/function_string_representations.js # 23: stack check. mongo::StackLocator::available()
+  # - jstests/core/geo1.js
+  # - jstests/core/geo10.js
+  # - jstests/core/geo2.js
+  # - jstests/core/geo3.js
+  # - jstests/core/geo5.js
+  # - jstests/core/geo6.js
+  # - jstests/core/geo7.js
+  # - jstests/core/geo9.js
+  # - jstests/core/geo_2d_explain.js
+  # - jstests/core/geo_2d_trailing_fields.js
+  # - jstests/core/geo_2d_with_geojson_point.js
+  # - jstests/core/geo_allowedcomparisons.js
+  # - jstests/core/geo_array0.js
+  # - jstests/core/geo_array1.js
+  # - jstests/core/geo_array2.js
+  # - jstests/core/geo_big_polygon.js
+  # - jstests/core/geo_big_polygon2.js
+  # - jstests/core/geo_big_polygon3.js
+  # - jstests/core/geo_borders.js
+  # - jstests/core/geo_box1.js
+  # - jstests/core/geo_box1_noindex.js
+  # - jstests/core/geo_box2.js
+  # - jstests/core/geo_box3.js
+  # - jstests/core/geo_center_sphere1.js
+  # - jstests/core/geo_center_sphere2.js
+  # - jstests/core/geo_circle1.js
+  # - jstests/core/geo_circle1_noindex.js
+  # - jstests/core/geo_circle2.js
+  # - jstests/core/geo_circle2a.js
+  # - jstests/core/geo_circle3.js
+  # - jstests/core/geo_circle4.js
+  # - jstests/core/geo_circle5.js
+  # - jstests/core/geo_distinct.js
+  # - jstests/core/geo_exactfetch.js
+  # - jstests/core/geo_fiddly_box.js
+  # - jstests/core/geo_fiddly_box2.js
+  # - jstests/core/geo_group.js
+  # - jstests/core/geo_haystack1.js
+  # - jstests/core/geo_haystack2.js
+  # - jstests/core/geo_haystack3.js
+  # - jstests/core/geo_invalid_2d_params.js
+  # - jstests/core/geo_invalid_polygon.js
+  # - jstests/core/geo_mapreduce.js
+  # - jstests/core/geo_mapreduce2.js
+  # - jstests/core/geo_max.js
+  # - jstests/core/geo_mindistance.js
+  # - jstests/core/geo_mindistance_boundaries.js
+  # - jstests/core/geo_multikey0.js
+  # - jstests/core/geo_multikey1.js
+  # - jstests/core/geo_multinest0.js
+  # - jstests/core/geo_multinest1.js
+  # - jstests/core/geo_near_random1.js
+  # - jstests/core/geo_near_random2.js
+  # - jstests/core/geo_nearwithin.js
+  # - jstests/core/geo_oob_sphere.js
+  # - jstests/core/geo_operator_crs.js
+  # - jstests/core/geo_or.js
+  # - jstests/core/geo_poly_edge.js
+  # - jstests/core/geo_poly_line.js
+  # - jstests/core/geo_polygon1.js
+  # - jstests/core/geo_polygon1_noindex.js
+  # - jstests/core/geo_polygon2.js
+  # - jstests/core/geo_polygon3.js
+  # - jstests/core/geo_queryoptimizer.js
+  # - jstests/core/geo_regex0.js
+  # - jstests/core/geo_s2cursorlimitskip.js
+  # - jstests/core/geo_s2dedupnear.js
+  # - jstests/core/geo_s2descindex.js
+  # - jstests/core/geo_s2disjoint_holes.js
+  # - jstests/core/geo_s2dupe_points.js
+  # - jstests/core/geo_s2edgecases.js
+  # - jstests/core/geo_s2exact.js
+  # - jstests/core/geo_s2explain.js
+  # - jstests/core/geo_s2holesameasshell.js
+  # - jstests/core/geo_s2index.js
+  # - jstests/core/geo_s2indexoldformat.js
+  # - jstests/core/geo_s2indexversion1.js
+  # - jstests/core/geo_s2intersection.js
+  # - jstests/core/geo_s2largewithin.js
+  # - jstests/core/geo_s2meridian.js
+  # - jstests/core/geo_s2multi.js
+  # - jstests/core/geo_s2near.js
+  # - jstests/core/geo_s2near_equator_opposite.js
+  # - jstests/core/geo_s2nearComplex.js
+  # - jstests/core/geo_s2nearcorrect.js
+  # - jstests/core/geo_s2nearwithin.js
+  # - jstests/core/geo_s2nongeoarray.js
+  # - jstests/core/geo_s2nonstring.js
+  # - jstests/core/geo_s2nopoints.js
+  # - jstests/core/geo_s2oddshapes.js
+  # - jstests/core/geo_s2ordering.js
+  # - jstests/core/geo_s2overlappingpolys.js
+  # - jstests/core/geo_s2polywithholes.js
+  # - jstests/core/geo_s2selfintersectingpoly.js
+  # - jstests/core/geo_s2sparse.js
+  # - jstests/core/geo_s2twofields.js
+  # - jstests/core/geo_s2validindex.js
+  # - jstests/core/geo_s2within.js
+  # - jstests/core/geo_s2within_line_polygon_sphere.js
+  # - jstests/core/geo_small_large.js
+  # - jstests/core/geo_sort1.js
+  # - jstests/core/geo_uniqueDocs.js
+  # - jstests/core/geo_uniqueDocs2.js
+  # - jstests/core/geo_update.js
+  # - jstests/core/geo_update1.js
+  # - jstests/core/geo_update2.js
+  # - jstests/core/geo_update_btree.js
+  # - jstests/core/geo_update_btree2.js
+  # - jstests/core/geo_update_dedup.js
+  # - jstests/core/geo_validate.js
+  # - jstests/core/geo_withinquery.js
+  # - jstests/core/geoa.js
+  # - jstests/core/geob.js
+  # - jstests/core/geoc.js
+  # - jstests/core/geod.js
+  # - jstests/core/geoe.js
+  # - jstests/core/geof.js
+  # - jstests/core/geonear_cmd_input_validation.js
+  # - jstests/core/geonear_key.js
+  - jstests/core/getlog1.js
+  # - jstests/core/getlog2.js # 14: TypeError: TestData is undefined
+  # - jstests/core/getmore_cmd_maxtimems.js # 47: metadata lock assert
+  # - jstests/core/getmore_invalidated_cursors.js # 33: Unimplemented  MonographRecordStore::appendCustomStats()
+  # - jstests/core/getmore_invalidated_documents.js # geo
+  - jstests/core/group1.js
+  - jstests/core/group2.js
+  - jstests/core/group3.js
+  - jstests/core/group4.js
+  - jstests/core/group5.js
+  - jstests/core/group6.js
+  - jstests/core/group8.js
+  - jstests/core/group9.js
+  - jstests/core/group_empty.js
+  - jstests/core/grow_hash_table.js
+  # - jstests/core/hashindex1.js
+  - jstests/core/hint1.js
+  - jstests/core/hostinfo.js
+  - jstests/core/id1.js
+  - jstests/core/idhack.js
+  - jstests/core/in.js
+  - jstests/core/in2.js
+  - jstests/core/in3.js
+  - jstests/core/in4.js
+  # - jstests/core/in5.js # 28: create index over exists document.
+  - jstests/core/in6.js
+  - jstests/core/in7.js
+  - jstests/core/in8.js
+  - jstests/core/inc-SERVER-7446.js
+  - jstests/core/inc1.js
+  - jstests/core/inc2.js
+  - jstests/core/inc3.js
+  - jstests/core/index1.js
+  - jstests/core/index13.js
+  - jstests/core/index2.js
+  - jstests/core/index3.js
+  # - jstests/core/index4.js # 26: Error: assert failed : valid :
+  - jstests/core/index5.js
+  - jstests/core/index6.js
+  # - jstests/core/index8.js # 28: reIndex()
+  # - jstests/core/index9.js # 17: set autoIndexID:false
+  - jstests/core/index_arr1.js
+  - jstests/core/index_arr2.js
+  # - jstests/core/index_big1.js # 21: Error: did not throw exception
+  # - jstests/core/index_bigkeys.js # 42: Error: assert failed
+  # - jstests/core/index_bigkeys_nofail.js # 15: Error: no write error: { "nInserted" : 1 }
+  # - jstests/core/index_bigkeys_update.js # 15: Error: no write error: { "nMatched" : 1, "nUpserted" : 0, "nModified" : 1 }
+  # - jstests/core/index_bigkeys_validation.js # 39: Error: [false] != [true] are not equal
+  - jstests/core/index_bounds_code.js
+  - jstests/core/index_bounds_maxkey.js
+  - jstests/core/index_bounds_minkey.js
+  - jstests/core/index_bounds_number_edge_cases.js
+  - jstests/core/index_bounds_object.js
+  - jstests/core/index_bounds_pipe.js
+  - jstests/core/index_bounds_timestamp.js
+  # - jstests/core/index_check2.js # 35: count over multikey index outputs wrong number.
+  - jstests/core/index_check3.js
+  # - jstests/core/index_check5.js # 18: count over multikey index outputs wrong number.
+  - jstests/core/index_check6.js
+  - jstests/core/index_check7.js
+  - jstests/core/index_create_too_many.js
+  - jstests/core/index_create_with_nul_in_name.js
+  - jstests/core/index_decimal.js
+  - jstests/core/index_diag.js
+  # - jstests/core/index_dropdups_ignore.js # 15: [js] Error: command worked when it should have failed
+  - jstests/core/index_elemmatch1.js
+  # - jstests/core/index_elemmatch2.js # 29: Error: [4] != [3] are not equal
+  - jstests/core/index_filter_commands.js
+  # - jstests/core/index_id_options.js # 29: create index on _id
+  # - jstests/core/index_many.js # 44: renameCollection
+  - jstests/core/index_many2.js
+  - jstests/core/index_multikey.js
+  - jstests/core/index_multiple_compatibility.js
+  # - jstests/core/index_partial_2dsphere.js
+  # - jstests/core/index_partial_create_drop.js # 52: [js] Error: [5] != [10] are not equal
+  - jstests/core/index_partial_read_ops.js
+  - jstests/core/index_partial_validate.js
+  # - jstests/core/index_partial_write_ops.js # 79: Error: [1] != [0] are not equal
+  # - jstests/core/index_plugins.js # 21: 2dsphere index
+  # - jstests/core/index_sparse1.js
+  # - jstests/core/index_sparse2.js
+  # - jstests/core/index_stats.js # 173: mongo::StackLocator::available
+  # - jstests/core/index_type_change.js # 41: Error: assert failed : Index entry did not change type
+  # - jstests/core/indexa.js # 17: count() wrong number.
+  - jstests/core/indexapi.js
+  - jstests/core/indexb.js
+  # - jstests/core/indexc.js # 19: itcount() wrong number.
+  - jstests/core/indexd.js
+  - jstests/core/indexe.js
+  - jstests/core/indexes_multiple_commands.js
+  - jstests/core/indexes_on_indexes.js
+  - jstests/core/indexf.js
+  # - jstests/core/indexg.js # 8: count() wrong number.
+  - jstests/core/indexj.js
+  - jstests/core/indexl.js
+  # - jstests/core/indexm.js # 9: count() wrong number.
+  - jstests/core/indexn.js
+  - jstests/core/indexOtherNamespace.js
+  - jstests/core/indexp.js
+  - jstests/core/indexr.js
+  - jstests/core/indexs.js
+  # - jstests/core/indext.js # 11: sparse index
+  # - jstests/core/indexu.js # 15: crash at MyMonograph::MongoSkEncoder::GenerateBSONKeys()
+  - jstests/core/indexv.js
+  - jstests/core/insert1.js
+  - jstests/core/insert2.js
+  - jstests/core/insert_id_undefined.js
+  - jstests/core/insert_illegal_doc.js
+    # - jstests/core/insert_long_index_key.js # 12: Error: [1] != [2] are not equal
+  - jstests/core/insert_one.js
+  - jstests/core/invalid_db_name.js
+  - jstests/core/ismaster.js
+  - jstests/core/js1.js
+  - jstests/core/js2.js
+  # - jstests/core/js3.js # 32: crash at CircularQueue<std::unique_ptr<mongo::QueryRequest, std::default_delete<mongo::QueryRequest> > >::Enqueue
+  - jstests/core/js4.js
+  - jstests/core/js5.js
+  # - jstests/core/js7.js # 9: crash
+  - jstests/core/js8.js
+  # - jstests/core/js9.js # 19: crash
+  - jstests/core/js_jit.js
+  - jstests/core/json1.js
+  - jstests/core/json_schema/additional_items.js
+  - jstests/core/json_schema/additional_properties.js
+  - jstests/core/json_schema/bsontype.js
+  - jstests/core/json_schema/dependencies.js
+  - jstests/core/json_schema/items.js
+  - jstests/core/json_schema/json_schema.js
+  - jstests/core/json_schema/logical_keywords.js
+  - jstests/core/json_schema/min_max_items.js
+  - jstests/core/json_schema/min_max_properties.js
+  # - jstests/core/json_schema/misc_validation.js # 99: geo
+  - jstests/core/json_schema/pattern_properties.js
+  - jstests/core/json_schema/required.js
+  - jstests/core/json_schema/unique_items.js
+  - jstests/core/jssymbol.js
+  - jstests/core/kill_cursors.js
+  - jstests/core/killop_drop_collection.js
+  # - jstests/core/list_all_local_cursors.js # 11: Unrecognized pipeline stage name: '$listLocalCursors'
+  - jstests/core/list_all_local_sessions.js
+  # - jstests/core/list_all_sessions.js # 21: no such command: 'refreshLogicalSessionCacheNow'
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/list_collections_name_only.js
+  - jstests/core/list_collections_no_views.js
+  - jstests/core/list_commands.js
+  - jstests/core/list_databases.js
+  # - jstests/core/list_indexes.js # 161: Monograph need to handle autoIndexId collection option.
+  - jstests/core/list_indexes_invalid.js
+  # - jstests/core/list_indexes_invalidation.js # 31: renameCollection()
+  - jstests/core/list_indexes_non_existent_ns.js
+  - jstests/core/list_local_sessions.js
+  # - jstests/core/list_namespaces_invalidation.js # 38: renameCollection()
+  # - jstests/core/list_sessions.js # 23: no such command: 'refreshLogicalSessionCacheNow'
+  # - jstests/core/loadserverscripts.js # 53: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/logprocessdetails.js # 38: Error: [false] != [true] are not equal
+  - jstests/core/long_index_rename.js
+  - jstests/core/map1.js
+  - jstests/core/max_doc_size.js
+  # - jstests/core/max_time_ms.js # 81: Error: did not throw exception : expected batch 2 (getmore) to abort due to time limit
+  - jstests/core/maxscan.js
+  - jstests/core/min_max_bounds.js
+  - jstests/core/minmax.js
+  - jstests/core/minmax_edge.js
+  - jstests/core/mod1.js
+  # - jstests/core/mr1.js # 49: crash at mongo::StackLocator::available()
+  # - jstests/core/mr2.js
+  # - jstests/core/mr3.js
+  # - jstests/core/mr4.js
+  # - jstests/core/mr5.js
+  # - jstests/core/mr_bigobject.js
+  # - jstests/core/mr_bigobject_replace.js
+  # - jstests/core/mr_comments.js
+  # - jstests/core/mr_errorhandling.js
+  # - jstests/core/mr_index.js
+  # - jstests/core/mr_index2.js
+  # - jstests/core/mr_index3.js
+  # - jstests/core/mr_killop.js
+  # - jstests/core/mr_merge.js
+  # - jstests/core/mr_merge2.js
+  # - jstests/core/mr_mutable_properties.js
+  # - jstests/core/mr_optim.js
+  # - jstests/core/mr_outreduce.js
+  # - jstests/core/mr_outreduce2.js
+  # - jstests/core/mr_replaceIntoDB.js
+  # - jstests/core/mr_sort.js
+  # - jstests/core/mr_stored.js
+  # - jstests/core/mr_tolerates_js_exception.js
+  # - jstests/core/mr_undef.js
+  - jstests/core/multi.js
+  - jstests/core/multi2.js
+  # - jstests/core/multikey_geonear.js
+  - jstests/core/nan.js
+  - jstests/core/natural.js
+  - jstests/core/ne1.js
+  - jstests/core/ne2.js
+  - jstests/core/ne3.js
+  - jstests/core/nestedarr1.js
+  - jstests/core/nestedobj1.js
+  - jstests/core/nin.js
+  - jstests/core/nin2.js
+  - jstests/core/no_db_created.js
+  - jstests/core/not1.js
+  - jstests/core/not2.js
+  - jstests/core/not3.js
+  - jstests/core/notablescan.js
+  # - jstests/core/ns_length.js # 79: canRenameCollection()
+  # - jstests/core/null.js # 25: sparse index
+  - jstests/core/null2.js 
+  - jstests/core/null_field_name.js
+  - jstests/core/numberint.js
+  - jstests/core/numberlong.js
+  - jstests/core/numberlong2.js
+  - jstests/core/numberlong3.js
+  - jstests/core/numberlong4.js
+  - jstests/core/objid1.js
+  - jstests/core/objid2.js
+  - jstests/core/objid3.js
+  - jstests/core/objid4.js
+  - jstests/core/objid5.js
+  - jstests/core/objid6.js
+  - jstests/core/objid7.js
+  # - jstests/core/opcounters_active.js # 21: serverStatus()
+  # - jstests/core/opcounters_write_cmd.js # 29: serverStatus()
+  # - jstests/core/operation_latency_histogram.js # 121: Unimplemented cmd parallelCollectionScan
+  - jstests/core/optime_cmp.js
+  - jstests/core/optimized_match_explain.js
+  - jstests/core/or1.js
+  - jstests/core/or2.js
+  - jstests/core/or3.js
+  # - jstests/core/or4.js # 75: crash at mongo::StackLocator::available()
+  - jstests/core/or5.js
+  # - jstests/core/or6.js # 17: index scan wrong outputs.
+  - jstests/core/or7.js
+  - jstests/core/or8.js
+  - jstests/core/or9.js
+  - jstests/core/or_always_false.js
+  # - jstests/core/or_inexact.js # 181: 2d index
+  - jstests/core/ora.js
+  - jstests/core/orb.js
+  - jstests/core/orc.js
+  - jstests/core/ord.js
+  - jstests/core/ore.js
+  - jstests/core/orf.js
+  - jstests/core/org.js
+  - jstests/core/orh.js
+  - jstests/core/orj.js
+  - jstests/core/ork.js
+  # - jstests/core/oro.js # 27: Unimplemented method MonographRecordStore::appendCustomStats()
+  - jstests/core/orp.js
+  # - jstests/core/plan_cache_clear.js # 86: reIndex()
+  - jstests/core/plan_cache_list_plans.js
+  - jstests/core/plan_cache_list_shapes.js
+  - jstests/core/plan_cache_shell_helpers.js
+  - jstests/core/pop_server_13516.js
+  # - jstests/core/profile1.js # 107: Unimplemented method MonographRecordStore::appendCustomStats()
+  # - jstests/core/profile2.js # 22: Error: [1] != [0] are not equal
+  # - jstests/core/profile3.js # 41: Error: [0] != [3] are not equal
+  # - jstests/core/profile_agg.js # 30: Error: assert failed : could not find any entries in the profile collection matching filter: undefined
+  # - jstests/core/profile_count.js 28: Error: assert failed : could not find any entries in the profile collection matching filter: undefined
+  # - jstests/core/profile_delete.js 31: Error: assert failed : could not find any entries in the profile collection matching filter: undefined
+  # - jstests/core/profile_distinct.js
+  # - jstests/core/profile_find.js
+  # - jstests/core/profile_findandmodify.js
+  # - jstests/core/profile_geonear.js
+  # - jstests/core/profile_getmore.js
+  # - jstests/core/profile_group.js
+  # - jstests/core/profile_insert.js
+  # - jstests/core/profile_list_collections.js
+  # - jstests/core/profile_list_indexes.js
+  # - jstests/core/profile_mapreduce.js
+  # - jstests/core/profile_no_such_db.js
+  # - jstests/core/profile_parallel_collection_scan.js
+  # - jstests/core/profile_repair_cursor.js
+  # - jstests/core/profile_sampling.js
+  # - jstests/core/profile_update.js
+  - jstests/core/proj_key1.js
+  - jstests/core/projection_dotted_paths.js
+  - jstests/core/pull.js
+  - jstests/core/pull2.js
+  - jstests/core/pull_or.js
+  - jstests/core/pull_remove1.js
+  - jstests/core/pullall.js
+  - jstests/core/pullall2.js
+  - jstests/core/push.js
+  - jstests/core/push2.js
+  - jstests/core/push_sort.js
+  - jstests/core/query1.js
+  # - jstests/core/queryoptimizer3.js # 52: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/queryoptimizer6.js
+  # - jstests/core/queryoptimizera.js # 83: create index on _id
+  - jstests/core/read_after_optime.js
+  - jstests/core/record_store_count.js
+  # - jstests/core/recursion.js # 30: eval()
+  - jstests/core/ref.js
+  - jstests/core/ref2.js
+  - jstests/core/ref3.js
+  - jstests/core/ref4.js
+  - jstests/core/regex.js
+  - jstests/core/regex2.js
+  - jstests/core/regex3.js
+  - jstests/core/regex4.js
+  # - jstests/core/regex5.js # 22: index scan on array.
+  - jstests/core/regex6.js
+  - jstests/core/regex7.js
+  - jstests/core/regex8.js
+  - jstests/core/regex9.js
+  - jstests/core/regex_embed1.js
+  - jstests/core/regex_limit.js
+  - jstests/core/regex_not_id.js
+  - jstests/core/regex_options.js
+  - jstests/core/regex_unicode.js
+  - jstests/core/regex_util.js
+  - jstests/core/regex_verbs.js
+  - jstests/core/regexa.js
+  - jstests/core/regexb.js
+  - jstests/core/regexc.js
+  - jstests/core/remove.js
+  - jstests/core/remove2.js
+  - jstests/core/remove3.js
+  - jstests/core/remove4.js
+  - jstests/core/remove6.js
+  - jstests/core/remove7.js
+  # - jstests/core/remove8.js # 29: eval()
+  # - jstests/core/remove9.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/remove_justone.js
+  - jstests/core/remove_undefined.js
+  - jstests/core/removea.js
+  # - jstests/core/removeb.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/removec.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/rename.js # renameCollection
+  # - jstests/core/rename2.js
+  # - jstests/core/rename3.js
+  - jstests/core/rename4.js
+  - jstests/core/rename5.js
+  - jstests/core/rename6.js
+  # - jstests/core/rename7.js
+  # - jstests/core/rename8.js
+  - jstests/core/rename_change_target_type.js
+  # - jstests/core/rename_stayTemp.js # renameCollection
+  # - jstests/core/repair_database.js # 27: repairDatabase(). metadata lock
+  # - jstests/core/repair_database_input_validation.js # 38: db already exists with different case already have
+  # - jstests/core/repair_server12955.js # 16: repairDatabase().
+  # - jstests/core/restart_catalog.js # 71: Storage engine does not support read concern
+  - jstests/core/return_key.js
+  - jstests/core/role_management_helpers.js
+  - jstests/core/run_program1.js
+  - jstests/core/SERVER-23626.js
+  - jstests/core/server1470.js
+  - jstests/core/server14747.js
+  - jstests/core/server14753.js
+  - jstests/core/server22053.js
+  - jstests/core/server25192.js
+  - jstests/core/server5346.js
+  - jstests/core/server7756.js
+  - jstests/core/server9385.js
+  - jstests/core/server9547.js
+  - jstests/core/set1.js
+  - jstests/core/set2.js
+  - jstests/core/set3.js
+  - jstests/core/set4.js
+  - jstests/core/set5.js
+  - jstests/core/set6.js
+  - jstests/core/set7.js
+  - jstests/core/set_param1.js
+  - jstests/core/set_type_change.js
+  - jstests/core/shell1.js
+  # - jstests/core/shell_connection_strings.js # 12: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/shell_writeconcern.js
+  - jstests/core/shellkillop.js
+  # - jstests/core/shellstartparallel.js # 11: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/shelltypes.js
+  # - jstests/core/show_record_id.js # 17: mongo::RecordId::repr(): invariant(isLong())
+  - jstests/core/single_batch.js
+  - jstests/core/skip1.js
+  - jstests/core/slice1.js
+  - jstests/core/sort1.js
+  - jstests/core/sort10.js
+  - jstests/core/sort2.js
+  - jstests/core/sort3.js
+  - jstests/core/sort4.js
+  - jstests/core/sort5.js
+  - jstests/core/sort6.js
+  - jstests/core/sort7.js
+  # - jstests/core/sort8.js # 14: index scan on array
+  - jstests/core/sort9.js
+  # - jstests/core/sort_array.js # 79: index scan on array
+  - jstests/core/sort_numeric.js
+  - jstests/core/sorta.js
+  - jstests/core/sortb.js
+  - jstests/core/sortc.js
+  # - jstests/core/sortd.js # 23: index scan on array
+  - jstests/core/sortf.js
+  - jstests/core/sortg.js # 58: txservice::PostReadCc::ValidTermCheck(): assert(ccm_ != nullptr)
+  - jstests/core/sorth.js
+  - jstests/core/sorti.js
+  - jstests/core/sortj.js
+  # - jstests/core/sortk.js # 84: [js] Error: [1] != [0] are not equal
+  - jstests/core/sortl.js
+  # - jstests/core/splitvector.js # 31: Implemented method mongo::MonographRecordStore::appendCustomStats()
+  # - jstests/core/stages_and_hash.js # 53: [js] Error: [0] != [1] are not equal
+  # - jstests/core/stages_and_sorted.js # 78: [js] Error: [0] != [1] are not equal
+  # - jstests/core/stages_collection_scan.js
+  # - jstests/core/stages_delete.js
+  # - jstests/core/stages_fetch.js
+  # - jstests/core/stages_ixscan.js
+  # - jstests/core/stages_limit_skip.js
+  # - jstests/core/stages_mergesort.js
+  # - jstests/core/stages_or.js
+  # - jstests/core/stages_sort.js
+  # - jstests/core/stages_text.js
+  # - jstests/core/startup_log.js # 32: Unimplemented method mongo::MonographRecordStore::appendCustomStats()
+  # - jstests/core/storefunc.js # 32: eval()
+  - jstests/core/string_with_nul_bytes.js
+  - jstests/core/sub1.js
+  # - jstests/core/system_profile.js # 22: Unimplemented method mongo::MonographRecordStore::appendCustomStats()
+  - jstests/core/tailable_cursor_invalidation.js
+  # - jstests/core/tailable_getmore_batch_size.js # 61: metadata lock
+  # - jstests/core/tailable_skip_limit.js # 44: Error: getMore command failed. BSONObjectTooLarge
+  # - jstests/core/temp_cleanup.js # 10: mongo::StackLocator::available()
+  - jstests/core/test_command_line_test_helpers.js
+  - jstests/core/testminmax.js
+  - jstests/core/text_covered_matching.js
+  - jstests/core/throw_big.js
+  - jstests/core/top.js
+  - jstests/core/ts1.js
+  - jstests/core/type1.js
+  - jstests/core/type2.js
+  - jstests/core/type3.js
+  - jstests/core/type4.js
+  - jstests/core/type5.js
+  - jstests/core/type6.js
+  - jstests/core/type7.js
+  - jstests/core/type8.js
+  - jstests/core/type_array.js
+  # - jstests/core/uniqueness.js # 41: Error: command worked when it should have failed
+  - jstests/core/unset.js
+  - jstests/core/unset2.js
+  - jstests/core/update2.js
+  - jstests/core/update3.js
+  - jstests/core/update5.js
+  - jstests/core/update6.js
+  # - jstests/core/update7.js # 110:  Error: ["5,8"] != [[ 6, 9 ]] are not equal
+  - jstests/core/update8.js
+  - jstests/core/update9.js
+  - jstests/core/update_addToSet.js
+  - jstests/core/update_addToSet2.js
+  - jstests/core/update_addToSet3.js
+  - jstests/core/update_affects_indexes.js
+  - jstests/core/update_array_offset_positional.js
+  - jstests/core/update_arrayFilters.js
+  - jstests/core/update_arraymatch1.js
+  - jstests/core/update_arraymatch2.js
+  - jstests/core/update_arraymatch3.js
+  - jstests/core/update_arraymatch4.js
+  - jstests/core/update_arraymatch5.js
+  - jstests/core/update_arraymatch6.js
+  - jstests/core/update_arraymatch7.js
+  - jstests/core/update_arraymatch8.js
+  - jstests/core/update_bit_examples.js
+  - jstests/core/update_blank1.js
+  - jstests/core/update_currentdate_examples.js
+  - jstests/core/update_dbref.js
+  - jstests/core/update_find_and_modify_id.js
+  - jstests/core/update_invalid1.js
+  - jstests/core/update_min_max_examples.js
+  - jstests/core/update_modifier_pop.js
+  - jstests/core/update_mul_examples.js
+  - jstests/core/update_multi3.js
+  - jstests/core/update_multi4.js
+  - jstests/core/update_multi5.js
+  - jstests/core/update_multi6.js
+  - jstests/core/update_server-12848.js
+  - jstests/core/update_setOnInsert.js
+  - jstests/core/updatea.js
+  - jstests/core/updateb.js
+  - jstests/core/updatec.js
+  - jstests/core/updated.js
+  - jstests/core/updatee.js
+  # - jstests/core/updatef.js # 26: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/updateg.js
+  - jstests/core/updateh.js
+  - jstests/core/updatei.js
+  - jstests/core/updatej.js
+  - jstests/core/updatek.js
+  - jstests/core/updatel.js
+  - jstests/core/updatem.js
+  - jstests/core/upsert_and.js
+  - jstests/core/upsert_fields.js
+  - jstests/core/upsert_shell.js
+  - jstests/core/useindexonobjgtlt.js
+  - jstests/core/user_management_helpers.js
+  - jstests/core/validate_cmd_ns.js
+  - jstests/core/validate_user_documents.js
+  - jstests/core/verify_update_mods.js
+  - jstests/core/views/duplicate_ns.js
+  # - jstests/core/views/invalid_system_views.js # 47: metadata lock
+  # - jstests/core/views/views_aggregation.js # 91: mongo::IndexCatalogImpl::_setupInMemoryStructures(): invariant(save == _entries.find(descriptorPtr->indexName()))
+  # - jstests/core/views/views_all_commands.js # 634: metadata lock
+  - jstests/core/views/views_basic.js
+  - jstests/core/views/views_change.js
+  - jstests/core/views/views_coll_stats.js
+  - jstests/core/views/views_collation.js
+  - jstests/core/views/views_count.js
+  - jstests/core/views/views_creation.js
+  - jstests/core/views/views_distinct.js
+  - jstests/core/views/views_drop.js
+  - jstests/core/views/views_find.js
+  # - jstests/core/views/views_rename.js # 15: renameCollection
+  - jstests/core/views/views_stats.js
+  - jstests/core/views/views_validation.js
+  - jstests/core/where1.js
+  - jstests/core/where2.js
+  - jstests/core/where3.js
+  - jstests/core/where4.js
+  - jstests/core/where5.js
+  - jstests/core/write_commands_reject_unknown_fields.js
+  # - jstests/core/write_result.js # 109: Error: [1] != [0] are not equal
+  # - jstests/core_standalone/read_concern.js # 23: crash
+  - jstests/core_standalone/write_concern.js
+  # - Tests that would be excluded from suite core_monograph
+  # - jstests/core/txns/abort_expired_transaction.js # 40: Transaction numbers are only allowed on a replica set member or mongos
+  # - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+  # - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
+  # - jstests/core/txns/aggregation_in_transaction.js
+  # - jstests/core/txns/ban_tailable_cursor.js
+  # - jstests/core/txns/banned_txn_dbs.js
+  # - jstests/core/txns/basic_causal_consistency.js
+  # - jstests/core/txns/commands_not_allowed_in_txn.js
+  # - jstests/core/txns/concurrent_drops_and_creates.js
+  # - jstests/core/txns/do_txn_atomicity.js
+  # - jstests/core/txns/do_txn_basic.js
+  # - jstests/core/txns/find_and_modify_in_transaction.js
+  # - jstests/core/txns/finished_transaction_error_handling.js
+  # - jstests/core/txns/kill_cursors_in_transaction.js
+  # - jstests/core/txns/kill_op_on_txn_expiry.js
+  # - jstests/core/txns/kill_sessions_kills_transaction.js
+  # - jstests/core/txns/kill_transaction_cursors_after_commit.js
+  # - jstests/core/txns/kill_txn_cursor.js
+  # - jstests/core/txns/libs/write_conflicts.js
+  # - jstests/core/txns/list_collections_not_blocked_by_txn.js
+  # - jstests/core/txns/multi_delete_in_transaction.js
+  # - jstests/core/txns/multi_statement_transaction.js
+  # - jstests/core/txns/multi_statement_transaction_abort.js
+  # - jstests/core/txns/multi_statement_transaction_command_args.js
+  # - jstests/core/txns/multi_statement_transaction_using_api.js
+  # - jstests/core/txns/multi_update_in_transaction.js
+  # - jstests/core/txns/no_implicit_collection_creation_in_txn.js
+  # - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
+  # - jstests/core/txns/no_read_or_write_concern_inside_txn.js
+  # - jstests/core/txns/no_writes_to_system_collections_in_txn.js
+  # - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
+  # - jstests/core/txns/noop_createIndexes_not_blocked_by_txn.js
+  # - jstests/core/txns/only_allow_transactions_on_FCV_40.js
+  # - jstests/core/txns/read_own_multikey_writes.js
+  # - jstests/core/txns/repeatable_reads_in_transaction.js
+  # - jstests/core/txns/shell_prompt_in_transaction.js
+  # - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+  # - jstests/core/txns/start_transaction_with_read.js
+  # - jstests/core/txns/statement_ids_accepted.js
+  # - jstests/core/txns/transaction_error_handling.js
+  # - jstests/core/txns/transactions_block_ddl.js
+  # - jstests/core/txns/transactions_profiling.js
+  # - jstests/core/txns/transactions_profiling_with_drops.js
+  # - jstests/core/txns/transactions_write_conflicts.js
+  # - jstests/core/txns/transactions_write_conflicts_unique_indexes.js
+  # - jstests/core/txns/upconvert_read_concern.js
+  # - jstests/core/txns/view_reads_in_transaction.js
+  # - jstests/core/txns/write_conflicts_with_non_txns.js
+
+  exclude_files:
+  # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+  # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
+  - jstests/core/txns/**/*.js
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      readMode: commands
+      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  hooks:
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnNamespaceNotFound: false
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
