@@ -301,6 +301,7 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     if config.EVERGREEN_TASK_ID is not None:
         test_data["inEvergreen"] = True
         test_data["evergreenTaskId"] = config.EVERGREEN_TASK_ID
+        test_data["evergreenVariantName"] = config.EVERGREEN_VARIANT_NAME
 
     if config.SHELL_SEED is not None:
         test_data["seed"] = int(config.SHELL_SEED)
