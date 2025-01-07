@@ -359,6 +359,7 @@ TTLMonitorService* TTLMonitorService::get(ServiceContext* serviceContext) {
 
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
+MONGO_FAIL_POINT_DEFINE(TTLMonitorSkipRunningCollMod);
 
 // A TTL pass completes when there are no more expired documents to remove. A single TTL pass may
 // consist of multiple sub-passes. Each sub-pass deletes all the expired documents it can up to
@@ -974,6 +975,12 @@ void TTLMonitor::onStepUp() {
                     if (auto correctedExpireAfterSeconds =
                             index_key_validate::normalizeExpireAfterSeconds(
                                 expireAfterSecondsElem)) {
+                        if (MONGO_unlikely(TTLMonitorSkipRunningCollMod.shouldFail())) {
+                            LOGV2(90449,
+                                  "TTL monitor skipping running collMod to fix TTL index due to "
+                                  "failpoint");
+                            continue;
+                        }
                         LOGV2(6847700,
                               "Running collMod to fix TTL index with invalid "
                               "'expireAfterSeconds'.",
