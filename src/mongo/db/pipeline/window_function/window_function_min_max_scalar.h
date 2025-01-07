@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/util/assert_util.h"
@@ -60,42 +59,7 @@ public:
                               const Value& windowMin,
                               const Value& windowMax,
                               const Value& sMin,
-                              const Value& sMax) {
-        // The current value must be bounded between the min and max of the window for the
-        // calculation to be valid.
-        tassert(9459903,
-                "The current value cannot be less than the minimum value of the window. Current "
-                "value = '" +
-                    currentValue.toString() + "', window minimum = '" + windowMin.toString() + "'.",
-                Value::compare(currentValue, windowMin, nullptr) >= 0);
-        tassert(
-            9459904,
-            "The current value cannot be greather than the maximum value of the window. Current "
-            "value = '" +
-                currentValue.toString() + "', window maximum = '" + windowMax.toString() + "'.",
-            Value::compare(currentValue, windowMax, nullptr) <= 0);
-
-
-        // Check for the special case where the min and max of the window are equal,
-        // meaning there is no range of the possible output domain. In this case, we squash the
-        // output value to the minimum of the output domain.
-        // Mathematically, we prevent a divide by zero (when max is subtracted by min in the
-        // denominator).
-        if (Value::compare(windowMin, windowMax, nullptr) == 0) {
-            return Value(sMin);
-        }
-
-        // Get the return value scaled between 0 and 1.
-        Value minMaxUnscaled = throwingApply<ExpressionDivide>(
-            throwingApply<ExpressionSubtract>(currentValue, windowMin),
-            throwingApply<ExpressionSubtract>(windowMax, windowMin));
-
-        // Scale the return value between the configured bounds.
-        return throwingApply<ExpressionAdd>(
-            throwingApply<ExpressionMultiply>(minMaxUnscaled,
-                                              throwingApply<ExpressionSubtract>(sMax, sMin)),
-            sMin);
-    }
+                              const Value& sMax);
 
     Value getValue(boost::optional<Value> current) const final {
         // Value of the current document is needed to compute the $minMaxScalar.

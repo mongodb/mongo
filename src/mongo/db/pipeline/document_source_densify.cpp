@@ -45,6 +45,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/document_source_fill.h"
 #include "mongo/db/pipeline/document_source_fill_gen.h"
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -729,30 +730,31 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
 }
 
 DensifyValue DensifyValue::increment(const RangeStatement& range) const {
-    return visit(
-        OverloadedVisitor{
-            [&](Value val) {
-                return DensifyValue(uassertStatusOK(ExpressionAdd::apply(val, range.getStep())));
-            },
-            [&](Date_t date) {
-                return DensifyValue(dateAdd(
-                    date, range.getUnit().value(), range.getStep().coerceToLong(), timezone()));
-            }},
-        _value);
-}
-
-DensifyValue DensifyValue::decrement(const RangeStatement& range) const {
     return visit(OverloadedVisitor{[&](Value val) {
                                        return DensifyValue(uassertStatusOK(
-                                           ExpressionSubtract::apply(val, range.getStep())));
+                                           exec::expression::evaluateAdd(val, range.getStep())));
                                    },
                                    [&](Date_t date) {
                                        return DensifyValue(dateAdd(date,
                                                                    range.getUnit().value(),
-                                                                   -range.getStep().coerceToLong(),
+                                                                   range.getStep().coerceToLong(),
                                                                    timezone()));
                                    }},
                  _value);
+}
+
+DensifyValue DensifyValue::decrement(const RangeStatement& range) const {
+    return visit(
+        OverloadedVisitor{
+            [&](Value val) {
+                return DensifyValue(
+                    uassertStatusOK(exec::expression::evaluateSubtract(val, range.getStep())));
+            },
+            [&](Date_t date) {
+                return DensifyValue(dateAdd(
+                    date, range.getUnit().value(), -range.getStep().coerceToLong(), timezone()));
+            }},
+        _value);
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalDensify::combineSorts(

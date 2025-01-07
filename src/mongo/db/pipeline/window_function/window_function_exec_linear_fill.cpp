@@ -36,6 +36,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -43,21 +44,17 @@
 namespace mongo {
 namespace {
 namespace value_arithmetic_operators {
-template <typename Op>
-Value applyExpressionOp(const Value& a, const Value& b) {
-    return uassertStatusOK(Op::apply(a, b));
-}
 Value operator+(const Value& a, const Value& b) {
-    return applyExpressionOp<ExpressionAdd>(a, b);
+    return uassertStatusOK(exec::expression::evaluateAdd(a, b));
 }
 Value operator-(const Value& a, const Value& b) {
-    return applyExpressionOp<ExpressionSubtract>(a, b);
+    return uassertStatusOK(exec::expression::evaluateSubtract(a, b));
 }
 Value operator*(const Value& a, const Value& b) {
-    return applyExpressionOp<ExpressionMultiply>(a, b);
+    return uassertStatusOK(exec::expression::evaluateMultiply(a, b));
 }
 Value operator/(const Value& a, const Value& b) {
-    return applyExpressionOp<ExpressionDivide>(a, b);
+    return uassertStatusOK(exec::expression::evaluateDivide(a, b));
 }
 }  // namespace value_arithmetic_operators
 

@@ -29,6 +29,7 @@
 
 #include "expression_trigonometric.h"
 
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression.h"
 
 namespace mongo {
@@ -64,4 +65,65 @@ REGISTER_STABLE_EXPRESSION(atan2, ExpressionArcTangent2::parse);
 
 REGISTER_STABLE_EXPRESSION(degreesToRadians, ExpressionDegreesToRadians::parse);
 REGISTER_STABLE_EXPRESSION(radiansToDegrees, ExpressionRadiansToDegrees::parse);
+
+Value ExpressionArcCosine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionArcSine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionHyperbolicArcTangent::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionHyperbolicArcCosine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionCosine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionSine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionTangent::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionArcTangent::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionHyperbolicArcSine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionHyperbolicCosine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionHyperbolicSine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionHyperbolicTangent::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionArcTangent2::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionDegreesToRadians::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+Value ExpressionRadiansToDegrees::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
 }  // namespace mongo

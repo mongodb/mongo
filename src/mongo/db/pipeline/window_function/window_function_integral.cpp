@@ -36,6 +36,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/exec/expression/evaluate.h"
 
 namespace mongo {
 
@@ -52,11 +53,11 @@ Value WindowFunctionIntegral::integralOfTwoPointsByTrapezoidalRule(const Value& 
         (preArr[0].numeric() && newArr[0].numeric())) {
         // Now 'newValue' and 'preValue' are either both numeric, or both dates.
         // $subtract on two dates gives us the difference in milliseconds.
-        Value delta = uassertStatusOK(ExpressionSubtract::apply(newArr[0], preArr[0]));
-        Value sumY = uassertStatusOK(ExpressionAdd::apply(newArr[1], preArr[1]));
-        Value integral = uassertStatusOK(ExpressionMultiply::apply(sumY, delta));
+        Value delta = uassertStatusOK(exec::expression::evaluateSubtract(newArr[0], preArr[0]));
+        Value sumY = uassertStatusOK(exec::expression::evaluateAdd(newArr[1], preArr[1]));
+        Value integral = uassertStatusOK(exec::expression::evaluateMultiply(sumY, delta));
 
-        return uassertStatusOK(ExpressionDivide::apply(integral, Value(2.0)));
+        return uassertStatusOK(exec::expression::evaluateDivide(integral, Value(2.0)));
     } else {
         return Value(0);
     }
@@ -123,6 +124,18 @@ void WindowFunctionIntegral::remove(Value value) {
     if (_values.size() > 0) {
         _integral.remove(integralOfTwoPointsByTrapezoidalRule(value, _values.front().value()));
     }
+}
+
+Value WindowFunctionIntegral::getValue(boost::optional<Value> current) const {
+    if (_values.size() == 0)
+        return kDefault;
+    if (_nanCount > 0)
+        return Value(std::numeric_limits<double>::quiet_NaN());
+
+
+    return _unitMillis ? uassertStatusOK(exec::expression::evaluateDivide(_integral.getValue(),
+                                                                          Value(*_unitMillis)))
+                       : _integral.getValue();
 }
 
 }  // namespace mongo

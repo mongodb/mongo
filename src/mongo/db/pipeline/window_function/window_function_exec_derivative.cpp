@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
@@ -87,15 +88,15 @@ Value WindowFunctionExecDerivative::getNext(boost::optional<Document> current) {
     }
     // Now leftTime and rightTime are either both numeric, or both dates.
     // $subtract on two dates gives us the difference in milliseconds.
-    Value run =
-        uassertStatusOK(ExpressionSubtract::apply(std::move(rightTime), std::move(leftTime)));
+    Value run = uassertStatusOK(
+        exec::expression::evaluateSubtract(std::move(rightTime), std::move(leftTime)));
 
-    Value rise = uassertStatusOK(ExpressionSubtract::apply(
+    Value rise = uassertStatusOK(exec::expression::evaluateSubtract(
         _position->evaluate(rightDoc, &_position->getExpressionContext()->variables),
         _position->evaluate(leftDoc, &_position->getExpressionContext()->variables)));
     uassert(5624903, "$derivative input must not be null or missing", !rise.nullish());
 
-    auto divideStatus = ExpressionDivide::apply(std::move(rise), std::move(run));
+    auto divideStatus = exec::expression::evaluateDivide(std::move(rise), std::move(run));
     if (divideStatus.getStatus().code() == ErrorCodes::BadValue) {
         // Divide by zero can't be an error. On the first document of a partition, a window like
         // 'documents: [-1, 0]' contains only one document, so 'run' is zero.
@@ -108,8 +109,8 @@ Value WindowFunctionExecDerivative::getNext(boost::optional<Document> current) {
         // 1/unit.
 
         // tassert because at this point the result should already be numeric, so if
-        // ExpressionMultiply returns a non-OK Status then something has gone wrong.
-        auto statusWithResult = ExpressionMultiply::apply(result, Value(*_unitMillis));
+        // evaluateMultiply returns a non-OK Status then something has gone wrong.
+        auto statusWithResult = exec::expression::evaluateMultiply(result, Value(*_unitMillis));
         tassert(statusWithResult);
         result = statusWithResult.getValue();
     }

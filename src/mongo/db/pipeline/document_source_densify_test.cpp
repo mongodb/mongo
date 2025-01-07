@@ -38,6 +38,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_densify.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -102,9 +103,9 @@ bool isOnStepRelativeTo(DensifyValue testVal, DensifyValue base, RangeStatement 
             return diff % stepDurationInMillis == 0;
         }
     } else if (testVal.isNumber()) {
-        Value diff =
-            uassertStatusOK(ExpressionSubtract::apply(testVal.getNumber(), base.getNumber()));
-        Value remainder = uassertStatusOK(ExpressionMod::apply(diff, range.getStep()));
+        Value diff = uassertStatusOK(
+            exec::expression::evaluateSubtract(testVal.getNumber(), base.getNumber()));
+        Value remainder = uassertStatusOK(exec::expression::evaluateMod(diff, range.getStep()));
         return remainder.getDouble() == 0.0;
     }
     return false;

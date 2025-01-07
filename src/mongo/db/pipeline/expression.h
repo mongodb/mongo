@@ -174,13 +174,6 @@ class BSONElement;
                                       boost::none,                                     \
                                       getTestCommandsEnabled())
 
-// Helper to apply an expression concisely.
-// Throws if anything goes wrong.
-template <typename Expression, typename... Args>
-inline Value throwingApply(Args&&... args) {
-    return uassertStatusOK(Expression::apply(args...));
-}
-
 class Expression : public RefCountable {
 public:
     using Parser = std::function<boost::intrusive_ptr<Expression>(
@@ -218,7 +211,7 @@ public:
         StringMap<std::string> complexRenames;
     };
 
-    ~Expression() override{};
+    ~Expression() override {}
 
     /**
      * Optimize the Expression.
@@ -467,7 +460,7 @@ public:
 
     void setValue(const Value& value) {
         _value = value;
-    };
+    }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -663,6 +656,7 @@ public:
         return visitor->visit(this);
     }
 };
+
 template <typename AccumulatorN>
 class ExpressionFromAccumulatorN : public Expression {
 public:
@@ -706,7 +700,6 @@ private:
     boost::intrusive_ptr<Expression> _output;
 };
 
-
 /**
  * Inherit from this class if your expression takes exactly one numeric argument.
  */
@@ -720,21 +713,6 @@ public:
         : ExpressionFixedArity<SubClass, 1>(expCtx, std::move(children)) {}
 
     ~ExpressionSingleNumericArg() override = default;
-
-    Value evaluate(const Document& root, Variables* variables) const final {
-        Value arg = this->_children[0]->evaluate(root, variables);
-        if (arg.nullish())
-            return Value(BSONNULL);
-
-        uassert(28765,
-                str::stream() << this->getOpName() << " only supports numeric types, not "
-                              << typeName(arg.getType()),
-                arg.numeric());
-
-        return evaluateNumericArg(arg);
-    }
-
-    virtual Value evaluateNumericArg(const Value& numericArg) const = 0;
 };
 
 /**
@@ -750,37 +728,6 @@ public:
         : ExpressionFixedArity<SubClass, 2>(expCtx, std::move(children)) {}
 
     ~ExpressionTwoNumericArgs() override = default;
-
-    /**
-     * Evaluate performs the type checking necessary to make sure that both arguments are numeric,
-     * then calls the evaluateNumericArgs on the two numeric args:
-     * 1. If either input is nullish, it returns null.
-     * 2. If either input is not numeric, it throws an error.
-     * 3. Call evaluateNumericArgs on the two numeric args.
-     */
-    Value evaluate(const Document& root, Variables* variables) const final {
-        Value arg1 = this->_children[0]->evaluate(root, variables);
-        if (arg1.nullish())
-            return Value(BSONNULL);
-        uassert(51044,
-                str::stream() << this->getOpName() << " only supports numeric types, not "
-                              << typeName(arg1.getType()),
-                arg1.numeric());
-        Value arg2 = this->_children[1]->evaluate(root, variables);
-        if (arg2.nullish())
-            return Value(BSONNULL);
-        uassert(51045,
-                str::stream() << this->getOpName() << " only supports numeric types, not "
-                              << typeName(arg2.getType()),
-                arg2.numeric());
-
-        return evaluateNumericArgs(arg1, arg2);
-    }
-
-    /**
-     *  Evaluate the expression on exactly two numeric arguments.
-     */
-    virtual Value evaluateNumericArgs(const Value& numericArg1, const Value& numericArg2) const = 0;
 };
 
 /**
@@ -845,7 +792,7 @@ public:
     explicit ExpressionAbs(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionAbs>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -859,15 +806,6 @@ public:
 
 class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
-    /**
-     * Adds two values as if by {$add: [{$const: lhs}, {$const: rhs}]}.
-     *
-     * If either argument is nullish, returns BSONNULL.
-     *
-     * Otherwise, returns ErrorCodes::TypeMismatch.
-     */
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     explicit ExpressionAdd(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionAdd>(expCtx) {}
 
@@ -895,7 +833,7 @@ public:
 private:
     monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
         return monotonic::combineExpressions(sortedFieldPath, getChildren());
-    };
+    }
 };
 
 
@@ -1137,7 +1075,7 @@ public:
     explicit ExpressionCeil(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionCeil>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1781,16 +1719,6 @@ private:
 
 class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {
 public:
-    /**
-     * Divides two values as if by {$divide: [{$const: numerator}, {$const: denominator]}.
-     *
-     * Returns BSONNULL if either argument is nullish.
-     *
-     * Returns ErrorCodes::TypeMismatch if either argument is non-nullish and non-numeric.
-     * Returns ErrorCodes::BadValue if the denominator is zero.
-     */
-    static StatusWith<Value> apply(Value numerator, Value denominator);
-
     explicit ExpressionDivide(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionDivide, 2>(expCtx) {}
     explicit ExpressionDivide(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -1816,7 +1744,7 @@ public:
     explicit ExpressionExp(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionExp>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2029,9 +1957,7 @@ public:
     explicit ExpressionFloor(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionFloor>(expCtx, std::move(children)) {}
 
-    static StatusWith<Value> apply(Value lhs);
-
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2255,7 +2181,7 @@ public:
     ExpressionLn(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionLn>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2297,7 +2223,7 @@ public:
     ExpressionLog10(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionLog10>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2535,8 +2461,6 @@ public:
     ExpressionMod(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx, std::move(children)) {}
 
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -2552,19 +2476,6 @@ public:
 
 class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
-    /**
-     * Multiplies two values together as if by evaluate() on
-     *     {$multiply: [{$const: lhs}, {$const: rhs}]}.
-     *
-     * Note that evaluate() does not use apply() directly, because when $multiply takes more than
-     * two arguments, it uses a wider intermediate state than Value.
-     *
-     * Returns BSONNULL if either argument is nullish.
-     *
-     * Returns ErrorCodes::TypeMismatch if any argument is non-nullish, non-numeric.
-     */
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     explicit ExpressionMultiply(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionMultiply>(expCtx) {}
     ExpressionMultiply(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -2724,6 +2635,9 @@ public:
     ExpressionPow(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionPow, 2>(expCtx, std::move(children)) {}
 
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
     static boost::intrusive_ptr<Expression> create(ExpressionContext* expCtx,
                                                    Value base,
                                                    Value exp);
@@ -2735,10 +2649,6 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
-
-private:
-    Value evaluate(const Document& root, Variables* variables) const final;
-    const char* getOpName() const final;
 };
 
 
@@ -3313,7 +3223,7 @@ public:
     ExpressionSqrt(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionSqrt>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -3449,20 +3359,6 @@ public:
 
 class ExpressionSubtract final : public ExpressionFixedArity<ExpressionSubtract, 2> {
 public:
-    /**
-     * Subtracts two values as if by {$subtract: [{$const: lhs}, {$const: rhs}]}.
-     *
-     * If either argument is nullish, returns BSONNULL.
-     *
-     * Otherwise, the arguments can be either:
-     *     (numeric, numeric)
-     *     (Date, Date)       Returns the time difference in milliseconds.
-     *     (Date, numeric)    Returns the date shifted earlier by that many milliseconds.
-     *
-     * Otherwise, returns ErrorCodes::TypeMismatch.
-     */
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     explicit ExpressionSubtract(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {}
     ExpressionSubtract(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -3947,15 +3843,33 @@ public:
     static bool checkBinDataConvertAllowed();
     static bool checkBinDataConvertNumericAllowed();
 
-    bool requestingConvertBinDataNumeric(ConvertTargetTypeInfo targetTypeInfo,
-                                         BSONType inputType) const;
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+    const Expression* getTo() const {
+        return _children[_kTo].get();
+    }
+    const Expression* getFormat() const {
+        return _children[_kFormat].get();
+    }
+    const Expression* getOnError() const {
+        return _children[_kOnError].get();
+    }
+    const Expression* getOnNull() const {
+        return _children[_kOnNull].get();
+    }
+    const Expression* getByteOrder() const {
+        return _children[_kByteOrder].get();
+    }
+    bool getAllowBinDataConvert() const {
+        return _allowBinDataConvert;
+    }
+    bool getAllowBinDataConvertNumeric() const {
+        return _allowBinDataConvertNumeric;
+    }
 
 private:
     static BSONType computeTargetType(Value typeName);
-    Value performConversion(ConvertTargetTypeInfo targetTypeInfo,
-                            Value inputValue,
-                            boost::optional<BinDataFormat> format,
-                            boost::optional<ConvertByteOrderType> byteOrder) const;
 
     // Support for BinData $convert is FCV gated. These feature flags are checked once during
     // parsing to avoid having to acquire FCV snapshot for every document during evaluation.
@@ -4117,10 +4031,6 @@ public:
  * Returns a double-valued random number from 0.0 to 1.0.
  */
 class ExpressionRandom final : public Expression {
-
-    static constexpr double kMinValue = 0.0;
-    static constexpr double kMaxValue = 1.0;
-
 public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement exprElement,
@@ -4144,8 +4054,6 @@ public:
 
 private:
     explicit ExpressionRandom(ExpressionContext* expCtx);
-
-    double getRandomValue() const;
 };
 
 class ExpressionToHashedIndexKey : public Expression {
@@ -4154,7 +4062,7 @@ public:
                                boost::intrusive_ptr<Expression> inputExpression)
         : Expression(expCtx, {inputExpression}) {
         expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-    };
+    }
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
@@ -4637,7 +4545,7 @@ public:
 
     const char* getOpName() const final {
         return "$bitAnd";
-    };
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -4668,7 +4576,7 @@ public:
 
     const char* getOpName() const final {
         return "$bitOr";
-    };
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -4698,7 +4606,7 @@ public:
 
     const char* getOpName() const final {
         return "$bitXor";
-    };
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -4720,6 +4628,7 @@ public:
         return visitor->visit(this);
     }
 };
+
 class ExpressionBitNot final : public ExpressionSingleNumericArg<ExpressionBitNot> {
 public:
     explicit ExpressionBitNot(ExpressionContext* const expCtx)
@@ -4731,7 +4640,7 @@ public:
         expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
