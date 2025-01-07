@@ -200,6 +200,37 @@ export function _copyFileHelper(file, sourceDbPath, destinationDirectory) {
     };
 }
 
+/**
+ * Helper function to ensure the namespace and UUID fields are correctly populated in files we are
+ * backing up.
+ */
+export function checkBackup(backupCursor) {
+    // Print the metadata document.
+    assert(backupCursor.hasNext());
+    jsTestLog(backupCursor.next());
+
+    while (backupCursor.hasNext()) {
+        let doc = backupCursor.next();
+
+        jsTestLog("File for backup: " + tojson(doc));
+
+        if (!doc.required) {
+            assert.neq(doc.ns, "");
+            assert.neq(doc.uuid, "");
+        } else {
+            let pathsep = _isWindows() ? '\\' : '/';
+            let stem = doc.filename.substr(doc.filename.lastIndexOf(pathsep) + 1);
+            // Denylisting internal files that don't need to have ns/uuid set. Denylisting known
+            // patterns will help catch subtle API changes if new filename patterns are added that
+            // don't generate ns/uuid.
+            if (!stem.startsWith("size") && !stem.startsWith("Wired") && !stem.startsWith("_")) {
+                assert.neq(doc.ns, "");
+                assert.neq(doc.uuid, "");
+            }
+        }
+    }
+}
+
 // Magic restore utility class
 
 // This class implements helpers for testing the magic restore proces. It maintains the state of the

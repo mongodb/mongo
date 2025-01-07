@@ -9,7 +9,7 @@
 executor:
   archive:
     tests:
-    - src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/*.js
+    - src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/*.js
   config:
     shell_options:
       global_vars:
@@ -29,6 +29,6 @@ selector:
   - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
   - jstests/multiVersion/**/*.js
-  - src/mongo/db/modules/*/jstests/hot_backups/multiVersion/*.js
+  - src/mongo/db/modules/*/jstests/hot_backups_multiversion/*.js
   - src/mongo/db/modules/*/jstests/audit/multiVersion/*.js
 test_kind: js_test

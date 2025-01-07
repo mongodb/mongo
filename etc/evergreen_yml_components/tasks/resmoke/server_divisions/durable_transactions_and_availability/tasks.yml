@@ -718,7 +718,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: no_passthrough
-      resmoke_args: src/mongo/db/modules/*/jstests/hot_backups/*.js
+      resmoke_args: src/mongo/db/modules/*/jstests/hot_backups/**/*.js
       use_large_distro: "true"
 
 - <<: *gen_task_template
