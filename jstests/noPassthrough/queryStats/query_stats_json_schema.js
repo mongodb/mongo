@@ -1,7 +1,6 @@
 /**
  * Test that $queryStats properly tokenizes $jsonSchema queries with dollar-prefixed field names on
  * mongod and mongos.
- * @tags: [requires_fcv_81]
  */
 import {getQueryStatsAggCmd, kShellApplicationName} from "jstests/libs/query_stats_utils.js";
 

@@ -1,10 +1,6 @@
 /**
  * Tests that collectionless aggregation pipelines get optimized even when running fully on mongos,
  * for both "allPlansExecution" and "executionStats".
- *
- * @tags: [
- *  requires_fcv_81
- * ]
  */
 
 // Verify that $limit gets absorbed by $sort, which indicates that optimization has taken place.

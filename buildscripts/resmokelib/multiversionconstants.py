@@ -133,6 +133,8 @@ REQUIRES_FCV_TAG_LATEST = version_constants.get_latest_tag()
 # All multiversion tests should be run with these tags excluded.
 REQUIRES_FCV_TAG = version_constants.get_fcv_tag_list()
 
+REQUIRES_FCV_TAGS_LESS_THAN_LATEST = version_constants.get_fcv_tags_less_than_latest()
+
 # Generate evergreen project names for all FCVs less than latest.
 EVERGREEN_PROJECTS = ['mongodb-mongo-master']
 EVERGREEN_PROJECTS.extend([evg_project_str(fcv) for fcv in version_constants.fcvs_less_than_latest])

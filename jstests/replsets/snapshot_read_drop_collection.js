@@ -6,11 +6,6 @@
  * Run a collMod to convert non-unique index to a unique index.
  * Drop the collection.
  * Perform a read at the timestamp noted earlier, and the server should not crash.
- *
- * @tags: [
- *   # SERVER-91178 is fixed in 8.1
- *   requires_fcv_81
- * ]
  */
 
 // Skip this test if not running with the "wiredTiger" storage engine.
