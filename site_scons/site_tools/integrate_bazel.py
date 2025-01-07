@@ -726,9 +726,9 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
     if os.name == "nt" and not os.path.exists(f"{os.path.expanduser('~')}/.bazelrc"):
         with open(f"{os.path.expanduser('~')}/.bazelrc", "a") as bazelrc:
             bazelrc.write(
-                f"build --tls_client_certificate={get_default_cert_dir()}/creds/engflow.crt\n"
+                f"common --tls_client_certificate={get_default_cert_dir()}/creds/engflow.crt\n"
             )
-            bazelrc.write(f"build --tls_client_key={get_default_cert_dir()}/creds/engflow.key\n")
+            bazelrc.write(f"common --tls_client_key={get_default_cert_dir()}/creds/engflow.key\n")
 
     if not running_in_evergreen and not os.path.exists(
         f"{get_default_cert_dir()}/creds/engflow.crt"
@@ -752,10 +752,10 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
                 )
                 with open(f"{get_default_cert_dir()}/.bazelrc", "a") as bazelrc:
                     bazelrc.write(
-                        f"build --tls_client_certificate={get_default_cert_dir()}/creds/engflow.crt\n"
+                        f"common --tls_client_certificate={get_default_cert_dir()}/creds/engflow.crt\n"
                     )
                     bazelrc.write(
-                        f"build --tls_client_key={get_default_cert_dir()}/creds/engflow.key\n"
+                        f"common --tls_client_key={get_default_cert_dir()}/creds/engflow.key\n"
                     )
             except OSError as exc:
                 print(exc)

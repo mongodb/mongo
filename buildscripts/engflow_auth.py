@@ -74,7 +74,7 @@ def update_bazelrc(binary_path: str):
                 if "--tls_client" in line or "--credential_helper" in line:
                     continue
                 lines.append(line)
-    lines.append(f"build --credential_helper={CLUSTER}={norm_path}")
+    lines.append(f"common --credential_helper={CLUSTER}={norm_path}")
 
     with open(bazelrc_path, "w+") as bazelrc:
         bazelrc.writelines(lines)
