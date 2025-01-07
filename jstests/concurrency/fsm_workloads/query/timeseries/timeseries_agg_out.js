@@ -14,6 +14,8 @@
  *   does_not_support_stepdowns,
  *   # `convertToCapped` is not supported in serverless.
  *   command_not_supported_in_serverless,
+ *   requires_getmore,
+ *   uses_getmore_outside_of_transaction,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
