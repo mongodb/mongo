@@ -263,7 +263,11 @@ mongo_cc_unit_test(
         "cluster_server_parameter_test_util.h",
         ":cluster_server_parameter_test_gen",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_second_group",
+    ],
     deps = [
         ":cluster_parameter_synchronization_helpers",
         ":cluster_server_parameter",

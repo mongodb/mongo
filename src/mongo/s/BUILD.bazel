@@ -1162,6 +1162,8 @@ mongo_cc_unit_test(
         "//src/mongo/s/write_ops:write_without_shard_key_util_test.cpp",
     ],
     tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
         "compile_requires_large_memory_gcc",
         "compile_requires_large_memory_sanitizer",
         "mongo_unittest_third_group",
@@ -1202,7 +1204,11 @@ mongo_cc_unit_test(
     srcs = [
         "service_entry_point_router_role_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_second_group",
+    ],
     deps = [
         ":startup_initialization",
         "//src/mongo/db:service_context_non_d",
@@ -1235,7 +1241,11 @@ mongo_cc_unit_test(
     srcs = [
         "multi_statement_transaction_requests_sender_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_second_group",
+    ],
     deps = [
         ":sharding_api",
         ":sharding_mongos_test_fixture",

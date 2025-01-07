@@ -78,7 +78,11 @@ mongo_cc_unit_test(
     srcs = [
         "watchdog_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_fourth_group",
+    ],
     deps = [
         "watchdog",
         "//src/mongo/db:service_context_non_d",

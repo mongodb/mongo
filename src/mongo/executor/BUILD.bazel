@@ -603,6 +603,8 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
     ],
     tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
         "compile_requires_large_memory_gcc_fission",
         "mongo_unittest_third_group",
     ],
@@ -646,6 +648,8 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
     ],
     tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
         "server-programmability",
     ],

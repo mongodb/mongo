@@ -82,7 +82,11 @@ mongo_cc_unit_test(
         "view_definition_test.cpp",
         "view_graph_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_third_group",
+    ],
     deps = [
         ":view_catalog_helpers",
         ":views",

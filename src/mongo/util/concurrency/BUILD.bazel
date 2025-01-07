@@ -118,6 +118,8 @@ mongo_cc_unit_test(
         "with_lock_test.cpp",
     ],
     tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
         "server-programmability",
     ],
@@ -176,7 +178,11 @@ mongo_cc_unit_test(
     srcs = [
         "ticketholder_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_fourth_group",
+    ],
     deps = [
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",

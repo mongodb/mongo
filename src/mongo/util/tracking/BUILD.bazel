@@ -32,7 +32,11 @@ mongo_cc_unit_test(
     srcs = [
         "tracking_allocator_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_fourth_group",
+    ],
     deps = [
         "//src/mongo/db:service_context_test_fixture",
     ],

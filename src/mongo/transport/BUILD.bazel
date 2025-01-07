@@ -333,7 +333,11 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     data = ["//jstests/libs:test_pem_files"],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_second_group",
+    ],
     deps = [
         ":message_compressor",
         ":message_compressor_options_server",

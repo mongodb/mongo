@@ -169,7 +169,11 @@ mongo_cc_unit_test(
         "store_possible_cursor_test.cpp",
         "//src/mongo/db/session:logical_session_cache_noop.h",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine-SERVER_99060",
+        "mongo_unittest_first_group",
+    ],
     deps = [
         ":async_results_merger",
         ":cluster_cursor",

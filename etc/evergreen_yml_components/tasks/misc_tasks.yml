@@ -1154,11 +1154,12 @@ tasks:
             --linkstatic=False
             --test_output=all
             --combined_report=lcov
-            --test_tag_filters=mongo_unittest,-intermediate_target,-code_coverage_quarantine
+            --test_tag_filters=mongo_unittest,-final_target,-code_coverage_quarantine
             --test_timeout=600
             --verbose_failures
             --copt=-Wno-mismatched-new-delete
             ${coverage_bazel_tags}
+            --instrumentation_filter="^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams[/:]"
 
   - name: monitor_build_status
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
