@@ -789,6 +789,8 @@ last-continuous:
     ticket: SERVER-95670
   - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
+  - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
+    ticket: SERVER-92930
   - test_file: jstests/replsets/sync_source_clears_post_failure.js
     ticket: SERVER-91960
   suites: null
@@ -1640,6 +1642,8 @@ last-lts:
     ticket: SERVER-95670
   - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
+  - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
+    ticket: SERVER-92930
   - test_file: jstests/replsets/sync_source_clears_post_failure.js
     ticket: SERVER-91960
   suites: null
