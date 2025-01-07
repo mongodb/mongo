@@ -45,7 +45,8 @@ function isOperationPartOfStableAPI(commandName, commandObj) {
         "listDatabases",
         "listIndexes",
         "ping",
-        "refreshSessions"
+        "refreshSessions",
+        "renameCollection",
     ]);
     if (stableCommands.has(commandName)) {
         if (commandName == "aggregate" && commandObj.pipeline &&
