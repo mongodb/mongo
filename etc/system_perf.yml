@@ -45,7 +45,6 @@ variables:
     - dsi
     - genny
     - workloads
-    - linkbench
     - linkbench2
     - tsbs
     - mongo-perf
@@ -80,11 +79,6 @@ modules:
   - name: workloads
     owner: 10gen
     repo: workloads
-    prefix: ${workdir}/src
-    branch: master
-  - name: linkbench
-    owner: 10gen
-    repo: linkbench
     prefix: ${workdir}/src
     branch: master
   - name: linkbench2
