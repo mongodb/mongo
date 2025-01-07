@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "devDependencies": {
-    "prettier": "3.2.5",
+    "prettier": "3.4.2",
     "eslint": "8.28.0"
   }
 }

@@ -15,8 +15,10 @@ def run_shellscripts_linters(shellscripts_linters: pathlib.Path, check: bool) ->
 
         command = [str(shellscripts_linters)]
         if not check:
+            print("Running shellscripts formatter")
             command.append("fix")
-        print(f"Running command: '{' '.join(command)}'")
+        else:
+            print("Running shellscripts linter")
         subprocess.run(command, check=True, env=env)
     except subprocess.CalledProcessError:
         print("Found shell script formatting errors. Run 'bazel run //:format' to fix")
@@ -31,8 +33,10 @@ def run_buildifier(check: bool) -> bool:
     if not os.path.exists(binary_path):
         download_buildifier.download(download_location=os.curdir)
     if check:
+        print("Running buildifier linter")
         return lint_all(binary_path, generate_report=True)
     else:
+        print("Running buildifier formatter")
         fix_all(binary_path)
         return True
 
@@ -52,12 +56,18 @@ def run_prettier(prettier: pathlib.Path, check: bool) -> bool:
         if path.is_symlink():
             force_exclude_dirs.add(f"!./{path}")
     try:
-        command = [str(prettier), "--cache", "."] + list(force_exclude_dirs)
+        command = [
+            str(prettier),
+            "--cache",
+            ".",
+            "--log-level",
+            "warn",
+        ] + list(force_exclude_dirs)
         if check:
             command.append("--check")
         else:
             command.append("--write")
-        print(f"Running command: '{' '.join(command)}'")
+        print("Running prettier")
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError:
         print("Found formatting errors. Run 'bazel run //:format' to fix")
