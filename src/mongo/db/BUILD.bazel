@@ -2368,6 +2368,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/expression:evaluate_array.cpp",
         "//src/mongo/db/exec/expression:evaluate_date.cpp",
         "//src/mongo/db/exec/expression:evaluate_index.cpp",
+        "//src/mongo/db/exec/expression:evaluate_javascript.cpp",
         "//src/mongo/db/exec/expression:evaluate_logical.cpp",
         "//src/mongo/db/exec/expression:evaluate_map_reduce.cpp",
         "//src/mongo/db/exec/expression:evaluate_meta.cpp",

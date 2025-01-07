@@ -40,7 +40,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_visitor.h"
-#include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/intrusive_counter.h"
@@ -90,6 +89,18 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    const Expression* getPassedArgs() const {
+        return _passedArgs.get();
+    }
+
+    bool getAssignFirstArgToThis() const {
+        return _assignFirstArgToThis;
+    }
+
+    const std::string& getFuncSource() const {
+        return _funcSource;
     }
 
     static constexpr auto kExpressionName = "$function"_sd;

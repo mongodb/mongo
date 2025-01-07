@@ -37,8 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/pipeline/javascript_execution.h"
-#include "mongo/scripting/engine.h"
+#include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -66,7 +65,7 @@ Value ExpressionFunction::serialize(const SerializationOptions& options) const {
                                        // is more of a selection of an enum
                                        {"lang"_sd, _lang}});
 
-    // This field will only be seralized when desugaring $where in $expr + $_internalJs
+    // This field will only be serialized when desugaring $where in $expr + $_internalJs
     if (_assignFirstArgToThis) {
         innerOpts["_internalSetObjToThis"] = options.serializeLiteral(_assignFirstArgToThis);
     }
@@ -122,39 +121,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
 }
 
 Value ExpressionFunction::evaluate(const Document& root, Variables* variables) const {
-    auto jsExec = getExpressionContext()->getJsExecWithScope(_assignFirstArgToThis);
-    auto scope = jsExec->getScope();
+    return exec::expression::evaluate(*this, root, variables);
+}
 
-    // createFunction is memoized in MozJSImplScope, so it's ok to call this for each
-    // eval call.
-    ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
-    uassert(31265, "The body function did not evaluate", func);
-
-    auto argValue = _passedArgs->evaluate(root, variables);
-    uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::Array);
-
-    // This logic exists to desugar $where into $expr + $function. In this case set the global obj
-    // to this, to handle cases where the $where function references the current document through
-    // obj.
-    BSONObjBuilder bob;
-    if (_assignFirstArgToThis) {
-        // For defense-in-depth, The $where case will pass a field path expr carrying $$CURRENT as
-        // the only element of the array.
-        auto args = argValue.getArray();
-        uassert(31422,
-                "field path $$CURRENT must be the only element in args",
-                argValue.getArrayLength() == 1);
-
-        BSONObj thisBSON = args[0].getDocument().toBson();
-        scope->setObject("obj", thisBSON);
-
-        return jsExec->callFunction(func, bob.done(), thisBSON);
-    }
-
-    int argNum = 0;
-    for (const auto& arg : argValue.getArray()) {
-        arg.addToBsonObj(&bob, "arg" + std::to_string(argNum++));
-    }
-    return jsExec->callFunction(func, bob.done(), {});
-};
 }  // namespace mongo

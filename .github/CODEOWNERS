@@ -1222,6 +1222,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_run_tracker.h @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_stage* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/exec/expression/OWNERS.yml
+/src/mongo/db/exec/expression/**/* @10gen/query-execution-classic-engine @svc-auto-approve-bot
+/src/mongo/db/exec/expression/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/exec/expression/**/evaluate_javascript* @10gen/query-integration-javascript @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/exec/mutable_bson/OWNERS.yml
 /src/mongo/db/exec/mutable_bson/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/exec/mutable_bson/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot

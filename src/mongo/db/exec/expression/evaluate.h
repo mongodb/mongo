@@ -34,6 +34,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_function.h"
+#include "mongo/db/pipeline/expression_js_emit.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/assert_util.h"
@@ -166,6 +168,9 @@ Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* vari
 Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables* variables);
+
+Value evaluate(const ExpressionFunction& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalJsEmit& expr, const Document& root, Variables* variables);
 
 Value evaluate(const ExpressionAnd& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionAllElementsTrue& expr, const Document& root, Variables* variables);
