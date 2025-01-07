@@ -43,7 +43,7 @@ const sbeRestrictedQuery = qsutils.makeAggregateQueryInstance({
 });
 
 const nonSbeRestrictedQuery = qsutils.makeAggregateQueryInstance({
-    pipeline: [{$limit: 1}],
+    pipeline: [{$match: {a: 1}}, {$project: {a: 1}}],
     hint: indexKeyPattern,
 });
 

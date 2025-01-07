@@ -12,6 +12,7 @@ import {
     planHasStage,
 } from "jstests/libs/analyze_plan.js";
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+import {getCollectionName, isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeRestrictedOrFullyEnabled
@@ -59,6 +60,9 @@ export class QuerySettingsIndexHintsTests {
             networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions;
         const willRetryOnNetworkErrors = networkErrorAndTxnOverrideConfig &&
             networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
+        // If the collection used is a view, determine the underlying collection being used.
+        const collName = getCollectionName(this.db, command);
+        const isTimeSeriesColl = isTimeSeriesCollection(this.db, collName);
         const shouldCheckPlanCache =
             // Single solution plans are not cached in classic, therefore do not perform plan cache
             // checks for when the classic cache is used. Note that the classic cache is used
@@ -85,15 +89,14 @@ export class QuerySettingsIndexHintsTests {
             // together with plan cache clear.
             !willRetryOnNetworkErrors &&
             // If read concern is explicitly set, avoid plan cache checks.
-            !defaultReadConcernLevel;
+            !defaultReadConcernLevel &&
+            // For timeseries collections with featureFlagSbeFull turned on, it is not possible to
+            // run the planCacheClear command because it is a view, so we cannot acquire lock.
+            !isTimeSeriesColl;
 
         if (!shouldCheckPlanCache) {
             return;
         }
-
-        // If the collection used is a view, determine the underlying collection being used.
-        const collInfo = this.db.getCollectionInfos({name: collOrViewName})[0];
-        const collName = collInfo.options.viewOn || collOrViewName;
 
         // Clear the plan cache before running any queries.
         this.db[collName].getPlanCache().clear();

@@ -401,19 +401,19 @@ private:
      * Applies 'indexHints' query settings for the given 'collection'.In addition, sets that there
      * were query settings applied.
      */
-    void applyQuerySettingsForCollection(const CanonicalQuery& canonicalQuery,
-                                         const CollectionPtr& collection,
-                                         const query_settings::IndexHintSpecs& indexHintSpecs,
-                                         CollectionInfo& collectionInfo);
+    void applyQuerySettingsForCollection(
+        const CanonicalQuery& canonicalQuery,
+        const NamespaceString& nss,
+        const query_settings::IndexHintSpecs& indexHintSpecs,
+        CollectionInfo& collectionInfo,
+        const boost::optional<TimeseriesOptions>& timeseriesOptions);
 
     void applyQuerySettingsIndexHintsForCollection(const CanonicalQuery& canonicalQuery,
-                                                   const CollectionPtr& collection,
                                                    const std::vector<mongo::IndexHint>& indexHints,
                                                    std::vector<IndexEntry>& indexes);
 
     void applyQuerySettingsNaturalHintsForCollection(
         const CanonicalQuery& canonicalQuery,
-        const CollectionPtr& collection,
         const std::vector<mongo::IndexHint>& indexHints,
         CollectionInfo& collectionInfo);
 };

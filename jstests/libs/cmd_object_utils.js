@@ -1,3 +1,5 @@
+import {sysCollNamePrefix} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+
 /**
  * Resolves the command name for the given 'cmdObj'.
  */
@@ -33,17 +35,28 @@ export function getExplainCommand(cmdObj) {
 
 /**
  * Resolves the collection name for the given 'cmdObj'. If the command targets a view, then this
- * will return the underlying collection's name. Returns 'undefined' if the collection does not
- * exist.
+ * will recursively find the underlying collection's name and return it. Returns 'undefined' if the
+ * collection does not exist.
  */
 export function getCollectionName(db, cmdObj) {
     try {
-        const name = cmdObj[getCommandName(cmdObj)];
-        const collInfos = db.getCollectionInfos({name});
-        if (!collInfos || collInfos.length === 0) {
+        const collectionsInfo = db.getCollectionInfos();
+        if (!collectionsInfo || collectionsInfo.length === 0) {
             return undefined;
         }
-        return collInfos[0].options.viewOn || name;
+        let viewOn;
+        let name = cmdObj[getCommandName(cmdObj)];
+        do {
+            let collInfo = collectionsInfo.find(c => c.name === name);
+            if (!collInfo) {
+                name = undefined;
+            }
+            viewOn = collInfo?.options?.viewOn;
+            if (viewOn) {
+                name = viewOn;
+            }
+        } while (viewOn);
+        return name;
     } catch (ex) {
         switch (ex.code) {
             case ErrorCodes.InvalidViewDefinition: {
@@ -64,4 +77,23 @@ export function isSystemCollectionName(collectionName) {
 
 export function isInternalDbName(dbName) {
     return ["admin", "local", "config"].includes(dbName);
+}
+
+/**
+ * Returns true iff the 'collectionName' exists and it is a timeseries collection.
+ */
+export function isTimeSeriesCollection(db, collectionName) {
+    const collectionInfo = db.getCollectionInfos({name: collectionName});
+    if (!collectionInfo || collectionInfo.length === 0) {
+        return false;
+    }
+    return collectionInfo[0].type === "timeseries" || collectionName.startsWith("system.bucket.");
+}
+
+/**
+ * Return true iff this is a "system.bucket.*" collection.
+ */
+export function isSystemBucketNss(innerCmd) {
+    const nss = innerCmd[getCommandName(innerCmd)];
+    return typeof nss === "string" && nss.startsWith(sysCollNamePrefix);
 }

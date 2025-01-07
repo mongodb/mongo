@@ -8,9 +8,14 @@ selector:
     - jstests/core/**/*.js
     - jstests/aggregation/**/*.js
   exclude_files:
-    # TODO SERVER-86996: Apply QuerySettings for queries involving timeseries collections.
-    - jstests/core/timeseries/**/*.js
-    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    # TODO SERVER-95456 Make CLUSTERED_IXSCANs obey query settings allowed indexes
+    - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
+    - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
+    - jstests/core/timeseries/timeseries_index_partial.js
+    - jstests/core/timeseries/timeseries_index_use.js
+    - jstests/core/timeseries/timeseries_match_pushdown.js
+    - jstests/core/timeseries/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/timeseries_update_hint.js
 
     # TODO SERVER-88977: Apply QuerySettings for queries involving columnstore indexes.
     - jstests/core/columnstore/**/*.js
@@ -52,11 +57,20 @@ selector:
     - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
     - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
     - jstests/core/sbe_plan_cache_duplicate_or_clauses.js
+    - jstests/core/timeseries/timeseries_bucket_level_filter.js
+    - jstests/core/timeseries/timeseries_groupby_reorder.js
+    - jstests/core/timeseries/timeseries_project.js
 
     # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
     # is a design decision due to mongos lacking collation information.
     - jstests/aggregation/sources/bucket/collation_bucket.js
     - jstests/core/clustered/clustered_collection_collation.js
+
+    # This test uses an IDHACK-like query, for which it is not allowed to set query settings.
+    - jstests/core/timeseries/timeseries_delete_multi.js
+    - jstests/core/timeseries/timeseries_simple.js
+    - jstests/core/timeseries/timeseries_update.js
+    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
 
     # Tests which already use query settings or index filters, which could be overridden by this suite.
     - jstests/core/index/express.js

@@ -8,12 +8,18 @@ selector:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js
   exclude_files:
+    # TODO SERVER-95456 Make CLUSTERED_IXSCANs obey query settings allowed indexes
+    - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
+    - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
+    - jstests/core/timeseries/timeseries_index_partial.js
+    - jstests/core/timeseries/timeseries_index_use.js
+    - jstests/core/timeseries/timeseries_match_pushdown.js
+    - jstests/core/timeseries/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/timeseries_update_hint.js
+
     # TODO SERVER-87318: Investigate why `verify_index_stats_output` fails with embedded
     # router and 2 shards.
     - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
-
-    # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
-    - jstests/core/timeseries/**/*.js
 
     # The following tests fail because a certain command or functionality is not supported by
     # mongos. This command or functionality is placed in a comment next to the failing test.
@@ -60,6 +66,10 @@ selector:
     - jstests/core/query/explain/explain_shell_helpers.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
     - jstests/core/return_key.js
+    - jstests/core/timeseries/timeseries_index_collation.js
+    - jstests/core/timeseries/timeseries_internal_bounded_sort_compound.js
+    - jstests/core/timeseries/timeseries_metric_index_compound.js
+    - jstests/core/timeseries/timeseries_special_indexes_metadata.js
 
     # Test which asserts on the number of execution metrics. The additional commands emitted by
     # this suite might cause the test to fail.
@@ -93,6 +103,7 @@ selector:
     - jstests/core/index/indext.js
     - jstests/core/index/sparse_index_internal_expr.js
     - jstests/core/query/exists/existsa.js
+    - jstests/core/timeseries/timeseries_sparse_index.js
     # Similar to the above, column store and timeseries indexes cannot be forced using query settings.
     - jstests/core/columnstore/columnstore_index_correctness.js
 
