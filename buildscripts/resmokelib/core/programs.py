@@ -497,6 +497,11 @@ def mongo_shell_program(
     if mongod_set_parameters.get("featureFlagQETextSearchPreview"):
         args.append("--setShellParameter=featureFlagQETextSearchPreview=true")
 
+    # If featureFlagLookupEncryptionSchemasFLE is enabled in mongod set parameters, enable it in the shell.
+    # TODO: SERVER-59284 remove once FF is enabled by default
+    if mongod_set_parameters.get("featureFlagLookupEncryptionSchemasFLE"):
+        args.append("--setShellParameter=featureFlagLookupEncryptionSchemasFLE=true")
+
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
 

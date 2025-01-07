@@ -3587,6 +3587,13 @@ BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
     return ei.toBSON();
 }
 
+BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(const BSONObj& schema) {
+    EncryptionInformation ei;
+    ei.setType(kEncryptionInformationSchemaVersion);
+    ei.setSchema(schema);
+    return ei.toBSON();
+}
+
 EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     const NamespaceString& nss, const EncryptionInformation& ei) {
     BSONObj schema = ei.getSchema();

@@ -179,7 +179,8 @@ inline auto makeAdditionalChildren(
             offTheEndContents.push_back(children.back().contents);
         }
 
-        if (lookupSource->hasPipeline()) {
+        if (lookupSource->hasPipeline() &&
+            lookupSource->getResolvedIntrospectionPipeline().getSources().size() > 0) {
             auto [child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
                 initialStageContents, lookupSource->getResolvedIntrospectionPipeline(), propagator);
             offTheEndContents.push_back(std::move(offTheEndReshaper(child.get().contents)));
@@ -262,8 +263,9 @@ inline void walk(Stage<T>* stage,
     if (stage->principalChild)
         walk(stage->principalChild.get(), sourceIter, zipper);
 
-    if (auto lookupSource = dynamic_cast<DocumentSourceLookUp*>(&***sourceIter);
-        lookupSource && lookupSource->hasPipeline()) {
+    if (auto lookupSource = dynamic_cast<DocumentSourceLookUp*>(&***sourceIter); lookupSource &&
+        lookupSource->hasPipeline() &&
+        lookupSource->getResolvedIntrospectionPipeline().getSources().size() > 0) {
         auto iter = lookupSource->getResolvedIntrospectionPipeline().getSources().begin();
         // The pipeline's schema child is always contained at the last element of the vector for
         // lookup.
