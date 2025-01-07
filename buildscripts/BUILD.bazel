@@ -125,5 +125,11 @@ exports_files(["cheetah_source_generator.py"])
 sh_binary(
     name = "shellscripts_linters",
     srcs = ["shellscripts-linters.sh"],
+    data = [
+        "@shfmt",
+    ],
+    env = {
+        "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
+    },
     visibility = ["//visibility:public"],
 )

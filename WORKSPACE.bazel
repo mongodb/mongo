@@ -304,3 +304,7 @@ load("//bazel/install_rules:pigz.bzl", "setup_pigz")
 setup_pigz(
     name = "pigz",
 )
+
+load("//bazel/format:shfmt.bzl", "shfmt")
+
+shfmt()
