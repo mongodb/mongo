@@ -5618,5 +5618,46 @@ TEST_F(ExpressionSigmoidTest, CorrectRedaction) {
         serialized);
 }
 
+TEST(ExpressionMapTest, CorrectRedaction) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto spec = fromjson(R"({$map: {input: "$a", as: "x", in : '$$x'}})");
+    auto mapExp = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+
+    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto serialized = mapExp->serialize(opts);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{$map: {input: \"$HASH<a>\", as: \"HASH<x>\", in: \"$$HASH<x>\"}}",
+        serialized);
+}
+
+TEST(ExpressionFilterTest, CorrectRedaction) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto spec = fromjson("{$filter: {input: '$a', as: 'x', cond: {$gt: ['$$x', 2]}}}");
+    auto filterExp = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+
+    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto serialized = filterExp->serialize(opts);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{$filter: {input: \"$HASH<a>\", as: \"HASH<x>\", cond: {$gt: [\"$$HASH<x>\", "
+        "\"?number\"]}}}",
+        serialized);
+}
+
+TEST(ExpressionFilterTest, CorrectRedactionWithLimit) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto spec = fromjson("{$filter: {input: '$a', as: 'x', cond: {$gt: ['$$x', 2]}, limit: 10}}");
+    auto filterExp = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+
+    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto serialized = filterExp->serialize(opts);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{$filter: {input: \"$HASH<a>\", as: \"HASH<x>\", cond: {$gt: [\"$$HASH<x>\", "
+        "\"?number\"]}, limit: \"?number\"}}",
+        serialized);
+}
+
 }  // namespace ExpressionTests
 }  // namespace mongo
