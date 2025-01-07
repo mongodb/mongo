@@ -1513,13 +1513,12 @@ tasks:
       aws_secret_remote: ${repo_aws_secret}
   - func: "set up notary client credentials"
   - func: "f_expansions_write"
-  - command: shell.exec
+  - command: subprocess.exec
     params:
-      shell: bash
+      binary: bash
       silent: true
-      script: |
-        set -oe
-        echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
+      args:
+      - "./src/evergreen/container_registry_login.sh"
   - command: subprocess.exec
     params:
       binary: bash
@@ -1575,13 +1574,12 @@ tasks:
   - func: "f_expansions_write"
 
   # login to container registry
-  - command: shell.exec
+  - command: subprocess.exec
     params:
-      shell: bash
+      binary: bash
       silent: true
-      script: |
-        set -oe
-        echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
+      args:
+      - "./src/evergreen/container_registry_login.sh"
 
   # signing windows artifacts
   - command: subprocess.exec
@@ -2017,13 +2015,12 @@ tasks:
       aws_secret_remote: ${repo_aws_secret}
   - func: "f_expansions_write"
   # login to container registry
-  - command: shell.exec
+  - command: subprocess.exec
     params:
-      shell: bash
+      binary: bash
       silent: true
-      script: |
-        set -oe
-        echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
+      args:
+      - "./src/evergreen/container_registry_login.sh"
   - command: subprocess.exec
     params:
       binary: bash
