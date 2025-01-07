@@ -9,6 +9,13 @@ set -o errexit
 
 echo $0 $@
 
+if grep 'Red Hat Enterprise Linux' /etc/os-release > /dev/null ; then
+        echo "Disto is RHEL, proceeding with registration"
+else
+        echo "Disto is NOT RHEL, exit without registration"
+        exit 0
+fi
+
 
 # _usage_: Provides usage infomation
 function _usage_ {
