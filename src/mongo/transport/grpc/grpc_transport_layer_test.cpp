@@ -47,6 +47,7 @@
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -236,6 +237,8 @@ public:
 
     MockServiceEntryPoint* serviceEntryPoint;
     test::SSLGlobalParamsGuard _sslGlobalParamsGuard;
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{logv2::LogComponent::kNetwork,
+                                                                 logv2::LogSeverity::Debug(3)};
 };
 
 TEST_F(GRPCTransportLayerTest, startupIngressAndEgress) {
@@ -727,18 +730,27 @@ public:
         _tempDir =
             test::copyCertsToTempDir(grpc::CommandServiceTestFixtures::kCAFile,
                                      grpc::CommandServiceTestFixtures::kServerCertificateKeyFile,
+                                     grpc::CommandServiceTestFixtures::kClientCertificateKeyFile,
                                      "grpc");
 
         sslGlobalParams.sslCAFile = _tempDir->getCAFile().toString();
         sslGlobalParams.sslPEMKeyFile = _tempDir->getPEMKeyFile().toString();
     }
 
-    StringData getFilePathCA() {
-        return _tempDir->getCAFile();
+    const test::TempCertificatesDir& getCertificatesDir() const {
+        return *_tempDir;
     }
 
-    StringData getFilePathPEM() {
-        return _tempDir->getPEMKeyFile();
+    std::shared_ptr<GRPCClient> startClient() {
+        GRPCClient::Options options{};
+        options.tlsCAFile = sslGlobalParams.sslCAFile;
+        options.tlsCertificateKeyFile = getCertificatesDir().getClientPEMKeyFile();
+        auto client = std::make_shared<GRPCClient>(nullptr /* transport layer */,
+                                                   getServiceContext(),
+                                                   makeClientMetadataDocument(),
+                                                   std::move(options));
+        client->start();
+        return client;
     }
 
 private:
@@ -767,10 +779,10 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceeds) {
 
             // Overwrite the tmp files to hold new certs.
             boost::filesystem::copy_file(kTrustedCAFile,
-                                         getFilePathCA().toString(),
+                                         getCertificatesDir().getCAFile().toString(),
                                          boost::filesystem::copy_options::overwrite_existing);
             boost::filesystem::copy_file(kTrustedPEMFile,
-                                         getFilePathPEM().toString(),
+                                         getCertificatesDir().getPEMKeyFile().toString(),
                                          boost::filesystem::copy_options::overwrite_existing);
 
             ASSERT_OK(tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false));
@@ -817,7 +829,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesThrowsAndUses
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub);
 
-            boost::filesystem::resize_file(getFilePathCA().toString(), 0);
+            boost::filesystem::resize_file(getCertificatesDir().getCAFile().toString(), 0);
 
             ASSERT_EQ(
                 tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false).code(),
@@ -840,6 +852,9 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
         makeNoopRPCHandler(),
         [&](auto& tl) {
             auto addr = tl.getListeningAddresses().at(0);
+            auto client = startClient();
+            auto reactor = checked_pointer_cast<GRPCReactor>(
+                tl.getReactor(GRPCTransportLayer::WhichReactor::kEgress));
 
             // Connect using the existing certs.
             auto stub = CommandServiceTestFixtures::makeStubWithCerts(
@@ -848,21 +863,87 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub);
 
+            ASSERT_OK(client->connect(addr, reactor, Milliseconds(500), {}).getNoThrow());
+            client->dropAllChannels_forTest();
+
             // Overwrite the tmp files to hold new, invalid certs.
             boost::filesystem::copy_file(kInvalidPEMFile,
-                                         getFilePathPEM().toString(),
+                                         getCertificatesDir().getPEMKeyFile().toString(),
+                                         boost::filesystem::copy_options::overwrite_existing);
+            boost::filesystem::copy_file(kInvalidPEMFile,
+                                         getCertificatesDir().getClientPEMKeyFile().toString(),
                                          boost::filesystem::copy_options::overwrite_existing);
 
             ASSERT_EQ(
                 tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false).code(),
                 ErrorCodes::InvalidSSLConfiguration);
+            ASSERT_EQ(client->rotateCertificates(), ErrorCodes::InvalidSSLConfiguration);
 
-            // Make sure we can still connect with the initial certs used before the bad rotation.
+            // Make sure we can still connect with the initial certs used before the bad
+            // rotation.
             auto stub2 = CommandServiceTestFixtures::makeStubWithCerts(
                 addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub2);
+
+            // The already-existing client should also also still be using the old certs after a
+            // failed rotation.
+            ASSERT_OK(client->connect(addr, reactor, Milliseconds(500), {}).getNoThrow());
+        },
+        CommandServiceTestFixtures::makeTLOptions());
+}
+
+TEST_F(RotateCertificatesGRPCTransportLayerTest, ClientUsesOldCertsUntilRotate) {
+    // Ceritificates that we wil rotate to.
+    const std::string kTrustedCAFile = "jstests/libs/trusted-ca.pem";
+    const std::string kTrustedPEMFile = "jstests/libs/trusted-server.pem";
+    const std::string kTrustedClientPEMFile = "jstests/libs/trusted-client.pem";
+
+    runWithTL(
+        makeNoopRPCHandler(),
+        [&](GRPCTransportLayer& tl) {
+            auto addr = tl.getListeningAddresses().at(0);
+
+            auto reactor = checked_pointer_cast<GRPCReactor>(
+                tl.getReactor(GRPCTransportLayer::WhichReactor::kEgress));
+
+            auto client = startClient();
+
+            // First connect should succeed.
+            ASSERT_OK(
+                client
+                    ->connect(addr, reactor, CommandServiceTestFixtures::kDefaultConnectTimeout, {})
+                    .getNoThrow());
+
+            // Overwrite the tmp files to hold new certs.
+            boost::filesystem::copy_file(kTrustedCAFile,
+                                         getCertificatesDir().getCAFile().toString(),
+                                         boost::filesystem::copy_options::overwrite_existing);
+            boost::filesystem::copy_file(kTrustedPEMFile,
+                                         getCertificatesDir().getPEMKeyFile().toString(),
+                                         boost::filesystem::copy_options::overwrite_existing);
+            boost::filesystem::copy_file(kTrustedClientPEMFile,
+                                         getCertificatesDir().getClientPEMKeyFile().toString(),
+                                         boost::filesystem::copy_options::overwrite_existing);
+            // Rotate the certificates server side.
+            ASSERT_OK(tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false));
+
+            // After rotating on the server side, connecting from the client should fail, as it is
+            // still using the old certificates.
+            client->dropAllChannels_forTest();
+            ASSERT_NOT_OK(
+                client
+                    ->connect(addr, reactor, CommandServiceTestFixtures::kDefaultConnectTimeout, {})
+                    .getNoThrow());
+
+            // After rotation, connection should now succeed.
+            client->dropAllChannels_forTest();
+            ASSERT_OK(client->rotateCertificates());
+            ASSERT_OK(
+                client
+                    ->connect(addr, reactor, CommandServiceTestFixtures::kDefaultConnectTimeout, {})
+                    .getNoThrow());
         },
         CommandServiceTestFixtures::makeTLOptions());
 }

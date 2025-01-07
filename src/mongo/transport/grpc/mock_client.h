@@ -36,6 +36,7 @@
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/mock_stub.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::transport::grpc {
 
@@ -55,6 +56,10 @@ public:
     }
 
     void appendStats(BSONObjBuilder* section) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    Status rotateCertificates() override {
         MONGO_UNIMPLEMENTED;
     }
 

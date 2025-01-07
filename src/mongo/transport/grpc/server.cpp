@@ -184,6 +184,8 @@ std::shared_ptr<::grpc::ServerCredentials> Server::_makeServerCredentialsWithFet
 }
 
 Status Server::rotateCertificates() {
+    LOGV2_DEBUG(
+        9886805, 3, "Rotating gRPC server TLS certificates", "addresses"_attr = _options.addresses);
     auto swNewCertificates =
         _readCertificatesFromDisk(*_options.tlsCAFile, _options.tlsCertificateKeyFile);
     if (!swNewCertificates.isOK()) {

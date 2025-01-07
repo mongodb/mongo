@@ -81,6 +81,8 @@ public:
 
     virtual void appendStats(BSONObjBuilder* section) const = 0;
 
+    virtual Status rotateCertificates() = 0;
+
     struct ConnectOptions {
         boost::optional<std::string> authToken = {};
         ConnectSSLMode sslMode = ConnectSSLMode::kGlobalSSLMode;
@@ -211,6 +213,9 @@ public:
     void start() override;
     void shutdown() override;
     void appendStats(BSONObjBuilder* section) const override;
+    Status rotateCertificates() override;
+    void dropAllChannels_forTest();
+
 
 private:
     Future<CtxAndStream> _streamFactory(const HostAndPort&,

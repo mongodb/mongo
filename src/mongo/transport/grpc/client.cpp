@@ -39,8 +39,12 @@
 #include <grpcpp/security/tls_credentials_options.h>
 #include <grpcpp/support/async_stream.h>
 
+#include "src/core/tsi/ssl_transport_security.h"
+#include "src/core/tsi/transport_security_interface.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/channel_pool.h"
 #include "mongo/transport/grpc/client_stream.h"
@@ -52,6 +56,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -409,6 +414,7 @@ public:
     }
 
     void start() {
+        _loadTlsCertificates();
         _prunerService.start(_svcCtx, _pool);
     }
 
@@ -427,28 +433,93 @@ public:
         _pool->dropAllChannels();
     }
 
+    Status rotateCertificates() try {
+        LOGV2_DEBUG(9886801, 3, "Rotating certificates used for creating gRPC channels");
+        _loadTlsCertificates();
+        return Status::OK();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    void dropAllChannels_forTest() {
+        _pool->dropAllChannels();
+    }
+
 private:
+    /**
+     * Utilize gRPC's ssl_client_handshaker_factory to verify that the user has provided valid TLS
+     * certificates. Throws an exception if the provided certificates are not valid.
+     * Leaves encryption-specific options as their defaults.
+     */
+    void _verifyTLSCertificates(
+        const boost::optional<const ::grpc::experimental::IdentityKeyCertPair&> certKeyPair,
+        const boost::optional<std::string>& caCert) {
+        tsi_ssl_pem_key_cert_pair pemKeyCertPair;
+        tsi_ssl_client_handshaker_factory* handshakerFactory = nullptr;
+        tsi_ssl_client_handshaker_options options;
+
+        if (certKeyPair) {
+            pemKeyCertPair = {certKeyPair->private_key.c_str(),
+                              certKeyPair->certificate_chain.c_str()};
+            options.pem_key_cert_pair = &pemKeyCertPair;
+        }
+
+        if (caCert) {
+            options.pem_root_certs = caCert->c_str();
+        }
+
+        tsi_result result =
+            tsi_create_ssl_client_handshaker_factory_with_options(&options, &handshakerFactory);
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "Invalid certificates provided.",
+                result == TSI_OK);
+        tsi_ssl_client_handshaker_factory_unref(handshakerFactory);
+    }
+
+    void _loadTlsCertificates() {
+        auto provider =
+            [&]() -> std::shared_ptr<::grpc::experimental::CertificateProviderInterface> {
+            if (!_options.tlsCAFile && !_options.tlsCertificateKeyFile) {
+                return nullptr;
+            }
+
+            std::vector<::grpc::experimental::IdentityKeyCertPair> certKeyPairs;
+            if (_options.tlsCertificateKeyFile) {
+                auto sslPair = util::parsePEMKeyFile(_options.tlsCertificateKeyFile.get());
+                certKeyPairs.push_back(
+                    {std::move(sslPair.private_key), std::move(sslPair.cert_chain)});
+            }
+
+            boost::optional<std::string> caCert;
+            if (_options.tlsCAFile) {
+                caCert.emplace(ssl_util::readPEMFile(_options.tlsCAFile.get()).getValue());
+            }
+
+            boost::optional<const ::grpc::experimental::IdentityKeyCertPair&> certPair;
+            if (!certKeyPairs.empty()) {
+                certPair = certKeyPairs.front();
+            }
+            _verifyTLSCertificates(certPair, caCert);
+            return std::make_shared<::grpc::experimental::StaticDataCertificateProvider>(
+                caCert.get_value_or(""), certKeyPairs);
+        }();
+
+        _certificateProvider.synchronize() = std::move(provider);
+    }
+
     ::grpc::experimental::TlsChannelCredentialsOptions _makeTlsOptions() {
         ::grpc::experimental::TlsChannelCredentialsOptions tlsOps;
-        std::vector<::grpc::experimental::IdentityKeyCertPair> certKeyPairTls;
+
+        if (auto provider = _certificateProvider.get()) {
+            tlsOps.set_certificate_provider(std::move(provider));
+        }
 
         if (_options.tlsCertificateKeyFile) {
-            auto certKeyPair = util::parsePEMKeyFile(_options.tlsCertificateKeyFile.get());
-            certKeyPairTls.push_back(
-                {std::move(certKeyPair.private_key), std::move(certKeyPair.cert_chain)});
             tlsOps.watch_identity_key_cert_pairs();
         }
 
         if (_options.tlsCAFile) {
-            auto caCert = ssl_util::readPEMFile(_options.tlsCAFile.get()).getValue();
-            tlsOps.set_certificate_provider(
-                std::make_shared<::grpc::experimental::StaticDataCertificateProvider>(
-                    caCert, certKeyPairTls));
             tlsOps.watch_root_certs();
-        } else {
-            tlsOps.set_certificate_provider(
-                std::make_shared<::grpc::experimental::StaticDataCertificateProvider>(
-                    certKeyPairTls));
         }
 
         if (_options.tlsAllowInvalidCertificates || _options.tlsAllowInvalidHostnames) {
@@ -483,6 +554,8 @@ private:
     ServiceContext* const _svcCtx;
     std::shared_ptr<ChannelPool<std::shared_ptr<::grpc::Channel>, Stub>> _pool;
     ChannelPrunerService<decltype(_pool)> _prunerService;
+    synchronized_value<std::shared_ptr<::grpc::experimental::CertificateProviderInterface>>
+        _certificateProvider;
 };
 
 GRPCClient::GRPCClient(TransportLayer* tl,
@@ -512,6 +585,14 @@ void GRPCClient::appendStats(BSONObjBuilder* section) const {
         BSONObjBuilder streamSection(section->subobjStart(kStreamsSubsectionFieldName));
         streamSection.append(kCurrentStreamsFieldName, _numCurrentStreams.get());
     }
+}
+
+Status GRPCClient::rotateCertificates() {
+    return static_cast<StubFactoryImpl&>(*_stubFactory).rotateCertificates();
+}
+
+void GRPCClient::dropAllChannels_forTest() {
+    static_cast<StubFactoryImpl&>(*_stubFactory).dropAllChannels_forTest();
 }
 
 Future<Client::CtxAndStream> GRPCClient::_streamFactory(const HostAndPort& remote,

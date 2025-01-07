@@ -381,6 +381,7 @@ public:
         _tempDir =
             test::copyCertsToTempDir(grpc::CommandServiceTestFixtures::kCAFile,
                                      grpc::CommandServiceTestFixtures::kServerCertificateKeyFile,
+                                     grpc::CommandServiceTestFixtures::kClientCertificateKeyFile,
                                      "tlm_gprc");
 
         setTLSCertificatePaths(_tempDir->getCAFile().toString(),

@@ -250,20 +250,26 @@ public:
         boost::filesystem::path filePathPEM(directoryPath / "server_pem.pem");
         _filePathCA = filePathCA.string();
         _filePathPEM = filePathPEM.string();
+        _filePathClientPEM = boost::filesystem::path(directoryPath / "client.pem").string();
     }
 
     StringData getCAFile() const {
-        return _filePathPEM;
+        return _filePathCA;
     }
 
     StringData getPEMKeyFile() const {
-        return _filePathCA;
+        return _filePathPEM;
+    }
+
+    StringData getClientPEMKeyFile() const {
+        return _filePathClientPEM;
     }
 
 private:
     std::unique_ptr<unittest::TempDir> _dir;
     std::string _filePathCA;
     std::string _filePathPEM;
+    std::string _filePathClientPEM;
 };
 
 /**
@@ -274,11 +280,13 @@ private:
  */
 inline std::unique_ptr<TempCertificatesDir> copyCertsToTempDir(std::string caFile,
                                                                std::string pemFile,
+                                                               std::string clientPemFile,
                                                                std::string directoryPrefix) {
     auto tempDir = std::make_unique<TempCertificatesDir>(directoryPrefix);
 
     boost::filesystem::copy_file(caFile, tempDir->getCAFile().toString());
     boost::filesystem::copy_file(pemFile, tempDir->getPEMKeyFile().toString());
+    boost::filesystem::copy_file(clientPemFile, tempDir->getClientPEMKeyFile().toString());
 
     return tempDir;
 };

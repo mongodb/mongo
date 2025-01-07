@@ -31,6 +31,7 @@
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_session_manager.h"
@@ -360,7 +361,27 @@ void GRPCTransportLayerImpl::stopAcceptingSessions() {
 #ifdef MONGO_CONFIG_SSL
 Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                                   bool asyncOCSPStaple) {
-    return _server->rotateCertificates();
+    if (_server) {
+        if (auto status = _server->rotateCertificates(); !status.isOK()) {
+            // Log at debug level since this is logged at a higher level in TransportLayerManager.
+            LOGV2_DEBUG(9886802,
+                        1,
+                        "Failed to rotate ingress gRPC TLS certificates",
+                        "error"_attr = status);
+            return status;
+        }
+    }
+
+    if (_client) {
+        if (auto status = _client->rotateCertificates(); !status.isOK()) {
+            LOGV2_DEBUG(
+                9886803, 1, "Failed to rotate egress gRPC TLS certificates", "error"_attr = status);
+            return status;
+        }
+    }
+
+    LOGV2_DEBUG(9886804, 1, "gRPC TLS certificates successfully rotated");
+    return Status::OK();
 }
 #endif
 
