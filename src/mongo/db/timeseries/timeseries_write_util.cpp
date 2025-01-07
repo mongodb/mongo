@@ -944,7 +944,7 @@ std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> m
     const OID& bucketId,
     const CollectionPtr& coll,
     const std::vector<BSONObj>& measurements,
-    const boost::optional<Date_t> currentMinTime) {
+    const boost::optional<Date_t>& currentMinTime) {
     // A bucket will be fully deleted if no measurements are passed in.
     if (measurements.empty()) {
         write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);

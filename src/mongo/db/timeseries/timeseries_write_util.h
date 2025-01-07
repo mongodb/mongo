@@ -132,10 +132,14 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
 
 /**
  * Returns an update request to the bucket when the 'measurements' is non-empty. Otherwise, returns
- * a delete request to the bucket.
+ * a delete request to the bucket. currentMinTime is passed in if we want to preserve a particular
+ * control.min.timestamp value for our bucket.
  */
 std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
-    const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements);
+    const OID& bucketId,
+    const CollectionPtr& coll,
+    const std::vector<BSONObj>& measurements,
+    const boost::optional<Date_t>& currentMinTime);
 
 using TimeseriesBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
 using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
