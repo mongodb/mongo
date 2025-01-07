@@ -517,7 +517,7 @@ BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* 
 BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* opCtx,
                                                             StringData ns) const {
     BSONObj obj = _findEntry(opCtx, ns);
-    MONGO_LOG(1) << " fetched CCE metadata: " << obj;
+    MONGO_LOG(1) << " fetched CCE metadata: " << obj.jsonString();
     BSONCollectionCatalogEntry::MetaData md;
     const BSONElement mdElement = obj["md"];
     if (mdElement.isABSONObj()) {

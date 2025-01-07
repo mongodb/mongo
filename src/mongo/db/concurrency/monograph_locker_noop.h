@@ -28,11 +28,18 @@
 
 #pragma once
 
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/util/time_support.h"
 #include <utility>
 
 #include "mongo/db/concurrency/locker.h"
 
 namespace mongo {
+// Global lock. Every server operation, which uses the Locker must acquire this lock at least
+// once. See comments in the header file (begin/endTransaction) for more information.
+const ResourceId resourceIdGlobalForMonograph =
+    ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+
 
 /**
  * Locker, which cannot be used to lock/unlock resources and just returns true for checks for
@@ -41,10 +48,12 @@ namespace mongo {
  */
 class MonographLockerNoop final : public Locker {
 public:
-    MonographLockerNoop() {}
+    MonographLockerNoop() = default;
 
     void reset() override {
-        _lockMode = LockMode::MODE_NONE;
+        _lockMap.clear();
+        _globalLockMode = LockMode::MODE_NONE;
+        _recursiveCount = 0;
         _wuowNestingLevel = 0;
     }
 
@@ -58,56 +67,69 @@ public:
     }
 
     LockerId getId() const override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     stdx::thread::id getThreadId() const override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     void updateThreadIdToCurrentThread() override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     void unsetThreadId() override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     void setMaxLockTimeout(Milliseconds maxTimeout) override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     bool hasMaxLockTimeout() override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
         return false;
     }
 
     void unsetMaxLockTimeout() override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     LockResult lockGlobal(OperationContext* opCtx, LockMode mode) override {
         // MONGO_UNREACHABLE;
-        return LockResult::LOCK_OK;
+        return lockGlobalBegin(opCtx, mode, Date_t{});
     }
 
     LockResult lockGlobal(LockMode mode) override {
         // MONGO_UNREACHABLE;
+        return lockGlobal(nullptr, mode);
+    }
+
+    LockResult lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
+        if (resId == resourceIdGlobalForMonograph) {
+            _recursiveCount++;
+            if (!isModeCovered(mode, _globalLockMode)) {
+                _globalLockMode = mode;
+            }
+        } else {
+            if (!isModeCovered(mode, _lockMap[resId])) {
+                _lockMap[resId] = mode;
+            }
+        }
         return LockResult::LOCK_OK;
     }
 
     LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) override {
-        // MONGO_UNREACHABLE;
-        return LockResult::LOCK_OK;
+        return lockBegin(opCtx, resourceIdGlobalForMonograph, mode);
     }
 
     LockResult lockGlobalBegin(LockMode mode, Date_t deadline) override {
         // MONGO_UNREACHABLE;
-        return LockResult::LOCK_OK;
+        return lockGlobalBegin(nullptr, mode, deadline);
     }
 
     LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline) override {
@@ -116,16 +138,15 @@ public:
     }
 
     LockResult lockGlobalComplete(Date_t deadline) override {
-        // MONGO_UNREACHABLE;v
+        // MONGO_UNREACHABLE;
         return LockResult::LOCK_OK;
     }
 
-    void lockMMAPV1Flush() override {
-        // MONGO_UNREACHABLE;
-    }
+    void lockMMAPV1Flush() override {}
 
     bool unlockGlobal() override {
         // MONGO_UNREACHABLE;
+        unlock(resourceIdGlobalForMonograph);
         return true;
     }
 
@@ -151,27 +172,41 @@ public:
                     LockMode mode,
                     Date_t deadline,
                     bool checkDeadlock) override {
-        _lockMode = mode;
-        return LockResult::LOCK_OK;
+        return lockBegin(opCtx, resId, mode);
     }
 
     LockResult lock(ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) override {
-        _lockMode = mode;
-        return LockResult::LOCK_OK;
+        return lock(nullptr, resId, mode, deadline, checkDeadlock);
     }
 
     void downgrade(ResourceId resId, LockMode newMode) override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     bool unlock(ResourceId resId) override {
-        _lockMode = LockMode::MODE_NONE;
+        if (resId == resourceIdGlobalForMonograph) {
+            _recursiveCount--;
+            if (_recursiveCount == 0) {
+                _globalLockMode = LockMode::MODE_NONE;
+            }
+        } else {
+            _lockMap[resId] = LockMode::MODE_NONE;
+        }
         return true;
     }
 
     LockMode getLockMode(ResourceId resId) const override {
         // MONGO_UNREACHABLE;
-        return _lockMode;
+        if (resId == resourceIdGlobalForMonograph) {
+            return _globalLockMode;
+        } else {
+            auto iter = _lockMap.find(resId);
+            if (iter == _lockMap.end()) {
+                return LockMode::MODE_NONE;
+            } else {
+                return iter->second;
+            }
+        }
     }
 
     bool isLockHeldForMode(ResourceId resId, LockMode mode) const override {
@@ -179,10 +214,12 @@ public:
     }
 
     bool isDbLockedForMode(StringData dbName, LockMode mode) const override {
-        if (isW())
+        if (isW()) {
             return true;
-        if (isR() && isSharedLockMode(mode))
+        }
+        if (isR() && isSharedLockMode(mode)) {
             return true;
+        }
         return true;
     }
 
@@ -191,11 +228,11 @@ public:
     }
 
     ResourceId getWaitingResource() const override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     void getLockerInfo(LockerInfo* lockerInfo) const override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     boost::optional<LockerInfo> getLockerInfo() const override {
@@ -207,16 +244,16 @@ public:
         stateOut->locks.clear();
         stateOut->globalMode = LockMode::MODE_NONE;
 
-        OneLock info{ResourceId(), _lockMode};
+        OneLock info{ResourceId(), _globalLockMode};
         stateOut->locks.emplace_back(std::move(info));
-        _lockMode = LockMode::MODE_NONE;
+        _globalLockMode = LockMode::MODE_NONE;
         return true;
     }
 
     void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) override {
         // MONGO_UNREACHABLE;
         for (const auto& info : stateToRestore.locks) {
-            _lockMode = info.mode;
+            _globalLockMode = info.mode;
         }
     }
 
@@ -226,11 +263,11 @@ public:
     }
 
     void releaseTicket() override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     void reacquireTicket(OperationContext* opCtx) override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     void dump() const override {
@@ -238,45 +275,47 @@ public:
     }
 
     bool isW() const override {
-        return _lockMode == LockMode::MODE_X;
+        return _globalLockMode == LockMode::MODE_X;
     }
 
     bool isR() const override {
         // MONGO_UNREACHABLE;
-        return _lockMode == LockMode::MODE_S;
+        return _globalLockMode == LockMode::MODE_S;
     }
 
     bool isLocked() const override {
         // This is necessary because replication makes decisions based on the answer to this, and
         // we wrote unit tests to test the behavior specifically when this returns "false".
-        return _lockMode != LockMode::MODE_NONE;
+        return _globalLockMode != LockMode::MODE_NONE;
     }
 
     bool isWriteLocked() const override {
-        return _lockMode == LockMode::MODE_IX;
+        return _globalLockMode == LockMode::MODE_IX;
     }
 
     bool isReadLocked() const override {
-        return _lockMode == LockMode::MODE_IS;
+        return _globalLockMode == LockMode::MODE_IS;
     }
 
     bool hasLockPending() const override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
         return false;
     }
 
     bool isGlobalLockedRecursively() override {
-        return true;
+        return _recursiveCount > 1;
     }
 
 private:
-    LockMode _lockMode{LockMode::MODE_NONE};
+    std::unordered_map<ResourceId, LockMode> _lockMap;
+    LockMode _globalLockMode{LockMode::MODE_NONE};
+    int _recursiveCount{0};
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
     int _wuowNestingLevel{0};
 
     // Indicates whether the client is active reader/writer or is queued.
-    AtomicWord<ClientState> _clientState{kInactive};
+    // AtomicWord<ClientState> _clientState{kInactive};
 };
 
 }  // namespace mongo

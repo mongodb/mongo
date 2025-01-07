@@ -330,7 +330,8 @@ Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
     // after the collection is created.
     bool canAcceptWrites = true;
     if (canAcceptWrites && createIdIndex && nss.isSystem()) {
-        createSystemIndexes(opCtx, collection.get());
+        // TODO: we should it in another place
+        // createSystemIndexes(opCtx, collection.get());
     }
 
     auto [iter, _] = _collections.try_emplace(nss.toString(), std::move(collection));
