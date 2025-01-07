@@ -221,7 +221,7 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
                                       bool errorsOnly,
                                       const BatchedCommandResponse& response) {
     BulkWriteReplyInfo replyInfo;
-    if (response.toStatus().isOK()) {
+    if (response.toStatus().isOK() || response.isWriteConcernErrorSet()) {
         if (firstOpType == BulkWriteCRUDOp::kInsert) {
             if (!errorsOnly) {
                 fillOKInsertReplies(replyInfo, response.getN());
@@ -252,6 +252,12 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
             if (!errorsOnly) {
                 replyInfo.replyItems.push_back(reply);
             }
+        }
+        if (response.isWriteConcernErrorSet()) {
+            auto bwWce = BulkWriteWriteConcernError::parseOwned(
+                IDLParserContext("BulkWriteWriteConcernError"),
+                response.getWriteConcernError()->toBSON());
+            replyInfo.wcErrors = bwWce;
         }
     } else {
         if (response.isErrDetailsSet()) {
@@ -293,7 +299,6 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
             uassertStatusOK(response.getTopLevelStatus());
             MONGO_UNREACHABLE;
         }
-        // TODO (SERVER-81280): Handle write concern errors.
     }
 
     switch (firstOpType) {
