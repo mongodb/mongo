@@ -134,9 +134,9 @@ function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillin
     // Assert spilling metrics are updated during the aggregation.
     for (let prop of ['spills', 'spilledBytes']) {
         const metrics = spillingMetrics.map(x => x[prop]);
-        // We should have three increasing metrics.
-        assert.lt(metrics[0], metrics[1], spillingMetrics);
-        assert.lt(metrics[1], metrics[2], spillingMetrics);
+        // We should have three non-decreasing metrics.
+        assert.lte(metrics[0], metrics[1], spillingMetrics);
+        assert.lte(metrics[1], metrics[2], spillingMetrics);
     }
 
     // Assert the final spilling metrics are as expected.
@@ -157,7 +157,7 @@ testSpillingMetrics({
 });
 testSpillingMetrics({
     stage: stages['setWindowFields'],
-    expectedSpillingMetrics: {spills: 10, spilledBytes: 180},
+    expectedSpillingMetrics: {spills: 10, spilledBytes: 500},
     expectedSbeSpillingMetrics: {spills: 9, spilledBytes: 500},
 });
 if (isSbeEnabled) {

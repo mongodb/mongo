@@ -169,8 +169,12 @@ public:
                                    const std::vector<Timestamp>& ts) const final;
 
     Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       RecordStore* rs,
+                                       const RecordStore* rs,
                                        RecordId rID) const final;
+
+    bool checkRecordInRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const RecordStore* rs,
+                                  RecordId rID) const final;
 
     void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      RecordStore* rs,

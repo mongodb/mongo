@@ -33,6 +33,7 @@
 #include <map>
 #include <set>
 
+#include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 
 #include "mongo/base/string_data.h"
@@ -203,6 +204,15 @@ public:
         return stdx::unordered_map<Value, T, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
     }
 
+    /**
+     * Construct an empty flat unordered map from Value to type T whose equivalence classes are
+     * given by this comparator. This comparator must outlive the returned set.
+     */
+    template <typename T>
+    absl::flat_hash_map<Value, T, Hasher, EqualTo> makeFlatUnorderedValueMap() const {
+        return absl::flat_hash_map<Value, T, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
+    }
+
 private:
     const StringDataComparator* _stringComparator = nullptr;
 };
@@ -226,5 +236,9 @@ using ValueMultimap = std::multimap<Value, T, ValueComparator::LessThan>;
 template <typename T>
 using ValueUnorderedMap =
     stdx::unordered_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
+
+template <typename T>
+using ValueFlatUnorderedMap =
+    absl::flat_hash_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
 
 }  // namespace mongo

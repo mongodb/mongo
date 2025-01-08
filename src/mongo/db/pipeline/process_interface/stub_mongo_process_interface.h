@@ -395,8 +395,14 @@ public:
     }
 
     Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       RecordStore* rs,
+                                       const RecordStore* rs,
                                        RecordId rID) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool checkRecordInRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const RecordStore* rs,
+                                  RecordId rID) const override {
         MONGO_UNREACHABLE;
     }
 

@@ -8,6 +8,7 @@ env.SConscript(
     must_exist=1,
     dirs=[
         "process_interface",
+        "spilling",
     ],
     exports=[
         "env",

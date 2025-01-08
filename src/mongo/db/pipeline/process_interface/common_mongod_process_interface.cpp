@@ -1002,12 +1002,23 @@ std::unique_ptr<TemporaryRecordStore> CommonMongodProcessInterface::createTempor
 }
 
 Document CommonMongodProcessInterface::readRecordFromRecordStore(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const RecordStore* rs,
+    RecordId rID) const {
     RecordData possibleRecord;
     Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
     auto foundDoc = rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
     tassert(775101, str::stream() << "Could not find document id " << rID, foundDoc);
     return Document(possibleRecord.toBson());
+}
+
+bool CommonMongodProcessInterface::checkRecordInRecordStore(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const RecordStore* rs,
+    RecordId rID) const {
+    RecordData possibleRecord;
+    Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+    return rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
 }
 
 void CommonMongodProcessInterface::deleteRecordFromRecordStore(

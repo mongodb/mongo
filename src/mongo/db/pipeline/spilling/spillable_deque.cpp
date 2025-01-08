@@ -34,35 +34,33 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/pipeline/window_function/spillable_cache.h"
+#include "mongo/db/pipeline/spilling/record_store_batch_writer.h"
+#include "mongo/db/pipeline/spilling/spillable_deque.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
-bool SpillableCache::isIdInCache(int id) {
+bool SpillableDeque::isIdInCache(int id) {
     tassert(5643005,
-            str::stream() << "Requested expired document from SpillableCache. Expected range was "
+            str::stream() << "Requested expired document from SpillableDeque. Expected range was "
                           << _nextFreedIndex << "-" << _nextIndex - 1 << " but got " << id,
             _nextFreedIndex <= id);
     return id < _nextIndex;
 }
 
-void SpillableCache::verifyInCache(int id) {
+void SpillableDeque::verifyInCache(int id) {
     tassert(5643004,
-            str::stream() << "Requested document not in SpillableCache. Expected range was "
+            str::stream() << "Requested document not in SpillableDeque. Expected range was "
                           << _nextFreedIndex << "-" << _nextIndex - 1 << " but got " << id,
             isIdInCache(id));
 }
-void SpillableCache::addDocument(Document input) {
+void SpillableDeque::addDocument(Document input) {
     _memCache.emplace_back(MemoryUsageToken{input.getApproximateSize(), &_memTracker},
                            std::move(input));
     if (!_memTracker.withinMemoryLimit() && _expCtx->getAllowDiskUse()) {
@@ -76,28 +74,28 @@ void SpillableCache::addDocument(Document input) {
         _memTracker.withinMemoryLimit());
     ++_nextIndex;
 }
-Document SpillableCache::getDocumentById(int id) {
+Document SpillableDeque::getDocumentById(int id) {
     verifyInCache(id);
     if (id < _diskWrittenIndex) {
         return readDocumentFromDiskById(id);
     }
     return readDocumentFromMemCacheById(id);
 }
-void SpillableCache::freeUpTo(int id) {
+void SpillableDeque::freeUpTo(int id) {
     for (int i = _nextFreedIndex; i <= id; ++i) {
         verifyInCache(i);
         // Deleting is expensive in WT. Only delete in memory documents, documents in the record
         // store will only be deleted when we drop the table.
         if (i >= _diskWrittenIndex) {
             tassert(5643010,
-                    "Attempted to remove document from empty memCache in SpillableCache",
+                    "Attempted to remove document from empty memCache in SpillableDeque",
                     _memCache.size() > 0);
             _memCache.pop_front();
         }
         ++_nextFreedIndex;
     }
 }
-void SpillableCache::clear() {
+void SpillableDeque::clear() {
     if (_diskCache) {
         _expCtx->getMongoProcessInterface()->truncateRecordStore(_expCtx, _diskCache->rs());
     }
@@ -107,29 +105,20 @@ void SpillableCache::clear() {
     _nextFreedIndex = 0;
 }
 
-void SpillableCache::writeBatchToDisk(std::vector<Record>& records) {
-    // By passing a vector of null timestamps, these inserts are not timestamped individually, but
-    // rather with the timestamp of the owning operation. We don't care about the timestamps.
-    std::vector<Timestamp> timestamps(records.size());
-
-    _expCtx->getMongoProcessInterface()->writeRecordsToRecordStore(
-        _expCtx, _diskCache->rs(), &records, timestamps);
-}
-void SpillableCache::spillToDisk() {
+void SpillableDeque::spillToDisk() {
     if (!_diskCache) {
         tassert(5643008,
                 "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
                 "spilling",
                 _expCtx->getAllowDiskUse());
         tassert(5872800,
-                "SpillableCache attempted to write to disk in an environment which is not prepared "
+                "SpillableDeque attempted to write to disk in an environment which is not prepared "
                 "to do so",
                 _expCtx->getOperationContext()->getServiceContext());
         tassert(5872801,
-                "SpillableCache attempted to write to disk in an environment without a storage "
+                "SpillableDeque attempted to write to disk in an environment without a storage "
                 "engine configured",
                 _expCtx->getOperationContext()->getServiceContext()->getStorageEngine());
-        _usedDisk = true;
         _diskCache = _expCtx->getMongoProcessInterface()->createTemporaryRecordStore(
             _expCtx, KeyFormat::Long);
     }
@@ -144,48 +133,38 @@ void SpillableCache::spillToDisk() {
         _diskWrittenIndex = _nextFreedIndex;
     }
 
-    std::vector<Record> records;
-    std::vector<BSONObj> ownedObjs;
-    // Batch our writes to reduce pressure on the storage engine's cache.
-    size_t batchSize = 0;
-    int64_t spilledBytes = 0;
-    int64_t spilledRecords = 0;
+    RecordStoreBatchWriter writer{_expCtx, _diskCache->rs()};
     for (auto& memoryTokenWithDoc : _memCache) {
+        RecordId recordId{++_diskWrittenIndex};
         auto bsonDoc = memoryTokenWithDoc.value().toBson();
-        size_t objSize = bsonDoc.objsize();
-        if (records.size() == 1000 || batchSize + objSize > kMaxWriteSize) {
-            writeBatchToDisk(records);
-            records.clear();
-            ownedObjs.clear();
-            batchSize = 0;
-        }
-        ownedObjs.push_back(bsonDoc.getOwned());
-        records.emplace_back(Record{RecordId(_diskWrittenIndex + 1),
-                                    RecordData(ownedObjs.back().objdata(), objSize)});
-        batchSize += objSize;
-        spilledBytes += objSize;
-        ++spilledRecords;
-        ++_diskWrittenIndex;
+        writer.write(recordId, std::move(bsonDoc));
     }
     _memCache.clear();
     // Write final batch.
-    if (records.size() != 0) {
-        writeBatchToDisk(records);
-    }
+    writer.flush();
 
-    setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
-        1 /* spills */, spilledBytes, spilledRecords);
+    _stats.spills++;
+    _stats.spilledBytes += writer.writtenBytes();
+    _stats.spilledRecords += writer.writtenRecords();
+    updateStorageSizeStat();
 }
 
-Document SpillableCache::readDocumentFromDiskById(int desired) {
+void SpillableDeque::updateStorageSizeStat() {
+    _stats.spilledDataStorageSize =
+        std::max(_stats.spilledDataStorageSize,
+                 static_cast<uint64_t>(_diskCache->rs()->storageSize(
+                     *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+}
+
+Document SpillableDeque::readDocumentFromDiskById(int desired) {
     tassert(5643006,
             str::stream() << "Attempted to read id " << desired
-                          << "from disk in SpillableCache before writing",
+                          << "from disk in SpillableDeque before writing",
             _diskCache && desired < _diskWrittenIndex);
     return _expCtx->getMongoProcessInterface()->readRecordFromRecordStore(
         _expCtx, _diskCache->rs(), RecordId(desired + 1));
 }
-Document SpillableCache::readDocumentFromMemCacheById(int desired) {
+Document SpillableDeque::readDocumentFromMemCacheById(int desired) {
     // If we have only freed documents from disk, the index into '_memCache' is off by the number of
     // documents we've ever written to disk. If we have freed documents from the cache, the index
     // into '_memCache' is off by how many documents we've ever freed. In this case what we've

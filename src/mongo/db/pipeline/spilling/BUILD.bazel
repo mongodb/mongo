@@ -1,0 +1,65 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "spilling",
+    srcs = [
+        "//src/mongo/db/pipeline/spilling:record_store_batch_writer.cpp",
+        "//src/mongo/db/pipeline/spilling:spillable_deque.cpp",
+        "//src/mongo/db/pipeline/spilling:spillable_map.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/pipeline/spilling:record_store_batch_writer.h",
+        "//src/mongo/db/pipeline/spilling:spillable_deque.h",
+        "//src/mongo/db/pipeline/spilling:spillable_map.h",
+        "//src/mongo/db/pipeline/spilling:spilling_stats.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/storage/key_string",
+    ],
+)
+
+mongo_cc_library(
+    name = "spilling_test_utils",
+    srcs = [
+        "spilling_test_fixture.cpp",
+        "spilling_test_process_interface.cpp",
+    ],
+    hdrs = [
+        "spilling_test_fixture.h",
+        "spilling_test_process_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/pipeline/process_interface:stub_mongo_process_interface",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_spilling_test",
+    srcs = [
+        "spillable_deque_test.cpp",
+        "spillable_map_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+    ],
+    deps = [
+        ":spilling_test_utils",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+    ],
+)

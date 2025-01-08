@@ -690,8 +690,15 @@ public:
      */
     virtual Document readRecordFromRecordStore(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        RecordStore* rs,
+        const RecordStore* rs,
         RecordId rID) const = 0;
+
+    /**
+     * Checks if the RecordId 'rID' is present in 'rs'.
+     */
+    virtual bool checkRecordInRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          const RecordStore* rs,
+                                          RecordId rID) const = 0;
 
     /**
      * Deletes the record with RecordId `rID` from `rs`. RecordStore must already exist.

@@ -13,7 +13,7 @@ coll.drop();
 const bigStr = Array(1025).toString();  // 1KB of ','
 const nDocs = 1000;
 const nPartitions = 50;
-// Size was found through logging in 'SpillableCache' class.
+// Size was found through logging in 'SpillableDeque' class.
 const docSize = 1292;
 
 let bulk = coll.initializeUnorderedBulkOp();
