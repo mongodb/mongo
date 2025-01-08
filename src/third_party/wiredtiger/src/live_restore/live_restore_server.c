@@ -59,6 +59,20 @@ __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
 }
 
 /*
+ * __live_restore_free_work_item --
+ *     Free a work item from the queue. Set the callers pointer to NULL. This enables unit testing
+ *     and is consistent with most WiredTiger free functions.
+ */
+static void
+__live_restore_free_work_item(WT_SESSION_IMPL *session, WT_LIVE_RESTORE_WORK_ITEM **work_itemp)
+{
+    __wt_free(session, (*work_itemp)->uri);
+    __wt_free(session, *work_itemp);
+
+    *work_itemp = NULL;
+}
+
+/*
  * __live_restore_work_queue_drain --
  *     Drain the work queue of any remaining items. This is called either on connection close, and
  *     the work will be continued after a restart, or for error handling cleanup in which case we're
@@ -79,8 +93,7 @@ __live_restore_work_queue_drain(WT_SESSION_IMPL *session)
         TAILQ_FOREACH_SAFE(work_item, &server->work_queue, q, work_item_tmp)
         {
             TAILQ_REMOVE(&server->work_queue, work_item, q);
-            __wt_free(session, work_item->uri);
-            __wt_free(session, work_item);
+            __live_restore_free_work_item(session, &work_item);
         }
     }
     WT_ASSERT_ALWAYS(
@@ -113,7 +126,6 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     work_item = TAILQ_FIRST(&server->work_queue);
     WT_ASSERT(session, work_item != NULL);
     TAILQ_REMOVE(&server->work_queue, work_item, q);
-    WT_STAT_CONN_SET(session, live_restore_queue_length, --server->queue_size);
     __wt_verbose_debug2(
       session, WT_VERB_FILEOPS, "Live restore worker taking queue item: %s", work_item->uri);
     __wt_spin_unlock(session, &server->queue_lock);
@@ -130,8 +142,11 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
      * regular files dropped, don't error out.
      */
     ret = wt_session->open_cursor(wt_session, work_item->uri, NULL, NULL, &cursor);
-    if (ret == ENOENT)
+    if (ret == ENOENT) {
+        /* Free the work item. */
+        __live_restore_free_work_item(session, &work_item);
         return (0);
+    }
     WT_RET(ret);
 
     /*
@@ -144,17 +159,17 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     /* FIXME-WT-13897 Replace this with an API call into the block manager. */
     WT_FILE_HANDLE *fh = bm->block->fh->handle;
 
-    /*
-     * Call the fill holes function. Right now no other reads or writes should be occurring
-     * concurrently or else things will eventually break.
-     *
-     * FIXME-WT-13825: Update this comment.
-     */
     __wt_verbose_debug2(
-      session, WT_VERB_FILEOPS, "Live restore worker filling holes for: %s", work_item->uri);
+      session, WT_VERB_FILEOPS, "Live restore worker: Filling holes in %s", work_item->uri);
     ret = __wti_live_restore_fs_fill_holes(fh, wt_session);
-    WT_TRET(cursor->close(cursor));
+    __wt_verbose_debug2(session, WT_VERB_FILEOPS,
+      "Live restore worker: Finished finished filling holes in %s", work_item->uri);
 
+    /* Free the work item. */
+    __live_restore_free_work_item(session, &work_item);
+    WT_STAT_CONN_SET(
+      session, live_restore_queue_length, __wt_atomic_sub64(&server->work_items_remaining, 1));
+    WT_TRET(cursor->close(cursor));
     return (ret);
 }
 
@@ -253,7 +268,7 @@ __wt_live_restore_server_create(WT_SESSION_IMPL *session, const char *cfg[])
     uint64_t work_count;
     WT_ERR(__live_restore_populate_queue(session, &work_count));
     WT_STAT_CONN_SET(session, live_restore_queue_length, work_count);
-    conn->live_restore_server->queue_size = work_count;
+    __wt_atomic_store64(&conn->live_restore_server->work_items_remaining, work_count);
 
     /* Set this value before the threads start up in case they immediately decrement it. */
     conn->live_restore_server->threads_working = (uint32_t)cval.val;
@@ -286,8 +301,13 @@ __wt_live_restore_server_destroy(WT_SESSION_IMPL *session)
 {
     WT_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
 
-    /* If we didn't create a live restore file system there is nothing to do. */
-    if (!F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+    /*
+     * If we didn't create a live restore file system or the server there is nothing to do, it is
+     * rare, but possible, to arrive here with the flag set and a NULL server. This situation
+     * happens when an error is encountered after the file system initialization but before the
+     * server is created.
+     */
+    if (!F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS) || server == NULL)
         return (0);
 
     /*

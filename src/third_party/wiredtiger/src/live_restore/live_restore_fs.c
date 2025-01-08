@@ -94,7 +94,8 @@ err:
 #pragma GCC diagnostic ignored "-Wunused-function"
 /*
  * __live_restore_debug_dump_extent_list --
- *     Dump the contents of a file handle's extent list.
+ *     Dump the contents of a file handle's extent list. Callers must hold the extent list readlock
+ *     at a minimum.
  */
 static void
 __live_restore_debug_dump_extent_list(WT_SESSION_IMPL *session, WT_LIVE_RESTORE_FILE_HANDLE *lr_fh)
@@ -103,9 +104,12 @@ __live_restore_debug_dump_extent_list(WT_SESSION_IMPL *session, WT_LIVE_RESTORE_
     WT_LIVE_RESTORE_HOLE_NODE *prev;
     bool list_valid;
 
-    prev = NULL;
     __wt_verbose_debug1(
       session, WT_VERB_FILEOPS, "Dumping extent list for %s\n", lr_fh->iface.name);
+    WT_ASSERT_ALWAYS(session, __wt_rwlock_islocked(session, &lr_fh->ext_lock),
+      "Live restore lock not taken when needed");
+
+    prev = NULL;
     hole = lr_fh->destination.hole_list_head;
     list_valid = true;
 
@@ -462,13 +466,17 @@ __live_restore_alloc_extent(WT_SESSION_IMPL *session, wt_off_t offset, size_t le
 
 /*
  * __live_restore_fs_free_extent_list --
- *     Free the extents associated with a live restore file handle.
+ *     Free the extents associated with a live restore file handle. Callers must hold the extent
+ *     list write lock.
  */
 static void
 __live_restore_fs_free_extent_list(WT_SESSION_IMPL *session, WT_LIVE_RESTORE_FILE_HANDLE *lr_fh)
 {
     WT_LIVE_RESTORE_HOLE_NODE *hole;
     WT_LIVE_RESTORE_HOLE_NODE *temp;
+
+    WT_ASSERT_ALWAYS(session, __wt_rwlock_islocked(session, &lr_fh->ext_lock),
+      "Live restore lock not taken when needed");
 
     hole = lr_fh->destination.hole_list_head;
     lr_fh->destination.hole_list_head = NULL;
@@ -499,7 +507,8 @@ __live_restore_fh_lock(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, bool lock)
 
 /*
  * __live_restore_remove_extlist_hole --
- *     Track that we wrote something by removing its hole from the extent list.
+ *     Track that we wrote something by removing its hole from the extent list. Callers must hold
+ *     the extent list write lock.
  */
 static int
 __live_restore_remove_extlist_hole(
@@ -508,12 +517,12 @@ __live_restore_remove_extlist_hole(
     WT_LIVE_RESTORE_HOLE_NODE *hole, *tmp, *new, *prev_hole;
     wt_off_t write_end;
 
+    WT_ASSERT_ALWAYS(session, __wt_rwlock_islocked(session, &lr_fh->ext_lock),
+      "Live restore lock not taken when needed");
     __wt_verbose_debug2(session, WT_VERB_FILEOPS, "REMOVE HOLE %s: %" PRId64 "-%" PRId64,
       lr_fh->iface.name, offset, WT_OFFSET_END(offset, len));
 
     write_end = WT_OFFSET_END(offset, len);
-
-    /* FIXME-WT-13825 - We need to make sure we're thread safe when touching the hole_list_head. */
     hole = lr_fh->destination.hole_list_head;
     prev_hole = NULL;
     while (hole != NULL) {
@@ -580,27 +589,41 @@ __live_restore_remove_extlist_hole(
     return (0);
 }
 
-/*
+typedef enum { NONE, FULL, PARTIAL } WT_LIVE_RESTORE_SERVICE_STATE;
+
+/* !!!
  * __live_restore_can_service_read --
- *     Return if a read can be serviced by the destination file. This assumes that the block manager
- *     is the only thing that perform reads and it only reads and writes full blocks. If that
- *     changes this code will unceremoniously fall over.
+ *     Return if a read can be serviced by the destination file. Callers must hold the extent list
+ *     read lock at a minimum.
+ *     There are three possible scenarios:
+ *     - The read is entirely within a hole and we return NONE.
+ *     - The read is entirely outside of all holes and we return FULL.
+ *     - The read begins outside a hole and then ends inside, in which case we return PARTIAL.
+ *       This scenario will only happen if background data migration occurs concurrently and has
+ *       partially migrated the content we're reading. The background threads always copies data in
+ *       order, so the partially filled hole can only start outside a hole and then continue into a
+ *       hole.
+ *     All other scenarios are considered impossible.
  */
-static bool
-__live_restore_can_service_read(
-  WT_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION_IMPL *session, wt_off_t offset, size_t len)
+static WT_LIVE_RESTORE_SERVICE_STATE
+__live_restore_can_service_read(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION_IMPL *session,
+  wt_off_t offset, size_t len, WT_LIVE_RESTORE_HOLE_NODE **holep)
 {
     WT_LIVE_RESTORE_HOLE_NODE *hole;
     wt_off_t read_end;
     bool read_begins_in_hole, read_ends_in_hole;
 
-    read_end = WT_OFFSET_END(offset, len);
+    if (lr_fh->destination.complete || lr_fh->source == NULL)
+        goto done;
 
+    WT_ASSERT_ALWAYS(session, __wt_rwlock_islocked(session, &lr_fh->ext_lock),
+      "Live restore lock not taken when needed");
+
+    read_end = WT_OFFSET_END(offset, len);
     hole = lr_fh->destination.hole_list_head;
     while (hole != NULL) {
-
         if (read_end < hole->off)
-            /* All subsequent holes are past the read. We won't find matching holes */
+            /* All subsequent holes are past the read. We won't find matching holes. */
             break;
 
         read_begins_in_hole = WT_OFFSET_IN_EXTENT(offset, hole);
@@ -611,22 +634,64 @@ __live_restore_can_service_read(
               "CANNOT SERVICE %s: Reading from hole. Read: %" PRId64 "-%" PRId64 ", hole: %" PRId64
               "-%" PRId64,
               lr_fh->iface.name, offset, read_end, hole->off, WT_EXTENT_END(hole));
-            return (false);
-        } else if (read_begins_in_hole != read_ends_in_hole) {
+            return (NONE);
+        } else if (!read_begins_in_hole && read_ends_in_hole) {
             /*
-             * The read starts in a hole but doesn't finish in it, or vice versa. This breaks
-             * assumptions we make about how the block manager works and is intentionally
-             * unimplemented.
+             * The block manager reads entire pages so we can expect all reads to exist entirely
+             * inside or outside a hole during normal WiredTiger operation. The one exception is
+             * when background migration threads are running as they will copy data chunks
+             * regardless of page size. The background threads always migrate a file from start to
+             * finish so the one case where we partially read from a hole is when the background
+             * thread reads the first part of a page and then we read that page before the remainder
+             * is migrated.
              */
-            WT_ASSERT_ALWAYS(session, false, "Read partially covers a hole");
+            __wt_verbose_debug3(session, WT_VERB_FILEOPS,
+              "PARTIAL READ %s: Reading from hole. Read: %" PRId64 "-%" PRId64 ", hole: %" PRId64
+              "-%" PRId64,
+              lr_fh->iface.name, offset, read_end, hole->off, WT_EXTENT_END(hole));
+            *holep = hole;
+            return (PARTIAL);
+        } else if (read_begins_in_hole && !read_ends_in_hole) {
+            /* A partial read should never begin in a hole. */
+            WT_ASSERT_ALWAYS(session, false,
+              "Read (offset: %ld, len: %lu) begins in a hole but does not end in one (offset: %ld, "
+              "len: %lu)",
+              offset, len, hole->off, hole->len);
         }
 
         hole = hole->next;
     }
-
+    /*
+     * If we got here we either traversed the full hole list and didn't find a hole, or the read is
+     * prior to any holes.
+     */
+done:
     __wt_verbose_debug3(
       session, WT_VERB_FILEOPS, "CAN SERVICE %s: No hole found", lr_fh->iface.name);
-    return (true);
+    return (FULL);
+}
+
+/*
+ * __live_restore_fh_write_int --
+ *     Write to a file. Callers of this function must hold the extent list lock.
+ */
+static int
+__live_restore_fh_write_int(
+  WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t offset, size_t len, const void *buf)
+{
+    WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
+    WT_SESSION_IMPL *session;
+
+    lr_fh = (WT_LIVE_RESTORE_FILE_HANDLE *)fh;
+    session = (WT_SESSION_IMPL *)wt_session;
+
+    WT_ASSERT_ALWAYS(session, __wt_rwlock_islocked(session, &lr_fh->ext_lock),
+      "Live restore lock not taken when needed");
+    __wt_verbose_debug1(
+      session, WT_VERB_FILEOPS, "WRITE %s: %" PRId64 ", %lu", fh->name, offset, len);
+
+    WT_RET(lr_fh->destination.fh->fh_write(lr_fh->destination.fh, wt_session, offset, len, buf));
+    return (__live_restore_remove_extlist_hole(lr_fh, session, offset, len));
 }
 
 /*
@@ -637,35 +702,16 @@ static int
 __live_restore_fh_write(
   WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t offset, size_t len, const void *buf)
 {
+    WT_DECL_RET;
     WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
     WT_SESSION_IMPL *session;
 
     lr_fh = (WT_LIVE_RESTORE_FILE_HANDLE *)fh;
     session = (WT_SESSION_IMPL *)wt_session;
 
-    __wt_verbose_debug1(
-      session, WT_VERB_FILEOPS, "WRITE %s: %" PRId64 ", %lu", fh->name, offset, len);
-    WT_RET(lr_fh->destination.fh->fh_write(lr_fh->destination.fh, wt_session, offset, len, buf));
-    WT_RET(lr_fh->destination.fh->fh_sync(lr_fh->destination.fh, wt_session));
-    WT_RET(__live_restore_remove_extlist_hole(lr_fh, session, offset, len));
-    return (0);
-}
-
-/*
- * __read_promote --
- *     Write out the contents of a read into the destination. This will be overkill for cases where
- *     a read is performed to service a write.
- */
-static int
-__read_promote(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION_IMPL *session, wt_off_t offset,
-  size_t len, char *read)
-{
-    __wt_verbose_debug2(session, WT_VERB_FILEOPS, "    READ PROMOTE %s : %" PRId64 ", %lu",
-      lr_fh->iface.name, offset, len);
-    WT_RET(
-      __live_restore_fh_write((WT_FILE_HANDLE *)lr_fh, (WT_SESSION *)session, offset, len, read));
-
-    return (0);
+    WT_WITH_LIVE_RESTORE_EXTENT_LIST_WRITE_LOCK(
+      session, lr_fh, ret = __live_restore_fh_write_int(fh, wt_session, offset, len, buf));
+    return (ret);
 }
 
 /*
@@ -676,6 +722,7 @@ static int
 __live_restore_fh_read(
   WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t offset, size_t len, void *buf)
 {
+    WT_DECL_RET;
     WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
     WT_SESSION_IMPL *session;
     char *read_data;
@@ -688,33 +735,125 @@ __live_restore_fh_read(
 
     read_data = (char *)buf;
 
+    __wt_readlock(session, &lr_fh->ext_lock);
+    WT_LIVE_RESTORE_HOLE_NODE *hole = NULL;
+
     /*
      * FIXME-WT-13828: WiredTiger will read the metadata file after creation but before anything has
      * been written in this case we forward the read to the empty metadata file in the destination.
      * Is this correct?
      */
-    if (lr_fh->destination.complete || lr_fh->source == NULL ||
-      __live_restore_can_service_read(lr_fh, session, offset, len)) {
-        /*
-         * FIXME-WT-13797: Right now if complete is true source will always be null. So the if
-         * statement here has redundancy is there a time when we need it? Maybe with the background
-         * thread.
-         */
+    /*
+     * The partial read length variables need to be initialized inside the else case to avoid clang
+     * sanitizer complaining about dead stores. However if we use a switch case here _and_
+     * initialize the variables inside the PARTIAL case then gcc complains about the switch jumping
+     * over the variable declaration. Thus we use if/else and declare inside to keep both happy.
+     */
+    WT_LIVE_RESTORE_SERVICE_STATE read_state =
+      __live_restore_can_service_read(lr_fh, session, offset, len, &hole);
+    if (read_state == FULL) {
         __wt_verbose_debug2(session, WT_VERB_FILEOPS, "    READ FROM DEST (src is NULL? %s)",
           lr_fh->source == NULL ? "YES" : "NO");
         /* Read the full read from the destination. */
-        WT_RET(lr_fh->destination.fh->fh_read(
+        WT_ERR(lr_fh->destination.fh->fh_read(
           lr_fh->destination.fh, wt_session, offset, len, read_data));
+    } else if (read_state == PARTIAL) {
+        /*
+         * If a portion of the read region is serviceable, combine a read from the source and
+         * destination.
+         */
+        /*
+         *              <--read len--->
+         * read:        |-------------|
+         * extent list: |####|----hole----|
+         *              ^    ^        |
+         *              |    |        |
+         *           read off|        |
+         *                hole off    |
+         * read dest:   |----|
+         * read source:      |--------|
+         *
+         *
+         */
+        size_t dest_partial_read_len = (size_t)(hole->off - offset);
+        size_t source_partial_read_len = len - dest_partial_read_len;
+
+        /* First read the serviceable portion from the destination. */
+        __wt_verbose_debug1(session, WT_VERB_FILEOPS,
+          "    PARTIAL READ FROM DEST (offset: %ld, len: %lu)", offset, dest_partial_read_len);
+        WT_ERR(lr_fh->destination.fh->fh_read(
+          lr_fh->destination.fh, wt_session, offset, dest_partial_read_len, read_data));
+
+        /* Now read the remaining data from the source. */
+        __wt_verbose_debug1(session, WT_VERB_FILEOPS,
+          "    PARTIAL READ FROM SOURCE (offset: %ld, len: %lu)", hole->off,
+          source_partial_read_len);
+        WT_ERR(lr_fh->source->fh_read(lr_fh->source, wt_session, hole->off, source_partial_read_len,
+          read_data + dest_partial_read_len));
     } else {
         /* Interestingly you cannot not have a format in verbose. */
         __wt_verbose_debug2(session, WT_VERB_FILEOPS, "    READ FROM %s", "SOURCE");
         /* Read the full read from the source. */
-        WT_RET(lr_fh->source->fh_read(lr_fh->source, wt_session, offset, len, read_data));
-        /* Promote the read */
-        WT_RET(__read_promote(lr_fh, session, offset, len, read_data));
+        WT_ERR(lr_fh->source->fh_read(lr_fh->source, wt_session, offset, len, read_data));
     }
 
-    return (0);
+err:
+    /*
+     * We could, in theory, release this lock a lot earlier. However we need to consider how a
+     * concurrent write could affect the read. Given the block manager should only read and write
+     * full blocks it should be fine to unlock early. We would need to copy the hole->off and
+     * hole->len from the hole before unlocking.
+     *
+     * Right now reads and writes are atomic if we unlock early we lose some guarantee of atomicity.
+     */
+    __wt_readunlock(session, &lr_fh->ext_lock);
+
+    return (ret);
+}
+
+/*
+ * Holes can be large, potentially the size of an entire file. When we find a large hole we'll read
+ * it in 4KB chunks. This function will take the extent list writelock. The caller should *not* hold
+ * the lock when calling.
+ */
+#define WT_LIVE_RESTORE_READ_SIZE ((size_t)(4 * WT_KILOBYTE))
+
+/*
+ * __live_restore_fill_hole --
+ *     Fill a single hole in the destination file. If the hole list is empty indicate using the
+ *     finished parameter. Must be called while holding the extent list write lock.
+ */
+static int
+__live_restore_fill_hole(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, bool *finishedp)
+{
+    WT_LIVE_RESTORE_FILE_HANDLE *lr_fh = (WT_LIVE_RESTORE_FILE_HANDLE *)fh;
+    WT_LIVE_RESTORE_HOLE_NODE *hole = lr_fh->destination.hole_list_head;
+    WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
+
+    WT_ASSERT(session, __wt_rwlock_islocked(session, &lr_fh->ext_lock));
+    if (hole == NULL) {
+        /* If there are no holes to fill we're done. */
+        *finishedp = true;
+        return (0);
+    }
+
+    __wt_verbose_debug3(session, WT_VERB_FILEOPS,
+      "Found hole in %s at %" PRId64 "-%" PRId64 " during background migration. ", fh->name,
+      hole->off, WT_EXTENT_END(hole));
+
+    /*
+     * When encountering a large hole, break the read into small chunks. Split the hole into n
+     * chunks: the first n - 1 chunks will read a full WT_LIVE_RESTORE_READ_SIZE buffer, and the
+     * last chunk reads the remaining data. This loop is a not obvious, effectively the read is
+     * shrinking the hole in the stack below us. This is why we always read from the start at the
+     * beginning of the loop.
+     */
+    char buf[WT_LIVE_RESTORE_READ_SIZE];
+    size_t read_size = WT_MIN(hole->len, (size_t)WT_LIVE_RESTORE_READ_SIZE);
+    __wt_verbose_debug2(session, WT_VERB_FILEOPS, "    BACKGROUND READ %s : %" PRId64 ", %lu",
+      lr_fh->iface.name, hole->off, read_size);
+    WT_RET(lr_fh->source->fh_read(lr_fh->source, wt_session, hole->off, read_size, buf));
+    return (__live_restore_fh_write_int(fh, wt_session, hole->off, read_size, buf));
 }
 
 /*
@@ -729,35 +868,17 @@ __live_restore_fh_read(
 int
 __wti_live_restore_fs_fill_holes(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
 {
-/*
- * Holes can be large, potentially the size of an entire file. When we find a large hole we'll read
- * it in 4KB chunks.
- */
-#define WT_LIVE_RESTORE_READ_SIZE ((size_t)(4 * WT_KILOBYTE))
-    WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
-    WT_LIVE_RESTORE_HOLE_NODE *hole;
+    WT_DECL_RET;
+    bool finished = false;
 
-    char buf[WT_LIVE_RESTORE_READ_SIZE];
-    lr_fh = (WT_LIVE_RESTORE_FILE_HANDLE *)fh;
-
-    while ((hole = lr_fh->destination.hole_list_head) != NULL) {
-        __wt_verbose_debug3((WT_SESSION_IMPL *)wt_session, WT_VERB_FILEOPS,
-          "Found hole in %s at %" PRId64 "-%" PRId64 " during background migration. ", fh->name,
-          hole->off, WT_EXTENT_END(hole));
-
-        /* If panic is set on the connection stop doing work. */
+    while (!finished) {
+        WT_WITH_LIVE_RESTORE_EXTENT_LIST_WRITE_LOCK((WT_SESSION_IMPL *)wt_session,
+          (WT_LIVE_RESTORE_FILE_HANDLE *)fh,
+          ret = __live_restore_fill_hole(fh, wt_session, &finished));
+        WT_RET(ret);
         WT_RET(WT_SESSION_CHECK_PANIC(wt_session));
-
-        /*
-         * When encountering a large hole, break the read into small chunks. Split the hole into n
-         * chunks: the first n - 1 chunks will read a full WT_LIVE_RESTORE_READ_SIZE buffer, and the
-         * last chunk reads the remaining data. This loop is a not obvious, effectively the read is
-         * shrinking the hole in the stack below us. This is why we always read from the start at
-         * the beginning of the loop.
-         */
-        WT_RET(__live_restore_fh_read(fh, wt_session, hole->off,
-          hole->len > WT_LIVE_RESTORE_READ_SIZE ? WT_LIVE_RESTORE_READ_SIZE : hole->len, buf));
     }
+
     return (0);
 }
 
@@ -780,7 +901,10 @@ __live_restore_fh_close(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
         WT_RET(__wti_live_restore_fs_fill_holes(fh, wt_session));
 
     lr_fh->destination.fh->close(lr_fh->destination.fh, wt_session);
-    __live_restore_fs_free_extent_list(session, lr_fh);
+
+    WT_WITH_LIVE_RESTORE_EXTENT_LIST_WRITE_LOCK(
+      session, lr_fh, __live_restore_fs_free_extent_list(session, lr_fh));
+    __wt_rwlock_destroy(session, &lr_fh->ext_lock);
 
     if (lr_fh->source != NULL) /* It's possible that we never opened the file in the source. */
         lr_fh->source->close(lr_fh->source, wt_session);
@@ -827,6 +951,7 @@ __live_restore_fh_sync(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
 static int
 __live_restore_fh_truncate(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t len)
 {
+    WT_DECL_RET;
     WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
     wt_off_t old_len, truncate_start, truncate_end;
 
@@ -852,8 +977,13 @@ __live_restore_fh_truncate(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t 
     truncate_start = WT_MIN(len, old_len);
     truncate_end = WT_MAX(len, old_len);
 
-    WT_RET(__live_restore_remove_extlist_hole(lr_fh, (WT_SESSION_IMPL *)wt_session, truncate_start,
-      (size_t)(truncate_end - truncate_start)));
+    WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
+
+    WT_WITH_LIVE_RESTORE_EXTENT_LIST_WRITE_LOCK(
+      session, lr_fh,
+      ret = __live_restore_remove_extlist_hole(
+        lr_fh, session, truncate_start, (size_t)(truncate_end - truncate_start)););
+    WT_RET(ret);
 
     return (lr_fh->destination.fh->fh_truncate(lr_fh->destination.fh, wt_session, len));
 }
@@ -928,8 +1058,10 @@ __live_restore_fh_find_holes_in_dest_file(
     /*
      * Find the next data block. data_end_offset is initialized to zero so we start from the
      * beginning of the file. lseek will find a block when it starts already positioned on the
-     * block, so starting at zero ensures we'll find data blocks at the beginning of the file.
+     * block, so starting at zero ensures we'll find data blocks at the beginning of the file. This
+     * logic is single threaded but removing holes from the extent list requires the lock.
      */
+    __wt_writelock(session, &lr_fh->ext_lock);
     wt_off_t data_offset;
     while ((data_offset = lseek(fd, data_end_offset, SEEK_DATA)) != -1) {
 
@@ -945,6 +1077,7 @@ __live_restore_fh_find_holes_in_dest_file(
     }
 
 err:
+    __wt_writeunlock(session, &lr_fh->ext_lock);
     WT_SYSCALL_TRET(close(fd), ret);
     return (ret);
 }
@@ -979,6 +1112,7 @@ __live_restore_handle_verify_hole_list(WT_SESSION_IMPL *session, WT_LIVE_RESTORE
         WT_ERR(lr_fs->os_file_system->fs_size(
           lr_fs->os_file_system, (WT_SESSION *)session, source_fh->name, &source_size));
 
+        __wt_readlock(session, &lr_fh->ext_lock);
         WT_LIVE_RESTORE_HOLE_NODE *final_hole;
         final_hole = lr_fh->destination.hole_list_head;
         while (final_hole->next != NULL)
@@ -988,9 +1122,11 @@ __live_restore_handle_verify_hole_list(WT_SESSION_IMPL *session, WT_LIVE_RESTORE
             __wt_verbose_debug1(session, WT_VERB_FILEOPS,
               "Error: Hole list for %s has holes beyond the the end of the source file!", name);
             __live_restore_debug_dump_extent_list(session, lr_fh);
+            __wt_readunlock(session, &lr_fh->ext_lock);
             WT_ERR_MSG(session, EINVAL,
               "Hole list for %s has holes beyond the the end of the source file!", name);
         }
+        __wt_readunlock(session, &lr_fh->ext_lock);
 
     } else
         WT_ASSERT_ALWAYS(session, lr_fh->destination.hole_list_head == NULL,
@@ -1076,6 +1212,8 @@ __live_restore_fs_open_file(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const ch
     lr_fh->iface.file_system = fs;
     lr_fh->file_type = file_type;
 
+    WT_ERR(__wt_rwlock_init(session, &lr_fh->ext_lock));
+
     /* FIXME-WT-13823 Handle the exclusive flag and other flags */
 
     /* Open it in the destination layer. */
@@ -1090,7 +1228,9 @@ __live_restore_fs_open_file(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const ch
          * source. Therefore the destination must be complete.
          */
         lr_fh->destination.complete = true;
-        __live_restore_fs_free_extent_list(session, lr_fh);
+        /* Opening files is single threaded but the remove extlist free requires the lock. */
+        WT_WITH_LIVE_RESTORE_EXTENT_LIST_WRITE_LOCK(
+          session, lr_fh, __live_restore_fs_free_extent_list(session, lr_fh));
     } else {
         /*
          * If it exists in the source, open it. If it doesn't exist in the source then by definition

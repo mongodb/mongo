@@ -134,3 +134,51 @@ err:
     __wt_scr_free(session, &buf);
     return (ret);
 }
+
+/*
+ * __wt_session_set_last_error --
+ *     Stores information about the last error to occur during this session.
+ */
+int
+__wt_session_set_last_error(
+  WT_SESSION_IMPL *session, int err, int sub_level_err, const char *fmt, ...)
+{
+    WT_DECL_ITEM(buf);
+    WT_DECL_RET;
+    const char *err_msg_content;
+    WT_ERROR_INFO *err_info = &(session->err_info);
+
+    /* Ensure arguments are valid. */
+    WT_ASSERT(session, __wt_is_valid_sub_level_error(sub_level_err));
+    WT_ASSERT(session, fmt != NULL);
+
+    /*
+     * Only update the error struct if an error occurs during a session API call, or if the error
+     * struct is being initialized.
+     */
+    if (!F_ISSET(session, WT_SESSION_SAVE_ERRORS))
+        return (0);
+
+    /* Format the error message string. */
+    WT_RET(__wt_scr_alloc(session, 0, &buf));
+    WT_VA_ARGS_BUF_FORMAT(session, buf, fmt, false);
+    err_msg_content = buf->data;
+
+    /* Only set the error if it results in a change. */
+    if (err_info->err == err && err_info->sub_level_err == sub_level_err &&
+      err_info->err_msg != NULL && strcmp(err_info->err_msg, err_msg_content) == 0)
+        goto err;
+
+    /* Free the last error message string. */
+    __wt_free(session, err_info->err_msg);
+
+    /* Load error codes and message content into err_info. */
+    WT_ERR(__wt_calloc(session, buf->size + 1, 1, &(err_info->err_msg)));
+    WT_ERR(__wt_snprintf(err_info->err_msg, buf->size + 1, "%s", err_msg_content));
+    err_info->err = err;
+    err_info->sub_level_err = sub_level_err;
+
+err:
+    __wt_scr_free(session, &buf);
+    return (ret);
+}

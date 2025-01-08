@@ -124,8 +124,10 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
         create_file(source_file.c_str(), 32768);
         testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh));
 
-        // Use a promote read to partially copy the file.
+        // Migrate the first 4KB by reading and writing them. Live restore will read from the source
+        // and write back to the destination.
         lr_fh->iface.fh_read(reinterpret_cast<WT_FILE_HANDLE *>(lr_fh), wt_session, 0, 4096, buf);
+        lr_fh->iface.fh_write(reinterpret_cast<WT_FILE_HANDLE *>(lr_fh), wt_session, 0, 4096, buf);
 
         // Close the file and reopen it to generate the extent list from holes in the dest file
         lr_fh->iface.close(reinterpret_cast<WT_FILE_HANDLE *>(lr_fh), wt_session);
@@ -137,6 +139,8 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
 
         // Now repeat the process to create an extent list with multiple holes.
         lr_fh->iface.fh_read(
+          reinterpret_cast<WT_FILE_HANDLE *>(lr_fh), wt_session, 8192, 4096, buf);
+        lr_fh->iface.fh_write(
           reinterpret_cast<WT_FILE_HANDLE *>(lr_fh), wt_session, 8192, 4096, buf);
         lr_fh->iface.close(reinterpret_cast<WT_FILE_HANDLE *>(lr_fh), wt_session);
         testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh));

@@ -1944,16 +1944,6 @@ struct __wt_session {
      */
     void __F(get_last_error)(WT_SESSION *session,
         int *err, int *sub_level_err, const char **err_msg);
-
-    /*!
-     * Update the stored information about the last error that occurred during a session API call.
-     *
-     * @param session the session handle
-     * @param err the error code
-     * @param sub_level_err the sub-level error code
-     * @returns zero for success, non-zero to indicate an error.
-     */
-    int __F(set_last_error)(WT_SESSION *session, int err, int sub_level_err);
     /*! @} */
 
 #ifndef DOXYGEN

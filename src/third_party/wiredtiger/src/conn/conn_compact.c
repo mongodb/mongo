@@ -806,10 +806,8 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
 
     /* Wait for any previous signal to be processed first. */
     __wt_spin_lock(session, &conn->background_compact.lock);
-    if (conn->background_compact.signalled) {
-        ret = EBUSY;
-        goto err;
-    }
+    if (conn->background_compact.signalled)
+        WT_ERR_MSG(session, EBUSY, "Background compact is busy processing a previous command");
 
     running = __wt_atomic_loadbool(&conn->background_compact.running);
 

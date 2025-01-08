@@ -5289,6 +5289,7 @@ buildvariants:
     - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
     - name: format-asan-smoke-test
+    - name: live-restore-long
 
 - name: ubuntu2004-tsan
   display_name: "! Ubuntu 20.04 TSAN"

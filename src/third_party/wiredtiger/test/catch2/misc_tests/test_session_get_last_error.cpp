@@ -8,14 +8,12 @@
 
 #include <catch2/catch.hpp>
 #include "wt_internal.h"
-#include "../wrappers/mock_session.h"
+#include "../wrappers/connection_wrapper.h"
 
 /*
  * [session_get_last_error]: test_session_get_last_error.cpp
  * Tests the API for getting verbose information about the last error of the session.
  */
-
-static const char *home;
 
 TEST_CASE("Session get last error - test getting verbose info about the last error in the session",
   "[session_get_last_error]")
@@ -23,11 +21,11 @@ TEST_CASE("Session get last error - test getting verbose info about the last err
     WT_CONNECTION *conn;
     WT_SESSION *session;
 
-    /* Open a connection to the database, creating it if necessary. */
-    REQUIRE(wiredtiger_open(home, NULL, "create", &conn) == 0);
+    connection_wrapper conn_wrapper = connection_wrapper(".", "create");
+    conn = conn_wrapper.get_wt_connection();
     REQUIRE(conn->open_session(conn, NULL, NULL, &session) == 0);
 
-    SECTION("Test API placeholder")
+    SECTION("Test default values")
     {
         /* Prepare return arguments. */
         int err, sub_level_err;
@@ -39,6 +37,6 @@ TEST_CASE("Session get last error - test getting verbose info about the last err
         /* Test that the API returns expected default values. */
         CHECK(err == 0);
         CHECK(sub_level_err == WT_NONE);
-        CHECK(strcmp(err_msg, "WT_NONE: No additional context") == 0);
+        CHECK(strcmp(err_msg, "") == 0);
     }
 }

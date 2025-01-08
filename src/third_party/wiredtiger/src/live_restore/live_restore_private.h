@@ -55,7 +55,19 @@ struct __wt_live_restore_file_handle {
     } destination;
 
     WT_FS_OPEN_FILE_TYPE file_type;
+    WT_RWLOCK ext_lock; /* File extent list lock */
 };
+
+/*
+ * WT_WITH_LIVE_RESTORE_EXTENT_LIST_WRITE_LOCK --
+ *     Acquire the extent list write lock and perform an operation.
+ */
+#define WT_WITH_LIVE_RESTORE_EXTENT_LIST_WRITE_LOCK(session, lr_fh, op) \
+    do {                                                                \
+        __wt_writelock((session), &(lr_fh)->ext_lock);                  \
+        op;                                                             \
+        __wt_writeunlock((session), &(lr_fh)->ext_lock);                \
+    } while (0)
 
 typedef enum {
     WT_LIVE_RESTORE_FS_LAYER_DESTINATION,
@@ -108,7 +120,7 @@ struct __wt_live_restore_server {
     WT_THREAD_GROUP threads;
     wt_shared uint32_t threads_working;
     WT_SPINLOCK queue_lock;
-    uint64_t queue_size;
+    uint64_t work_items_remaining;
 
     TAILQ_HEAD(__wt_live_restore_work_queue, __wt_live_restore_work_item) work_queue;
 };
