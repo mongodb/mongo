@@ -253,6 +253,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+    exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "fetch bazel"
       - func: "bazel compile"
