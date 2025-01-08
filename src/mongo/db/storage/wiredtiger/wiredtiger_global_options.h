@@ -60,6 +60,7 @@ public:
     bool directoryForIndexes;
     double maxCacheOverflowFileSizeGBDeprecated;
     std::string engineConfig;
+    std::string liveRestoreSource;
 
     std::string collectionBlockCompressor;
     bool useCollectionPrefixCompression;

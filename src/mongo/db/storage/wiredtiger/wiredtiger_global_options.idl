@@ -97,6 +97,11 @@ configs:
         cpp_varname: 'wiredTigerGlobalOptions.engineConfig'
         short_name: wiredTigerEngineConfigString
         hidden: true
+    "storage.wiredTiger.engineConfig.wiredTigerLiveRestoreSource":
+        description: 'Path to the source for live restore.'
+        arg_vartype: String
+        cpp_varname: 'wiredTigerGlobalOptions.liveRestoreSource'
+        short_name: wiredTigerLiveRestoreSource
 
     # WiredTiger collection options
     "storage.wiredTiger.collectionConfig.blockCompressor":
