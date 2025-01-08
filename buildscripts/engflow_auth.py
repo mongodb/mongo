@@ -13,7 +13,7 @@ from datetime import datetime
 
 from retry import retry
 
-NORMALIZED_ARCH = {"x86_64": "x64", "aarch64": "arm64", "AMD64": "x64"}
+NORMALIZED_ARCH = {"x86_64": "x64", "aarch64": "arm64", "arm64": "arm64", "AMD64": "x64"}
 
 NORMALIZED_OS = {"Windows": "windows", "Darwin": "macos", "Linux": "linux"}
 
