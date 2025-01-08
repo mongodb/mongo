@@ -647,6 +647,11 @@ DocumentSourceGroupBase::pipelineDependentDistributedPlanLogic(
         return distributedPlanLogic();
     }
 
+    if (pExpCtx->getSubPipelineDepth() >= 1) {
+        // TODO SERVER-99094: Allow $group pushdown within nested pipelines.
+        return distributedPlanLogic();
+    }
+
     if (groupIsOnShardKey(ctx.pipelinePrefix, ctx.shardKeyPaths)) {
         // This group can fully execute on a shard, because no two shards will return the same group
         // key. Prior calls to distributedPlanLogic() may have set the 'willBeMerged' flag to true,
