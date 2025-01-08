@@ -286,7 +286,7 @@ public:
     // However, it will still match collection names starting with system.buckets or
     // system.resharding, or a collection exactly named system.js
     static constexpr StringData kRegexAllCollectionsShowSystemEvents =
-        R"((?!(\$|system\.(?!(js$|resharding\.|buckets\.)))))"_sd;
+        R"((?!(\$|system\.(?!(js$|resharding\.|buckets\.|views$)))))"_sd;
 
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
     static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
