@@ -1768,6 +1768,40 @@ TEST_F(EgressAsioNetworkingBatonTest, AsyncOpsMakeProgressWhenSessionAddedToDeta
     opCtx.reset();
 }
 
+class NetworkOperationTest : public AsioNetworkingBatonTest {};
+
+/**
+ * Creates a connection and interrupts the server side while it awaits the second half of a message.
+ * The expected behavior for the server thread is to continue picking up data from the wire after
+ * receiving the interruption.
+ */
+TEST_F(NetworkOperationTest, InterruptDuringRead) {
+    connection().wait();
+
+    auto pf = makePromiseFuture<Message>();
+    test::JoinThread serverThread([&] { pf.promise.setFrom(client().session()->sourceMessage()); });
+
+    auto msg = [] {
+        OpMsgRequest request;
+        request.body = BSON("ping" << 1 << "$db"
+                                   << "admin");
+        auto msg = request.serialize();
+        msg.header().setResponseToMsgId(0);
+        return msg;
+    }();
+
+    const auto kChunkSize = msg.size() / 2;
+    connection().socket().send(msg.buf(), kChunkSize, "sending the first batch");
+    // Wait before signaling to make it more likely for the server thread to be waiting for the next
+    // batch while receiving the interruption signal.
+    sleepFor(Milliseconds(10));
+    pthread_kill(serverThread.native_handle(), SIGRTMIN);
+    connection().socket().send(msg.buf() + kChunkSize, msg.size() - kChunkSize, "sending the rest");
+
+    auto received = pf.future.get();
+    ASSERT_EQ(received.opMsgDebugString(), msg.opMsgDebugString());
+}
+
 #endif  // __linux__
 
 }  // namespace
