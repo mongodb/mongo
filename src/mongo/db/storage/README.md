@@ -16,7 +16,7 @@ them. All MongoDB collections are implemented with a [RecordStore](record_store.
 implemented with a [SortedDataInterface](sorted_data_interface.h). By using the
 [KVEngine](kv/kv_engine.h) class, you only have to deal with the abstraction, as the
 [StorageEngineImpl](storage_engine_impl.h) implements the [StorageEngine](storage_engine.h)
-interface, using record stores for catalogs. See the [Catalog](../catalog/README) for more information.
+interface, using record stores for catalogs. See the [Catalog](../catalog/README.md) for more information.
 
 ### Record Identities
 
@@ -160,7 +160,6 @@ for efficient mass-deletes.
 
 See
 [WriteUnitOfWork](https://github.com/mongodb/mongo/blob/fa32d665bd63de7a9d246fa99df5e30840a931de/src/mongo/db/storage/write_unit_of_work.h).
-See
 
 ## Lazy initialization of storage transactions
 
