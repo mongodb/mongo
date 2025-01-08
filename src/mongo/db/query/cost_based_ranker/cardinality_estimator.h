@@ -94,10 +94,13 @@ private:
     // MatchExpressions
     CEResult estimate(const MatchExpression* node, bool isFilterRoot);
     CEResult estimate(const ComparisonMatchExpression* node);
-    CEResult estimate(const LeafMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const NotMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const AndMatchExpression* node);
     CEResult estimate(const OrMatchExpression* node, bool isFilterRoot);
+    // Estimate all match expressions without children. Notice that there are other such nodes
+    // besides LeafMatchExpression subclasses.
+    CEResult estimateLeafExpression(const MatchExpression* node, bool isFilterRoot);
+
     // Intervals
     CEResult estimate(const IndexBounds* node);
     CEResult estimate(const OrderedIntervalList* node, bool forceHistogram = false);

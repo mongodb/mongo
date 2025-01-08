@@ -146,7 +146,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
             break;
         default:
             if (node->numChildren() == 0) {
-                ceRes = estimate(static_cast<const LeafMatchExpression*>(node), isFilterRoot);
+                ceRes = estimateLeafExpression(node, isFilterRoot);
             } else {
                 MONGO_UNIMPLEMENTED_TASSERT(9586708);
             }
@@ -471,7 +471,8 @@ CEResult CardinalityEstimator::estimate(const ComparisonMatchExpression* node) {
     MONGO_UNREACHABLE_TASSERT(9751900);
 }
 
-CEResult CardinalityEstimator::estimate(const LeafMatchExpression* node, bool isFilterRoot) {
+CEResult CardinalityEstimator::estimateLeafExpression(const MatchExpression* node,
+                                                      bool isFilterRoot) {
     const SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
     if (isFilterRoot) {
         // Add this node's selectivity to the _conjSels so that it can be combined with parent

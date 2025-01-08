@@ -77,33 +77,50 @@ SelectivityEstimate heuristicOpenRangeSel(CardinalityEstimate inputCard) {
     return kLargeCardOpenRangeSel;
 }
 
-SelectivityEstimate heuristicPointIntervalSel(CardinalityEstimate inputCard) {
-    return SelectivityEstimate{SelectivityType{1 / std::sqrt(inputCard.toDouble())},
+/**
+ * Compute the selectivity of an arbitrary predicate. The selectivity can be scaled depending on the
+ * input cardinality - the bigger the cardinality, the better (smaller) the selectivity.
+ * The idea being that typically queries in OLTP workloads against large datasets are designed to
+ * select a small portion of the data.
+ * Since different kinds of predicates are generally less/more selective, this function allows to
+ * control the rate at which selectivity varies, so that some predicates can be more selective than
+ * others.
+ */
+SelectivityEstimate heuristicScaledPredSel(CardinalityEstimate inputCard, double scalingFactor) {
+    return SelectivityEstimate{SelectivityType{1 / std::pow(inputCard.toDouble(), scalingFactor)},
                                EstimationSource::Heuristics};
 }
 
 SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
                                                 CardinalityEstimate inputCard) {
+    tassert(
+        9844001, "estimateLeafMatchExpression got non-leaf expression", expr->numChildren() == 0);
+
     switch (expr->matchType()) {
         case MatchExpression::MatchType::ALWAYS_FALSE:
             return zeroSelHeuristic;
         case MatchExpression::MatchType::ALWAYS_TRUE:
             return oneSelHeuristic;
         case MatchExpression::MatchType::EQ:
-        case MatchExpression::MatchType::INTERNAL_EXPR_EQ: {
+        case MatchExpression::MatchType::INTERNAL_EXPR_EQ:
+        case MatchExpression::MatchType::INTERNAL_EQ_HASHED_KEY:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_EQ:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_ROOT_DOC_EQ: {
             // Equality predicate is equalivent to a point interval
-            return heuristicPointIntervalSel(inputCard);
+            return heuristicScaledPredSel(inputCard, kEqualityScalingFactor);
         }
         case MatchExpression::MatchType::LT:
-        case MatchExpression::MatchType::GT: {
+        case MatchExpression::MatchType::GT:
+        case MatchExpression::MatchType::INTERNAL_EXPR_LT:
+        case MatchExpression::MatchType::INTERNAL_EXPR_GT: {
             return heuristicOpenRangeSel(inputCard);
         }
         case MatchExpression::MatchType::LTE:
-        case MatchExpression::MatchType::GTE: {
+        case MatchExpression::MatchType::GTE:
+        case MatchExpression::MatchType::INTERNAL_EXPR_LTE:
+        case MatchExpression::MatchType::INTERNAL_EXPR_GTE: {
             return heuristicClosedRangeSel(inputCard);
         }
-        case MatchExpression::MatchType::REGEX:
-            return kRegexSel;
         case MatchExpression::MatchType::MOD: {
             // Assume that the results of mod are equally likely.
             auto modExpr = static_cast<const ModMatchExpression*>(expr);
@@ -120,13 +137,14 @@ SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
             // each IN-list element are disjunct (similar to the elements of an OIL). Therefore
             // the selectivities of all equalities should be summed instead of applying
             // exponential backoff.
-            double eqSel = heuristicPointIntervalSel(inputCard).toDouble();
+            double eqSel = heuristicScaledPredSel(inputCard, kEqualityScalingFactor).toDouble();
             double totalSelDbl = std::min(inExpr->getEqualities().size() * eqSel, 1.0);
             SelectivityEstimate totalEqSel{SelectivityType{totalSelDbl},
                                            EstimationSource::Heuristics};
             std::vector<SelectivityEstimate> sels;
             sels.push_back(std::move(totalEqSel));
-            sels.insert(sels.end(), inExpr->getRegexes().size(), kRegexSel);
+            auto regexSel = heuristicScaledPredSel(inputCard, kTextSearchScalingFactor);
+            sels.insert(sels.end(), inExpr->getRegexes().size(), regexSel);
             return disjExponentialBackoff(sels);
         }
         case MatchExpression::MatchType::TYPE_OPERATOR: {
@@ -138,16 +156,50 @@ SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
             double totalSelDbl = std::min(typeExpr->typeSet().bsonTypes.size() * rangeSel, 1.0);
             return SelectivityEstimate{SelectivityType{totalSelDbl}, EstimationSource::Heuristics};
         }
+        case MatchExpression::MatchType::REGEX:
+        case MatchExpression::MatchType::TEXT:
+            return heuristicScaledPredSel(inputCard, kTextSearchScalingFactor);
+        case MatchExpression::MatchType::WHERE:
+        case MatchExpression::MatchType::SIZE:
+        case MatchExpression::MatchType::EXPRESSION:
+        case MatchExpression::MatchType::GEO:
+        case MatchExpression::MatchType::GEO_NEAR:
+        case MatchExpression::MatchType::INTERNAL_BUCKET_GEO_WITHIN:
+        case MatchExpression::MatchType::INTERNAL_2D_POINT_IN_ANNULUS:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_FMOD:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MAX_LENGTH:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MIN_LENGTH:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_TYPE:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MAX_ITEMS:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MIN_ITEMS:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MAX_PROPERTIES:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MIN_PROPERTIES:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_UNIQUE_ITEMS:
         case MatchExpression::MatchType::BITS_ALL_SET:
         case MatchExpression::MatchType::BITS_ALL_CLEAR:
         case MatchExpression::MatchType::BITS_ANY_SET:
         case MatchExpression::MatchType::BITS_ANY_CLEAR: {
-            return kBitsSel;
+            return heuristicScaledPredSel(inputCard, kDefaultScalingFactor);
         }
-        default:
-            tasserted(9608701,
-                      fmt::format("invalid MatchExpression passed to heuristic estimate: {}",
-                                  expr->matchType()));
+
+        // List all non-leaf expression types below for completeness. These should never appear in
+        // this function. The assert at the end checks that.
+        case MatchExpression::MatchType::AND:
+        case MatchExpression::MatchType::OR:
+        case MatchExpression::MatchType::ELEM_MATCH_OBJECT:
+        case MatchExpression::MatchType::ELEM_MATCH_VALUE:
+        case MatchExpression::MatchType::NOT:
+        case MatchExpression::MatchType::NOR:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_COND:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_OBJECT_MATCH:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_XOR:
+            break;
     }
     MONGO_UNREACHABLE_TASSERT(9695000);
 }
@@ -163,7 +215,7 @@ SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstima
         if (inputCard <= oneCE) {
             return oneSelHeuristic;
         }
-        return heuristicPointIntervalSel(inputCard);
+        return heuristicScaledPredSel(inputCard, kEqualityScalingFactor);
     }
     // At this point, we know this interval is a range.
 

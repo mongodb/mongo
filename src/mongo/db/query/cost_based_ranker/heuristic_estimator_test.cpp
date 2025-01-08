@@ -69,12 +69,6 @@ TEST(HeuristicEstimator, AlwaysTrue) {
     ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), oneSel);
 }
 
-TEST(HeuristicEstimate, RegexMatchExpression) {
-    BSONObj query = fromjson("{a: /abc/}");
-    auto expr = parse(query);
-    ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), kRegexSel);
-}
-
 TEST(HeuristicEstimate, ModExpression) {
     BSONObj query = fromjson("{a: {$mod: [5, 2]}}");
     auto expr = parse(query);
@@ -89,22 +83,24 @@ TEST(HeuristicEstimate, ExistsExpression) {
     ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), kExistsSel);
 }
 
-TEST(HeuristicEstimate, BitsExpression) {
-    BSONObj bitsAllClearQuery = fromjson("{a: {$bitsAllClear: [1, 5]}}");
-    auto bitsAllClearExpr = parse(bitsAllClearQuery);
-    ASSERT_EQ(estimateLeafMatchExpression(bitsAllClearExpr.get(), makeCard(100)), kBitsSel);
+SelectivityEstimate estimateLeafQueryExpr(std::string queryStr, double card) {
+    BSONObj query = fromjson(queryStr);
+    auto expr = parse(query);
+    return estimateLeafMatchExpression(expr.get(), makeCard(card));
+}
 
-    BSONObj bitsAllSetQuery = fromjson("{a: {$bitsAllSet: [1, 5]}}");
-    auto bitsSetClearExpr = parse(bitsAllSetQuery);
-    ASSERT_EQ(estimateLeafMatchExpression(bitsSetClearExpr.get(), makeCard(100)), kBitsSel);
+TEST(HeuristicEstimate, SelectivityRelationships) {
+    double card = 100.0;
+    auto eqSel = estimateLeafQueryExpr("{a: 42}", card);
+    auto regexSel = estimateLeafQueryExpr("{a: /abc/}", card);
+    auto sizeSel = estimateLeafQueryExpr("{a: { $size: 3 }}", card);
+    auto bitOpSel = estimateLeafQueryExpr("{a: {$bitsAllClear: [1, 5]}}", card);
+    auto exprSel = estimateLeafQueryExpr("{ '$expr' : {  '$ifNull' : [ '$a', null ] } }", card);
 
-    BSONObj bitsAnyClearQuery = fromjson("{a: {$bitsAnyClear: [1, 5]}}");
-    auto bitsAnyClearExpr = parse(bitsAnyClearQuery);
-    ASSERT_EQ(estimateLeafMatchExpression(bitsAnyClearExpr.get(), makeCard(100)), kBitsSel);
-
-    BSONObj bitsAnySetQuery = fromjson("{a: {$bitsAnySet: [1, 5]}}");
-    auto bitsAnySetExpr = parse(bitsAnySetQuery);
-    ASSERT_EQ(estimateLeafMatchExpression(bitsAnySetExpr.get(), makeCard(100)), kBitsSel);
+    ASSERT_LT(eqSel, regexSel);
+    ASSERT_LT(regexSel, sizeSel);
+    ASSERT_EQ(sizeSel, bitOpSel);
+    ASSERT_EQ(sizeSel, exprSel);
 }
 
 }  // unnamed namespace

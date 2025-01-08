@@ -218,7 +218,7 @@ TEST(CardinalityEstimator, ThreeOrsWithImplicitAnd) {
 
     auto indexPlan =
         makeIndexScanFetchPlan(bounds, indexFields, std::move(indexExpr), std::move(fetchExpr));
-    ASSERT_EQ(getPlanHeuristicCE(*indexPlan, 1000), makeCard(14.9523));
+    ASSERT_EQ(getPlanHeuristicCE(*indexPlan, 1000), makeCard(10.6626));
 }
 
 TEST(CardinalityEstimator, ThreeOrsWithAndChildrenImplicitAnd) {
@@ -236,7 +236,7 @@ TEST(CardinalityEstimator, ThreeOrsWithAndChildrenImplicitAnd) {
 
     auto indexPlan =
         makeIndexScanFetchPlan(bounds, indexFields, std::move(indexExpr), std::move(fetchExpr));
-    ASSERT_EQ(getPlanHeuristicCE(*indexPlan, 1000), makeCard(10.5793));
+    ASSERT_EQ(getPlanHeuristicCE(*indexPlan, 1000), makeCard(10.0423));
 }
 
 TEST(CardinalityEstimator, IndexIntersectionWithFetchFilter) {
@@ -285,7 +285,7 @@ TEST(CardinalityEstimator, IndexIntersectionWithFetchFilter) {
     CardinalityEstimate e2 = getPlanHeuristicCE(*intersectionPlan2, 1000);
 
     ASSERT_EQ(e1, e2);
-    ASSERT_EQ(e1, makeCard(3.8222));
+    ASSERT_EQ(e1, makeCard(3.78916));
 }
 
 TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
