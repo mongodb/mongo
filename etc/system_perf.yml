@@ -161,207 +161,8 @@ functions:
       params: {script: "echo"}
 
   ###
-  # Prepares the environment before compiling the binaries
-  compile prep:
-    # We create a virtual environment with the Python dependencies for compiling the server
-    # installed.
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          mkdir -p mongodb/bin
-
-          # This is copied from evergreen/functions/venv_setup.sh
-          # Consider consolidating this in the future
-          /opt/mongodbtoolchain/v4/bin/python3 -m venv "${workdir}/compile_venv"
-          source "${workdir}/compile_venv/bin/activate"
-
-          poetry_dir="${workdir}/poetry_dir"
-          mkdir -p $poetry_dir
-          export POETRY_CONFIG_DIR="$poetry_dir/config"
-          export POETRY_DATA_DIR="$poetry_dir/data"
-          export POETRY_CACHE_DIR="$poetry_dir/cache"
-          python -m pip install "poetry==1.5.1"
-          # See BF-29897 / https://github.com/python-poetry/poetry/issues/7584
-          poetry config installer.max-workers 10
-          # Trying poetry install due to https://github.com/python-poetry/poetry/issues/7611
-          python -m poetry install --no-root --sync || python -m poetry install --no-root --sync
-    - command: expansions.write
-      params:
-        file: expansions.yml
-        redacted: true
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          source "${workdir}/compile_venv/bin/activate"
-
-          # We get the raw version string (r1.2.3-45-gabcdef) from git
-          # And append "-sys-perf" at the end
-          export MONGO_VERSION=$(git describe --abbrev=7)
-          MONGO_VERSION="$MONGO_VERSION-sys-perf"
-
-          # If this is a patch build, we add the patch version id to the version string so we know
-          # this build was a patch, and which evergreen task it came from
-          if [ "${is_patch|false}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-          fi
-
-          # This script handles sanitizing the version string for use during SCons build
-          # and when pushing artifacts up to S3.
-          IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
-            buildscripts/generate_version_expansions.py --out version_expansions.yml
-    - command: expansions.update
-      params:
-        file: src/version_expansions.yml
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          # This script handles whether the SCons cache should be used
-          source "${workdir}/compile_venv/bin/activate"
-          SCONS_CACHE_MODE=${scons_cache_mode|} USE_SCONS_CACHE=${use_scons_cache|false} \
-            IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
-            python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
-  get engflow creds perf:
-  - command: s3.get
-    display_name: "get engflow key"
-    params:
-      aws_key: ${engflow_key}
-      aws_secret: ${engflow_secret}
-      remote_file: engflow/engflow.key
-      bucket: serverengflow
-      local_file: "src/engflow.key"
-      # Mark as optional to allow local-mode execution to succeed.
-      optional: true
-  - command: s3.get
-    display_name: "get engflow cert"
-    params:
-      aws_key: ${engflow_key}
-      aws_secret: ${engflow_secret}
-      remote_file: engflow/engflow.cert
-      bucket: serverengflow
-      local_file: "src/engflow.cert"
-      # Mark as optional to allow local-mode execution to succeed.
-      optional: true
-  - command: shell.exec
-    params:
-      display_name: "generate evergreen engflow bazelrc"
-      shell: bash
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # Pulled from evergreen/generate_evergreen_engflow_bazelrc.sh consider
-        # consolidating once prelude.sh is runnable in the perf project.
-
-        source ./evergreen/bazel_RBE_supported.sh
-
-        if bazel_rbe_supported; then
-
-          uri="https://spruce.mongodb.com/task/${task_id}?execution=${execution}"
-
-          echo "build --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
-          echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
-        fi
-  compile prep old:
-    # We create a virtual environment with the Python dependencies for compiling the server
-    # installed.
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          mkdir -p mongodb/bin
-
-          # This is copied from evergreen/functions/venv_setup.sh
-          # Consider consolidating this in the future
-          /opt/mongodbtoolchain/v4/bin/python3 -m venv "${workdir}/compile_venv"
-          source "${workdir}/compile_venv/bin/activate"
-
-          python -m pip install "poetry==1.5.1"
-          # See BF-29897 / https://github.com/python-poetry/poetry/issues/7584
-          poetry config installer.max-workers 10
-          # Trying poetry install due to https://github.com/python-poetry/poetry/issues/7611
-          python -m poetry install --no-root --sync || python -m poetry install --no-root --sync
-    - command: expansions.write
-      params:
-        file: expansions.yml
-        redacted: true
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-
-            source "${workdir}/compile_venv/bin/activate"
-
-            # We get the raw version string (r1.2.3-45-gabcdef) from git
-            # And append "-sys-perf" at the end
-            export MONGO_VERSION=$(git describe --abbrev=7)
-            MONGO_VERSION="$MONGO_VERSION-sys-perf"
-
-            # If this is a patch build, we add the patch version id to the version string so we know
-            # this build was a patch, and which evergreen task it came from
-            if [ "${is_patch|false}" = "true" ]; then
-              MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-            fi
-
-            # This script handles sanitizing the version string for use during SCons build
-            # and when pushing artifacts up to S3.
-            IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
-              buildscripts/generate_version_expansions.py --out version_expansions.yml
-          else
-            touch version_expansions.yml
-          fi
-    - command: expansions.update
-      params:
-        file: src/version_expansions.yml
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-
-            # This script handles whether the SCons cache should be used
-            source "${workdir}/compile_venv/bin/activate"
-            SCONS_CACHE_MODE=${scons_cache_mode|} USE_SCONS_CACHE=${use_scons_cache|false} \
-              IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
-              python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
-          else
-            touch compile_expansions.yml
-          fi
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
-  ###
-
-  ###
-  # Compile mongodb
+  # Package the supplementary DSI data (mongo tools, feature flag list,
+  # server params list, jstests, and buildscripts)
   download mongo tools:
   - command: shell.exec
     params:
@@ -428,11 +229,23 @@ functions:
             ;;
         esac
 
-        echo "Downloading and installing MongoDB tools..."
-        sudo mkdir -p mongodb/
-        wget "$binary_url" -O mongo-tools.tar.gz
-        sudo tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
-        echo "MongoDB tools installed successfully!"
+          echo "Downloading and installing MongoDB tools..."
+          mkdir -p mongodb/
+          wget "$binary_url" -O mongo-tools.tar.gz
+          tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
+          echo "MongoDB tools installed successfully!"
+  generate atlas info:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          uarch=$(uname -p)
+          os=$(uname -r)
+          json="{ \"version\": \"${version}\", \"gitVersion\": \"${revision}\", \"uarch\": \"$uarch\", \"os\": \"$os\" }"
+          echo $json | jq '.' > mongodb/atlas_info.json
   generate feature flag list:
     - command: shell.exec
       params:
@@ -440,7 +253,11 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          source "${workdir}/compile_venv/bin/activate"
+          pushd ..
+          . src/evergreen/prelude.sh
+          activate_venv
+          popd
+
           python ./buildscripts/idl/gen_all_feature_flag_list.py
           mkdir -p mongodb/feature_flags
           cp ./all_feature_flags.txt mongodb/feature_flags
@@ -451,37 +268,15 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          source "${workdir}/compile_venv/bin/activate"
+          pushd ..
+          . src/evergreen/prelude.sh
+          activate_venv
+          popd
+
           python ./buildscripts/idl/gen_all_server_params_list.py
           mkdir -p mongodb/server_params
           cp ./all_server_params.txt mongodb/server_params
-  compile mongodb:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            set -o errexit
-            set -o verbose
-            source "${workdir}/compile_venv/bin/activate"
-            python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args install-core install-jstestshell SPLIT_DWARF=0 MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb ${patch_compile_flags|}
-          fi
-  download mongodb:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-            set -o errexit
-            set -o verbose
-            wget --quiet https://s3.amazonaws.com/mciuploads/${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.${ext|tgz}
-            tar -xvf mongo-${revision_order_id}.${ext|tgz}
-            mv ./dist-test/bin/mongo mongodb/bin
-            mv ./dist-test/bin/mongos mongodb/bin
-            mv ./dist-test/bin/mongod mongodb/bin
-            mv ./dist-test/bin/mongocryptd mongodb/bin
-            # Copy libs folder if it exists
-            [ ! -d ./dist-test/lib ] || mv ./dist-test/lib mongodb
-  download jstests:
+  copy jstests:
     - command: shell.exec
       params:
         working_dir: src
@@ -503,41 +298,64 @@ functions:
             await import("jstests/hooks/run_validate_collections.actual.js");
           EOF
           fi
-  package binary:
+  copy buildscripts:
     - command: shell.exec
       params:
         working_dir: src
         script: |
-          tar czf mongodb${compile_variant|}.tar.gz mongodb
-  upload binary:
+          set -o errexit
+          set -o verbose
+          mkdir -p mongodb/buildscripts
+          cp -a buildscripts/* mongodb/buildscripts
+  package supplementary data:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          if [ -z "${build_patch_id}" ] || [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
+            tar czf supplementary-data.tgz mongodb
+          else
+            # Evergreen does not handle nested escaped expansions well
+            reuse_compile_from="${reuse_compile_from}"
+            build_patch_id="${build_patch_id}"
+            version_to_reuse_from=$(if [ -n "${build_patch_id}" ]; then echo "${build_patch_id}"; else echo "${reuse_compile_from}"; fi)
+
+            curl -o supplementary-data.tgz https://s3.amazonaws.com/mciuploads/${project}/${compile_variant}/$${version_to_reuse_from}/dsi/supplementary-data.tgz
+          fi
+  upload supplementary data:
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb${compile_variant|}.tar.gz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}.tar.gz
+        local_file: src/supplementary-data.tgz
+        remote_file: ${project}/${compile_variant}/${version_id}/dsi/supplementary-data.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: mongodb${compile_variant|}.tar.gz
-  ###
+        content_type: application/x-gzip
+        display_name: supplementary-data.tgz
 
 tasks:
-  - name: package_new_compile
+  - name: package_supplementary_data
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
     commands:
       - command: manifest.load
       - command: git.get_project
         params:
           directory: src
-      - func: "compile prep"
-      - func: "get engflow creds perf"
+          clone_depth: 1000
+      - func: "set up venv"
+      - func: "get version expansions"
+      - func: "apply version expansions"
       - func: "download mongo tools"
       - func: "generate feature flag list"
+      - func: "generate atlas info"
       - func: "generate server params list"
-      - func: "download mongodb"
-      - func: "download jstests"
-      - func: "package binary"
-      - func: "upload binary"
+      - func: "copy jstests"
+      - func: "copy buildscripts"
+      - func: "package supplementary data"
+      - func: "upload supplementary data"
 
 buildvariants:
   - name: amazon2-x86-compile
@@ -555,10 +373,7 @@ buildvariants:
       - amazon2-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
-      - name: package_new_compile
-        depends_on:
-          - name: archive_dist_test
-            variant: amazon2-x86-compile
+      - name: package_supplementary_data
 
   - name: amazon2-arm64-compile
     display_name: "* Compile for Amazon Linux 2 arm64"
@@ -575,10 +390,7 @@ buildvariants:
       - amazon2-arm64-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
-      - name: package_new_compile
-        depends_on:
-          - name: archive_dist_test
-            variant: amazon2-arm64-compile
+      - name: package_supplementary_data
 
   - name: amazon2-arm64-mongocrypt-shlib-compile
     display_name: "* Compile mongo_crypt_v1.so for Amazon Linux 2 arm64"
@@ -625,10 +437,7 @@ buildvariants:
       - amazon2-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
-      - name: package_new_compile
-        depends_on:
-          - name: archive_dist_test
-            variant: amazon2-x86-streams-compile
+      - name: package_supplementary_data
 
   - name: al2023-arm64-compile
     display_name: "* Compile for Al2023 arm64 NEW"
@@ -646,10 +455,7 @@ buildvariants:
       - amazon2023.3-arm64-large
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
-      - name: package_new_compile
-        depends_on:
-          - name: archive_dist_test
-            variant: al2023-arm64-compile
+      - name: package_supplementary_data
 
   - name: al2023-x86-compile
     display_name: "* Compile for Al2023 x86 NEW"
@@ -667,7 +473,4 @@ buildvariants:
       - amazon2023.3-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
-      - name: package_new_compile
-        depends_on:
-          - name: archive_dist_test
-            variant: al2023-x86-compile
+      - name: package_supplementary_data
