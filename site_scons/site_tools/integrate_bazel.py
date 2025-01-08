@@ -645,6 +645,12 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
     print("Starting bazel build thread...")
     run_bazel_command(env, bazel_cmd)
 
+    # This is used to detect if a user is running under bazelisk, delete this since
+    # the SCons integration sets up bazelisk internally, but we want to trigger failures
+    # afterwards if the user calls a non-bazelisk bazel directly.
+    if os.path.exists(".bazelrc.bazelisk"):
+        os.remove(".bazelrc.bazelisk")
+
 
 def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builder:
     return SCons.Builder.Builder(

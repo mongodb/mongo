@@ -2444,3 +2444,35 @@ selects.config_setting_group(
         ":linux_gcc_fission",
     ],
 )
+
+# --------------------------------------
+# running_through_bazelisk
+# --------------------------------------
+
+bool_flag(
+    name = "running_through_bazelisk",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "running_through_bazelisk_enabled",
+    flag_values = {
+        "//bazel/config:running_through_bazelisk": "True",
+    },
+)
+
+selects.config_setting_group(
+    name = "x86_64_or_arm64",
+    match_any = [
+        "@platforms//cpu:aarch64",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "running_through_bazelisk_x86_64_or_arm64",
+    match_all = [
+        ":x86_64_or_arm64",
+        ":running_through_bazelisk_enabled",
+    ],
+)

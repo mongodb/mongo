@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 # Whenever Bazel is invoked, it first calls this script setting "BAZEL_REAL" to the path of the real Bazel binary.
 # Use this file as a wrapper for any logic that should run before bazel itself is executed.
 
@@ -66,5 +68,7 @@ if [[ $OSTYPE == darwin* ]]; then
 fi
 
 printf '%s\n' "${bazelrc_xcode_lines[@]}" > .bazelrc.xcode
+
+echo "common --//bazel/config:running_through_bazelisk" > .bazelrc.bazelisk
 
 exec "$bazel_real" "$@"

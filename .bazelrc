@@ -396,3 +396,6 @@ try-import %workspace%/.bazelrc.git
 
 # Used for build profiles and any settings a user wants to consistently use
 try-import %workspace%/.bazelrc.local
+
+# Flag as built with bazelisk
+try-import %workspace%/.bazelrc.bazelisk

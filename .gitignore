@@ -282,6 +282,7 @@ buildozer
 .bazelrc.gitinfo
 .bazelrc.workstation
 .bazelrc.xcode
+.bazelrc.bazelisk
 *.bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
 bazel/coverity/analysis/BUILD.bazel
