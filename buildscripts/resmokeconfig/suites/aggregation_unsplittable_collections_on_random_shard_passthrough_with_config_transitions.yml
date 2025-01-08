@@ -86,12 +86,6 @@ selector:
     - jstests/aggregation/sources/merge/on_fields_validation.js
     - jstests/aggregation/bugs/server10530.js
     - jstests/aggregation/range.js
-    - jstests/aggregation/sources/setWindowFields/concat_arrays.js
-    - jstests/aggregation/accumulators/concat_arrays.js
-    - jstests/aggregation/bugs/substrCP.js
-    - jstests/aggregation/bugs/substr.js
-    - jstests/aggregation/sources/setWindowFields/set_union.js
-    - jstests/aggregation/accumulators/set_union.js
 
     # These tests run larger aggregations that can take a long time and can repeatedly get interrupted by config transitions.
     - jstests/aggregation/query_limits_test.js

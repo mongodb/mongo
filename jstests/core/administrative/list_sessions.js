@@ -12,7 +12,6 @@
 //   does_not_support_config_fuzzer,
 //   # $listSession is not supported in serverless.
 //   command_not_supported_in_serverless,
-//   requires_getmore,
 // ]
 
 // Basic tests for the $listSessions aggregation stage.

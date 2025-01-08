@@ -828,18 +828,14 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         let docs;
         try {
             docs = db.getSiblingDB("admin")
-                       .aggregate([{$listSampledQueries: {namespace: ns}}],
-                                  // The network override does not support issuing getMore commands
-                                  // since if a network error occurs during it then it won't know
-                                  // whether the cursor was advanced or not. To allow this workload
-                                  // to run in a suite with network error, use a large batch size so
-                                  // that no getMore commands would be issued.
-                                  {
-                                      cursor: TestData.runningWithShardStepdowns ||
-                                              TestData.runningWithBalancer
-                                          ? {batchSize: 100000}
-                                          : {}
-                                  })
+                       .aggregate(
+                           [{$listSampledQueries: {namespace: ns}}],
+                           // The network override does not support issuing getMore commands since
+                           // if a network error occurs during it then it won't know whether the
+                           // cursor was advanced or not. To allow this workload to run in a suite
+                           // with network error, use a large batch size so that no getMore commands
+                           // would be issued.
+                           {cursor: TestData.runningWithShardStepdowns ? {batchSize: 100000} : {}})
                        .toArray();
         } catch (e) {
             if (this.expectedAggregateInterruptErrors.includes(e.code)) {

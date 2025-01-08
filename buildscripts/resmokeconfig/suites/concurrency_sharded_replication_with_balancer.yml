@@ -48,7 +48,6 @@ selector:
     # mongos has no system.profile collection.
     - requires_profiling
     - assumes_unsharded_collection
-    - requires_getmore
 
 executor:
   archive:

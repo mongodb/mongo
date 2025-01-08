@@ -107,18 +107,6 @@ selector:
     - config_shard_incompatible
     - assumes_stable_shard_list
 
-    # We do NOT exclude all tests tagged with 'requires_getmore', but we do exclude tests tagged with
-    # the more specific 'uses_getmore_outside_of_transaction'. Tests that use a getMore are generally
-    # incompatible with suites that run background moveCollections because moveCollection's commit
-    # will drop the original collection, leading to QueryPlanKilled. However in this suite because all operations
-    # are wrapped within a txn, if a getMore fails due to QueryPlanKilled the entire txn will be
-    # retried, including the getMore.
-    # A very small number of tests run a getMore in the same state function as an operation that is
-    # incompatible with txns (such as dropDatabase or $out). When this happens, the entire state function is run
-    # outside a txn. Therefore, because the getMore will also be run outside a txn, it once again becomes
-    # incompatible with background moveCollection and the test must be excluded.
-    - uses_getmore_outside_of_transaction
-
 executor:
   archive:
     hooks:

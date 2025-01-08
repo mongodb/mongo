@@ -4,17 +4,19 @@
  * Base workload for aggregation. Inserts a bunch of documents in its setup,
  * then each thread does an aggregation with an empty $match.
  * @tags: [
- *   requires_getmore,
- *   # Some passthrough suites can tolerate getMore commands because the passthrough wraps them in
- *   # transactions. The getMore in this workload does not get wrapped, though, because it is in the
- *   # setup function, making the workload incompatible with even those suites.
- *   uses_getmore_outside_of_transaction,
+ *   requires_getmore
  * ]
  */
 
-import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-
 export const $config = (function() {
+    var data = {
+        numDocs: 1000,
+        // Use 12KB documents by default. This number is useful because 12,000 documents each of
+        // size 12KB take up more than 100MB in total, and 100MB is the in-memory limit for $sort
+        // and $group.
+        docSize: 12 * 1000
+    };
+
     var getStringOfLength = (function() {
         var cache = {};
         return function getStringOfLength(size) {
@@ -47,27 +49,6 @@ export const $config = (function() {
     var transitions = {query: {query: 1}};
 
     function setup(db, collName, cluster) {
-        if (!this.numDocs) {
-            this.numDocs = 1000;
-        }
-        if (!this.docSize) {
-            // Use 12KB documents by default. This number is useful because 12,000 documents each of
-            // size 12KB take up more than 100MB in total, and 100MB is the in-memory limit for
-            // $sort and $group.
-            this.docSize = 12 * 1000;
-        }
-        this.anyNodeIsEphemeral = false;
-
-        // TODO SERVER-92452: Burn in testing fails with WT_CACHE_FULL for inmemory variants, so
-        // substantially reduce the workload until this is fixed in a better way.
-        cluster.executeOnMongodNodes((db) => {
-            this.anyNodeIsEphemeral = this.anyNodeIsEphemeral || isEphemeral(db);
-        });
-        if (this.anyNodeIsEphemeral) {
-            this.numDocs = this.numDocs / 100;
-            this.docSize = Math.max(this.docSize / 100, 100);
-        }
-
         // load example data
         var bulk = db[collName].initializeUnorderedBulkOp();
         for (var i = 0; i < this.numDocs; ++i) {
@@ -101,7 +82,7 @@ export const $config = (function() {
         states: states,
         startState: 'query',
         transitions: transitions,
-        data: {},
+        data: data,
         setup: setup,
         teardown: teardown,
     };
