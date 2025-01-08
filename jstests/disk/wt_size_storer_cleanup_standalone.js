@@ -19,16 +19,10 @@ const runTest = function(insertAfterRestart) {
         return conn.getDB(jsTestName()).test;
     };
 
-    // TODO (SERVER-82902): Use JSON-formatted size storer data.
-    // const getSizeStorerData = function() {
-    //     const filePath = dbpath + (_isWindows() ? "\\" : "/") + jsTestName();
-    //     runWiredTigerTool("-r", "-h", dbpath, "dump", "-j", "-f", filePath, "sizeStorer");
-    //     return JSON.parse(cat(filePath))["table:sizeStorer"][1].data;
-    // };
     const getSizeStorerData = function() {
         const filePath = dbpath + (_isWindows() ? "\\" : "/") + jsTestName();
-        runWiredTigerTool("-r", "-h", dbpath, "dump", "-f", filePath, "sizeStorer");
-        return cat(filePath);
+        runWiredTigerTool("-r", "-h", dbpath, "dump", "-j", "-f", filePath, "sizeStorer");
+        return JSON.parse(cat(filePath))["table:sizeStorer"][1].data;
     };
 
     assert.commandWorked(coll().insert({a: 1}));
@@ -38,12 +32,9 @@ const runTest = function(insertAfterRestart) {
     MongoRunner.stopMongod(conn);
 
     let sizeStorerData = getSizeStorerData();
-    // TODO (SERVER-82902): Use JSON-formatted size storer data.
-    // assert(sizeStorerData.find(entry => entry.key0 === uri),
-    //        "Size storer unexpectedly does not contain entry for " + uri + ": " +
-    //            tojson(sizeStorerData));
-    assert(sizeStorerData.includes(uri),
-           "Size storer unexpectedly does not contain entry for " + uri + ": " + sizeStorerData);
+    assert(sizeStorerData.find(entry => entry.key0 === uri),
+           "Size storer unexpectedly does not contain entry for " + uri + ": " +
+               tojson(sizeStorerData));
 
     conn = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true, setParameter: {syncdelay: 0}});
 
@@ -58,11 +49,8 @@ const runTest = function(insertAfterRestart) {
     MongoRunner.stopMongod(conn);
 
     sizeStorerData = getSizeStorerData();
-    // TODO (SERVER-82902): Use JSON-formatted size storer data.
-    // assert(!sizeStorerData.find(entry => entry.key0 === uri),
-    //        "Size storer unexpectedly contains entry for " + uri + ": " + tojson(sizeStorerData));
-    assert(!sizeStorerData.includes(uri),
-           "Size storer unexpectedly contains entry for " + uri + ": " + sizeStorerData);
+    assert(!sizeStorerData.find(entry => entry.key0 === uri),
+           "Size storer unexpectedly contains entry for " + uri + ": " + tojson(sizeStorerData));
 };
 
 runTest(false);
