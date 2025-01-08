@@ -125,7 +125,6 @@ mongo_cc_library(
         "exclusion_projection_executor.cpp",
         "inclusion_projection_executor.cpp",
         "projection_executor_builder.cpp",
-        "projection_executor_utils.cpp",
         "projection_node.cpp",
         "//src/mongo/base:exact_cast.h",
         "//src/mongo/db/query:projection_ast_path_tracking_visitor.h",
@@ -135,7 +134,6 @@ mongo_cc_library(
         "exclusion_projection_executor.h",
         "inclusion_projection_executor.h",
         "projection_executor_builder.h",
-        "projection_executor_utils.h",
         "projection_node.h",
     ],
     deps = [

@@ -35,13 +35,10 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -50,7 +47,6 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 /**
@@ -70,22 +66,7 @@ public:
           _path{std::move(path)},
           _matchExpr{std::move(matchExpr)} {}
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        using namespace fmt::literals;
-
-        auto preImage = _children[0]->evaluate(root, variables);
-        auto postImage = _children[1]->evaluate(root, variables);
-        uassert(51255,
-                "Positional operator pre-image can only be an object, but got {}"_format(
-                    typeName(preImage.getType())),
-                preImage.getType() == BSONType::Object);
-        uassert(51258,
-                "Positional operator post-image can only be an object, but got {}"_format(
-                    typeName(postImage.getType())),
-                postImage.getType() == BSONType::Object);
-        return Value{projection_executor_utils::applyFindPositionalProjection(
-            preImage.getDocument(), postImage.getDocument(), *_matchExpr, _path)};
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -125,6 +106,14 @@ public:
         return _matchExpr;
     }
 
+    const FieldPath& getFieldPath() const {
+        return _path;
+    }
+
+    const CopyableMatchExpression& getMatchExpression() const {
+        return _matchExpr;
+    }
+
 private:
     const FieldPath _path;
     const CopyableMatchExpression _matchExpr;
@@ -145,17 +134,7 @@ public:
                                 int limit)
         : Expression{expCtx, {postImageExpr}}, _path{std::move(path)}, _skip{skip}, _limit{limit} {}
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        using namespace fmt::literals;
-
-        auto postImage = _children[0]->evaluate(root, variables);
-        uassert(51256,
-                "$slice operator can only be applied to an object, but got {}"_format(
-                    typeName(postImage.getType())),
-                postImage.getType() == BSONType::Object);
-        return Value{projection_executor_utils::applyFindSliceProjection(
-            postImage.getDocument(), _path, _skip, _limit)};
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -183,6 +162,18 @@ public:
         return this;
     }
 
+    const FieldPath& getFieldPath() const {
+        return _path;
+    }
+
+    const boost::optional<int>& getSkip() const {
+        return _skip;
+    }
+
+    int getLimit() const {
+        return _limit;
+    }
+
 private:
     const FieldPath _path;
     const boost::optional<int> _skip;
@@ -204,14 +195,7 @@ public:
                                     CopyableMatchExpression matchExpr)
         : Expression{expCtx, {child}}, _path{std::move(path)}, _matchExpr{std::move(matchExpr)} {}
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        using namespace fmt::literals;
-
-        auto input = _children[0]->evaluate(root, variables);
-        invariant(input.getType() == BSONType::Object);
-        return projection_executor_utils::applyFindElemMatchProjection(
-            input.getDocument(), *_matchExpr, _path);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -241,6 +225,14 @@ public:
     }
 
     const CopyableMatchExpression& getMatchExpr() const {
+        return _matchExpr;
+    }
+
+    const FieldPath& getFieldPath() const {
+        return _path;
+    }
+
+    const CopyableMatchExpression& getMatchExpression() const {
         return _matchExpr;
     }
 

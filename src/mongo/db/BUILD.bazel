@@ -2365,8 +2365,10 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_expressions",
     srcs = [
+        "//src/mongo/db/exec:projection_executor_utils.cpp",
         "//src/mongo/db/exec/expression:evaluate_array.cpp",
         "//src/mongo/db/exec/expression:evaluate_date.cpp",
+        "//src/mongo/db/exec/expression:evaluate_find_internal.cpp",
         "//src/mongo/db/exec/expression:evaluate_index.cpp",
         "//src/mongo/db/exec/expression:evaluate_javascript.cpp",
         "//src/mongo/db/exec/expression:evaluate_logical.cpp",
@@ -2427,6 +2429,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:expression.cpp",
         "//src/mongo/db/pipeline:expression_context.cpp",
         "//src/mongo/db/pipeline:expression_dependencies.cpp",
+        "//src/mongo/db/pipeline:expression_find_internal.cpp",
         "//src/mongo/db/pipeline:expression_function.cpp",
         "//src/mongo/db/pipeline:expression_js_emit.cpp",
         "//src/mongo/db/pipeline:expression_let.cpp",

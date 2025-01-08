@@ -34,13 +34,13 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_js_emit.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/pcre.h"
 
 namespace mongo {
 
@@ -297,6 +297,14 @@ Value evaluate(const ExpressionLet& expr, const Document& root, Variables* varia
 
 Value evaluate(const ExpressionToHashedIndexKey& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionInternalKeyStringValue& expr,
+               const Document& root,
+               Variables* variables);
+
+Value evaluate(const ExpressionInternalFindPositional& expr,
+               const Document& root,
+               Variables* variables);
+Value evaluate(const ExpressionInternalFindSlice& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalFindElemMatch& expr,
                const Document& root,
                Variables* variables);
 
