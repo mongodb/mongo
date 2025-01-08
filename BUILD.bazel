@@ -8507,6 +8507,16 @@ mongo_unittest_install(
 )
 
 mongo_unittest_install(
+    name = "tracing_test",
+    srcs = ["//src/mongo/tracing:tracing_test"],
+)
+
+mongo_unittest_install(
+    name = "tracing_test-trace_initialization_test",
+    srcs = ["//src/mongo/tracing:tracing_test"],
+)
+
+mongo_unittest_install(
     name = "watchdog_test",
     srcs = ["//src/mongo/watchdog:watchdog_test"],
 )
