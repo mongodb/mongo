@@ -613,15 +613,6 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
     // If this bucket was archived, we need to remove it from the set of archived buckets.
     auto archivedKey = std::make_tuple(key.collectionUUID, key.hash, bucket->minTime);
     if (auto it = stripe.archivedBuckets.find(archivedKey); it != stripe.archivedBuckets.end()) {
-        // Decrement refCount and cleanup collectionTimeFields if needed
-        if (auto timeFieldIt = stripe.collectionTimeFields.find(key.collectionUUID);
-            timeFieldIt != stripe.collectionTimeFields.end()) {
-            int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
-            if (--refCount == 0) {
-                stripe.collectionTimeFields.erase(timeFieldIt);
-            }
-        }
-
         stripe.archivedBuckets.erase(it);
         stats.decNumActiveBuckets();
     }
@@ -950,15 +941,6 @@ void archiveBucket(BucketCatalog& catalog,
             .second;
 
     if (archived) {
-        // If we have an archived bucket, ensure that we've stored the timeField for this UUID
-        auto& [timeField, refCount] = stripe.collectionTimeFields[bucket.bucketId.collectionUUID];
-        // Set timeField if we constructed the entry above
-        if (timeField.empty()) {
-            timeField = bucket.timeField;
-        }
-        // Always increase ref-count when archiving
-        ++refCount;
-
         // If we have an archived bucket, we still want to account for it in numberOfActiveBuckets
         // so we will increase it here since removeBucket decrements the count.
         stats.incNumActiveBuckets();
@@ -1193,21 +1175,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
         BucketId bucketId(uuid, archived.oid, BucketKey::signature(hash));
         ExecutionStatsController& stats = statsForBucket(bucketId);
 
-        StringData timeField;
-        auto timeFieldIt = stripe.collectionTimeFields.find(uuid);
-        if (timeFieldIt != stripe.collectionTimeFields.end()) {
-            const tracking::string& tf = std::get<tracking::string>(timeFieldIt->second);
-            timeField = {tf.data(), tf.size()};
-        }
-
         closeArchivedBucket(catalog, bucketId);
-
-        if (timeFieldIt != stripe.collectionTimeFields.end()) {
-            int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
-            if (--refCount == 0) {
-                stripe.collectionTimeFields.erase(timeFieldIt);
-            }
-        }
 
         stripe.archivedBuckets.erase(it);
 

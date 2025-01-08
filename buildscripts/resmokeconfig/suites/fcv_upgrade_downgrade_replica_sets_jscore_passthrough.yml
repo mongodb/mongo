@@ -52,18 +52,6 @@ selector:
     # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
     - jstests/core/query/api/api_version_unstable_indexes.js
 
-    # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
-    # upgrade/downgrade
-    # TODO SERVER-70605: remove this block.
-    - jstests/core/timeseries/ddl/bucket_granularity.js
-    - jstests/core/timeseries/query/timeseries_id_range.js
-    - jstests/core/timeseries/write/timeseries_insert_after_update.js
-    - jstests/core/timeseries/write/timeseries_sparse.js
-    - jstests/core/timeseries/write/timeseries_min_max.js
-    - jstests/core/timeseries/write/timeseries_simple.js
-    - jstests/core/timeseries/ddl/timeseries_collation.js
-    - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js
-
     # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
     - jstests/aggregation/api_version_stage_allowance_checks.js
@@ -111,10 +99,6 @@ selector:
 
     # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
     - jstests/core/bench_test1.js
-
-    # Bucketing behavior changes based on the timeseriesAlwaysUseCompressedBuckets feature flag.
-    - jstests/core/timeseries/query/timeseries_lastpoint.js
-    - jstests/core/timeseries/write/timeseries_reopened_bucket_insert.js
 
 executor:
   archive:

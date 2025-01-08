@@ -110,7 +110,7 @@ public:
     // True if the bucket already exists and was reopened.
     bool isReopened = false;
 
-    // For always compressed, the total compressed size in bytes of the bucket's BSON serialization,
+    // The total compressed size in bytes of the bucket's BSON serialization,
     // not including measurements to be inserted until a WriteBatch is committed. With the feature
     // flag off, the total uncompressed size in bytes of the bucket's BSON serialization, including
     // measurements to be inserted.
@@ -155,7 +155,7 @@ public:
     const BucketKey key;
 
     // Top-level hashed field names of the measurements that have been inserted into the bucket.
-    // TODO(SERVER-70605): Remove to avoid extra overhead. These are stored as keys in
+    // TODO(SERVER-99003): Remove to avoid extra overhead. These are stored as keys in
     // measurementMap.
     tracking::StringSet fieldNames;
 
@@ -200,7 +200,7 @@ bool schemaIncompatible(Bucket& bucket,
  * to overflow, we will create a new bucket and recalculate the change to the bucket size
  * and data fields.
  *
- * For always compressed, it is impossible to know how well a measurement will compress in the
+ * It is impossible to know how well a measurement will compress in the
  * existing bucket ahead of time. We skip adding the element size to the calculation. The cost of
  * adding one more measurement over the limit won't be much, especially as it will get compressed on
  * commit. After committing, the Bucket is updated with the compressed size.

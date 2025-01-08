@@ -255,14 +255,6 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesUpdatesSupport
         default: false
         shouldBeFCVGated: true
-    featureFlagTimeseriesAlwaysUseCompressedBuckets:
-        description: >-
-            Enable support to always use the compressed time-series bucket format when inserting,
-            updating, or removing data into new, existing, or re-opened buckets.
-        cpp_varname: feature_flags::gTimeseriesAlwaysUseCompressedBuckets
-        default: true
-        version: 8.0
-        shouldBeFCVGated: true
     featureFlagTSBucketingParametersUnchanged:
         description: "Enable storing the 'timeseriesBucketingParametersHaveChanged' parameter on disk"
         cpp_varname: feature_flags::gTSBucketingParametersUnchanged

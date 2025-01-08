@@ -116,7 +116,7 @@ struct WriteBatch {
 
     uint32_t numPreviouslyCommittedMeasurements = 0;
 
-    // For always compressed, adds the compressed measurement sizes while committing.
+    // Will add the compressed measurement sizes while committing.
     int32_t size = 0;
 
     TrackingContexts& trackingContexts;

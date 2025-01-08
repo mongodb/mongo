@@ -144,12 +144,6 @@ struct Stripe {
     using ArchivedKey = std::tuple<UUID, BucketKey::Hash, Date_t>;
     tracking::btree_map<ArchivedKey, ArchivedBucket, std::greater<ArchivedKey>> archivedBuckets;
 
-    // Mapping of timeField for UUID. The integer in the value represent a reference count of how
-    // many buckets it exist in 'archivedBuckets' for this UUID.
-    // TODO SERVER-70605: Remove this mapping, only needed when usingAlwaysCompressedBuckets is
-    // disabled.
-    tracking::unordered_map<UUID, std::tuple<tracking::string, int64_t>> collectionTimeFields;
-
     // All series currently with outstanding reopening operations. Used to coordinate disk access
     // between reopenings and regular writes to prevent stale reads and corrupted updates.
     static constexpr int kInlinedVectorSize = 4;
