@@ -83,6 +83,14 @@ constexpr inline StringData kStageName = "$documents"_sd;
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+
+/**
+ * If the pipeline starts with a desugared $documents, returns stages representing the desugared
+ * $documents.
+ */
+boost::optional<std::vector<BSONObj>> extractDesugaredStagesFromPipeline(
+    const std::vector<BSONObj>& pipeline);
+
 };  // namespace DocumentSourceDocuments
 
 }  // namespace mongo

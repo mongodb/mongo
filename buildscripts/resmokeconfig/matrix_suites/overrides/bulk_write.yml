@@ -53,6 +53,9 @@
       - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
       # The way we override explain doesn't work with FLE tests.
       - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
+      # This file is an end to end test for both CSFLE and QE. CSFLE is not supported in bulk_write mode,
+      # and any writes performed are simply for setting up the test collection.
+      - src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_lookupMultiSchema.js
 
 - name: txn_passthrough_runner_selftest
   value:

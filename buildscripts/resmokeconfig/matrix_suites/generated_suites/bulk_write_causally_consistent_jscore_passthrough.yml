@@ -67,6 +67,7 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
     - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_lookupMultiSchema.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling

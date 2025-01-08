@@ -902,25 +902,77 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithDocumentsPipeli
     //
     // Serialize the $lookup stage and confirm contents.
     //
+    for (auto& opts :
+         {SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue},
+          SerializationOptions{}}) {
+        std::vector<Value> serialization;
+        lookupStage->serializeToArray(serialization, opts);
+        ASSERT_EQ(serialization.size(), 1UL);
+        auto serializedDoc = serialization[0].getDocument();
+        ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
+
+        // Ensure the $documents desugared to $queue properly.
+        auto serializedStage = serializedDoc["$lookup"].getDocument();
+        ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::Array);
+        ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 4UL);
+
+        ASSERT_EQ(serializedStage["pipeline"][0].getType(), BSONType::Object);
+        ASSERT_EQ(serializedStage["pipeline"][0]["$queue"].getType(), BSONType::Array);
+
+        auto roundTripped =
+            DocumentSourceLookUp::createFromBson(serializedDoc.toBson().firstElement(), expCtx);
+
+        std::vector<Value> newSerialization;
+        roundTripped->serializeToArray(newSerialization, opts);
+
+        ASSERT_EQ(newSerialization.size(), 1UL);
+        ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+    }
+}
+
+
+// Tests that $lookup with '$search' can be round tripped.
+TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineStage) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    auto originalBSON = BSON("$lookup" << BSON("from"
+                                               << "coll"
+                                               << "pipeline"
+                                               << BSON_ARRAY(BSON("$search" << BSON("term"
+                                                                                    << "asdf")))
+                                               << "as"
+                                               << "as"));
+    auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
+
+    //
+    // Serialize the $lookup stage and confirm contents.
+    //
     std::vector<Value> serialization;
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    lookupStage->serializeToArray(serialization, opts);
+    lookupStage->serializeToArray(serialization);
+    ASSERT_EQ(serialization.size(), 1UL);
     auto serializedDoc = serialization[0].getDocument();
     ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
 
-    // Ensure the $documents desugared to $queue properly.
     auto serializedStage = serializedDoc["$lookup"].getDocument();
     ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::Array);
-    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 4UL);
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 1UL);
 
+    // If the serialized pipeline doesn't have $search as the first stage, extractSourceStage()
+    // needs to be updated to include the desugared $search for sharded queries to work properly.
     ASSERT_EQ(serializedStage["pipeline"][0].getType(), BSONType::Object);
-    ASSERT_EQ(serializedStage["pipeline"][0]["$queue"].getType(), BSONType::Array);
+    ASSERT_EQ(serializedStage["pipeline"][0]["$search"].getType(), BSONType::Object);
+    ASSERT_DOCUMENT_EQ(serializedStage["pipeline"][0]["$search"].getDocument(),
+                       Document(fromjson("{term: 'asdf'}")));
 
     auto roundTripped =
         DocumentSourceLookUp::createFromBson(serializedDoc.toBson().firstElement(), expCtx);
 
     std::vector<Value> newSerialization;
-    roundTripped->serializeToArray(newSerialization, opts);
+    roundTripped->serializeToArray(newSerialization);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);

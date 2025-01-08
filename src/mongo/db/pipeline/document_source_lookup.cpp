@@ -282,10 +282,24 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
 }
 
 std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
-    if (!pipeline.empty() &&
-        (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
-         pipeline[0].hasField(DocumentSourceQueue::kStageName) ||
-         pipeline[0].hasField("$search"_sd))) {
+    if (pipeline.empty()) {
+        return {};
+    }
+
+    // When serializing $lookup to send the pipeline to a shard, we send the
+    // '_resolvedIntrospectionPipeline'. '_resolvedIntrospectionPipeline' is parsed and contains
+    // a desugared version of $documents. Therefore, on a shard, we must check for a desugared
+    // $documents and return those stages as the source stage.
+    if (auto desugaredStages =
+            DocumentSourceDocuments::extractDesugaredStagesFromPipeline(pipeline);
+        desugaredStages.has_value()) {
+        return desugaredStages.value();
+    }
+    // When we first create a $lookup stage, the input 'pipeline' is unparsed, so we
+    // check for the $documents stage itself.
+    if (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
+        pipeline[0].hasField("$search"_sd) ||
+        pipeline[0].hasField(DocumentSourceQueue::kStageName)) {
         return {pipeline[0]};
     }
     return {};
@@ -1222,17 +1236,14 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
             // TODO SERVER-94227 we don't need to do any validation as part of this parsing pass.
             return Pipeline::parse(*_userPipeline, _fromExpCtx)->serializeToBson(opts);
         }
-        if (opts.serializeForQueryAnalysis) {
-            // If we are in query analysis, encrypted fields will have been marked in the
-            // introspection pipeline, so we need to serialize that here.
-            // TODO SERVER-81802 always serialize the resolved pipeline for non-query-shapification
-            // cases.
-            return _resolvedIntrospectionPipeline->serializeToBson(opts);
-        } else if (opts.serializeForFLE2) {
+        if (opts.verbosity) {
+            // TODO SERVER-81802 We should also serialize the resolved pipeline for explain.
+            return *_userPipeline;
+        }
+        if (opts.serializeForFLE2) {
             // This is a workaround for testing server rewrites for FLE2. We need to verify that the
             // _resolvedPipeline was rewritten, since the _resolvedPipeline is used to execute the
-            // query. We should remove this serialization option once we serialize the resolved
-            // pipeline SERVER-81802.
+            // query.
             auto resolvedPipelineWithoutIndexMatchPlaceholder = _resolvedPipeline;
 
             /**
@@ -1260,7 +1271,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
             }
             return resolvedPipelineWithoutIndexMatchPlaceholder;
         }
-        return *_userPipeline;
+        return _resolvedIntrospectionPipeline->serializeToBson(opts);
     }();
     if (_additionalFilter) {
         auto serializedFilter = [&]() -> BSONObj {

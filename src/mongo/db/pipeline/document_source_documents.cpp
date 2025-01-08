@@ -79,4 +79,17 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceDocuments::createFromBson
                 SbeCompatibility::noRequirements)};
 }
 
+
+boost::optional<std::vector<BSONObj>> DocumentSourceDocuments::extractDesugaredStagesFromPipeline(
+    const std::vector<BSONObj>& pipeline) {
+    if (pipeline.size() >= 4 && pipeline[0].hasField(DocumentSourceQueue::kStageName) &&
+        pipeline[1].hasField(DocumentSourceProject::kStageName) &&
+        pipeline[1][DocumentSourceProject::kStageName].Obj().hasField(
+            DocumentSourceDocuments::kGenFieldName)) {
+        return boost::optional<std::vector<BSONObj>>(
+            {pipeline[0], pipeline[1], pipeline[2], pipeline[3]});
+    }
+    return boost::none;
+}
+
 }  // namespace mongo
