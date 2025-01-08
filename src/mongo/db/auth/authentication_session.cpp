@@ -385,7 +385,10 @@ void AuthenticationSession::markSuccessful() {
 void AuthenticationSession::markFailed(const Status& status) {
     _finish();
 
-    if (!_isSpeculative) {
+    // If we have made it to SaslContinue, that means that the attempt
+    // is effectively no longer speculative. We should continue auditing
+    // in this case.
+    if (!_isSpeculative || (_lastStep && _lastStep == StepType::kSaslContinue)) {
         auto event = audit::AuthenticateEvent(
             _mechName, _userName, makeAppender(_mech.get()), status.code());
         audit::logAuthentication(_client, event);
