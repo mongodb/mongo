@@ -378,10 +378,10 @@ QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function(
         this, transformedQueryShapeConfigurations, shouldRunExplain);
 };
 
-const getQueryHashFromQuerySettingsInit =
-    QuerySettingsUtils.prototype.getQueryHashFromQuerySettings;
-QuerySettingsUtils.prototype.getQueryHashFromQuerySettings = function(representativeQuery) {
-    return getQueryHashFromQuerySettingsInit.call(
+const getQueryShapeHashFromQuerySettingsInit =
+    QuerySettingsUtils.prototype.getQueryShapeHashFromQuerySettings;
+QuerySettingsUtils.prototype.getQueryShapeHashFromQuerySettings = function(representativeQuery) {
+    return getQueryShapeHashFromQuerySettingsInit.call(
         this, applyTimefieldProjectionToRepresentativeQuery(representativeQuery));
 };
 
