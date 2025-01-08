@@ -192,4 +192,11 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchHybridScoringFull
       default: false
       shouldBeFCVGated: true
+    
+    featureFlagQueryMemoryTracking:
+      description: "Feature flag to enable current and high watermark memory usage tracking for 
+                    queries' blocking stages."
+      cpp_varname: gFeatureFlagQueryMemoryTracking
+      default: false
+      shouldBeFCVGated: false
 
