@@ -30,14 +30,12 @@
 #pragma once
 
 #include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 
 namespace mongo {
@@ -56,15 +54,10 @@ namespace rpc {
 static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
 
 /*
- * A type that maybe contains parsed ImpersonationUserMetadata
- */
-using MaybeImpersonatedUserMetadata = boost::optional<ImpersonatedUserMetadata>;
-
-/*
  * Gets the current impersonation data from the OpCtx (assumes readImpersonatedUserMetadata
  * has already been called)
  */
-MaybeImpersonatedUserMetadata getImpersonatedUserMetadata(OperationContext* opCtx);
+boost::optional<ImpersonatedUserMetadata> getImpersonatedUserMetadata(OperationContext* opCtx);
 
 /*
  * Sets the provided impersonated user metadata on the opCtx only if there are actually impersonated
