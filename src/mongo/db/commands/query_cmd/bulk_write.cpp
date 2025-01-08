@@ -1730,6 +1730,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                     auto cq = uassertStatusOK(
                         parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, updateRequest));
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
+                            opCtx,
                             updateRequest,
                             *cq,
                             *ex.extraInfo<DuplicateKeyErrorInfo>(),

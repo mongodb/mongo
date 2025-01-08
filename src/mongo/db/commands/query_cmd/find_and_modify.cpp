@@ -630,6 +630,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                     auto cq = uassertStatusOK(
                         parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, updateRequest));
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
+                            opCtx,
                             updateRequest,
                             *cq,
                             *ex.extraInfo<DuplicateKeyErrorInfo>(),
