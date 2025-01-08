@@ -8,11 +8,15 @@
 //   requires_non_retryable_commands,
 // ]
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 const testDB = db.getSiblingDB("test");
 const srcName = "renameSRC";
 const src = testDB.getCollection(srcName);
-const dstName = "dest4567890123456789012345678901234567890123456789012345678901234567890";
-const dst = testDB.getCollection(dstName);
+
+const collLength = 250;
+const longDstName = 'a'.repeat(collLength);
+const dst = testDB.getCollection(longDstName);
 
 src.drop();
 dst.drop();
@@ -31,9 +35,15 @@ src.createIndex({
 const originalNumberOfIndexes = src.getIndexes().length;
 
 // Should succeed in renaming collection as the long index namespace is acceptable.
-assert.commandWorked(src.renameCollection(dstName), "Rename collection with long name failed");
+assert.commandWorked(src.renameCollection(longDstName), "Rename collection with long name failed");
 
 assert.eq(0, src.getIndexes().length, "No indexes expected on already renamed collection");
 assert.eq(originalNumberOfIndexes,
           dst.getIndexes().length,
           "Expected exactly same number of indexes of source collection before rename");
+
+// Renaming a collection over 255 characters fails.
+const longDstNameInvalid = 'a'.repeat(255);
+db.createCollection(srcName);
+assert.commandFailedWithCode(src.renameCollection(longDstNameInvalid),
+                             [ErrorCodes.InvalidNamespace, ErrorCodes.IllegalOperation]);

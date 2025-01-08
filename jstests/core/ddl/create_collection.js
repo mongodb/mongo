@@ -9,7 +9,15 @@
 import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+
+function is73orBelow(db) {
+    const res = db.getSiblingDB("admin")
+                    .system.version.find({_id: "featureCompatibilityVersion"})
+                    .toArray();
+    return MongoRunner.compareBinVersions(res[0].version, "8.0") < 0;
+}
 
 // "create" command rejects invalid options.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
@@ -23,10 +31,27 @@ assert.commandFailedWithCode(db.createCollection("ab\0"), ErrorCodes.InvalidName
 
 // The collection name length limit was upped in 4.4, try creating a collection with a longer
 // name than previously allowed.
-const longCollName = 'a'.repeat(200);
+const collLength = 250;
+const longCollName = 'a'.repeat(collLength);
 assert.commandWorked(db.runCommand({drop: longCollName}));
 assert.commandWorked(db.createCollection(longCollName));
 
+// The collection name for internal db collections is longer then 255 but still capped to 512.
+if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
+    const internalCollLength = is73orBelow(db) ? 245 : 500;
+    const internalLongCollName = 'a'.repeat(internalCollLength);
+    assert.commandWorked(db.runCommand({drop: internalLongCollName}));
+    assert.commandWorked(db.getSiblingDB("config").runCommand({drop: internalLongCollName}));
+    assert.commandWorked(db.getSiblingDB("config").createCollection(internalLongCollName));
+    assert.commandWorked(db.getSiblingDB("admin").runCommand({drop: internalLongCollName}));
+    assert.commandWorked(db.getSiblingDB("admin").createCollection(internalLongCollName));
+}
+
+// Cannot create a collection with a nss above the limit (255 including the db name).
+const longCollNameInvalid = 'a'.repeat(255);
+assert.commandWorked(db.runCommand({drop: longCollNameInvalid}));
+assert.commandFailedWithCode(db.createCollection(longCollNameInvalid),
+                             [ErrorCodes.InvalidNamespace]);
 //
 // Tests for "idIndex" field.
 //

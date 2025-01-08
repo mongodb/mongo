@@ -44,6 +44,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
@@ -122,6 +123,8 @@
 
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 static const size_t kSerializedErrorStatusMaxSize = 1024 * 2;
 
@@ -425,12 +428,9 @@ void removeCollAndChunksMetadataFromConfig(
 void checkRenamePreconditions(OperationContext* opCtx,
                               const NamespaceString& toNss,
                               const boost::optional<CollectionType>& optToCollType,
+                              bool isSourceUnsharded,
                               const bool dropTarget) {
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Namespace of target collection too long. Namespace: "
-                          << toNss.toStringForErrorMsg()
-                          << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
-            toNss.size() <= NamespaceString::MaxNsShardedCollectionLen);
+    sharding_ddl_util::assertNamespaceLengthLimit(toNss, isSourceUnsharded);
 
     if (!dropTarget) {
         // Check that the target collection doesn't exist if dropTarget is not set
@@ -819,6 +819,18 @@ void assertDataMovementAllowed() {
             "Cannot migrate data in a cluster before a second shard has been successfully added",
             clusterHasTwoOrMoreShards);
 }
+
+
+void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded) {
+    auto maxNsLen = isUnsharded ? NamespaceString::MaxUserNsCollectionLen
+                                : NamespaceString::MaxUserNsShardedCollectionLen;
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        "Namespace too log. The namespace {} is {} characters long, but the maximum allowed is {}"_format(
+            nss.toStringForErrorMsg(), nss.size(), maxNsLen),
+        nss.size() <= maxNsLen);
+}
+
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

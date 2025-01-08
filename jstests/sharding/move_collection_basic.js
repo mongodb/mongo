@@ -84,5 +84,11 @@ assert.eq(1, unshardedChunk.length);
 assert.eq(0, st.rs1.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
 assert.eq(50, st.rs0.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
 
+// Successfully move a collection with a long namespace below 255.
+const collLength = 250;
+const longCollName = 'a'.repeat(collLength);
+const longNs = dbName + "." + longCollName;
+assert.commandWorked(mongos.getDB(dbName).createCollection(longCollName));
+assert.commandWorked(mongos.adminCommand({moveCollection: longNs, toShard: shard1}));
 st.stop();
 })();

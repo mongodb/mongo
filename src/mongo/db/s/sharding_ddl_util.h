@@ -203,6 +203,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONOb
 void checkRenamePreconditions(OperationContext* opCtx,
                               const NamespaceString& toNss,
                               const boost::optional<CollectionType>& optTargetCollType,
+                              bool isSourceUnsharded,
                               bool dropTarget);
 
 /**
@@ -348,6 +349,12 @@ std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOn
  * that data cannot be migrated to a new shard before all direct shard operations have been blocked.
  */
 void assertDataMovementAllowed();
+
+/*
+ * Throws InvalidNamespace if the namespace length for the collection exceeds the maximum namespace
+ * character limit.
+ */
+void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

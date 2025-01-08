@@ -950,9 +950,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 ShardingRecoveryService::NoCustomAction());
                         }
                     }
-
+                    const auto isSourceUnsharded =
+                        !optSourceCollType || optSourceCollType->getUnsplittable();
                     sharding_ddl_util::checkRenamePreconditions(
-                        opCtx, toNss, optTargetCollType, _doc.getDropTarget());
+                        opCtx, toNss, optTargetCollType, isSourceUnsharded, _doc.getDropTarget());
 
                     checkDatabaseRestrictions(opCtx, fromNss, optSourceCollType, toNss);
 

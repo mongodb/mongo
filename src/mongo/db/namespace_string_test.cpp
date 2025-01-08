@@ -231,7 +231,7 @@ TEST_F(NamespaceStringTest, MakeDropPendingNamespace) {
         makeNamespaceString(boost::none, "test.foo")
             .makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
 
-    std::string collName(NamespaceString::MaxNsCollectionLen, 't');
+    std::string collName(NamespaceString::MaxUserNsCollectionLen, 't');
     NamespaceString nss = makeNamespaceString(boost::none, "test", collName);
     ASSERT_EQUALS(makeNamespaceString(boost::none, "test.system.drop.1234567i8t9." + collName),
                   nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
@@ -761,7 +761,6 @@ TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyCollMultitenancy) {
     auto nssEmptyColl = makeNamespaceString(dbName, "");
     ASSERT_EQ(nssEmptyColl.toString_forTest(), "dbTest");
 }
-
 
 }  // namespace
 }  // namespace mongo
