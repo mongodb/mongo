@@ -50,7 +50,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/routing_information_cache.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -130,9 +129,8 @@ public:
             }
         }
 
-        // (Ignore FCV check): this feature flag is not FCV-gated.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+        // TODO SERVER-84243 Remove / adapt the block below.
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             auto const routingInfoCache = RoutingInformationCache::get(opCtx);
 
             if (argumentElem.isNumber() || argumentElem.isBoolean()) {

@@ -48,11 +48,10 @@ public:
     ~RoutingInformationCache() override = default;
 
     static void set(ServiceContext* serviceCtx);
-    static void setOverride(ServiceContext* serviceCtx, CatalogCache* cacheOverride);
 
-    static CatalogCache* get(ServiceContext* serviceCtx);
+    static RoutingInformationCache* get(ServiceContext* serviceCtx);
 
-    static CatalogCache* get(OperationContext* opCtx);
+    static RoutingInformationCache* get(OperationContext* opCtx);
 };
 
 }  // namespace mongo

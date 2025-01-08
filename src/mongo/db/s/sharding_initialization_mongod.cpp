@@ -459,16 +459,11 @@ void _initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
         return boost::none;
     }();
 
-    _initializeGlobalShardingState(opCtx, configCS);
+    // TODO SERVER-84243 replace the line below with the initialisation of the routing information
+    // cache on the Grid.
+    RoutingInformationCache::set(service);
 
-    // (Ignore FCV check): this feature flag is not FCV-gated.
-    if (feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
-        // With the feature flag enabled, there is a separate routing and filtering cache, so this
-        // cache and the routing cache can be the same.
-        RoutingInformationCache::setOverride(service, Grid::get(service)->catalogCache());
-    } else {
-        RoutingInformationCache::set(service);
-    }
+    _initializeGlobalShardingState(opCtx, configCS);
 
     ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 
