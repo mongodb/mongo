@@ -47,28 +47,32 @@ tests:
       # The current suggested method for raising these values is to run the benchmark a few times in patches, get the
       # means of these metrics in them, and then multiply them by 1.002 (+ .2%). Please make sure the new values
       # are above the maximum values reported in those patches to prevent any future flakiness.
+      #
+      # The below thresholds are based on commit 98588e7.
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 20616
+            value: 20301
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 20642
+            value: 20323
             bound_direction: upper
   ServiceEntryPointShardRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
       # The current suggested method for raising these values is to run the benchmark a few times in patches, get the
       # means of these metrics in them, and then multiply them by 1.002 (+ .2%). Please make sure the new values
       # are above the maximum values reported in those patches to prevent any future flakiness.
+      #
+      # The below thresholds are based on commit 98588e7.
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 23154
+            value: 22613
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 23184
+            value: 22646
             bound_direction: upper
