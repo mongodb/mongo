@@ -110,8 +110,10 @@ const advancedTimestamp =
 jsTestLog(
     `Waiting for 'testNode' to receive heartbeats. The target sync source should have advanced its optime to ${
         tojson(advancedTimestamp)}`);
+
+let replSetGetStatus;
 assert.soon(() => {
-    const replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
+    replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 
     // Wait for a heartbeat from the target sync source that shows that the target sync source's
     // last timestamp is at least 'advancedTimestamp'. This ensures the test node sees that the
@@ -139,9 +141,8 @@ assert.soon(() => {
 
     return (receivedCentralHb && receivedSyncSourceHb && exceedsChangeSyncSourceThreshold &&
             centralWithinChangeSyncSourceThreshold);
-});
+}, tojson(replSetGetStatus));
 
-const replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 jsTestLog(replSetGetStatus);
 
 hangOplogFetcherBeforeAdvancingLastFetched.off();
