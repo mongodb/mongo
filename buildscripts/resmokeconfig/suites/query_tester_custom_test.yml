@@ -1,0 +1,13 @@
+test_kind: query_tester_server_test
+description: |
+  This suite will run custom tests on the mongo server using QueryTester's mongotest binary.
+
+selector:
+  roots:
+    - src/mongo/db/query/query_tester/tests/query-correctness-tests/custom_tests/*/
+executor:
+  hooks:
+    - class: CleanEveryN
+      n: 1
+  fixture:
+    class: MongoDFixture

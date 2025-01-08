@@ -145,8 +145,9 @@ functions:
       args:
         - "-c"
         - |
-          if [ -z "${gcov_tool}" ]; then
-            echo "Not a code coverage repo, skipping git clone."
+          # clone_repo_for_test indicates that we want to clone the mongo git repo.
+          if [ -z "${gcov_tool}" ] && [ "${clone_repo_for_test}" != "true" ]; then
+            echo "Not a code coverage repo or task that requires a git checkout, skipping git clone."
             exit 0
           fi
 
@@ -1779,6 +1780,26 @@ functions:
           - "./src/evergreen/jstestfuzz_setup.sh"
         include_expansions_in_env:
           - github_token
+
+  "setup query_tester test repos":
+    - *f_expansions_write
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: query-correctness-tests
+        expansion_name: github_token
+        permissions:
+          metadata: read
+          contents: read
+    - command: subprocess.exec
+      display_name: "query_tester test repos setup sh"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/query_tester_test_repo_setup.sh"
+        include_expansions_in_env:
+          - github_token
+          - repo_name
 
   "lint fuzzer sanity patch":
     - *f_expansions_write
