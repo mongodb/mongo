@@ -224,15 +224,12 @@ const size_t CollectionRoutingInfoTargeter::kMaxDatabaseCreationAttempts = 3;
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                                              const NamespaceString& nss,
                                                              boost::optional<OID> targetEpoch)
-    : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cri(_init(opCtx, false)) {
-    _isUpdateOneWithIdWithoutShardKeyEnabled = true;
-}
+    : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cri(_init(opCtx, false)) {}
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceString& nss,
                                                              const CollectionRoutingInfo& cri)
     : _nss(nss), _cri(cri) {
     invariant(!cri.cm.hasRoutingTable() || cri.cm.getNss() == nss);
-    _isUpdateOneWithIdWithoutShardKeyEnabled = true;
 }
 
 /**
@@ -441,10 +438,6 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
     return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec, chunkRanges));
 }
 
-bool CollectionRoutingInfoTargeter::isUpdateOneWithIdWithoutShardKeyEnabled() const {
-    return _isUpdateOneWithIdWithoutShardKeyEnabled;
-}
-
 bool isRetryableWrite(OperationContext* opCtx) {
     return opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction();
 }
@@ -596,8 +589,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
             getQueryCounters(opCtx).updateOneOpStyleBroadcastWithExactIDCount.increment(1);
             if (isUpsert && useTwoPhaseWriteProtocol) {
                 *useTwoPhaseWriteProtocol = true;
-            } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId &&
-                       isUpdateOneWithIdWithoutShardKeyEnabled()) {
+            } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId) {
                 if (isRetryableWrite(opCtx)) {
                     getQueryCounters(opCtx).updateOneWithoutShardKeyWithIdCount.increment(1);
                     *isNonTargetedWriteWithoutShardKeyWithExactId = true;
@@ -692,8 +684,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     if (!isMulti) {
         getQueryCounters(opCtx).deleteOneNonTargetedShardedCount.increment(1);
         if (isExactId) {
-            if (isNonTargetedWriteWithoutShardKeyWithExactId &&
-                isUpdateOneWithIdWithoutShardKeyEnabled()) {
+            if (isNonTargetedWriteWithoutShardKeyWithExactId) {
                 if (isRetryableWrite(opCtx)) {
                     *isNonTargetedWriteWithoutShardKeyWithExactId = true;
                     getQueryCounters(opCtx).deleteOneWithoutShardKeyWithIdCount.increment(1);

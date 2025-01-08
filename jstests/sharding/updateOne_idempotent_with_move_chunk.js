@@ -37,9 +37,6 @@ assert.commandWorked(coll.insert({x: -1, _id: 0}));
 // Delay messages from mongos to shard 0 or shard 1 such that the updateOne to that shard
 // reaches post chunk migration from shard 0 to shard 1 below.
 const delayMillis = 500;
-// In this scenario, we delay updateOne broadcast from mongos to shard 0 until after the
-// chunk is migrated to shard 1. This causes zero updates to the document in the
-// absence of featureFlagUpdateOneWithIdWithoutShardKey.
 st.rs0.getPrimary().delayMessagesFrom(st.s, delayMillis);
 
 const cmdObj = {
@@ -70,7 +67,5 @@ const joinMoveChunk = startParallelShell(
 joinMoveChunk();
 joinUpdate();
 
-// There should only be a single update of counter value in both scenarios with
-// featureFlagUpdateOneWithIdWithoutShardKey enabled.
 assert.neq(null, coll.findOne({x: -1, counter: 1}));
 st.stop();

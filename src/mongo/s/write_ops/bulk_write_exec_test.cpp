@@ -3595,8 +3595,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatch) {
 // Test that if all shards return n=0 we consider the write complete when multiple write ops are
 // batched together.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
     auto req = requestMultipleWriteOps;
     req.setOrdered(false);
     auto op = BulkWriteOp(_opCtx, req);
@@ -3760,8 +3758,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyMode) {
 // Test that if all shards return n=0 we consider the write comple withh multiple write ops are
 // batched together. Same as the previous test but uses bulkWrite errorsOnly mode.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyModeBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
 
     auto req = requestMultipleWriteOps;
     req.setOrdered(false);
@@ -3902,8 +3898,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatch) {
 // Test that if the one shard returns n > 0 we wait for responses from other shards before setting
 // write as completed when multiple write ops are batched together.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
     auto req = requestMultipleWriteOps;
 
     // Ordered is set to false to ensure batching
@@ -4068,9 +4062,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyMode)
 
 // Same as above but with multiple write ops are batched together.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyModeBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto req = requestMultipleWriteOps;
     req.setErrorsOnly(true);
     // Ordered is set to false to ensure batching
@@ -4228,9 +4219,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDelete) {
 // Same as the SecondShardFindMatchBatched test, but ensures we correctly
 // extract 'n' for deletes as well as updates.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDeleteBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto request = BulkWriteCommandRequest(
         {
             BulkWriteDeleteOp(0, BSON("_id" << 1)),
@@ -4400,8 +4388,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
 }
 
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCErrorBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
     auto req = requestMultipleWriteOps;
     req.setOrdered(false);
     auto op = BulkWriteOp(_opCtx, req);
@@ -4535,8 +4521,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableError) {
 // Test that if 2 shards receive n=0 and then one shard receives a retryable error (e.g.
 // StaleConfig) we will re-target all shards on retry.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
     auto req = requestMultipleWriteOps;
     // Ordered is set to false to ensure batching
     req.setOrdered(false);
@@ -4721,8 +4705,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
 // StaleConfig) we will discard any write concern errors from the first round of processing for
 // batched writes.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
     auto req = requestMultipleWriteOps;
     req.setOrdered(false);
     auto op = BulkWriteOp(_opCtx, req);
@@ -4859,9 +4841,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorB
 // Test that if one shard a retryable error (e.g. StaleConfig) but then another shard receives n=1
 // we consider the entire batch of writes are retried.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableErrorBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto req = requestMultipleWriteOps;
     // Ordered is set to false to ensure batching
     req.setOrdered(false);
@@ -5093,8 +5072,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableError) {
 }
 
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorMatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
     auto req = requestMultipleWriteOps;
     req.setOrdered(false);
     auto op = BulkWriteOp(_opCtx, req);
@@ -5344,9 +5321,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
 // Test that if one shard receives a non-retryable error but then another shard receives an n=1
 // response we abandon the batch.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableErrorBatched) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto req = requestMultipleWriteOps;
     req.setOrdered(false);
     auto op = BulkWriteOp(_opCtx, req);

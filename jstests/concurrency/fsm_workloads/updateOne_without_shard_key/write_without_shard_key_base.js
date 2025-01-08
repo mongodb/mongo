@@ -545,8 +545,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
-        this.featureFlagUpdateWithIdWithoutShardKey =
-            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'UpdateOneWithIdWithoutShardKey');
     };
 
     $config.states.updateOne = function updateOne(db, collName, connCache) {
@@ -556,9 +554,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.updateOneWithId = function updateOneWithId(db, collName, connCache) {
-        if (!this.featureFlagUpdateWithIdWithoutShardKey) {
-            return;
-        }
         jsTestLog("Running updateOneWithId state");
         this.generateAndRunRandomUpdateOpWithId(db, collName);
         jsTestLog("Finished updateOneWithId state");
@@ -593,9 +588,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.deleteOneWithId = function deleteOneWithId(db, collName, connCache) {
-        if (!this.featureFlagUpdateWithIdWithoutShardKey) {
-            return;
-        }
         jsTestLog("Running deleteOneWithId state");
         const query = {
             _id: {

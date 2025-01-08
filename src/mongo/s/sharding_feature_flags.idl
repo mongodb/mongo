@@ -87,13 +87,6 @@ feature_flags:
     default: true
     shouldBeFCVGated: true
     version: 7.2
-  # TODO (SERVER-76291): Remove once 8.0 becomes last LTS.
-  featureFlagUpdateOneWithIdWithoutShardKey:
-    description: "Feature flag for updateOne and deleteOne with _id equality without shard key correctness during chunk migrations."
-    cpp_varname: feature_flags::gUpdateOneWithIdWithoutShardKey
-    default: true
-    version: 8.0
-    shouldBeFCVGated: true
   # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
   featureFlagPlacementHistoryPostFCV73 :
     description: "Feature flag that marks a version change in the logic that generates config.placementHistory;

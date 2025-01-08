@@ -189,22 +189,10 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             const epsilon = 5000;
             const elapsed = Date.now() - startTime;
             assert.gt(elapsed, minimumOperationDurationMS - epsilon);
-            if (FeatureFlagUtil.isPresentAndEnabled(mongos, "UpdateOneWithIdWithoutShardKey")) {
-                runRetryableWrites("during resharding after collection cloning had finished");
-            } else {
-                runRetryableWrites("during resharding after collection cloning had finished",
-                                   ErrorCodes.IncompleteTransactionHistory);
-            }
+            runRetryableWrites("during resharding after collection cloning had finished");
         });
 
-    if (FeatureFlagUtil.isPresentAndEnabled(mongos, "UpdateOneWithIdWithoutShardKey")) {
-        runRetryableWrites(
-            "after resharding", ErrorCodes.OK, ErrorCodes.IncompleteTransactionHistory);
-    } else {
-        runRetryableWrites("after resharding",
-                           ErrorCodes.IncompleteTransactionHistory,
-                           ErrorCodes.IncompleteTransactionHistory);
-    }
+    runRetryableWrites("after resharding", ErrorCodes.OK, ErrorCodes.IncompleteTransactionHistory);
     reshardingTest.teardown();
 }
 const minimumOperationDurationMS = 30000;
