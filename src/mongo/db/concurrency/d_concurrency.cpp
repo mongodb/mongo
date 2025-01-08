@@ -99,10 +99,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              Date_t deadline,
                              InterruptBehavior behavior,
                              GlobalLockSkipOptions options)
-    : _opCtx(opCtx),
-      _interruptBehavior(behavior),
-      _skipRSTLLock(options.skipRSTLLock),
-      _isOutermostLock(!shard_role_details::getLocker(opCtx)->isLocked()) {
+    : _opCtx(opCtx), _interruptBehavior(behavior), _skipRSTLLock(options.skipRSTLLock) {
     if (!options.skipFlowControlTicket) {
         shard_role_details::getLocker(_opCtx)->getFlowControlTicket(_opCtx, lockMode);
     }
@@ -165,8 +162,7 @@ Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
       _result(otherLock._result),
       _multiDocTxnBarrier(std::move(otherLock._multiDocTxnBarrier)),
       _interruptBehavior(otherLock._interruptBehavior),
-      _skipRSTLLock(otherLock._skipRSTLLock),
-      _isOutermostLock(otherLock._isOutermostLock) {
+      _skipRSTLLock(otherLock._skipRSTLLock) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
     otherLock._result = LOCK_INVALID;
 }
@@ -180,7 +176,8 @@ Lock::GlobalLock::~GlobalLock() {
         // Abandon our snapshot if destruction of the GlobalLock object results in actually
         // unlocking the global lock. Recursive locking and the two-phase locking protocol may
         // prevent lock release.
-        const bool willReleaseLock = _isOutermostLock && !locker->inAWriteUnitOfWork();
+        const bool willReleaseLock =
+            !locker->isGlobalLockedRecursively() && !locker->inAWriteUnitOfWork();
         if (willReleaseLock) {
             shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         }

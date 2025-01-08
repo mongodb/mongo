@@ -2509,6 +2509,32 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenNotInWriteUnit
     ASSERT_FALSE(recovUnitBorrowed->activeTransaction);
 }
 
+TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenAllGlobalLocksAreReleased) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    auto recovUnitOwned = std::make_unique<RecoveryUnitMock>();
+    auto recovUnitBorrowed = recovUnitOwned.get();
+    shard_role_details::setRecoveryUnit(opCtx,
+                                        std::unique_ptr<RecoveryUnit>(recovUnitOwned.release()),
+                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+    {
+        boost::optional<Lock::GlobalLock> gw1 =
+            Lock::GlobalLock(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        ASSERT(gw1->isLocked());
+        ASSERT(recovUnitBorrowed->activeTransaction);
+
+        Lock::GlobalLock gw2(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        ASSERT(gw2.isLocked());
+        ASSERT(recovUnitBorrowed->activeTransaction);
+
+        // Clear the first global lock to test out-of-order releases.
+        gw1.reset();
+        ASSERT(recovUnitBorrowed->activeTransaction);
+    }
+    ASSERT_FALSE(recovUnitBorrowed->activeTransaction);
+}
+
 TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteUnitOfWork) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
