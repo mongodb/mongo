@@ -149,7 +149,8 @@ Bucket* useBucket(OperationContext* opCtx,
                   const NamespaceString& nss,
                   InsertContext& info,
                   AllowBucketCreation mode,
-                  const Date_t& time);
+                  const Date_t& time,
+                  const StringDataComparator* comparator);
 
 /**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
@@ -221,7 +222,8 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
-    const Date_t& time);
+    const Date_t& time,
+    const StringDataComparator* comparator);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -338,7 +340,8 @@ Bucket& allocateBucket(OperationContext* opCtx,
                        Stripe& stripe,
                        WithLock stripeLock,
                        InsertContext& info,
-                       const Date_t& time);
+                       const Date_t& time,
+                       const StringDataComparator* comparator);
 
 /**
  * Close the existing, full bucket and open a new one for the same metadata.
@@ -352,7 +355,8 @@ Bucket& rollover(OperationContext* opCtx,
                  Bucket& bucket,
                  InsertContext& info,
                  RolloverAction action,
-                 const Date_t& time);
+                 const Date_t& time,
+                 const StringDataComparator* comparator);
 
 /**
  * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
@@ -368,7 +372,8 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
     Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
-    const Date_t& time);
+    const Date_t& time,
+    const StringDataComparator* comparator);
 
 /**
  * Retrieves or initializes the execution stats for the given namespace, for writing.

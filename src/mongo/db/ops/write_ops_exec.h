@@ -55,6 +55,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
@@ -268,6 +269,20 @@ void explainDelete(OperationContext* opCtx,
                    const BSONObj& command,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result);
+
+namespace details {
+bool commitTimeseriesBucket(OperationContext* opCtx,
+                            std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
+                            size_t start,
+                            size_t index,
+                            std::vector<StmtId>&& stmtIds,
+                            std::vector<write_ops::WriteError>* errors,
+                            boost::optional<repl::OpTime>* opTime,
+                            boost::optional<OID>* electionId,
+                            std::vector<size_t>* docsToRetry,
+                            absl::flat_hash_map<int, int>& retryAttemptsForDup,
+                            const write_ops::InsertCommandRequest& request);
+}
 
 }  // namespace write_ops_exec
 }  // namespace mongo

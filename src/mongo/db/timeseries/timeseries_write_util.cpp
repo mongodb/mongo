@@ -1343,8 +1343,10 @@ void commitTimeseriesBucketsAtomically(
         auto& mainBucketCatalog = bucket_catalog::BucketCatalog::get(opCtx);
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(sideBucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus =
-                prepareCommit(sideBucketCatalog, coll->ns().getTimeseriesViewNamespace(), batch);
+            auto prepareCommitStatus = prepareCommit(sideBucketCatalog,
+                                                     coll->ns().getTimeseriesViewNamespace(),
+                                                     batch,
+                                                     coll->getDefaultCollator());
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return;
