@@ -1702,14 +1702,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                     LOGV2_DEBUG(20930, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
                     UpdateStageParams updateStageParams(
                         request, driver, opDebug, std::move(documentCounter));
-
+                    BSONObj queryFilter = request->isUpsert()
+                        ? getQueryFilterMaybeUnwrapEq(unparsedQuery)
+                        : unparsedQuery;
                     fastPathQueryCounters.incrementIdHackQueryCounter();
-                    return InternalPlanner::updateWithIdHack(opCtx,
-                                                             coll,
-                                                             updateStageParams,
-                                                             idIndexDesc,
-                                                             unparsedQuery["_id"].wrap(),
-                                                             policy);
+                    return InternalPlanner::updateWithIdHack(
+                        opCtx, coll, updateStageParams, idIndexDesc, queryFilter, policy);
                 }
             }
         }

@@ -80,4 +80,18 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
  */
 boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
                                                        const QueryPlannerParams& plannerParams);
+
+inline BSONObj getQueryFilterMaybeUnwrapEq(const BSONObj& query) {
+    // We allow queries of the shape {_id: {$eq: <value>}} to use the express path, but we
+    // want to pass in BSON of the shape {_id: <value>} to the executor for consistency and
+    // because a later code path may rely on this shape. Note that we don't have to use
+    // 'isExactMatchOnId' here since we know we haven't reached this code via the eligibilty
+    // check on the CanonicalQuery's MatchExpression (since there was no CanonicalQuery created
+    // for this path). Therefore, we know the incoming query is either exactly of the shape
+    // {_id: <value>} or {_id: {$eq: <value>}}.
+    if (const auto idValue = query["_id"]; idValue.isABSONObj() && idValue.Obj().hasField("$eq")) {
+        return idValue.Obj()["$eq"].wrap("_id");
+    }
+    return query;
+}
 }  // namespace mongo

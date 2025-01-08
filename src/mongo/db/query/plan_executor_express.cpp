@@ -684,20 +684,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
     using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
                                   express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
     auto iterator = [&]() -> Iterator {
-        // We allow queries of the shape {_id: {$eq: <value>}} to use the express path, but we
-        // want to pass in BSON of the shape {_id: <value>} to the executor for consistency and
-        // because a later code path may rely on this shape. Note that we don't have to use
-        // 'isExactMatchOnId' here since we know we haven't reached this code via the eligibilty
-        // check on the CanonicalQuery's MatchExpression (since there was no CanonicalQuery created
-        // for this path). Therefore, we know the incoming query is either exactly of the shape
-        // {_id: <value>} or {_id: {$eq: <value>}}.
-        BSONObj queryFilter;
-        if (request->getQuery()["_id"].isABSONObj() &&
-            request->getQuery()["_id"].Obj().hasField("$eq")) {
-            queryFilter = request->getQuery()["_id"].Obj()["$eq"].wrap("_id");
-        } else {
-            queryFilter = request->getQuery();
-        }
+        BSONObj queryFilter = getQueryFilterMaybeUnwrapEq(request->getQuery());
 
         tassert(9248801,
                 str::stream()
@@ -757,21 +744,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
     using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
                                   express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
     auto iterator = [&]() -> Iterator {
-        // We allow queries of the shape {_id: {$eq: <value>}} to use the express path, but we
-        // want to pass in BSON of the shape {_id: <value>} to the executor for consistency and
-        // because a later code path may rely on this shape. Note that we don't have to use
-        // 'isExactMatchOnId' here since we know we haven't reached this code via the eligibilty
-        // check on the CanonicalQuery's MatchExpression (since there was no CanonicalQuery created
-        // for this path). Therefore, we know the incoming query is either exactly of the shape
-        // {_id: <value>} or {_id: {$eq: <value>}}.
-        BSONObj queryFilter;
-        if (request->getQuery()["_id"].isABSONObj() &&
-            request->getQuery()["_id"].Obj().hasField("$eq")) {
-            queryFilter = request->getQuery()["_id"].Obj()["$eq"].wrap("_id");
-        } else {
-            queryFilter = request->getQuery();
-        }
-
+        BSONObj queryFilter = getQueryFilterMaybeUnwrapEq(request->getQuery());
         tassert(9248804,
                 str::stream()
                     << "Expected the input to be of the shape {_id: <value>}, but the input is "
