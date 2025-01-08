@@ -49,7 +49,7 @@ bazelrc_xcode_lines=()
 if [[ -z "${BAZELISK_SKIP_WRAPPER}" ]]; then
     echo "You're not using Bazelisk, which is recommended for a consistent build environment." >&2
     echo "Your version of Bazel may be mismatched with the version intended to be used to build MongoDB." >&2
-    echo "Please run the following command to install Bazelisk:" >&2
+    echo "Please run the following command to install Bazelisk and make sure to add ~/.local/bin to your PATH:" >&2
     echo "" >&2
     echo "python buildscripts/install_bazel.py" >&2
     exit 0
