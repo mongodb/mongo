@@ -346,7 +346,7 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
     if (globalMongotParams.useGRPC) {
         uassert(9715900,
                 "Egress GRPC for search is not enabled",
-                feature_flags::gEgressGrpcForSearch.isEnabled(
+                feature_flags::gEgressGrpcForSearch.isEnabledUseLatestFCVWhenUninitialized(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         useEgressGRPC = true;
     }
