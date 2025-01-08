@@ -1509,6 +1509,46 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "any_sanitizer_clang",
+    match_all = [
+        ":any_enabled_sanitizer",
+        ":compiler_type_clang",
+    ],
+)
+
+config_setting(
+    name = "asan_enabled_clang",
+    flag_values = {
+        "//bazel/config:asan": "True",
+        "//bazel/config:compiler_type": "clang",
+    },
+)
+
+config_setting(
+    name = "msan_enabled_clang",
+    flag_values = {
+        "//bazel/config:msan": "True",
+        "//bazel/config:compiler_type": "clang",
+    },
+)
+
+config_setting(
+    name = "ubsan_enabled_clang",
+    flag_values = {
+        "//bazel/config:ubsan": "True",
+        "//bazel/config:compiler_type": "clang",
+    },
+)
+
+config_setting(
+    name = "tsan_enabled_clang",
+    flag_values = {
+        "//bazel/config:tsan": "True",
+        "//bazel/config:compiler_type": "clang",
+    },
+)
+
+selects.config_setting_group(
     name = "sanitize_address_required_settings",
     match_all = [
         ":asan_enabled",

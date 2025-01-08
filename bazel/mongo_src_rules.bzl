@@ -1005,6 +1005,109 @@ SANITIZER_DENYLIST_HEADERS = select({
     "//conditions:default": [],
 })
 
+ASAN_OPTIONS = [
+    "detect_leaks=1",
+    "check_initialization_order=true",
+    "strict_init_order=true",
+    "abort_on_error=1",
+    "disable_coredump=0",
+    "handle_abort=1",
+    "strict_string_checks=true",
+    "detect_invalid_pointer_pairs=1",
+]
+
+LSAN_OPTIONS = [
+    "report_objects=1",
+    "suppressions=$(location //etc:lsan.suppressions)",
+]
+
+MSAN_OPTIONS = []
+
+UBSAN_OPTIONS = [
+    "print_stacktrace=1",
+]
+
+TSAN_OPTIONS = [
+    "abort_on_error=1",
+    "disable_coredump=0",
+    "handle_abort=1",
+    "halt_on_error=1",
+    "report_thread_leaks=0",
+    "die_after_fork=0",
+    "history_size=4",
+    "suppressions=$(location //etc:tsan.suppressions)",
+]
+
+LLVM_SYMBOLIZER_OPTION = [
+    "external_symbolizer_path=$(location //:llvm_symbolizer)",
+]
+
+ASAN_ENV = select({
+    "//bazel/config:asan_enabled": {
+        "ASAN_OPTIONS": ":".join(ASAN_OPTIONS),
+        "LSAN_OPTIONS": ":".join(LSAN_OPTIONS),
+    },
+    "//bazel/config:asan_enabled_clang": {
+        "ASAN_OPTIONS": ":".join(ASAN_OPTIONS + LLVM_SYMBOLIZER_OPTION),
+        "LSAN_OPTIONS": ":".join(LSAN_OPTIONS + LLVM_SYMBOLIZER_OPTION),
+    },
+    "//conditions:default": {},
+})
+
+MSAN_ENV = select({
+    "//bazel/config:msan_enabled": {
+        "MSAN_OPTIONS": ":".join(MSAN_OPTIONS),
+    },
+    "//bazel/config:msan_enabled_clang": {
+        "MSAN_OPTIONS": ":".join(MSAN_OPTIONS + LLVM_SYMBOLIZER_OPTION),
+    },
+    "//conditions:default": {},
+})
+
+TSAN_ENV = select({
+    "//bazel/config:tsan_enabled": {
+        "TSAN_OPTIONS": ":".join(TSAN_OPTIONS),
+    },
+    "//bazel/config:tsan_enabled_clang": {
+        "TSAN_OPTIONS": ":".join(TSAN_OPTIONS + LLVM_SYMBOLIZER_OPTION),
+    },
+    "//conditions:default": {},
+})
+
+UBSAN_ENV = select({
+    "//bazel/config:ubsan_enabled": {
+        "UBSAN_OPTIONS": ":".join(UBSAN_OPTIONS),
+    },
+    "//bazel/config:ubsan_enabled_clang": {
+        "UBSAN_OPTIONS": ":".join(UBSAN_OPTIONS + LLVM_SYMBOLIZER_OPTION),
+    },
+    "//conditions:default": {},
+})
+
+ASAN_DATA = select({
+    "//bazel/config:asan_enabled": [
+        "//etc:lsan.suppressions",
+    ],
+    "//conditions:default": [],
+})
+
+TSAN_DATA = select({
+    "//bazel/config:tsan_enabled": [
+        "//etc:tsan.suppressions",
+    ],
+    "//conditions:default": [],
+})
+
+ANY_SAN_DATA = select({
+    "//bazel/config:any_sanitizer_clang": [
+        "//:llvm_symbolizer",
+    ],
+    "//conditions:default": [],
+})
+
+SANITIZER_ENV = ASAN_ENV | MSAN_ENV | TSAN_ENV | UBSAN_ENV
+SANITIZER_DATA = ASAN_DATA + TSAN_DATA + ANY_SAN_DATA
+
 LINKSTATIC_ENABLED = select({
     "//bazel/config:linkdynamic_required_settings": False,
     "//bazel/config:linkstatic_enabled": True,
@@ -1874,7 +1977,7 @@ write_sources = rule(
     },
 )
 
-def _mongo_cc_binary_and_program(
+def _mongo_cc_binary_and_test(
         name,
         srcs = [],
         deps = [],
@@ -1894,6 +1997,7 @@ def _mongo_cc_binary_and_program(
         features = [],
         exec_properties = {},
         skip_global_deps = [],
+        env = {},
         _program_type = "",
         skip_windows_crt_flags = False,
         **kwargs):
@@ -2005,7 +2109,7 @@ def _mongo_cc_binary_and_program(
         "visibility": visibility,
         "testonly": testonly,
         "copts": MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
-        "data": data,
+        "data": data + SANITIZER_DATA,
         "tags": tags,
         "linkopts": MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts + rpath_flags,
         "linkstatic": LINKSTATIC_ENABLED,
@@ -2026,6 +2130,7 @@ def _mongo_cc_binary_and_program(
         }),
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         "exec_properties": exec_properties,
+        "env": env | SANITIZER_ENV,
     } | kwargs
 
     create_link_deps(
@@ -2091,6 +2196,7 @@ def mongo_cc_binary(
         features = [],
         exec_properties = {},
         skip_global_deps = [],
+        env = {},
         **kwargs):
     """Wrapper around cc_binary.
 
@@ -2120,8 +2226,10 @@ def mongo_cc_binary(
         to the linker, for example, linker scripts.
       skip_global_deps: Globally injected dependencies to skip adding as a
         dependency (options: "libunwind", "allocator").
+      env: environment variables to pass to the binary when running through
+        bazel.
     """
-    _mongo_cc_binary_and_program(
+    _mongo_cc_binary_and_test(
         name,
         srcs,
         deps,
@@ -2141,6 +2249,7 @@ def mongo_cc_binary(
         features,
         exec_properties,
         skip_global_deps,
+        env,
         _program_type = "binary",
         **kwargs
     )
@@ -2163,6 +2272,8 @@ def mongo_cc_test(
         additional_linker_inputs = [],
         features = [],
         exec_properties = {},
+        skip_global_deps = [],
+        env = {},
         **kwargs):
     """Wrapper around cc_test.
 
@@ -2189,8 +2300,12 @@ def mongo_cc_test(
         depend on this.
       additional_linker_inputs: Any additional files that you may want to pass
         to the linker, for example, linker scripts.
+      skip_global_deps: Globally injected dependencies to skip adding as a
+        dependency (options: "libunwind", "allocator").
+      env: environment variables to pass to the binary when running through
+        bazel.
     """
-    _mongo_cc_binary_and_program(
+    _mongo_cc_binary_and_test(
         name,
         srcs,
         deps,
@@ -2209,6 +2324,8 @@ def mongo_cc_test(
         additional_linker_inputs,
         features,
         exec_properties,
+        skip_global_deps,
+        env,
         _program_type = "test",
         **kwargs
     )

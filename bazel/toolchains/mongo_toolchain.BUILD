@@ -154,3 +154,10 @@ filegroup(
         "{version}/bin/clang-tidy",
     ],
 )
+
+filegroup(
+    name = "llvm_symbolizer",
+    srcs = [
+        "{version}/bin/llvm-symbolizer",
+    ],
+)

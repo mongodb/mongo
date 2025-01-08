@@ -332,6 +332,14 @@ def linux_extraction(ctx, cc_toolchain, inputs):
         create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin, ctx.attr.cc_shared_library),
     ]
 
+    if ctx.attr.type == "program":
+        provided_info += [
+            RunEnvironmentInfo(
+                environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].environment,
+                inherited_environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].inherited_environment,
+            ),
+        ]
+
     if ctx.attr.cc_shared_library != None:
         provided_info.append(
             create_new_cc_shared_library_info(ctx, cc_toolchain, output_bin, ctx.attr.cc_shared_library[CcSharedLibraryInfo], static_lib),
@@ -406,6 +414,14 @@ def macos_extraction(ctx, cc_toolchain, inputs):
         ),
         create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin, ctx.attr.cc_shared_library),
     ]
+
+    if ctx.attr.type == "program":
+        provided_info += [
+            RunEnvironmentInfo(
+                environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].environment,
+                inherited_environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].inherited_environment,
+            ),
+        ]
 
     if ctx.attr.cc_shared_library != None:
         provided_info.append(
@@ -491,6 +507,14 @@ def windows_extraction(ctx, cc_toolchain, inputs):
         ),
         create_new_ccinfo_library(ctx, cc_toolchain, output_dynamic_library, output_library, ctx.attr.cc_shared_library),
     ]
+
+    if ctx.attr.type == "program":
+        provided_info += [
+            RunEnvironmentInfo(
+                environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].environment,
+                inherited_environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].inherited_environment,
+            ),
+        ]
 
     if ctx.attr.cc_shared_library != None:
         provided_info.append(

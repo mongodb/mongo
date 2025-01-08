@@ -5,6 +5,7 @@ Sets up install and archive rules.
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:providers.bzl", "PackageFilesInfo")
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("//bazel:mongo_src_rules.bzl", "SANITIZER_DATA", "SANITIZER_ENV")
 
 MongoInstallInfo = provider(
     doc = "A install rule provider to pass around deps files",
@@ -376,6 +377,8 @@ def mongo_unittest_install(
             exec_properties = {
                 "no-remote": "1",
             },
+            env = SANITIZER_ENV,
+            data = SANITIZER_DATA,
         )
     else:
         native.sh_test(
@@ -385,4 +388,6 @@ def mongo_unittest_install(
             exec_properties = {
                 "no-remote": "1",
             },
+            env = SANITIZER_ENV,
+            data = SANITIZER_DATA,
         )
