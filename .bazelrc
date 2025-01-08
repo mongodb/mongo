@@ -28,6 +28,15 @@ common --experimental_cc_shared_library
 # Reuse sandboxes to save sandbox execution and deletion times.
 common --experimental_reuse_sandbox_directories
 
+# Disabled until we do the work to move over to bzlmod
+common --enable_bzlmod=false
+
+# Enable Build without the Bytes
+common --remote_download_outputs=toplevel
+
+# Files we always want to download for debugging and error checking
+common --remote_download_regex=.*\.(dwo|h|cpp)$
+
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
@@ -119,7 +128,6 @@ common --flag_alias=dbg_level=//bazel/config:dbg_level
 # To avoid the bazel warning about passing multiple configs
 common -c fastbuild
 common --fission=yes
-common --remote_download_regex=.*\.dwo$
 common --//bazel/config:opt=off
 common --//bazel/config:dbg=True
 common --//bazel/config:dbg_level=1
@@ -144,7 +152,6 @@ common:windows --jobs=auto
 --config=fastbuild
 common:fastbuild -c fastbuild
 common:fastbuild --fission=yes
-common:fastbuild --remote_download_regex=.*\.dwo$
 common:fastbuild --//bazel/config:opt=off
 common:fastbuild --//bazel/config:dbg=True
 common:fastbuild --//bazel/config:dbg_level=1
@@ -166,7 +173,6 @@ common:fastbuild --enable_platform_specific_config=true
 --config=dbg
 common:dbg -c dbg
 common:dbg --fission=yes
-common:dbg --remote_download_regex=.*\.dwo$
 common:dbg --//bazel/config:opt=off
 common:dbg --//bazel/config:dbg=True
 common:dbg --//bazel/config:dbg_level=2
@@ -210,7 +216,6 @@ common:dbg_tsan --enable_platform_specific_config=true
 --config=opt
 common:opt -c opt
 common:opt --fission=yes
-common:opt --remote_download_regex=.*\.dwo$
 common:opt --//bazel/config:opt=on
 common:opt --//bazel/config:dbg=False
 common:opt --//bazel/config:dbg_level=2
@@ -364,11 +369,6 @@ common:fission --remote_download_regex=.*\.dwo$
 
 # Avoid failing builds when BES metadata fails to upload.
 common --bes_upload_mode=fully_async
-
-# Enable Build without the Bytes
-common --remote_download_outputs=toplevel
-
-common --enable_bzlmod=false
 
 # Default Mongo Version if a version is not specified.
 common --define=MONGO_VERSION=8.1.0-alpha
