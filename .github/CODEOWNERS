@@ -2182,7 +2182,3 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/third_party/wiredtiger/OWNERS.yml
 /src/third_party/wiredtiger/**/*
-
-# The following patterns are added by the generator script as exemptions during the Bazel migration
-**/SConscript
-**/BUILD.bazel

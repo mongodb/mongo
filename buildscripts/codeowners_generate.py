@@ -219,13 +219,6 @@ def main():
     print(f"Scanning for OWNERS.yml files in {os.path.abspath(os.curdir)}")
     try:
         process_dir(output_lines, "./")
-
-        # TODO(SERVER-93711) remove exemptions after the Bazel migration is complete.
-        output_lines.append(
-            "# The following patterns are added by the generator script as exemptions during the Bazel migration"
-        )
-        add_owner_line(output_lines, "./", "**/SConscript", set())
-        add_owner_line(output_lines, "./", "**/BUILD.bazel", set())
     except Exception as ex:
         print("An exception was found while generating the CODEOWNERS file.", file=sys.stderr)
         print(
