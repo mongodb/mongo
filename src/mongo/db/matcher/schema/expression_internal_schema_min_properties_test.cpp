@@ -48,12 +48,26 @@ TEST(InternalSchemaMinPropertiesMatchExpression, RejectsObjectsWithTooFewElement
     ASSERT_FALSE(minProperties.matchesBSON(BSON("b" << 21)));
 }
 
+
 TEST(InternalSchemaMinPropertiesMatchExpression, AcceptsObjectWithAtLeastMinElements) {
     InternalSchemaMinPropertiesMatchExpression minProperties(2);
 
     ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << BSONNULL)));
     ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << 3)));
     ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << 3 << "d" << 43)));
+}
+
+TEST(InternalSchemaMinPropertiesMatchExpression, MatchesSingleElementTest) {
+    InternalSchemaMinPropertiesMatchExpression minProperties(2);
+
+    // Only BSON elements that are embedded objects can match.
+    BSONObj match = BSON("a" << BSON("a" << 5 << "b" << 10));
+    BSONObj notMatch1 = BSON("a" << 1);
+    BSONObj notMatch2 = BSON("a" << BSON("b" << 10));
+
+    ASSERT_TRUE(minProperties.matchesSingleElement(match.firstElement()));
+    ASSERT_FALSE(minProperties.matchesSingleElement(notMatch1.firstElement()));
+    ASSERT_FALSE(minProperties.matchesSingleElement(notMatch2.firstElement()));
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, MinPropertiesZeroAllowsEmptyObjects) {

@@ -101,5 +101,13 @@ DEATH_TEST_REGEX(InternalSchemaMinItemsMatchExpression,
     ASSERT_THROWS_CODE(minItems.getChild(0), AssertionException, 6400215);
 }
 
+TEST(InternalSchemaMinItemsMatchExpression, EquivalentTest) {
+    InternalSchemaMinItemsMatchExpression minItems1("a"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems2("a"_sd, 5);
+
+    auto clone = minItems1.clone();
+    ASSERT_TRUE(minItems1.equivalent(clone.get()));
+    ASSERT_FALSE(minItems1.equivalent(&minItems2));
+}
 }  // namespace
 }  // namespace mongo

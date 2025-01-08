@@ -123,6 +123,15 @@ TEST(InternalSchemaUniqueItemsMatchExpression, FindsFirstDuplicateValue) {
     ASSERT_FALSE(uniqueItems.findFirstDuplicateValue(fromjson("[]}")));
 }
 
+TEST(InternalSchemaUniqueItemsMatchExpression, EquivalentFunctionTest) {
+    InternalSchemaUniqueItemsMatchExpression uniqueItems1("foo"_sd);
+    InternalSchemaUniqueItemsMatchExpression uniqueItems2("bar"_sd);
+
+    auto uniqueItems3 = uniqueItems1.clone();
+    ASSERT_TRUE(uniqueItems1.equivalent(uniqueItems3.get()));
+    ASSERT_FALSE(uniqueItems1.equivalent(&uniqueItems2));
+}
+
 DEATH_TEST_REGEX(InternalSchemaUniqueItemsMatchExpression,
                  GetChildFailsIndexLargerThanZero,
                  "Tripwire assertion.*6400219") {

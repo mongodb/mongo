@@ -84,6 +84,24 @@ TEST(InternalSchemaXorOp, MatchesThreeClauses) {
     ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 11 << "b" << 0)));
 }
 
+TEST(InternalSchemaXorOp, MatchesSingleElement) {
+    BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: {$lt: 5 }}, {b: 10}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
+
+    ASSERT_OK(expr.getStatus());
+    BSONObj match1 = BSON("a" << 4);
+    BSONObj match2 = BSON("b" << 10);
+    BSONObj noMatch1 = BSON("a" << 8);
+    BSONObj noMatch2 = BSON("c"
+                            << "x");
+
+    ASSERT_TRUE(expr.getValue()->matchesSingleElement(match1.firstElement()));
+    ASSERT_TRUE(expr.getValue()->matchesSingleElement(match2.firstElement()));
+    ASSERT_FALSE(expr.getValue()->matchesSingleElement(noMatch1.firstElement()));
+    ASSERT_FALSE(expr.getValue()->matchesSingleElement(noMatch2.firstElement()));
+}
+
 TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
