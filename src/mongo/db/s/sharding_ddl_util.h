@@ -100,7 +100,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
     const std::vector<ShardId>& shardIds,
-    bool ignoreResponses = false) {
+    bool throwOnError = true) {
     if (shardIds.size() == 0) {
         return {};
     }
@@ -134,33 +134,51 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         (*indexToShardId)[i] = shardIds[i];
     }
 
-    auto responses =
-        async_rpc::getAllResponsesOrFirstErrorWithCancellation<
-            AsyncRequestsSender::Response,
-            async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
-            std::move(futures),
-            cancelSource,
-            [indexToShardId](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
-                             size_t index) -> AsyncRequestsSender::Response {
-                BSONObjBuilder replyBob;
-                reply.response.serialize(&replyBob);
-                reply.genericReplyFields.serialize(&replyBob);
-                return AsyncRequestsSender::Response{
-                    (*indexToShardId)[index],
-                    executor::RemoteCommandResponse(
-                        reply.targetUsed, replyBob.obj(), reply.elapsed)};
-            })
-            .getNoThrow();
+    auto formatResponse = [](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply) {
+        BSONObjBuilder replyBob;
+        reply.response.serialize(&replyBob);
+        reply.genericReplyFields.serialize(&replyBob);
+        return executor::RemoteCommandResponse(reply.targetUsed, replyBob.obj(), reply.elapsed);
+    };
 
-    if (ignoreResponses) {
-        return {};
+    if (throwOnError) {
+        auto responses = async_rpc::getAllResponsesOrFirstErrorWithCancellation<
+                             AsyncRequestsSender::Response,
+                             async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
+                             std::move(futures),
+                             cancelSource,
+                             [indexToShardId, formatResponse](
+                                 async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
+                                 size_t index) -> AsyncRequestsSender::Response {
+                                 return AsyncRequestsSender::Response{(*indexToShardId)[index],
+                                                                      formatResponse(reply)};
+                             })
+                             .getNoThrow();
+
+        if (auto status = responses.getStatus(); status != Status::OK()) {
+            uassertStatusOK(async_rpc::unpackRPCStatus(status));
+        }
+
+        return responses.getValue();
+    } else {
+        return async_rpc::getAllResponses<AsyncRequestsSender::Response,
+                                          async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
+                   std::move(futures),
+                   [indexToShardId, formatResponse](
+                       StatusWith<async_rpc::AsyncRPCResponse<typename CommandType::Reply>> swReply,
+                       size_t index) -> AsyncRequestsSender::Response {
+                       auto response = [&]() -> StatusWith<executor::RemoteCommandResponse> {
+                           if (!swReply.isOK()) {
+                               return async_rpc::unpackRPCStatus(swReply.getStatus());
+                           } else {
+                               return formatResponse(swReply.getValue());
+                           }
+                       }();
+
+                       return AsyncRequestsSender::Response{(*indexToShardId)[index], response};
+                   })
+            .get();
     }
-
-    if (auto status = responses.getStatus(); status != Status::OK()) {
-        uassertStatusOK(async_rpc::unpackRPCStatus(status));
-    }
-
-    return responses.getValue();
 }
 
 /**

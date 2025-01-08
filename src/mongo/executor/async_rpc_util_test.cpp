@@ -65,26 +65,107 @@ namespace mongo {
 namespace async_rpc {
 namespace {
 
+class AsyncRPCUtilTest : public AsyncRPCTestFixture {
+public:
+    NamespaceString kNss{NamespaceString::createNamespaceString_forTest(
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdb"))};
+
+    /**
+     * Sends `totalTargets` find commands and schedules success responses for those commands.
+     * Returns the futures from scheduling the commands.
+     */
+    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>>
+    setupSuccessTest(OperationContext* opCtx,
+                     const size_t totalTargets,
+                     CancellationSource source) {
+        FindCommandRequest findCmd(kNss);
+
+        std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>> futures;
+        for (size_t i = 0; i < totalTargets; ++i) {
+            std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+            auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+                getExecutorPtr(), source.token(), findCmd);
+            futures.push_back(
+                async_rpc::sendCommand<FindCommandRequest>(options, opCtx, std::move(targeter)));
+        }
+
+        NetworkTestEnv::OnCommandFunction returnSuccess = [&](const auto& request) {
+            return CursorResponse(kNss, 0LL, {BSON("x" << 1)})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        };
+        onCommands(std::vector(totalTargets, returnSuccess));
+
+        return futures;
+    }
+
+    /**
+     * Creates one future with an error status and schedules one find command. Returns a vector of
+     * futures containing the ready one with an error status matching the passed in status and the
+     * pending one from the find request.
+     */
+    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>>
+    setupErrorTest(OperationContext* opCtx, CancellationSource source, const Status& errorStatus) {
+        FindCommandRequest findCmd(kNss);
+
+        std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>> futures;
+
+        // Make an immediately ready future filled with an error status.
+        futures.push_back(ExecutorFuture<AsyncRPCResponse<FindCommandRequest::Reply>>(
+            getExecutorPtr(), Status{AsyncRPCErrorInfo(errorStatus), "mock"}));
+
+        std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+        auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+            getExecutorPtr(), source.token(), findCmd);
+        futures.push_back(
+            async_rpc::sendCommand<FindCommandRequest>(options, opCtx, std::move(targeter)));
+
+        // runReadyNetworkOperations blocks until waitForWork is called, therefore ensuring
+        // sendCommand schedules the request.
+        auto network = getNetworkInterfaceMock();
+        network->enterNetwork();
+        network->exitNetwork();
+
+        return futures;
+    }
+
+    /**
+     * Creates an executor which is rejecting work due to shutdown. Schedules a find command with
+     * this excutor and returns the future from that find command.
+     */
+    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>>
+    setupExecutorShutdownTest(OperationContext* opCtx, CancellationSource source) {
+        // Set up a find command to schedule.
+        FindCommandRequest findCmd(kNss);
+
+        std::vector<ExecutorFuture<AsyncRPCResponse<FindCommandRequest::Reply>>> futures;
+
+        // Set up an executor that rejects work that is scheduled.
+        auto rejectingExecutor = std::make_shared<repl::TaskExecutorMock>(getExecutorPtr().get());
+        rejectingExecutor->shouldFailScheduleWorkRequest = []() {
+            return true;
+        };
+        rejectingExecutor->failureCode = ErrorCodes::ShutdownInProgress;
+
+        // Try and send a find command and store the result future.
+        std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+        auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+            rejectingExecutor, source.token(), findCmd);
+        futures.push_back(sendCommand(options, opCtx, std::move(targeter)));
+
+        return futures;
+    }
+};
+
 /**
  * Tests the getAllResponsesOrFirstErrorWithCancellation function returns the responses
  * of each sendCommand.
  */
-TEST_F(AsyncRPCTestFixture, GetAllResponsesUtil) {
+TEST_F(AsyncRPCUtilTest, GetAllResponsesOrFirstErrorUtil) {
     const size_t total_targets = 3;
     auto opCtxHolder = makeOperationContext();
-    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
-    FindCommandRequest findCmd(nss);
-
     CancellationSource source;
-    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>> futures;
-    for (size_t i = 0; i < total_targets; ++i) {
-        std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
-        auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-            getExecutorPtr(), source.token(), findCmd);
-        futures.push_back(async_rpc::sendCommand<FindCommandRequest>(
-            options, opCtxHolder.get(), std::move(targeter)));
-    }
+
+    auto futures = setupSuccessTest(opCtxHolder.get(), total_targets, source);
 
     auto responsesFut = async_rpc::getAllResponsesOrFirstErrorWithCancellation<
         size_t,
@@ -95,12 +176,6 @@ TEST_F(AsyncRPCTestFixture, GetAllResponsesUtil) {
             return index;
         });
 
-    NetworkTestEnv::OnCommandFunction returnSuccess = [&](const auto& request) {
-        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
-    };
-    onCommands(std::vector(total_targets, returnSuccess));
-
     auto responses = responsesFut.get();
     std::sort(responses.begin(), responses.end());
 
@@ -110,36 +185,81 @@ TEST_F(AsyncRPCTestFixture, GetAllResponsesUtil) {
 }
 
 /**
+ * Tests the getAllResponses function returns the responses of each sendCommand.
+ */
+TEST_F(AsyncRPCUtilTest, GetAllResponsesUtil) {
+    const size_t total_targets = 3;
+    auto opCtxHolder = makeOperationContext();
+    CancellationSource source;
+
+    auto futures = setupSuccessTest(opCtxHolder.get(), total_targets, source);
+
+    auto responsesFut =
+        async_rpc::getAllResponses<StatusWith<size_t>,
+                                   async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>(
+            std::move(futures),
+            [](StatusWith<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>> swReply,
+               size_t index) -> StatusWith<size_t> {
+                if (!swReply.isOK())
+                    return swReply.getStatus();
+                else
+                    return index;
+            });
+
+    auto responses = responsesFut.get();
+
+    size_t responseSum = 0;
+    size_t expectedSum = 0;
+    for (size_t i = 0; i < total_targets; ++i) {
+        ASSERT_OK(responses[i]);
+        responseSum += responses[i].getValue();
+        expectedSum += i;
+    }
+    ASSERT_EQ(responseSum, expectedSum);
+}
+
+/**
+ * Test that when the user supplied lambda throws an exception, the top level future returned will
+ * contain that error.
+ */
+TEST_F(AsyncRPCUtilTest, GetAllResponsesUtilExceptionCancelsPendingRequests) {
+    const size_t total_targets = 3;
+    auto opCtxHolder = makeOperationContext();
+    CancellationSource source;
+
+    auto futures = setupSuccessTest(opCtxHolder.get(), total_targets, source);
+
+    auto responsesFut =
+        async_rpc::getAllResponses<StatusWith<size_t>,
+                                   async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>(
+            std::move(futures),
+            [](StatusWith<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>> swReply,
+               size_t index) -> StatusWith<size_t> {
+                uassert(
+                    ErrorCodes::InvalidOptions, "Dummy error thrown on client side", index != 0);
+                if (!swReply.isOK())
+                    return swReply.getStatus();
+                else
+                    return index;
+            });
+
+    auto response = responsesFut.getNoThrow();
+
+    ASSERT_NOT_OK(response);
+    ASSERT_EQ(response.getStatus().code(), ErrorCodes::InvalidOptions);
+}
+
+/**
  * Tests that when the getAllResponsesOrFirstErrorWithCancellation function cancels early due
  * to an error, the rest of the sendCommand functions are able to run to completion.
  */
-TEST_F(AsyncRPCTestFixture, GetAllResponsesUtilCancellationFinishesResolvingPendingFutures) {
+TEST_F(AsyncRPCUtilTest,
+       GetAllResponsesOrFirstErrorUtilCancellationFinishesResolvingPendingFutures) {
     auto opCtxHolder = makeOperationContext();
-    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
-    FindCommandRequest findCmd(nss);
-
+    CancellationSource source;
     const auto timeoutStatus = Status(ErrorCodes::NetworkTimeout, "dummy status");
 
-    CancellationSource source;
-    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>> futures;
-
-    // Make an immediately ready future filled with an error status, intended to cancel other
-    // futures.
-    futures.push_back(ExecutorFuture<AsyncRPCResponse<FindCommandRequest::Reply>>(
-        getExecutorPtr(), Status{AsyncRPCErrorInfo(timeoutStatus), "mock"}));
-
-    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
-    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        getExecutorPtr(), source.token(), findCmd);
-    futures.push_back(async_rpc::sendCommand<FindCommandRequest>(
-        options, opCtxHolder.get(), std::move(targeter)));
-
-    // runReadyNetworkOperations blocks until waitForWork is called, therefore ensuring
-    // sendCommand schedules the request.
-    auto network = getNetworkInterfaceMock();
-    network->enterNetwork();
-    network->exitNetwork();
+    auto futures = setupErrorTest(opCtxHolder.get(), source, timeoutStatus);
 
     // A ready future with an error status already exists, so the util function will
     // be able to cancel the token before the network steps below.
@@ -151,6 +271,7 @@ TEST_F(AsyncRPCTestFixture, GetAllResponsesUtilCancellationFinishesResolvingPend
         [](async_rpc::AsyncRPCResponse<FindCommandRequest::Reply> reply, size_t index)
             -> async_rpc::AsyncRPCResponse<FindCommandRequest::Reply> { return reply; });
 
+    auto network = getNetworkInterfaceMock();
     network->enterNetwork();
     ASSERT_TRUE(source.token().isCanceled());
 
@@ -175,39 +296,86 @@ TEST_F(AsyncRPCTestFixture, GetAllResponsesUtilCancellationFinishesResolvingPend
 }
 
 /**
+ * Tests that when the getAllResponses function finds an error, it completes all
+ * the other tasks and then returns all of their results.
+ */
+TEST_F(AsyncRPCUtilTest, GetAllResponsesUtilErrorsDoNotAffectOtherCommands) {
+    auto opCtxHolder = makeOperationContext();
+    CancellationSource source;
+    const auto timeoutStatus = Status(ErrorCodes::NetworkTimeout, "dummy status");
+
+    auto futures = setupErrorTest(opCtxHolder.get(), source, timeoutStatus);
+
+    auto responsesFut =
+        async_rpc::getAllResponses<StatusWith<size_t>,
+                                   async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>(
+            std::move(futures),
+            [](StatusWith<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>> swReply,
+               size_t index) -> StatusWith<size_t> {
+                if (!swReply.isOK())
+                    return swReply.getStatus();
+                else
+                    return index;
+            });
+
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    ASSERT_FALSE(source.token().isCanceled());
+
+    // Make sure that responseFut is not ready because there is still a future that has not
+    // finished.
+    ASSERT_FALSE(responsesFut.isReady());
+
+    // Process the failure, which should not affect anything.
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
+
+    auto counters = network->getCounters();
+    ASSERT_EQ(counters.canceled, 0);
+
+    // Issue a success response for the other response.
+    NetworkTestEnv::OnCommandFunction returnSuccess = [&](const auto& request) {
+        return CursorResponse(kNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    };
+    onCommands({returnSuccess});
+
+    auto responses = responsesFut.get();
+    ASSERT_EQ(responses.size(), 2);
+
+    auto checkErrorResponse = [&](const StatusWith<size_t> response) {
+        ASSERT_NOT_OK(response);
+        auto error = response.getStatus();
+        ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+        auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+        ASSERT(extraInfo);
+        ASSERT(extraInfo->isLocal());
+        ASSERT_EQ(extraInfo->asLocal(), timeoutStatus);
+    };
+
+    if (responses[0].isOK()) {
+        checkErrorResponse(responses[1]);
+    } else {
+        ASSERT_OK(responses[1]);
+        checkErrorResponse(responses[0]);
+    }
+}
+
+/**
  * Test that responses from getAllResponsesOrFirstErrorWithCancellation are still processed, and
  * the appropriate cancellation actions are still taken, if the executor rejects the work of
  * processing the response. */
-TEST_F(AsyncRPCTestFixture, ExecutorShutdownErrorProcessed) {
+TEST_F(AsyncRPCUtilTest, GetAllResponsesOrFirstErrorUtilExecutorShutdownErrorProcessed) {
     auto opCtxHolder = makeOperationContext();
-    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
-
-    // Set up a find command to schedule.
-    FindCommandRequest findCmd(nss);
-
-    using Reply = AsyncRPCResponse<FindCommandRequest::Reply>;
     CancellationSource source;
-    std::vector<ExecutorFuture<Reply>> responseFutureContainer;
+    using Reply = AsyncRPCResponse<FindCommandRequest::Reply>;
 
-    // Set up an executor that rejects work that is scheduled.
-    auto rejectingExecutor = std::make_shared<repl::TaskExecutorMock>(getExecutorPtr().get());
-    rejectingExecutor->shouldFailScheduleWorkRequest = []() {
-        return true;
-    };
-    rejectingExecutor->failureCode = ErrorCodes::ShutdownInProgress;
+    auto futures = setupExecutorShutdownTest(opCtxHolder.get(), source);
 
-    // Try and send a find command and store the result future.
-    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
-    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        rejectingExecutor, source.token(), findCmd);
-    responseFutureContainer.push_back(sendCommand(options, opCtxHolder.get(), std::move(targeter)));
-
-    auto response = getAllResponsesOrFirstErrorWithCancellation<size_t, Reply>(
-                        std::move(responseFutureContainer),
-                        source,
-                        [](Reply reply, size_t index) -> size_t { return index; })
-                        .getNoThrow();
+    auto response =
+        getAllResponsesOrFirstErrorWithCancellation<size_t, Reply>(
+            std::move(futures), source, [](Reply reply, size_t index) -> size_t { return index; })
+            .getNoThrow();
 
     // We expect to the promise to get resolved even if the executor is rejecteding work.
     auto error = response.getStatus();
@@ -220,6 +388,37 @@ TEST_F(AsyncRPCTestFixture, ExecutorShutdownErrorProcessed) {
     ASSERT(source.token().isCanceled());
 }
 
+/**
+ * Test that responses from getAllResponses are still processed, if the executor rejects the work of
+ * processing the response.
+ */
+TEST_F(AsyncRPCUtilTest, GetAllResponsesUtilExecutorShutdownErrorProcessed) {
+    auto opCtxHolder = makeOperationContext();
+    CancellationSource source;
+
+    auto futures = setupExecutorShutdownTest(opCtxHolder.get(), source);
+
+    auto responses =
+        getAllResponses<StatusWith<size_t>, AsyncRPCResponse<FindCommandRequest::Reply>>(
+            std::move(futures),
+            [](StatusWith<AsyncRPCResponse<FindCommandRequest::Reply>> swReply,
+               size_t index) -> StatusWith<size_t> {
+                if (!swReply.isOK())
+                    return swReply.getStatus();
+                else
+                    return index;
+            })
+            .get();
+
+    // We expect to the promise to get resolved even if the executor is rejecteding work.
+    ASSERT_EQ(responses.size(), 1);
+    ASSERT_NOT_OK(responses[0]);
+    auto error = responses[0].getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal().code(), ErrorCodes::ShutdownInProgress);
+}
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo

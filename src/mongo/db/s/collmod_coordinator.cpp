@@ -104,12 +104,11 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShar
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
     const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
-    bool ignoreResponses,
+    bool throwOnError = true,
     WriteConcernOptions wc = WriteConcernOptions()) {
     generic_argument_util::setMajorityWriteConcern(opts->cmd.getGenericArguments(), &wc);
     generic_argument_util::setOperationSessionInfo(opts->cmd.getGenericArguments(), osi);
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, shardIds, ignoreResponses);
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds, throwOnError);
 }
 
 // Extract the first response from the list of shardResponses, and propagate to the global level of
@@ -232,11 +231,8 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPri
         **executor, token, request);
 
     try {
-        return sendAuthenticatedCommandWithOsiToShards(opCtx,
-                                                       opts,
-                                                       {_shardingInfo->primaryShard},
-                                                       getNewSession(opCtx),
-                                                       false /* ignoreResponses */);
+        return sendAuthenticatedCommandWithOsiToShards(
+            opCtx, opts, {_shardingInfo->primaryShard}, getNewSession(opCtx));
     } catch (const DBException& ex) {
         // For a db primary shard not owning chunks only throw retriable errors for the coordinator.
         if (_shardingInfo->isPrimaryOwningChunks ||
@@ -258,24 +254,21 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPar
 
     // The collMod command targets all shards, regardless of whether they have chunks. The shards
     // that have no chunks for the collection will not be included in the responses.
-
-    for (auto&& shard : _shardingInfo->participantsNotOwningChunks) {
-        try {
-            sendAuthenticatedCommandWithOsiToShards(
-                opCtx, opts, {shard}, getNewSession(opCtx), false /* ignoreResponses */);
-        } catch (const DBException& ex) {
-            // For shards not owning chunks only throw retriable errors for the coordinator.
-            if (_isRetriableErrorForDDLCoordinator(ex.toStatus())) {
-                throw;
-            }
+    auto responses =
+        sendAuthenticatedCommandWithOsiToShards(opCtx,
+                                                opts,
+                                                _shardingInfo->participantsNotOwningChunks,
+                                                getNewSession(opCtx),
+                                                false /* throwOnError */);
+    for (const auto& response : responses) {
+        auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+        if (!status.isOK() && _isRetriableErrorForDDLCoordinator(status)) {
+            uassertStatusOK(status);
         }
     }
 
-    return sendAuthenticatedCommandWithOsiToShards(opCtx,
-                                                   opts,
-                                                   _shardingInfo->participantsOwningChunks,
-                                                   getNewSession(opCtx),
-                                                   false /* ignoreResponses */);
+    return sendAuthenticatedCommandWithOsiToShards(
+        opCtx, opts, _shardingInfo->participantsOwningChunks, getNewSession(opCtx));
 }
 
 ExecutorFuture<void> CollModCoordinator::_runImpl(
@@ -355,7 +348,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         shards.push_back(_shardingInfo->primaryShard);
                     }
                     sendAuthenticatedCommandWithOsiToShards(
-                        opCtx, opts, shards, getNewSession(opCtx), false /* ignoreResponses */);
+                        opCtx, opts, shards, getNewSession(opCtx));
                 }
             }))
         .then(_buildPhaseHandler(
