@@ -362,6 +362,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "add_shard_coordinator_document_gen",
+    src = "add_shard_coordinator_document.idl",
+    deps = [
+        ":sharding_ddl_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "reshard_collection_coordinator_document_gen",
     src = "reshard_collection_coordinator_document.idl",
     deps = [
@@ -1090,6 +1099,8 @@ mongo_cc_library(
 mongo_cc_library(
     name = "sharding_commands_d",
     srcs = [
+        "add_shard_coordinator.cpp",
+        "add_shard_coordinator_document_gen",
         "analyze_shard_key_cmd.cpp",
         "analyze_shard_key_cmd_util.cpp",
         "auto_split_vector_command.cpp",
@@ -1264,6 +1275,7 @@ mongo_cc_library(
         "//src/mongo/db/s/query_cmd:cluster_write_cmd_d.cpp",
     ],
     hdrs = [
+        "add_shard_coordinator.h",
         "analyze_shard_key_cmd_util.h",
         "cleanup_structured_encryption_data_coordinator.h",
         "collmod_coordinator.h",

@@ -61,6 +61,7 @@ enums:
             kUntrackUnsplittableCollection: "untrackUnsplittableCollection"
             kCreateDatabase: "createDatabase"
             kRemoveShardCommit: "removeShardCommit"
+            kAddShard: "addShard"
 
 types:
     ForwardableOperationMetadata:
