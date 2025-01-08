@@ -48,13 +48,6 @@ std::pair<boost::optional<Milliseconds>, bool> getRequestOrDefaultMaxTimeMS(
         return {boost::none, false};
     }
 
-    // If the feature flag is disabled, return early.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (!fcvSnapshot.isVersionInitialized() ||
-        !gFeatureFlagDefaultReadMaxTimeMS.isEnabled(fcvSnapshot)) {
-        return {boost::none, false};
-    }
-
     const boost::optional<auth::ValidatedTenancyScope>& vts =
         auth::ValidatedTenancyScope::get(opCtx);
     auto tenantId = vts && vts->hasTenantId() ? boost::make_optional(vts->tenantId()) : boost::none;

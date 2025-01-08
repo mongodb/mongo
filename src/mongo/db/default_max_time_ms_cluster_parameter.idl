@@ -57,6 +57,4 @@ server_parameters:
     omit_in_ftdc: false
     cpp_vartype: DefaultMaxTimeMSParam
     cpp_varname: defaultMaxTimeMS
-    condition:
-      feature_flag: gFeatureFlagDefaultReadMaxTimeMS
     redact: false
