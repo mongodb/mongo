@@ -34,7 +34,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/request_types/add_shard_to_zone_request_type.h"
+#include "mongo/bson/json.h"
+#include "mongo/s/request_types/add_shard_to_zone_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -43,126 +44,114 @@ namespace mongo {
 
 namespace {
 
-TEST(AddShardToZoneRequest, BasicValidMongosCommand) {
-    auto requestStatus = AddShardToZoneRequest::parseFromMongosCommand(BSON("addShardToZone"
-                                                                            << "a"
-                                                                            << "zone"
-                                                                            << "z"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-    ASSERT_EQ("a", request.getShardName());
-    ASSERT_EQ("z", request.getZoneName());
+TEST(AddShardToZone, BasicValidMongosCommand) {
+    auto cmdObj = fromjson(R"BSON({
+        addShardToZone: "a",
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("AddShardToZone");
+    auto parsedRequest = AddShardToZone::parse(ctx, cmdObj);
+    ASSERT_EQ("a", parsedRequest.getCommandParameter());
+    ASSERT_EQ("z", parsedRequest.getZone());
 }
 
-TEST(AddShardToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommand) {
-    auto requestStatus = AddShardToZoneRequest::parseFromMongosCommand(BSON("addShardToZone"
-                                                                            << "a"
-                                                                            << "zone"
-                                                                            << "z"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-
-    BSONObjBuilder builder;
-    request.appendAsConfigCommand(&builder);
-    auto cmdObj = builder.obj();
-
-    ASSERT_BSONOBJ_EQ(BSON("_configsvrAddShardToZone"
-                           << "a"
-                           << "zone"
-                           << "z"),
-                      cmdObj);
+TEST(AddShardToZone, MissingShardNameErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("AddShardToZone");
+    ASSERT_THROWS_CODE(
+        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
-TEST(AddShardToZoneRequest, MissingZoneErrors) {
-    auto request = AddShardToZoneRequest::parseFromMongosCommand(BSON("addShardToZone"
-                                                                      << "a"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(AddShardToZone, MissingZoneErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        addShardToZone: "a",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("AddShardToZone");
+    ASSERT_THROWS_CODE(
+        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
-TEST(AddShardToZoneRequest, MissingShardNameErrors) {
-    auto request = AddShardToZoneRequest::parseFromMongosCommand(BSON("zone"
-                                                                      << "z"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(AddShardToZone, WrongShardNameTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        addShardToZone: 1234,
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("AddShardToZone");
+    ASSERT_THROWS_CODE(
+        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST(AddShardToZoneRequest, WrongShardNameTypeErrors) {
-    auto request =
-        AddShardToZoneRequest::parseFromMongosCommand(BSON("addShardToZone" << 1234 << "zone"
-                                                                            << "z"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+TEST(AddShardToZone, WrongZoneTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        addShardToZone: "a",
+        zone: 1234,
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("AddShardToZone");
+    ASSERT_THROWS_CODE(
+        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST(AddShardToZoneRequest, WrongZoneNameTypeErrors) {
-    auto request = AddShardToZoneRequest::parseFromMongosCommand(BSON("addShardToZone"
-                                                                      << "a"
-                                                                      << "zone" << 1234));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+TEST(ConfigsvrAddShardToZone, BasicValidConfigsvrCommand) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrAddShardToZone: "a",
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrAddShardToZone");
+    auto parsedRequest = ConfigsvrAddShardToZone::parse(ctx, cmdObj);
+    ASSERT_EQ("a", parsedRequest.getCommandParameter());
+    ASSERT_EQ("z", parsedRequest.getZone());
 }
 
-TEST(AddShardToZoneRequest, CannotUseMongosToParseConfigCommand) {
-    auto request = AddShardToZoneRequest::parseFromMongosCommand(BSON("_configsvrAddShardToZone"
-                                                                      << "a"
-                                                                      << "zone"
-                                                                      << "z"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(ConfigsvrAddShardToZone, MissingShardNameErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrAddShardToZone");
+    ASSERT_THROWS_CODE(ConfigsvrAddShardToZone::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
-TEST(CfgAddShardToZoneRequest, BasicValidConfigCommand) {
-    auto requestStatus =
-        AddShardToZoneRequest::parseFromConfigCommand(BSON("_configsvrAddShardToZone"
-                                                           << "a"
-                                                           << "zone"
-                                                           << "z"));
-    ASSERT_OK(requestStatus.getStatus());
-
-    auto request = requestStatus.getValue();
-    ASSERT_EQ("a", request.getShardName());
-    ASSERT_EQ("z", request.getZoneName());
-
-    BSONObjBuilder builder;
-    request.appendAsConfigCommand(&builder);
-    auto cmdObj = builder.obj();
-
-    ASSERT_BSONOBJ_EQ(BSON("_configsvrAddShardToZone"
-                           << "a"
-                           << "zone"
-                           << "z"),
-                      cmdObj);
+TEST(ConfigsvrAddShardToZone, MissingZoneErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        addShardToZone: "a",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrAddShardToZone");
+    ASSERT_THROWS_CODE(ConfigsvrAddShardToZone::parse(ctx, cmdObj),
+                       mongo::DBException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
-TEST(CfgAddShardToZoneRequest, MissingZoneErrors) {
-    auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("_configsvrAddShardToZone"
-                                                                      << "a"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(ConfigsvrAddShardToZone, WrongShardNameTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrAddShardToZone: 1234,
+        zone: "z",
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrAddShardToZone");
+    ASSERT_THROWS_CODE(
+        ConfigsvrAddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
-TEST(CfgAddShardToZoneRequest, MissingShardNameErrors) {
-    auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("zone"
-                                                                      << "z"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
-}
-
-TEST(CfgAddShardToZoneRequest, WrongShardNameTypeErrors) {
-    auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("_configsvrAddShardToZone"
-                                                                      << 1234 << "zone"
-                                                                      << "z"));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
-}
-
-TEST(CfgAddShardToZoneRequest, WrongZoneNameTypeErrors) {
-    auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("_configsvrAddShardToZone"
-                                                                      << "a"
-                                                                      << "zone" << 1234));
-    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
-}
-
-TEST(CfgAddShardToZoneRequest, CannotUseConfigToParseMongosCommand) {
-    auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("addShardToZone"
-                                                                      << "a"
-                                                                      << "zone" << 1234));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+TEST(ConfigsvrAddShardToZone, WrongZoneTypeErrors) {
+    auto cmdObj = fromjson(R"BSON({
+        _configsvrAddShardToZone: "a",
+        zone: 1234,
+        $db: "admin"
+    })BSON");
+    IDLParserContext ctx("ConfigsvrAddShardToZone");
+    ASSERT_THROWS_CODE(
+        ConfigsvrAddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 }  // unnamed namespace

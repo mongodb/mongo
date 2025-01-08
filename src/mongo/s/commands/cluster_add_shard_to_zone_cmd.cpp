@@ -49,7 +49,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/add_shard_to_zone_request_type.h"
+#include "mongo/s/request_types/add_shard_to_zone_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
@@ -75,9 +75,63 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
  *   zone: <string zoneName>
  * }
  */
-class AddShardToZoneCmd : public BasicCommand {
+class AddShardToZoneCmd : public TypedCommand<AddShardToZoneCmd> {
 public:
-    AddShardToZoneCmd() : BasicCommand("addShardToZone", "addshardtozone") {}
+    using Request = AddShardToZone;
+
+    AddShardToZoneCmd() : TypedCommand(Request::kCommandName, Request::kCommandAlias) {}
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+
+            BSONObjBuilder cmdBuilder;
+            ConfigsvrAddShardToZone cmd(getShard().toString(), request().getZone().toString());
+            cmd.serialize(&cmdBuilder);
+            cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
+
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto cmdResponseStatus = uassertStatusOK(
+                configShard->runCommandWithFixedRetryAttempts(opCtx,
+                                                              kPrimaryOnlyReadPreference,
+                                                              DatabaseName::kAdmin,
+                                                              cmdBuilder.obj(),
+                                                              Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(cmdResponseStatus.commandStatus);
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return {};
+        }
+
+        StringData getShard() const {
+            return request().getCommandParameter();
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::enableSharding));
+
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forExactNamespace(
+                                NamespaceString::kConfigsvrShardsNamespace),
+                            ActionType::update));
+        }
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -87,54 +141,8 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
     std::string help() const override {
-        return "adds a shard to zone";
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj&) const final {
-        auto* as = AuthorizationSession::get(opCtx->getClient());
-
-        if (as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(dbName.tenantId()),
-                ActionType::enableSharding)) {
-            return Status::OK();
-        }
-
-        // Fallback on permissions to directly modify the shard config.
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString::kConfigsvrShardsNamespace),
-                ActionType::update)) {
-            return {ErrorCodes::Unauthorized, "Unauthorized"};
-        }
-
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto parsedRequest = uassertStatusOK(AddShardToZoneRequest::parseFromMongosCommand(cmdObj));
-
-        BSONObjBuilder cmdBuilder;
-        parsedRequest.appendAsConfigCommand(&cmdBuilder);
-        cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
-
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                          kPrimaryOnlyReadPreference,
-                                                          DatabaseName::kAdmin,
-                                                          cmdBuilder.obj(),
-                                                          Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponseStatus.commandStatus);
-        return true;
+        return "Adds a shard to zone.";
     }
 };
 MONGO_REGISTER_COMMAND(AddShardToZoneCmd).forRouter();
