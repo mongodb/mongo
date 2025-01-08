@@ -114,7 +114,11 @@ export var ChunkHelper = (function() {
                     // A stepdown may cause the collection's lock to become temporarily unreleasable
                     // and cause the chunk migration to timeout.  The migration may still succeed
                     // after the lock's lease expires.
-                    (runningWithStepdowns && res.code === ErrorCodes.LockBusy)));
+                    (runningWithStepdowns && res.code === ErrorCodes.LockBusy) ||
+                    // Slow builds can result in a failure when waiting for write concern in certain
+                    // migration phases.
+                    (isSlowBuild() && res.code === ErrorCodes.OperationFailed &&
+                     res.errmsg.includes("WriteConcernTimeout"))));
     }
 
     function mergeChunks(db, collName, bounds) {
