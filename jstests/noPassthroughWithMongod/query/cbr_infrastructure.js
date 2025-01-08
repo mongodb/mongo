@@ -100,13 +100,22 @@ const queries = [
     {$nor: [{$or: [{a: {$lt: 10}}, {b: {$gt: 19}}]}]},
     {$nor: [{b: {$ne: 3}}]},
     {$nor: [{a: {$ne: 1}}]},
+    {$alwaysFalse: 1},
+    {$alwaysTrue: 1},
+    {a: {$in: []}},
+    {a: {$all: []}},
+    {a: {$gt: 10}, b: {$in: []}},
 ];
 
 queries.push({$or: [queries[0], queries[1]]});
 
 function assertCbrExplain(plan) {
     assert(plan.hasOwnProperty("cardinalityEstimate"), plan);
-    assert.gt(plan.cardinalityEstimate, 0, plan);
+    if (plan.stage === "EOF") {
+        assert.eq(plan.cardinalityEstimate, 0, plan);
+    } else {
+        assert.gt(plan.cardinalityEstimate, 0, plan);
+    }
     assert(plan.hasOwnProperty("costEstimate"), plan);
     assert.gt(plan.costEstimate, 0, plan);
     if (plan.hasOwnProperty("inputStage")) {
