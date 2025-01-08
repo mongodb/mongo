@@ -1257,6 +1257,13 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("numYields", curop.numYields());
     OPDEBUG_TOATTR_HELP_OPTIONAL("nreturned", additiveMetrics.nreturned);
 
+    // Add sorter diagnostics only when spills occur.
+    if (sortSpills) {
+        pAttrs->add("sortSpills", sortSpills);
+        pAttrs->add("sortSpillBytes", sortSpillBytes);
+        pAttrs->add("sortTotalDataSizeBytes", sortTotalDataSizeBytes);
+    }
+
     if (planCacheShapeHash) {
         pAttrs->addDeepCopy("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
     }
@@ -1365,7 +1372,7 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    // Extract admisson and execution control queueing stats from AdmissionContext stored on opCtx
+    // Extract admission and execution control queueing stats from AdmissionContext stored on opCtx
     TicketHolderQueueStats queueingStats(opCtx);
     pAttrs->add("queues", queueingStats.toBson());
 
@@ -1469,6 +1476,13 @@ void OpDebug::append(OperationContext* opCtx,
 
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_OPTIONAL(b, "nreturned", additiveMetrics.nreturned);
+
+    // Add sorter diagnostics only when spills occur.
+    if (sortSpills) {
+        b.append("sortSpills", sortSpills);
+        b.append("sortSpillBytes", sortSpillBytes);
+        b.append("sortTotalDataSizeBytes", static_cast<long long>(sortTotalDataSizeBytes));
+    }
 
     if (planCacheShapeHash) {
         b.append("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));

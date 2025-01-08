@@ -59,6 +59,21 @@ assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 
 //
+// Confirm that disk use is correctly detected for the $sort stage and the
+// sorter spilling metrics--'sortSpills', 'sortSpillBytes', 'sortTotalDataSizeBytes'--are outputted.
+//
+resetCollection();
+
+coll.aggregate([{$sort: {a: 1}}], {comment: "sort_spill"});
+profileObj = getLatestProfilerEntry(testDB);
+
+assert.eq(profileObj.command.comment, "sort_spill", tojson(profileObj));
+assert.eq(profileObj.usedDisk, true, tojson(profileObj));
+assert.gt(profileObj.sortSpills, 0, tojson(profileObj));
+assert.gt(profileObj.sortSpillBytes, 0, tojson(profileObj));
+assert.gt(profileObj.sortTotalDataSizeBytes, 0, tojson(profileObj));
+
+//
 // Confirm that disk use is correctly detected for the $facet stage.
 //
 resetCollection();

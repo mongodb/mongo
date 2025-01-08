@@ -273,8 +273,8 @@ public:
      * in logs, typically as part of "Slow Query" logging, this method also handles redaction and
      * removal of sensitive fields from any command BSON.
      *
-     * The metrics/fields reported here should generally be kept in line with what is reported in
-     * append().
+     * Generally, the metrics/fields reported here should be a subset of what is reported in
+     * append(). The profiler is meant to be more verbose than the slow query log.
      */
     void report(OperationContext* opCtx,
                 const SingleThreadedLockStats* lockStats,
@@ -291,8 +291,8 @@ public:
      *
      * @param lockStats lockStats object containing locking information about the operation
      *
-     * The metrics/fields reported here should generally be kept in line with what is reported in
-     * report().
+     * Generally, the metrics/fields reported here should be a superset of what is reported in
+     * report(). The profiler is meant to be more verbose than the slow query log.
      */
     void append(OperationContext* opCtx,
                 const SingleThreadedLockStats& lockStats,
