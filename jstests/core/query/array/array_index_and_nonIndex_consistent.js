@@ -3,7 +3,9 @@
  * multikey index.
  * @tags: [
  *     requires_fcv_81,
- *     requires_getmore
+ *     requires_getmore,
+ *     # This test runs too long for Evergreen's 30 min timeout in TSAN builds.
+ *     tsan_incompatible,
  *  ]
  */
 
