@@ -91,7 +91,7 @@ filters:
       - 10gen/query-optimization-golden-test
   - "queryable_wt*":
     approvers:
-      - 10gen/server-rss-sydney
+      - 10gen/server-backup-restore
   - "read_only*":
     approvers:
       - 10gen/server-rss-sydney
