@@ -156,6 +156,7 @@ enums:
            querySettings: "querySettings" # allows to set and retrieve querySettings
            queryStatsRead: "queryStatsRead" # view untransformed contents of queryStats store
            queryStatsReadTransformed: "queryStatsReadTransformed" # view transformed contents of queryStats store
+           performRawDataOperations: "performRawDataOperations" # allow operations that use the rawData field
            refineCollectionShardKey :  "refineCollectionShardKey"
            reIndex :  "reIndex"
            remove :  "remove"
