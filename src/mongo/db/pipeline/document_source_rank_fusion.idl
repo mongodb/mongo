@@ -54,4 +54,8 @@ structs:
         description: The set of pipeline weights to match up with the input pipelines.
         type: RankFusionCombinationSpec
         optional: true
+      scoreDetails:
+        description: If true scoreDetails will be materialized. Will include sub-pipeline scoreDetails if they have them.
+        type: bool
+        default: false
 

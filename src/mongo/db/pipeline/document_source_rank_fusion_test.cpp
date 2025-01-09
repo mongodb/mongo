@@ -45,6 +45,17 @@ namespace {
 class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
                                      public AggregationContextFixture {};
 
+BSONObj replaceUUIDNames(BSONObj original) {
+    auto stringified = original.jsonString();
+    std::regex findUUID("([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})");
+    std::smatch match;
+    std::regex_search(stringified, match, findUUID);
+    std::string UUIDString(match[0]);
+    std::regex replaceUUID(UUIDString);
+    stringified = std::regex_replace(stringified, replaceUUID, "UUID");
+    return fromjson(stringified);
+}
+
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -2341,6 +2352,507 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                 "$matchGenres_score",
                                 "$matchPlot_score"
                             ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ]
+                }
+            },
+            scoreDetails: true
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    // Score Details uses randomly generated UUID fields to avoid field name collision. We'll need
+    // to replace those in the pipeline.
+    asOneObj = replaceUUIDNames(asOneObj);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$addFields": {
+                        "UUID_score": {
+                            "$meta": "score"
+                        },
+                        "UUID_scoreDetails": {
+                            "$meta": "scoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "agatha_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$agatha_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        },
+                        "agatha_scoreDetails": {
+                            "$ifNull": [
+                                "$docs.UUID_scoreDetails",
+                                {
+                                    "value": "$docs.UUID_score",
+                                    "details": {
+                                        "$const": "Not Calculated"
+                                    }
+                                }
+                            ]
+                        },
+                        "agatha_rank": "$agatha_rank"
+                    }
+                },
+                {
+                    "$project": {
+                        "docs": {
+                            "UUID_score": false,
+                            "UUID_scoreDetails": false
+                        },
+                        "_id": true
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "agatha_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_scoreDetails": {
+                            "$mergeObjects": "$agatha_scoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$agatha_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "calculatedScoreDetails": {
+                            "$mergeObjects": [
+                                {
+                                    "agatha": {
+                                        "$mergeObjects": [
+                                            {
+                                                "rank": "$agatha_rank"
+                                            },
+                                            "$agatha_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": "$score",
+                            "details": "$calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    searchPipe : [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                },
+                                scoreDetails: true
+                            }
+                        }
+                    ]
+                }
+            },
+            scoreDetails: true
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    asOneObj = replaceUUIDNames(asOneObj);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$addFields": {
+                        "UUID_score": {
+                            "$meta": "score"
+                        },
+                        "UUID_scoreDetails": {
+                            "$meta": "scoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "agatha_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$agatha_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        },
+                        "agatha_scoreDetails": {
+                            "$ifNull": [
+                                "$docs.UUID_scoreDetails",
+                                {
+                                    "value": "$docs.UUID_score",
+                                    "details": {
+                                        "$const": "Not Calculated"
+                                    }
+                                }
+                            ]
+                        },
+                        "agatha_rank": "$agatha_rank"
+                    }
+                },
+                {
+                    "$project": {
+                        "docs": {
+                            "UUID_score": false,
+                            "UUID_scoreDetails": false
+                        },
+                        "_id": true
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "index": "search_index",
+                                    "text": {
+                                        "query": "mystery",
+                                        "path": "genres"
+                                    },
+                                    "scoreDetails": true
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "searchPipe_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "searchPipe_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$searchPipe_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 1
+                                            }
+                                        ]
+                                    },
+                                    "searchPipe_scoreDetails": {
+                                        "$ifNull": [
+                                            "$docs.UUID_scoreDetails",
+                                            {
+                                                "value": "$docs.UUID_score",
+                                                "details": {
+                                                    "$const": "Not Calculated"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    "searchPipe_rank": "$searchPipe_rank"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "agatha_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_scoreDetails": {
+                            "$mergeObjects": "$agatha_scoreDetails"
+                        },
+                        "searchPipe_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$searchPipe_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "searchPipe_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$searchPipe_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "searchPipe_scoreDetails": {
+                            "$mergeObjects": "$searchPipe_scoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$agatha_score",
+                                "$searchPipe_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "calculatedScoreDetails": {
+                            "$mergeObjects": [
+                                {
+                                    "agatha": {
+                                        "$mergeObjects": [
+                                            {
+                                                "rank": "$agatha_rank"
+                                            },
+                                            "$agatha_scoreDetails"
+                                        ]
+                                    }
+                                },
+                                {
+                                    "searchPipe": {
+                                        "$mergeObjects": [
+                                            {
+                                                "rank": "$searchPipe_rank"
+                                            },
+                                            "$searchPipe_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": "$score",
+                            "details": "$calculatedScoreDetails"
                         }
                     }
                 },
