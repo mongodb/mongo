@@ -96,9 +96,7 @@ public:
 
     const NamespaceString& getNS() const override;
 
-    ShardEndpoint targetInsert(OperationContext* opCtx,
-                               const BSONObj& doc,
-                               std::set<ChunkRange>* chunkRange = nullptr) const override;
+    ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const override;
 
     /**
      * Attempts to target an update request by shard key and returns a vector of shards to target.
@@ -248,8 +246,7 @@ private:
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
     StatusWith<ShardEndpoint> _targetShardKey(const BSONObj& shardKey,
-                                              const BSONObj& collation,
-                                              std::set<ChunkRange>* chunkRanges = nullptr) const;
+                                              const BSONObj& collation) const;
 
     // Full namespace of the collection for this targeter
     NamespaceString _nss;

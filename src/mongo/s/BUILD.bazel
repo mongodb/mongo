@@ -1101,6 +1101,7 @@ mongo_cc_unit_test(
         "catalog_cache_refresh_test.cpp",
         "catalog_cache_test.cpp",
         "chunk_manager_query_test.cpp",
+        "chunk_manager_test.cpp",
         "chunk_map_test.cpp",
         "chunk_test.cpp",
         "chunk_version_test.cpp",

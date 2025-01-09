@@ -8560,3 +8560,8 @@ mongo_unittest_install(
     name = "audit_test-audit_client_observer_test",
     srcs = ["//src/mongo/db/modules/enterprise/src/audit:audit_test"],
 )
+
+mongo_unittest_install(
+    name = "s_test-chunk_manager_test",
+    srcs = ["//src/mongo/s:s_test"],
+)
