@@ -1,107 +1,107 @@
 # Use mongo/bazel/toolchains/toolchain_generator.py to generate this mapping for a given patch build.
 
 TOOLCHAIN_URL_FORMAT = "https://mciuploads.s3.amazonaws.com/toolchain-builder/{platform_name}/{patch_build_id}/bazel_v4_toolchain_builder_{underscore_platform_name}_{patch_build_id}_{patch_build_date}.tar.gz"
-TOOLCHAIN_PATCH_BUILD_ID = "11bae3c145a48dd7be9ee8aa44e5591783f787aa"
-TOOLCHAIN_PATCH_BUILD_DATE = "24_01_09_16_10_07"
+TOOLCHAIN_PATCH_BUILD_ID = "acdc1709a01126c67dbd4f0f37491e171f64ec29"
+TOOLCHAIN_PATCH_BUILD_DATE = "24_10_11_23_01_02"
 TOOLCHAIN_MAP = {
     "amazon_linux_2023_aarch64": {
         "platform_name": "amazon2023-arm64",
-        "sha": "521b80a87a199eb0a0a148f92b4140ff161cd3cf7bf813d58f650055f4ff8523",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2023-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2023_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "405b63f369fdcc9767314a9ae9d488a4f8ad1eaecd181f5f95fc090d6b218614",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_amazon2023_arm64_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "amazon_linux_2023_x86_64": {
         "platform_name": "amazon2023",
-        "sha": "afaccbfd377c8f0ca4edc4396dd93bcfb816c302e2a446ba01062a6d8b3de433",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2023/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2023_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "48f35037f7e9f49c3c9885ea57d9cc59f27550a6e0dfb226e8f2396373b1657b",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_amazon2023_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "amazon_linux_2_aarch64": {
         "platform_name": "amazon2-arm64",
-        "sha": "269e54f97d9049d24d934f549a8963c15c954a5cb6fc0d75bbbcfb78df3c3647",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "1db4c8ef6b30b3a72f2c929247dcffed3a99356099b84c16b8b20efdf99e00d6",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_amazon2_arm64_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "amazon_linux_2_x86_64": {
         "platform_name": "amazon2",
         "sha": "e2bf59dacb789bd3ed708bafb7bf4e432f611f19d6b888340e3b73eee6949b31",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_amazon2_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     },
     "debian10_x86_64": {
         "platform_name": "debian10",
-        "sha": "f36060ae5ff9c2f1a8ec5009cbaaa7e7f1f12fd0001a1f37a7d61046e94c4acf",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/debian10/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_debian10_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "9fd2e74e160699de706aac08bd94aefa7539e835693773c56ff6019847df7cd7",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_debian10_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "debian12_x86_64": {
         "platform_name": "debian12",
-        "sha": "382aeec8de641d466e2ca2562539b497534c620e0e403304d6794434e73bbdce",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/debian12/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_debian12_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "d34bba732f9a4846d6eb27bb1c2f00586fb341a249a12fbb0216268b3b2e69ab",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_debian12_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "rhel8_aarch64": {
         "platform_name": "rhel82-arm64",
-        "sha": "5e7d9d0b9f978332c409359453acacec4ce1106030674e549203a0c61a049bc4",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel82-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel82_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "5b56277cc3a9820fe09774d6a2a6c861b306d7cd8a7bca55848193e249909033",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel82_arm64_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "rhel8_ppc64le": {
         "platform_name": "rhel81-ppc64le",
-        "sha": "e9ac010977f6b92d301174a5749c06e4678a0071556745ea3681a2825b6f7bd1",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel81-ppc64le/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel81_ppc64le_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "b62574a447e0e5120475c7ef0ec0e821548a32a103999ed350b05adcc9073b55",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel81_ppc64le_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "rhel8_s390x": {
         "platform_name": "rhel80-zseries",
-        "sha": "efb59b97ac16150a91ad76609bb5ecfe644a5140bc08bd123c0bd44fea78a3a0",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel80-zseries/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel80_zseries_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "5d4f93968672f324e532b62eb9345351b407a866650d824eee79d295d6613606",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel80_zseries_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "rhel8_x86_64": {
         "platform_name": "rhel80",
-        "sha": "94b67aecc97501a314214c6c8dd00008edeb139f33097180cea70ffef623dc61",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel80/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel80_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "4b3406838c9adbb47d308ba4028ca88948f9bab336eef591f7b8395781ab5cd5",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel80_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "rhel9_aarch64": {
         "platform_name": "rhel90-arm64",
-        "sha": "de77d0a9d4f1b59ffc2e458c9c6f8f87093cd245c53bbcd50990a9c1f152aa2b",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel90-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel90_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "7c6ce149660197f4b63c50404e0c8604285299f6fcf67c1f9bae1de0bad606e1",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel90_arm64_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "rhel9_x86_64": {
         "platform_name": "rhel90",
-        "sha": "ee596be40aa6ab5a676ce700ddd20a5fa05b2b311ae2c56f756b96def74102c4",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel90/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel90_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "ba2cf2efd68805eec11580e0276f2f4bde6a94735b0375cae901bcb7099daebe",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel90_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "suse15_x86_64": {
         "platform_name": "suse15",
-        "sha": "084a0a24949f8a20aeb2f1108e284c8304602544d40a3f0087de869dcf5faf93",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/suse15/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_suse15_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "f7ac487d2ace8d4b8793de712f9e7d7cf3bec35bd82da39b30f42db76f59b919",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_suse15_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "ubuntu18_x86_64": {
         "platform_name": "ubuntu1804",
         "sha": "526b64a04731275ae52b9d8b062efa20c3db183091cdbffd023d86e27c93b490",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu1804/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu1804_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_ubuntu1804_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     },
     "ubuntu20_aarch64": {
         "platform_name": "ubuntu2004-arm64",
-        "sha": "63542b336dfef39a92f0f5cac9d97a192eef68c0f80df30556ba464e8826ea6d",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2004-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2004_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "1f0bee3bde3611d1f2a5f10ea521f333f508d0f3fbd3f4675c77bf0aed1037ec",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_ubuntu2004_arm64_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "ubuntu20_x86_64": {
         "platform_name": "ubuntu2004",
-        "sha": "d1df4ee545cfc324d30e07386beeb27d34b2424303898c9f0f3c6e45ca8a8650",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2004/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2004_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "1dc69e016569ddefa925ee09961e0e466ed80985b767e0f634c0c80286573952",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_ubuntu2004_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "ubuntu22_aarch64": {
         "platform_name": "ubuntu2204-arm64",
-        "sha": "72c9d731021b8e42096bd04d0fbf53254062f5ec1830f8707ebbcc73ea29a0b3",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2204_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "536829b77db6b40fc4b29f848e0b31715e61fe7bfeca0a58575e52bdf4ec0b2b",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_ubuntu2204_arm64_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "ubuntu22_x86_64": {
         "platform_name": "ubuntu2204",
-        "sha": "04ca222c288d6601a8cbc22e1d75f2170cbc24e77dfb59e27249a78872952f16",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_ubuntu2204_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+        "sha": "e7b305c973b69268983431e1b11ddf1f2fbf38715ede2c415b0cf9a4fcdc0615",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_ubuntu2204_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "ubuntu24_aarch64": {
         "platform_name": "ubuntu2404-arm64",
-        "sha": "02ec959be765bf9f89bd39df78366af05d60d00bec44963feeda1274bc7a4a91",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404-arm64/e0a4b30be5b1d4667d4adeed82f0f806626038f7/bazel_v4_toolchain_builder_ubuntu2404_arm64_e0a4b30be5b1d4667d4adeed82f0f806626038f7_24_07_02_18_20_40.tar.gz",
+        "sha": "72e8188295d3296e0361534762e1f4226242b1c65001628cff1f9aac60d94a94",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_ubuntu2404_arm64_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
     "ubuntu24_x86_64": {
         "platform_name": "ubuntu2404",
-        "sha": "c9193240f96a1112edb24b816a87cb6bd9e1393c2757b0b76a3182460ed9498b",
-        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2404/e0a4b30be5b1d4667d4adeed82f0f806626038f7/bazel_v4_toolchain_builder_ubuntu2404_e0a4b30be5b1d4667d4adeed82f0f806626038f7_24_07_02_18_20_40.tar.gz",
+        "sha": "d08520df222f81253eb9b9802fd8c7acd02dd0d60f08776b45ea47401754f947",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_ubuntu2404_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
 }
