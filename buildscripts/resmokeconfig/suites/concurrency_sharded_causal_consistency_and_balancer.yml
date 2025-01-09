@@ -45,6 +45,9 @@ selector:
     - requires_profiling
     - assumes_against_mongod_not_mongos
     - assumes_unsharded_collection
+    # This suite executes random moveCollections in the background that cause open cursors on the
+    # collection to be killed.
+    - requires_getmore
 
 executor:
   archive:

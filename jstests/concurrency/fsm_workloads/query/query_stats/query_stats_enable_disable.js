@@ -13,6 +13,7 @@
  *  # query stats results.
  *  incompatible_with_concurrency_simultaneous,
  *  requires_getmore,
+ *  uses_getmore_outside_of_transaction,
  * ]
  *
  */

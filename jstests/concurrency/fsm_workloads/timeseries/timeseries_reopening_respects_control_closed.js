@@ -10,7 +10,8 @@
  * @tags: [
  *  requires_timeseries,
  *  # Timeseries do not support multi-document transactions with inserts.
- *   does_not_support_transactions,
+ *  does_not_support_transactions,
+ *  requires_getmore,
  * ]
  */
 

@@ -8,6 +8,7 @@
  *  does_not_support_causal_consistency,
  *  does_not_support_stepdowns,
  *  requires_getmore,
+ *  uses_getmore_outside_of_transaction,
  * ]
  *
  *
