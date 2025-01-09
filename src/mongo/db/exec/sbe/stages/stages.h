@@ -746,6 +746,16 @@ public:
     virtual void open(bool reOpen) = 0;
 
     /**
+     * It asks from all its children to spill their data. Stages that can spill their own data need
+     * to override this method to spill their data before asking their children to spill.
+     */
+    virtual void forceSpill() {
+        for (const auto& child : _children) {
+            child->forceSpill();
+        }
+    }
+
+    /**
      * Moves to the next position. If the end is reached then return EOF otherwise ADVANCED. Callers
      * are not required to call getNext until EOF. They can stop consuming results at any time. Once
      * EOF is reached it will stay at EOF unless reopened.
