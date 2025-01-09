@@ -31,7 +31,7 @@ buildvariants:
     python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     scons_cache_scope: shared
-    large_distro_name: windows-2022-large
+    large_distro_name: windows-2022-xlarge
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -43,11 +43,11 @@ buildvariants:
   - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_windows
   - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_windows
     distros:
-      - windows-2022-large
+      - windows-2022-xlarge
   - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_windows !publish_packages
   - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_windows !publish_packages
     distros:
-      - windows-2022-large
+      - windows-2022-xlarge
 
 - &enterprise-windows-template
   name: &enterprise-windows enterprise-windows
