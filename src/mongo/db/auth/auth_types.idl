@@ -65,12 +65,6 @@ types:
     is_view: false
 
 structs:
-  authLocalGetUserFailPoint:
-    description: Data for authLocalGetUser failpoint
-    fields:
-      resolveUserDelayMS:
-        type: int
-        validator: { gte: 0 }
   authLocalGetSubRolesFailPoint:
     description: Data for authLocalGetSubRoles failpoint
     fields:
