@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
@@ -178,6 +179,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
     // was added to $vectorSearch, but that needed to be changed to support sharded
     // $unionWith $vectorSearch)
     if (!enableUnionWithVectorSearch.load()) {
+        auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(expCtx);
         // Only add an idLookup stage once, when we reach the mongod that will execute the pipeline.
         // Ignore the case where we have a stub 'mongoProcessInterface' because this only occurs
         // during validation/analysis, e.g. for QE and pipeline-style updates.
@@ -185,7 +187,10 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
              !expCtx->mongoProcessInterface->inShardedEnvironment(expCtx->opCtx)) ||
             OperationShardingState::isComingFromRouter(expCtx->opCtx)) {
             desugaredPipeline.insert(std::next(desugaredPipeline.begin()),
-                                     make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx));
+                                     make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+                                         expCtx, 0, buildExecShardFilterPolicy(shardFilterer)));
+            if (shardFilterer)
+                desugaredPipeline.push_back(std::move(shardFilterer));
         }
     }
 
@@ -199,9 +204,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
         make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
 
-    auto idLookupStage =
-        make_intrusive<DocumentSourceInternalSearchIdLookUp>(pExpCtx, _limit.value_or(0));
+    auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(pExpCtx);
+    auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+        pExpCtx, _limit.value_or(0), buildExecShardFilterPolicy(shardFilterer));
     desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
+    if (shardFilterer)
+        desugaredPipeline.push_back(std::move(shardFilterer));
 
     return desugaredPipeline;
 }

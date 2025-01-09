@@ -38,7 +38,6 @@
 
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
@@ -59,7 +58,7 @@ MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
 
 namespace search_helpers {
 namespace {
-void prepareSearchPipelineLegacyExecutor(Pipeline* pipeline, bool applyShardFilter) {
+void prepareSearchPipelineLegacyExecutor(Pipeline* pipeline) {
     auto searchStage = pipeline->popFrontWithName(DocumentSourceSearch::kStageName);
     auto& sources = pipeline->getSources();
     if (searchStage) {
@@ -76,43 +75,6 @@ void prepareSearchPipelineLegacyExecutor(Pipeline* pipeline, bool applyShardFilt
             auto desugaredPipeline =
                 dynamic_cast<DocumentSourceVectorSearch*>(vectorSearchStage.get())->desugar();
             sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
-            Pipeline::stitch(&sources);
-        }
-    }
-
-    auto internalSearchLookupIt = sources.begin();
-    // Bail early if the pipeline is not $_internalSearchMongotRemote stage or doesn't need to apply
-    // shardFilter.
-    if (internalSearchLookupIt == sources.end() || !applyShardFilter ||
-        (mongo::DocumentSourceInternalSearchMongotRemote::kStageName !=
-             (*internalSearchLookupIt)->getSourceName() &&
-         mongo::DocumentSourceVectorSearch::kStageName !=
-             (*internalSearchLookupIt)->getSourceName())) {
-        return;
-    }
-
-    while (internalSearchLookupIt != sources.end()) {
-        if (DocumentSourceInternalSearchIdLookUp::kStageName ==
-            (*internalSearchLookupIt)->getSourceName()) {
-            break;
-        }
-        internalSearchLookupIt++;
-    }
-
-    if (internalSearchLookupIt != sources.end()) {
-        auto expCtx = pipeline->getContext();
-        if (OperationShardingState::isComingFromRouter(expCtx->opCtx)) {
-            // We can only rely on the ownership filter if the operation is coming from the router
-            // (i.e. it is versioned).
-            auto collectionFilter =
-                CollectionShardingState::acquire(expCtx->opCtx, expCtx->ns)
-                    ->getOwnershipFilter(
-                        expCtx->opCtx,
-                        CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
-            auto doc = new DocumentSourceInternalShardFilter(
-                expCtx, std::make_unique<ShardFiltererImpl>(std::move(collectionFilter)));
-            internalSearchLookupIt++;
-            sources.insert(internalSearchLookupIt, doc);
             Pipeline::stitch(&sources);
         }
     }
@@ -346,8 +308,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     const AggregateCommandRequest& request,
     Pipeline* origPipeline,
     boost::optional<UUID> uuid) {
-    // First, desuguar $search, and inject shard filterer.
-    prepareSearchPipelineLegacyExecutor(origPipeline, true);
+    // First, desuguar $search.
+    prepareSearchPipelineLegacyExecutor(origPipeline);
 
     if (expCtx->explain || !isSearchPipeline(origPipeline)) {
         // $search doesn't return documents or metadata from explain regardless of the verbosity.
@@ -456,7 +418,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
 }
 
 void prepareSearchForNestedPipelineLegacyExecutor(Pipeline* pipeline) {
-    prepareSearchPipelineLegacyExecutor(pipeline, false);
+    prepareSearchPipelineLegacyExecutor(pipeline);
 }
 
 void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,

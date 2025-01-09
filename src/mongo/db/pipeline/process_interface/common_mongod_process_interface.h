@@ -124,7 +124,8 @@ public:
                                                   const NamespaceString& nss) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) final;
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
     boost::optional<ShardId> getShardId(OperationContext* opCtx) const final;

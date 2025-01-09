@@ -505,7 +505,9 @@ query_shape::CollectionType CommonMongodProcessInterface::getCollectionType(
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
-    Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
+    Pipeline* ownedPipeline,
+    boost::optional<const AggregateCommandRequest&> aggRequest,
+    ExecShardFilterPolicy shardFilterPolicy) {
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
@@ -575,7 +577,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
                                       secondaryNamespaces};
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-        holder, expCtx->ns, resolvedAggRequest, pipeline.get());
+        holder, expCtx->ns, resolvedAggRequest, pipeline.get(), shardFilterPolicy);
 
     return pipeline;
 }

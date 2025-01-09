@@ -106,7 +106,8 @@ public:
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* ownedPipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) final;
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
 
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

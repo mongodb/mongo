@@ -47,6 +47,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
@@ -111,7 +112,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     Pipeline* pipeline = nullptr,
     bool needsMerge = false,
     QueryMetadataBitSet unavailableMetadata = QueryMetadataBitSet{},
-    boost::optional<TraversalPreference> traversalPreference = boost::none);
+    boost::optional<TraversalPreference> traversalPreference = boost::none,
+    ExecShardFilterPolicy = AutomaticShardFiltering{});
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
     OperationContext* opCtx,

@@ -43,20 +43,12 @@ REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
                          AllowedWithApiStrict::kInternal);
 
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
-    const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx) {
-    // We need to reset the docsReturnedByIdLookup in the state shared by the
-    // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
-    // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
-    // part of a $lookup sub-pipeline, the sub-pipeline gets parsed anew for every document the
-    // stage processes, but each parse uses the same expression context.
-    pExpCtx->sharedSearchState.resetDocsReturnedByIdLookup();
-}
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    long long limit,
+    ExecShardFilterPolicy shardFilterPolicy)
+    : DocumentSource(kStageName, expCtx), _limit(limit), _shardFilterPolicy(shardFilterPolicy) {
 
-DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
-    const intrusive_ptr<ExpressionContext>& pExpCtx, long long limit)
-    : DocumentSource(kStageName, pExpCtx), _limit(limit) {
-    // We need to reset the docsReturnedByIdLookup in the state shared by the
+    // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
     // part of a $lookup sub-pipeline, the sub-pipeline gets parsed anew for every document the
@@ -65,7 +57,7 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(
         31016,
         str::stream() << "$_internalSearchIdLookup value must be an empty object or just have "
@@ -79,9 +71,9 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBs
     if (specObj.hasField(InternalSearchMongotRemoteSpec::kLimitFieldName)) {
         auto limitElem = specObj.getField(InternalSearchMongotRemoteSpec::kLimitFieldName);
         uassert(6770001, "Limit must be a long", limitElem.type() == BSONType::NumberLong);
-        return new DocumentSourceInternalSearchIdLookUp(pExpCtx, limitElem.Long());
+        return make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx, limitElem.Long());
     }
-    return new DocumentSourceInternalSearchIdLookUp(pExpCtx);
+    return make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx);
 }
 
 Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions& opts) const {
@@ -120,7 +112,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
                 Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
 
             pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                pipeline.release());
+                pipeline.release(), boost::none, _shardFilterPolicy);
 
             result = pipeline->getNext();
             if (auto next = pipeline->getNext()) {

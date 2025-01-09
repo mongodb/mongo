@@ -1387,11 +1387,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     Pipeline* pipeline,
     bool needsMerge,
     QueryMetadataBitSet unavailableMetadata,
-    boost::optional<TraversalPreference> traversalPreference) {
+    boost::optional<TraversalPreference> traversalPreference,
+    ExecShardFilterPolicy execShardFilterPolicy) {
     invariant(canonicalQuery);
 
     // Ensure that the shard filter option is set if this is a shard.
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
+    if (OperationShardingState::isComingFromRouter(opCtx) &&
+        std::holds_alternative<AutomaticShardFiltering>(execShardFilterPolicy)) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 

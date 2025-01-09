@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -61,9 +62,17 @@ public:
     static constexpr StringData kStageName = "$_internalShardFilter"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    DocumentSourceInternalShardFilter(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+    /**
+     * Examines the state of the OperationContext (attached to 'expCtx') to determine if this
+     * operation is expected to be shard versioned. If so, builds and returns a
+     * DocumentSourceInternalShardFilter. If not, returns nullptr.
+     */
+    static boost::intrusive_ptr<DocumentSourceInternalShardFilter> buildIfNecessary(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    DocumentSourceInternalShardFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       std::unique_ptr<ShardFilterer> shardFilterer);
 
     const char* getSourceName() const override {
@@ -105,10 +114,22 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    const auto& shardFilterer() {
+        return *_shardFilterer;
+    }
+
 private:
     GetNextResult doGetNext() override;
 
     std::unique_ptr<ShardFilterer> _shardFilterer;
 };
+
+inline ExecShardFilterPolicy buildExecShardFilterPolicy(
+    const boost::intrusive_ptr<DocumentSourceInternalShardFilter>& maybeShardFilterer) {
+    if (maybeShardFilterer) {
+        return ProofOfUpstreamFiltering{maybeShardFilterer->shardFilterer()};
+    }
+    return AutomaticShardFiltering{};
+}
 
 }  // namespace mongo

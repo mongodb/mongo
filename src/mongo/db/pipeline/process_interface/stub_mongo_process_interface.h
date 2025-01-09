@@ -249,7 +249,8 @@ public:
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) override {
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) override {
         MONGO_UNREACHABLE;
     }
 

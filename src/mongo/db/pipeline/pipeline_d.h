@@ -42,6 +42,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -130,7 +131,8 @@ public:
         const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
-        Pipeline* pipeline);
+        Pipeline* pipeline,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
     /**
      * Completes creation of the $cursor stage using the given callback pair obtained by calling
@@ -155,7 +157,8 @@ public:
         const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
-        Pipeline* pipeline);
+        Pipeline* pipeline,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
     static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
 
@@ -180,7 +183,8 @@ private:
         const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
-        Pipeline* pipeline);
+        Pipeline* pipeline,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
     static BuildQueryExecutorResult buildInnerQueryExecutorSearch(
         const MultipleCollectionAccessor& collections,

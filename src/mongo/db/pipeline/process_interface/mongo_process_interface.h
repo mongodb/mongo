@@ -58,6 +58,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/generic_cursor.h"
 #include "mongo/db/generic_cursor_gen.h"
 #include "mongo/db/matcher/expression.h"
@@ -460,7 +461,8 @@ public:
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) = 0;
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) = 0;
 
     /**
      * Returns a vector of owned BSONObjs, each of which contains details of an in-progress

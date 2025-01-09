@@ -159,12 +159,21 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
                          "$ifNull" << BSON_ARRAY("$" + kProtocolStoredFieldsName << "$$ROOT"))));
         desugaredPipeline.push_back(
             DocumentSourceReplaceRoot::createFromBson(replaceRootSpec.firstElement(), pExpCtx));
+        // Note: intentionally not including a shard filtering operator here. The isolation
+        // semantics are already weaker here so this was deemed OK. Potentially part of that
+        // conversation: the documents are not guaranteed to have the shard key, and we don't have
+        // an idLookup to go get it.
+        return desugaredPipeline;
     } else {
+        auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(pExpCtx);
         // idLookup must always be immediately after the $mongotRemote stage, which is always first
         // in the pipeline.
-        desugaredPipeline.insert(
-            std::next(desugaredPipeline.begin()),
-            make_intrusive<DocumentSourceInternalSearchIdLookUp>(pExpCtx, _limit.value_or(0)));
+        auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+            pExpCtx, _limit.value_or(0), buildExecShardFilterPolicy(shardFilterer));
+        desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
+        if (shardFilterer) {
+            desugaredPipeline.push_back(std::move(shardFilterer));
+        }
     }
 
     return desugaredPipeline;

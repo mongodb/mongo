@@ -257,7 +257,9 @@ public:
                                       ExplainOptions::Verbosity verbosity) final;
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* pipeline, boost::optional<const AggregateCommandRequest&> aggRequest) final {
+        Pipeline* pipeline,
+        boost::optional<const AggregateCommandRequest&> aggRequest,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final {
         // It is not meaningful to perform a "local read" on mongos.
         MONGO_UNREACHABLE;
     }
