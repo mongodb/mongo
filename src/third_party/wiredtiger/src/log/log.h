@@ -45,6 +45,8 @@ union __wt_lsn {
 
 #define WT_LOG_FILENAME "WiredTigerLog" /* Log file name */
 
+#define WT_MAX_LSN_STRING 32
+
 /*
  * Atomically set the LSN. There are two forms. We need WT_ASSIGN_LSN because some compilers (at
  * least clang address sanitizer) does not do atomic 64-bit structure assignment so we need to

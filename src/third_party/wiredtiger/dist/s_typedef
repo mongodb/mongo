@@ -32,7 +32,7 @@ build() {
     l=`ls ../src/*/*.h ../src/include/*.in |
         sed -e '/wiredtiger.*/d' -e '/queue.h/d'` || exit $?
     grep -E -h \
-        '^[[:space:]]*(((struct|union)[[:space:]].*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \
+        '^[[:space:]]*(((struct|union)[[:space:]].*__wti?_.*{)|WT_PACKED_STRUCT_BEGIN)' \
         $l |
         sed -e 's/WT_PACKED_STRUCT_BEGIN(\(.*\))/struct \1 {/' \
             -e 's/WT_COMPILER_TYPE_ALIGN(.*)[ ]*//' \

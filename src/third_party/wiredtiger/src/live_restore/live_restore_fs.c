@@ -654,8 +654,10 @@ __live_restore_can_service_read(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION_I
         } else if (read_begins_in_hole && !read_ends_in_hole) {
             /* A partial read should never begin in a hole. */
             WT_ASSERT_ALWAYS(session, false,
-              "Read (offset: %ld, len: %lu) begins in a hole but does not end in one (offset: %ld, "
-              "len: %lu)",
+              "Read (offset: %" PRId64 ", len: %" WT_SIZET_FMT
+              ") begins in a hole but does not end in one (offset: %" PRId64
+              ", "
+              "len: %" WT_SIZET_FMT ")",
               offset, len, hole->off, hole->len);
         }
 
@@ -688,7 +690,7 @@ __live_restore_fh_write_int(
     WT_ASSERT_ALWAYS(session, __wt_rwlock_islocked(session, &lr_fh->ext_lock),
       "Live restore lock not taken when needed");
     __wt_verbose_debug1(
-      session, WT_VERB_FILEOPS, "WRITE %s: %" PRId64 ", %lu", fh->name, offset, len);
+      session, WT_VERB_FILEOPS, "WRITE %s: %" PRId64 ", %" WT_SIZET_FMT, fh->name, offset, len);
 
     WT_RET(lr_fh->destination.fh->fh_write(lr_fh->destination.fh, wt_session, offset, len, buf));
     return (__live_restore_remove_extlist_hole(lr_fh, session, offset, len));
@@ -731,7 +733,7 @@ __live_restore_fh_read(
     session = (WT_SESSION_IMPL *)wt_session;
 
     __wt_verbose_debug1(
-      session, WT_VERB_FILEOPS, "READ %s : %" PRId64 ", %lu", fh->name, offset, len);
+      session, WT_VERB_FILEOPS, "READ %s : %" PRId64 ", %" WT_SIZET_FMT, fh->name, offset, len);
 
     read_data = (char *)buf;
 
@@ -780,13 +782,14 @@ __live_restore_fh_read(
 
         /* First read the serviceable portion from the destination. */
         __wt_verbose_debug1(session, WT_VERB_FILEOPS,
-          "    PARTIAL READ FROM DEST (offset: %ld, len: %lu)", offset, dest_partial_read_len);
+          "    PARTIAL READ FROM DEST (offset: %" PRId64 ", len: %" WT_SIZET_FMT ")", offset,
+          dest_partial_read_len);
         WT_ERR(lr_fh->destination.fh->fh_read(
           lr_fh->destination.fh, wt_session, offset, dest_partial_read_len, read_data));
 
         /* Now read the remaining data from the source. */
         __wt_verbose_debug1(session, WT_VERB_FILEOPS,
-          "    PARTIAL READ FROM SOURCE (offset: %ld, len: %lu)", hole->off,
+          "    PARTIAL READ FROM SOURCE (offset: %" PRId64 ", len: %" WT_SIZET_FMT ")", hole->off,
           source_partial_read_len);
         WT_ERR(lr_fh->source->fh_read(lr_fh->source, wt_session, hole->off, source_partial_read_len,
           read_data + dest_partial_read_len));
@@ -850,8 +853,9 @@ __live_restore_fill_hole(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, bool *finis
      */
     char buf[WT_LIVE_RESTORE_READ_SIZE];
     size_t read_size = WT_MIN(hole->len, (size_t)WT_LIVE_RESTORE_READ_SIZE);
-    __wt_verbose_debug2(session, WT_VERB_FILEOPS, "    BACKGROUND READ %s : %" PRId64 ", %lu",
-      lr_fh->iface.name, hole->off, read_size);
+    __wt_verbose_debug2(session, WT_VERB_FILEOPS,
+      "    BACKGROUND READ %s : %" PRId64 ", %" WT_SIZET_FMT, lr_fh->iface.name, hole->off,
+      read_size);
     WT_RET(lr_fh->source->fh_read(lr_fh->source, wt_session, hole->off, read_size, buf));
     return (__live_restore_fh_write_int(fh, wt_session, hole->off, read_size, buf));
 }
@@ -953,7 +957,7 @@ __live_restore_fh_truncate(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, wt_off_t 
 {
     WT_DECL_RET;
     WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
-    wt_off_t old_len, truncate_start, truncate_end;
+    wt_off_t old_len, truncate_end, truncate_start;
 
     lr_fh = (WT_LIVE_RESTORE_FILE_HANDLE *)fh;
     old_len = 0;
@@ -1252,8 +1256,7 @@ __live_restore_fs_open_file(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const ch
                 WT_ERR(lr_fh->source->fh_size(lr_fh->source, wt_session, &source_size));
                 __wt_verbose_debug1(session, WT_VERB_FILEOPS,
                   "Creating destination file backed by source file. Copying size (%" PRId64
-                  ") from source "
-                  "file",
+                  ") from source file",
                   source_size);
 
                 /*
