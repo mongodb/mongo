@@ -686,7 +686,8 @@ UpdateResult PlanExecutorImpl::executeUpdate() {
                 "An update plan should never yield after having performed an upsert; upsertId: {}",
                 redact(updateResult.upsertedId.toString())),
             updateResult.upsertedId.isEmpty());
-        if (updateResult.numDocsModified > 0 && !_opCtx->isRetryableWrite()) {
+        if (updateResult.numDocsModified > 0 && !_opCtx->isRetryableWrite() &&
+            !_opCtx->inMultiDocumentTransaction()) {
             // An update plan can fail with StaleConfig error after having performed some writes but
             // not completed. This can happen when the collection is moved. Routers consider
             // StaleConfig as retryable. However, it is unsafe to retry, because if the update is

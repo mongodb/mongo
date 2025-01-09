@@ -914,7 +914,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
                 "An update plan should never yield after having performed an upsert; upsertId: {}",
                 redact(updateResult.upsertedId.toString())),
             updateResult.upsertedId.isEmpty());
-        if (updateResult.numDocsModified > 0 && !opCtx->isRetryableWrite()) {
+        if (updateResult.numDocsModified > 0 && !opCtx->isRetryableWrite() &&
+            !opCtx->inMultiDocumentTransaction()) {
             ex.addContext("Update plan failed after having partially executed");
             uasserted(ErrorCodes::QueryPlanKilled, ex.reason());
         } else {
