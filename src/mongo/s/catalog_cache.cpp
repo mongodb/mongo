@@ -127,8 +127,8 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
                             "the collection placement version {}. Old value: {}, new value: {}",
                             nss.toStringForErrorMsg(),
                             existingHistory->optRt->getVersion().toString(),
-                            oldReshardingFields->toBSON().toString(),
-                            newReshardingFields->toBSON().toString()),
+                            oldReshardingFields ? oldReshardingFields->toBSON().toString() : "{}",
+                            newReshardingFields ? newReshardingFields->toBSON().toString() : "{}"),
                 [&] {
                     if (oldReshardingFields && newReshardingFields)
                         return oldReshardingFields->toBSON().woCompare(
