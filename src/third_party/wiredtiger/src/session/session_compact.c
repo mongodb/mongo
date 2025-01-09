@@ -340,35 +340,12 @@ __compact_worker(WT_SESSION_IMPL *session)
                 continue;
             }
 
-            /*
-             * If compaction failed because checkpoint was running, continue with the next handle.
-             * We might continue to race with checkpoint on each handle, but that's OK, we'll step
-             * through all the handles, and then we'll block until a checkpoint completes.
-             *
-             * Just quit if eviction is the problem.
-             */
-            else if (ret == EBUSY) {
-                if (__wt_cache_stuck(session)) {
-                    WT_STAT_CONN_INCR(session, session_table_compact_fail_cache_pressure);
-                    WT_ERR_MSG(session, EBUSY,
-                      "Compaction halted at data handle %s by eviction pressure. Returning EBUSY.",
-                      session->op_handle[i]->name);
-                }
-
-                WT_STAT_CONN_INCR(session, session_table_compact_conflicting_checkpoint);
-
-                __wt_verbose_info(session, WT_VERB_COMPACT,
-                  "The compaction of the data handle %s returned EBUSY due to an in-progress "
-                  "conflicting checkpoint.%s",
-                  session->op_handle[i]->name,
-                  background_compaction ? "" : " Compaction of this data handle will be retried.");
-
-                ret = 0;
-
-                /* Don't retry in the case of background compaction, move on. */
-                if (!background_compaction)
-                    another_pass = true;
-
+            /* Compact will return EBUSY if eviction is a problem. */
+            if (ret == EBUSY) {
+                WT_STAT_CONN_INCR(session, session_table_compact_fail_cache_pressure);
+                WT_ERR_MSG(session, EBUSY,
+                  "Compaction halted at data handle %s by eviction pressure. Returning EBUSY.",
+                  session->op_handle[i]->name);
             }
 
             /* Compaction was interrupted internally. */

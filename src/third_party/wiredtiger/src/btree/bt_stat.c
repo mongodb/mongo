@@ -41,6 +41,8 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
     WT_STAT_SET(session, stats, rec_multiblock_max, btree->rec_multiblock_max);
 
     WT_STAT_SET(session, stats, cache_bytes_dirty, __wt_btree_dirty_inuse(session));
+    WT_STAT_SET(session, stats, cache_bytes_dirty_leaf, __wt_btree_dirty_leaf_inuse(session));
+    WT_STAT_SET(session, stats, cache_bytes_dirty_internal, __wt_btree_dirty_intl_inuse(session));
     WT_STAT_SET(session, stats, cache_bytes_dirty_total,
       __wt_cache_bytes_plus_overhead(
         S2C(session)->cache, __wt_atomic_load64(&btree->bytes_dirty_total)));

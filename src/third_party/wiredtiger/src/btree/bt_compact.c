@@ -173,10 +173,10 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_REF_LOCK(session, ref, &previous_state);
 
     /*
-     * Don't bother rewriting deleted pages but also don't skip. The on-disk block is discarded by
-     * the next checkpoint.
+     * Don't bother rewriting deleted pages but also don't skip. The on-disk block with an address
+     * is discarded by the next checkpoint, if it has not already been freed.
      */
-    if (previous_state == WT_REF_DELETED && ref->page_del == NULL)
+    if (previous_state == WT_REF_DELETED && ref->page_del == NULL && ref->addr != NULL)
         *skipp = false;
 
     /*
@@ -242,11 +242,27 @@ __compact_walk_internal(WT_SESSION_IMPL *session, WT_REF *parent)
     /*
      * We could corrupt a checkpoint if we moved a block that's part of the checkpoint, that is, if
      * we race with checkpoint's review of the tree. Get the tree's flush lock which blocks threads
-     * writing pages for checkpoints, and hold it long enough to review a single internal page. Quit
-     * working the file if checkpoint is holding the lock, checkpoint holds the lock for relatively
-     * long periods.
+     * writing pages for checkpoints, and hold it long enough to review a single internal page. If
+     * checkpoint has the lock, check for a compact interrupt and cache stuck before trying again.
      */
-    WT_RET(__wt_spin_trylock(session, &S2BT(session)->flush_lock));
+    while ((ret = __wt_spin_trylock(session, &S2BT(session)->flush_lock)) == EBUSY) {
+        WT_STAT_CONN_INCR(session, session_table_compact_conflicting_checkpoint);
+
+        __wt_verbose_level(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_1,
+          "The compaction of the data handle %s returned EBUSY due to an in-progress "
+          "conflicting checkpoint. Compaction of this data handle will resume after checkpoint "
+          "completes.",
+          session->dhandle->name);
+
+        WT_RET(__wt_session_compact_check_interrupted(session));
+
+        if (__wt_cache_stuck(session))
+            WT_RET(EBUSY);
+
+        __wt_sleep(1, 0);
+    }
+
+    WT_ERR(ret);
 
     /*
      * Walk the internal page and check any leaf pages it references; skip internal pages, we'll

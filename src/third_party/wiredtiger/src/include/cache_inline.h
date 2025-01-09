@@ -168,6 +168,16 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_dirty_intl_inuse --
+ *     Return the number of dirty bytes in use by internal pages.
+ */
+static WT_INLINE uint64_t
+__wt_cache_dirty_intl_inuse(WT_CACHE *cache)
+{
+    return (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_dirty_intl)));
+}
+
+/*
  * __wt_cache_dirty_leaf_inuse --
  *     Return the number of dirty bytes in use by leaf pages.
  */

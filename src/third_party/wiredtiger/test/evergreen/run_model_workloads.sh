@@ -20,6 +20,13 @@ do
     echo
     echo "Testing workload $BASENAME_WORKLOAD"
 
+    # FIXME-WT-13232 The WT-12539 workload can be re-enabled once we've confirmed
+    # how to handle prepare conflicts on keys adjacent to the truncation range.
+    if [[ "$BASENAME_WORKLOAD" = "WT-12539" ]]; then
+        echo "Skipping workload"
+        continue
+    fi
+
     ./model_test -R -h "WT_TEST_$BASENAME_WORKLOAD" -w "$W"
     RESULT="$?"
 
