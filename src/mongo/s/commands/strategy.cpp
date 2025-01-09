@@ -1300,9 +1300,26 @@ void ClientCommand::_handleException(Status status) {
     auto opCtx = _rec->getOpCtx();
     auto reply = _rec->getReplyBuilder();
 
+    // Salvage the value of the 'writeConcernError' field, if already set in the reply.
+    // We will re-add this value later to the reply we will build from scratch.
+    BSONObjBuilder wceBuilder;
+    {
+        auto bob = reply->getBodyBuilder().asTempObj();
+        if (auto f = bob.getField("writeConcernError"_sd); !f.eoo()) {
+            wceBuilder.append(f);
+            wceBuilder.done();
+        }
+    }
+
+    // Wipe whatever was already built in the reply so far and start a new reply.
     reply->reset();
     auto bob = reply->getBodyBuilder();
+
     CommandHelpers::appendCommandStatusNoThrow(bob, status);
+
+    // Append original writeConcernError if it was set in the original reply.
+    bob.appendElements(wceBuilder.asTempObj());
+
     appendRequiredFieldsToResponse(opCtx, &bob);
 
     // Only attach the topology version to the response if mongos is in quiesce mode. If mongos

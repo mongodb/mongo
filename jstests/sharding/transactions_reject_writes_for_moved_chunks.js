@@ -101,7 +101,7 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack, hashed,
         }
         assert.commandFailedWithCode(res, expectedCodes, errMsg);
     }
-    assert.eq(res.errorLabels, ["TransientTransactionError"]);
+    assert.eq(res.errorLabels, ["TransientTransactionError"], tojson(res));
 
     // The commit should fail because the earlier write failed.
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
