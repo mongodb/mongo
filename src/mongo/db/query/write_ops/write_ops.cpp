@@ -181,6 +181,11 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base,
             kBoolSize + kPerElementOverhead;
     }
 
+    if (auto rawData = base.getRawData(); rawData.has_value()) {
+        estSize += write_ops::WriteCommandRequestBase::kRawDataFieldName.size() + kBoolSize +
+            kPerElementOverhead;
+    }
+
     if (auto query = base.getOriginalQuery(); query) {
         estSize += write_ops::WriteCommandRequestBase::kOriginalQueryFieldName.size() +
             query->objsize() + kPerElementOverhead;
