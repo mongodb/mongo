@@ -139,7 +139,7 @@ void runCreateCommandDirectClient(OperationContext* opCtx,
     DBDirectClient localClient(opCtx);
     // Forward the api check rules enforced by the client
     localClient.runCommand(ns.dbName(), cmd.toBSON(APIParameters::get(opCtx).toBSON()), createRes);
-    auto createStatus = getStatusFromCommandResult(createRes);
+    auto createStatus = getStatusFromWriteCommandReply(createRes);
     uassertStatusOK(createStatus);
 }
 
