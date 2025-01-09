@@ -5,6 +5,7 @@ import collections
 from logging import Logger
 import os
 import os.path
+import platform
 import random
 import shlex
 import subprocess
@@ -451,6 +452,20 @@ class TestRunner(Subcommand):
                 parent_resmoke_ctime = proc.environ().get('RESMOKE_PARENT_CTIME')
                 if not parent_resmoke_pid:
                     continue
+                if platform.system() == "Darwin":
+                    # On macOS, 'psutil.Process.environ' gives non-sensical output if the calling process
+                    # does not have permission/entitlement to do so. Refer to the doc for psutil at
+                    # https://psutil.readthedocs.io/en/stable/#psutil.Process.environ.
+                    # Worst case, it returns the environment variables of a different process,
+                    # which may unluckily contain RESMOKE_PARENT_PROCESS. To avoid attempting to kill arbitrary
+                    # processes, double-check the environment against the results from 'ps'. Double-check rather
+                    # than use ps for all processes because the subprocess handling is slower in the common case
+                    # where there are no rogue resmoke processes.
+                    cmd = ["ps", "-E", str(proc.pid)]
+                    ps_proc = subprocess.run(cmd, capture_output=True)
+                    if (f"RESMOKE_PARENT_PROCESS={parent_resmoke_pid}" not in
+                            ps_proc.stdout.decode()):
+                        continue
                 if psutil.pid_exists(int(parent_resmoke_pid)):
                     # Double check `parent_resmoke_pid` is really a rooting resmoke process. Having
                     # the RESMOKE_PARENT_PROCESS environment variable proves it is a process which
