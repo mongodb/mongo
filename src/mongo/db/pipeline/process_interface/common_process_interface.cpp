@@ -336,92 +336,82 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
 
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
     const bool isCollectionless = nss.coll().empty();
-    try {
-        return router.route(
-            opCtx,
-            "CommonMongodProcessInterface::_runListCollectionsCommandOnAShardedCluster",
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                ListCollections listCollectionsCmd;
-                listCollectionsCmd.setDbName(nss.dbName());
-                if (!isCollectionless) {
-                    listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
-                }
+    return router.route(
+        opCtx,
+        "CommonMongodProcessInterface::_runListCollectionsCommandOnAShardedCluster",
+        [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            ListCollections listCollectionsCmd;
+            listCollectionsCmd.setDbName(nss.dbName());
+            if (!isCollectionless) {
+                listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+            }
 
-                listCollectionsCmd.setReadConcern(std::invoke([opCtx] {
-                    const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
-                    tassert(9746001,
-                            str::stream()
-                                << "listCollections only allows 'local' read concern. Trying "
-                                   "to call it with '"
-                                << repl::readConcernLevels::toString(readConcern.getLevel())
-                                << "' read concern level.",
-                            readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
-                    return readConcern;
-                }));
+            listCollectionsCmd.setReadConcern(std::invoke([opCtx] {
+                const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+                tassert(9746001,
+                        str::stream() << "listCollections only allows 'local' read concern. Trying "
+                                         "to call it with '"
+                                      << repl::readConcernLevels::toString(readConcern.getLevel())
+                                      << "' read concern level.",
+                        readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
+                return readConcern;
+            }));
 
-                generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
+            generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
 
-                const auto shard = uassertStatusOK(
-                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
-                Shard::QueryResponse resultCollections;
+            const auto shard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
+            Shard::QueryResponse resultCollections;
 
-                try {
-                    resultCollections = uassertStatusOK(shard->runExhaustiveCursorCommand(
-                        opCtx,
-                        ReadPreferenceSetting::get(opCtx),
-                        nss.dbName(),
-                        listCollectionsCmd.toBSON(),
-                        opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis()
-                                             : Milliseconds(-1)));
-                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                    return std::vector<BSONObj>();
-                }
-
-                auto addPrimaryField = [&cdb](BSONObj obj) {
-                    BSONObjBuilder bob(obj.getOwned());
-                    bob.append("primary", cdb->getPrimary());
-                    return bob.obj();
-                };
-
-                if (isCollectionless) {
-                    if (addPrimaryShard) {
-                        std::vector<BSONObj> collections;
-                        collections.reserve(resultCollections.docs.size());
-                        for (BSONObj& bsonObj : resultCollections.docs) {
-                            collections.emplace_back(addPrimaryField(bsonObj.getOwned()));
-                        }
-                        return collections;
-                    }
-                    return resultCollections.docs;
-                }
-
-                for (BSONObj& bsonObj : resultCollections.docs) {
-                    // Return the entire 'listCollections' response for the first element which
-                    // matches on name.
-                    const BSONElement nameElement = bsonObj["name"];
-                    if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
-                        continue;
-                    }
-
-                    return (addPrimaryShard
-                                ? std::vector<BSONObj>{addPrimaryField(bsonObj.getOwned())}
-                                : std::vector<BSONObj>{bsonObj.getOwned()});
-
-                    tassert(5983900,
-                            str::stream() << "Expected at most one collection with the name "
-                                          << nss.toStringForErrorMsg() << ": "
-                                          << resultCollections.docs.size(),
-                            resultCollections.docs.size() <= 1);
-                }
-
+            try {
+                resultCollections = uassertStatusOK(shard->runExhaustiveCursorCommand(
+                    opCtx,
+                    ReadPreferenceSetting::get(opCtx),
+                    nss.dbName(),
+                    listCollectionsCmd.toBSON(),
+                    opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1)));
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 return std::vector<BSONObj>();
-            });
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The listCollections command returns a success status with an empty list when the given
-        // database doesn't exist. Therefore, we must replicate the same behavior here by ignoring
-        // the NamespaceNotFound error.
-        return std::vector<BSONObj>();
-    }
+            }
+
+            auto addPrimaryField = [&cdb](BSONObj obj) {
+                BSONObjBuilder bob(obj.getOwned());
+                bob.append("primary", cdb->getPrimary());
+                return bob.obj();
+            };
+
+            if (isCollectionless) {
+                if (addPrimaryShard) {
+                    std::vector<BSONObj> collections;
+                    collections.reserve(resultCollections.docs.size());
+                    for (BSONObj& bsonObj : resultCollections.docs) {
+                        collections.emplace_back(addPrimaryField(bsonObj.getOwned()));
+                    }
+                    return collections;
+                }
+                return resultCollections.docs;
+            }
+
+            for (BSONObj& bsonObj : resultCollections.docs) {
+                // Return the entire 'listCollections' response for the first element which matches
+                // on name.
+                const BSONElement nameElement = bsonObj["name"];
+                if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
+                    continue;
+                }
+
+                return (addPrimaryShard ? std::vector<BSONObj>{addPrimaryField(bsonObj.getOwned())}
+                                        : std::vector<BSONObj>{bsonObj.getOwned()});
+
+                tassert(5983900,
+                        str::stream()
+                            << "Expected at most one collection with the name "
+                            << nss.toStringForErrorMsg() << ": " << resultCollections.docs.size(),
+                        resultCollections.docs.size() <= 1);
+            }
+
+            return std::vector<BSONObj>();
+        });
 }
 
 }  // namespace mongo

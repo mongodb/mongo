@@ -105,8 +105,6 @@ struct RemoveShardProgress {
      */
     struct DrainingShardUsage {
         long long totalChunks;
-        long long shardedChunks;
-        long long totalCollections;
         long long databases;
         long long jumboChunks;
     };
