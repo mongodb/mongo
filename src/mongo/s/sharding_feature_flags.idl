@@ -183,3 +183,9 @@ feature_flags:
     cpp_varname: feature_flags::gShardAuthoritativeDbMetadata
     default: false
     shouldBeFCVGated: false
+  # TODO (SERVER-99140): Remove once 9.0 becomes last LTS
+  featureFlagProhibitNonEmptyReplicaSetOnAddShard:
+    description: "Feature flag to prohibit adding non-empty replica set to the cluster."
+    cpp_varname: feature_flags::gProhibitNonEmptyReplicaSetOnAddShard
+    default: false
+    shouldBeFCVGated: true
