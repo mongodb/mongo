@@ -1521,12 +1521,6 @@ mongo_cc_library(
     ],
 )
 
-# TODO(SERVER-96860): Remove cycle created by moving //src/mongo/db/pipeline:field_path.h to //src/mongo/db/pipeline:field_path
-filegroup(
-    name = "field_path_hdrs",
-    srcs = [":field_path.h"],
-)
-
 mongo_cc_library(
     name = "aggregation_context_fixture",
     hdrs = [

@@ -137,8 +137,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/mutable_bson:element_hdrs",
         "//src/mongo/db/index_builds:index_builds.h",
         "//src/mongo/db/index_builds:resumable_index_builds_gen",
-        "//src/mongo/db/pipeline:field_path_hdrs",
-        "//src/mongo/db/query:explain_options_hdrs",
         "//src/mongo/db/query:explain_verbosity_gen",
         "//src/mongo/db/query:record_id_bound.h",
         "//src/mongo/db/query/collation:collation_spec.h",

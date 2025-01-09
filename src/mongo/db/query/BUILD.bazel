@@ -899,12 +899,6 @@ mongo_cc_unit_test(
     ],
 )
 
-# TODO(SERVER-96860): Remove cycle created by moving //src/mongo/db/query:explain_options.h to //src/mongo/db/query:common_query_enums_and_helpers
-filegroup(
-    name = "explain_options_hdrs",
-    srcs = [":explain_options.h"],
-)
-
 mongo_cc_benchmark(
     name = "canonical_query_bm",
     srcs = ["canonical_query_bm.cpp"],
