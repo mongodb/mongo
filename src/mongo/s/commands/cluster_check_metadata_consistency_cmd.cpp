@@ -95,6 +95,9 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangCheckMetadataBeforeEstablishCursors);
+MONGO_FAIL_POINT_DEFINE(tripwireCheckMetadataAfterEstablishCursors);
+
 /*
  * Return the set of shards that are primaries for at least one database
  */
@@ -232,6 +235,7 @@ public:
             const NamespaceString& nss,
             const std::vector<AsyncRequestsSender::Request>& requests,
             std::vector<OperationKey> opKeys = {}) {
+            hangCheckMetadataBeforeEstablishCursors.pauseWhileSet();
 
             ClusterClientCursorParams params(
                 nss,
@@ -252,10 +256,15 @@ public:
                 std::move(opKeys));
 
             // Transfer the established cursors to a ClusterClientCursor.
-            return ClusterClientCursorImpl::make(
+            auto ccc = ClusterClientCursorImpl::make(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                 std::move(params));
+            tassert(9504000,
+                    "Expected interrupt before tripwireCheckMetadataAfterEstablishCursors",
+                    !tripwireCheckMetadataAfterEstablishCursors.shouldFail());
+
+            return ccc;
         }
 
         Response _createInitialCursorReply(OperationContext* opCtx,
