@@ -345,6 +345,26 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             return status;
         }
 
+        // First do a pass over all indexes we have been requested to build to see if there are any
+        // conflicts with existing indexes. We do this without adding anything to the index catalog
+        // so we can distinguish between conflicts against already existing indexes and the specs
+        // we've been requested to build. We skip this step when initializing unfinished index
+        // builds during startup recovery as they are already in the index catalog.
+        if (!forRecovery) {
+            for (size_t i = 0; i < indexSpecs.size(); i++) {
+                BSONObj info = indexSpecs[i];
+                StatusWith<BSONObj> statusWithInfo =
+                    collection->getIndexCatalog()->prepareSpecForCreate(
+                        opCtx, collection.get(), info, resumeInfo);
+                Status status = statusWithInfo.getStatus();
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+        }
+
+        // Then proceed to start the index builds. If we encounter conflicts for the index specs at
+        // this point we know it is a conflict between the indexes we are requested to build.
         for (size_t i = 0; i < indexSpecs.size(); i++) {
             BSONObj info = indexSpecs[i];
             if (!forRecovery) {
@@ -355,16 +375,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                         opCtx, collection.get(), info, resumeInfo);
                 Status status = statusWithInfo.getStatus();
                 if (!status.isOK()) {
-                    // If we were given two identical indexes to build, we will run into an error
-                    // trying to set up the same index a second time in this for-loop. This is the
-                    // only way to encounter this error because callers filter out ready/in-progress
-                    // indexes and start the build while holding a lock throughout.
+                    // If we were given two identical indexes to build, we will return an error to
+                    // the user. We need to convert this error into something that is not retryable.
+                    // The create index command automatically retrys for the
+                    // IndexBuildAlreadyInProgress error as it interprets it as an existing index
+                    // build.
                     if (status == ErrorCodes::IndexBuildAlreadyInProgress) {
-                        invariant(indexSpecs.size() > 1,
-                                  str::stream()
-                                      << "Collection: " << collection->ns().toStringForErrorMsg()
-                                      << " (" << _collectionUUID
-                                      << "), Index spec: " << indexSpecs.front());
                         return {ErrorCodes::OperationFailed,
                                 "Cannot build two identical indexes. Try again without duplicate "
                                 "indexes."};

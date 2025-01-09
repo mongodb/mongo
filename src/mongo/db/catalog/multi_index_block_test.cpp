@@ -214,5 +214,76 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
+    auto indexer = getIndexer();
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
+                              << "a_1"
+                              << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion));
+
+    // Starting multiple index builds that conflicts with each other fails, but not with
+    // IndexBuildAlreadyInProgress
+    {
+        WriteUnitOfWork wuow(operationContext());
+        auto status = indexer
+                          ->init(operationContext(),
+                                 coll,
+                                 {spec, spec},
+                                 [](std::vector<BSONObj>& specs) -> Status { return Status::OK(); })
+                          .getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_NE(status, ErrorCodes::IndexBuildAlreadyInProgress);
+    }
+
+    // Start one index build is OK
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
+                      .getStatus());
+        wuow.commit();
+    }
+
+    auto secondaryIndexer = std::make_unique<MultiIndexBlock>();
+
+    // Trying to start the index build again fails with IndexBuildAlreadyInProgress
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_EQ(
+            secondaryIndexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
+                .getStatus(),
+            ErrorCodes::IndexBuildAlreadyInProgress);
+    }
+
+    // Trying to start multiple index builds with the same spec fails with
+    // IndexBuildAlreadyInProgress if there is an existing index build matching any spec
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_EQ(secondaryIndexer
+                      ->init(operationContext(), coll, {spec, spec}, MultiIndexBlock::kNoopOnInitFn)
+                      .getStatus(),
+                  ErrorCodes::IndexBuildAlreadyInProgress);
+    }
+
+    BSONObj specB = BSON("key" << BSON("b" << 1) << "name"
+                               << "b_1"
+                               << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion));
+
+    // If one of the requested specs are already in progress we fail with
+    // IndexBuildAlreadyInProgress
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_EQ(
+            secondaryIndexer
+                ->init(operationContext(), coll, {specB, spec}, MultiIndexBlock::kNoopOnInitFn)
+                .getStatus(),
+            ErrorCodes::IndexBuildAlreadyInProgress);
+    }
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 }  // namespace
 }  // namespace mongo
