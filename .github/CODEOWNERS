@@ -2045,7 +2045,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/request_types/**/set_allow_migrations.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/sharded_ddl_commands.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/shardsvr_join_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/s/request_types/**/update_zone_key_range_request_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/s/request_types/**/update_zone_key_range* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/*balanc* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/move_primary.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/cluster_commands_without_shard_key.idl @10gen/query-execution-router-write-exec @svc-auto-approve-bot

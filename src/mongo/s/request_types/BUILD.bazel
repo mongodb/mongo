@@ -343,3 +343,12 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+idl_generator(
+    name = "update_zone_key_range_gen",
+    src = "update_zone_key_range.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

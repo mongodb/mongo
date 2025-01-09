@@ -60,7 +60,7 @@ filters:
   - "shardsvr_join_*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "update_zone_key_range_request_*":
+  - "update_zone_key_range*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "*balanc*":
