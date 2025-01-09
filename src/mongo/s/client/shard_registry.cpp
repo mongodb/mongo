@@ -542,8 +542,9 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
         auto opCtx = opCtxHolder.get();
 
         auto grid = Grid::get(opCtx);
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto connStr = replCoord->getConfigConnectionString();
+        // Gets a copy of the replica set config which will be used to update the config server.
+        const repl::ReplSetConfig rsConfig = repl::ReplicationCoordinator::get(opCtx)->getConfig();
+        auto connStr = rsConfig.getConnectionString();
 
         grid->shardRegistry()->updateReplSetHosts(
             connStr, ShardRegistry::ConnectionStringUpdateType::kPossible);
@@ -568,7 +569,7 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
             return Status::OK();
         }
 
-        auto replSetConfigVersion = replCoord->getConfig().getConfigVersion();
+        auto replSetConfigVersion = rsConfig.getConfigVersion();
         // Specify the config version in the filter and the update to prevent overwriting a
         // newer connection string when there are concurrent updates.
         auto filter =
