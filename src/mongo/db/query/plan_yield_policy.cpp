@@ -31,8 +31,6 @@
 #include <boost/optional/optional.hpp>
 #include <utility>
 
-
-#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -43,6 +41,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -122,9 +121,12 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                                          std::function<void()> whileYieldingFn) {
     invariant(opCtx);
 
+    // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
+    // again right away. We delay the resetTimer() call so that the clock doesn't start ticking
+    // until after we return from the yield.
+    ON_BLOCK_EXIT([this]() { resetTimer(); });
+
     if (_policy == YieldPolicy::INTERRUPT_ONLY) {
-        ON_BLOCK_EXIT([this]() { resetTimer(); });
-        invariant(opCtx);
         if (_callbacks) {
             _callbacks->preCheckInterruptOnly(opCtx);
         }
@@ -133,17 +135,15 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
-    // again right away. We delay the resetTimer() call so that the clock doesn't start ticking
-    // until after we return from the yield.
-    ON_BLOCK_EXIT([this]() { resetTimer(); });
     _forceYield = false;
 
     for (int attempt = 1; true; attempt++) {
         try {
             // Saving and restoring can modify '_yieldable', so we make a copy before we start.
+            // This copying cannot throw.
             const auto yieldable = _yieldable;
 
+            // This sets _yieldable to a nullptr.
             saveState(opCtx);
 
             boost::optional<ScopeGuard<std::function<void()>>> exitGuard;
@@ -172,7 +172,11 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                     performYieldWithAcquisitions(opCtx, whileYieldingFn);
                 } else {
                     const Yieldable* yieldablePtr = get<const Yieldable*>(yieldable);
-                    invariant(yieldablePtr);
+                    tassert(9762900,
+                            str::stream()
+                                << "no yieldable object available for yield policy "
+                                << serializeYieldPolicy(getPolicy()) << " in attempt " << attempt,
+                            yieldablePtr);
                     performYield(opCtx, *yieldablePtr, whileYieldingFn);
                 }
             }
