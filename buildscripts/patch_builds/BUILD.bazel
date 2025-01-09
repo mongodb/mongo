@@ -1,0 +1,19 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "patch_builds",
+    srcs = [
+        "change_data.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+    ],
+)

@@ -271,6 +271,7 @@ buildvariants:
             variant: *linux_x86_dynamic_compile_variant_name
       - name: check_feature_flag_tags
       - name: check_for_todos
+      - name: check_for_legacy_command_types
       - name: disk_wiredtiger
       - name: initial_sync_fuzzer_gen
       - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen

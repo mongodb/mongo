@@ -305,6 +305,7 @@ buildvariants:
             variant: *amazon_linux2_arm64_static_compile_variant_name
       - name: check_feature_flag_tags
       - name: check_for_todos
+      - name: check_for_legacy_command_types
       - name: test_api_version_compatibility
       - name: replica_sets_jscore_passthrough_gen
       - name: sharding_jscore_passthrough_gen

@@ -391,6 +391,28 @@ tasks:
           args:
             - "./src/evergreen/todos_check.sh"
 
+  - name: check_for_legacy_command_types
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+      ]
+    exec_timeout_secs: 600 # 10 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/check_legacy_command_types.sh"
+
   - name: generate_buildid_to_debug_symbols_mapping
     tags:
       [

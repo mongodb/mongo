@@ -120,6 +120,20 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "legacy_commands_check",
+    srcs = [
+        "legacy_commands_check.py",
+        "moduleconfig.py",
+    ],
+    main = "legacy_commands_check.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/linter",
+        "//buildscripts/patch_builds",
+    ],
+)
+
 exports_files(["cheetah_source_generator.py"])
 
 sh_binary(
