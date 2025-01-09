@@ -461,6 +461,7 @@ let testCases = {
     transitionToDedicatedConfigServer: {skip: "primary only"},
     transitionToShardedCluster: {skip: "primary only"},
     unshardCollection: {skip: "primary only"},
+    untrackUnshardedCollection: {skip: "primary only"},
     update: {skip: "primary only"},
     updateRole: {skip: "primary only"},
     updateSearchIndex: {skip: "does not return user data"},

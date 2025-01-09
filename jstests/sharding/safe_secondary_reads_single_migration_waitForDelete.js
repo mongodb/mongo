@@ -414,6 +414,7 @@ let testCases = {
     transitionToShardedCluster: {skip: "primary only"},
     top: {skip: "does not return user data"},
     unshardCollection: {skip: "primary only"},
+    untrackUnshardedCollection: {skip: "primary only"},
     update: {skip: "primary only"},
     updateRole: {skip: "primary only"},
     updateSearchIndex: {skip: "does not return user data"},

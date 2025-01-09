@@ -280,6 +280,7 @@ env.Library(
         'request_types/shardsvr_join_ddl_coordinators_request.idl',
         'request_types/transition_from_dedicated_config_server.idl',
         'request_types/transition_to_dedicated_config_server.idl',
+        'request_types/untrack_unsplittable_collection.idl',
         'request_types/update_zone_key_range_request_type.cpp',
         'request_types/wait_for_fail_point.idl',
         'resharding/common_types.idl',

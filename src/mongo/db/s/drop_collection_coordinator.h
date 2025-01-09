@@ -85,12 +85,15 @@ public:
      *
      * If expectedUUID is set and doesn't match the value persisted on the CollectionCatalog, then
      * this is a no-op. If expectedUUID is not set, no UUID check will be performed.
+     *
+     * If requireCollectionEmpty is set to true and the collection has records, this is a no-op.
      */
     static void dropCollectionLocally(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       bool fromMigrate,
                                       bool dropSystemCollections,
-                                      const boost::optional<UUID>& expectedUUID = boost::none);
+                                      const boost::optional<UUID>& expectedUUID = boost::none,
+                                      bool requireCollectionEmpty = false);
 
 private:
     const BSONObj _critSecReason;

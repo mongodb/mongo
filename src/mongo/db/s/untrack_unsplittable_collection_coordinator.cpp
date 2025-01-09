@@ -53,6 +53,7 @@ void UntrackUnsplittableCollectionCoordinator::appendCommandInfo(
 
 void UntrackUnsplittableCollectionCoordinator::checkIfOptionsConflict(
     const BSONObj& coorDoc) const {
+    stdx::lock_guard lk{_docMutex};
     const auto otherDoc = UntrackUnsplittableCollectionCoordinatorDocument::parse(
         IDLParserContext("UntrackUnsplittableCollectionCoordinatorDocument"), coorDoc);
     uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -142,21 +143,27 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     // during the critical section.
     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
-    // Remove unnecessary collection catalog entries potentially left behind by previous movePrimary
+    // Remove unneccesary collection catalog entries potentially left behind by previous movePrimary
     // operations.
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    // Remove primary shard from participants.
-    std::erase(participants, ShardingState::get(opCtx)->shardId());
-
-    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx,
-        nss(),
-        participants,
-        **executor,
-        getNewSession(opCtx),
-        true /* fromMigrate */,
-        false /* dropSystemCollections */);
-
+    // Remove primary shard from participants
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
+                       participants.end());
+    {
+        const auto session = getNewSession(opCtx);
+        const auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+            opCtx,
+            nss(),
+            participants,
+            **executor,
+            getNewSession(opCtx),
+            true /* fromMigrate */,
+            false /* dropSystemCollections */,
+            uuid,
+            true /*requireCollectionEmpty*/);
+    }
     LOGV2_DEBUG(9237001, 2, "Collection untracked", logAttrs(nss()));
 }
 

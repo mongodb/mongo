@@ -572,11 +572,13 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const OperationSessionInfo& osi,
                                                   bool fromMigrate,
                                                   bool dropSystemCollections,
-                                                  const boost::optional<UUID>& collectionUUID) {
+                                                  const boost::optional<UUID>& collectionUUID,
+                                                  bool requireCollectionEmpty) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
     dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
     dropCollectionParticipant.setCollectionUUID(collectionUUID);
+    dropCollectionParticipant.setRequireCollectionEmpty(requireCollectionEmpty);
     GenericArguments args;
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);

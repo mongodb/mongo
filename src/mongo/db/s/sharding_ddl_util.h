@@ -283,7 +283,8 @@ void sendDropCollectionParticipantCommandToShards(
     const OperationSessionInfo& osi,
     bool fromMigrate,
     bool dropSystemCollections,
-    const boost::optional<UUID>& collectionUUID = boost::none);
+    const boost::optional<UUID>& collectionUUID = boost::none,
+    bool requireCollectionEmpty = false);
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to);
 

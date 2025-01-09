@@ -223,6 +223,23 @@ export const $config = (function() {
             const inconsistencies = db[targetThreadColl].checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
+        untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
+            // Note this command will behave as no-op in case the collection is not tracked.
+            const namespace = `${db}.${collName}`;
+            jsTestLog(`Started to untrack collection ${namespace}`);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}), [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                    // The command does not exist in pre-8.0 versions
+                    ErrorCodes.CommandNotFound,
+                ]);
+            jsTestLog(`Untrack collection completed`);
+        },
         BulkWrite: function(db, collName, connCache) {
             let tid = this.tid;
             // Pick a tid at random until we pick one that doesn't target this thread's collection.

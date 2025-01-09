@@ -38,10 +38,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.transitions = {
         query: {
-            query: 0.63,
+            query: 0.58,
             createIndexes: 0.1,
             dropIndex: 0.1,
             collMod: 0.1,
+            untrackUnshardedCollection: 0.05,
             movePrimary: 0.05,
             // Converting the target collection to a capped collection or a sharded collection will
             // cause all subsequent aggregations to fail, so give these a low probability to make
@@ -55,6 +56,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         collMod: {query: 1},
         convertToCapped: {query: 1},
         shardCollection: {query: 1},
+        untrackUnshardedCollection: {query: 1},
     };
 
     /**
@@ -166,6 +168,28 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // MovePrimary command that has purposefully triggered a failpoint.
                 9046501,
             ]);
+    };
+
+    /*
+     * Untrack the collection from the sharding catalog.
+     */
+    $config.states.untrackUnshardedCollection = function untrackCollection(db, collName) {
+        // Note this command will behave as no-op in case the collection is not tracked.
+        const namespace = `${db}.${collName}`;
+        jsTestLog(`Running untrackUnshardedCollection: ns=${namespace}`);
+        if (isMongos(db)) {
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}), [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                    // The command does not exist in pre-8.0 versions
+                    ErrorCodes.CommandNotFound,
+                ]);
+        }
     };
 
     /**
