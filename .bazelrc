@@ -39,6 +39,12 @@ common --remote_download_regex=.*\.(dwo|h|cpp)$
 
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
+# Restrict local actions to 20% to prevent linking from hitting OOM issues, but give the
+# freedom to remote execution to schedule more compilation actions.
+common --local_resources=cpu=HOST_CPUS*.2
+common:windows --local_resources=cpu=HOST_CPUS
+common:macos --local_resources=cpu=HOST_CPUS
+
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
 # in those cases:
@@ -143,10 +149,10 @@ common --//bazel/config:asan=False
 common --//bazel/config:tsan=False
 common --//bazel/config:ubsan=False
 common --//bazel/config:libunwind=auto
-common --enable_platform_specific_config=true
-common --jobs=200
+common --jobs=250
 common:macos --jobs=auto
 common:windows --jobs=auto
+common --enable_platform_specific_config=true
 
 # Profile for building fast with minimal debuggability - the build is fast ##################################################
 --config=fastbuild
@@ -198,6 +204,7 @@ common:dbg_aubsan --//bazel/config:linkstatic=False
 common:dbg_aubsan --//bazel/config:allocator=system
 common:dbg_aubsan --//bazel/config:asan=True
 common:dbg_aubsan --//bazel/config:ubsan=True
+common:dbg_aubsan --local_resources=cpu=HOST_CPUS
 common:dbg_aubsan --enable_platform_specific_config=true
 
 # Build with thread sanitizers
@@ -290,10 +297,6 @@ common:windows --cxxopt=-UCOMPILER_MSVC
 
 # Enable remote build execution:
 common:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
-
-# Restrict local actions to 20% to prevent linking from hitting OOM issues, but give the
-# freedom to remote execution to schedule more compilation actions.
-common:linux --local_resources=cpu=HOST_CPUS*.2
 
 # Enable remote cache (also necessary for remote build execution):
 common --remote_cache=grpcs://sodalite.cluster.engflow.com
