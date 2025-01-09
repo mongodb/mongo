@@ -169,7 +169,7 @@ feature_flags:
     featureFlagLookupEncryptionSchemasFLE:
       description: "Feature flag to support multiple FLE schemas with $lookup"
       cpp_varname: gFeatureFlagLookupEncryptionSchemasFLE
-      default: false
+      default: true
       shouldBeFCVGated: false
 
     featureFlagRankFusionBasic:
