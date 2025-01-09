@@ -58,6 +58,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
@@ -159,6 +160,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
@@ -393,6 +395,149 @@ void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
     LOGV2(5687906, "Resetting addOrRemoveShardInProgress cluster parameter after failure");
     unblockDDLCoordinators(opCtx);
     LOGV2(5687907, "Resetted addOrRemoveShardInProgress cluster parameter after failure");
+}
+
+AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
+                                                                           const ShardId& shardId,
+                                                                           bool isCount = false) {
+    BSONObj listStage = BSON("$listClusterCatalog" << BSON("shards" << true));
+    BSONObj matchStage = BSON("$match" << BSON("sharded" << false << "shards" << shardId));
+    BSONObj countStage = BSON("$count"
+                              << "totalCount");
+
+    auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
+
+    std::vector<mongo::BSONObj> pipeline;
+    pipeline.reserve(isCount ? 3 : 2);
+    pipeline.push_back(listStage);
+    pipeline.push_back(matchStage);
+    if (isCount) {
+        pipeline.push_back(countStage);
+    }
+
+    AggregateCommandRequest aggRequest{dbName, pipeline};
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
+    aggRequest.setWriteConcern({});
+    return aggRequest;
+}
+
+AggregateCommandRequest makeChunkCountAggregation(OperationContext* opCtx, const ShardId& shardId) {
+    std::vector<BSONObj> pipeline;
+
+    // Match documents in the chunks collection where shard is "shard01"
+    pipeline.emplace_back(BSON("$match" << BSON("shard" << shardId)));
+    // Perform a $group to count chunks by uuid
+    pipeline.emplace_back(fromjson(R"(
+            { $group: {
+                '_id': '$uuid',
+                'count': { $sum: 1 }
+            }})"));
+    // Fetch the collection global catalog
+    pipeline.emplace_back(fromjson(R"(
+            { $lookup: {
+                from: {
+                    db: "config",
+                    coll: "collections"
+                },
+                localField: "_id",
+                foreignField: "uuid",
+                as: "collectionInfo"
+            }})"));
+    pipeline.emplace_back(fromjson(R"(
+            { $unwind: "$collectionInfo"})"));
+    pipeline.emplace_back(fromjson(R"(
+            { $match: {
+                "collectionInfo.unsplittable": {$ne: true}
+            }})"));
+    // Deliver a single document with the aggregation of all the chunks
+    pipeline.emplace_back(fromjson(R"(
+            { $group: {
+                '_id': null,
+                'totalChunks': {$sum: '$count'}
+            }})"));
+
+    AggregateCommandRequest aggRequest{NamespaceString::kConfigsvrChunksNamespace, pipeline};
+    aggRequest.setReadConcern(repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern));
+    return aggRequest;
+}
+
+std::vector<NamespaceString> getCollectionsToMoveForShard(OperationContext* opCtx,
+                                                          Shard* shard,
+                                                          const ShardId& shardId) {
+
+    auto listCollectionAggReq = makeUnshardedCollectionsOnSpecificShardAggregation(opCtx, shardId);
+
+    std::vector<NamespaceString> collections;
+
+    uassertStatusOK(
+        shard->runAggregation(opCtx,
+                              listCollectionAggReq,
+                              [&collections](const std::vector<BSONObj>& batch,
+                                             const boost::optional<BSONObj>& postBatchResumeToken) {
+                                  for (const auto& doc : batch) {
+                                      collections.push_back(NamespaceStringUtil::deserialize(
+                                          boost::none,
+                                          doc.getField("ns").String(),
+                                          SerializationContext::stateDefault()));
+                                  }
+                                  return true;
+                              }));
+
+    return collections;
+}
+
+long long getCollectionsToMoveForShardCount(OperationContext* opCtx,
+                                            Shard* shard,
+                                            const ShardId& shardId) {
+
+    auto listCollectionAggReq =
+        makeUnshardedCollectionsOnSpecificShardAggregation(opCtx, shardId, true);
+
+    long long collectionsCounter = 0;
+
+    uassertStatusOK(shard->runAggregation(
+        opCtx,
+        listCollectionAggReq,
+        [&collectionsCounter](const std::vector<BSONObj>& batch,
+                              const boost::optional<BSONObj>& postBatchResumeToken) {
+            if (batch.size() > 0) {
+                tassert(8988300, "totalCount field is missing", batch[0].hasField("totalCount"));
+                collectionsCounter = batch[0].getField("totalCount").safeNumberLong();
+            }
+            return true;
+        }));
+
+    return collectionsCounter;
+}
+
+long long getChunkForShardCount(OperationContext* opCtx, Shard* shard, const ShardId& shardId) {
+
+    auto chunkCounterAggReq = makeChunkCountAggregation(opCtx, shardId);
+
+    long long chunkCounter = 0;
+
+    uassertStatusOK(shard->runAggregation(
+        opCtx,
+        chunkCounterAggReq,
+        [&chunkCounter](const std::vector<BSONObj>& batch,
+                        const boost::optional<BSONObj>& postBatchResumeToken) {
+            if (batch.size() > 0) {
+                chunkCounter = batch[0].getField("totalChunks").safeNumberLong();
+            }
+            return true;
+        }));
+
+    return chunkCounter;
+}
+
+bool appendToArrayIfRoom(int& offset, BSONArrayBuilder& arrayBuilder, const std::string& toAppend) {
+    auto toAppendSize = toAppend.length() + 8;
+    if ((offset + toAppendSize) < BSONObjMaxUserSize) {
+        arrayBuilder.append(toAppend);
+        offset += toAppendSize;
+        return true;
+    }
+    return false;
 }
 
 }  // namespace
@@ -1467,8 +1612,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
     const auto getDrainingProgress = [&]() -> RemoveShardProgress::DrainingShardUsage {
-        const auto chunkCount = uassertStatusOK(_runCountCommandOnConfig(
+        const auto totalChunkCount = uassertStatusOK(_runCountCommandOnConfig(
             opCtx, NamespaceString::kConfigsvrChunksNamespace, BSON(ChunkType::shard(shardName))));
+
+        const auto shardedChunkCount =
+            getChunkForShardCount(opCtx, _localConfigShard.get(), shardName);
+
+        const auto unshardedCollectionsCount =
+            getCollectionsToMoveForShardCount(opCtx, _localConfigShard.get(), shardName);
 
         const auto databaseCount = uassertStatusOK(
             _runCountCommandOnConfig(opCtx,
@@ -1480,15 +1631,28 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                      NamespaceString::kConfigsvrChunksNamespace,
                                      BSON(ChunkType::shard(shardName) << ChunkType::jumbo(true))));
 
-        return {chunkCount, databaseCount, jumboCount};
+        return {totalChunkCount,
+                shardedChunkCount,
+                unshardedCollectionsCount,
+                databaseCount,
+                jumboCount};
     };
 
     auto drainingProgress = getDrainingProgress();
-    if (drainingProgress.totalChunks > 0 || drainingProgress.databases > 0) {
+    // The counters: `shardedChunks`, `totalCollections`, and `databases` are used to present
+    // the ongoing status to the user. Additionally, `totalChunks` on the shard is checked for
+    // safety, as it is a critical point in the removeShard process, to ensure that a non-empty
+    // shard is not removed. For example the number of unsharded collections might be inaccurate due
+    // to $listClusterCatalog potentially returning an incorrect list of shards during concurrent
+    // DDL operations.
+    if (drainingProgress.totalChunks > 0 || drainingProgress.shardedChunks > 0 ||
+        drainingProgress.totalCollections > 0 || drainingProgress.databases > 0) {
         // Still more draining to do
         LOGV2(21946,
               "removeShard: draining",
               "chunkCount"_attr = drainingProgress.totalChunks,
+              "shardedChunkCount"_attr = drainingProgress.shardedChunks,
+              "unshardedCollectionsCount"_attr = drainingProgress.totalCollections,
               "databaseCount"_attr = drainingProgress.databases,
               "jumboCount"_attr = drainingProgress.jumboChunks);
 
@@ -1540,11 +1704,20 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Now that DDL operations are not executing, recheck that this shard truly does not own any
     // chunks nor database.
     drainingProgress = getDrainingProgress();
-    if (drainingProgress.totalChunks > 0 || drainingProgress.databases > 0) {
+    // The counters: `shardedChunks`, `totalCollections`, and `databases` are used to present
+    // the ongoing status to the user. Additionally, `totalChunks` on the shard is checked for
+    // safety, as it is a critical point in the removeShard process, to ensure that a non-empty
+    // shard is not removed. For example the number of unsharded collections might be inaccurate due
+    // to $listClusterCatalog potentially returning an incorrect list of shards during concurrent
+    // DDL operations.
+    if (drainingProgress.totalChunks > 0 || drainingProgress.shardedChunks > 0 ||
+        drainingProgress.totalCollections > 0 || drainingProgress.databases > 0) {
         // Still more draining to do
         LOGV2(5687909,
               "removeShard: more draining to do after having blocked DDLCoordinators",
               "chunkCount"_attr = drainingProgress.totalChunks,
+              "shardedChunkCount"_attr = drainingProgress.shardedChunks,
+              "unshardedCollectionsCount"_attr = drainingProgress.totalCollections,
               "databaseCount"_attr = drainingProgress.databases,
               "jumboCount"_attr = drainingProgress.jumboChunks);
 
@@ -1687,10 +1860,12 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
     const auto databases =
         uassertStatusOK(_localCatalogClient->getDatabasesForShard(opCtx, shardId));
 
+    const auto collections = getCollectionsToMoveForShard(opCtx, _localConfigShard.get(), shardId);
+
     // Get BSONObj containing:
     // 1) note about moving or dropping databases in a shard
     // 2) list of databases (excluding 'local' database) that need to be moved
-    const auto dbInfo = [&] {
+    const auto dbAndCollectionInfo = [&] {
         std::vector<DatabaseName> userDatabases;
         for (const auto& dbName : databases) {
             if (!dbName.isLocalDB()) {
@@ -1699,17 +1874,48 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
         }
 
         BSONObjBuilder dbInfoBuilder;
-        if (!userDatabases.empty()) {
-            dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
+        if (!userDatabases.empty() || !collections.empty()) {
+            dbInfoBuilder.append("note",
+                                 "you need to call moveCollection for collectionsToMove and "
+                                 "afterwards movePrimary for the dbsToMove");
         }
 
         // Note the `dbsToMove` field could be excluded if we have no user database to move but we
         // enforce it for backcompatibilty.
         BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
+        bool canAppendToDoc = true;
+        // The dbsToMove and collectionsToMove arrays will be truncated accordingly if they exceed
+        // the 16MB BSON limitation. The offset for calculation is set to 10K to reserve place for
+        // other attributes.
+        int reservationOffsetBytes = 10 * 1024 + dbs.len();
+
         for (const auto& dbName : userDatabases) {
-            dbs.append(DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
+            canAppendToDoc = appendToArrayIfRoom(
+                reservationOffsetBytes,
+                dbs,
+                DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
+            if (!canAppendToDoc)
+                break;
         }
         dbs.doneFast();
+
+        BSONArrayBuilder collectionsToMove(dbInfoBuilder.subarrayStart("collectionsToMove"));
+        reservationOffsetBytes += collectionsToMove.len();
+        if (canAppendToDoc) {
+            for (const auto& collectionName : collections) {
+                canAppendToDoc =
+                    appendToArrayIfRoom(reservationOffsetBytes,
+                                        collectionsToMove,
+                                        NamespaceStringUtil::serialize(
+                                            collectionName, SerializationContext::stateDefault()));
+                if (!canAppendToDoc)
+                    break;
+            }
+        }
+        collectionsToMove.doneFast();
+        if (!canAppendToDoc) {
+            dbInfoBuilder.appendElements(BSON("truncated" << true));
+        }
 
         return dbInfoBuilder.obj();
     }();
@@ -1719,17 +1925,18 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
             result.append("msg", "draining started successfully");
             result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kStarted));
             result.append("shard", shardId);
-            result.appendElements(dbInfo);
+            result.appendElements(dbAndCollectionInfo);
             break;
         case RemoveShardProgress::ONGOING: {
             const auto& remainingCounts = shardDrainingStatus.remainingCounts;
             result.append("msg", "draining ongoing");
             result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kOngoing));
             result.append("remaining",
-                          BSON("chunks" << remainingCounts->totalChunks << "dbs"
+                          BSON("chunks" << remainingCounts->shardedChunks << "collectionsToMove"
+                                        << remainingCounts->totalCollections << "dbs"
                                         << remainingCounts->databases << "jumboChunks"
                                         << remainingCounts->jumboChunks));
-            result.appendElements(dbInfo);
+            result.appendElements(dbAndCollectionInfo);
             break;
         }
         case RemoveShardProgress::PENDING_DATA_CLEANUP: {
