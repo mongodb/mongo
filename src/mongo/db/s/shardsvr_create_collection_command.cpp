@@ -234,6 +234,7 @@ public:
                                 fmt::format("Tracking of collection '{}' is not supported.",
                                             ns().toStringForErrorMsg()),
                                 !isTrackCollectionIfExists);
+                        optFixedFcvRegion.reset();
                         return _createUntrackedCollection(opCtx);
                     }
 
@@ -247,6 +248,7 @@ public:
                         request().getRegisterExistingCollectionInGlobalCatalog();
 
                     if (!isTrackUnshardedUponCreationEnabled && !mustTrackOnMoveCollection) {
+                        optFixedFcvRegion.reset();
                         return _createUntrackedCollection(opCtx);
                     }
                 }
