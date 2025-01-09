@@ -18,6 +18,8 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbTest1 = db.getSiblingDB(jsTestName() + "1");
 const dbTest2 = db.getSiblingDB(jsTestName() + "2");
+const adminDB = db.getSiblingDB("admin");
+const configDB = db.getSiblingDB("config");
 
 const isBalancerEnabled = TestData.runningWithBalancer;
 const testingReplicaSetEndpoint = TestData.testingReplicaSetEndpoint;
@@ -167,34 +169,74 @@ function runTestOnDb(dbTest) {
 
 function runInternalCollectionsTest(dbTest) {
     // Check that $_internalListCollections returns collections for "admin" db.
-    assert.soon(() => {
-        let adminCollectionInfos = dbTest.getSiblingDB("admin").getCollectionInfos();
-        let adminCollections = dbTest.getSiblingDB("admin").aggregate([
-            {$_internalListCollections: {}},
-            {$match: {$and: [{db: "admin"}, {ns: {$not: /system.profile/}}]}}
-        ]);
-        return adminCollectionInfos.length == adminCollections.toArray().length;
-    });
+    assert.soon(
+        () => {
+            const adminCollsListCollections = adminDB.getCollectionInfos();
+            const adminCollsInternalListCollections =
+                adminDB.aggregate([{$_internalListCollections: {}}, {$match: {db: "admin"}}])
+                    .toArray();
+
+            if (adminCollsListCollections.length != adminCollsInternalListCollections.length) {
+                jsTestLog(
+                    "The collections of the 'admin' db returned by listCollections don't match " +
+                    "with the collections returned by $_internalListCollections. listCollections " +
+                    "response: " + tojson(adminCollsListCollections) +
+                    ", $_internalListCollections response: " +
+                    tojson(adminCollsInternalListCollections) +
+                    ". Going to retry the comparison check.");
+                return false;
+            }
+            return true;
+        },
+        "The collections of the 'admin' db returned by listCollections don't match with the " +
+            "collections returned by $_internalListCollections.");
 
     // Check that $_internalListCollections returns "config" collections if called against "admin"
     // db.
-    assert.soon(() => {
-        let configCollectionInfos = dbTest.getSiblingDB("config").getCollectionInfos();
-        let configCollectionsFromAdmin = dbTest.getSiblingDB("admin").aggregate([
-            {$_internalListCollections: {}},
-            {$match: {$and: [{db: "config"}, {ns: {$not: /system.profile/}}]}}
-        ]);
-        return configCollectionInfos.length == configCollectionsFromAdmin.toArray().length;
-    });
+    assert.soon(
+        () => {
+            const configCollsListCollections = configDB.getCollectionInfos();
+            const configCollsInternalListCollections =
+                adminDB.aggregate([{$_internalListCollections: {}}, {$match: {db: "config"}}])
+                    .toArray();
+
+            if (configCollsListCollections.length != configCollsInternalListCollections.length) {
+                jsTestLog(
+                    "The collections of the 'config' db returned by listCollections don't match " +
+                    "with the collections returned by $_internalListCollections when targeting " +
+                    "the 'admin' database. listCollections response: " +
+                    tojson(configCollsListCollections) + ", $_internalListCollections response: " +
+                    tojson(configCollsInternalListCollections) +
+                    ". Going to retry the comparison check.");
+                return false;
+            }
+            return true;
+        },
+        "The collections of the 'config' db returned by listCollections don't match with the " +
+            "collections returned by $_internalListCollections when targeting the 'admin' database.");
 
     // Check that $_internalListCollections returns "config" collections if called against "config"
     // db.
-    assert.soon(() => {
-        let configCollectionInfos = dbTest.getSiblingDB("config").getCollectionInfos();
-        let configCollectionsFromConfig = dbTest.getSiblingDB("config").aggregate(
-            [{$_internalListCollections: {}}, {$match: {ns: {$not: /system.profile/}}}]);
-        return configCollectionInfos.length == configCollectionsFromConfig.toArray().length;
-    });
+    assert.soon(
+        () => {
+            const configCollsListCollections = configDB.getCollectionInfos();
+            const configCollsInternalListCollections =
+                configDB.aggregate([{$_internalListCollections: {}}]).toArray();
+
+            if (configCollsListCollections.length != configCollsInternalListCollections.length) {
+                jsTestLog(
+                    "The collections of the 'config' db returned by listCollections don't match " +
+                    "with the collections returned by $_internalListCollections when targeting " +
+                    "the 'config' database. listCollections response: " +
+                    tojson(configCollsListCollections) + ", $_internalListCollections response: " +
+                    tojson(configCollsInternalListCollections) +
+                    ". Going to retry the comparison check.");
+                return false;
+            }
+            return true;
+        },
+        "The collections of the 'config' db returned by listCollections don't match with the " +
+            "collections returned by $_internalListCollections when targeting the 'config' database.");
 }
 
 assert.commandWorked(dbTest1.dropDatabase());
