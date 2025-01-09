@@ -8552,6 +8552,11 @@ mongo_unittest_install(
 )
 
 mongo_unittest_install(
+    name = "db_spilling_test-record_store_batch_writer_test",
+    srcs = ["//src/mongo/db/pipeline/spilling:db_spilling_test"],
+)
+
+mongo_unittest_install(
     name = "audit_test-audit_client_observer_test",
     srcs = ["//src/mongo/db/modules/enterprise/src/audit:audit_test"],
 )

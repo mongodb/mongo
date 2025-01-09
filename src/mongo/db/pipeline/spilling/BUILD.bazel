@@ -52,6 +52,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "db_spilling_test",
     srcs = [
+        "record_store_batch_writer_test.cpp",
         "spillable_deque_test.cpp",
         "spillable_map_test.cpp",
     ],
