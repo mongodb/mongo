@@ -224,6 +224,7 @@ selector:
     - jstests/core/query/covered_multikey.js
     - jstests/core/query/dotted_path_in_null.js
     - jstests/core/query/explode_for_sort_equality_to_array.js
+    - jstests/core/query/explode_for_sort_multikey.js
     - jstests/core/query/find/find_dedup.js
     - jstests/core/query/find/find_project_sort.js
     - jstests/core/query/nan.js

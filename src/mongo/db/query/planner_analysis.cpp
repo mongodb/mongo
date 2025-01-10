@@ -1063,8 +1063,10 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             auto elem = kpIt.next();
             if (isn->multikeyFields.find(elem.fieldNameStringData()) != isn->multikeyFields.end()) {
                 // One of the indexed fields providing the sort is multikey. It is not correct for a
-                // field with multikey components to provide a sort, so bail out.
-                return false;
+                // field with multikey components to provide a sort, so break out of this loop and
+                // look to see if the resulting sort we can provide is able to satisfy the desired
+                // sort.
+                break;
             }
             resultingSortBob.append(elem);
         }

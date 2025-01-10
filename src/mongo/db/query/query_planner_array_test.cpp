@@ -2235,6 +2235,24 @@ TEST_F(QueryPlannerTest, CanExplodeMultikeyIndexScanForSortWhenSortFieldsAreNotM
         "bounds: {a: [[2,2,true,true]], 'b.c': [['MinKey','MaxKey',true,true]]}}}]}}}}");
 }
 
+TEST_F(QueryPlannerTest, CanExploreMultikeyIndexScanForSortWhenFieldsNotUsedForSortAreMultikey) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    // Index {a: 1, b: 1, c: 1} where 'c' is multikey
+    MultikeyPaths multikeyPaths{{}, {}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1), multikeyPaths);
+
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {a: {$in: [1, 2]}}, sort: {'b': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {mergeSort: {nodes: ["
+        "{ixscan: {pattern: {a: 1, b: 1, c: 1}, filter: null,"
+        "bounds: {a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]], "
+        "c: [['MinKey','MaxKey',true,true]]}}},"
+        "{ixscan: {pattern: {a: 1, b: 1, c: 1}, filter: null,"
+        "bounds: {a: [[2,2,true,true]], b: [['MinKey','MaxKey',true,true]], "
+        "c: [['MinKey','MaxKey',true,true]]}}}]}}}}");
+}
+
 TEST_F(QueryPlannerTest, MultikeyIndexScanWithMinKeyMaxKeyBoundsCanProvideSort) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}};
