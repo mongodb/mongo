@@ -257,6 +257,21 @@ common:remote_link --strategy=ExtractDebugInfo=remote
 common:remote_link --strategy=StripDebugInfo=remote
 common:remote_link --features=-thin_archive
 
+# Coverage
+coverage --config=dbg
+coverage --compiler_type=gcc
+coverage --linkstatic=False
+coverage --test_output=all
+coverage --combined_report=lcov
+coverage --remote_download_outputs=all
+coverage --config=no-remote-exec
+coverage --fission=no
+# -Wno-mismatched-new-delete to address https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100485
+# which appears to only happen when coverage is enabled. It seems like enabling coverage is
+# changing inlining behavior, since this doesn't manifest when -fno-inline is passed in.
+coverage --copt=-Wno-mismatched-new-delete
+
+
 # Don't detect the native toolchain on linux, only use the hermetic toolchains.
 # Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.
 common:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
