@@ -8,6 +8,9 @@ selector:
     - jstests/core/**/*.js
     - jstests/aggregation/**/*.js
   exclude_files:
+    # TODO SERVER-96339: Fix $changeStream shape computation on sharded setQuerySettings commands.
+    - jstests/aggregation/explain_per_stage_exec_stats.js
+
     # TODO SERVER-95456 Make CLUSTERED_IXSCANs obey query settings allowed indexes
     - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
     - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
@@ -76,6 +79,9 @@ selector:
     - jstests/core/index/express.js
     - jstests/core/index/index_filter_commands.js
     - jstests/core/query/query_settings/**/*.js
+
+    # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
+    - jstests/core/index/wildcard/*.js
 
     # Query settings application is skipped for queries targeting collections containing encryption information,
     # and as such it's not possible to engage the fallback mechanism.
