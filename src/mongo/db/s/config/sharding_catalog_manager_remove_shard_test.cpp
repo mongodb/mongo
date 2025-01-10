@@ -272,6 +272,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
     ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
     ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
     ASSERT_EQUALS(1, ongoingResult.remainingCounts->jumboChunks);
     ASSERT_EQUALS(1, ongoingResult.remainingCounts->databases);
     ASSERT_TRUE(isDraining(shard1.getName()));
@@ -304,6 +305,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
     ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
     ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
     ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
     ASSERT_EQUALS(0, ongoingResult.remainingCounts->jumboChunks);
     ASSERT_EQUALS(1, ongoingResult.remainingCounts->databases);
     ASSERT_TRUE(isDraining(shard1.getName()));
@@ -357,6 +359,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
     ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
     ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
     ASSERT_EQUALS(0, ongoingResult.remainingCounts->jumboChunks);
     ASSERT_EQUALS(0, ongoingResult.remainingCounts->databases);
     ASSERT_TRUE(isDraining(shard1.getName()));

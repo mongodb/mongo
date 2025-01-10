@@ -44,11 +44,14 @@ enums:
 
 structs:
     RemainingCounts:
-        description: "Remaining count of chunks, dbs, and jumbo chunks on the shard being removed."
+        description: "Remaining count of chunks, unsharded collections, dbs, and jumbo chunks on the shard being removed."
         strict: false
         fields:
             chunks:
                 description: "Number of chunks remaining on the shard being removed."
+                type: long
+            collectionsToMove:
+                description: "Number of unsharded collections remaining on the shard being removed."
                 type: long
             dbs:
                 description: "Number of databases remaining on the shard being removed."
@@ -69,7 +72,7 @@ structs:
                 type: ShardDrainingState
                 description: "State of shard draining on the shard being removed."
             shard:
-                type: string 
+                type: string
                 description: "The ID of the shard being removed."
                 optional: true
             dbsToMove:
@@ -77,8 +80,8 @@ structs:
                 description: "Remaining databases left to move."
                 optional: true
             remaining:
-                type: RemainingCounts 
-                description: "Number of chunks, dbs, and jumbo chunks remaining on the shard being removed."
+                type: RemainingCounts
+                description: "Number of chunks, unsharded collections, dbs, and jumbo chunks remaining on the shard being removed."
                 optional: true
             pendingRangeDeletions:
                 type: long
@@ -91,4 +94,8 @@ structs:
             note:
                 type: string
                 description: "Additional notes."
+                optional: true
+            collectionsToMove:
+                type: array<string>
+                description: "Remaining unsharded collections left to move."
                 optional: true
