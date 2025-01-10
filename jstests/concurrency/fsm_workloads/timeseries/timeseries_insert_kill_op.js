@@ -13,6 +13,10 @@
  */
 
 export const $config = (function() {
+    // The test takes an extended period of time specifically on Windows debug variants.
+    const buildInfo = getBuildInfo();
+    const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os === "windows";
+
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
 
@@ -86,7 +90,7 @@ export const $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: 100,
+        iterations: skipTest ? 0 : 100,
         setup: setup,
         states: states,
         transitions: transitions,
