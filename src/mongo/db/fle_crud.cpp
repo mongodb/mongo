@@ -652,6 +652,14 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         appendPossibleWriteConcernErrorToReply(commitResult.wcError,
                                                &reply->getWriteCommandReplyBase());
         if (!commitResult.cmdStatus.isOK()) {
+            if (commitResult.cmdStatus == ErrorCodes::UnsatisfiableWriteConcern) {
+                // On single-write-shard commits, the transaction API will abort the transaction and
+                // return a CommitResult with cmdStatus=UnsatisfiableWriteConcern if any of the
+                // read-only shards fail to commit with the user requested write concern. This
+                // happens before any commits to the write shards are performed, so none of the
+                // changes are actually made durable.
+                reply->setN(0);
+            }
             appendSingleStatusToWriteErrors(commitResult.cmdStatus,
                                             &reply->getWriteCommandReplyBase());
         }
@@ -735,7 +743,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
             if (reply->getWriteErrors().has_value() && !reply->getWriteErrors().value().empty()) {
                 return SemiFuture<void>::makeReady(
                     Status(ErrorCodes::FLETransactionAbort,
-                           "Queryable Encryption write errors on delete"));
+                           "Queryable Encryption write errors on update"));
             }
 
             return SemiFuture<void>::makeReady();
@@ -758,6 +766,15 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
         appendPossibleWriteConcernErrorToReply(commitResult.wcError,
                                                &reply->getWriteCommandReplyBase());
         if (!commitResult.cmdStatus.isOK()) {
+            if (commitResult.cmdStatus == ErrorCodes::UnsatisfiableWriteConcern) {
+                // On single-write-shard commits, the transaction API will abort the transaction and
+                // return a CommitResult with cmdStatus=UnsatisfiableWriteConcern if any of the
+                // read-only shards fail to commit with the user requested write concern. This
+                // happens before any commits to the write shards are performed, so none of the
+                // changes are actually made durable.
+                reply->setNModified(0);
+                reply->setN(0);
+            }
             appendSingleStatusToWriteErrors(commitResult.cmdStatus,
                                             &reply->getWriteCommandReplyBase());
         }
