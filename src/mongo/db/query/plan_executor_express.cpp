@@ -300,7 +300,7 @@ public:
     }
 
     bool usesCollectionAcquisitions() const override {
-        return std::is_same_v<std::decay<typename Plan::CollectionType>, CollectionAcquisition>;
+        return std::is_same_v<std::decay_t<typename Plan::CollectionType>, CollectionAcquisition>;
     }
 
     const Plan& getPlan() const {
