@@ -1033,24 +1033,26 @@ public:
                                int secondsBetween = 3);
 
     /**
-     * Captures stats on the locker after transaction resources are unstashed to the operation
-     * context to be able to correctly ignore stats from outside this CurOp instance. Assumes that
-     * operation will only unstash transaction resources once.
+     * Captures stats on the locker and recovery unit after transaction resources are unstashed to
+     * the operation context to be able to correctly ignore stats from outside this CurOp instance.
+     * Assumes that operation will only unstash transaction resources once. Requires holding the
+     * client lock.
      */
-    void updateStatsOnTransactionUnstash();
+    void updateStatsOnTransactionUnstash(ClientLock&);
 
     /**
-     * Captures stats on the locker that happened during this CurOp instance before transaction
-     * resources are stashed. Also cleans up stats taken when transaction resources were unstashed.
-     * Assumes that operation will only stash transaction resources once.
+     * Captures stats on the locker and recovery unit that happened during this CurOp instance
+     * before transaction resources are stashed. Also cleans up stats taken when transaction
+     * resources were unstashed. Assumes that operation will only stash transaction resources once.
+     * Requires holding the client lock.
      */
-    void updateStatsOnTransactionStash();
+    void updateStatsOnTransactionStash(ClientLock&);
 
     /**
      * Captures metrics from the recovery unit that happened during this CurOp instance before a new
-     * recovery unit is set to the operation.
+     * recovery unit is set to the operation. Requires holding the client lock.
      */
-    void updateStorageMetricsOnRecoveryUnitChange();
+    void updateStorageMetricsOnRecoveryUnitChange(ClientLock&);
 
     /*
      * Gets the message for FailPoints used.
@@ -1069,7 +1071,7 @@ public:
     CurOp* parent() const {
         return _parent;
     }
-    boost::optional<GenericCursor> getGenericCursor(WithLock) const {
+    boost::optional<GenericCursor> getGenericCursor(ClientLock) const {
         return _genericCursor;
     }
 

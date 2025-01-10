@@ -33,6 +33,7 @@
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -54,6 +55,16 @@ protected:
 
     TickSourceMock<Microseconds>* tickSource() {
         return checked_cast<decltype(tickSource())>(getServiceContext()->getTickSource());
+    }
+
+    void updateStatsOnTransactionUnstashWithLock(OperationContext* opCtx, CurOp* curop) {
+        ClientLock lk(opCtx->getClient());
+        curop->updateStatsOnTransactionUnstash(lk);
+    }
+
+    void updateStatsOnTransactionStashWithLock(OperationContext* opCtx, CurOp* curop) {
+        ClientLock lk(opCtx->getClient());
+        curop->updateStatsOnTransactionStash(lk);
     }
 };
 
@@ -214,7 +225,7 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
 
     // Simulate stashing locker from opCtx1. Check that wait times after stashing are still reported
     // on opCtx1.
-    curop1->updateStatsOnTransactionStash();
+    updateStatsOnTransactionStashWithLock(opCtx1.get(), curop1);
     auto locker = shard_role_details::swapLocker(
         opCtx1.get(), std::make_unique<Locker>(opCtx1->getServiceContext()));
     curop1->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
@@ -229,7 +240,7 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
     // unstashed locker is not considered blocked for opCtx2.
     shard_role_details::swapLocker(opCtx2.get(), std::move(locker));
     auto lockerOp2 = shard_role_details::getLocker(opCtx2.get());
-    curop2->updateStatsOnTransactionUnstash();
+    updateStatsOnTransactionUnstashWithLock(opCtx2.get(), curop2);
     curop2->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(lockerOp2->getLockerInfo(boost::none).stats.getCumulativeWaitTimeMicros(),
               waitForLocks);
@@ -265,7 +276,7 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
 
     // Simulate stashing locker from opCtx2. Check that ticket and lock wait time after stashing is
     // still reported on opCtx2.
-    curop2->updateStatsOnTransactionStash();
+    updateStatsOnTransactionStashWithLock(opCtx2.get(), curop2);
     locker = shard_role_details::swapLocker(opCtx2.get(),
                                             std::make_unique<Locker>(opCtx2->getServiceContext()));
     curop2->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
@@ -275,7 +286,7 @@ TEST_F(CurOpStatsTest, UnstashingAndStashingTransactionResource) {
 
     // Confirm stats are correctly accounted for even when we try unstashing the locker again.
     shard_role_details::swapLocker(opCtx2.get(), std::move(locker));
-    curop2->updateStatsOnTransactionUnstash();
+    updateStatsOnTransactionUnstashWithLock(opCtx2.get(), curop2);
     lockerOp2 = shard_role_details::getLocker(opCtx2.get());
     int64_t waitForLocksOnOp3 =
         addWaitForLock(opCtx2.get(), opCtx2->getServiceContext(), lockerOp2, Milliseconds(1));
@@ -360,20 +371,20 @@ TEST_F(CurOpStatsTest, MultipleUnstashingAndStashingTransaction) {
     lockerOp1->addFlowControlTicketQueueTime(Milliseconds{20});
 
     // Advance counters while stashed
-    curop1->updateStatsOnTransactionStash();
+    updateStatsOnTransactionStashWithLock(opCtx1.get(), curop1);
     tickSourceMock->advance(Milliseconds{1000});
     lockerOp1->addFlowControlTicketQueueTime(Milliseconds{30});
-    curop1->updateStatsOnTransactionUnstash();
+    updateStatsOnTransactionUnstashWithLock(opCtx1.get(), curop1);
 
     // Advance counters while not stashed
     tickSourceMock->advance(Milliseconds{1000});
     lockerOp1->addFlowControlTicketQueueTime(Milliseconds{40});
 
     // Advance counters while stashed
-    curop1->updateStatsOnTransactionStash();
+    updateStatsOnTransactionStashWithLock(opCtx1.get(), curop1);
     tickSourceMock->advance(Milliseconds{1000});
     lockerOp1->addFlowControlTicketQueueTime(Milliseconds{50});
-    curop1->updateStatsOnTransactionUnstash();
+    updateStatsOnTransactionUnstashWithLock(opCtx1.get(), curop1);
 
     // Advance counters while not stashed
     tickSourceMock->advance(Milliseconds{1000});

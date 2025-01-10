@@ -465,7 +465,7 @@ ProgressMeter& CurOp::setProgress(WithLock lk,
     return _progressMeter.value();
 }
 
-void CurOp::updateStatsOnTransactionUnstash() {
+void CurOp::updateStatsOnTransactionUnstash(ClientLock&) {
     // Store lock stats and storage metrics from the locker and recovery unit after unstashing.
     // These stats have accrued outside of this CurOp instance so we will ignore/subtract them when
     // reporting on this operation.
@@ -475,7 +475,7 @@ void CurOp::updateStatsOnTransactionUnstash() {
     _resourceStatsBase->addForUnstash(getAdditiveResourceStats(boost::none));
 }
 
-void CurOp::updateStatsOnTransactionStash() {
+void CurOp::updateStatsOnTransactionStash(ClientLock&) {
     // Store lock stats and storage metrics that happened during this operation before the locker
     // and recovery unit are stashed. We take the delta of the stats before stashing and the base
     // stats which includes the snapshot of stats when it was unstashed. This stats delta on
@@ -486,7 +486,7 @@ void CurOp::updateStatsOnTransactionStash() {
     _resourceStatsBase->subtractForStash(getAdditiveResourceStats(boost::none));
 }
 
-void CurOp::updateStorageMetricsOnRecoveryUnitChange() {
+void CurOp::updateStorageMetricsOnRecoveryUnitChange(ClientLock&) {
     auto storageMetrics = shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
     if (!storageMetrics.isEmpty()) {
         if (!_resourceStatsBase) {

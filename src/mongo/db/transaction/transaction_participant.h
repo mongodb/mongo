@@ -229,7 +229,9 @@ public:
          * Stashes transaction state from 'opCtx' in the newly constructed TxnResources.
          * Caller must hold the Client lock associated with opCtx, attested by WithLock.
          */
-        TxnResources(WithLock, OperationContext* opCtx, StashStyle stashStyle) noexcept;
+        TxnResources(ClientLock& clientLock,
+                     OperationContext* opCtx,
+                     StashStyle stashStyle) noexcept;
         ~TxnResources();
 
         // Rule of 5: because we have a class-defined destructor, we need to explicitly specify
