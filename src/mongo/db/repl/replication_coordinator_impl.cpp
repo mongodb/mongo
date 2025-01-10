@@ -2359,13 +2359,17 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     // It is illegal to wait for replication with a session checked out because it can lead to
     // deadlocks.
-    invariant(OperationContextSession::get(opCtx) == nullptr);
+    tassert(8731900,
+            "session must be checked out before waiting for replication",
+            OperationContextSession::get(opCtx) == nullptr);
 
     Timer timer;
 
     // We should never wait for replication if we are holding any locks, because this can
     // potentially block for long time while doing network activity.
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    tassert(8731901,
+            "no locks should be held when waiting for replication",
+            !shard_role_details::getLocker(opCtx)->isLocked());
 
     auto interruptStatus = opCtx->checkForInterruptNoAssert();
     if (!interruptStatus.isOK()) {
