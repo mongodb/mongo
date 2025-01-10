@@ -807,11 +807,13 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
     const CanonicalQuery& query, std::set<ChunkRange>* chunkRanges) const {
 
     std::set<ShardId> shardIds;
-    QueryTargetingInfo info;
     try {
-        getShardIdsForCanonicalQuery(query, _cri.cm, &shardIds, &info);
         if (chunkRanges) {
+            QueryTargetingInfo info;
+            getShardIdsForCanonicalQuery(query, _cri.cm, &shardIds, &info);
             chunkRanges->swap(info.chunkRanges);
+        } else {
+            getShardIdsForCanonicalQuery(query, _cri.cm, &shardIds, nullptr);
         }
     } catch (const DBException& ex) {
         return ex.toStatus();
