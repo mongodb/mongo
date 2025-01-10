@@ -85,6 +85,7 @@ struct IndexInfo {
     const bool unique;
     // Index access method pointer.
     const IndexAccessMethod* accessMethod;
+    IndexType indexType;
 };
 
 /**
@@ -275,6 +276,13 @@ private:
                      IndexInfo* indexInfo,
                      const RecordId& recordId,
                      ValidateResults* results);
+
+    /**
+     * Returns true if we should skip doing the hash bucket counting to detect extra/missing index
+     * keys. This is currently done for geo indexes as they can experience rounding errors in trig
+     * functions leading to false positives
+     */
+    bool skipTrackingIndexKeyCount(const IndexInfo& indexInfo);
 
     /**
      * During the first phase of validation, tracks the multikey paths for every observed document.
