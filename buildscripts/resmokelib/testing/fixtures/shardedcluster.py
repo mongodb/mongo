@@ -9,6 +9,9 @@ import pymongo.errors
 import yaml
 
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
+from buildscripts.resmokelib.utils.sharded_cluster_util import (
+    refresh_logical_session_cache_with_retry,
+)
 
 
 class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface):
@@ -296,18 +299,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
-            retry_count = 10
-            while retry_count > 0:
-                try:
-                    self.refresh_logical_session_cache(self.configsvr)
-                    break
-                except pymongo.errors.OperationFailure as err:
-                    if err.code == 70:  # ShardNotFound
-                        time.sleep(0.5)  # Wait a little bit before trying again.
-                        retry_count -= 1
-                    raise err
-            if retry_count == 0:
-                raise Exception("Unable refresh the logical session cache for the config server.")
+            primary_mongo_client = self.configsvr.get_primary().mongo_client()
+            refresh_logical_session_cache_with_retry(primary_mongo_client)
 
         for shard in self.shards:
             self.refresh_logical_session_cache(shard)
