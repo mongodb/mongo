@@ -88,5 +88,4 @@ const db = conn.getDB(dbName);
     assert.eq(2, bucketsColl.find().itcount());
 })();
 
-// TODO SERVER-87065: Look into re-enabling validation on shutdown.
-MongoRunner.stopMongod(conn, null, {skipValidation: true});
+MongoRunner.stopMongod(conn);
