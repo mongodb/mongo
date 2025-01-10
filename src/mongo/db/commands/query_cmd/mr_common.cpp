@@ -161,7 +161,7 @@ auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string
     auto initializer = ExpressionArray::create(expCtx.get(), {});
     auto argument = ExpressionFieldPath::parse(expCtx.get(), "$emits", expCtx->variablesParseState);
     auto reduceFactory = [expCtx, funcSource = std::move(code)]() {
-        return AccumulatorInternalJsReduce::create(expCtx.get(), funcSource);
+        return make_intrusive<AccumulatorInternalJsReduce>(expCtx.get(), funcSource);
     };
     AccumulationStatement jsReduce("value",
                                    AccumulationExpression(std::move(initializer),

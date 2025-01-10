@@ -514,13 +514,13 @@ ExpressionN<WindowFunctionN, AccumulatorNType>::createAccumulatorWithoutInitiali
                               << " should not have received a 'sortBy' but did!",
                 !sortPattern);
 
-        return AccumulatorNType::create(_expCtx);
+        return make_intrusive<AccumulatorNType>(_expCtx);
     } else {
         tassert(5788601,
                 str::stream() << AccumulatorNType::getName()
                               << " should have received a 'sortBy' but did not!",
                 sortPattern);
-        return AccumulatorNType::create(_expCtx, *sortPattern);
+        return make_intrusive<AccumulatorNType>(_expCtx, *sortPattern);
     }
 }
 
@@ -681,7 +681,7 @@ std::unique_ptr<WindowFunctionState> ExpressionQuantile<AccumulatorTType>::build
 template <typename AccumulatorTType>
 boost::intrusive_ptr<AccumulatorState> ExpressionQuantile<AccumulatorTType>::buildAccumulatorOnly()
     const {
-    return AccumulatorTType::create(_expCtx, _ps, _method);
+    return make_intrusive<AccumulatorTType>(_expCtx, _ps, _method);
 }
 
 

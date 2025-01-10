@@ -94,7 +94,7 @@ static void assertProcessFailsWithCode(ExpressionContext* const expCtx,
                                        const std::string& eval,
                                        Value processArgument,
                                        int code) {
-    auto accum = AccName::create(expCtx, eval);
+    auto accum = make_intrusive<AccName>(expCtx, eval);
     ASSERT_THROWS_CODE(accum->process(processArgument, false), AssertionException, code);
 }
 
@@ -114,7 +114,7 @@ static void assertExpectedResults(ExpressionContext* const expCtx,
                                   Value expectedResult) {
     // Asserts that result equals expected result when not sharded.
     {
-        auto accum = AccName::create(expCtx, eval);
+        auto accum = make_intrusive<AccName>(expCtx, eval);
         for (auto&& val : data) {
             accum->process(val, false);
         }
@@ -125,8 +125,8 @@ static void assertExpectedResults(ExpressionContext* const expCtx,
 
     // Asserts that result equals expected result when all input is on one shard.
     {
-        auto accum = AccName::create(expCtx, eval);
-        auto shard = AccName::create(expCtx, eval);
+        auto accum = make_intrusive<AccName>(expCtx, eval);
+        auto shard = make_intrusive<AccName>(expCtx, eval);
         for (auto&& val : data) {
             shard->process(val, false);
         }
@@ -138,9 +138,9 @@ static void assertExpectedResults(ExpressionContext* const expCtx,
 
     // Asserts that result equals expected result when each input is on a separate shard.
     {
-        auto accum = AccName::create(expCtx, eval);
+        auto accum = make_intrusive<AccName>(expCtx, eval);
         for (auto&& val : data) {
-            auto shard = AccName::create(expCtx, eval);
+            auto shard = make_intrusive<AccName>(expCtx, eval);
             shard->process(val, false);
             accum->process(shard->getValue(true), true);
         }
@@ -176,7 +176,7 @@ TEST_F(MapReduceFixture, InternalJsReduceProducesExpectedResults) {
 
 TEST_F(MapReduceFixture, InternalJsReduceIdempotentOnlyWhenJSFunctionIsIdempotent) {
     std::string eval("function(key, values) { return Array.sum(values) + 1; };");
-    auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), eval);
+    auto accum = make_intrusive<AccumulatorInternalJsReduce>(getExpCtx(), eval);
 
     // A non-idempotent Javascript function will produce non-idempotent results. In this case a
     // single document reduce causes a change in value.
@@ -194,7 +194,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript)
     std::string eval("INVALID_JAVASCRIPT");
     // Multiple source documents.
     {
-        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+        auto accum = make_intrusive<AccumulatorInternalJsReduce>(getExpCtx(), "INVALID_JAVASCRIPT");
         auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
         accum->process(input, false);
         accum->process(input, false);
@@ -204,7 +204,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript)
 
     // Single source document.
     {
-        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+        auto accum = make_intrusive<AccumulatorInternalJsReduce>(getExpCtx(), "INVALID_JAVASCRIPT");
 
         auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
         accum->process(input, false);
@@ -221,7 +221,7 @@ TEST_F(
     // Multiple source documents should evaluate the passed in function and return an error with
     // invalid javascript.
     {
-        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+        auto accum = make_intrusive<AccumulatorInternalJsReduce>(getExpCtx(), "INVALID_JAVASCRIPT");
         auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
         accum->process(input, false);
         accum->process(input, false);
@@ -232,7 +232,7 @@ TEST_F(
     // Single source document. With the reduce optimization, we simply return this document rather
     // than executing the JS engine at all, so no error is thrown.
     {
-        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+        auto accum = make_intrusive<AccumulatorInternalJsReduce>(getExpCtx(), "INVALID_JAVASCRIPT");
 
         auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
         auto expectedResult = Value(2);

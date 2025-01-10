@@ -436,7 +436,7 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
             AccumulationExpression(
                 ExpressionConstant::create(pExpCtx.get(), Value(BSONNULL)),
                 ExpressionConstant::create(pExpCtx.get(), Value(1)),
-                [pExpCtx] { return AccumulatorSum::create(pExpCtx.get()); },
+                [pExpCtx] { return make_intrusive<AccumulatorSum>(pExpCtx.get()); },
                 AccumulatorSum::kName));
     }
     return new DocumentSourceBucketAuto(pExpCtx,

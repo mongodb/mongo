@@ -519,7 +519,7 @@ std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
     return std::make_unique<AccumulationExpression>(
         initializer,
         argument,
-        [pExpCtx]() { return AccumulatorSum::create(pExpCtx); },
+        [pExpCtx]() { return make_intrusive<AccumulatorSum>(pExpCtx); },
         AccumulatorSum::kName);
 }
 

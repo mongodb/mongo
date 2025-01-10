@@ -300,7 +300,7 @@ public:
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return NonRemovableType::create(_expCtx);
+        return make_intrusive<NonRemovableType>(_expCtx);
     }
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
         uasserted(5461500,
@@ -368,7 +368,7 @@ public:
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return FunctionType::create(_expCtx);
+        return make_intrusive<FunctionType>(_expCtx);
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
@@ -425,11 +425,11 @@ public:
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return NonRemovableType::create(_expCtx);
+        return make_intrusive<NonRemovableType>(_expCtx);
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
-        return RemovableType::create(_expCtx);
+        return std::make_unique<RemovableType>(_expCtx);
     }
 };
 
@@ -492,7 +492,7 @@ public:
           _isAscending(isAscending) {}
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return RankType::create(_expCtx, _isAscending);
+        return make_intrusive<RankType>(_expCtx, _isAscending);
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
@@ -539,10 +539,10 @@ public:
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
         if (_N) {
-            return AccumulatorExpMovingAvg::create(
+            return make_intrusive<AccumulatorExpMovingAvg>(
                 _expCtx, Decimal128(2).divide(Decimal128(_N.get()).add(Decimal128(1))));
         } else if (_alpha) {
-            return AccumulatorExpMovingAvg::create(_expCtx, _alpha.get());
+            return make_intrusive<AccumulatorExpMovingAvg>(_expCtx, _alpha.get());
         }
         tasserted(5433602, "ExpMovingAvg neither N nor alpha was set");
     }
@@ -810,7 +810,7 @@ public:
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return AccumulatorIntegral::create(_expCtx, unitInMillis());
+        return make_intrusive<AccumulatorIntegral>(_expCtx, unitInMillis());
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {

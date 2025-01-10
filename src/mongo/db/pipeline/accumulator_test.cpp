@@ -182,7 +182,7 @@ static void assertExpectedResults(
     boost::optional<Value> newGroupValue = boost::none) {
     auto initializeAccumulator =
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        auto accum = AccName::create(expCtx);
+        auto accum = make_intrusive<AccName>(expCtx);
         if (newGroupValue) {
             accum->startNewGroup(*newGroupValue);
         }
@@ -671,7 +671,7 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         bottomCasesAscending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << 1));
             acc->startNewGroup(n);
             return acc;
@@ -684,7 +684,7 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         bottomCasesDescending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << -1));
             acc->startNewGroup(n);
             return acc;
@@ -697,8 +697,8 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         topCasesAscending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << 1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << 1));
             acc->startNewGroup(n);
             return acc;
         });
@@ -710,8 +710,8 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         topCasesDescending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << -1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << -1));
             acc->startNewGroup(n);
             return acc;
         });
@@ -797,7 +797,7 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
     try {
         auto accumInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << 1));
             acc->startNewGroup(n3);
             return acc;
@@ -844,8 +844,8 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << -1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << -1));
             acc->startNewGroup(n3);
             return acc;
         };
@@ -945,7 +945,7 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << -1));
             acc->startNewGroup(n3);
             return acc;
@@ -992,8 +992,8 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << 1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << 1));
             acc->startNewGroup(n3);
             return acc;
         };
@@ -1046,7 +1046,7 @@ TEST(Accumulators, TopBottomNMultiSortPattern) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << -1 << "b" << -1));
             acc->startNewGroup(n);
             return acc;
@@ -1068,7 +1068,7 @@ TEST(Accumulators, TopBottomNMultiSortPattern) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
                 expCtx, BSON("a" << 1 << "b" << 1));
             acc->startNewGroup(n);
             return acc;
@@ -1088,7 +1088,8 @@ void runTopBottomAccumulatorTest(ExpressionContext* const expCtx,
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<Sense, false>::create(expCtx, BSON("a" << dir));
+            auto acc =
+                make_intrusive<AccumulatorTopBottomN<Sense, false>>(expCtx, BSON("a" << dir));
             acc->startNewGroup(n);
             return acc;
         };
@@ -1148,7 +1149,7 @@ void testSingle(OperationsType cases, ExpressionContext* const expCtx, const BSO
             expCtx,
             cases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<s, true>::create(expCtx, sortPattern);
+                auto acc = make_intrusive<AccumulatorTopBottomN<s, true>>(expCtx, sortPattern);
                 acc->startNewGroup(Value(1));
                 return acc;
             });
@@ -1188,8 +1189,8 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomAscTopDescCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc =
-                    AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(expCtx, ascSort);
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
+                    expCtx, ascSort);
                 acc->startNewGroup(n);
                 return acc;
             });
@@ -1204,7 +1205,7 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomAscTopDescCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
                     expCtx, BSON("a" << -1));
                 acc->startNewGroup(n);
                 return acc;
@@ -1231,7 +1232,7 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomDescTopAscCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                     expCtx, BSON("a" << -1));
                 acc->startNewGroup(n);
                 return acc;
@@ -1248,7 +1249,7 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomDescTopAscCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
                     expCtx, BSON("a" << 1));
                 acc->startNewGroup(n);
                 return acc;
@@ -1266,7 +1267,7 @@ struct TopBottomNRemoveTest : public AggregationContextFixture {
         auto expCtx = getExpCtxRaw();
         expCtx->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kToLowerString));
-        auto accState = T::create(expCtx, sortBy, /* isRemovable */ true);
+        auto accState = make_intrusive<T>(expCtx, sortBy, /* isRemovable */ true);
         _acc = boost::dynamic_pointer_cast<T>(accState);
         _acc->startNewGroup(Value(n.value_or(1)));
     }
@@ -1690,7 +1691,7 @@ TEST_F(BottomRemoveTest, BottomRemoveNoUnderflow) {
 TEST(Accumulators, Rank) {
     auto expCtx = ExpressionContextForTest{};
     auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorRank::create(expCtx, true /* isAscending */);
+        return make_intrusive<AccumulatorRank>(expCtx, true /* isAscending */);
     };
     assertExpectedResults(
         &expCtx,
@@ -1717,7 +1718,7 @@ TEST(Accumulators, Rank) {
 TEST(Accumulators, DenseRank) {
     auto expCtx = ExpressionContextForTest{};
     auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorDenseRank::create(expCtx, true /* isAscending */);
+        return make_intrusive<AccumulatorDenseRank>(expCtx, true /* isAscending */);
     };
     assertExpectedResults(
         &expCtx,
@@ -1741,7 +1742,7 @@ TEST(Accumulators, DenseRank) {
 TEST(Accumulators, DocumentNumberRank) {
     auto expCtx = ExpressionContextForTest{};
     auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorDocumentNumber::create(expCtx, true /* isAscending */);
+        return make_intrusive<AccumulatorDocumentNumber>(expCtx, true /* isAscending */);
     };
     assertExpectedResults(
         &expCtx,
@@ -1829,7 +1830,7 @@ template <typename AccName>
 static void assertCovariance(ExpressionContext* const expCtx,
                              const std::vector<Value>& input,
                              boost::optional<double> result = boost::none) {
-    auto accum = AccName::create(expCtx);
+    auto accum = make_intrusive<AccName>(expCtx);
     for (auto&& val : input) {
         accum->process(val, false);
     }
@@ -2333,7 +2334,7 @@ static void assertSetUnionResults(
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
     auto initializeAccumulator =
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        auto accum = AccumulatorSetUnion::create(expCtx);
+        auto accum = make_intrusive<AccumulatorSetUnion>(expCtx);
         return accum;
     };
     assertExpectedResults(expCtx,

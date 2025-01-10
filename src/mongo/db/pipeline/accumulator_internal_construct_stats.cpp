@@ -60,8 +60,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 AccumulationExpression parseInternalConstructStats(ExpressionContext* const expCtx,
                                                    BSONElement elem,
                                                    VariablesParseState vps) {
@@ -75,11 +73,12 @@ AccumulationExpression parseInternalConstructStats(ExpressionContext* const expC
 
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);
-    return {
-        initializer,
-        argument,
-        [expCtx, params]() { return AccumulatorInternalConstructStats::create(expCtx, params); },
-        "_internalConstructStats"};
+    return {initializer,
+            argument,
+            [expCtx, params]() {
+                return make_intrusive<AccumulatorInternalConstructStats>(expCtx, params);
+            },
+            "_internalConstructStats"};
 }
 
 REGISTER_ACCUMULATOR(_internalConstructStats, parseInternalConstructStats);
@@ -90,11 +89,6 @@ AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
     assertAllowedInternalIfRequired(
         expCtx->getOperationContext(), "_internalConstructStats", AllowedWithClientType::kInternal);
     _memUsageTracker.set(sizeof(*this));
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorInternalConstructStats::create(
-    ExpressionContext* const expCtx, InternalConstructStatsAccumulatorParams params) {
-    return new AccumulatorInternalConstructStats(expCtx, params);
 }
 
 void AccumulatorInternalConstructStats::processInternal(const Value& input, bool merging) {

@@ -45,8 +45,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 // These don't make sense as accumulators, so only register them as window functions.
 REGISTER_STABLE_WINDOW_FUNCTION(
     rank, mongo::window_function::ExpressionFromRankAccumulator<AccumulatorRank>::parse);
@@ -109,21 +107,6 @@ void AccumulatorDenseRank::processInternal(const Value& input, bool merging) {
         _lastInput = input;
         _memUsageTracker.set(sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value));
     }
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorRank::create(ExpressionContext* const expCtx,
-                                                        bool isAscending) {
-    return new AccumulatorRank(expCtx, isAscending);
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorDenseRank::create(ExpressionContext* const expCtx,
-                                                             bool isAscending) {
-    return new AccumulatorDenseRank(expCtx, isAscending);
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorDocumentNumber::create(ExpressionContext* const expCtx,
-                                                                  bool isAscending) {
-    return new AccumulatorDocumentNumber(expCtx, isAscending);
 }
 
 AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx, bool isAscending)

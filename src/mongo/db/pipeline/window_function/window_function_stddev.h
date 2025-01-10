@@ -38,8 +38,8 @@ class WindowFunctionStdDev : public WindowFunctionState {
 protected:
     explicit WindowFunctionStdDev(ExpressionContext* const expCtx, bool isSamp)
         : WindowFunctionState(expCtx),
-          _sum(AccumulatorSum::create(expCtx)),
-          _m2(AccumulatorSum::create(expCtx)),
+          _sum(make_intrusive<AccumulatorSum>(expCtx)),
+          _m2(make_intrusive<AccumulatorSum>(expCtx)),
           _isSamp(isSamp),
           _count(0),
           _nonfiniteValueCount(0) {

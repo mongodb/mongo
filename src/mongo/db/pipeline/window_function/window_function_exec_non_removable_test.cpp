@@ -79,15 +79,16 @@ public:
                 ExpressionArray::create(
                     getExpCtx().get(),
                     std::vector<boost::intrusive_ptr<Expression>>{sortBy, input}),
-                AccumulatorType::create(getExpCtx().get()),
+                make_intrusive<AccumulatorType>(getExpCtx().get()),
                 upper,
                 &_tracker["output"]);
         } else {
-            return WindowFunctionExecNonRemovable(_iter.get(),
-                                                  std::move(input),
-                                                  AccumulatorType::create(getExpCtx().get()),
-                                                  upper,
-                                                  &_tracker["output"]);
+            return WindowFunctionExecNonRemovable(
+                _iter.get(),
+                std::move(input),
+                make_intrusive<AccumulatorType>(getExpCtx().get()),
+                upper,
+                &_tracker["output"]);
         }
     }
 
@@ -160,8 +161,11 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
                                   boost::none);
     auto input =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
-    auto mgr = WindowFunctionExecNonRemovable(
-        &iter, std::move(input), AccumulatorSum::create(getExpCtx().get()), 1, &_tracker["output"]);
+    auto mgr = WindowFunctionExecNonRemovable(&iter,
+                                              std::move(input),
+                                              make_intrusive<AccumulatorSum>(getExpCtx().get()),
+                                              1,
+                                              &_tracker["output"]);
     ASSERT_VALUE_EQ(Value(1), mgr.getNext());
     iter.advance();
     // Normally the stage would be responsible for detecting a new partition, for this test reset
@@ -196,7 +200,7 @@ TEST_F(WindowFunctionExecNonRemovableTest, InputExpressionAllowedToCreateVariabl
         getExpCtx().get(), filterBSON.firstElement(), getExpCtx()->variablesParseState);
     auto exec = WindowFunctionExecNonRemovable(iter.get(),
                                                std::move(input),
-                                               AccumulatorFirst::create(getExpCtx().get()),
+                                               make_intrusive<AccumulatorFirst>(getExpCtx().get()),
                                                1,
                                                &_tracker["output"]);
     // The input is a constant [2, 3] for each document.

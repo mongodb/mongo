@@ -241,9 +241,9 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
 
     auto factory = [expCtx] {
         if constexpr (s == MinMaxSense::kMin) {
-            return AccumulatorMinN::create(expCtx);
+            return make_intrusive<AccumulatorMinN>(expCtx);
         } else {
-            return AccumulatorMaxN::create(expCtx);
+            return make_intrusive<AccumulatorMaxN>(expCtx);
         }
     };
 
@@ -295,16 +295,8 @@ const char* AccumulatorMinN::getName() {
     return kName.rawData();
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorMinN::create(ExpressionContext* const expCtx) {
-    return make_intrusive<AccumulatorMinN>(expCtx);
-}
-
 const char* AccumulatorMaxN::getName() {
     return kName.rawData();
-}
-
-boost::intrusive_ptr<AccumulatorState> AccumulatorMaxN::create(ExpressionContext* const expCtx) {
-    return make_intrusive<AccumulatorMaxN>(expCtx);
 }
 
 AccumulatorFirstLastN::AccumulatorFirstLastN(ExpressionContext* const expCtx, FirstLastSense sense)
@@ -334,9 +326,9 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
 
     auto factory = [expCtx] {
         if constexpr (v == Sense::kFirst) {
-            return AccumulatorFirstN::create(expCtx);
+            return make_intrusive<AccumulatorFirstN>(expCtx);
         } else {
-            return AccumulatorLastN::create(expCtx);
+            return make_intrusive<AccumulatorLastN>(expCtx);
         }
     };
 
@@ -406,16 +398,8 @@ const char* AccumulatorFirstN::getName() {
     return kName.rawData();
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorFirstN::create(ExpressionContext* const expCtx) {
-    return make_intrusive<AccumulatorFirstN>(expCtx);
-}
-
 const char* AccumulatorLastN::getName() {
     return kName.rawData();
-}
-
-boost::intrusive_ptr<AccumulatorState> AccumulatorLastN::create(ExpressionContext* const expCtx) {
-    return make_intrusive<AccumulatorLastN>(expCtx);
 }
 
 // TODO SERVER-59327 Refactor other operators to use this parse function.
@@ -473,6 +457,14 @@ accumulatorNParseArgs(ExpressionContext* expCtx,
 
     return {n, *output, sortBy};
 }
+
+template <TopBottomSense sense, bool single>
+AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* const expCtx,
+                                                            BSONObj sortBy,
+                                                            bool isRemovable)
+    : AccumulatorTopBottomN(expCtx,
+                            std::get<0>(parseAccumulatorTopBottomNSortBy<sense>(expCtx, sortBy)),
+                            isRemovable) {}
 
 template <TopBottomSense sense, bool single>
 AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* const expCtx,
@@ -617,20 +609,6 @@ AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     };
 
     return {std::move(n), std::move(argument), std::move(factory), name};
-}
-
-template <TopBottomSense sense, bool single>
-boost::intrusive_ptr<AccumulatorState> AccumulatorTopBottomN<sense, single>::create(
-    ExpressionContext* expCtx, BSONObj sortBy, bool isRemovable) {
-    return make_intrusive<AccumulatorTopBottomN<sense, single>>(
-        expCtx, std::get<0>(parseAccumulatorTopBottomNSortBy<sense>(expCtx, sortBy)), isRemovable);
-}
-
-template <TopBottomSense sense, bool single>
-boost::intrusive_ptr<AccumulatorState> AccumulatorTopBottomN<sense, single>::create(
-    ExpressionContext* expCtx, SortPattern sortPattern) {
-    return make_intrusive<AccumulatorTopBottomN<sense, single>>(
-        expCtx, sortPattern, /* isRemovable */ false);
 }
 
 template <TopBottomSense sense, bool single>

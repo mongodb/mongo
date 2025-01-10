@@ -73,7 +73,4 @@ void AccumulatorLocf::reset() {
     _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorLocf::create(ExpressionContext* const expCtx) {
-    return new AccumulatorLocf(expCtx);
-}
 }  // namespace mongo

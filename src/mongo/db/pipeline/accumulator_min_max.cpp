@@ -45,8 +45,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 template <>
 Value ExpressionFromAccumulator<AccumulatorMax>::evaluate(const Document& root,
                                                           Variables* variables) const {
@@ -93,13 +91,5 @@ AccumulatorMinMax::AccumulatorMinMax(ExpressionContext* const expCtx, Sense sens
 void AccumulatorMinMax::reset() {
     _val = Value();
     _memUsageTracker.set(sizeof(*this));
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorMin::create(ExpressionContext* const expCtx) {
-    return new AccumulatorMin(expCtx);
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorMax::create(ExpressionContext* const expCtx) {
-    return new AccumulatorMax(expCtx);
 }
 }  // namespace mongo

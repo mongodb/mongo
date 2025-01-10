@@ -232,15 +232,6 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
           sum);
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorSum::create(ExpressionContext* const expCtx) {
-    return new AccumulatorSum(expCtx);
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorSum::create(ExpressionContext* expCtx,
-                                                       boost::optional<Value> constantAddend) {
-    return new AccumulatorSum(expCtx, constantAddend);
-}
-
 Value serializePartialSum(BSONType nonDecimalTotalType,
                           BSONType totalType,
                           const DoubleDoubleSummation& nonDecimalTotal,

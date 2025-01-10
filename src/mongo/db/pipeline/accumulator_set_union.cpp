@@ -104,9 +104,4 @@ void AccumulatorSetUnion::reset() {
     _memUsageTracker.set(sizeof(*this));
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorSetUnion::create(
-    ExpressionContext* const expCtx) {
-    return new AccumulatorSetUnion(expCtx, boost::none);
-}
-
 }  // namespace mongo

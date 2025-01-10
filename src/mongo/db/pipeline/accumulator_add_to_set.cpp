@@ -52,7 +52,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 using std::vector;
 
 REGISTER_ACCUMULATOR(addToSet, genericParseSingleExpressionAccumulator<AccumulatorAddToSet>);
@@ -102,9 +101,4 @@ void AccumulatorAddToSet::reset() {
     _set = getExpressionContext()->getValueComparator().makeFlatUnorderedValueSet();
     _memUsageTracker.set(sizeof(*this));
 }
-
-intrusive_ptr<AccumulatorState> AccumulatorAddToSet::create(ExpressionContext* const expCtx) {
-    return new AccumulatorAddToSet(expCtx, boost::none);
-}
-
 }  // namespace mongo

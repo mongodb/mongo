@@ -59,9 +59,6 @@ public:
         return kName.rawData();
     }
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         StringData funcSource);
-
     static AccumulationExpression parseInternalJsReduce(ExpressionContext* expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps);
@@ -99,11 +96,18 @@ public:
 
     // An AccumulatorState instance only owns its "static" arguments: those that don't need to be
     // evaluated per input document.
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         std::string init,
-                                                         std::string accumulate,
-                                                         std::string merge,
-                                                         boost::optional<std::string> finalize);
+    AccumulatorJs(ExpressionContext* const expCtx,
+                  std::string init,
+                  std::string accumulate,
+                  std::string merge,
+                  boost::optional<std::string> finalize)
+        : AccumulatorState(expCtx),
+          _init(std::move(init)),
+          _accumulate(std::move(accumulate)),
+          _merge(std::move(merge)),
+          _finalize(std::move(finalize)) {
+        resetMemUsageBytes();
+    }
 
     static AccumulationExpression parse(ExpressionContext* expCtx,
                                         BSONElement elem,
@@ -120,18 +124,6 @@ public:
     void startNewGroup(Value const& input) final;
 
 private:
-    AccumulatorJs(ExpressionContext* const expCtx,
-                  std::string init,
-                  std::string accumulate,
-                  std::string merge,
-                  boost::optional<std::string> finalize)
-        : AccumulatorState(expCtx),
-          _init(std::move(init)),
-          _accumulate(std::move(accumulate)),
-          _merge(std::move(merge)),
-          _finalize(std::move(finalize)) {
-        resetMemUsageBytes();
-    }
     void resetMemUsageBytes();
     void incrementMemUsageBytes(size_t bytes);
 

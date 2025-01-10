@@ -79,10 +79,6 @@ public:
                                                             BSONElement elem,
                                                             VariablesParseState vps);
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         const std::vector<double>& ps,
-                                                         PercentileMethodEnum method);
-
     /**
      * Necessary for supporting $percentile as window functions and/or as expression.
      */
@@ -173,10 +169,6 @@ public:
     static boost::intrusive_ptr<Expression> parseExpression(ExpressionContext* expCtx,
                                                             BSONElement elem,
                                                             VariablesParseState vps);
-
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         const std::vector<double>& unused,
-                                                         PercentileMethodEnum method);
 
     /**
      * We are matching the signature of the AccumulatorPercentile for the purpose of using

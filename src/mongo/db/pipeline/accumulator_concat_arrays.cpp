@@ -102,9 +102,4 @@ void AccumulatorConcatArrays::reset() {
     _memUsageTracker.set(sizeof(*this));
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorConcatArrays::create(
-    ExpressionContext* const expCtx) {
-    return new AccumulatorConcatArrays(expCtx, boost::none);
-}
-
 }  // namespace mongo

@@ -81,7 +81,6 @@ public:
 
     explicit AccumulatorCovarianceSamp(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, true) {}
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorCovariancePop final : public AccumulatorCovariance {
@@ -90,7 +89,6 @@ public:
 
     explicit AccumulatorCovariancePop(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, false) {}
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorRankBase : public AccumulatorForWindowFunctions {
@@ -119,8 +117,6 @@ public:
     explicit AccumulatorRank(ExpressionContext* const expCtx, bool isAscending)
         : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         bool isAscending);
     void reset() final;
 
 private:
@@ -138,8 +134,6 @@ public:
     explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx, bool isAscending)
         : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         bool isAscending);
 };
 
 class AccumulatorDenseRank : public AccumulatorRankBase {
@@ -153,8 +147,6 @@ public:
     explicit AccumulatorDenseRank(ExpressionContext* const expCtx, bool isAscending)
         : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         bool isAscending);
 };
 
 class AccumulatorIntegral : public AccumulatorForWindowFunctions {
@@ -171,9 +163,6 @@ public:
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;
-
-    static boost::intrusive_ptr<AccumulatorState> create(
-        ExpressionContext* expCtx, boost::optional<long long> unitMillis = boost::none);
 
 private:
     WindowFunctionIntegral _integralWF;
@@ -192,7 +181,6 @@ public:
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
 private:
     Value _lastNonNull{BSONNULL};

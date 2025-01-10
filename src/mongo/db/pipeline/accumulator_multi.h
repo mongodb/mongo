@@ -186,8 +186,6 @@ public:
     AccumulatorType getAccumulatorType() const override {
         return AccumulatorType::kMinN;
     }
-
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorMaxN : public AccumulatorMinMaxN {
@@ -201,8 +199,6 @@ public:
     AccumulatorType getAccumulatorType() const override {
         return AccumulatorType::kMaxN;
     }
-
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorFirstLastN : public AccumulatorN {
@@ -264,8 +260,6 @@ public:
     AccumulatorType getAccumulatorType() const override {
         return AccumulatorType::kFirstN;
     }
-
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorLastN : public AccumulatorFirstLastN {
@@ -279,8 +273,6 @@ public:
     AccumulatorType getAccumulatorType() const override {
         return AccumulatorType::kLastN;
     }
-
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 enum TopBottomSense {
@@ -294,13 +286,8 @@ public:
     // pair of (sortKey, output) for storing in AccumulatorTopBottomN's internal multimap.
     using KeyOutPair = std::pair<Value, Value>;
 
-    AccumulatorTopBottomN(ExpressionContext* expCtx, SortPattern sp, bool isRemovable);
-
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         BSONObj sortPattern,
-                                                         bool isRemovable = false);
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         SortPattern sortPattern);
+    AccumulatorTopBottomN(ExpressionContext* expCtx, SortPattern sp, bool isRemovable = false);
+    AccumulatorTopBottomN(ExpressionContext* expCtx, BSONObj sortPattern, bool isRemovable = false);
 
     /**
      * Verifies that 'elem' is an object, delegates argument parsing to 'accumulatorNParseArgs',
