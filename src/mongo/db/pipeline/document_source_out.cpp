@@ -73,6 +73,7 @@ MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
 MONGO_FAIL_POINT_DEFINE(outWaitBeforeTempCollectionRename);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionRenameBeforeView);
+MONGO_FAIL_POINT_DEFINE(outImplictlyCreateDBOnSpecificShard);
 
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
@@ -266,6 +267,11 @@ void DocumentSourceOut::createTemporaryCollection() {
     // If the output collection exists, we should create the temp collection on the shard that
     // owns the output collection.
     auto targetShard = getMergeShardId();
+    // Used for consistently picking a shard in testing.
+    if (auto fpTarget = outImplictlyCreateDBOnSpecificShard.scoped();
+        MONGO_unlikely(fpTarget.isActive()) && !targetShard) {
+        targetShard = ShardId(fpTarget.getData()["shardId"].String());
+    }
 
     // Set the enum state to 'kTmpCollExists' first, because 'createTempCollection' can throw
     // after constructing the collection.
