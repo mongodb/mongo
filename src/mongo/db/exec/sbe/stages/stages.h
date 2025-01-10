@@ -746,10 +746,10 @@ public:
     virtual void open(bool reOpen) = 0;
 
     /**
-     * It asks from all its children to spill their data. Stages that can spill their own data need
-     * to override this method to spill their data before asking their children to spill.
+     * The stage spills its data and asks from all its children to spill their data as well.
      */
-    virtual void forceSpill() {
+    void forceSpill() {
+        doForceSpill();
         for (const auto& child : _children) {
             child->forceSpill();
         }
@@ -784,6 +784,13 @@ public:
     friend class CanChangeState<PlanStage>;
     friend class CanTrackStats<PlanStage>;
     friend class CanInterrupt<PlanStage>;
+
+private:
+    /**
+     * Spills the stage's data to disk. Stages that can spill their own data need to override this
+     * method.
+     */
+    virtual void doForceSpill() {}
 
 protected:
     // Derived classes can optionally override these methods.
