@@ -323,10 +323,7 @@ public:
                 utils::validateRepresentativeQuery(*representativeQueryInfo);
             }
 
-            // Make a query shape configuration to insert.
-            QueryShapeConfiguration newQueryShapeConfiguration(queryShapeHash,
-                                                               request().getSettings());
-            newQueryShapeConfiguration.setRepresentativeQuery(representativeQuery);
+            SetQuerySettingsCommandReply reply;
             auto&& tenantId = request().getDbName().tenantId();
 
             readModifyWriteQuerySettingsConfigOption(
@@ -339,6 +336,10 @@ public:
                         findQueryShapeConfigurationByQueryShapeHash(queryShapeConfigurations,
                                                                     queryShapeHash);
                     if (matchingQueryShapeConfigurationIt == queryShapeConfigurations.end()) {
+                        // Make a query shape configuration to insert.
+                        QueryShapeConfiguration newQueryShapeConfiguration(queryShapeHash,
+                                                                           request().getSettings());
+                        newQueryShapeConfiguration.setRepresentativeQuery(representativeQuery);
                         // Add a new query settings entry.
                         validateAndSimplifyQuerySettings(
                             opCtx,
@@ -353,6 +354,9 @@ public:
                                     "settings"_attr =
                                         newQueryShapeConfiguration.getSettings().toBSON());
                         queryShapeConfigurations.push_back(newQueryShapeConfiguration);
+
+                        // Update the reply with the new query shape configuration.
+                        reply.setQueryShapeConfiguration(std::move(newQueryShapeConfiguration));
                     } else {
                         // Update an existing query settings entry by updating the existing
                         // QueryShapeConfiguration with the new query settings.
@@ -377,11 +381,11 @@ public:
                             queryShapeConfigurationToUpdate.setRepresentativeQuery(
                                 representativeQuery);
                         }
+
+                        // Update the reply with the updated query shape configuration.
+                        reply.setQueryShapeConfiguration(queryShapeConfigurationToUpdate);
                     }
                 });
-
-            SetQuerySettingsCommandReply reply;
-            reply.setQueryShapeConfiguration(std::move(newQueryShapeConfiguration));
             return reply;
         }
     };
