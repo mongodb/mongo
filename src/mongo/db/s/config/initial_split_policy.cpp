@@ -88,7 +88,7 @@ namespace {
 using ChunkDistributionMap = stdx::unordered_map<ShardId, size_t>;
 using ZoneShardMap = StringMap<std::vector<ShardId>>;
 
-std::vector<ShardId> getAllNonDrainingShardIdsShuffled(OperationContext* opCtx) {
+std::vector<ShardId> getAllNonDrainingShardIds(OperationContext* opCtx) {
     const auto shardsAndOpTime = uassertStatusOKWithContext(
         Grid::get(opCtx)->catalogClient()->getAllShards(
             opCtx, repl::ReadConcernLevel::kMajorityReadConcern, true /* excludeDraining */),
@@ -107,6 +107,11 @@ std::vector<ShardId> getAllNonDrainingShardIdsShuffled(OperationContext* opCtx) 
                    shards.end(),
                    std::back_inserter(shardIds),
                    [](const ShardType& shard) { return ShardId(shard.getName()); });
+    return shardIds;
+}
+
+std::vector<ShardId> getAllNonDrainingShardIdsShuffled(OperationContext* opCtx) {
+    auto shardIds = getAllNonDrainingShardIds(opCtx);
 
     std::default_random_engine rng{};
     std::shuffle(shardIds.begin(), shardIds.end(), rng);
@@ -984,6 +989,20 @@ InitialSplitPolicy::ShardCollectionConfig ShardDistributionSplitPolicy::createFi
     const ShardKeyPattern& shardKeyPattern,
     const SplitPolicyParams& params) {
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
+
+    // Check that shards receiving chunks are not draining.
+    std::vector<ShardId> nonDrainingShardIds = getAllNonDrainingShardIds(opCtx);
+    std::set<ShardId> nonDrainingShardIdSet(nonDrainingShardIds.begin(), nonDrainingShardIds.end());
+
+    for (const auto& shardInfo : _shardDistribution) {
+        auto currentShardId = shardInfo.getShard();
+
+        uassert(ErrorCodes::ShardNotFound,
+                str::stream() << "Shard " << currentShardId << " is draining and "
+                              << "cannot be used for chunk distribution",
+                nonDrainingShardIdSet.count(currentShardId) > 0);
+    }
+
     if (_zones) {
         for (auto& zone : *_zones) {
             zone.setRange({keyPattern.extendRangeBound(zone.getMinKey(), false),
@@ -1001,6 +1020,7 @@ InitialSplitPolicy::ShardCollectionConfig ShardDistributionSplitPolicy::createFi
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
     ChunkVersion version({OID::gen(), validAfter}, {1, 0});
+
     for (const auto& splitPoint : splitPoints) {
         _appendChunks(params, splitPoint, keyPattern, shardDistributionIdx, version, chunks);
     }
@@ -1027,6 +1047,7 @@ void ShardDistributionSplitPolicy::_appendChunks(const SplitPolicyParams& params
             keyPattern.extendRangeBound(*_shardDistribution[shardDistributionIdx].getMax(), false);
         auto lastChunkMax =
             chunks.empty() ? keyPattern.globalMin() : chunks.back().getRange().getMax();
+
         /* When we compare a defined shard range with a splitPoint, there are three cases:
          * 1. The whole shard range is on the left side of the splitPoint -> Add this shard as a
          * whole chunk and move to next shard.

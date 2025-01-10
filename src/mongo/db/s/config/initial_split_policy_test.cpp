@@ -69,6 +69,8 @@ namespace {
 
 using unittest::assertGet;
 
+const ShardId primaryShard{"primaryShard"};
+
 /**
  * Asserts that the given vectors of BSON objects are equal
  */
@@ -705,7 +707,6 @@ public:
         const std::vector<TagsType>& tags,
         boost::optional<size_t> numInitialChunk = boost::none,
         bool isCollEmpty = true) {
-        ShardId primaryShard("doesntMatter");
 
         PresplitHashedZonesSplitPolicy splitPolicy(
             operationContext(), shardKeyPattern, tags, isCollEmpty);
@@ -1619,7 +1620,6 @@ public:
         const std::vector<ShardType>& shardList,
         const std::vector<ChunkRange>& expectedChunkRanges,
         const std::vector<boost::optional<ShardId>>& expectedShardIds) {
-        const ShardId primaryShard("doesntMatter");
 
         const auto shardCollectionConfig = splitPolicy->createFirstChunks(
             operationContext(), shardKeyPattern, {UUID::gen(), primaryShard});
@@ -1667,7 +1667,6 @@ public:
     void checkGeneratedInitialSplitPoints(SamplingBasedSplitPolicy* splitPolicy,
                                           const ShardKeyPattern& shardKeyPattern,
                                           const std::vector<ChunkRange>& expectedChunkRanges) {
-        const ShardId primaryShard("doesntMatter");
         const auto splitPoints = splitPolicy->createFirstSplitPoints(
             operationContext(), shardKeyPattern, {UUID::gen(), primaryShard});
 
@@ -2264,8 +2263,6 @@ public:
                                          const std::vector<ShardKeyRange>& shardDistribution,
                                          const std::vector<ChunkRange>& expectedChunkRanges,
                                          const std::vector<ShardId>& expectedShardIds) {
-        const ShardId primaryShard("doesntMatter");
-
         const auto shardCollectionConfig = splitPolicy->createFirstChunks(
             operationContext(), shardKeyPattern, {UUID::gen(), primaryShard});
 
@@ -2388,6 +2385,39 @@ TEST_F(ShardDistributionInitSplitTest, InterleaveWithZones) {
                                     shardDistribution,
                                     expectedChunkRanges,
                                     expectedShardForEachChunk);
+}
+
+TEST_F(ShardDistributionInitSplitTest, ThrowIfContainsDrainingShard) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    ShardType kShard0{shardId("0").toString(), "rs0/fakeShard0:123"};
+    ShardType kShard1{shardId("1").toString(), "rs1/fakeShard1:123"};
+    kShard1.setDraining(true);
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(kShard0);
+    shardList.emplace_back(kShard1);
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    ShardKeyRange range0(shardId("0"));
+    range0.setMin(BSON("y" << MINKEY));
+    range0.setMax(BSON("y" << 0));
+    ShardKeyRange range1(shardId("1"));
+    range1.setMin(BSON("y" << 0));
+    range1.setMax(BSON("y" << MAXKEY));
+    std::vector<ShardKeyRange> shardDistribution = {range0, range1};
+
+    const SplitPolicyParams params{UUID::gen(), primaryShard};
+
+    std::unique_ptr<ShardDistributionSplitPolicy> splitPolicy =
+        makeInitialSplitPolicy(shardDistribution, zones);
+    ASSERT_THROWS_CODE(splitPolicy->createFirstChunks(operationContext(), shardKey, params),
+                       DBException,
+                       ErrorCodes::ShardNotFound);
 }
 
 }  // namespace
