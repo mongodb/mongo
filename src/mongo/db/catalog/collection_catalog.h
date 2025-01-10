@@ -423,13 +423,20 @@ public:
      * Checks if the provided instance is the latest version for this catalog version. This check
      * should be used to determine if the collection instance is safe to perform CRUD writes on. For
      * the check to be meaningful it should be performed against CollectionCatalog::latest.
+     * NOTE: the check is based on pointer equality between the 'collection' parameter and
+     * the object stored by the catalog under the same UUID; this may lead to unexpected false
+     * results when a different, but structurally equivalent parameter is passed in (like a
+     * 'collection' obtained via read-through). Consider using checkIfUUIDExistsAtLatest when such a
+     * behavior is not desirable.
      */
     bool isLatestCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
      * Checks if the provided UUID is compatible with the latest version for this catalog version
-     * (plus uncommitted catalog updates). The method is exclusively meant to support the ShardRole
-     * API in the resource acquisition for unsharded collection.
+     * (plus uncommitted catalog updates).
+     * The function only returns a meaningful result when called against CollectionCatalog::latest()
+     * and it is exclusively meant to support the ShardRole API in the resource acquisition for
+     * unsharded collection.
      */
     bool checkIfUUIDExistsAtLatest(OperationContext* opCtx, UUID uuid) const;
 
