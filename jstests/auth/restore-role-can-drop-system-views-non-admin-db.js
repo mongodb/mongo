@@ -1,8 +1,6 @@
 // Validate that the restore role is able to drop <db>.system.views for any db
 // @tags: [requires_sharding, requires_auth]
 
-import {ShardingTest} from "jstests/libs/shardingtest.js";
-
 function runTest(conn, isSharding) {
     const admin = conn.getDB('admin');
     const test = conn.getDB('test');
