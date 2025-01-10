@@ -440,6 +440,16 @@ public:
     ~DocumentSource() override {}
 
     /**
+     * The stage spills its data and asks from all its children to spill their data as well.
+     */
+    void forceSpill() {
+        doForceSpill();
+        if (pSource) {
+            pSource->forceSpill();
+        }
+    }
+
+    /**
      * Makes a deep clone of the DocumentSource by serializing and re-parsing it. DocumentSources
      * that cannot be safely cloned this way should override this method. Callers can optionally
      * specify 'newExpCtx' to construct the deep clone with it instead of defaulting to the
@@ -1021,6 +1031,12 @@ private:
      * being added to the array for this stage (DocumentSource).
      */
     virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
+
+    /**
+     * Spills the stage's data to disk. Stages that can spill their own data need to override this
+     * method.
+     */
+    virtual void doForceSpill() {}
 };
 
 /**
