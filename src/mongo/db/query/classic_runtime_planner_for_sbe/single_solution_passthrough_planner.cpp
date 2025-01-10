@@ -44,7 +44,7 @@ SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
     std::unique_ptr<QuerySolution> solution,
     boost::optional<std::string> replanReason)
     : PlannerBase(std::move(plannerData)),
-      _solution(extendSolutionWithPipeline(std::move(solution))),
+      _solution(extendSolutionWithPipelineIfNeeded(std::move(solution))),
       _sbePlanAndData(prepareSbePlanAndData(*_solution, std::move(replanReason))),
       _isFromPlanCache(false) {}
 
@@ -75,5 +75,18 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPl
                                   _isFromPlanCache,
                                   cachedPlanHash(),
                                   nullptr /*classicRuntimePlannerStage*/);
+}
+
+std::unique_ptr<QuerySolution> SingleSolutionPassthroughPlanner::extendSolutionWithPipelineIfNeeded(
+    std::unique_ptr<QuerySolution> solution) {
+    // Check if the main collection does not exist. In this case the solution should not be
+    // extended because we can satisfy the query with a trivial EOF plan.
+    if (!collections().hasMainCollection()) {
+        tassert(9235900,
+                "Expected solution with a single EOF stage",
+                solution->root()->getType() == StageType::STAGE_EOF);
+        return solution;
+    }
+    return extendSolutionWithPipeline(std::move(solution));
 }
 }  // namespace mongo::classic_runtime_planner_for_sbe

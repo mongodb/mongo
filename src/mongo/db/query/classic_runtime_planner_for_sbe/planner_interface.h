@@ -180,6 +180,9 @@ public:
         std::unique_ptr<CanonicalQuery> canonicalQuery) override;
 
 private:
+    std::unique_ptr<QuerySolution> extendSolutionWithPipelineIfNeeded(
+        std::unique_ptr<QuerySolution> solution);
+
     std::unique_ptr<QuerySolution> _solution;
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> _sbePlanAndData;
     bool _isFromPlanCache;
