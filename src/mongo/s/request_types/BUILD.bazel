@@ -67,6 +67,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "cleanup_orphaned_gen",
+    src = "cleanup_orphaned.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "clone_catalog_data_gen",
     src = "clone_catalog_data.idl",
     deps = [
