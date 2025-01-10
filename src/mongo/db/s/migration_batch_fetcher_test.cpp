@@ -223,16 +223,14 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
         true,
         0 /* maxBytesPerThread */);
 
+    ASSERT_EQ(fetcher->getChunkMigrationConcurrency(), 1);
+
     // Start asynchronous task for responding to _migrateClone requests.
     // Must name the return of value std::async.  The destructor of std::future joins the
     // asynchrounous task. (If it were left unnamed, the destructor would run inline, and the test
     // would hang forever.)
-    auto fut = stdx::async(stdx::launch::async, [&]() {
-        // One terminal response for each thread
-        for (int i = 0; i < concurrency; ++i) {
-            onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj()));
-        }
-    });
+    auto fut = stdx::async(stdx::launch::async,
+                           [&]() { onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj())); });
     fetcher->fetchAndScheduleInsertion();
 }
 
@@ -273,14 +271,14 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
         true,
         0 /* maxBytesPerThread */);
 
+    ASSERT_EQ(fetcher->getChunkMigrationConcurrency(), 1);
+
     auto fut = stdx::async(stdx::launch::async, [&]() {
         for (int i = 0; i < 8; ++i) {
             onCommand(getOnMigrateCloneCommandCb(getBatchBsonObj()));
         }
-        // One terminal response for each thread
-        for (int i = 0; i < concurrency; ++i) {
-            onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj()));
-        }
+
+        onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj()));
     });
     fetcher->fetchAndScheduleInsertion();
 }
