@@ -229,6 +229,16 @@ public:
     }
 
     /**
+     * The stage spills its data and asks from all its children to spill their data as well.
+     */
+    void forceSpill() {
+        doForceSpill();
+        for (const auto& child : _children) {
+            child->forceSpill();
+        }
+    }
+
+    /**
      * Returns true if no more work can be done on the query / out of results.
      */
     virtual bool isEOF() = 0;
@@ -443,6 +453,12 @@ private:
     // The PlanExecutor holds a strong reference to this which ensures that this pointer remains
     // valid for the entire lifetime of the PlanStage.
     ExpressionContext* _expCtx;
+
+    /**
+     * Spills the stage's data to disk. Stages that can spill their own data need to override this
+     * method.
+     */
+    virtual void doForceSpill() {}
 };
 
 }  // namespace mongo
