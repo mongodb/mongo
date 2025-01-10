@@ -31,7 +31,8 @@ live_restore_test_env::live_restore_test_env()
      * them on close. Move these files to a temp location. We'll restore them in destructor before
      * _conn->close() is called.
      */
-    static std::string cfg_string = "live_restore=(enabled=true, path=" + DB_SOURCE + ")";
+    static std::string cfg_string =
+      "create=true,live_restore=(enabled=true, path=" + DB_SOURCE + ")";
     conn = std::make_unique<connection_wrapper>(DB_DEST.c_str(), cfg_string.c_str());
     testutil_copy(DB_DEST.c_str(), DB_TEMP_BACKUP.c_str());
     testutil_recreate_dir(DB_DEST.c_str());

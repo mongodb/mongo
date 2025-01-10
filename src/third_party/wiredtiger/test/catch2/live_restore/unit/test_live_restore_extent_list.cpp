@@ -35,7 +35,7 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
     SECTION("Open a new unbacked file")
     {
         WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
-        testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh));
+        testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh, WT_FS_OPEN_CREATE));
 
         // There's no backing file in the source directory, so no extent list to track.
         REQUIRE(extent_list_str(lr_fh) == "");

@@ -73,7 +73,6 @@ ForEachMacros:
   - WT_CELL_FOREACH_KV
   - WT_CELL_FOREACH_VRFY
   - WT_CKPT_FOREACH
-  - WT_CKPT_FOREACH_NAME_OR_ORDER
   - WT_COL_FIX_FOREACH_BITS
   - WT_COL_FOREACH
   - WT_EXT_FOREACH
@@ -85,6 +84,7 @@ ForEachMacros:
   - WT_ROW_FOREACH
   - WT_ROW_FOREACH_REVERSE
   - WT_SKIP_FOREACH
+  - WTI_CKPT_FOREACH_NAME_OR_ORDER
 IncludeBlocks:   Preserve
 IncludeCategories:
   - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'

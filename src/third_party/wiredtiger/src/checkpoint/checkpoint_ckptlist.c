@@ -24,7 +24,7 @@ __wt_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT **ckptbasep)
      * Sometimes the checkpoint list has a checkpoint which has not been named yet, but carries an
      * order number.
      */
-    WT_CKPT_FOREACH_NAME_OR_ORDER (ckptbase, ckpt)
+    WTI_CKPT_FOREACH_NAME_OR_ORDER (ckptbase, ckpt)
         __wt_checkpoint_free(session, ckpt);
     __wt_free(session, *ckptbasep);
 }

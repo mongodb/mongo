@@ -1592,8 +1592,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
      * between the special rules for history store eviction and the special handling of the
      * checkpoint transaction.
      */
-    orig_flags = F_MASK(session, WT_CHECKPOINT_SESSION_FLAGS);
-    F_SET(session, WT_CHECKPOINT_SESSION_FLAGS);
+    orig_flags = F_MASK(session, WTI_CHECKPOINT_SESSION_FLAGS);
+    F_SET(session, WTI_CHECKPOINT_SESSION_FLAGS);
 
     WT_RET(__wt_config_gets(session, cfg, "debug.checkpoint_cleanup", &cval));
     checkpoint_cleanup = cval.val;
@@ -1636,7 +1636,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
     if (flush && flush_sync)
         WT_ERR(__checkpoint_flush_tier_wait(session, cfg));
 err:
-    F_CLR(session, WT_CHECKPOINT_SESSION_FLAGS);
+    F_CLR(session, WTI_CHECKPOINT_SESSION_FLAGS);
     F_SET(session, orig_flags);
 
     return (ret);
@@ -1843,8 +1843,8 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
          * of WiredTiger checkpoints dropped per checkpoint.
          */
         if (is_wt_ckpt)
-#define WT_MAX_CHECKPOINT_DROP 4
-            if (++max_ckpt_drop >= WT_MAX_CHECKPOINT_DROP)
+#define WTI_MAX_CHECKPOINT_DROP 4
+            if (++max_ckpt_drop >= WTI_MAX_CHECKPOINT_DROP)
                 F_CLR(ckpt, WT_CKPT_DELETE);
     }
 
@@ -2084,7 +2084,7 @@ __checkpoint_lock_dirty_tree(
      * appended to the list.
      */
     if (F_ISSET(btree, WT_BTREE_SKIP_CKPT)) {
-        WT_CKPT_FOREACH_NAME_OR_ORDER (ckptbase, ckpt) {
+        WTI_CKPT_FOREACH_NAME_OR_ORDER (ckptbase, ckpt) {
             /* Checkpoint(s) to be added are always at the end of the list. */
             WT_ASSERT(session, !seen_ckpt_add || F_ISSET(ckpt, WT_CKPT_ADD));
             if (F_ISSET(ckpt, WT_CKPT_ADD)) {
