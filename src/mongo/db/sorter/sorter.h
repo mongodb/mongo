@@ -273,10 +273,6 @@ public:
         const SortOptions& opts,
         const Comparator& comp);
 
-    // Opens and closes the source of data over which this class iterates, if applicable.
-    virtual void openSource() = 0;
-    virtual void closeSource() = 0;
-
     virtual SorterRange getRange() const {
         invariant(false, "Only FileIterator has ranges");
         MONGO_UNREACHABLE;

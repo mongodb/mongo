@@ -120,8 +120,6 @@ class IntIterator : public IWIterator {
 public:
     IntIterator(int start = 0, int stop = INT_MAX, int increment = 1)
         : _current(start), _increment(increment), _stop(stop) {}
-    void openSource() override {}
-    void closeSource() override {}
     bool more() override {
         if (_increment == 0)
             return true;
@@ -152,8 +150,6 @@ private:
 
 class EmptyIterator : public IWIterator {
 public:
-    void openSource() override {}
-    void closeSource() override {}
     bool more() override {
         return false;
     }
@@ -177,9 +173,6 @@ public:
         : _remaining(limit), _source(source) {
         invariant(limit > 0);
     }
-
-    void openSource() override {}
-    void closeSource() override {}
 
     bool more() override {
         return _remaining && _source->more();
@@ -208,8 +201,6 @@ template <typename It1, typename It2>
 void _assertIteratorsEquivalent(It1&& it1, It2&& it2, int line) {
     int iteration;
     try {
-        it1->openSource();
-        it2->openSource();
         for (iteration = 0; true; iteration++) {
             ASSERT_EQUALS(it1->more(), it2->more());
             ASSERT_EQUALS(it1->more(), it2->more());  // make sure more() is safe to call twice
@@ -221,15 +212,11 @@ void _assertIteratorsEquivalent(It1&& it1, It2&& it2, int line) {
             ASSERT_EQUALS(pair1.first, pair2.first);
             ASSERT_EQUALS(pair1.second, pair2.second);
         }
-        it1->closeSource();
-        it2->closeSource();
     } catch (...) {
         LOGV2(22047,
               "Failure from line {line} on iteration {iteration}",
               "line"_attr = line,
               "iteration"_attr = iteration);
-        it1->closeSource();
-        it2->closeSource();
         throw;
     }
 }
@@ -239,8 +226,6 @@ template <typename It1, typename It2>
 void _assertIteratorsEquivalentForNSteps(It1& it1, It2& it2, int maxSteps, int line) {
     int iteration;
     try {
-        it1->openSource();
-        it2->openSource();
         for (iteration = 0; iteration < maxSteps; iteration++) {
             ASSERT_EQUALS(it1->more(), it2->more());
             ASSERT_EQUALS(it1->more(), it2->more());  // make sure more() is safe to call twice
@@ -252,15 +237,11 @@ void _assertIteratorsEquivalentForNSteps(It1& it1, It2& it2, int maxSteps, int l
             ASSERT_EQUALS(pair1.first, pair2.first);
             ASSERT_EQUALS(pair1.second, pair2.second);
         }
-        it1->closeSource();
-        it2->closeSource();
     } catch (...) {
         LOGV2(6409300,
               "Failure from line {line} on iteration {iteration}",
               "line"_attr = line,
               "iteration"_attr = iteration);
-        it1->closeSource();
-        it2->closeSource();
         throw;
     }
 }
@@ -282,9 +263,7 @@ std::shared_ptr<IWIterator> makeInMemIterator(const int (&array)[N]) {
  */
 template <typename IteratorPtr>
 std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter, const unittest::TempDir& tempDir) {
-    inputIter->openSource();
     if (!inputIter->more()) {
-        inputIter->closeSource();
         return std::make_shared<EmptyIterator>();
     }
     SorterFileStats sorterFileStats(nullptr /* sorterTracker */);
@@ -296,9 +275,7 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter, const unittest::T
         auto pair = inputIter->next();
         writer.addAlreadySorted(pair.first, pair.second);
     }
-    auto outputIter = writer.done();
-    inputIter->closeSource();
-    return outputIter;
+    return writer.done();
 }
 
 template <typename IteratorPtr, int N>
@@ -339,8 +316,6 @@ public:
             class UnsortedIter : public IWIterator {
             public:
                 UnsortedIter() : _pos(0) {}
-                void openSource() override {}
-                void closeSource() override {}
                 bool more() override {
                     return _pos < sizeof(unsorted) / sizeof(unsorted[0]);
                 }
@@ -1130,9 +1105,7 @@ TEST_F(SorterMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     auto iter = sorter->done();
     ASSERT_EQ(0, sorter->stats().numSorted());
 
-    iter->openSource();
     ASSERT_FALSE(iter->more());
-    iter->closeSource();
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, MissingFile) {
@@ -1229,7 +1202,6 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
     // Read data from sorter.
     {
         auto iter = sorter->done();
-        iter->openSource();
 
         ASSERT(iter->more());
         auto pair1 = iter->next();
@@ -1246,7 +1218,6 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
             << pair2.first << "/" << pair2.second;
 
         ASSERT_FALSE(iter->more());
-        iter->closeSource();
     }
 }
 
@@ -1262,7 +1233,6 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
     writer.addAlreadySorted(pair1.first, pair1.second);
     writer.addAlreadySorted(pair2.first, pair2.second);
     auto iter = writer.done();
-    iter->openSource();
 
     ASSERT(iter->more());
     IntWrapper key1 = iter->nextWithDeferredValue();
@@ -1277,7 +1247,6 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
     ASSERT_EQUALS(pair2.second, value2);
 
     ASSERT_FALSE(iter->more());
-    iter->closeSource();
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, ChecksumVersion) {

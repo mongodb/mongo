@@ -180,9 +180,6 @@ public:
 
     InMemIterator(std::vector<Data> data) : _data(std::move(data)) {}
 
-    void openSource() override {}
-    void closeSource() override {}
-
     bool more() override {
         return _index < _data.size();
     }
@@ -223,9 +220,6 @@ public:
         _iterator = _data.begin();
     }
 
-    void openSource() override {}
-    void closeSource() override {}
-
     bool more() override {
         return _iterator != _data.end();
     }
@@ -255,14 +249,9 @@ private:
 /**
  * Returns results from a sorted range within a file. Each instance is given a file name and start
  * and end offsets.
- *
- * This class is NOT responsible for file clean up / deletion. There are openSource() and
- * closeSource() functions to ensure the FileIterator is not holding the file open when the file is
- * deleted. Since it is one among many FileIterators, it cannot close a file that may still be in
- * use elsewhere.
  */
 template <typename Key, typename Value>
-class FileIterator : public SortIteratorInterface<Key, Value> {
+class FileIterator final : public SortIteratorInterface<Key, Value> {
 public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
@@ -285,32 +274,18 @@ public:
           _afterReadChecksumCalculator(checksumVersion),
           _originalChecksum(checksum) {}
 
-    void openSource() override {}
-
-    void closeSource() override {
-        // If the file iterator reads through all data objects, we can ensure non-corrupt data
-        // by comparing the newly calculated checksum with the original checksum from the data
-        // written to disk. Some iterators do not read back all data from the file, which prohibits
-        // the _afterReadChecksum from obtaining all the information needed. Thus, we only fassert
-        // if all data that was written to disk is read back and the checksums are not equivalent.
-        if (_done && _bufferReader->atEof() &&
-            (_originalChecksum != _afterReadChecksumCalculator.checksum())) {
-            fassert(31182,
-                    Status(ErrorCodes::Error::ChecksumMismatch,
-                           "Data read from disk does not match what was written to disk. Possible "
-                           "corruption of data."));
-        }
-    }
 
     bool more() override {
-        invariant(!_startOfNewData);
         if (!_done)
             _fillBufferIfNeeded();  // may change _done
-
         return !_done;
     }
 
     Data next() override {
+        // Note: calling read() on the _bufferReader buffer in the deserialize function advances the
+        // buffer. Since Key comes before Value in the _bufferReader, and C++ makes no function
+        // parameter evaluation order guarantees, we cannot deserialize Key and Value straight into
+        // the Data constructor
         Key deserializedKey = nextWithDeferredValue();
         Value deserializedValue = getDeferredValue();
         return Data(std::move(deserializedKey), std::move(deserializedValue));
@@ -318,32 +293,14 @@ public:
 
     Key nextWithDeferredValue() override {
         invariant(!_done);
-        invariant(!_startOfNewData);
         _fillBufferIfNeeded();
-
-        _startOfNewData = static_cast<const char*>(_bufferReader->pos());
-
-        // Note: calling read() on the _bufferReader buffer in the deserialize function advances the
-        // buffer. Since Key comes before Value in the _bufferReader, and C++ makes no function
-        // parameter evaluation order guarantees, we cannot deserialize Key and Value straight into
-        // the Data constructor
         return Key::deserializeForSorter(*_bufferReader, _settings.first);
     }
 
     Value getDeferredValue() override {
         invariant(!_done);
-        invariant(_startOfNewData);
-        Value deserializedValue = Value::deserializeForSorter(*_bufferReader, _settings.second);
-
-        // The difference of _bufferReader's position before and after reading the data
-        // will provide the length of the data that was just read.
-        const char* endOfNewData = static_cast<const char*>(_bufferReader->pos());
-
-        if (_afterReadChecksumCalculator.version() == SorterChecksumVersion::v1) {
-            _afterReadChecksumCalculator.addData(_startOfNewData, endOfNewData - _startOfNewData);
-        }
-        _startOfNewData = nullptr;
-        return deserializedValue;
+        // Value is always in the same buffer as the Key, so no need to fill the buffer here
+        return Value::deserializeForSorter(*_bufferReader, _settings.second);
     }
 
     const Key& current() override {
@@ -368,11 +325,12 @@ private:
 
         if (!_bufferReader || _bufferReader->atEof()) {
             _fillBufferFromDisk();
-            if (_afterReadChecksumCalculator.version() > SorterChecksumVersion::v1 &&
-                !_bufferReader->atEof()) {
-                _afterReadChecksumCalculator.addData(static_cast<const char*>(_bufferReader->pos()),
-                                                     _bufferReader->remaining());
-            }
+        }
+        if (_done && _originalChecksum != _afterReadChecksumCalculator.checksum()) {
+            fassert(31182,
+                    Status(ErrorCodes::Error::ChecksumMismatch,
+                           "Data read from disk does not match what was written to disk. Possible "
+                           "corruption of data."));
         }
     }
 
@@ -413,6 +371,7 @@ private:
 
         if (!compressed) {
             _bufferReader = std::make_unique<BufReader>(_buffer.get(), blockSize);
+            _afterReadChecksumCalculator.addData(_buffer.get(), blockSize);
             return;
         }
 
@@ -431,6 +390,7 @@ private:
         // hold on to decompressed data and throw out compressed data at block exit
         _buffer.swap(decompressionBuffer);
         _bufferReader = std::make_unique<BufReader>(_buffer.get(), uncompressedSize);
+        _afterReadChecksumCalculator.addData(_buffer.get(), uncompressedSize);
     }
 
     /**
@@ -483,7 +443,7 @@ private:
  * responsible for deleting the data source file upon destruction.
  */
 template <typename Key, typename Value, typename Comparator>
-class MergeIterator : public SortIteratorInterface<Key, Value> {
+class MergeIterator final : public SortIteratorInterface<Key, Value> {
 public:
     typedef SortIteratorInterface<Key, Value> Input;
     typedef std::pair<Key, Value> Data;
@@ -493,15 +453,10 @@ public:
                   const Comparator& comp)
         : _opts(opts),
           _remaining(opts.limit ? opts.limit : std::numeric_limits<unsigned long long>::max()),
-          _positioned(false),
           _greater(comp) {
         for (auto& iter : iters) {
-            iter->openSource();
             if (iter->more()) {
-                _heap.push_back(
-                    std::make_unique<Stream>(_maxFile++, iter->nextWithDeferredValue(), iter));
-            } else {
-                iter->closeSource();
+                _heap.push_back(std::make_unique<Stream>(_maxFile++, iter));
             }
         }
 
@@ -523,23 +478,18 @@ public:
         _heap.clear();
     }
 
-    void openSource() override {}
-    void closeSource() override {}
-
     void addSource(std::shared_ptr<Input> iter) {
-        iter->openSource();
-        if (iter->more()) {
-            _heap.push_back(
-                std::make_unique<Stream>(++_maxFile, iter->nextWithDeferredValue(), iter));
-            std::push_heap(_heap.begin(), _heap.end(), _greater);
+        if (!iter->more()) {
+            return;
+        }
 
-            if (_greater(_current, _heap.front())) {
-                std::pop_heap(_heap.begin(), _heap.end(), _greater);
-                std::swap(_current, _heap.back());
-                std::push_heap(_heap.begin(), _heap.end(), _greater);
-            }
-        } else {
-            iter->closeSource();
+        _heap.push_back(std::make_unique<Stream>(++_maxFile, iter));
+        std::push_heap(_heap.begin(), _heap.end(), _greater);
+
+        if (_greater(_current, _heap.front())) {
+            std::pop_heap(_heap.begin(), _heap.end(), _greater);
+            std::swap(_current, _heap.back());
+            std::push_heap(_heap.begin(), _heap.end(), _greater);
         }
     }
 
@@ -601,19 +551,11 @@ public:
 private:
     /**
      * Data iterator over an Input stream.
-     *
-     * This class is responsible for closing the Input source upon destruction, unfortunately,
-     * because that is the path of least resistence to a design change requiring MergeIterator to
-     * handle eventual deletion of said Input source.
      */
     class Stream {
     public:
-        Stream(size_t fileNum, const Key& first, std::shared_ptr<Input> rest)
-            : fileNum(fileNum), _current(first), _rest(std::move(rest)) {}
-
-        ~Stream() {
-            _rest->closeSource();
-        }
+        Stream(size_t fileNum, std::shared_ptr<Input> iter)
+            : fileNum(fileNum), _current(iter->nextWithDeferredValue()), _rest(std::move(iter)) {}
 
         const Key& current() const {
             return _current;
@@ -660,7 +602,7 @@ private:
 
     SortOptions _opts;
     unsigned long long _remaining;
-    bool _positioned;
+    bool _positioned = false;
     std::unique_ptr<Stream> _current;
     std::vector<std::unique_ptr<Stream>> _heap;  // MinHeap
     STLComparator _greater;                      // named so calls make sense
@@ -763,15 +705,12 @@ protected:
                             "endIdx"_attr = i + count - 1);
 
                 auto mergeIterator = Iterator::merge(spillsToMerge, this->_opts, _comp);
-                mergeIterator->openSource();
                 SortedFileWriter<Key, Value> writer(this->_opts, newSpillsFile, _settings);
                 while (mergeIterator->more()) {
                     auto pair = mergeIterator->next();
                     writer.addAlreadySorted(pair.first, pair.second);
                 }
-                auto iteratorPtr = writer.done();
-                mergeIterator->closeSource();
-                this->_iters.push_back(std::move(iteratorPtr));
+                this->_iters.push_back(writer.done());
                 this->_stats.incrementSpilledRanges();
             }
             iterators.clear();
@@ -1580,19 +1519,9 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
 
 template <typename Key, typename Value>
 void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value& val) {
-
-    // Offset that points to the place in the buffer where a new data object will be stored.
-    int _nextObjPos = _buffer.len();
-
     // Add serialized key and value to the buffer.
     key.serializeForSorter(_buffer);
     val.serializeForSorter(_buffer);
-
-    // Serializing the key and value grows the buffer, but _buffer.buf() still points to the
-    // beginning. Use _buffer.len() to determine portion of buffer containing new datum.
-    if (_checksumCalculator.version() == SorterChecksumVersion::v1) {
-        _checksumCalculator.addData(_buffer.buf() + _nextObjPos, _buffer.len() - _nextObjPos);
-    }
 
     if (_buffer.len() > static_cast<int>(kSortedFileBufferSize))
         writeChunk();
@@ -1606,9 +1535,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     if (size == 0)
         return;
 
-    if (_checksumCalculator.version() > SorterChecksumVersion::v1) {
-        _checksumCalculator.addData(outBuffer, size);
-    }
+    _checksumCalculator.addData(outBuffer, size);
 
     if (_opts.sorterFileStats) {
         _opts.sorterFileStats->addSpilledDataSizeUncompressed(size);
