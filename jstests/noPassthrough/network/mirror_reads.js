@@ -57,8 +57,7 @@ function sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary}) {
 
 /* Wait for all reads to resolve on primary, and check various other metrics related to the
    primary. */
-function waitForReadsToResolveOnPrimary(
-    rst, initialStatsOnPrimary, minRateResolved, readsExpectedToFail) {
+function waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, readsExpectedToFail) {
     let primary = rst.getPrimary();
     let sent, succeeded, erroredDuringSend;
     // Wait for stats to reflect that all the sent reads have been resolved.
@@ -71,10 +70,14 @@ function waitForReadsToResolveOnPrimary(
         erroredDuringSend = statDifferenceOnPrimary.erroredDuringSend;
         let resolved = statDifferenceOnPrimary.resolved;
         let seen = statDifferenceOnPrimary.seen;
-        // `pending` refers to the number of reads the primary has decided to mirror to
-        // secondaries, but hasn't yet resolved. Unlike the other mirrored reads metrics, this
-        // metric does not accumulate, and refers only to the reads currently pending.
+        // `pending` refers to the number of reads the primary should mirror, but hasn't yet
+        // scheduled. Unlike the other mirrored reads metrics, this metric does not accumulate, and
+        // refers only to the reads currently pending.
         let pending = currentStatsOnPrimary.pending;
+        // `scheduled` refers to the number of reads the primary has scheduled mirrors for, but
+        // hasn't yet resolved. Unlike the other mirrored reads metrics, this metric does not
+        // accumulate, and refers only to the reads currently scheduled.
+        let scheduled = currentStatsOnPrimary.scheduled;
 
         jsTestLog("Verifying that all mirrored reads sent from primary have been resolved: " +
                   tojson({
@@ -83,10 +86,11 @@ function waitForReadsToResolveOnPrimary(
                       resolved: resolved,
                       succeeded: succeeded,
                       pending: pending,
+                      scheduled: scheduled,
                       seen: seen
                   }));
         // Verify that the reads mirrored to the secondaries have been resolved by the primary.
-        return ((pending == 0) && (sent === resolved) && (minRateResolved * seen <= resolved));
+        return pending == 0 && scheduled == 0 && sent === resolved;
     }, "Did not resolve all requests within time limit", 20000);
 
     if (!readsExpectedToFail) {
@@ -153,7 +157,7 @@ function sendAndCheckReadsSucceedWithRate({rst, db, cmd, minRate, maxRate, burst
 
     sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary});
 
-    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, minRate, false);
+    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, false);
 
     // Stats should be stable now that all of the reads have resolved.
     let currentStatsOnPrimary = getMirroredReadsStats(primary);
@@ -181,7 +185,7 @@ function sendAndCheckReadsFailBeforeProcessing(
 
     sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary});
 
-    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, 1, true);
+    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, true);
 
     // Stats should be stable now that all of the reads have resolved.
     let currentStatsOnPrimary = getMirroredReadsStats(primary);
@@ -402,18 +406,25 @@ function verifyMirrorReads(rst, db, cmd) {
         let sent = statDifferenceOnPrimary.sent;
         let erroredDuringSend = statDifferenceOnPrimary.erroredDuringSend;
         let seen = statDifferenceOnPrimary.seen;
-        // `pending` refers to the number of reads the primary has decided to mirror to
-        // secondaries, but hasn't yet resolved. Unlike the other mirrored reads metrics, this
-        // metric does not accumulate, and refers only to the reads currently pending.
+        // `pending` refers to the number of reads the primary should mirror, but hasn't yet
+        // scheduled. Unlike the other mirrored reads metrics, this metric does not accumulate, and
+        // refers only to the reads currently pending.
         let pending = currentStatsOnPrimary.pending;
+        // `scheduled` refers to the number of reads the primary has scheduled mirrors for, but
+        // hasn't yet resolved. Unlike the other mirrored reads metrics, this metric does not
+        // accumulate, and refers only to the reads currently scheduled.
+        let scheduled = currentStatsOnPrimary.scheduled;
 
-        jsTestLog(
-            "Verifying that no mirrored reads remain pending: " +
-            tojson(
-                {sent: sent, erroredDuringSend: erroredDuringSend, pending: pending, seen: seen}));
-        // Verify that no more reads are pending.
-        return (pending == 0);
-    }, "Did not resolve all pending requests within the time limit", 10000);
+        jsTestLog("Verifying that no mirrored reads remain unresolved: " + tojson({
+                      sent: sent,
+                      erroredDuringSend: erroredDuringSend,
+                      pending: pending,
+                      scheduled: scheduled,
+                      seen: seen
+                  }));
+        // Verify that no more reads are unresolved.
+        return (pending == 0 && scheduled == 0);
+    }, "Did not resolve all requests within the time limit", 10000);
 
     rst.stopSet();
 }
