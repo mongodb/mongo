@@ -1,4 +1,11 @@
-// Tests the parsing of the timeZoneInfo parameter and file use.
+/**
+ * Tests the parsing of the timeZoneInfo parameter and file use.
+ *
+ *  @tags: [
+ *    # TODO (SERVER-99100): Re-enable this test in aubsan once SERVER-92451 has upgraded Timelib.
+ *    incompatible_aubsan,
+ * ]
+ */
 // Test that a bad file causes startup to fail.
 assert.throws(
     () => MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/bad_timezone_info"}),
