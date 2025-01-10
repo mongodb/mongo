@@ -200,7 +200,7 @@ private:
     // The time when the cursor was last unpinned, i.e. the end of the last getMore.
     Date_t _lastUseDate;
 
-    // The hash of the query shape to be used for slow query logging;
+    // The hash of the query shape to be used for slow query logging.
     boost::optional<uint32_t> _planCacheShapeHash;
 
     // Whether ClusterClientCursor::next() was interrupted due to MaxTimeMSExpired.
@@ -217,6 +217,8 @@ private:
     std::unique_ptr<query_stats::Key> _queryStatsKey;
 
     bool _queryStatsWillNeverExhaust = false;
+
+    bool _isChangeStreamQuery = false;
 
     // Tracks if kill() has been called on the cursor. Multiple calls to kill() is an error.
     bool _hasBeenKilled = false;

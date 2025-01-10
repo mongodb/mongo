@@ -132,6 +132,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.key)),
       _queryStatsWillNeverExhaust(
           CurOp::get(operationUsingCursor)->debug().queryStatsInfo.willNeverExhaust),
+      _isChangeStreamQuery(CurOp::get(operationUsingCursor)->debug().isChangeStreamQuery),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
       _opKey(operationUsingCursor->getOperationKey()) {

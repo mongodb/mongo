@@ -944,6 +944,7 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> preparePipeline(
 
     // Start the query planning timer right after parsing.
     CurOp::get(aggExState.getOpCtx())->beginQueryPlanningTimer();
+    CurOp::get(aggExState.getOpCtx())->debug().isChangeStreamQuery = aggExState.hasChangeStream();
 
     if (expCtx->getServerSideJsConfig().accumulator && _samplerAccumulatorJs.tick()) {
         LOGV2_WARNING(

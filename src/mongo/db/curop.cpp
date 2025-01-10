@@ -436,7 +436,7 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         }
 
         if (_debug.storageStats) {
-            _debug.additiveMetrics.aggregateStorageStats(*_debug.storageStats);
+            metrics.aggregateStorageStats(*_debug.storageStats);
         }
     }
 }

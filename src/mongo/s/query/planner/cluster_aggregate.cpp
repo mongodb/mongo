@@ -464,6 +464,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     liteParsedPipeline.verifyIsSupported(opCtx, isSharded, request.getExplain());
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+    CurOp::get(opCtx)->debug().isChangeStreamQuery = hasChangeStream;
     const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     bool shouldDoFLERewrite = request.getEncryptionInformation().has_value();
     auto startsWithQueue = liteParsedPipeline.startsWithQueue();

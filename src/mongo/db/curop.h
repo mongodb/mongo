@@ -386,6 +386,8 @@ public:
     bool cursorExhausted{
         false};  // true if the cursor has been closed at end a find/getMore operation
 
+    bool isChangeStreamQuery{false};
+
     BSONObj execStats;  // Owned here.
 
     // The hash of the PlanCache key for the query being run. This may change depending on what

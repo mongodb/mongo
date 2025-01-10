@@ -85,7 +85,7 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiting>>
 namespace {
 
 auto& queryStatsEvictedMetric = *MetricBuilder<Counter64>{"queryStats.numEvicted"};
-auto& queryStatsNumParitionsMetric = *MetricBuilder<Atomic64Metric>{"queryStats.numPartitions"};
+auto& queryStatsNumPartitionsMetric = *MetricBuilder<Atomic64Metric>{"queryStats.numPartitions"};
 auto& queryStatsMaxSizeBytesMetric = *MetricBuilder<Atomic64Metric>{"queryStats.maxSizeBytes"};
 auto& queryStatsRateLimitedRequestsMetric =
     *MetricBuilder<Counter64>{"queryStats.numRateLimitedRequests"};
@@ -185,7 +185,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
             numPartitions = numLogicalCores;
         }
         queryStatsMaxSizeBytesMetric.set(size);
-        queryStatsNumParitionsMetric.set(numPartitions);
+        queryStatsNumPartitionsMetric.set(numPartitions);
 
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);

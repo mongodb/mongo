@@ -242,6 +242,8 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     CurOp::get(opCtx)->debug().queryStatsInfo.keyHash = cursor->_queryStatsKeyHash;
     CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust =
         cursor->_queryStatsWillNeverExhaust;
+    // Pass along 'isChangeStreamQuery' for serverStatus metrics.
+    CurOp::get(opCtx)->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
 
     cursor->_operationUsingCursor = opCtx;
 
