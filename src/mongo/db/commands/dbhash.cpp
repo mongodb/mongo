@@ -67,6 +67,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -190,6 +191,11 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         Timer timer;
+
+        // We want the dbCheck command to be allowed via direct shard connections despite the fact
+        // that it acquires a collection lock on a user collection. This is an exception, and should
+        // not be repeated elsewhere without sufficient need.
+        OperationShardingState::get(opCtx).setShouldSkipDirectShardConnectionChecks();
 
         std::set<std::string> desiredCollections;
         if (cmdObj["collections"].type() == Array) {
