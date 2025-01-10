@@ -357,15 +357,3 @@ mongo_cc_benchmark(
         "//src/mongo/rpc:message",
     ],
 )
-
-# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/idl:command_generic_argument.h to //src/mongo/db:server_base
-filegroup(
-    name = "command_generic_argument_hdrs",
-    srcs = [":command_generic_argument.h"],
-)
-
-# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/idl:idl_parser.h to //src/mongo/idl:idl_parser
-filegroup(
-    name = "idl_parser_hdrs",
-    srcs = [":idl_parser.h"],
-)

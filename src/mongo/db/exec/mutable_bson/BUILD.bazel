@@ -56,9 +56,3 @@ mongo_cc_unit_test(
         "//src/mongo/transport:transport_layer_common",
     ],
 )
-
-# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/db/exec/mutable_bson:element.h to //src/mongo/db/exec/mutable_bson:mutable_bson
-filegroup(
-    name = "element_hdrs",
-    srcs = [":element.h"],
-)

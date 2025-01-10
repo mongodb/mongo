@@ -4269,12 +4269,6 @@ filegroup(
     srcs = [":baton.h"],
 )
 
-# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/db:client.h to //src/mongo/db:service_context
-filegroup(
-    name = "client_hdrs",
-    srcs = [":client.h"],
-)
-
 # TODO(SERVER-96855): Remove cycle created by moving //src/mongo/db:cluster_role.h to //src/mongo/db:server_base
 filegroup(
     name = "cluster_role_hdrs",
