@@ -164,8 +164,10 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto parsedMr = MapReduceCommandRequest::parse(
         IDLParserContext("mapReduce", false /* apiStrict */, vts, dbName.tenantId(), sc), cmd);
 
+    // Start the query planning timer right after parsing.
     auto curop = CurOp::get(opCtx);
     curop->beginQueryPlanningTimer();
+
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);

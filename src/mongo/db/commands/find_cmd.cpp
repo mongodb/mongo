@@ -429,6 +429,10 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* replyBuilder) override {
+            // We want to start the query planning timer right after parsing. In the explain code
+            // path, we have already parsed the FindCommandRequest, so start timing here.
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
             // TODO SERVER-79175: Make nicer. We need to instantiate the AutoStatsTracker before the
@@ -459,8 +463,6 @@ public:
             _rewriteFLEPayloads(opCtx);
             auto respSc =
                 SerializationContext::stateCommandReply(_cmdRequest->getSerializationContext());
-
-            CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
@@ -561,11 +563,12 @@ public:
                 // We're rerunning the same invocation, so we have to parse again
                 _cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, _request);
             }
+            // Start the query planning timer right after parsing.
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             _rewriteFLEPayloads(opCtx);
             auto respSc =
                 SerializationContext::stateCommandReply(_cmdRequest->getSerializationContext());
-
-            CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,

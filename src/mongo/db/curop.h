@@ -907,19 +907,17 @@ public:
         return computeElapsedTimeTotal(start, _end.load()) - _totalPausedDuration;
     }
     /**
-    * The planningTimeMicros metric, reported in the system profiler and in queryStats, is measured
-    * using the Curop instance's _tickSource. Currently, _tickSource is only paused in places where
-    logical work is being done. If this were to change, and _tickSource
-    were to be paused during query planning for reasons unrelated to the work of
-    planning/optimization, it would break the planning time measurement below.
-    *
-    */
+     * The planningTimeMicros metric, reported in the system profiler and in queryStats, is measured
+     * using the Curop instance's _tickSource. Currently, _tickSource is only paused in places where
+     * logical work is being done. If this were to change, and _tickSource were to be paused during
+     * query planning for reasons unrelated to the work of planning/optimization, it would break the
+     * planning time measurement below.
+     */
     void beginQueryPlanningTimer() {
-        // This is an inner executor/cursor, the metrics for which don't get tracked by
-        // OpDebug::planningTime.
-        if (_queryPlanningStart.load() != 0) {
-            return;
-        }
+        // If we've already started the query planning timer, we could be processing a command that
+        // is being retried. It's also possible that we're processing a command on a view that has
+        // been rewritten to an aggregation. To handle the former case, reset the start time here,
+        // even though it means excluding view-related work from the query planning timer.
         _queryPlanningStart = _tickSource->getTicks();
     }
 

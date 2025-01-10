@@ -751,6 +751,10 @@ last-continuous:
     ticket: SERVER-92292
   - test_file: jstests/core/query/project/projection_with_hashed_index.js
     ticket: SERVER-91757
+  - test_file: jstests/noPassthrough/explain_optimization_stats.js
+    ticket: SERVER-92476
+  - test_file: jstests/noPassthrough/profile_planning_time_stats.js
+    ticket: SERVER-92476
   - test_file: jstests/sharding/sharded_data_distribution.js
     ticket: SERVER-88400
   - test_file: jstests/core/index/geo/negated_geo_queries.js
@@ -1604,6 +1608,10 @@ last-lts:
     ticket: SERVER-92292
   - test_file: jstests/core/query/project/projection_with_hashed_index.js
     ticket: SERVER-91757
+  - test_file: jstests/noPassthrough/explain_optimization_stats.js
+    ticket: SERVER-92476
+  - test_file: jstests/noPassthrough/profile_planning_time_stats.js
+    ticket: SERVER-92476
   - test_file: jstests/sharding/sharded_data_distribution.js
     ticket: SERVER-88400
   - test_file: jstests/sharding/sharded_data_distribution.js

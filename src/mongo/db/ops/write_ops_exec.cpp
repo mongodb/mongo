@@ -1711,6 +1711,9 @@ WriteResult performUpdates(OperationContext* opCtx,
             }
         });
 
+        // Begin query planning timing once we have the nested CurOp.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
+
         auto sampleId = analyze_shard_key::getOrGenerateSampleId(
             opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kUpdate, singleOp);
         if (sampleId) {
@@ -1994,6 +1997,9 @@ WriteResult performDeletes(OperationContext* opCtx,
                     &hangBeforeChildRemoveOpIsPopped, opCtx, "hangBeforeChildRemoveOpIsPopped");
             }
         });
+
+        // Begin query planning timing once we have the nested CurOp.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
                 opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kDelete, singleOp)) {
@@ -3391,8 +3397,6 @@ void explainUpdate(OperationContext* opCtx,
                               isTimeseriesViewRequest);
     uassertStatusOK(parsedUpdate.parseRequest());
 
-    CurOp::get(opCtx)->beginQueryPlanningTimer();
-
     auto exec = uassertStatusOK(
         getExecutorUpdate(&CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
     auto bodyBuilder = result->getBodyBuilder();
@@ -3431,8 +3435,6 @@ void explainDelete(OperationContext* opCtx,
     ParsedDelete parsedDelete(
         opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
     uassertStatusOK(parsedDelete.parseRequest());
-
-    CurOp::get(opCtx)->beginQueryPlanningTimer();
 
     // Explain the plan tree.
     auto exec = uassertStatusOK(

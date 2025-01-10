@@ -356,6 +356,10 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     validate(request());
     const BSONObj& cmdObj = request().toBSON(BSONObj() /* commandPassthroughFields */);
 
+    // Start the query planning timer right after parsing.
+    auto const curOp = CurOp::get(opCtx);
+    curOp->beginQueryPlanningTimer();
+
     auto requestAndMsg = [&]() {
         if (request().getEncryptionInformation()) {
             {
@@ -375,10 +379,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, request);
 
     uassertStatusOK(userAllowedWriteNS(opCtx, nss));
-    auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
     auto const dbName = request.getDbName();
-    curOp->beginQueryPlanningTimer();
 
     if (request.getRemove().value_or(false)) {
         auto deleteRequest = DeleteRequest{};
@@ -480,7 +482,9 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     validate(req);
 
+    // Start the query planning timer right after parsing.
     auto& curOp = *CurOp::get(opCtx);
+    curOp.beginQueryPlanningTimer();
 
     if (req.getEncryptionInformation().has_value()) {
         {

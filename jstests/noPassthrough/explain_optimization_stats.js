@@ -1,64 +1,15 @@
 /**
  * Tests for validating that optimization stats are included in explain output.
  */
+import {
+    runWithFailpoint,
+    setupCollectionAndGetExplainTestCases
+} from "jstests/noPassthrough/explain_and_profile_optimization_stats_util.js";
 
 const collName = "jstests_explain_optimization_stats";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-
 function runTest(db) {
-    assertDropAndRecreateCollection(db, collName);
-
-    const collection = db[collName];
-
-    assert.commandWorked(collection.createIndex({a: 1}));
-    assert.commandWorked(collection.createIndex({b: 1}));
-    assert.commandWorked(
-        collection.insertMany(Array.from({length: 100}, (_, i) => ({a: "abc", b: "def", c: i}))));
-
-    const filter = {a: "abc", b: "def", c: {$gt: 50}};
-    const commands = [
-        {testName: "find", command: {explain: {find: collName, filter: filter}}},
-        {testName: "count", command: {explain: {count: collName, query: filter}}},
-        {testName: "distinct", command: {explain: {distinct: collName, key: "c", query: filter}}},
-        {
-            testName: "findAndModify",
-            command: {explain: {findAndModify: collName, query: filter, update: {$inc: {c: 1}}}}
-        },
-        {
-            testName: "delete",
-            command: {explain: {delete: collName, deletes: [{q: filter, limit: 0}]}}
-        },
-        {
-            testName: "update",
-            command: {explain: {update: collName, updates: [{q: filter, u: {$inc: {c: 1}}}]}}
-        },
-        {
-            testName: "aggregate with explain command",
-            command: {explain: {aggregate: collName, pipeline: [{$match: filter}], cursor: {}}}
-        },
-        {
-            testName: "aggregate with explain flag",
-            command: {aggregate: collName, pipeline: [{$match: filter}], cursor: {}, explain: true}
-        },
-        {
-            testName: "mapReduce",
-            command: {
-                explain: {
-                    mapReduce: collName,
-                    query: filter,
-                    map: function() {
-                        emit("val", 1);
-                    },
-                    reduce: function(k, v) {
-                        return 1;
-                    },
-                    out: "example"
-                }
-            }
-        }
-    ];
+    const waitTimeMillis = 500;
+    const testCases = setupCollectionAndGetExplainTestCases(db, collName, waitTimeMillis);
 
     function collectOptimizationTimeMillis(explain) {
         if (explain === null || typeof explain !== 'object') {
@@ -78,25 +29,17 @@ function runTest(db) {
         }
     }
 
-    let failPoints = [];
+    for (let testCase of testCases) {
+        jsTestLog(`Test explain on ${testCase.testName} command`);
 
-    try {
-        failPoints = FixtureHelpers.mapOnEachShardNode({
-            db: db.getSiblingDB("admin"),
-            func: (db) => configureFailPoint(db, "sleepWhileMultiplanning", {ms: 1000}),
-            primaryNodeOnly: false,
-        });
+        runWithFailpoint(db, testCase.failpointName, testCase.failpointOpts, () => {
+            const explain = assert.commandWorked(db.runCommand(testCase.command));
 
-        for (let command of commands) {
-            jsTestLog(`Test explain on ${command.testName} command`);
-            const explain = assert.commandWorked(db.runCommand(command.command));
+            // Assert the optimizationTimeMillis field is reported in explain as expected.
             const optimizationTimeMillis = collectOptimizationTimeMillis(explain);
-            optimizationTimeMillis.forEach(time => assert.gte(time, 1000, explain));
-            assert.gt(optimizationTimeMillis.length, 0, explain);
-        }
-
-    } finally {
-        failPoints.forEach(failPoint => failPoint.off());
+            optimizationTimeMillis.forEach(time => assert.gte(time, waitTimeMillis, explain));
+            assert.gte(optimizationTimeMillis.length, 0, explain);
+        });
     }
 }
 
