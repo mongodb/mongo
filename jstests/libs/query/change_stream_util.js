@@ -216,6 +216,7 @@ export function ChangeStreamTest(_db, options) {
                         _db,
                         Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
                         doNotModifyInPassthroughs));
+                    break;
                 } catch (e) {
                     if (attemptNumber === maxRetries || !isResumableChangeStreamError(e)) {
                         throw e;
