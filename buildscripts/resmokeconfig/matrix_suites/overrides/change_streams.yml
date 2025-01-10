@@ -58,14 +58,6 @@
       # Exclude any that assume sharding is disabled
       - assumes_against_mongod_not_mongos
 
-- name: sharded_collections_passthrough
-  value:
-    executor:
-      fixture:
-        mongod_options:
-          set_parameters:
-            coordinateCommitReturnImmediatelyAfterPersistingDecision: true
-
 - name: sharded_collections_passthrough_excludes
   value:
     exclude_with_any_tags:

@@ -26,7 +26,6 @@ executor:
     mongod_options:
       bind_ip_all: ""
       set_parameters:
-        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
         enableTestCommands: 1
         periodicNoopIntervalSecs: 1
         writePeriodicNoops: true

@@ -11,7 +11,6 @@ description: >-
   You can run any of these tests individually to debug any issues that might arrise.
 overrides:
   - "change_streams.mongos_passthrough"
-  - "change_streams.sharded_collections_passthrough"
   - "change_streams.secondary_reads"
   - "change_streams.base_eval"
 eval:
