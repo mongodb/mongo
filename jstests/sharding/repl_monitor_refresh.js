@@ -3,7 +3,7 @@
  * become invalid when a replica set reconfig happens.
  * @tags: [multiversion_incompatible]
  */
-import {awaitRSClientHosts, reconfig} from "jstests/replsets/rslib.js";
+import {reconfig, reconnect} from "jstests/replsets/rslib.js";
 
 // Skip the following checks since the removed node has wrong config and is still alive.
 TestData.skipCheckDBHashes = true;
@@ -21,42 +21,14 @@ assert.soon(() => {
     return NODE_COUNT == shardDoc.host.split(',').length;  // seed list should contain all nodes
 });
 
-/* Make sure that the first node is not the primary (by making the second one primary).
- * We need to do this since the ReplicaSetMonitor iterates over the nodes one
- * by one and you can't remove a node that is currently the primary.
- */
-var connPoolStats = mongos.getDB('admin').runCommand({connPoolStats: 1});
-var targetHostName = connPoolStats['replicaSets'][replTest.name].hosts[1].addr;
+let confDoc = replTest.getReplSetConfigFromNode();
+let secondary = replTest.getSecondary();
 
-var priConn = replTest.getPrimary();
-var confDoc = priConn.getDB("local").system.replset.findOne();
+jsTestLog("Removing " + secondary.host + " from the set");
 
-for (var idx = 0; idx < confDoc.members.length; idx++) {
-    if (confDoc.members[idx].host == targetHostName) {
-        confDoc.members[idx].priority = 100;
-    } else {
-        confDoc.members[idx].priority = 1;
-    }
-}
-
-confDoc.version++;
-
-jsTest.log('Changing conf to ' + tojson(confDoc));
-
-reconfig(replTest, confDoc);
-
-awaitRSClientHosts(mongos, {host: targetHostName}, {ok: true, ismaster: true});
-let rsConfig = st.rs0.getReplSetConfigFromNode();
-assert.soon(function() {
-    const res = st.rs0.getPrimary().adminCommand({replSetGetStatus: 1});
-    return ((res.members[0].configVersion === rsConfig.version) &&
-            (res.members[2].configVersion === rsConfig.version) &&
-            (res.members[0].configTerm === rsConfig.term) &&
-            (res.members[2].configTerm === rsConfig.term));
+confDoc.members = confDoc.members.filter((member) => {
+    return member.host !== secondary.host;
 });
-
-// Remove first node from set
-confDoc.members.shift();
 confDoc.version++;
 
 reconfig(replTest, confDoc);
@@ -85,5 +57,18 @@ assert.soon(
         return ("Expected to find " + confDoc.members.length + " nodes but found " +
                 shardDoc.host.split(',').length + " in " + shardDoc.host);
     });
+
+jsTestLog("Waiting for" + secondary.host + "replSetGetStatus to show that it was removed.");
+assert.soonNoExcept(
+    () => {
+        // The secondary dropped connections when it was removed.
+        reconnect(secondary);
+        let status = secondary.getDB('admin').runCommand({replSetGetStatus: 1});
+        jsTestLog(`replSetGetStatus: ${tojson(status)}`);
+        return status.code === ErrorCodes.InvalidReplicaSetConfig;
+    },
+    "Waiting for" + secondary.host + "replSetGetStatus to show that it was removed",
+    undefined /* timeout */,
+    1000 /* intervalMS */);
 
 st.stop({parallelSupported: false});
