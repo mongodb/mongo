@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import hashlib
 import os
@@ -5,9 +7,8 @@ import platform
 import shutil
 import stat
 import sys
+import time
 import urllib.request
-
-from retry import retry
 
 _S3_HASH_MAPPING = {
     "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-ppc64le": "4ecc7f1396b8d921c6468b34cc8ed356c4f2dbe8a154c25d681a61ccb5dfc9cb",
@@ -20,9 +21,17 @@ _S3_HASH_MAPPING = {
 }
 
 
-@retry(tries=5, delay=3)
 def _download_path_with_retry(*args, **kwargs):
-    urllib.request.urlretrieve(*args, **kwargs)
+    for i in range(5):
+        try:
+            return urllib.request.urlretrieve(*args, **kwargs)
+        except Exception as e:
+            print(f"Download failed: {e}")
+            if i == 4:
+                raise
+            print("Retrying download...")
+            time.sleep(3)
+            continue
 
 
 def _sha256_file(filename: str) -> str:
