@@ -2258,6 +2258,10 @@ public:
         return visitor->visit(this);
     }
 
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
+    }
+
 private:
     EncryptedPredicateEvaluatorV2 _evaluatorV2;
 };
@@ -2283,6 +2287,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
     }
 
 private:

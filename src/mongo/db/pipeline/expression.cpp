@@ -2478,23 +2478,7 @@ Value ExpressionInternalFLEEqual::serialize(const SerializationOptions& options)
 }
 
 Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* variables) const {
-    auto fieldValue = _children[0]->evaluate(root, variables);
-    if (fieldValue.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    // Hang on to the FLE2IndexedEqualityEncryptedValueV2 object, because getRawMetadataBlock
-    // returns a view on its member.
-    boost::optional<FLE2IndexedEqualityEncryptedValueV2> value;
-    return Value(_evaluatorV2.evaluate(
-        fieldValue, EncryptedBinDataType::kFLE2EqualityIndexedValueV2, [&value](auto serverValue) {
-            // extractMetadataBlocks should only be run once.
-            tassert(9588901, "extractMetadataBlocks should only be run once by evaluate", !value);
-            value.emplace(serverValue);
-            std::vector<ConstDataRange> metadataBlocks;
-            metadataBlocks.push_back(value->getRawMetadataBlock());
-            return metadataBlocks;
-        }));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 const char* ExpressionInternalFLEEqual::getOpName() const {
@@ -2554,17 +2538,7 @@ Value ExpressionInternalFLEBetween::serialize(const SerializationOptions& option
 }
 
 Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* variables) const {
-    auto fieldValue = _children[0]->evaluate(root, variables);
-    if (fieldValue.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    return Value(_evaluatorV2.evaluate(
-        fieldValue, EncryptedBinDataType::kFLE2RangeIndexedValueV2, [](auto serverValue) {
-            auto [subType, data] = fromEncryptedConstDataRange(serverValue);
-            return uassertStatusOK(FLE2IndexedRangeEncryptedValueV2::parseAndValidateFields(data))
-                .metadataBlocks;
-        }));
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 const char* ExpressionInternalFLEBetween::getOpName() const {

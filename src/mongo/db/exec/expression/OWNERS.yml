@@ -11,3 +11,6 @@ filters:
   - "evaluate_javascript*":
     approvers:
       - 10gen/query-integration-javascript
+  - "evaluate_fle*":
+    approvers:
+      - 10gen/query-integration-fle
