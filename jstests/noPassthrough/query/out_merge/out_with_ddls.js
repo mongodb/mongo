@@ -141,15 +141,6 @@ function assertSerializedOrError({desc, failpointName, setupFn, ddlFn}) {
     return aggRes;
 }
 
-FixtureHelpers.runCommandOnAllShards({
-    db: sourceColl.getDB().getSiblingDB("admin"),
-    cmdObj: {
-        configureFailPoint: "outImplictlyCreateDBOnSpecificShard",
-        mode: "alwaysOn",
-        data: {shardId: st.shard1.shardName}
-    }
-});
-
 assert.commandWorked(assertSerializedOrError({
     desc: "Concurrent $out and moveCollection on target",
     failpointName: "hangWhileBuildingDocumentSourceOutBatch",
@@ -177,7 +168,8 @@ assert.commandWorked(assertSerializedOrError({
     }
 }));
 
-for (const targetDBExists of [true, false]) {
+// TODO SERVER-97621 improve test harness to deal with placement issues when $out creates the db
+for (const targetDBExists of [true]) {
     const targetDBDesc = ` and targetDB does${targetDBExists ? ' ' : ' not '}exist`;
     const maybeCreateTargetDB = () => {
         if (targetDBExists) {
@@ -211,6 +203,10 @@ for (const targetDBExists of [true, false]) {
         }
     }));
 
+    // TODO SERVER-97621 Because this test drops the target database, it gets implicitly recreated
+    // by the $out on a random database, so we can't compare the placement. Unblock this test after
+    // we can predict where the placement of the implicitly created db is.
+    /*
     assert.commandWorked(assertSerializedOrError({
         desc: "Concurrent $out and dropDatabase on targetDB" + targetDBDesc,
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
@@ -222,7 +218,7 @@ for (const targetDBExists of [true, false]) {
             assert.commandWorked(targetDB.dropDatabase());
         }
     }));
-
+    */
     assert.commandWorked(assertSerializedOrError({
         desc: "Concurrent $out and dropDatabase on sourceDB" + targetDBDesc,
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
