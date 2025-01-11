@@ -245,10 +245,6 @@ Value evaluate(const ExpressionAdd& expr, const Document& root, Variables* varia
     return state.getValue();
 }
 
-Value evaluate(const ExpressionConstant& expr, const Document& root, Variables* variables) {
-    return expr.getValue();
-}
-
 StatusWith<Value> evaluateDivide(Value lhs, Value rhs) {
     if (lhs.numeric() && rhs.numeric()) {
         // If, and only if, either side is decimal, return decimal.
@@ -276,12 +272,6 @@ StatusWith<Value> evaluateDivide(Value lhs, Value rhs) {
                           << "$divide only supports numeric types, not " << typeName(lhs.getType())
                           << " and " << typeName(rhs.getType()));
     }
-}
-
-Value evaluate(const ExpressionDivide& expr, const Document& root, Variables* variables) {
-    auto& children = expr.getChildren();
-    return uassertStatusOK(evaluateDivide(children[0]->evaluate(root, variables),
-                                          children[1]->evaluate(root, variables)));
 }
 
 StatusWith<Value> evaluateMod(Value lhs, Value rhs) {
@@ -331,13 +321,6 @@ StatusWith<Value> evaluateMod(Value lhs, Value rhs) {
                           << "$mod only supports numeric types, not " << typeName(lhs.getType())
                           << " and " << typeName(rhs.getType()));
     }
-}
-
-Value evaluate(const ExpressionMod& expr, const Document& root, Variables* variables) {
-    auto& children = expr.getChildren();
-    Value lhs = children[0]->evaluate(root, variables);
-    Value rhs = children[1]->evaluate(root, variables);
-    return uassertStatusOK(evaluateMod(lhs, rhs));
 }
 
 namespace {
@@ -633,12 +616,6 @@ StatusWith<Value> evaluateSubtract(Value lhs, Value rhs) {
     }
 }
 
-Value evaluate(const ExpressionSubtract& expr, const Document& root, Variables* variables) {
-    auto& children = expr.getChildren();
-    return uassertStatusOK(evaluateSubtract(children[0]->evaluate(root, variables),
-                                            children[1]->evaluate(root, variables)));
-}
-
 namespace {
 
 void assertFlagsValid(uint32_t flags,
@@ -738,12 +715,6 @@ Value evaluate(const ExpressionTrunc& expr, const Document& root, Variables* var
     auto& children = expr.getChildren();
     return evaluateRoundOrTrunc(
         root, children, expr.getOpName(), Decimal128::kRoundTowardZero, &std::trunc, variables);
-}
-
-Value evaluate(const ExpressionIsNumber& expr, const Document& root, Variables* variables) {
-    auto& children = expr.getChildren();
-    Value val(children[0]->evaluate(root, variables));
-    return Value(val.numeric());
 }
 
 namespace {
