@@ -6,6 +6,7 @@
  *		a. includes explain() validation
  * 3. the outer collection is a view and the inner collection is a view.
  * 		a. includes explain() validation
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

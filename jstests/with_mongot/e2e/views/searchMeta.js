@@ -3,6 +3,7 @@
  * results provide meta data on the enriched collection, they don't have/display the enriched fields
  * themselves. On an implementation level, $searchMeta doesn't desugar to $_internalSearchIdLookup
  * (which performs view transforms for other mongot operators).
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";

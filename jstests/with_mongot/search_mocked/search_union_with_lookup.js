@@ -746,7 +746,11 @@ const lookupSearchViewQuery = setupSearchQuery(
         {_id: 8, $searchScore: 0.5}
     ],
     1,
-    view1.getName()  // viewName
+    // TODO SERVER-98368 change this to view object instead of viewName
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'MongotIndexedView')
+        ? view1.getName()
+        : null  // viewName is only included in the request to mongot if the feature flag to enable
+                // mongot indexing on views is enabled
 );
 view1.drop();
 assert.commandWorked(db.createView(view1.getName(), coll.getName(), []));

@@ -1,6 +1,7 @@
 /**
  * This test asserts that storedSource queries work correctly on views by inspecting explain()
  * output and document results.
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

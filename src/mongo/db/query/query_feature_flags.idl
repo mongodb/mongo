@@ -200,3 +200,9 @@ feature_flags:
       default: false
       shouldBeFCVGated: false
 
+    featureFlagMongotIndexedViews:
+      description: "Feature flag to enable issuing mongot index commands on views and running mongot queries on said mongot indexed views."
+      cpp_varname: gFeatureFlagMongotIndexedViews
+      default: false
+      shouldBeFCVGated: true
+

@@ -2,6 +2,7 @@
  * This test confirms mongod correctly resolves inner pipelines that are discovered during view
  * resolution. In this test, we create a lookup view where the foreign collection is another view
  * and the subpipeline contains $search.
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 
