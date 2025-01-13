@@ -12,6 +12,7 @@ const db = conn.getDB(dbName);
 
 if (checkSbeCompletelyDisabled(db)) {
     jsTestLog(`Skipping ${jsTestName()} as SBE executor is disabled`);
+    MongoRunner.stopMongod(conn);
     quit();
 }
 
