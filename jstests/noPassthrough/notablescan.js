@@ -18,14 +18,17 @@
 
 import {isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 function checkError(err) {
     assert.includes(err.toString(), "'notablescan'");
 }
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
 
-const conn = MongoRunner.runMongod();
-assert.neq(null, conn, "mongod failed to start.");
-let db = conn.getDB(jsTestName());
+let db = rst.getPrimary().getDB(jsTestName());
 const colName = jsTestName();
 let coll = db.getCollection(colName);
 coll.drop();
@@ -84,4 +87,26 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
         db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}));
 }
 
-MongoRunner.stopMongod(conn);
+{  // Make sure that Query Settings override the notablescan parameter.
+    const qsutils = new QuerySettingsUtils(db, colName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
+    const ns = {db: db.getName(), coll: colName};
+
+    coll = db.getCollection(colName);
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(coll.createIndexes([qstests.indexA, qstests.indexB, qstests.indexAB]));
+
+    const querySettingsFindQuery = qsutils.makeFindQueryInstance({
+        filter: {a: 1, b: 1},
+        let : {
+            c: 1,
+            d: 2,
+        }
+    });
+
+    qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns);
+    qstests.assertQuerySettingsFallback(querySettingsFindQuery, ns);
+}
+
+rst.stopSet();

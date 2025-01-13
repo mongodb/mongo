@@ -345,13 +345,16 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
               allowedIndex.getHint());
     }
 
+    constexpr auto strictNoTableScan = (QueryPlannerParams::Options::NO_TABLE_SCAN |
+                                        QueryPlannerParams::Options::STRICT_NO_TABLE_SCAN);
     if (!forwardAllowed && !backwardAllowed) {
         // No '$natural' or cluster key hint present. Ensure that table scans are forbidden.
-        collectionInfo.options |= QueryPlannerParams::Options::NO_TABLE_SCAN;
+        collectionInfo.options |= strictNoTableScan;
     } else {
-        // At least one direction is allowed. Clear out the 'NO_TABLE_SCAN' flag if it exists,
-        // as query settings should have a higher precedence over server parameters.
-        collectionInfo.options &= ~QueryPlannerParams::Options::NO_TABLE_SCAN;
+        // At least one direction is allowed. Clear out the 'NO_TABLE_SCAN' and
+        // 'STRICT_NO_TABLE_SCAN' flags if they exist, as query settings should have a higher
+        // precedence over server parameters.
+        collectionInfo.options &= ~strictNoTableScan;
 
         // Enforce the scan direction if needed.
         const bool bothDirectionsAllowed = forwardAllowed && backwardAllowed;

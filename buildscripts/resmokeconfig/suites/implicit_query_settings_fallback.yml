@@ -11,15 +11,6 @@ selector:
     # TODO SERVER-96339: Fix $changeStream shape computation on sharded setQuerySettings commands.
     - jstests/aggregation/explain_per_stage_exec_stats.js
 
-    # TODO SERVER-95456 Make CLUSTERED_IXSCANs obey query settings allowed indexes
-    - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
-    - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
-    - jstests/core/timeseries/timeseries_index_partial.js
-    - jstests/core/timeseries/timeseries_index_use.js
-    - jstests/core/timeseries/timeseries_match_pushdown.js
-    - jstests/core/timeseries/timeseries_partial_index_opt.js
-    - jstests/core/timeseries/timeseries_update_hint.js
-
     # TODO SERVER-88977: Apply QuerySettings for queries involving columnstore indexes.
     - jstests/core/columnstore/**/*.js
     - jstests/core/query/project/projection_semantics.js
