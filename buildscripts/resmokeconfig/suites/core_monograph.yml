@@ -14,15 +14,15 @@ selector:
   - jstests/core/and2.js
   - jstests/core/and3.js
   - jstests/core/andor.js
-  # - jstests/core/apitest_db.js # 51: var storageEngineName = db.serverStatus().storageEngine.name;
+  - jstests/core/apitest_db.js
   - jstests/core/apitest_db_profile_level.js
   # - jstests/core/apitest_dbcollection.js # 160: capped collection
-  # - jstests/core/apply_ops1.js # 65: metadata lock assert
-  # - jstests/core/apply_ops2.js # 21: metadata lock assert
-  # - jstests/core/apply_ops_dups.js # 17: metadata lock assert
-  # - jstests/core/apply_ops_index_collation.js # 28: metadata lock assert
+  # - jstests/core/apply_ops1.js # hang at unknown line
+  - jstests/core/apply_ops2.js
+  # - jstests/core/apply_ops_dups.js # 38: unique index
+  - jstests/core/apply_ops_index_collation.js
   # - jstests/core/apply_ops_invalid_index_spec.js # 38: replTest
-  # - jstests/core/apply_ops_without_ns.js #12: metadata lock assert
+  - jstests/core/apply_ops_without_ns.js
   - jstests/core/array1.js
   - jstests/core/array3.js
   - jstests/core/array4.js
@@ -76,7 +76,7 @@ selector:
   - jstests/core/bulk_insert.js
   # - jstests/core/bulk_insert_capped.js // Unsupport capped collections
   - jstests/core/bulk_legacy_enforce_gle.js
-  # - jstests/core/bypass_doc_validation.js # 54: metadata lock assert
+  # - jstests/core/bypass_doc_validation.js # 84:  mongodb create index flow.
   - jstests/core/cannot_create_system_dot_indexes.js
   #- jstests/core/capped.js
   # - jstests/core/capped1.js
@@ -100,20 +100,20 @@ selector:
   # - jstests/core/collection_truncate.js # 10: CommandNotFound
   - jstests/core/collmod.js
   - jstests/core/collmod_bad_spec.js
-  # - jstests/core/collmod_without_uuid.js # 25: metadata lock assert
+  - jstests/core/collmod_without_uuid.js
   # - jstests/core/commands_namespace_parsing.js  # 164: no such command: 'godinsert'
   - jstests/core/commands_that_do_not_write_do_not_accept_wc.js
-  # - jstests/core/commands_with_uuid.js # 91: Unimplemented parallelCollectionScan.
+  - jstests/core/commands_with_uuid.js
   # - jstests/core/compact_keeps_indexes.js # 21: Unimplemented compact
   - jstests/core/compare_timestamps.js
   - jstests/core/connection_status.js
   - jstests/core/connection_string_validation.js
-  # - jstests/core/constructors.js # crash
+  # - jstests/core/constructors.js # failed in mapReduce context: Error: map reduce failed
   # - jstests/core/convert_to_capped.js
   # - jstests/core/convert_to_capped_nonexistant.js
   # - jstests/core/copydb.js
   - jstests/core/count.js
-  # - jstests/core/count10.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/count10.js # Start a parallel shell which repeatedly checks for a count query using db.currentOp() 
   - jstests/core/count11.js
   - jstests/core/count2.js
   - jstests/core/count3.js
@@ -123,7 +123,7 @@ selector:
   - jstests/core/count7.js
   - jstests/core/count9.js
   # - jstests/core/count_hint.js # 33: sparse index
-  # - jstests/core/count_plan_summary.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/count_plan_summary.js # startParallelShell
   - jstests/core/counta.js
   - jstests/core/countb.js
   - jstests/core/countc.js
@@ -141,10 +141,10 @@ selector:
   - jstests/core/coveredIndex2.js
   - jstests/core/coveredIndex3.js
   - jstests/core/coveredIndex4.js
-  # - jstests/core/create_collection.js # 62: db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "a_1"}})
+  - jstests/core/create_collection.js
   - jstests/core/create_collection_fail_cleanup.js
   - jstests/core/create_indexes.js
-  # - jstests/core/crud_api.js
+  # - jstests/core/crud_api.js # 201: server crash
   # - jstests/core/currentop.js # 16: The current storage engine doesn't support backup mode
   - jstests/core/currentop_predicate.js
   - jstests/core/cursor1.js
@@ -154,13 +154,13 @@ selector:
   - jstests/core/cursor5.js
   - jstests/core/cursor6.js
   - jstests/core/cursor7.js
-  # - jstests/core/cursora.js # 45: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+    # - jstests/core/cursora.js # warning: cursora.js warning: shouldn't have counted all  n: 1500 num: 1500
   - jstests/core/datasize2.js
   - jstests/core/date1.js
   - jstests/core/date2.js
   - jstests/core/date3.js
   - jstests/core/db.js
-  # - jstests/core/dbadmin.js # 28: db.runCommand("serverStatus")
+  - jstests/core/dbadmin.js
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
   # - jstests/core/dbhash.js # 43: dbhash()
@@ -169,13 +169,13 @@ selector:
   - jstests/core/dbref2.js
   - jstests/core/dbref3.js
   - jstests/core/dbref4.js
-  # - jstests/core/dbstats.js # 22: serverStatus cmd
+  - jstests/core/dbstats.js
   - jstests/core/delx.js
   - jstests/core/depth_limit.js
-  # - jstests/core/diagdata.js # 15: etDiagnosticData failed to return a non-empty command, is FTDC running? 
+  - jstests/core/diagdata.js # 15: etDiagnosticData failed to return a non-empty command, is FTDC running? 
   - jstests/core/distinct1.js
   - jstests/core/distinct2.js
-  # - jstests/core/distinct3.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/distinct3.js
   - jstests/core/distinct4.js
   - jstests/core/distinct_array1.js
   - jstests/core/distinct_compound_index.js
@@ -191,30 +191,30 @@ selector:
   # - jstests/core/dropdb.js # 29: dropDatabase()
   - jstests/core/dropdb_race.js
   - jstests/core/elemmatch_or_pushdown.js
-  # - jstests/core/elemMatchProjection.js # 158: virtual bool txservice::PostReadCc::ValidTermCheck(): Assertion `ccm_ != nullptr' failed.
+  - jstests/core/elemMatchProjection.js 
   - jstests/core/ensure_sorted.js
-  # - jstests/core/error2.js # server crash at CircularQueue<std::unique_ptr<mongo::QueryRequest, std::default_delete<mongo::QueryRequest> > >::Enqueue
+  - jstests/core/error2.js
   - jstests/core/error5.js
-  # - jstests/core/eval0.js # server crash at CircularQueue<std::unique_ptr<mongo::QueryRequest, std::default_delete<mongo::QueryRequest> > >::Enqueue
-  # - jstests/core/eval1.js
-  # - jstests/core/eval2.js
-  # - jstests/core/eval3.js
-  # - jstests/core/eval4.js
-  # - jstests/core/eval5.js
-  # - jstests/core/eval6.js
-  # - jstests/core/eval7.js
-  # - jstests/core/eval8.js
-  # - jstests/core/eval9.js
+  - jstests/core/eval0.js 
+  - jstests/core/eval1.js
+  - jstests/core/eval2.js
+  # - jstests/core/eval3.js 34: wrong distinct count.
+  # - jstests/core/eval4.js 31: wrong count after eval().
+  - jstests/core/eval5.js
+  - jstests/core/eval6.js
+  - jstests/core/eval7.js
+  - jstests/core/eval8.js
+  - jstests/core/eval9.js
   # - jstests/core/eval_mr.js
-  # - jstests/core/eval_nolock.js
-  # - jstests/core/eval_wait_for_read_write_concern.js
-  # - jstests/core/evala.js
-  # - jstests/core/evalb.js
-  # - jstests/core/evald.js
-  # - jstests/core/evale.js
-  # - jstests/core/evalg.js
-  # - jstests/core/evalh.js
-  # - jstests/core/evalj.js
+  # - jstests/core/eval_nolock.js 23: wrong count after eval().
+  - jstests/core/eval_wait_for_read_write_concern.js
+  - jstests/core/evala.js
+  # - jstests/core/evalb.js 53: MonographLockerNoop::getLockerInfo
+  # - jstests/core/evald.js eval JavaScript execution interrupted
+  - jstests/core/evale.js
+  - jstests/core/evalg.js
+  - jstests/core/evalh.js
+  - jstests/core/evalj.js
   - jstests/core/exhaust.js
   - jstests/core/exists.js
   - jstests/core/exists2.js
@@ -240,7 +240,7 @@ selector:
   - jstests/core/explain_distinct.js
   - jstests/core/explain_execution_error.js
   - jstests/core/explain_find.js
-  # - jstests/core/explain_find_and_modify.js # 34: Explaining findAndModify on a non-existent database should return an error.
+  - jstests/core/explain_find_and_modify.js
   - jstests/core/explain_large_bounds.js
   - jstests/core/explain_missing_collection.js
   - jstests/core/explain_missing_database.js
@@ -266,7 +266,7 @@ selector:
   - jstests/core/find_and_modify2.js
   - jstests/core/find_and_modify3.js
   - jstests/core/find_and_modify4.js
-  # - jstests/core/find_and_modify_concurrent_update.js # 33: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/find_and_modify_empty_coll.js
   - jstests/core/find_and_modify_empty_update.js
   - jstests/core/find_and_modify_server6226.js
@@ -283,12 +283,12 @@ selector:
   - jstests/core/find_getmore_bsonsize.js
   - jstests/core/find_getmore_cmd.js
   - jstests/core/find_size.js
-  # - jstests/core/finda.js # hang
+  # - jstests/core/finda.js # 57: Error: assert failed : 150 :
   - jstests/core/fm1.js
   - jstests/core/fm2.js
   - jstests/core/fm3.js
   - jstests/core/fm4.js
-  # - jstests/core/fsync.js # 20: db.serverStatus()
+  - jstests/core/fsync.js # 20: db.serverStatus()
   # - jstests/core/fts1.js
   # - jstests/core/fts2.js # Full-Text Search # 12: [js] Error: [[ 1, 2 ]] != [[ ]] are not equal
   # - jstests/core/fts3.js
@@ -441,8 +441,8 @@ selector:
   # - jstests/core/geonear_key.js
   - jstests/core/getlog1.js
   # - jstests/core/getlog2.js # 14: TypeError: TestData is undefined
-  # - jstests/core/getmore_cmd_maxtimems.js # 47: metadata lock assert
-  # - jstests/core/getmore_invalidated_cursors.js # 33: Unimplemented  MonographRecordStore::appendCustomStats()
+  - jstests/core/getmore_cmd_maxtimems.js
+  # - jstests/core/getmore_invalidated_cursors.js # 106: invariant(uuidCatalog.lookupCollectionByUUID(_uuid.get()) != _this);
   # - jstests/core/getmore_invalidated_documents.js # geo
   - jstests/core/group1.js
   - jstests/core/group2.js
@@ -503,9 +503,9 @@ selector:
   - jstests/core/index_create_with_nul_in_name.js
   - jstests/core/index_decimal.js
   - jstests/core/index_diag.js
-  # - jstests/core/index_dropdups_ignore.js # 15: [js] Error: command worked when it should have failed
+  # - jstests/core/index_dropdups_ignore.js # 15: create unique index on existing data.
   - jstests/core/index_elemmatch1.js
-  # - jstests/core/index_elemmatch2.js # 29: Error: [4] != [3] are not equal
+  # - jstests/core/index_elemmatch2.js # 29: sparse index
   - jstests/core/index_filter_commands.js
   # - jstests/core/index_id_options.js # 29: create index on _id
   # - jstests/core/index_many.js # 44: renameCollection
@@ -520,8 +520,8 @@ selector:
   # - jstests/core/index_plugins.js # 21: 2dsphere index
   # - jstests/core/index_sparse1.js
   # - jstests/core/index_sparse2.js
-  # - jstests/core/index_stats.js # 173: mongo::StackLocator::available
-  # - jstests/core/index_type_change.js # 41: Error: assert failed : Index entry did not change type
+  - jstests/core/index_stats.js
+  - jstests/core/index_type_change.js
   # - jstests/core/indexa.js # 17: count() wrong number.
   - jstests/core/indexapi.js
   - jstests/core/indexb.js
@@ -553,12 +553,12 @@ selector:
   - jstests/core/ismaster.js
   - jstests/core/js1.js
   - jstests/core/js2.js
-  # - jstests/core/js3.js # 32: crash at CircularQueue<std::unique_ptr<mongo::QueryRequest, std::default_delete<mongo::QueryRequest> > >::Enqueue
+  # - jstests/core/js3.js # 85: wrong count result.
   - jstests/core/js4.js
   - jstests/core/js5.js
-  # - jstests/core/js7.js # 9: crash
+  - jstests/core/js7.js
   - jstests/core/js8.js
-  # - jstests/core/js9.js # 19: crash
+  - jstests/core/js9.js
   - jstests/core/js_jit.js
   - jstests/core/json1.js
   - jstests/core/json_schema/additional_items.js
@@ -593,7 +593,7 @@ selector:
   - jstests/core/list_local_sessions.js
   # - jstests/core/list_namespaces_invalidation.js # 38: renameCollection()
   # - jstests/core/list_sessions.js # 23: no such command: 'refreshLogicalSessionCacheNow'
-  # - jstests/core/loadserverscripts.js # 53: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/loadserverscripts.js
   # - jstests/core/logprocessdetails.js # 38: Error: [false] != [true] are not equal
   - jstests/core/long_index_rename.js
   - jstests/core/map1.js
@@ -604,7 +604,7 @@ selector:
   - jstests/core/minmax.js
   - jstests/core/minmax_edge.js
   - jstests/core/mod1.js
-  # - jstests/core/mr1.js # 49: crash at mongo::StackLocator::available()
+  # - jstests/core/mr1.js # mapreduce
   # - jstests/core/mr2.js
   # - jstests/core/mr3.js
   # - jstests/core/mr4.js
@@ -661,15 +661,15 @@ selector:
   - jstests/core/objid5.js
   - jstests/core/objid6.js
   - jstests/core/objid7.js
-  # - jstests/core/opcounters_active.js # 21: serverStatus()
-  # - jstests/core/opcounters_write_cmd.js # 29: serverStatus()
-  # - jstests/core/operation_latency_histogram.js # 121: Unimplemented cmd parallelCollectionScan
+  - jstests/core/opcounters_active.js
+  - jstests/core/opcounters_write_cmd.js
+  # - jstests/core/operation_latency_histogram.js # 146: collection.reIndex()
   - jstests/core/optime_cmp.js
   - jstests/core/optimized_match_explain.js
   - jstests/core/or1.js
   - jstests/core/or2.js
   - jstests/core/or3.js
-  # - jstests/core/or4.js # 75: crash at mongo::StackLocator::available()
+  - jstests/core/or4.js
   - jstests/core/or5.js
   # - jstests/core/or6.js # 17: index scan wrong outputs.
   - jstests/core/or7.js
@@ -687,19 +687,19 @@ selector:
   - jstests/core/orh.js
   - jstests/core/orj.js
   - jstests/core/ork.js
-  # - jstests/core/oro.js # 27: Unimplemented method MonographRecordStore::appendCustomStats()
+  - jstests/core/oro.js
   - jstests/core/orp.js
   # - jstests/core/plan_cache_clear.js # 86: reIndex()
   - jstests/core/plan_cache_list_plans.js
   - jstests/core/plan_cache_list_shapes.js
   - jstests/core/plan_cache_shell_helpers.js
   - jstests/core/pop_server_13516.js
-  # - jstests/core/profile1.js # 107: Unimplemented method MonographRecordStore::appendCustomStats()
-  # - jstests/core/profile2.js # 22: Error: [1] != [0] are not equal
-  # - jstests/core/profile3.js # 41: Error: [0] != [3] are not equal
-  # - jstests/core/profile_agg.js # 30: Error: assert failed : could not find any entries in the profile collection matching filter: undefined
-  # - jstests/core/profile_count.js 28: Error: assert failed : could not find any entries in the profile collection matching filter: undefined
-  # - jstests/core/profile_delete.js 31: Error: assert failed : could not find any entries in the profile collection matching filter: undefined
+  # - jstests/core/profile1.js # 107: Unimplemented MonographLockerNoop::getLockerInfo
+  # - jstests/core/profile2.js # 20: Unimplemented MonographLockerNoop::getLockerInfo
+  # - jstests/core/profile3.js # 51: Unimplemented MonographLockerNoop::getLockerInfo
+  # - jstests/core/profile_agg.js
+  # - jstests/core/profile_count.js
+  # - jstests/core/profile_delete.js
   # - jstests/core/profile_distinct.js
   # - jstests/core/profile_find.js
   # - jstests/core/profile_findandmodify.js
@@ -727,7 +727,7 @@ selector:
   - jstests/core/push2.js
   - jstests/core/push_sort.js
   - jstests/core/query1.js
-  # - jstests/core/queryoptimizer3.js # 52: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/queryoptimizer3.js # 25: assert(_collection->getCatalogEntry()->getTotalIndexCount(opCtx) == count);
   - jstests/core/queryoptimizer6.js
   # - jstests/core/queryoptimizera.js # 83: create index on _id
   - jstests/core/read_after_optime.js
@@ -762,13 +762,13 @@ selector:
   - jstests/core/remove4.js
   - jstests/core/remove6.js
   - jstests/core/remove7.js
-  # - jstests/core/remove8.js # 29: eval()
-  # - jstests/core/remove9.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/remove8.js # 29: After eval(). count wrong number.
+  # - jstests/core/remove9.js # 30: MonographRecordStoreCursor::seekExact null MonographRecord.
   - jstests/core/remove_justone.js
   - jstests/core/remove_undefined.js
   - jstests/core/removea.js
-  # - jstests/core/removeb.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
-  # - jstests/core/removec.js # error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/removeb.js
+  - jstests/core/removec.js
   # - jstests/core/rename.js # renameCollection
   # - jstests/core/rename2.js
   # - jstests/core/rename3.js
@@ -806,12 +806,12 @@ selector:
   - jstests/core/set_param1.js
   - jstests/core/set_type_change.js
   - jstests/core/shell1.js
-  # - jstests/core/shell_connection_strings.js # 12: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/shell_connection_strings.js
   - jstests/core/shell_writeconcern.js
   - jstests/core/shellkillop.js
-  # - jstests/core/shellstartparallel.js # 11: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  - jstests/core/shellstartparallel.js
   - jstests/core/shelltypes.js
-  # - jstests/core/show_record_id.js # 17: mongo::RecordId::repr(): invariant(isLong())
+  - jstests/core/show_record_id.js
   - jstests/core/single_batch.js
   - jstests/core/skip1.js
   - jstests/core/slice1.js
@@ -832,13 +832,13 @@ selector:
   - jstests/core/sortc.js
   # - jstests/core/sortd.js # 23: index scan on array
   - jstests/core/sortf.js
-  - jstests/core/sortg.js # 58: txservice::PostReadCc::ValidTermCheck(): assert(ccm_ != nullptr)
+  - jstests/core/sortg.js
   - jstests/core/sorth.js
   - jstests/core/sorti.js
   - jstests/core/sortj.js
   # - jstests/core/sortk.js # 84: [js] Error: [1] != [0] are not equal
   - jstests/core/sortl.js
-  # - jstests/core/splitvector.js # 31: Implemented method mongo::MonographRecordStore::appendCustomStats()
+  - jstests/core/splitvector.js
   # - jstests/core/stages_and_hash.js # 53: [js] Error: [0] != [1] are not equal
   # - jstests/core/stages_and_sorted.js # 78: [js] Error: [0] != [1] are not equal
   # - jstests/core/stages_collection_scan.js
@@ -850,15 +850,15 @@ selector:
   # - jstests/core/stages_or.js
   # - jstests/core/stages_sort.js
   # - jstests/core/stages_text.js
-  # - jstests/core/startup_log.js # 32: Unimplemented method mongo::MonographRecordStore::appendCustomStats()
-  # - jstests/core/storefunc.js # 32: eval()
+  # - jstests/core/startup_log.js # 33: Error: assert failed
+  - jstests/core/storefunc.js
   - jstests/core/string_with_nul_bytes.js
   - jstests/core/sub1.js
-  # - jstests/core/system_profile.js # 22: Unimplemented method mongo::MonographRecordStore::appendCustomStats()
+  # - jstests/core/system_profile.js # 22: Error: [false] != [undefined] are not equal
   - jstests/core/tailable_cursor_invalidation.js
-  # - jstests/core/tailable_getmore_batch_size.js # 61: metadata lock
+  - jstests/core/tailable_getmore_batch_size.js
   # - jstests/core/tailable_skip_limit.js # 44: Error: getMore command failed. BSONObjectTooLarge
-  # - jstests/core/temp_cleanup.js # 10: mongo::StackLocator::available()
+  # - jstests/core/temp_cleanup.js # 10: Collection::insertDocument got document without _id for ns:local.tmp.mr.tempCleanup_1_temp_cleanup_test_inc
   - jstests/core/test_command_line_test_helpers.js
   - jstests/core/testminmax.js
   - jstests/core/text_covered_matching.js
@@ -918,7 +918,7 @@ selector:
   - jstests/core/updatec.js
   - jstests/core/updated.js
   - jstests/core/updatee.js
-  # - jstests/core/updatef.js # 26: error while loading shared libraries: build/debug/mongo/util/libpassword.so
+  # - jstests/core/updatef.js # 23: renameCollection.
   - jstests/core/updateg.js
   - jstests/core/updateh.js
   - jstests/core/updatei.js
@@ -935,7 +935,7 @@ selector:
   - jstests/core/validate_user_documents.js
   - jstests/core/verify_update_mods.js
   - jstests/core/views/duplicate_ns.js
-  # - jstests/core/views/invalid_system_views.js # 47: metadata lock
+  # - jstests/core/views/invalid_system_views.js # 47: reIndex
   # - jstests/core/views/views_aggregation.js # 91: mongo::IndexCatalogImpl::_setupInMemoryStructures(): invariant(save == _entries.find(descriptorPtr->indexName()))
   # - jstests/core/views/views_all_commands.js # 634: metadata lock
   - jstests/core/views/views_basic.js
@@ -957,7 +957,7 @@ selector:
   - jstests/core/where5.js
   - jstests/core/write_commands_reject_unknown_fields.js
   # - jstests/core/write_result.js # 109: Error: [1] != [0] are not equal
-  # - jstests/core_standalone/read_concern.js # 23: crash
+  - jstests/core_standalone/read_concern.js
   - jstests/core_standalone/write_concern.js
   # - Tests that would be excluded from suite core_monograph
   # - jstests/core/txns/abort_expired_transaction.js # 40: Transaction numbers are only allowed on a replica set member or mongos
