@@ -30,8 +30,9 @@
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
 
-namespace mongo::ce {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
+namespace mongo::ce {
 
 CardinalityEstimate HistogramEstimator::estimateCardinality(
     const stats::CEHistogram& hist,
@@ -42,6 +43,10 @@ CardinalityEstimate HistogramEstimator::estimateCardinality(
 
     // Empty histogram.
     if (hist.getSampleSize() <= 0) {
+        LOGV2_DEBUG(9756602,
+                    5,
+                    "HistogramCE returning 0-estimate due to empty histogram",
+                    "interval"_attr = interval.toString(false));
         return CardinalityEstimate{CardinalityType{0.0}, EstimationSource::Histogram};
     }
 
@@ -49,7 +54,13 @@ CardinalityEstimate HistogramEstimator::estimateCardinality(
     auto scaleFactor = collectionSize.toDouble() / hist.getSampleSize();
     CardinalityEstimate card =
         estimateIntervalCardinality(hist, interval, includeScalar, arrayEstimationAlgo);
-    return card * scaleFactor;
+    auto ret = card * scaleFactor;
+    LOGV2_DEBUG(9756603,
+                5,
+                "HistogramCE cardinality",
+                "interval"_attr = interval.toString(false),
+                "estimate"_attr = ret);
+    return ret;
 }
 
 bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,

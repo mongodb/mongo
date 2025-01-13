@@ -34,6 +34,8 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/stage_types.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
+
 namespace mongo::cost_based_ranker {
 
 CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
@@ -164,7 +166,6 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
                 _conjSels.empty());
         _inputCard = ceRes.getValue();
     }
-
     return ceRes;
 }
 

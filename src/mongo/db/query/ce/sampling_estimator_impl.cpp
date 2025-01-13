@@ -46,6 +46,8 @@
 #include "mongo/platform/basic.h"
 #include "mongo/util/assert_util.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
+
 namespace mongo::ce {
 
 using CardinalityType = mongo::cost_based_ranker::CardinalityType;
@@ -422,8 +424,14 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
             cnt++;
         }
     }
-    double estimate = (cnt * getCollCard()) / _sampleSize;
-    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
+    CardinalityEstimate estimate{CardinalityType{(cnt * getCollCard()) / _sampleSize},
+                                 EstimationSource::Sampling};
+    LOGV2_DEBUG(9756604,
+                5,
+                "SamplingCE cardinality (# docs) for MatchExpression",
+                "matchExpression"_attr = expr->toString(),
+                "estimate"_attr = estimate);
+    return estimate;
 }
 
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
@@ -444,8 +452,14 @@ CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds
     for (auto&& doc : _sample) {
         count += numberKeysMatch(bounds, doc);
     }
-    double estimate = (count * getCollCard()) / _sampleSize;
-    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
+    CardinalityEstimate estimate{CardinalityType{(count * getCollCard()) / _sampleSize},
+                                 EstimationSource::Sampling};
+    LOGV2_DEBUG(9756605,
+                5,
+                "SamplingCE cardinality (# keys) for index bounds",
+                "interval"_attr = bounds.toString(false),
+                "estimate"_attr = estimate);
+    return estimate;
 }
 
 CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bounds,
@@ -459,8 +473,15 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
             }
         }
     }
-    double estimate = (count * getCollCard()) / _sampleSize;
-    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
+    CardinalityEstimate estimate{CardinalityType{(count * getCollCard()) / _sampleSize},
+                                 EstimationSource::Sampling};
+    LOGV2_DEBUG(9756606,
+                5,
+                "SamplingCE cardinality (# docs) for index bounds and MatchExpression",
+                "interval"_attr = bounds.toString(false),
+                "matchExpression"_attr = expr ? expr->toString() : "<none>",
+                "estimate"_attr = estimate);
+    return estimate;
 }
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
