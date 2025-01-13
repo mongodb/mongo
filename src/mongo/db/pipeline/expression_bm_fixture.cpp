@@ -1362,7 +1362,7 @@ void ExpressionBenchmarkFixture::benchmarkMultiplyIntegers(benchmark::State& sta
     auto generator = [this]() {
         return random.nextInt32(kMax);
     };
-    testBinaryOpExpression("$add", randomPairs(kCount, generator), state);
+    testBinaryOpExpression("$multiply", randomPairs(kCount, generator), state);
 }
 
 void ExpressionBenchmarkFixture::benchmarkMultiplyDoubles(benchmark::State& state) {
@@ -1959,6 +1959,16 @@ void ExpressionBenchmarkFixture::benchmarkRegexMatch(benchmark::State& state) {
                                                   << "cafe")),
                         state,
                         std::vector<Document>(1, {{"value"_sd, "cafe"_sd}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkAddWithDottedFieldPath(benchmark::State& state) {
+    benchmarkExpression(BSON("$add" << BSON_ARRAY("$lhs.a.b.c.d"
+                                                  << "$rhs.a.b.c.d")),
+                        state,
+                        std::vector<Document>(
+                            1,
+                            {{"lhs"_sd, BSON("a" << BSON("b" << BSON("c" << BSON("d" << 10))))},
+                             {"rhs"_sd, BSON("a" << BSON("b" << BSON("c" << BSON("d" << 20))))}}));
 }
 
 }  // namespace mongo

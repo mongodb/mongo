@@ -1865,24 +1865,6 @@ protected:
 private:
     monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 
-    /*
-      Internal implementation of evaluate(), used recursively.
-
-      The internal implementation doesn't just use a loop because of
-      the possibility that we need to skip over an array.  If the path
-      is "a.b.c", and a is an array, then we fan out from there, and
-      traverse "b.c" for each element of a:[...].  This requires that
-      a be an array of objects in order to navigate more deeply.
-
-      @param index current path field index to extract
-      @param input current document traversed to (not the top-level one)
-      @returns the field found; could be an array
-     */
-    Value evaluatePath(size_t index, const Document& input) const;
-
-    // Helper for evaluatePath to handle Array case
-    Value evaluatePathArray(size_t index, const Value& input) const;
-
     const FieldPath _fieldPath;
     const Variables::Id _variable;
 };
@@ -4417,6 +4399,14 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getField() const {
+        return _children[_kField].get();
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
     static constexpr auto kExpressionName = "$getField"_sd;
 
 private:
@@ -4455,6 +4445,22 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    const std::string& getFieldName() const {
+        return _fieldName;
+    }
+
+    const Expression* getField() const {
+        return _children[_kField].get();
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getValue() const {
+        return _children[_kValue].get();
     }
 
     static constexpr auto kExpressionName = "$setField"_sd;

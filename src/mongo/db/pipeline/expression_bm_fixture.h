@@ -273,7 +273,9 @@ public:
     void benchmarkStdDevSamp(benchmark::State& state);
     void benchmarkAvg(benchmark::State& state);
     void benchmarkSum(benchmark::State& state);
+
     void benchmarkRegexMatch(benchmark::State& state);
+    void benchmarkAddWithDottedFieldPath(benchmark::State& state);
 
 private:
     void testDateDiffExpression(long long startDate,
@@ -1023,6 +1025,10 @@ private:
     }                                                                                           \
     BENCHMARK_F(Fixture, RegexMatch)(benchmark::State & state) {                                \
         benchmarkRegexMatch(state);                                                             \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, AddWithDottedFieldPath)(benchmark::State & state) {                    \
+        benchmarkAddWithDottedFieldPath(state);                                                 \
     }
 
 

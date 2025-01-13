@@ -407,6 +407,15 @@ Value evaluate(const ExpressionRegexFind& expr, const Document& root, Variables*
 Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables* variables);
 
+Value evaluate(const ExpressionObject& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionFieldPath& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalFindAllValuesAtPath& expr,
+               const Document& root,
+               Variables* variables);
+
 Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionType& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables);
