@@ -141,7 +141,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
-#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
@@ -299,6 +298,7 @@
 #include "mongo/watchdog/watchdog_mongod.h"
 
 #ifdef MONGO_CONFIG_GRPC
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #endif
 

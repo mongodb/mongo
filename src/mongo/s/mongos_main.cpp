@@ -173,6 +173,11 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
 
+#ifdef MONGO_CONFIG_GRPC
+#include "mongo/db/query/search/mongot_options.h"
+#include "mongo/transport/grpc/grpc_feature_flag_gen.h"
+#endif
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -789,13 +794,24 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
             quickExit(ExitCode::badOptions);
         }
 
+        bool useEgressGRPC = false;
+#ifdef MONGO_CONFIG_GRPC
+        if (globalMongotParams.useGRPC) {
+            uassert(9925000,
+                    "Egress GRPC for search is not enabled",
+                    feature_flags::gEgressGrpcForSearch.isEnabledUseLatestFCVWhenUninitialized(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            useEgressGRPC = true;
+        }
+#endif
+
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Set up transport layer listener",
                                                   &startupTimeElapsedBuilder);
         auto tl = transport::TransportLayerManagerImpl::createWithConfig(
             &serverGlobalParams,
             serviceContext,
-            false /* useEgressGRPC */,
+            useEgressGRPC,
             loadBalancerPort,
             boost::none,
             std::make_unique<ClientTransportObserverMongos>());
