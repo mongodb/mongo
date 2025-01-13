@@ -11,6 +11,7 @@
 //   uses_change_streams,
 //   temp_disabled_embedded_router_mongo_bridge,
 // ]
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Check the build flags to determine whether we are running in a code-coverage variant. These
 // variants are sufficiently slow as to interfere with the operation of this test, so we skip them.
@@ -22,7 +23,6 @@ if (buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage')) {
 const st = new ShardingTest({
     shards: 2,
     mongos: 2,
-    useBridge: true,
     rs: {
         nodes: 1,
         // Use a higher frequency for periodic noops to speed up the test.
@@ -98,31 +98,37 @@ function listIdleCursorsOnTestNs(rs, filter = {}) {
         .toArray();
 }
 
-// Start the $changeStream with shard 1 unavailable on the second mongos (s1).  We will be
-// writing through the first mongos (s0), which will remain connected to all shards.
-st.rs1.getPrimary().disconnect(st.s1);
+// Start the $changeStream and hang shard 1 when the mongos attempts to establish a $changeStream
+// cursor on it.
+const collUUID = mongosDB.runCommand({listCollections: 1, filter: {name: mongosColl.getName()}})
+                     .cursor.firstBatch[0]
+                     .info.uuid;
+const hangCursorEstablishingOnShard1 =
+    configureFailPoint(st.shard1, "hangAfterCreatingAggregationPlan", {uuid: collUUID});
 let waitForShell = startParallelShell(checkStream, st.s1.port);
 
 // Helper function which waits for a $changeStream cursor to appear in currentOp on the given shard.
-function waitForShardCursor(rs) {
+function waitForShardCursor(rs, n = 1) {
     assert.soon(() => listIdleCursorsOnTestNs(rs, {
                           "cursor.originatingCommand.aggregate": {$exists: true},
                           "cursor.originatingCommand.comment": jsTestName()
-                      }).length === 1,
+                      }).length === n,
                 () => tojson(listIdleCursorsOnTestNs(rs)));
 }
 
 // Make sure the shard 0 $changeStream cursor is established before doing the first writes.
 waitForShardCursor(st.rs0);
 
+// Make sure that no $changeStream cursor is established on shard 1 yet.
+waitForShardCursor(st.rs1, 0);
+
 assert.commandWorked(mongosColl.insert({_id: -1000}, {writeConcern: {w: "majority"}}));
 
-// This write to shard 1 occurs before the $changeStream cursor on shard 1 is open, because the
-// mongos where the $changeStream is running is disconnected from shard 1.
+// This write to shard 1 occurs before the $changeStream cursor on shard 1 is open.
 assert.commandWorked(mongosColl.insert({_id: 1001}, {writeConcern: {w: "majority"}}));
 
-jsTestLog("Reconnecting");
-st.rs1.getPrimary().reconnect(st.s1);
+jsTestLog("Establishing $changeStream cursor on shard 1.");
+hangCursorEstablishingOnShard1.off();
 waitForShardCursor(st.rs1);
 
 assert.commandWorked(mongosColl.insert({_id: -1002}, {writeConcern: {w: "majority"}}));
