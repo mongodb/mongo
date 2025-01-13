@@ -377,8 +377,6 @@ mongo_cc_unit_test(
         "//src/mongo/s/commands/query_cmd:cluster_update_test.cpp",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_third_group",
     ],
     deps = [

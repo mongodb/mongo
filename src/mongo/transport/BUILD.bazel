@@ -334,8 +334,6 @@ mongo_cc_unit_test(
     }),
     data = ["//jstests/libs:test_pem_files"],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
     ],
     deps = [

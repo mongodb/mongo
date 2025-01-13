@@ -264,8 +264,6 @@ mongo_cc_unit_test(
         ":cluster_server_parameter_test_gen",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
     ],
     deps = [

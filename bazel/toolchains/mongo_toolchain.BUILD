@@ -68,8 +68,8 @@ mongo_cc_toolchain_config(
         "dwp": "{version}/bin/dwp",
         "objcopy": "{version}/bin/llvm-objcopy",
         "objdump": "{version}/bin/objdump",
-        "gcov": "{version}/bin/gcov",
         "strip": "{version}/bin/strip",
+        "gcov": "{version}/bin/gcov",
         "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
     },
     toolchain_identifier = "gcc_toolchain",
@@ -103,9 +103,9 @@ mongo_cc_toolchain_config(
         "dwp": "{version}/bin/dwp",
         "objcopy": "{version}/bin/llvm-objcopy",
         "objdump": "{version}/bin/objdump",
-        "gcov": "{version}/bin/gcov",
         "strip": "{version}/bin/strip",
-        "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
+        "gcov": "{version}/bin/llvm-profdata",
+        "llvm-cov": "{version}/bin/llvm-cov",
     },
     toolchain_identifier = "clang_toolchain",
     verbose = True,

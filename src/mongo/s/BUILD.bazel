@@ -1164,8 +1164,6 @@ mongo_cc_unit_test(
         "//src/mongo/s/write_ops:write_without_shard_key_util_test.cpp",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "compile_requires_large_memory_gcc",
         "compile_requires_large_memory_sanitizer",
         "mongo_unittest_third_group",
@@ -1207,8 +1205,6 @@ mongo_cc_unit_test(
         "service_entry_point_router_role_test.cpp",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
     ],
     deps = [
@@ -1244,8 +1240,6 @@ mongo_cc_unit_test(
         "multi_statement_transaction_requests_sender_test.cpp",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
     ],
     deps = [

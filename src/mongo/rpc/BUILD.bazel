@@ -235,8 +235,6 @@ mongo_cc_unit_test(
         "//src/mongo/rpc/metadata:security_token_metadata_test.cpp",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_third_group",
     ],
     target_compatible_with = select({
