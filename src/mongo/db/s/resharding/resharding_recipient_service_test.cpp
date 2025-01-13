@@ -53,6 +53,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_builds_coordinator_mock.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -220,7 +221,15 @@ public:
 
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
-                                   const BSONObj& update) override {}
+                                   const BSONObj& update) override {
+        auto coll = acquireCollection(opCtx,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx,
+                                          NamespaceString::kConfigReshardingOperationsNamespace,
+                                          AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
+        Helpers::update(opCtx, coll, query, update);
+    }
 
     void clearFilteringMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) override {}
@@ -450,7 +459,7 @@ public:
 
     ReshardingRecipientDocument makeRecipientDocument(const TestOptions& testOptions) {
         RecipientShardContext recipientCtx;
-        recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
+        recipientCtx.setState(RecipientStateEnum::kUnused);
 
         ReshardingRecipientDocument doc(
             std::move(recipientCtx),
@@ -475,6 +484,28 @@ public:
         doc.setStoreOplogFetcherProgress(testOptions.storeOplogFetcherProgress);
         doc.setPerformVerification(testOptions.performVerification);
         return doc;
+    }
+
+    ReshardingCoordinatorDocument makeCoordinatorDocument(
+        const ReshardingRecipientDocument& recipientDoc) {
+        ReshardingCoordinatorDocument coordinatorDoc;
+        coordinatorDoc.setState(CoordinatorStateEnum::kUnused);
+        coordinatorDoc.setCommonReshardingMetadata(recipientDoc.getCommonReshardingMetadata());
+
+        std::vector<DonorShardEntry> donorShards;
+        std::transform(recipientDoc.getDonorShards().begin(),
+                       recipientDoc.getDonorShards().end(),
+                       std::back_inserter(donorShards),
+                       [](auto donorShard) {
+                           return DonorShardEntry{donorShard.getShardId(), {}};
+                       });
+        coordinatorDoc.setDonorShards(donorShards);
+
+        std::vector<RecipientShardEntry> recipientShards;
+        recipientShards.push_back({recipientShardId, recipientDoc.getMutableState()});
+        coordinatorDoc.setRecipientShards(recipientShards);
+
+        return coordinatorDoc;
     }
 
     void createSourceCollection(OperationContext* opCtx,
@@ -514,21 +545,32 @@ public:
         ASSERT_TRUE(bool(recipientColl->isEmpty(opCtx)));
     }
 
-    ReshardingRecipientDocument getPersistedRecipientDocument(OperationContext* opCtx,
-                                                              UUID reshardingUUID) {
-        boost::optional<ReshardingRecipientDocument> persistedDoc;
-        PersistentTaskStore<ReshardingRecipientDocument> store(
-            NamespaceString::kRecipientReshardingOperationsNamespace);
+    template <typename DocumentType>
+    DocumentType getPersistedStateDocument(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           UUID reshardingUUID) {
+        boost::optional<DocumentType> persistedDoc;
+        PersistentTaskStore<DocumentType> store(nss);
         store.forEach(opCtx,
-                      BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << reshardingUUID),
-                      [&](const auto& recipientDocument) {
-                          persistedDoc.emplace(recipientDocument);
+                      BSON(DocumentType::kReshardingUUIDFieldName << reshardingUUID),
+                      [&](const auto& doc) {
+                          persistedDoc.emplace(doc);
                           return false;
                       });
-
         ASSERT(persistedDoc);
-
         return persistedDoc.get();
+    }
+
+    ReshardingRecipientDocument getPersistedRecipientDocument(OperationContext* opCtx,
+                                                              UUID reshardingUUID) {
+        return getPersistedStateDocument<ReshardingRecipientDocument>(
+            opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, reshardingUUID);
+    }
+
+    ReshardingCoordinatorDocument getPersistedCoordinatorDocument(OperationContext* opCtx,
+                                                                  UUID reshardingUUID) {
+        return getPersistedStateDocument<ReshardingCoordinatorDocument>(
+            opCtx, NamespaceString::kConfigReshardingOperationsNamespace, reshardingUUID);
     }
 
 protected:
@@ -785,6 +827,91 @@ protected:
         checkRecipientToCopyMetrics(testOptions, recipientDoc, currOp);
         checkRecipientCopiedMetrics(testOptions, testRecipientMetrics, recipientDoc, currOp);
         checkRecipientOplogMetrics(testRecipientMetrics, recipientDoc, currOp);
+    }
+
+    void checkCoordinatorCopiedMetrics(const TestOptions& testOptions,
+                                       const TestRecipientMetrics& testRecipientMetrics,
+                                       const ReshardingCoordinatorDocument& coordinatorDoc,
+                                       RecipientStateEnum recipientState) {
+        if (recipientState < RecipientStateEnum::kApplying) {
+            return;
+        }
+
+        bool checked = false;
+        for (const auto& recipientShard : coordinatorDoc.getRecipientShards()) {
+            if (recipientShard.getId() == recipientShardId) {
+                auto mutableState = recipientShard.getMutableState();
+
+                auto expectedDocsCopied = testRecipientMetrics.getMetricsTotal().docsCopied;
+                auto expectedBytesCopied = testRecipientMetrics.getMetricsTotal().bytesCopied;
+
+                // The metrics below are populated upon transitioning to the "strict-consistency"
+                // state.
+                if (recipientState >= RecipientStateEnum::kStrictConsistency) {
+                    // There is currently no 'documentsCopied'.
+                    ASSERT_EQ(*mutableState.getBytesCopied(), expectedBytesCopied);
+                } else {
+                    ASSERT_FALSE(mutableState.getBytesCopied());
+                }
+
+                // If verification is enabled, the metrics below are populated upon transitioning to
+                // the "applying" state after cloning completes and are updated upon transitioning
+                // to the "strict-consistency" state. If verification is disabled, they are
+                // populated upon transitioning to the "strict-consistency" state.
+                if (testOptions.performVerification ||
+                    recipientState >= RecipientStateEnum::kStrictConsistency) {
+
+                    ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
+                    // Upon transitioning to the "strict-consistency" state, 'totalDocumentSize' is
+                    // set to the fast count size. This test deliberately leaves the temporary
+                    // collection empty when testing verification so this is expected to be equal to
+                    // 0.
+                    bool expectInaccurateSize = testOptions.performVerification &&
+                        recipientState >= RecipientStateEnum::kStrictConsistency;
+                    ASSERT_EQ(*mutableState.getTotalDocumentSize(),
+                              expectInaccurateSize ? 0 : expectedBytesCopied);
+                } else {
+                    ASSERT_FALSE(mutableState.getTotalNumDocuments());
+                    ASSERT_FALSE(mutableState.getTotalDocumentSize());
+                }
+                checked = true;
+                break;
+            }
+        }
+        ASSERT(checked);
+    }
+
+    void checkCoordinatorOplogMetrics(const TestRecipientMetrics& testRecipientMetrics,
+                                      const ReshardingCoordinatorDocument& coordinatorDoc,
+                                      RecipientStateEnum recipientState) {
+        if (recipientState < RecipientStateEnum::kStrictConsistency) {
+            return;
+        }
+
+        auto expectedOplogFetched = testRecipientMetrics.getMetricsTotal().oplogFetched;
+        auto expectedOplogApplied = testRecipientMetrics.getMetricsTotal().oplogApplied;
+
+        bool checked = false;
+        for (const auto& recipientShard : coordinatorDoc.getRecipientShards()) {
+            if (recipientShard.getId() == recipientShardId) {
+                auto mutableState = recipientShard.getMutableState();
+                ASSERT_EQ(*mutableState.getOplogFetched(), expectedOplogFetched);
+                ASSERT_EQ(*mutableState.getOplogApplied(), expectedOplogApplied);
+
+                checked = true;
+                break;
+            }
+        }
+        ASSERT(checked);
+    }
+
+    void checkCoordinatorMetrics(const TestOptions& testOptions,
+                                 const TestRecipientMetrics& testRecipientMetrics,
+                                 const ReshardingCoordinatorDocument& coordinatorDoc,
+                                 RecipientStateEnum recipientState) {
+        checkCoordinatorCopiedMetrics(
+            testOptions, testRecipientMetrics, coordinatorDoc, recipientState);
+        checkCoordinatorOplogMetrics(testRecipientMetrics, coordinatorDoc, recipientState);
     }
 
 private:
@@ -1460,12 +1587,37 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
         auto opCtx = makeOperationContext();
 
-        auto doc = makeRecipientDocument(testOptions);
-        auto instanceId =
-            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+        auto recipientDoc = makeRecipientDocument(testOptions);
+        auto instanceId = BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                               << recipientDoc.getReshardingUUID());
         auto prevState = RecipientStateEnum::kUnused;
 
-        auto testRecipientMetrics = makeTestRecipientMetrics(testOptions, doc.getDonorShards());
+        auto coordinatorDoc = makeCoordinatorDocument(recipientDoc);
+        insertDocuments(opCtx.get(),
+                        NamespaceString::kConfigReshardingOperationsNamespace,
+                        {coordinatorDoc.toBSON()});
+
+        auto testRecipientMetrics =
+            makeTestRecipientMetrics(testOptions, recipientDoc.getDonorShards());
+
+        auto checkPersistedState = [&]() {
+            auto persistedRecipientDoc =
+                getPersistedRecipientDocument(opCtx.get(), recipientDoc.getReshardingUUID());
+            auto persistedCoordinatorDoc =
+                getPersistedCoordinatorDocument(opCtx.get(), recipientDoc.getReshardingUUID());
+            auto persistedRecipientState = persistedRecipientDoc.getMutableState().getState();
+
+            checkRecipientMetrics(
+                testOptions, testRecipientMetrics, persistedRecipientDoc, boost::none /* currOp */);
+            checkCoordinatorMetrics(testOptions,
+                                    testRecipientMetrics,
+                                    persistedCoordinatorDoc,
+                                    persistedRecipientState);
+
+            if (persistedRecipientState >= RecipientStateEnum::kCloning) {
+                ASSERT(persistedRecipientDoc.getCloneTimestamp());
+            }
+        };
 
         auto removeRecipientDocFailpoint =
             globalFailPointRegistry().find("removeRecipientDocFailpoint");
@@ -1474,8 +1626,9 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
         for (const auto state : recipientStates) {
             auto recipient = [&] {
                 if (prevState == RecipientStateEnum::kUnused) {
-                    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-                    return RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+                    RecipientStateMachine::insertStateDocument(opCtx.get(), recipientDoc);
+                    return RecipientStateMachine::getOrCreate(
+                        opCtx.get(), _service, recipientDoc.toBSON());
                 } else {
                     auto [maybeRecipient, isPausedOrShutdown] =
                         RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
@@ -1492,7 +1645,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
             mockDataReplicationStateIfNeeded(opCtx.get(),
                                              testOptions,
                                              testRecipientMetrics,
-                                             doc.getCommonReshardingMetadata(),
+                                             recipientDoc.getCommonReshardingMetadata(),
                                              prevState,
                                              recipient->getMetricsForTest());
 
@@ -1507,11 +1660,11 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
             switch (state) {
                 case RecipientStateEnum::kCreatingCollection:
                 case RecipientStateEnum::kCloning: {
-                    notifyToStartCloning(opCtx.get(), *recipient, doc);
+                    notifyToStartCloning(opCtx.get(), *recipient, recipientDoc);
                     break;
                 }
                 case RecipientStateEnum::kDone: {
-                    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+                    notifyReshardingCommitting(opCtx.get(), *recipient, recipientDoc);
                     break;
                 }
                 default:
@@ -1519,16 +1672,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
             }
 
             stateTransitionsGuard.wait(state);
-
-            auto persistedDoc = getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
-            auto persistedState = persistedDoc.getMutableState().getState();
-
-            checkRecipientMetrics(
-                testOptions, testRecipientMetrics, persistedDoc, boost::none /* currOp */);
-
-            if (persistedState >= RecipientStateEnum::kCloning) {
-                ASSERT(persistedDoc.getCloneTimestamp());
-            }
+            checkPersistedState();
 
             prevState = state;
         }
@@ -1540,12 +1684,10 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
         auto recipient = *maybeRecipient;
 
         stateTransitionsGuard.unset(RecipientStateEnum::kDone);
-        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+        notifyReshardingCommitting(opCtx.get(), *recipient, recipientDoc);
 
         removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-        auto persistedDoc = getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
-        checkRecipientMetrics(
-            testOptions, testRecipientMetrics, persistedDoc, boost::none /* currOp */);
+        checkPersistedState();
 
         removeRecipientDocFailpoint->setMode(FailPoint::off);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
