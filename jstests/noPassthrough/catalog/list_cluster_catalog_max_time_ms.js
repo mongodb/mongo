@@ -1,6 +1,11 @@
 /*
  * Verifies the $listClusterCatalog will respect the set maxTimeMS while running internally
  * listCollection.
+ *
+ * @tags: [
+ *    # TODO (SERVER-98651) remove the tag as part of this ticket.
+ *   requires_fcv_81,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

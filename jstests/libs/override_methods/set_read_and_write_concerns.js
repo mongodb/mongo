@@ -77,6 +77,7 @@ function runCommandWithReadAndWriteConcerns(
             shouldForceReadConcern = false;
         }
 
+        // TODO (SERVER-98658) Reconsider if $listClusterCatalog still needs a local read concern
         if (OverrideHelpers.isAggregationWithListClusterCatalog(commandName, commandObj)) {
             // The $listClusterCatalog stage can only be used with readConcern={level:"local"}.
             shouldForceReadConcern = false;

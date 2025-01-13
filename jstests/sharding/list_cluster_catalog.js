@@ -2,7 +2,6 @@
  * Test the $listClusterCatalog stage in a sharded cluster for any type of collection,
   collection tracking state and stage's specs.
  *
- *
  * @tags: [
  *    # TODO (SERVER-98651) remove the tag as part of this ticket.
  *   requires_fcv_81,

@@ -400,6 +400,7 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
             shouldForceWriteConcern = false;
         }
     } else if (cmdName === "aggregate") {
+        // TODO (SERVER-98658) Reconsider if $listClusterCatalog still needs a local read concern
         if (OverrideHelpers.isAggregationWithListLocalSessionsStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithCurrentOpStage(cmdName, cmdObj) ||
