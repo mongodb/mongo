@@ -5,11 +5,13 @@
 //   assumes_read_concern_local,
 // ]
 //
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 if (checkSbeRestrictedOrFullyEnabled(db)) {
     const coll = db.test;
+    assertDropCollection(coll.getDB(), coll.getName());
     assert.commandWorked(coll.createIndex({"a": 1}));
     assert.commandWorked(coll.createIndex({"b": 1}));
     assert.commandWorked(coll.insertMany([{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 1}, {a: 2, b: 2}]));
