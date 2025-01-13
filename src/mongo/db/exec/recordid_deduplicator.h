@@ -55,6 +55,11 @@ public:
     }
 
     /**
+     * Return true if the RecordId has been seen.
+     */
+    bool contains(const RecordId& recordId) const;
+
+    /**
      * Insert a RecordId and return true if the RecordId has not been seen.
      */
     bool insert(const RecordId& recordId);

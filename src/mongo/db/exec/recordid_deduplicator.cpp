@@ -40,6 +40,13 @@ RecordIdDeduplicator::RecordIdDeduplicator(size_t threshold,
                                            uint64_t universeSize)
     : _roaring(threshold, chunkSize, universeSize, [&]() { roaringMetric.increment(); }) {}
 
+bool RecordIdDeduplicator::contains(const RecordId& recordId) const {
+    return recordId.withFormat(
+        [&](RecordId::Null _) -> bool { return _hashset.contains(recordId); },
+        [&](int64_t rid) -> bool { return _roaring.contains(rid); },
+        [&](const char* str, int size) -> bool { return _hashset.contains(recordId); });
+}
+
 bool RecordIdDeduplicator::insert(const RecordId& recordId) {
     return recordId.withFormat(
         [&](RecordId::Null _) -> bool { return _hashset.insert(recordId).second; },

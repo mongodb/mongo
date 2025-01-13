@@ -111,6 +111,19 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool contains(uint64_t value) const {
+        switch (_state) {
+            case kHashTable:
+                return _hashTable.contains(value);
+            case kHashTableAndBitmap:
+                return _hashTable.contains(value) || _bitmap.contains(value);
+            case kBitmap:
+                return _bitmap.contains(value);
+        }
+
+        MONGO_UNREACHABLE;
+    }
+
     /**
      * Expose the current data structures used by the set at the moment.
      */
