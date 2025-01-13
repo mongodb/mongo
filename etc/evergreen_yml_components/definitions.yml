@@ -1800,6 +1800,16 @@ functions:
         include_expansions_in_env:
           - github_token
           - repo_name
+    - command: subprocess.exec
+      display_name: "query_tester test repos sparse checkout sh"
+      params:
+        background: true
+        binary: bash
+        args:
+          - "./src/evergreen/query_tester_test_sparse_checkout.sh"
+          # Pass repo name in as an argument since background process
+          # loses context of environment variables.
+          - ${repo_name}
 
   "lint fuzzer sanity patch":
     - *f_expansions_write

@@ -1762,6 +1762,7 @@ tasks:
   #     - func: "run tests"
   #       vars:
   #         suite: query_tester_generated_test
+  #         should_shuffle: false
   #
   # - <<: *task_template
   #   name: query_tester_generated_test_2
@@ -1782,6 +1783,7 @@ tasks:
   #     - func: "run tests"
   #       vars:
   #         suite: query_tester_generated_test
+  #         should_shuffle: false
   #
   # - <<: *task_template
   #   name: query_tester_generated_test_3
@@ -1802,6 +1804,7 @@ tasks:
   #     - func: "run tests"
   #       vars:
   #         suite: query_tester_generated_test
+  #         should_shuffle: false
 
   ################################################
   #           Query Integration tasks            #
