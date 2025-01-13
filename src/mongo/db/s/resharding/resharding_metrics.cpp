@@ -366,7 +366,9 @@ void ReshardingMetrics::fillDonorCtxOnCompletion(DonorShardContext& donorCtx) {
 }
 
 void ReshardingMetrics::fillRecipientCtxOnCompletion(RecipientShardContext& recipientCtx) {
-    recipientCtx.setBytesCopied(getBytesWrittenCount());
+    if (!recipientCtx.getBytesCopied()) {
+        recipientCtx.setBytesCopied(getBytesWrittenCount());
+    }
     recipientCtx.setOplogFetched(getOplogEntriesFetched());
     recipientCtx.setOplogApplied(getOplogEntriesApplied());
 }

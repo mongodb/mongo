@@ -200,6 +200,11 @@ public:
         return *_metrics;
     }
 
+    ReshardingMetrics& getMetricsForTest() const {
+        invariant(_metrics);
+        return *_metrics;
+    }
+
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode,
         MongoProcessInterface::CurrentOpSessionsMode) noexcept override;
@@ -225,6 +230,23 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
 private:
+    class CloningMetrics {
+    public:
+        void add(int64_t documentsCopied, int64_t bytesCopied);
+
+        int64_t getDocumentsCopied() const {
+            return _documentsCopied;
+        }
+
+        int64_t getBytesCopied() const {
+            return _bytesCopied;
+        }
+
+    private:
+        int64_t _documentsCopied = 0;
+        int64_t _bytesCopied = 0;
+    };
+
     /**
      * The work inside this function must be run regardless of any work on _scopedExecutor ever
      * running.
@@ -278,6 +300,8 @@ private:
                                          boost::optional<mongo::Date_t> startConfigTxnCloneTime,
                                          const CancelableOperationContextFactory& factory);
 
+    void _transitionToApplying(const CancelableOperationContextFactory& factory);
+
     void _transitionToError(Status abortReason, const CancelableOperationContextFactory& factory);
 
     void _transitionToDone(bool aborted, const CancelableOperationContextFactory& factory);
@@ -325,6 +349,10 @@ private:
 
     // Get indexesToBuild and indexesBuilt from the index catalog, then save them in _metrics
     void _tryFetchBuildIndexMetrics(OperationContext* opCtx);
+
+    // Return the total and per-donor number documents and bytes cloned if the numbers are available
+    // in the cloner resume data documents. Otherwise, return none.
+    boost::optional<CloningMetrics> _tryFetchCloningMetrics(OperationContext* opCtx);
 
     // The primary-only service instance corresponding to the recipient instance. Not owned.
     const ReshardingRecipientService* const _recipientService;

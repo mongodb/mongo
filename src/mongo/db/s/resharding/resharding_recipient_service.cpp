@@ -196,6 +196,7 @@ void buildStateDocumentBuildingIndexMetricsForUpdate(BSONObjBuilder& bob, Date_t
 }
 
 void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
+                                             const RecipientShardContext& recipientCtx,
                                              ReshardingMetrics* metrics,
                                              Date_t timestamp) {
     if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
@@ -213,9 +214,11 @@ void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
         timestamp);
 
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName,
-               metrics->getDocumentsProcessedCount());
+               recipientCtx.getTotalNumDocuments() ? *recipientCtx.getTotalNumDocuments()
+                                                   : metrics->getDocumentsProcessedCount());
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName,
-               metrics->getBytesWrittenCount());
+               recipientCtx.getTotalDocumentSize() ? *recipientCtx.getTotalDocumentSize()
+                                                   : metrics->getBytesWrittenCount());
 }
 
 void buildStateDocumentStrictConsistencyMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
@@ -225,10 +228,10 @@ void buildStateDocumentStrictConsistencyMetricsForUpdate(BSONObjBuilder& bob, Da
 }
 
 void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
+                                        const RecipientShardContext& newRecipientCtx,
                                         ReshardingMetrics* metrics,
-                                        RecipientStateEnum newState,
                                         Date_t timestamp) {
-    switch (newState) {
+    switch (newRecipientCtx.getState()) {
         case RecipientStateEnum::kCloning:
             buildStateDocumentCloneMetricsForUpdate(bob, timestamp);
             return;
@@ -236,7 +239,7 @@ void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
             buildStateDocumentBuildingIndexMetricsForUpdate(bob, timestamp);
             return;
         case RecipientStateEnum::kApplying:
-            buildStateDocumentApplyMetricsForUpdate(bob, metrics, timestamp);
+            buildStateDocumentApplyMetricsForUpdate(bob, newRecipientCtx, metrics, timestamp);
             return;
         case RecipientStateEnum::kStrictConsistency:
             buildStateDocumentStrictConsistencyMetricsForUpdate(bob, timestamp);
@@ -433,7 +436,13 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
                 {
                     AutoGetCollection coll(opCtx.get(), _metadata.getTempReshardingNss(), MODE_IS);
                     if (coll) {
-                        _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx.get()));
+                        // If verification is enabled, this is expected to have been set upon
+                        // transitioning to the "applying" state after cloning completes and updated
+                        // as oplog entries are applied. So it should not be overwrriten with the
+                        // fast count.
+                        if (!_recipientCtx.getTotalNumDocuments()) {
+                            _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx.get()));
+                        }
                         _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx.get()));
                         if (coll->isClustered()) {
                             // There is an implicit 'clustered' index on a clustered collection.
@@ -987,7 +996,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             _transitionState(RecipientStateEnum::kBuildingIndex, factory);
         } else {
-            _transitionState(RecipientStateEnum::kApplying, factory);
+            _transitionToApplying(factory);
         }
     });
 }
@@ -1106,7 +1115,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                                   tempCollIdxSpecs.cbegin(),
                                                   tempCollIdxSpecs.cend());
             }
-            _transitionState(RecipientStateEnum::kApplying, factory);
+            _transitionToApplying(factory);
         });
 }
 
@@ -1325,6 +1334,21 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
         std::move(newRecipientCtx), std::move(cloneDetails), startConfigTxnCloneTime, factory);
 }
 
+void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
+    const CancelableOperationContextFactory& factory) {
+    auto newRecipientCtx = _recipientCtx;
+    newRecipientCtx.setState(RecipientStateEnum::kApplying);
+    {
+        auto opCtx = factory.makeOperationContext(&cc());
+        auto cloningMetrics = _tryFetchCloningMetrics(opCtx.get());
+        if (cloningMetrics) {
+            newRecipientCtx.setTotalNumDocuments(cloningMetrics->getDocumentsCopied());
+            newRecipientCtx.setTotalDocumentSize(cloningMetrics->getBytesCopied());
+        }
+    }
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
+}
+
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
     Status abortReason, const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
@@ -1499,8 +1523,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                               *configStartTime);
         }
 
-        buildStateDocumentMetricsForUpdate(
-            setBuilder, _metrics.get(), newRecipientCtx.getState(), timestamp);
+        buildStateDocumentMetricsForUpdate(setBuilder, newRecipientCtx, _metrics.get(), timestamp);
 
         setBuilder.doneFast();
     }
@@ -1607,8 +1630,13 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             // documents do not affect the cloning metrics.
             return;
         }
-        externalMetrics.documentBytesCopied = tempReshardingColl->dataSize(opCtx.get());
-        externalMetrics.documentCountCopied = tempReshardingColl->numRecords(opCtx.get());
+        auto cloningMetrics = _tryFetchCloningMetrics(opCtx.get());
+        externalMetrics.documentBytesCopied = cloningMetrics
+            ? cloningMetrics->getBytesCopied()
+            : tempReshardingColl->dataSize(opCtx.get());
+        externalMetrics.documentCountCopied = cloningMetrics
+            ? cloningMetrics->getDocumentsCopied()
+            : tempReshardingColl->numRecords(opCtx.get());
     }();
 
     reshardingOpCtxKilledWhileRestoringMetrics.execute(
@@ -1749,6 +1777,66 @@ void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetri
         LOGV2_WARNING(
             9037600, "Unable to fetch index build metrics", "reason"_attr = redact(e.toStatus()));
     }
+}
+
+void ReshardingRecipientService::RecipientStateMachine::CloningMetrics::add(int64_t documentsCopied,
+                                                                            int64_t bytesCopied) {
+    _documentsCopied += documentsCopied;
+    _bytesCopied += bytesCopied;
+}
+
+boost::optional<ReshardingRecipientService::RecipientStateMachine::CloningMetrics>
+ReshardingRecipientService::RecipientStateMachine::_tryFetchCloningMetrics(
+    OperationContext* opCtx) {
+    // The cloning metrics are only available when verification is enabled and this recipient did
+    // not skip cloning.
+    if (!_metadata.getPerformVerification()) {
+        return boost::none;
+    }
+
+    if (_skipCloningAndApplying) {
+        return CloningMetrics{};
+    }
+
+    CloningMetrics cloningMetrics;
+
+    DBDirectClient client(opCtx);
+    for (const auto& donor : _donorShards) {
+        auto resumeDataId =
+            (ReshardingRecipientResumeDataId{_metadata.getReshardingUUID(), donor.getShardId()})
+                .toBSON();
+
+        auto doc =
+            client.findOne(NamespaceString::kRecipientReshardingResumeDataNamespace,
+                           BSON(ReshardingRecipientResumeData::kIdFieldName << resumeDataId));
+
+        if (doc.isEmpty()) {
+            LOGV2_WARNING(
+                9849001,
+                "Could not find the collection cloner resume data document for a donor. This "
+                "is expected when there are no documents for this recipient to copy from this "
+                "donor",
+                "donorShardId"_attr = donor.getShardId());
+            continue;
+        }
+
+        auto parsedDoc =
+            ReshardingRecipientResumeData::parse(IDLParserContext("RecipientStateMachine"), doc);
+        uassert(
+            9849002,
+            str::stream() << "Expected the collection cloner resume data document for the donor "
+                          << donor.getShardId() << " to have the number of documents cloned",
+            parsedDoc.getDocumentsCopied());
+        uassert(
+            9849003,
+            str::stream() << "Expected the collection cloner resume data document for the donor "
+                          << donor.getShardId() << " to have the number of bytes cloned",
+            parsedDoc.getBytesCopied());
+
+        cloningMetrics.add(*parsedDoc.getDocumentsCopied(), *parsedDoc.getBytesCopied());
+    }
+
+    return cloningMetrics;
 }
 
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {

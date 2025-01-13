@@ -291,6 +291,7 @@ struct TestOptions {
     bool skipCloningAndApplying;
     bool noChunksToCopy;
     bool storeOplogFetcherProgress = true;
+    bool performVerification = true;
 
     BSONObj toBSON() const {
         BSONObjBuilder bob;
@@ -298,6 +299,7 @@ struct TestOptions {
         bob.append("skipCloningAndApplying", skipCloningAndApplying);
         bob.append("noChunksToCopy", noChunksToCopy);
         bob.append("storeOplogFetcherProgress", storeOplogFetcherProgress);
+        bob.append("performVerification", performVerification);
         return bob.obj();
     }
 };
@@ -318,19 +320,92 @@ std::vector<TestOptions> makeAllTestOptions() {
         for (bool skipCloningAndApplying : {false, true}) {
             for (bool noChunksToCopy : {false, true}) {
                 for (bool storeOplogFetcherProgress : {false, true}) {
-                    if (skipCloningAndApplying && !noChunksToCopy) {
-                        // This is an invalid combination.
-                        continue;
+                    for (bool performVerification : {false, true}) {
+                        if (skipCloningAndApplying && !noChunksToCopy) {
+                            // This is an invalid combination.
+                            continue;
+                        }
+                        testOptions.push_back({isAlsoDonor,
+                                               skipCloningAndApplying,
+                                               noChunksToCopy,
+                                               storeOplogFetcherProgress,
+                                               performVerification});
                     }
-                    testOptions.push_back({isAlsoDonor,
-                                           skipCloningAndApplying,
-                                           noChunksToCopy,
-                                           storeOplogFetcherProgress});
                 }
             }
         }
     }
     return testOptions;
+}
+
+BSONObj makeTestDocument(int i) {
+    auto id = UUID::gen();
+    return BSON("_id" << id.toBSON() << "x" << i << "y" << i);
+}
+
+struct RecipientMetricsCommon {
+    int64_t docsCopied = 0;
+    int64_t bytesCopied = 0;
+    int64_t oplogFetched = 0;
+    int64_t oplogApplied = 0;
+};
+
+struct RecipientMetricsForDonor {
+    ShardId shardId;
+    RecipientMetricsCommon metrics;
+};
+
+struct TestRecipientMetrics {
+public:
+    void add(const RecipientMetricsForDonor& metricsForDonor) {
+        _metricsTotal.docsCopied += metricsForDonor.metrics.docsCopied;
+        _metricsTotal.bytesCopied += metricsForDonor.metrics.bytesCopied;
+        _metricsTotal.oplogFetched += metricsForDonor.metrics.oplogFetched;
+        _metricsTotal.oplogApplied += metricsForDonor.metrics.oplogApplied;
+        _metricsForDonors.push_back(metricsForDonor);
+    }
+
+    const RecipientMetricsCommon& getMetricsTotal() const {
+        return _metricsTotal;
+    }
+
+    const std::vector<RecipientMetricsForDonor>& getMetricsForDonors() const {
+        return _metricsForDonors;
+    }
+
+private:
+    RecipientMetricsCommon _metricsTotal;
+    std::vector<RecipientMetricsForDonor> _metricsForDonors;
+};
+
+TestRecipientMetrics makeTestRecipientMetrics(const TestOptions& testOptions,
+                                              const std::vector<DonorShardFetchTimestamp>& donors) {
+    if (testOptions.noChunksToCopy) {
+        return {};
+    }
+
+    ASSERT_GT(donors.size(), 1);
+    TestRecipientMetrics testRecipientMetrics;
+
+    for (unsigned long i = 0; i < donors.size(); i++) {
+        if (i == 0) {
+            // Make the recipient not have any documents to copy or oplog entries to fetch/apply
+            // from donor0.
+            continue;
+        }
+
+        RecipientMetricsForDonor metricsForDonor;
+        metricsForDonor.shardId = donors[i].getShardId();
+
+        auto bytesPerDoc = makeTestDocument(0).objsize();
+        metricsForDonor.metrics.docsCopied = i;
+        metricsForDonor.metrics.bytesCopied = bytesPerDoc * metricsForDonor.metrics.docsCopied;
+        metricsForDonor.metrics.oplogFetched = i * 2;
+        metricsForDonor.metrics.oplogApplied = metricsForDonor.metrics.oplogFetched;
+
+        testRecipientMetrics.add(metricsForDonor);
+    }
+    return testRecipientMetrics;
 }
 
 /**
@@ -398,6 +473,7 @@ public:
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         doc.setSkipCloningAndApplying(testOptions.skipCloningAndApplying);
         doc.setStoreOplogFetcherProgress(testOptions.storeOplogFetcherProgress);
+        doc.setPerformVerification(testOptions.performVerification);
         return doc;
     }
 
@@ -458,6 +534,257 @@ public:
 protected:
     void setNoChunksToCopy(const TestOptions& testOptions) {
         _noChunksToCopy = testOptions.noChunksToCopy;
+    }
+
+    void insertDocuments(OperationContext* opCtx,
+                         const NamespaceString nss,
+                         const std::vector<BSONObj>& docs) {
+        resharding::data_copy::ensureCollectionExists(opCtx, nss, CollectionOptions());
+        std::vector<InsertStatement> inserts;
+        for (const auto& doc : docs) {
+            inserts.emplace_back(doc);
+        }
+        resharding::data_copy::insertBatch(opCtx, nss, inserts);
+    }
+
+    void mockCollectionClonerStateForDonor(
+        OperationContext* opCtx,
+        const TestOptions testOptions,
+        const RecipientMetricsForDonor& testRecipientMetricsForDonor,
+        const CommonReshardingMetadata& metadata,
+        ReshardingMetrics& metrics) {
+        auto docsCopied = testRecipientMetricsForDonor.metrics.docsCopied;
+        auto bytesCopied = testRecipientMetricsForDonor.metrics.bytesCopied;
+
+        if (docsCopied == 0) {
+            ASSERT_EQ(bytesCopied, 0);
+            return;
+        }
+        ASSERT_GT(bytesCopied, 0);
+
+        bool storeCollectionClonerProgress = testOptions.performVerification;
+        if (storeCollectionClonerProgress) {
+            // Set up the cloner resume data collection. To verify that the metrics are restored
+            // from the counts in this collection instead of the fast count of documents the
+            // temporary collection, do not insert any documents to the temporary collection.
+            ReshardingRecipientResumeDataId resumeDataId(
+                {metadata.getReshardingUUID(), testRecipientMetricsForDonor.shardId});
+            ReshardingRecipientResumeData resumeDataDoc(resumeDataId);
+            resumeDataDoc.setDocumentsCopied(docsCopied);
+            resumeDataDoc.setBytesCopied(bytesCopied);
+            insertDocuments(opCtx,
+                            NamespaceString::kRecipientReshardingResumeDataNamespace,
+                            {resumeDataDoc.toBSON()});
+        } else {
+            // Set up the temporary collection.
+            std::vector<BSONObj> docs;
+            for (int i = 0; i < docsCopied; i++) {
+                docs.push_back(makeTestDocument(i));
+            }
+            insertDocuments(opCtx, metadata.getTempReshardingNss(), docs);
+        }
+
+        metrics.onDocumentsProcessed(docsCopied, bytesCopied, Milliseconds(1));
+    }
+
+    std::vector<BSONObj> makeFetchedOplogEntryDocuments(long num) {
+        std::vector<BSONObj> oplogEntries;
+
+        Timestamp timestamp{1, 1};
+        for (auto i = 0; i < num; i++) {
+            // Only mock the necessary fields.
+            ReshardingDonorOplogId oplogId{timestamp, timestamp};
+            oplogEntries.push_back(BSON("_id" << oplogId.toBSON()));
+            timestamp = timestamp + 1ULL;
+        }
+        return oplogEntries;
+    }
+
+    void mockOplogFetcherAndApplierStateForDonor(
+        OperationContext* opCtx,
+        const TestOptions testOptions,
+        const RecipientMetricsForDonor& testRecipientMetricsForDonor,
+        const CommonReshardingMetadata& metadata,
+        boost::optional<ReshardingMetrics&> metrics = boost::none) {
+        auto oplogEntriesFetched = testRecipientMetricsForDonor.metrics.oplogFetched;
+        auto oplogEntriesApplied = testRecipientMetricsForDonor.metrics.oplogApplied;
+        ASSERT_EQ(oplogEntriesFetched, oplogEntriesApplied);
+
+        if (oplogEntriesApplied == 0) {
+            return;
+        }
+
+        auto fetchedOplogEntries = makeFetchedOplogEntryDocuments(oplogEntriesApplied);
+
+        if (testOptions.storeOplogFetcherProgress) {
+            // Set up the fetcher progress collection. To verify that the metrics are restored
+            // from the counts in this collection instead of the fast count of documents the oplog
+            // buffer collection, do not insert any documents to the buffer collection.
+            ReshardingOplogFetcherProgress fetcherProgressDoc(
+                {metadata.getReshardingUUID(), testRecipientMetricsForDonor.shardId},
+                oplogEntriesApplied);
+            insertDocuments(opCtx,
+                            NamespaceString::kReshardingFetcherProgressNamespace,
+                            {fetcherProgressDoc.toBSON()});
+        } else {
+            // Set up the oplog buffer collection.
+            insertDocuments(opCtx,
+                            resharding::getLocalOplogBufferNamespace(
+                                metadata.getSourceUUID(), testRecipientMetricsForDonor.shardId),
+                            fetchedOplogEntries);
+        }
+
+        // Set up the applier progress collection.
+        auto donorOplogId =
+            ReshardingDonorOplogId::parse(IDLParserContext("ReshardingRecipientServiceTest"),
+                                          fetchedOplogEntries.back()["_id"].Obj());
+        ReshardingOplogApplierProgress applierProgressDoc(
+            {metadata.getReshardingUUID(), testRecipientMetricsForDonor.shardId},
+            donorOplogId,
+            oplogEntriesApplied);
+        insertDocuments(opCtx,
+                        NamespaceString::kReshardingApplierProgressNamespace,
+                        {applierProgressDoc.toBSON()});
+
+        if (metrics) {
+            metrics->onOplogEntriesFetched(oplogEntriesFetched);
+            metrics->onOplogEntriesApplied(oplogEntriesApplied);
+        }
+    }
+
+    void mockDataReplicationStateIfNeeded(OperationContext* opCtx,
+                                          const TestOptions testOptions,
+                                          const TestRecipientMetrics& testRecipientMetrics,
+                                          const CommonReshardingMetadata& metadata,
+                                          RecipientStateEnum prevState,
+                                          ReshardingMetrics& metrics) {
+        if (testOptions.skipCloningAndApplying) {
+            return;
+        }
+
+        if (prevState == RecipientStateEnum::kCloning) {
+            for (const auto& testMetricsForDonor : testRecipientMetrics.getMetricsForDonors()) {
+                mockCollectionClonerStateForDonor(
+                    opCtx, testOptions, testMetricsForDonor, metadata, metrics);
+            }
+        } else if (prevState == RecipientStateEnum::kApplying) {
+            for (const auto& testMetricsForDonor : testRecipientMetrics.getMetricsForDonors()) {
+                mockOplogFetcherAndApplierStateForDonor(
+                    opCtx, testOptions, testMetricsForDonor, metadata, metrics);
+            }
+        }
+    }
+
+    void checkRecipientToCopyMetrics(const TestOptions& testOptions,
+                                     const ReshardingRecipientDocument& recipientDoc,
+                                     const boost::optional<BSONObj>& currOp) {
+        auto state = recipientDoc.getMutableState().getState();
+
+        if (state <= RecipientStateEnum::kCloning) {
+            return;
+        }
+
+        auto expectedApproxDocsToCopy = testOptions.noChunksToCopy ? 0 : approxDocumentsToCopy;
+        auto expectedApproxBytesToCopy = testOptions.noChunksToCopy ? 0 : approxBytesToCopy;
+
+        ASSERT_EQ(*recipientDoc.getMetrics()->getApproxDocumentsToCopy(), expectedApproxDocsToCopy);
+        ASSERT_EQ(*recipientDoc.getMetrics()->getApproxBytesToCopy(), expectedApproxBytesToCopy);
+
+        if (currOp) {
+            ASSERT_EQ(currOp->getField("approxDocumentsToCopy").numberLong(),
+                      expectedApproxDocsToCopy);
+            ASSERT_EQ(currOp->getField("approxBytesToCopy").numberLong(),
+                      expectedApproxBytesToCopy);
+        }
+    }
+
+    void checkRecipientCopiedMetrics(const TestOptions& testOptions,
+                                     const TestRecipientMetrics& testRecipientMetrics,
+                                     const ReshardingRecipientDocument& recipientDoc,
+                                     const boost::optional<BSONObj>& currOp) {
+        auto mutableState = recipientDoc.getMutableState();
+        auto state = mutableState.getState();
+
+        if (state < RecipientStateEnum::kApplying) {
+            return;
+        }
+
+        auto expectedDocsCopied = testRecipientMetrics.getMetricsTotal().docsCopied;
+        auto expectedBytesCopied = testRecipientMetrics.getMetricsTotal().bytesCopied;
+
+        ASSERT_EQ(*recipientDoc.getMetrics()->getFinalDocumentsCopiedCount(), expectedDocsCopied);
+        ASSERT_EQ(*recipientDoc.getMetrics()->getFinalBytesCopiedCount(), expectedBytesCopied);
+
+        // There are separate metrics in the recipient doc that are shared with the coordinator doc
+        // (via RecipientShardEntry/ReshardingRecipientContext).
+
+        // The metrics below are populated upon transitioning to the "done" state.
+        if (state == RecipientStateEnum::kDone) {
+            // There is currently no 'documentsCopied'.
+            ASSERT_EQ(*mutableState.getBytesCopied(), expectedBytesCopied);
+        } else {
+            ASSERT_FALSE(mutableState.getBytesCopied());
+        }
+
+        // If verification is enabled, the metrics below are populated upon transitioning to the
+        // "applying" state after cloning completes and are updated as oplog entries are applied. If
+        // verification is disabled, they are populated upon transitioning to the "done" state.
+        if (testOptions.performVerification || state == RecipientStateEnum::kDone) {
+            ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
+            // Upon transitioning to the "done" state, 'totalDocumentSize' is set to the fast count
+            // size. This test deliberately leaves the temporary collection empty when testing
+            // verification so this is expected to be equal to 0.
+            bool expectInaccurateSize =
+                testOptions.performVerification && state == RecipientStateEnum::kDone;
+            ASSERT_EQ(*mutableState.getTotalDocumentSize(),
+                      expectInaccurateSize ? 0 : expectedBytesCopied);
+        } else {
+            ASSERT_FALSE(mutableState.getTotalNumDocuments());
+            ASSERT_FALSE(mutableState.getTotalDocumentSize());
+        }
+
+        if (currOp) {
+            ASSERT_EQ(currOp->getField("documentsCopied").numberLong(), expectedDocsCopied);
+            ASSERT_EQ(currOp->getField("bytesCopied").numberLong(), expectedBytesCopied);
+        }
+    }
+
+    void checkRecipientOplogMetrics(const TestRecipientMetrics& testRecipientMetrics,
+                                    const ReshardingRecipientDocument& recipientDoc,
+                                    const boost::optional<BSONObj>& currOp) {
+        auto mutableState = recipientDoc.getMutableState();
+        auto state = mutableState.getState();
+
+        if (state < RecipientStateEnum::kStrictConsistency) {
+            return;
+        }
+
+        auto expectedOplogFetched = testRecipientMetrics.getMetricsTotal().oplogFetched;
+        auto expectedOplogApplied = testRecipientMetrics.getMetricsTotal().oplogApplied;
+
+        // The oplog metrics in the recipient doc (in ReshardingRecipientContext) are populated upon
+        // transitioning to the "done" state.
+        if (state == RecipientStateEnum::kDone) {
+            ASSERT_EQ(*mutableState.getOplogFetched(), expectedOplogFetched);
+            ASSERT_EQ(*mutableState.getOplogApplied(), expectedOplogApplied);
+        } else {
+            ASSERT_FALSE(mutableState.getOplogFetched());
+            ASSERT_FALSE(mutableState.getOplogApplied());
+        }
+
+        if (currOp) {
+            ASSERT_EQ(currOp->getField("oplogEntriesFetched").numberLong(), expectedOplogFetched);
+            ASSERT_EQ(currOp->getField("oplogEntriesApplied").numberLong(), expectedOplogApplied);
+        }
+    }
+
+    void checkRecipientMetrics(const TestOptions& testOptions,
+                               const TestRecipientMetrics& testRecipientMetrics,
+                               const ReshardingRecipientDocument& recipientDoc,
+                               const boost::optional<BSONObj>& currOp) {
+        checkRecipientToCopyMetrics(testOptions, recipientDoc, currOp);
+        checkRecipientCopiedMetrics(testOptions, testRecipientMetrics, recipientDoc, currOp);
+        checkRecipientOplogMetrics(testRecipientMetrics, recipientDoc, currOp);
     }
 
 private:
@@ -1115,35 +1442,114 @@ TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelat
     }
 }
 
-TEST_F(ReshardingRecipientServiceTest, CloningDetailsDurable) {
+TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
+    const std::vector<RecipientStateEnum> recipientStates{RecipientStateEnum::kCreatingCollection,
+                                                          RecipientStateEnum::kCloning,
+                                                          RecipientStateEnum::kBuildingIndex,
+                                                          RecipientStateEnum::kApplying,
+                                                          RecipientStateEnum::kStrictConsistency,
+                                                          RecipientStateEnum::kDone};
+
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(9297807,
               "Running case",
               "test"_attr = _agent.getTestName(),
               "testOptions"_attr = testOptions);
         setNoChunksToCopy(testOptions);
-        auto doc = makeRecipientDocument(testOptions);
+
+        PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
         auto opCtx = makeOperationContext();
-        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
 
-        auto failpoint = globalFailPointRegistry().find("reshardingPauseRecipientDuringCloning");
-        auto timeEnteredBefore = failpoint->setMode(FailPoint::alwaysOn, 1);
-        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+        auto doc = makeRecipientDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+        auto prevState = RecipientStateEnum::kUnused;
 
-        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        auto testRecipientMetrics = makeTestRecipientMetrics(testOptions, doc.getDonorShards());
 
-        failpoint->waitForTimesEntered(timeEnteredBefore + 1);
-        auto persistedDoc = getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
-        ASSERT(persistedDoc.getCloneTimestamp());
-        auto metrics = persistedDoc.getMetrics();
-        ASSERT_EQ(*metrics->getApproxBytesToCopy(),
-                  testOptions.noChunksToCopy ? 0 : approxBytesToCopy);
-        ASSERT_EQ(*metrics->getApproxDocumentsToCopy(),
-                  testOptions.noChunksToCopy ? 0 : approxDocumentsToCopy);
+        auto removeRecipientDocFailpoint =
+            globalFailPointRegistry().find("removeRecipientDocFailpoint");
+        auto timesEnteredFailPoint = removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
 
-        failpoint->setMode(FailPoint::off, 0);
+        for (const auto state : recipientStates) {
+            auto recipient = [&] {
+                if (prevState == RecipientStateEnum::kUnused) {
+                    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+                    return RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+                } else {
+                    auto [maybeRecipient, isPausedOrShutdown] =
+                        RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+                    ASSERT_TRUE(maybeRecipient);
+                    ASSERT_FALSE(isPausedOrShutdown);
+
+                    // Allow the transition to prevState to succeed on this primary-only service
+                    // instance.
+                    stateTransitionsGuard.unset(prevState);
+                    return *maybeRecipient;
+                }
+            }();
+
+            mockDataReplicationStateIfNeeded(opCtx.get(),
+                                             testOptions,
+                                             testRecipientMetrics,
+                                             doc.getCommonReshardingMetadata(),
+                                             prevState,
+                                             recipient->getMetricsForTest());
+
+            if (prevState != RecipientStateEnum::kUnused) {
+                // Allow the transition to prevState to succeed on this primary-only service
+                // instance.
+                stateTransitionsGuard.unset(prevState);
+            }
+
+            // Signal the coordinator's earliest state that allows the recipient's transition into
+            // 'state' to be valid.
+            switch (state) {
+                case RecipientStateEnum::kCreatingCollection:
+                case RecipientStateEnum::kCloning: {
+                    notifyToStartCloning(opCtx.get(), *recipient, doc);
+                    break;
+                }
+                case RecipientStateEnum::kDone: {
+                    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+                    break;
+                }
+                default:
+                    break;
+            }
+
+            stateTransitionsGuard.wait(state);
+
+            auto persistedDoc = getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+            auto persistedState = persistedDoc.getMutableState().getState();
+
+            checkRecipientMetrics(
+                testOptions, testRecipientMetrics, persistedDoc, boost::none /* currOp */);
+
+            if (persistedState >= RecipientStateEnum::kCloning) {
+                ASSERT(persistedDoc.getCloneTimestamp());
+            }
+
+            prevState = state;
+        }
+
+        auto [maybeRecipient, isPausedOrShutdown] =
+            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeRecipient);
+        ASSERT_FALSE(isPausedOrShutdown);
+        auto recipient = *maybeRecipient;
+
+        stateTransitionsGuard.unset(RecipientStateEnum::kDone);
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+        removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+        auto persistedDoc = getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+        checkRecipientMetrics(
+            testOptions, testRecipientMetrics, persistedDoc, boost::none /* currOp */);
+
+        removeRecipientDocFailpoint->setMode(FailPoint::off);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkRecipientDocumentRemoved(opCtx.get());
     }
 }
 
@@ -1162,22 +1568,16 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
               "testOptions"_attr = testOptions);
 
         setNoChunksToCopy(testOptions);
-        auto checkToCopyMetrics = [&](const BSONObj& currOp) {
-            ASSERT_EQ(currOp.getField("approxBytesToCopy").numberLong(),
-                      testOptions.noChunksToCopy ? 0 : approxBytesToCopy);
-            ASSERT_EQ(currOp.getField("approxDocumentsToCopy").numberLong(),
-                      testOptions.noChunksToCopy ? 0 : approxDocumentsToCopy);
-        };
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
+        auto opCtx = makeOperationContext();
+
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
             BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
-        auto opCtx = makeOperationContext();
         auto prevState = RecipientStateEnum::kUnused;
 
-        auto reshardedDoc = BSON("_id" << 0 << "x" << 2 << "y" << 10);
-        int64_t oplogEntriesAppliedOnEachDonor = 10;
+        auto testRecipientMetrics = makeTestRecipientMetrics(testOptions, doc.getDonorShards());
 
         for (const auto state : recipientStates) {
             auto recipient = [&] {
@@ -1190,56 +1590,19 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                     ASSERT_TRUE(maybeRecipient);
                     ASSERT_FALSE(isPausedOrShutdown);
 
-                    // Allow the transition to prevState to succeed on this primary-only
-                    // service instance.
+                    // Allow the transition to prevState to succeed on this primary-only service
+                    // instance.
                     stateTransitionsGuard.unset(prevState);
                     return *maybeRecipient;
                 }
             }();
 
-            if (prevState == RecipientStateEnum::kCloning) {
-                std::vector<InsertStatement> inserts{InsertStatement(reshardedDoc)};
-                resharding::data_copy::insertBatch(
-                    opCtx.get(), doc.getTempReshardingNss(), inserts);
-            } else if (prevState == RecipientStateEnum::kApplying) {
-                auto insertFn = [&](const NamespaceString nss,
-                                    const InsertStatement insertStatement) {
-                    resharding::data_copy::ensureCollectionExists(
-                        opCtx.get(), nss, CollectionOptions());
-
-                    std::vector<InsertStatement> inserts{insertStatement};
-                    resharding::data_copy::insertBatch(opCtx.get(), nss, inserts);
-                };
-
-                auto donorShards = doc.getDonorShards();
-                unsigned int i = 0;
-                for (const auto& donor : donorShards) {
-                    ReshardingDonorOplogId donorOplogId{{20, i}, {19, 0}};
-
-                    if (testOptions.storeOplogFetcherProgress) {
-                        // Set up the fetcher progress collection.
-                        ReshardingOplogFetcherProgress fetcherProgressDoc(
-                            {doc.getReshardingUUID(), donor.getShardId()}, 1);
-                        insertFn(NamespaceString::kReshardingFetcherProgressNamespace,
-                                 InsertStatement{fetcherProgressDoc.toBSON()});
-                    } else {
-                        // Set up the oplog buffer collection.
-                        insertFn(resharding::getLocalOplogBufferNamespace(doc.getSourceUUID(),
-                                                                          donor.getShardId()),
-                                 InsertStatement{BSON("_id" << donorOplogId.toBSON())});
-                    }
-
-                    // Set up the applier progress collection.
-                    ReshardingOplogApplierProgress applierProgressDoc(
-                        {doc.getReshardingUUID(), donor.getShardId()},
-                        donorOplogId,
-                        oplogEntriesAppliedOnEachDonor);
-                    insertFn(NamespaceString::kReshardingApplierProgressNamespace,
-                             InsertStatement{applierProgressDoc.toBSON()});
-
-                    ++i;
-                }
-            }
+            mockDataReplicationStateIfNeeded(opCtx.get(),
+                                             testOptions,
+                                             testRecipientMetrics,
+                                             doc.getCommonReshardingMetadata(),
+                                             prevState,
+                                             recipient->getMetricsForTest());
 
             if (prevState != RecipientStateEnum::kUnused) {
                 // Allow the transition to prevState to succeed on this primary-only
@@ -1247,10 +1610,10 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                 stateTransitionsGuard.unset(prevState);
             }
 
-            // Signal the coordinator's earliest state that allows the recipient's
-            // transition into 'state' to be valid. This mimics the real system where,
-            // upon step up, the new RecipientStateMachine instance gets refreshed with
-            // the coordinator's most recent state.
+            // Signal the coordinator's earliest state that allows the recipient's transition into
+            // 'state' to be valid. This mimics the real system where, upon step up, the new
+            // RecipientStateMachine instance gets refreshed with the coordinator's most recent
+            // state.
             switch (state) {
                 case RecipientStateEnum::kCreatingCollection:
                 case RecipientStateEnum::kCloning: {
@@ -1266,44 +1629,18 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
             }
             // Step down before the transition to state can complete.
             stateTransitionsGuard.wait(state);
-            {
-                auto currOp = recipient
-                                  ->reportForCurrentOp(
-                                      MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
-                                      MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
-                                  .value();
-            }
-            if (state == RecipientStateEnum::kApplying) {
-                auto currOp = recipient
-                                  ->reportForCurrentOp(
-                                      MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
-                                      MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
-                                  .value();
 
-                checkToCopyMetrics(currOp);
-                ASSERT_EQ(currOp.getField("documentsCopied").numberLong(), 1L);
-                ASSERT_EQ(currOp.getField("bytesCopied").numberLong(),
-                          (long)reshardedDoc.objsize());
-                ASSERT_EQ(currOp.getStringField("recipientState"),
-                          RecipientState_serializer(RecipientStateEnum::kBuildingIndex));
-            } else if (state == RecipientStateEnum::kDone) {
-                auto currOp = recipient
-                                  ->reportForCurrentOp(
-                                      MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
-                                      MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
-                                  .value();
+            auto persistedDoc = getPersistedRecipientDocument(opCtx.get(), doc.getReshardingUUID());
+            auto currOp = recipient
+                              ->reportForCurrentOp(
+                                  MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
+                                  MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
+                              .value();
 
-                checkToCopyMetrics(currOp);
-                ASSERT_EQ(currOp.getField("documentsCopied").numberLong(), 1L);
-                ASSERT_EQ(currOp.getField("bytesCopied").numberLong(),
-                          (long)reshardedDoc.objsize());
-                ASSERT_EQ(currOp.getField("oplogEntriesFetched").numberLong(),
-                          (long)(1 * doc.getDonorShards().size()));
-                ASSERT_EQ(currOp.getField("oplogEntriesApplied").numberLong(),
-                          oplogEntriesAppliedOnEachDonor * doc.getDonorShards().size());
-                ASSERT_EQ(currOp.getStringField("recipientState"),
-                          RecipientState_serializer(RecipientStateEnum::kStrictConsistency));
-            }
+            ASSERT_EQ(currOp.getStringField("recipientState"),
+                      RecipientState_serializer(persistedDoc.getMutableState().getState()));
+            checkRecipientMetrics(testOptions, testRecipientMetrics, persistedDoc, currOp);
+
             stepDown();
 
             ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
@@ -1311,8 +1648,8 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
             prevState = state;
             if (state == RecipientStateEnum::kApplying ||
                 state == RecipientStateEnum::kStrictConsistency) {
-                // If metrics are being verified in the next pass, ensure a retry does
-                // not alter values.
+                // If metrics are being verified in the next pass, ensure a retry does not alter
+                // values.
                 auto fp =
                     globalFailPointRegistry().find("reshardingOpCtxKilledWhileRestoringMetrics");
                 fp->setMode(FailPoint::nTimes, 1);
@@ -1340,41 +1677,20 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
         auto opCtx = makeOperationContext();
 
         auto donorShards = doc.getDonorShards();
-        auto insertFn = [&](const NamespaceString nss, const InsertStatement insertStatement) {
-            resharding::data_copy::ensureCollectionExists(opCtx.get(), nss, CollectionOptions());
-
-            std::vector<InsertStatement> inserts{insertStatement};
-            resharding::data_copy::insertBatch(opCtx.get(), nss, inserts);
-        };
-
         for (unsigned i = 0; i < donorShards.size(); i++) {
             if (i == 0) {
                 continue;
             }
 
-            const auto& donor = donorShards[i];
-            ReshardingDonorOplogId donorOplogId{{20, i}, {19, 0}};
+            RecipientMetricsForDonor metricsForDonor;
+            metricsForDonor.shardId = donorShards[i].getShardId();
+            metricsForDonor.metrics.oplogFetched = i;
+            metricsForDonor.metrics.oplogApplied = metricsForDonor.metrics.oplogFetched;
 
-            if (testOptions.storeOplogFetcherProgress) {
-                // Set up the fetcher progress collection.
-                ReshardingOplogFetcherProgress fetcherProgressDoc(
-                    {doc.getReshardingUUID(), donor.getShardId()}, 1);
-                insertFn(NamespaceString::kReshardingFetcherProgressNamespace,
-                         InsertStatement{fetcherProgressDoc.toBSON()});
-            } else {
-                // Set up the oplog buffer collection.
-                insertFn(resharding::getLocalOplogBufferNamespace(doc.getSourceUUID(),
-                                                                  donor.getShardId()),
-                         InsertStatement{BSON("_id" << donorOplogId.toBSON())});
-            }
-
-            // Set up the applier progress collection.
-            ReshardingOplogApplierProgress progressDoc(
-                {doc.getReshardingUUID(), donor.getShardId()},
-                donorOplogId,
-                10 /* numOplogApplied */);
-            insertFn(NamespaceString::kReshardingApplierProgressNamespace,
-                     InsertStatement{progressDoc.toBSON()});
+            mockOplogFetcherAndApplierStateForDonor(opCtx.get(),
+                                                    testOptions,
+                                                    std::move(metricsForDonor),
+                                                    doc.getCommonReshardingMetadata());
         }
 
         auto mutableState = doc.getMutableState();
