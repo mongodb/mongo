@@ -7,7 +7,6 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -43,16 +42,14 @@ function setUpCollection(collectionName, nss) {
     // Move a chunk to create orphan documents.
     let chunk =
         findChunksUtil.findOneChunkByNs(st.s.getDB('config'), nss, {shard: st.shard0.shardName});
-    // TODO SERVER-81884: update once 8.0 becomes last LTS.
-    if (FeatureFlagUtil.isPresentAndEnabled(db,
-                                            "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-        // For a given collection, the 'dropIndexes' command isn't being run on shards
-        // that do not own any of its chunks. Create another chunk to make sure the index gets
-        // dropped on the shard with orphaned documents, when 'dropIndex' is called.
-        assert.commandWorked(db.adminCommand({split: nss, bounds: [chunk.min, chunk.max]}));
-        chunk = findChunksUtil.findOneChunkByNs(
-            st.s.getDB('config'), nss, {shard: st.shard0.shardName});
-    }
+
+    // For a given collection, the 'dropIndexes' command isn't being run on shards
+    // that do not own any of its chunks. Create another chunk to make sure the index gets
+    // dropped on the shard with orphaned documents, when 'dropIndex' is called.
+    assert.commandWorked(db.adminCommand({split: nss, bounds: [chunk.min, chunk.max]}));
+    chunk =
+        findChunksUtil.findOneChunkByNs(st.s.getDB('config'), nss, {shard: st.shard0.shardName});
+
     assert.commandWorked(
         db.adminCommand({moveChunk: nss, bounds: [chunk.min, chunk.max], to: st.shard1.shardName}));
 }

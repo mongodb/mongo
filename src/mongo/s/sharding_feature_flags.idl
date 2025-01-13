@@ -80,13 +80,6 @@ feature_flags:
     cpp_varname: feature_flags::gBalanceUnshardedCollections
     default: false
     shouldBeFCVGated: true
-  # TODO SERVER-81884: Remove once 8.0 becomes last LTS.
-  featureFlagOneChunkPerShardEmptyCollectionWithHashedShardKey :
-    description: "Feature flag to enable creation of one chunk per shard for empty collections with hashed shard key."
-    cpp_varname: feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey
-    default: true
-    shouldBeFCVGated: true
-    version: 7.2
   # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
   featureFlagPlacementHistoryPostFCV73 :
     description: "Feature flag that marks a version change in the logic that generates config.placementHistory;

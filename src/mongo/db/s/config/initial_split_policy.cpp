@@ -361,13 +361,6 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
     const std::vector<ShardId>& allShardIds) {
     invariant(!allShardIds.empty());
 
-    size_t numInitialChunksPerShard = 1;
-    // TODO SERVER-81884: update once 8.0 becomes last LTS.
-    if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        numInitialChunksPerShard = 2;
-    }
-
     std::vector<BSONObj> finalSplitPoints;
 
     // Make sure points are unique and ordered
@@ -390,8 +383,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
         const BSONObj min = (i == 0) ? keyPattern.globalMin() : finalSplitPoints[i - 1];
         const BSONObj max =
             (i < finalSplitPoints.size()) ? finalSplitPoints[i] : keyPattern.globalMax();
-        // TODO SERVER-81884: simplify once numInitialChunksPerShard is always 1
-        const ShardId shardId = allShardIds[(i / numInitialChunksPerShard) % allShardIds.size()];
+        const ShardId shardId = allShardIds[i % allShardIds.size()];
 
         appendChunk(params, min, max, &version, shardId, &chunks);
     }
@@ -447,15 +439,9 @@ SplitPointsBasedSplitPolicy::SplitPointsBasedSplitPolicy(
     boost::optional<std::vector<ShardId>> availableShardIds)
     : _availableShardIds(std::move(availableShardIds)) {
 
-    size_t numInitialChunksPerShard = 1;
-    // TODO SERVER-81884: update once 8.0 becomes last LTS.
-    if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        numInitialChunksPerShard = 2;
-    }
-
-    _splitPoints = calculateHashedSplitPoints(
-        shardKeyPattern, BSONObj(), numShards * numInitialChunksPerShard);
+    // Calculate split points such that a single chunk is allocated to every shard,
+    // with 'numShards' chunks created in total.
+    _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), numShards);
 }
 
 InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
@@ -565,39 +551,17 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
 AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSplitInfoForTag(
     TagsType tag, const ShardKeyPattern& shardKeyPattern) {
 
-    // This strategy presplits each tag such that at least 'minNumInitialChunksPerShard' chunks are
-    // placed on every shard to which the tag is assigned. We distribute the chunks in an
-    // best-effort attempt to ensure that an equal number of chunks are created on each shard
-    // regardless of how the zones are laid out.
-
-    size_t minNumInitialChunksPerShard = 1;
-    // TODO SERVER-81884: update once 8.0 becomes last LTS.
-    if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        minNumInitialChunksPerShard = 2;
-    }
-
-    // Returns the ceiling number for the decimal value of x/y.
-    auto ceilOfXOverY = [](auto x, auto y) {
-        return (x / y) + (x % y != 0);
-    };
+    // This strategy pre-splits each tag, such that a single chunk is allocated
+    // to every shard associated with the given tag.
 
     const auto& tagsToShardsMap = getTagsToShardIds();
     invariant(tagsToShardsMap.find(tag.getTag()) != tagsToShardsMap.end());
     const auto& shardsForCurrentTag = tagsToShardsMap.find(tag.getTag())->second;
 
-    // For each shard in the current zone, find the quota of chunks that can be allocated to that
-    // zone. We distribute chunks equally to all the zones present on a shard.
     std::vector<std::pair<ShardId, size_t>> chunkDistribution;
     chunkDistribution.reserve((shardsForCurrentTag.size()));
-    auto numChunksForCurrentTag = 0;
     for (auto&& shard : shardsForCurrentTag) {
-        // TODO SERVER-81884: update once 8.0 becomes last LTS.
-        // numChunksForCurrentTagOnShard will always be 1 when minNumInitialChunksPerShard == 1
-        auto numChunksForCurrentTagOnShard =
-            ceilOfXOverY(minNumInitialChunksPerShard, _numTagsPerShard[shard.toString()]);
-        chunkDistribution.push_back({shard, numChunksForCurrentTagOnShard});
-        numChunksForCurrentTag += numChunksForCurrentTagOnShard;
+        chunkDistribution.push_back({shard, 1});
     }
 
     // Extract the fields preceding the hashed field. We use this object as a base for building
@@ -611,7 +575,7 @@ AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSpl
     }
     auto prefixBSON = bob.obj();
 
-    return {calculateHashedSplitPoints(shardKeyPattern, prefixBSON, numChunksForCurrentTag),
+    return {calculateHashedSplitPoints(shardKeyPattern, prefixBSON, chunkDistribution.size()),
             std::move(chunkDistribution)};
 }
 

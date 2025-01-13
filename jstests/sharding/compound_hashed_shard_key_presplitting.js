@@ -2,7 +2,6 @@
  * Tests the pre-splitting behaviour of compound hashed shard key, for both the case where the
  * prefix field is hashed, and where the hashed field is not the prefix.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -12,20 +11,14 @@ const mongos = st.s0;
 const db = st.getDB(dbname);
 db.adminCommand({enablesharding: dbname, primaryShard: st.shard1.shardName});
 
-let expectedTotalChunkCount = 3;
-let expectedChunkPerShardCount = 1;
-// TODO SERVER-81884: update once 8.0 becomes last LTS.
-if (!FeatureFlagUtil.isPresentAndEnabled(db, "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-    expectedTotalChunkCount = 6;
-    expectedChunkPerShardCount = 2;
-}
+const expectedTotalChunkCount = 3;
+const expectedChunkPerShardCount = 1;
 
 /**
  * Test that 'shardCollection' command works when there is existing data in collection and does not
  * do pre-splitting.
  */
-[{a: "hashed", rangeField1: 1, rangeField2: 1},
- {rangeField1: 1, a: "hashed", rangeField2: 1}]
+[{a: "hashed", rangeField1: 1, rangeField2: 1}, {rangeField1: 1, a: "hashed", rangeField2: 1}]
     .forEach(function(shardKey) {
         db.collWithData.drop();
         db.collWithData.insert({a: 1});

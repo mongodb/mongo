@@ -2,7 +2,6 @@
  * Verify initial chunks are properly created and distributed in various combinations of shard key
  * and empty/non-empty collections.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -21,13 +20,6 @@ function checkChunkCounts(collName, chunksOnShard0, chunksOnShard1) {
         chunksOnShard1, counts[st.shard1.shardName], 'Count mismatch on shard1: ' + tojson(counts));
 }
 
-let expectedNumberOfChunksPerShard = 1;
-// TODO SERVER-81884: update once 8.0 becomes last LTS.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongos,
-                                         "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-    expectedNumberOfChunksPerShard = 2;
-}
-
 // Hashed sharding + non-empty collection
 assert.commandWorked(db.HashedCollNotEmpty.insert({aKey: 1}));
 assert.commandWorked(db.HashedCollNotEmpty.createIndex({aKey: "hashed"}));
@@ -41,12 +33,11 @@ assert.eq(1,
 assert.commandWorked(db.HashedCollEmpty.createIndex({aKey: "hashed"}));
 assert.commandWorked(
     mongos.adminCommand({shardCollection: 'TestDB.HashedCollEmpty', key: {aKey: "hashed"}}));
-checkChunkCounts('HashedCollEmpty', expectedNumberOfChunksPerShard, expectedNumberOfChunksPerShard);
+checkChunkCounts('HashedCollEmpty', 1, 1);
 
 // Hashed sharding + non-existent collection
 assert.commandWorked(
     mongos.adminCommand({shardCollection: 'TestDB.HashedCollNonExistent', key: {aKey: "hashed"}}));
-checkChunkCounts(
-    'HashedCollNonExistent', expectedNumberOfChunksPerShard, expectedNumberOfChunksPerShard);
+checkChunkCounts('HashedCollNonExistent', 1, 1);
 
 st.stop();
