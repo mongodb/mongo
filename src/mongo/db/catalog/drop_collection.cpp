@@ -587,7 +587,8 @@ Status dropCollection(OperationContext* opCtx,
 
 Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
                                        const NamespaceString& ns,
-                                       const UUID& expectedUUID) {
+                                       const UUID& expectedUUID,
+                                       bool fromMigrate) {
     AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
     if (autoDb.getDb()) {
         {
@@ -604,7 +605,7 @@ Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
                                boost::none,
                                &repl,
                                DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
-                               false /*fromMigrate*/,
+                               fromMigrate,
                                expectedUUID);
     }
 
