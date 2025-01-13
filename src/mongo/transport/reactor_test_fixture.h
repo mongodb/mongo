@@ -133,6 +133,9 @@ public:
 
             ASSERT_OK(std::move(pf.future).getNoThrow());
 
+            // Give the reactor stats enough time to update.
+            sleepmillis(100);
+
             // No need to test the functionality of ExecutorStats, but we should ensure the reactor
             // properly monitors tasks via wrapTask.
             BSONObjBuilder bob;
