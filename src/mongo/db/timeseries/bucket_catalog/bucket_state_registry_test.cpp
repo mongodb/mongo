@@ -673,16 +673,12 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     ASSERT_EQ(bucket6.lastChecked, 3);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket5);
-    if constexpr (!kDebugBuild) {
-        ASSERT_EQ(bucket4.lastChecked, 2);
-        // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
-        // non-zero.
-        ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
-    } else {
-        ASSERT_EQ(bucket4.lastChecked, 3);  // Debug check advanced this while creating bucket6.
-        // Era3 still has bucket4 and bucket6, so its count remains non-zero.
-        ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
-    }
+
+    ASSERT_EQ(bucket4.lastChecked, 2);
+    // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
+    // non-zero.
+    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
+
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket4);
     checkAndRemoveClearedBucket(bucket6);

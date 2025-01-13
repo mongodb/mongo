@@ -107,21 +107,23 @@ void assertNoOpenUnclearedBucketsForKey(Stripe& stripe,
     if (it != stripe.openBucketsByKey.end()) {
         auto& openSet = it->second;
         for (Bucket* bucket : openSet) {
-            auto state = materializeAndGetBucketState(registry, bucket);
-            if (bucket->rolloverAction == RolloverAction::kNone && state &&
-                !conflictsWithInsertions(state.value())) {
-                for (Bucket* b : openSet) {
-                    LOGV2_INFO(8999000,
-                               "Dumping buckets for key",
-                               "key"_attr = key.metadata,
-                               "bucketId"_attr = b->bucketId.oid,
-                               "bucketState"_attr = bucketStateToString(
-                                   materializeAndGetBucketState(registry, b).value()),
-                               "rolloverAction"_attr = rolloverActionToString(b->rolloverAction));
+            if (bucket->rolloverAction == RolloverAction::kNone) {
+                if (auto state = materializeAndGetBucketState(registry, bucket);
+                    state && !conflictsWithInsertions(state.value())) {
+                    for (Bucket* b : openSet) {
+                        LOGV2_INFO(8999000,
+                                   "Dumping buckets for key",
+                                   "key"_attr = key.metadata,
+                                   "bucketId"_attr = b->bucketId.oid,
+                                   "bucketState"_attr = bucketStateToString(
+                                       materializeAndGetBucketState(registry, b).value()),
+                                   "rolloverAction"_attr =
+                                       rolloverActionToString(b->rolloverAction));
+                    }
+                    invariant(bucket->rolloverAction != RolloverAction::kNone || !state ||
+                              conflictsWithInsertions(state.value()));
                 }
             }
-            invariant(bucket->rolloverAction != RolloverAction::kNone || !state ||
-                      conflictsWithInsertions(state.value()));
         }
     }
 }
@@ -427,13 +429,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
 
         // Clean up the bucket if it has been cleared.
         if (state && (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
-            abort(catalog,
-                  stripe,
-                  stripeLock,
-                  *potentialBucket,
-                  insertContext.stats,
-                  nullptr,
-                  getTimeseriesBucketClearedError(potentialBucket->bucketId.oid));
+            bucketsToCleanUp.push_back(potentialBucket);
         }
     }
 
@@ -628,15 +624,19 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
         auto& openSet = it->second;
         for (Bucket* existingBucket : openSet) {
             if (existingBucket->rolloverAction == RolloverAction::kNone) {
-                stats.incNumBucketsClosedDueToReopening();
-                if (allCommitted(*existingBucket)) {
-                    closeOpenBucket(
-                        catalog, stripe, stripeLock, *existingBucket, stats, closedBuckets);
-                } else {
-                    existingBucket->rolloverAction = RolloverAction::kSoftClose;
+                auto state =
+                    materializeAndGetBucketState(catalog.bucketStateRegistry, unownedBucket);
+                if (state && !conflictsWithInsertions(state.value())) {
+                    stats.incNumBucketsClosedDueToReopening();
+                    if (allCommitted(*existingBucket)) {
+                        closeOpenBucket(
+                            catalog, stripe, stripeLock, *existingBucket, stats, closedBuckets);
+                    } else {
+                        existingBucket->rolloverAction = RolloverAction::kSoftClose;
+                    }
+                    // We should only have one open, uncleared bucket at a time.
+                    break;
                 }
-                // We should only have one open bucket at a time.
-                break;
             }
         }
     }
