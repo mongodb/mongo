@@ -139,8 +139,9 @@ boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
 std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes);
 
 /**
- * Atomically inserts a batch of documents in a single multi-document transaction, along with also
- * storing the resume token in the same transaction. Returns the number of bytes inserted.
+ * Atomically inserts a batch of documents in a single multi-document transaction, and updates
+ * the resume token and increments the number of documents and bytes copied (only if 'storeProgress'
+ * is true) in the same transaction. Returns the number of bytes inserted.
  */
 int insertBatchTransactionally(OperationContext* opCtx,
                                const NamespaceString& nss,
@@ -150,7 +151,8 @@ int insertBatchTransactionally(OperationContext* opCtx,
                                const UUID& reshardingUUID,
                                const ShardId& donorShard,
                                const HostAndPort& donorHost,
-                               const BSONObj& resumeToken);
+                               const BSONObj& resumeToken,
+                               bool storeProgress);
 
 /**
  * Atomically inserts a batch of documents in a single storage transaction. Returns the number of

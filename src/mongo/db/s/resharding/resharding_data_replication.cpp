@@ -108,6 +108,9 @@ std::unique_ptr<ReshardingCollectionCloner> ReshardingDataReplication::_makeColl
     const ShardId& myShardId,
     Timestamp cloneTimestamp,
     bool relaxed) {
+    // If verification is enabled, the cloner should store the progress since the per-donor and
+    // total number of documents will be needed for the verification.
+    bool storeProgress = metadata.getPerformVerification();
     return std::make_unique<ReshardingCollectionCloner>(
         metrics,
         metadata.getReshardingUUID(),
@@ -117,6 +120,7 @@ std::unique_ptr<ReshardingCollectionCloner> ReshardingDataReplication::_makeColl
         myShardId,
         cloneTimestamp,
         metadata.getTempReshardingNss(),
+        storeProgress,
         relaxed);
 }
 

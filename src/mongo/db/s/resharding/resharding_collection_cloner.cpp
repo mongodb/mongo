@@ -127,6 +127,7 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
                                                        ShardId recipientShard,
                                                        Timestamp atClusterTime,
                                                        NamespaceString outputNss,
+                                                       bool storeProgress,
                                                        bool relaxed)
     : _metrics(metrics),
       _reshardingUUID(reshardingUUID),
@@ -136,6 +137,7 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
       _recipientShard(std::move(recipientShard)),
       _atClusterTime(atClusterTime),
       _outputNss(std::move(outputNss)),
+      _storeProgress(storeProgress),
       _relaxed(std::move(relaxed)) {}
 
 std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
@@ -816,7 +818,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
 
 bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx,
                                             Pipeline& pipeline,
-                                            TxnNumber& txnNum) {
+                                            TxnNumber& txnNum,
+                                            ShardId donorShard,
+                                            HostAndPort donorHost,
+                                            BSONObj resumeToken,
+                                            bool useNaturalOrderCloner) {
     pipeline.reattachToOperationContext(opCtx);
     ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
 
@@ -830,7 +836,7 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx,
         return false;
     }
 
-    writeOneBatch(opCtx, txnNum, batch);
+    writeOneBatch(opCtx, txnNum, batch, donorShard, donorHost, resumeToken, useNaturalOrderCloner);
     return true;
 }
 
@@ -858,7 +864,8 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
                                                                      _reshardingUUID,
                                                                      donorShard,
                                                                      donorHost,
-                                                                     resumeToken);
+                                                                     resumeToken,
+                                                                     _storeProgress);
         } else {
             ScopedSetShardRole scopedSetShardRole(
                 opCtx,
@@ -920,8 +927,13 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                    chainCtx->pipeline->dispose(opCtx.get());
                    chainCtx->pipeline.reset();
                });
-               chainCtx->moreToCome =
-                   doOneBatch(opCtx.get(), *chainCtx->pipeline, chainCtx->batchTxnNumber);
+               chainCtx->moreToCome = doOneBatch(opCtx.get(),
+                                                 *chainCtx->pipeline,
+                                                 chainCtx->batchTxnNumber,
+                                                 {} /* donorShard */,
+                                                 {} /* donorHost*/,
+                                                 {} /* resumeToken */,
+                                                 false /* useNaturalOrderCloner */);
                guard.dismiss();
            })
         .onTransientError([this](const Status& status) {
