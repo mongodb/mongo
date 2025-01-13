@@ -554,8 +554,6 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     Timestamp maxTSEligibleForTruncate = getMaxTSEligibleForTruncate(opCtx);
     stats.maxTimestampEligibleForTruncate = maxTSEligibleForTruncate;
 
-    // TODO SERVER-90305: Explore options for handling rollback-to-stable with truncate markers.
-    //
     // Truncate markers can be generated with data that is later rolled back via rollback-to-stable.
     // This behavior is acceptable given the following:
     //      (1) Only expired data is truncated (expire by seconds or oldest oplog TS).

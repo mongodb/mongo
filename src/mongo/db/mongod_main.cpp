@@ -133,8 +133,6 @@
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
-#include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
-#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
@@ -1094,12 +1092,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     }
 
     // If not in standalone mode, start background tasks to:
-    //  * Periodically remove expired pre-images from the 'system.preimages'
     //  * Periodically remove expired documents from change collections
     if (!isStandalone) {
-        if (!gPreImageRemoverDisabled) {
-            startChangeStreamExpiredPreImagesRemover(serviceContext);
-        }
         if (!gChangeCollectionRemoverDisabled) {
             startChangeCollectionExpiredDocumentsRemover(serviceContext);
         }
@@ -1975,13 +1969,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(),
-            "Shut down expired pre-images and documents removers",
-            &shutdownTimeElapsedBuilder);
-        LOGV2(6278511, "Shutting down the Change Stream Expired Pre-images Remover");
-        shutdownChangeStreamExpiredPreImagesRemover(serviceContext);
-
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Shut down expired change collection removers",
+                                                  &shutdownTimeElapsedBuilder);
         shutdownChangeCollectionExpiredDocumentsRemover(serviceContext);
     }
 

@@ -3732,6 +3732,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/idl:server_parameter_test_util",
     ],
