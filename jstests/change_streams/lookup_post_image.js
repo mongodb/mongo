@@ -189,6 +189,11 @@ assertCreateCollection(db, coll.getName());
 // collection.
 assert.commandWorked(coll.insert({_id: "fullDocument is lookup 2"}));
 
+// If this test is running with secondary read preference, it's necessary for the insert
+// to propagate to all secondary nodes and be available for majority reads before we can
+// assume looking up the document will succeed.
+FixtureHelpers.awaitLastOpCommitted(db);
+
 // After a collection has been dropped and re-created, verify a change stream can be created with
 // 'fullDocument: updateLookup' using a resume token from before the collection was dropped.
 cursor = cst.startWatchingChanges({
@@ -206,13 +211,13 @@ assert.eq(latestChange.operationType, "insert");
 assert(latestChange.hasOwnProperty("fullDocument"));
 assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup 2"});
 
-// The next entry is the 'update' operation. Confirm that the next entry's post-image is null
-// because the original collection (i.e. the collection that the 'update' was applied to) has
-// been dropped and the new incarnation of the collection has a different UUID.
+// The next entry is the 'update' operation. Confirm that the next entry's post-image is not-null
+// even though the original collection has been dropped and the new incarnation of the collection
+// with the same name has a different UUID.
 latestChange = cst.getOneChange(cursor);
 assert.eq(latestChange.operationType, "update");
 assert(latestChange.hasOwnProperty("fullDocument"));
-assert.eq(latestChange.fullDocument, null);
+assert.eq(latestChange.fullDocument, {"_id": "fullDocument is lookup 2"});
 
 jsTestLog("Testing full document lookup with a real getMore");
 assert.commandWorked(coll.insert({_id: "getMoreEnabled"}));

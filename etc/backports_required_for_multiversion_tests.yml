@@ -795,6 +795,12 @@ last-continuous:
     ticket: SERVER-95670
   - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
+  - test_file: jstests/change_streams/update_lookup_before_ddl.js
+    ticket: SERVER-95976
+  - test_file: jstests/change_streams/lookup_post_image.js
+    ticket: SERVER-95976
+  - test_file: jstests/sharding/change_stream_update_lookup_collation.js
+    ticket: SERVER-95976
   - test_file: jstests/concurrency/fsm_workloads/upsert_unique_index_collation.js
     ticket: SERVER-94156
   - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
@@ -1658,6 +1664,12 @@ last-lts:
     ticket: SERVER-95670
   - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
+  - test_file: jstests/change_streams/update_lookup_before_ddl.js
+    ticket: SERVER-95976
+  - test_file: jstests/change_streams/lookup_post_image.js
+    ticket: SERVER-95976
+  - test_file: jstests/sharding/change_stream_update_lookup_collation.js
+    ticket: SERVER-95976
   - test_file: jstests/concurrency/fsm_workloads/upsert_unique_index_collation.js
     ticket: SERVER-94156
   - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js

@@ -223,9 +223,20 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
     // Update lookup queries sent from mongoS to shards are allowed to use speculative majority
     // reads. Even if the lookup itself succeeded, it may not have returned any results if the
     // document was deleted in the time since the update op.
-    invariant(resumeTokenData.uuid);
-    return pExpCtx->mongoProcessInterface->lookupSingleDocument(
-        pExpCtx, nss, *resumeTokenData.uuid, documentKey, std::move(readConcern));
+    tassert(9797601, "UUID should be present in the resume token", resumeTokenData.uuid);
+    try {
+        // In case we are running $changeStreams and are performing updateLookup, we do not pass
+        // 'collectionUUID' to avoid any UUID validation on the target collection. UUID of the
+        // target collection should only be checked if 'matchCollectionUUIDForUpdateLookup' flag has
+        // been passed.
+        auto collectionUUID = pExpCtx->changeStreamSpec->getMatchCollectionUUIDForUpdateLookup()
+            ? boost::optional<UUID>(*resumeTokenData.uuid)
+            : boost::none;
+        return pExpCtx->mongoProcessInterface->lookupSingleDocument(
+            pExpCtx, nss, std::move(collectionUUID), documentKey, std::move(readConcern));
+    } catch (const ExceptionFor<ErrorCodes::TooManyMatchingDocuments>& ex) {
+        uasserted(ErrorCodes::ChangeStreamFatalError, ex.what());
+    }
 }
 
 Value DocumentSourceChangeStreamAddPostImage::doSerialize(const SerializationOptions& opts) const {

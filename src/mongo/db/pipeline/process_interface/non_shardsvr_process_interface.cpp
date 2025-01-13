@@ -76,13 +76,15 @@ NonShardServerProcessInterface::preparePipelineForExecution(
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 NonShardServerProcessInterface::preparePipelineForExecution(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
-    boost::optional<BSONObj> readConcern) {
-    return attachCursorSourceToPipelineForLocalRead(pipeline, aggRequest);
+    boost::optional<BSONObj> readConcern,
+    bool shouldUseCollectionDefaultCollator) {
+    return attachCursorSourceToPipelineForLocalRead(
+        pipeline, aggRequest, shouldUseCollectionDefaultCollator);
 }
 
 std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
@@ -100,15 +102,19 @@ std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsA
 boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    UUID collectionUUID,
+    boost::optional<UUID> collectionUUID,
     const Document& documentKey,
     boost::optional<BSONObj> readConcern) {
     MakePipelineOptions opts;
     opts.shardTargetingPolicy = ShardTargetingPolicy::kNotAllowed;
     opts.readConcern = std::move(readConcern);
 
-    auto lookedUpDocument =
-        doLookupSingleDocument(expCtx, nss, collectionUUID, documentKey, std::move(opts));
+    // Do not inherit the collator from 'expCtx', but rather use the target collection default
+    // collator.
+    opts.useCollectionDefaultCollator = true;
+
+    auto lookedUpDocument = doLookupSingleDocument(
+        expCtx, nss, std::move(collectionUUID), documentKey, std::move(opts));
 
     // Set the speculative read timestamp appropriately after we do a document lookup locally. We
     // set the speculative read timestamp based on the timestamp used by the transaction.

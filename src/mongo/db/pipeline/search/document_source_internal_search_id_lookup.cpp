@@ -112,7 +112,10 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
                 Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
 
             pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                pipeline.release(), boost::none, _shardFilterPolicy);
+                pipeline.release(),
+                boost::none,
+                false /* shouldUseCollectionDefaultCollator */,
+                _shardFilterPolicy);
 
             result = pipeline->getNext();
             if (auto next = pipeline->getNext()) {

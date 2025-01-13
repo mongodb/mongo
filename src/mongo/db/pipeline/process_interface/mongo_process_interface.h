@@ -426,16 +426,32 @@ public:
         boost::optional<BSONObj> readConcern = boost::none) = 0;
 
     /**
-     * Same as above but takes in an aggRequest and pipeline. This preserves any
-     * aggregation options set on the AggregateCommandRequest.
+     * Prepares a pipeline for execution based on the provided aggregation request and pipeline.
+     * This method preserves any aggregation options specified in the AggregateCommandRequest.
+     *
+     * The 'shardCursorsSortSpec' parameter, if provided, specifies the expected sort order of
+     * cursors from the shards. The cursors must be sorted according to this specification and
+     * include a "$sortKey" metadata field for result comparison.
+     *
+     * The routing of the corresponding 'aggRequest' to local or remote shards is determined by the
+     * 'shardTargetingPolicy'. If 'shardTargetingPolicy' is set to kNotAllowed, the request will
+     * only be routed for local reads, regardless of the sharded environment.
+     *
+     * The 'readConcern' parameter specifies the read concern level for the aggregation request. If
+     * 'shouldUseCollectionDefaultCollator' is set to true, the default collection collator will be
+     * attached to the 'expCtx'.
+     *
+     * This function takes ownership of the 'pipeline' argument, which is expected to be a valid
+     * pointer to a Pipeline object.
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-        boost::optional<BSONObj> readConcern = boost::none) = 0;
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) = 0;
 
     /**
      * Accepts a pipeline and attaches a cursor source to it. Returns a BSONObj of the form
@@ -451,9 +467,12 @@ public:
      * this method on a shard server will only return results which match the pipeline on that
      * shard.
 
-     * Performs no further optimization of the pipeline. NamespaceNotFound will be
-     * thrown if ExpressionContext has a UUID and that UUID doesn't match the ExpressionContext's
-     * ns. That should be the only case where NamespaceNotFound is returned.
+     * Performs no further optimization of the pipeline. CollectionUUIDMismatch exception will be
+     * thrown if 'aggRequest' has 'collectionUUID' set and it doesn't match with the UUID of the
+     * collection acquired via the nss.
+     *
+     * When 'shouldUseCollectionDefaultCollator' is set to true, the collator of the target
+     * collection will be used instead of previously provided collator.
      *
      * This function takes ownership of the 'pipeline' argument as if it were a unique_ptr.
      * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
@@ -462,6 +481,7 @@ public:
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        bool shouldUseCollectionDefaultCollator = false,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) = 0;
 
     /**
@@ -511,8 +531,14 @@ public:
     /**
      * Returns zero or one documents with the document key 'documentKey'. 'documentKey' is treated
      * as a unique identifier of a document, and may include an _id or all fields from the shard key
-     * and an _id. Throws if more than one match was found. Returns boost::none if no matching
-     * documents were found, including cases where the given namespace does not exist.
+     * and an _id. The lookup is performed using collection's default collator.
+     *
+     * The method will validate that the requested collection's UUID matches the provided
+     * 'collectionUUID' if specified. In case of collection not being present or UUID mismatch,
+     * boost::none will be returned.
+     *
+     * The method ensures that only one document is returned for the specified 'documentKey'. If
+     * more than one document is found, TooManyMatchingDocuments exception will be thrown.
      *
      * If this interface needs to send requests (possibly to other nodes) in order to look up the
      * document, 'readConcern' will be attached to these requests. Otherwise 'readConcern' will be
@@ -521,7 +547,7 @@ public:
     virtual boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        UUID,
+        boost::optional<UUID> collectionUUID,
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) = 0;
 
