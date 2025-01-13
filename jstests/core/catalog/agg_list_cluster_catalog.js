@@ -8,10 +8,6 @@
  *    # There is no need to support multitenancy, as it has been canceled and was never in
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
- *    # In a clustered environment, the $listClusterCatalog will eventually target the CSRS to
- *    # access the cluster catalog. The causally consistent suites run on fixtures with CSRS without
- *    # secondaries.
- *    does_not_support_causal_consistency,
  *    # This test invokes listCollections separately to validate the $listClusterCatalog output.
  *    # None of them can read at a provided timestamp, therefore this test cannot run in a suite
  *    # that can change a collection's incarnation.

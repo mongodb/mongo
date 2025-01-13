@@ -2,7 +2,6 @@
  * Test the $listClusterCatalog stage in a sharded cluster for any type of collection,
   collection tracking state and stage's specs.
  *
- *
  * @tags: [
  *   requires_fcv_80,
  *   # Requires to know the exact list of shards owning chunks for the collection.
