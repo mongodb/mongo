@@ -95,9 +95,9 @@ inclusive. The following is a list of the WiredTiger-specific return values:
 This sub-level error code is returned by default and indicates that no further context exists or is
 necessary.
 
-@par \c WT_COMPACTION_ALREADY_RUNNING
-This sub-level error returns when the user tries to reconfigure compaction while it is already
-running.
+@par \c WT_BACKGROUND_COMPACT_ALREADY_RUNNING
+This sub-level error returns when the user tries to reconfigure background compaction while it is
+already running.
 
 @par \c WT_SESSION_MAX
 This sub-level error returns when the user has created more than the maximum number of sessions

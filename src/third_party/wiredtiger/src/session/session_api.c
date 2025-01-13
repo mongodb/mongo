@@ -883,7 +883,7 @@ __session_blocking_checkpoint(WT_SESSION_IMPL *session)
     uint64_t txn_gen;
     const char *checkpoint_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_checkpoint), NULL};
 
-    if ((ret = __wt_txn_checkpoint(session, checkpoint_cfg, false)) == 0)
+    if ((ret = __wt_checkpoint_db(session, checkpoint_cfg, false)) == 0)
         return (0);
     WT_RET_BUSY_OK(ret);
 
@@ -2248,7 +2248,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
      */
     WT_ERR(__wt_txn_context_check(session, false));
 
-    ret = __wt_txn_checkpoint(session, cfg, true);
+    ret = __wt_checkpoint_db(session, cfg, true);
 
     /*
      * Release common session resources (for example, checkpoint may acquire significant

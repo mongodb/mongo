@@ -4106,6 +4106,24 @@ tasks:
           test-name: code_complexity
           collection: CodeComplexity
 
+  - name: modularity_metrics
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          shell: bash
+          script: |
+            set -o verbose
+            set -o errexit
+            ${PREPARE_PATH}
+            ./dist/modstat -me --unmod > atlas_out_modularity_metrics.json
+      - func: "upload stats to atlas"
+        vars:
+          stats_dir: ./wiredtiger
+          test-name: modularity_metrics
+          collection: CodeModularityMetrics
+
     ###############################
     # Performance Tests for btree #
     ###############################

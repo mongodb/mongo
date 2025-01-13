@@ -95,11 +95,6 @@ struct __wt_live_restore_fs {
     WT_LIVE_RESTORE_FS_LAYER source;
 
     uint8_t background_threads_max;
-
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_LIVE_RESTORE_DEBUG_FILL_HOLES_ON_CLOSE 0x1u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
-    uint8_t debug_flags;
 };
 
 /*

@@ -275,7 +275,7 @@ __compact_checkpoint(WT_SESSION_IMPL *session)
     WT_RET(__wt_session_compact_check_interrupted(session));
 
     WT_STAT_CONN_INCR(session, checkpoints_compact);
-    return (__wt_txn_checkpoint(session, checkpoint_cfg, true));
+    return (__wt_checkpoint_db(session, checkpoint_cfg, true));
 }
 
 /*

@@ -281,7 +281,7 @@ err:
 
         /* Mark the connection modified to make sure a checkpoint happens even on an idle system. */
         conn->modified = true;
-        WT_TRET(__wt_txn_checkpoint(session, cfg, true));
+        WT_TRET(__wt_checkpoint_db(session, cfg, true));
     }
     /* Clear the flag on force stop after the completion of the checkpoint. */
     if (F_ISSET(cb, WT_CURBACKUP_FORCE_STOP))

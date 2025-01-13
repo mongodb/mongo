@@ -4064,11 +4064,11 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  */
 #define	WT_NONE	(-32000)
 /*!
- * Compaction is already running.
- * This sub-level error returns when the user tries to reconfigure compaction
- * while it is already running.
+ * Background compaction is already running.
+ * This sub-level error returns when the user tries to reconfigure background
+ * compaction while it is already running.
  */
-#define	WT_COMPACTION_ALREADY_RUNNING	(-32001)
+#define	WT_BACKGROUND_COMPACT_ALREADY_RUNNING	(-32001)
 /*!
  * Max capacity of configured sessions reached.
  * This sub-level error returns when the user has created more than the maximum

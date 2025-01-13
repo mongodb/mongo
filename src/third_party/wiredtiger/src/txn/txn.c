@@ -2666,7 +2666,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
 
             __wt_timer_start(session, &timer);
 
-            WT_TRET(__wt_txn_checkpoint(s, checkpoint_cfg, true));
+            WT_TRET(__wt_checkpoint_db(s, checkpoint_cfg, true));
 
             /*
              * Mark the metadata dirty so we flush it on close, allowing recovery to be skipped.

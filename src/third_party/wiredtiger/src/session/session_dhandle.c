@@ -540,7 +540,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
      * previous database so we can ensure checkpoint times increase across restarts. This avoids
      * trouble if the system clock moves backwards between runs, and also avoids possible issues if
      * the checkpoint clock runs forward. (See comment about that in
-     * __txn_checkpoint_establish_time().) When reading from a previous database, the checkpoint
+     * __checkpoint_establish_time().) When reading from a previous database, the checkpoint
      * time in the snapshot and timestamp metadata default to zero if not present, avoiding
      * confusion caused by older versions that don't include these values.
      *

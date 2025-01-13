@@ -17,7 +17,7 @@ static int
 __curlog_logrec(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, WT_LSN *next_lsnp,
   void *cookie, int firstrecord)
 {
-    WT_CURSOR_LOG *cl;
+    WTI_CURSOR_LOG *cl;
 
     cl = cookie;
     WT_UNUSED(firstrecord);
@@ -61,14 +61,14 @@ __curlog_logrec(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, WT_LSN 
 static int
 __curlog_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 {
-    WT_CURSOR_LOG *acl, *bcl;
+    WTI_CURSOR_LOG *acl, *bcl;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     CURSOR_API_CALL(a, session, ret, compare, NULL);
 
-    acl = (WT_CURSOR_LOG *)a;
-    bcl = (WT_CURSOR_LOG *)b;
+    acl = (WTI_CURSOR_LOG *)a;
+    bcl = (WTI_CURSOR_LOG *)b;
     WT_ASSERT(session, cmpp != NULL);
     *cmpp = __wt_log_cmp(acl->cur_lsn, bcl->cur_lsn);
     /*
@@ -89,7 +89,7 @@ err:
  */
 static int
 __curlog_op_read(
-  WT_SESSION_IMPL *session, WT_CURSOR_LOG *cl, uint32_t optype, uint32_t opsize, uint32_t *fileid)
+  WT_SESSION_IMPL *session, WTI_CURSOR_LOG *cl, uint32_t optype, uint32_t opsize, uint32_t *fileid)
 {
     WT_ITEM key, value;
     uint64_t recno;
@@ -146,12 +146,12 @@ __curlog_op_read(
 static int
 __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
-    WT_CURSOR_LOG *cl;
+    WTI_CURSOR_LOG *cl;
     WT_DECL_RET;
     uint64_t raw;
     uint32_t fileid, key_count, opsize, optype;
 
-    cl = (WT_CURSOR_LOG *)cursor;
+    cl = (WTI_CURSOR_LOG *)cursor;
     /* Temporarily turn off raw so we can do direct cursor operations. */
     raw = F_MASK(cursor, WT_CURSTD_RAW);
     F_CLR(cursor, WT_CURSTD_RAW);
@@ -175,7 +175,7 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
          * Add one to skip over the type which is normally consumed by __wt_logrec_read.
          */
         cl->opvalue->data = WT_LOG_SKIP_HEADER(cl->logrec->data) + 1;
-        cl->opvalue->size = WT_LOG_REC_SIZE(cl->logrec->size) - 1;
+        cl->opvalue->size = WTI_LOG_REC_SIZE(cl->logrec->size) - 1;
     }
     /*
      * The log cursor sets the LSN and step count as the cursor key and log record related data in
@@ -197,11 +197,11 @@ err:
 static int
 __curlog_next(WT_CURSOR *cursor)
 {
-    WT_CURSOR_LOG *cl;
+    WTI_CURSOR_LOG *cl;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    cl = (WT_CURSOR_LOG *)cursor;
+    cl = (WTI_CURSOR_LOG *)cursor;
 
     CURSOR_API_CALL(cursor, session, ret, next, NULL);
 
@@ -231,14 +231,14 @@ err:
 static int
 __curlog_search(WT_CURSOR *cursor)
 {
-    WT_CURSOR_LOG *cl;
+    WTI_CURSOR_LOG *cl;
     WT_DECL_RET;
     WT_LSN key;
     WT_SESSION_IMPL *session;
     uint64_t raw;
     uint32_t counter, key_file, key_offset;
 
-    cl = (WT_CURSOR_LOG *)cursor;
+    cl = (WTI_CURSOR_LOG *)cursor;
     /* Temporarily turn off raw so we can do direct cursor operations. */
     raw = F_MASK(cursor, WT_CURSTD_RAW);
     F_CLR(cursor, WT_CURSTD_RAW);
@@ -269,12 +269,12 @@ err:
 static int
 __curlog_reset(WT_CURSOR *cursor)
 {
-    WT_CURSOR_LOG *cl;
+    WTI_CURSOR_LOG *cl;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
-    cl = (WT_CURSOR_LOG *)cursor;
+    cl = (WTI_CURSOR_LOG *)cursor;
     cl->stepp = cl->stepp_end = NULL;
     cl->step_count = 0;
     WT_INIT_LSN(cl->cur_lsn);
@@ -292,16 +292,16 @@ static int
 __curlog_close(WT_CURSOR *cursor)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_CURSOR_LOG *cl;
+    WTI_CURSOR_LOG *cl;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    cl = (WT_CURSOR_LOG *)cursor;
+    cl = (WTI_CURSOR_LOG *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 err:
 
     conn = S2C(session);
-    if (F_ISSET(cl, WT_CURLOG_REMOVE_LOCK)) {
+    if (F_ISSET(cl, WTI_CURLOG_REMOVE_LOCK)) {
         (void)__wt_atomic_sub32(&conn->log_mgr.cursors, 1);
         __wt_readunlock(session, &conn->log_mgr.log->log_remove_lock);
     }
@@ -352,11 +352,11 @@ __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], W
       __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curlog_close);                                /* close */
     WT_CURSOR *cursor;
-    WT_CURSOR_LOG *cl;
+    WTI_CURSOR_LOG *cl;
     WT_DECL_RET;
-    WT_LOG *log;
+    WTI_LOG *log;
 
-    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_LOG);
+    WT_VERIFY_OPAQUE_POINTER(WTI_CURSOR_LOG);
 
     conn = S2C(session);
     log = conn->log_mgr.log;
@@ -365,8 +365,8 @@ __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], W
     cursor = (WT_CURSOR *)cl;
     *cursor = iface;
     cursor->session = (WT_SESSION *)session;
-    cursor->key_format = WT_LOGC_KEY_FORMAT;
-    cursor->value_format = WT_LOGC_VALUE_FORMAT;
+    cursor->key_format = WTI_LOGC_KEY_FORMAT;
+    cursor->value_format = WTI_LOGC_VALUE_FORMAT;
 
     WT_ERR(__wt_calloc_one(session, &cl->cur_lsn));
     WT_ERR(__wt_calloc_one(session, &cl->next_lsn));
@@ -387,7 +387,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], W
 
         /* Log cursors block removal. */
         __wt_readlock(session, &log->log_remove_lock);
-        F_SET(cl, WT_CURLOG_REMOVE_LOCK);
+        F_SET(cl, WTI_CURLOG_REMOVE_LOCK);
         (void)__wt_atomic_add32(&conn->log_mgr.cursors, 1);
     }
 

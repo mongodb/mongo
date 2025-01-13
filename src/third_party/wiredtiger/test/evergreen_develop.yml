@@ -95,6 +95,7 @@ buildvariants:
     - name: generate-coverage-report
     - name: cyclomatic-complexity
     - name: code-change-report
+    - name: modularity_metrics
 
 - name: compatibility-tests-less-frequent
   display_name: Compatibility tests (less frequent)

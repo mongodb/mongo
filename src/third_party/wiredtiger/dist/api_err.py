@@ -142,10 +142,10 @@ sub_errors = [
         'No additional context', '''
         This sub-level error code is returned by default and indicates that no
         further context exists or is necessary.'''),
-    Error('WT_COMPACTION_ALREADY_RUNNING', -32001,
-        "Compaction is already running", '''
-        This sub-level error returns when the user tries to reconfigure compaction
-        while it is already running.'''),
+    Error('WT_BACKGROUND_COMPACT_ALREADY_RUNNING', -32001,
+        "Background compaction is already running", '''
+        This sub-level error returns when the user tries to reconfigure background
+        compaction while it is already running.'''),
     Error('WT_SESSION_MAX', -32002,
         "Max capacity of configured sessions reached", '''
         This sub-level error returns when the user has created more than the maximum

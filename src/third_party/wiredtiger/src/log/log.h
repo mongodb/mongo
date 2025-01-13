@@ -136,7 +136,7 @@ struct __wt_log_thread {
 
 struct __wt_log_manager {
 
-    WT_LOG *log; /* Logging structure */
+    WTI_LOG *log; /* Logging structure */
 
     WT_COMPRESSOR *compressor; /* configuration : Logging compressor */
 
