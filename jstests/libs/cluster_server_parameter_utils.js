@@ -45,7 +45,6 @@ export const kNonTestOnlyClusterParameters = {
     defaultMaxTimeMS: {
         default: {readOperations: 0},
         testValues: [{readOperations: 42}, {readOperations: 60000}],
-        featureFlag: 'DefaultReadMaxTimeMS',
     },
     addOrRemoveShardInProgress: {
         default: {inProgress: false},
