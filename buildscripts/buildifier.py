@@ -43,7 +43,7 @@ def find_all_failed(bin_path: str) -> list[str]:
 def lint_all(bin_path: str, generate_report: bool):
     files = find_all_failed(bin_path)
     result = lint(bin_path, files, generate_report)
-    validate_bazel_groups(generate_report=generate_report, fix=False, quick=False)
+    validate_bazel_groups(generate_report=generate_report, fix=False)
     return result
 
 
@@ -51,12 +51,7 @@ def fix_all(bin_path: str):
     files = find_all_failed(bin_path)
     fix(bin_path, files)
     print("Checking unittest rules...")
-    validate_bazel_groups(generate_report=False, fix=True, quick=True)
-
-
-def fix_unittests(bin_path: str):
-    print("Checking unittest rules (thorough)...")
-    validate_bazel_groups(generate_report=False, fix=True, quick=False)
+    validate_bazel_groups(generate_report=False, fix=True)
 
 
 def lint(bin_path: str, files: list[str], generate_report: bool):
@@ -99,7 +94,6 @@ def lint(bin_path: str, files: list[str], generate_report: bool):
 def fix(bin_path: str, files: list[str]):
     for file in files:
         subprocess.run([bin_path, "--mode=fix", file], check=True)
-
     print("Done fixing files")
 
 
@@ -130,11 +124,6 @@ def main():
 
     fix_all_parser = sub.add_parser("fix-all", help="Fix all files")
     fix_all_parser.set_defaults(subcommand="fix-all")
-
-    fix_all_parser = sub.add_parser(
-        "fix-unittests", help="Fix all unittests without taking any short-cuts"
-    )
-    fix_all_parser.set_defaults(subcommand="fix-unittests")
 
     lint_parser = sub.add_parser("lint", help="Lint specified list of files")
     lint_parser.add_argument("files", nargs="+")
@@ -167,8 +156,6 @@ def main():
         lint(binary_path, args.files, args.generate_report)
     elif subcommand == "fix":
         fix(binary_path, args.files)
-    elif subcommand == "fix-unittests":
-        fix_unittests(binary_path)
     else:
         # we purposefully do not use sub.choices.keys() so it does not print as a dict_keys object
         choices = [key for key in sub.choices]

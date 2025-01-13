@@ -71,4 +71,92 @@ printf '%s\n' "${bazelrc_xcode_lines[@]}" > .bazelrc.xcode
 
 echo "common --//bazel/config:running_through_bazelisk" > .bazelrc.bazelisk
 
-exec "$bazel_real" "$@"
+if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]]; then
+    wrapper_start_time="$(date -u +%s.%N)"
+fi
+
+cur_dir="${PWD##*/}" 
+
+if [[ "$OSTYPE" == "linux"* ]]; then
+  os="linux"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  os="macos"
+else
+  echo "Unsupported OS $OSTYPE"
+  exit 1
+fi
+
+ARCH=$(uname -m)
+if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
+  ARCH="arm64"
+elif [[ "$ARCH" == "ppc64le" || "$ARCH" == "ppc64" || "$ARCH" == "ppc" || "$ARCH" == "ppcle" ]]; then
+  ARCH="ppc64le"
+elif [[ "$ARCH" == "s390x" || "$ARCH" == "s390" ]]; then
+  ARCH="s390x"
+else
+  ARCH="x86_64"
+fi
+
+python="bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
+
+wrapper_deps=("retry")
+declare -a wrapper_deps_to_install=()
+declare -a python_path=()
+for dep in ${wrapper_deps[@]}; do
+  python_path+=("bazel-bin/external/poetry/$dep")
+  if [ ! -d bazel-bin/external/poetry/$dep ] || [ ! -d bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin ] ; then
+    wrapper_deps_to_install+=(@poetry//:install_$dep)
+  fi
+done
+
+declare -a cert_locs=()
+cert_locs+=("/etc/ssl/certs/ca-certificates.crt")                # Debian/Ubuntu/Gentoo etc.
+cert_locs+=("/etc/pki/tls/certs/ca-bundle.crt")                  # Fedora/RHEL 6
+cert_locs+=("/etc/ssl/ca-bundle.pem")                            # OpenSUSE
+cert_locs+=("/etc/pki/tls/cacert.pem")                           # OpenELEC
+cert_locs+=("/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem") # CentOS/RHEL 7
+cert_locs+=("/etc/ssl/cert.pem")                                 # Alpine Linux
+
+for cert in ${cert_locs[@]}; do
+  if [ -f $cert ]; then
+    export SSL_CERT_DI=R$(dirname $cert)
+    export SSL_CERT_FILE=$cert
+    break
+  fi
+done
+
+if [[ ${#wrapper_deps_to_install[@]} != 0 ]]; then
+  >&2 echo "python prereq missing, using bazel to install python..."
+  >&2 $bazel_real build --config=local $(IFS=  ; echo "${wrapper_deps_to_install[*]}")
+fi
+
+autocomplete_query=0
+# bash autocomplete detection
+if [[ $* =~ ^.*--output_base=/tmp/.*-completion-$USER.*$ ]]; then
+  autocomplete_query=1
+fi
+# zsh autocomplete detection
+if [[ $* == *"--noblock_for_lock query kind(\".*_test\", //:all)"* ]] || [[ $* == *"--noblock_for_lock query kind(\".*_test\", :all)"* ]]; then
+  autocomplete_query=1
+fi
+
+rm -f /tmp/mongo_autocomplete_plus_targets
+python="bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
+new_args=$(MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query PYTHONPATH=$(IFS=: ; echo "${python_path[*]}") $python bazel/wrapper_hook.py "$@")
+
+if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]] && [[ $autocomplete_query == 0 ]]; then
+  wrapper_end_time="$(date -u +%s.%N)"
+  runtime=$(bc <<< "$wrapper_end_time - $wrapper_start_time")
+  runtime=$(printf "%0.3f" $runtime)
+  echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script input args: $@"
+  echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script new args: $new_args"
+  echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script took $runtime seconds"
+fi
+
+if [[ $autocomplete_query == 1 ]]; then
+  plus_targets=$(</tmp/mongo_autocomplete_plus_targets)
+  query_output=$("$bazel_real" $new_args) 
+  echo $query_output $plus_targets | tr " " "\n"
+else
+  exec "$bazel_real" $new_args
+fi

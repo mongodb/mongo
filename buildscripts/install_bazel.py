@@ -20,6 +20,35 @@ _S3_HASH_MAPPING = {
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-windows-amd64.exe": "d04555245a99dfb628e33da24e2b9198beb8f46d7e7661c313eb045f6a59f5e4",
 }
 
+BUILDOZER_RELEASE_URL = "https://github.com/bazelbuild/buildtools/releases/download/v7.3.1/"
+
+
+def determine_platform():
+    syst = platform.system()
+    pltf = None
+    if syst == "Darwin":
+        pltf = "darwin"
+    elif syst == "Windows":
+        pltf = "windows"
+    elif syst == "Linux":
+        pltf = "linux"
+    else:
+        raise RuntimeError("Platform cannot be inferred.")
+    return pltf
+
+
+def determine_architecture():
+    arch = None
+    machine = platform.machine()
+    if machine in ("AMD64", "x86_64"):
+        arch = "amd64"
+    elif machine in ("arm", "arm64", "aarch64"):
+        arch = "arm64"
+    else:
+        raise RuntimeError(f"Detected architecture is not supported: {machine}")
+
+    return arch
+
 
 def _download_path_with_retry(*args, **kwargs):
     for i in range(5):
@@ -55,7 +84,24 @@ def _verify_s3_hash(s3_path: str, local_path: str) -> None:
         )
 
 
+def install_buildozer(download_location: str = "./"):
+    operating_system = determine_platform()
+    architechture = determine_architecture()
+    if operating_system == "windows" and architechture == "arm64":
+        raise RuntimeError("There are no published arm windows releases for buildifier.")
+
+    extension = ".exe" if operating_system == "windows" else ""
+    binary_name = f"buildozer-{operating_system}-{architechture}{extension}"
+    url = f"{BUILDOZER_RELEASE_URL}{binary_name}"
+
+    file_location = os.path.join(download_location, f"buildozer{extension}")
+    urllib.request.urlretrieve(url, file_location)
+    os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    return file_location
+
+
 def install_bazel(binary_directory: str) -> str:
+    install_buildozer(binary_directory)
     normalized_arch = (
         platform.machine().lower().replace("aarch64", "arm64").replace("x86_64", "amd64")
     )

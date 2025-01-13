@@ -116,15 +116,10 @@ def find_group(unittest_paths):
     return json.dumps(group_to_path, indent=4)
 
 
-def validate_bazel_groups(generate_report, fix, quick):
+def validate_bazel_groups(generate_report, fix):
     buildozer = download_buildozer()
 
     bazel_bin = install_bazel(".")
-
-    if quick:
-        print(
-            "Checking unittests in quick mode, you may consider running 'fix-unittests' for a thorough (longer) check."
-        )
 
     query_opts = [
         "--implicit_deps=False",
@@ -135,36 +130,6 @@ def validate_bazel_groups(generate_report, fix, quick):
         "--bes_backend=",
         "--bes_results_url=",
     ]
-    try:
-        start = time.time()
-        sys.stdout.write("Query all unittest runner rules... ")
-        sys.stdout.flush()
-        query_proc = subprocess.run(
-            [
-                bazel_bin,
-                "cquery",
-                'kind("mongo_install_rule", //:all-targets)',
-                "--output",
-                "build",
-            ]
-            + query_opts,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        sys.stdout.write("{:0.2f}s\n".format(time.time() - start))
-        installed_tests = query_proc.stdout.splitlines()
-        installed_test_names = set()
-        for i in range(2, len(installed_tests)):
-            if 'generator_function = "mongo_unittest_install' in installed_tests[i]:
-                test_name = installed_tests[i - 1].split('"')[1]
-                installed_test_names.add(test_name)
-
-    except subprocess.CalledProcessError as exc:
-        print("BAZEL ERROR:")
-        print(exc.stdout)
-        print(exc.stderr)
-        sys.exit(exc.returncode)
 
     try:
         start = time.time()
@@ -189,86 +154,7 @@ def validate_bazel_groups(generate_report, fix, quick):
         print(exc.stderr)
         sys.exit(exc.returncode)
 
-    buildozer_delete_cmds = []
-    buildozer_add_cmds = []
     buildozer_update_cmds = []
-    nodiff_build_files = set()
-    diff_build_files = set()
-
-    for test in bazel_unittests:
-        test_name = test.split(":")[1]
-        if test_name not in installed_test_names:
-            buildozer_add_cmds += [f"new mongo_unittest_install {test_name}"]
-            buildozer_update_cmds += [[f"add srcs {test}", f"//:{test_name}"]]
-        else:
-            installed_test_names.remove(test_name)
-
-        if quick:
-            build_file = (
-                os.path.dirname(test.replace("//", "./").replace(":", "/")) + "/BUILD.bazel"
-            )
-            if build_file not in diff_build_files and build_file not in nodiff_build_files:
-                cmd = [
-                    "git",
-                    "diff",
-                    "master",
-                    os.path.dirname(test.replace("//", "./").replace(":", "/")) + "/BUILD.bazel",
-                ]
-                stdout = subprocess.run(cmd, capture_output=True, text=True).stdout
-
-            if build_file in nodiff_build_files or not stdout:
-                nodiff_build_files.add(build_file)
-                associated_files = []
-                # print(installed_test_names)
-                for name in installed_test_names:
-                    if name.startswith(test_name + "-"):
-                        associated_files.append(name)
-                for name in associated_files:
-                    installed_test_names.remove(name)
-                continue
-            else:
-                diff_build_files.add(build_file)
-
-        try:
-            start = time.time()
-            sys.stdout.write(f"Query tests in {test}... ")
-            sys.stdout.flush()
-            query_proc = subprocess.run(
-                [
-                    bazel_bin,
-                    "query",
-                    f"labels(srcs, {test}_with_debug)",
-                ]
-                + query_opts,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            sys.stdout.write("{:0.2f}s\n".format(time.time() - start))
-            sources = query_proc.stdout.splitlines()
-
-        except subprocess.CalledProcessError as exc:
-            print("BAZEL ERROR:")
-            print(exc.stdout)
-            print(exc.stderr)
-            sys.exit(exc.returncode)
-
-        for source in sources:
-            if source.endswith(".cpp"):
-                source_base = source.split(":")
-                if len(source_base) > 1:
-                    source_base = source_base[1]
-                else:
-                    source_base = source_base[0]
-                source_base = source_base.replace(".cpp", "")
-                if f"{test_name}-{source_base}" not in installed_test_names:
-                    buildozer_add_cmds += [f"new mongo_unittest_install {test_name}-{source_base}"]
-                    buildozer_update_cmds += [[f"add srcs {test}", f"//:{test_name}-{source_base}"]]
-                else:
-                    installed_test_names.remove(f"{test_name}-{source_base}")
-
-    for existing_test in installed_test_names:
-        buildozer_delete_cmds += ["delete", existing_test]
 
     groups = json.loads(find_group(bazel_unittests))
     failures = []
@@ -323,14 +209,8 @@ def validate_bazel_groups(generate_report, fix, quick):
                         ]
 
     if fix:
-        if buildozer_delete_cmds:
-            subprocess.run([buildozer] + buildozer_delete_cmds)
-        subprocess.run([buildozer] + buildozer_add_cmds + ["//:__pkg__"])
         for cmd in buildozer_update_cmds:
             subprocess.run([buildozer] + cmd)
-
-    if buildozer_delete_cmds or buildozer_add_cmds:
-        failures.append(["unittest install rules", "Some install rules are incorrect"])
 
     if failures:
         for failure in failures:
@@ -346,7 +226,7 @@ def main():
     parser.add_argument("--generate-report", default=False, action="store_true")
     parser.add_argument("--fix", default=False, action="store_true")
     args = parser.parse_args()
-    validate_bazel_groups(args.generate_report, args.fix, quick=False)
+    validate_bazel_groups(args.generate_report, args.fix)
 
 
 if __name__ == "__main__":
