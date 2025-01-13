@@ -351,9 +351,9 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinal
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto plan2 = makeCollScanPlan(parse(query));
 
-    auto collStats = makeCollStatsWithHistograms(histFields, 1000.0);
-    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collStats);
-    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collStats);
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms(histFields, 1000.0));
+    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collInfo);
+    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collInfo);
     ASSERT_EQ(e1, e2);
     ASSERT_GT(e1, zeroCE);
 }
@@ -371,9 +371,9 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveS
     BSONObj query = fromjson("{a: 5, b: 6}");
     auto plan2 = makeCollScanPlan(parse(query));
 
-    auto collStats = makeCollStatsWithHistograms(histFields, 1000.0);
-    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collStats);
-    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collStats);
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms(histFields, 1000.0));
+    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collInfo);
+    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collInfo);
     ASSERT_EQ(e1, e2);
     ASSERT_GT(e1, zeroCE);
 }
@@ -381,9 +381,34 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveS
 TEST(CardinalityEstimator, NoHistogramForPath) {
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto plan = makeCollScanPlan(parse(query));
-    auto collStats = makeCollStatsWithHistograms({"b"}, 1000.0);
-    const auto ceRes = getPlanCE(*plan, collStats, QueryPlanRankerModeEnum::kHistogramCE);
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({"b"}, 1000.0));
+    const auto ceRes = getPlanCE(*plan, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
     ASSERT(!ceRes.isOK() && ceRes.getStatus().code() == ErrorCodes::HistogramCEFailure);
+}
+
+TEST(CardinalityEstimator, HistogramConjunctionOverMultikey) {
+    BSONObj query = fromjson("{a: {$gt: 1, $lt: 5}}");
+    auto plan = makeCollScanPlan(parse(query));
+    auto collStatsFn = []() {
+        return makeCollStatsWithHistograms({"a"}, 1000.0);
+    };
+    auto nonMultikeyIndex = buildSimpleIndexEntry({"a"});
+    auto nonMultikeyCollInfo = buildCollectionInfo({nonMultikeyIndex}, collStatsFn());
+
+    auto multikeyIndex = buildMultikeyIndexEntry({"a"}, "a");
+    auto multikeyCollInfo = buildCollectionInfo({multikeyIndex}, collStatsFn());
+
+    // Estimate the cardinality of the query twice: one using a catalog with 'a' as non-multikey and
+    // a second time with a catalog with 'a' as multikey. The non-multikey version will create an
+    // interval (1,5) while the multikey version cannot intersect intervals and thus will estimate
+    // [-inf, 5) and (1, inf] using the histogram and combine their selectivities like a regular
+    // conjunction (exponential backoff). We verify this behavior by asserting the estimates have
+    // histogram source and that the non-multikey estimate is smaller.
+    CardinalityEstimate nonMultikeyEst = getPlanHistogramCE(*plan, nonMultikeyCollInfo);
+    CardinalityEstimate multikeyEst = getPlanHistogramCE(*plan, multikeyCollInfo);
+    ASSERT_EQ(nonMultikeyEst.source(), EstimationSource::Histogram);
+    ASSERT_EQ(multikeyEst.source(), EstimationSource::Histogram);
+    ASSERT_LT(nonMultikeyEst, multikeyEst);
 }
 
 }  // unnamed namespace

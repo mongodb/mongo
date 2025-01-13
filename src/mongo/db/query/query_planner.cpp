@@ -1656,7 +1656,7 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     auto cbrMode = query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
     EstimateMap estimates;
     CardinalityEstimator cardEstimator(
-        *params.mainCollectionInfo.collStats, samplingEstimator, estimates, cbrMode);
+        params.mainCollectionInfo, samplingEstimator, estimates, cbrMode);
     CostEstimator costEstimator(estimates);
 
     std::vector<std::unique_ptr<QuerySolution>> allSoln =

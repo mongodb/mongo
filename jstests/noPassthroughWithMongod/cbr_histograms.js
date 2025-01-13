@@ -92,7 +92,7 @@ try {
 
 try {
     // Test if both nulls and missings are counted in the histogram estimate.
-    assert(coll.drop());
+    coll.drop();
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.insertMany([
         {a: null, b: 0},
@@ -110,6 +110,41 @@ try {
         assert.eq(plan.estimatesMetadata.ceSource, "Histogram", plan);
         assert.close(plan.cardinalityEstimate, 7);
     });
+} finally {
+    // Ensure that query knob doesn't leak into other testcases in the suite.
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+}
+
+try {
+    // Test CE module makse us of multikey metadata
+    coll.drop();
+    let docs = [];
+    for (let i = 0; i < 100; i++) {
+        docs.push({a: i});
+    }
+    assert.commandWorked(coll.insertMany(docs));
+    // Create index so the catalog has multikey metadata, but the queries we run hint a collection
+    // scan so we can test CE of MatchExpressions using histogram.
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+
+    const query = {a: {$gt: 10, $lt: 20}};
+    const nonMultikeyEstimate =
+        getWinningPlanFromExplain(coll.find(query).hint({$natural: 1}).explain())
+            .cardinalityEstimate;
+
+    // Make index on 'a' multikey
+    assert.commandWorked(coll.insert({_id: 1, a: [100, 101, 102]}));
+    assert.commandWorked(coll.deleteOne({_id: 1}));
+
+    const multiKeyEstimate =
+        getWinningPlanFromExplain(coll.find(query).hint({$natural: 1}).explain())
+            .cardinalityEstimate;
+
+    // CBR can generate (10,20) interval in the non-multikey case, but must estimate [-inf, 20) &
+    // (10, inf] intervals in the multikey case.
+    assert.lt(nonMultikeyEstimate, multiKeyEstimate);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));

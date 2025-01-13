@@ -33,7 +33,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/stats/collection_statistics_impl.h"
+#include "mongo/db/query/stats/collection_statistics_mock.h"
 
 namespace mongo::cost_based_ranker {
 
@@ -53,13 +53,16 @@ std::unique_ptr<MatchExpression> parse(const BSONObj& bson) {
     return std::move(expr.getValue());
 }
 
-IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields) {
+BSONObj fieldsToKeyPattern(const std::vector<std::string>& indexFields) {
     BSONObjBuilder bob;
     for (auto& fieldName : indexFields) {
         bob.append(fieldName, 1);
     }
-    BSONObj kp = bob.obj();
+    return bob.obj();
+}
 
+IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields) {
+    BSONObj kp = fieldsToKeyPattern(indexFields);
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
             IndexDescriptor::kLatestIndexVersion,
@@ -73,6 +76,40 @@ IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields) {
             {},
             nullptr,
             nullptr};
+}
+
+IndexEntry buildMultikeyIndexEntry(const std::vector<std::string>& indexFields,
+                                   std::string multikeyField) {
+    BSONObj kp = fieldsToKeyPattern(indexFields);
+    MultikeyPaths mkp;
+    for (auto&& field : indexFields) {
+        if (field == multikeyField) {
+            mkp.push_back({0U});
+        } else {
+            mkp.push_back({});
+        }
+    }
+    return {kp,
+            IndexNames::nameToType(IndexNames::findPluginName(kp)),
+            IndexDescriptor::kLatestIndexVersion,
+            true,
+            mkp,
+            {},
+            false,
+            false,
+            CoreIndexInfo::Identifier("test_foo"),
+            nullptr,
+            {},
+            nullptr,
+            nullptr};
+}
+
+CollectionInfo buildCollectionInfo(const std::vector<IndexEntry>& indexes,
+                                   std::unique_ptr<stats::CollectionStatistics> collStats) {
+    CollectionInfo collInfo;
+    collInfo.indexes = indexes;
+    collInfo.collStats = std::move(collStats);
+    return collInfo;
 }
 
 std::unique_ptr<IndexScanNode> makeIndexScan(IndexBounds bounds,
@@ -153,40 +190,41 @@ IndexBounds makeRangeIntervalBounds(const BSONObj& range,
 }
 
 CEResult getPlanCE(const QuerySolution& plan,
-                   stats::CollectionStatisticsMock& stats,
+                   const CollectionInfo& collInfo,
                    QueryPlanRankerModeEnum ceMode) {
     EstimateMap qsnEstimates;
-    CardinalityEstimator estimator{stats, nullptr, qsnEstimates, ceMode};
+    CardinalityEstimator estimator{collInfo, nullptr /*samplingEstimator*/, qsnEstimates, ceMode};
     return estimator.estimatePlan(plan);
 }
 
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCard) {
-    auto stats = makeCollStatsWithHistograms({}, collCard);
-    const auto ceRes = getPlanCE(plan, stats, QueryPlanRankerModeEnum::kHeuristicCE);
+    const auto ceRes = getPlanCE(plan,
+                                 buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard)),
+                                 QueryPlanRankerModeEnum::kHeuristicCE);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();
 }
 
-CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan,
-                                       stats::CollectionStatisticsMock& stats) {
-    const auto ceRes = getPlanCE(plan, stats, QueryPlanRankerModeEnum::kHistogramCE);
+CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const CollectionInfo& collInfo) {
+    const auto ceRes = getPlanCE(plan, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();
 }
 
-stats::CollectionStatisticsMock makeCollStatsWithHistograms(
+std::unique_ptr<stats::CollectionStatistics> makeCollStatsWithHistograms(
     const std::vector<std::string>& histFields, double collCard) {
-    stats::CollectionStatisticsMock stats(collCard);
+    std::unique_ptr<stats::CollectionStatistics> stats =
+        std::make_unique<stats::CollectionStatisticsMock>(collCard);
     std::vector<ce::BucketData> data{
         {0 /*bucketBoundary*/, 10 /*equalFreq*/, 90 /*rangeFreq*/, 5 /*ndv*/},
         {5, 100, 100, 0},
         {6, 700, 0, 0}};
     for (const auto& field : histFields) {
-        stats.addHistogram(field,
-                           stats::CEHistogram::make(
-                               ce::createHistogram(data),
-                               stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, collCard}},
-                               collCard));
+        stats->addHistogram(field,
+                            stats::CEHistogram::make(
+                                ce::createHistogram(data),
+                                stats::TypeCounts{{sbe::value::TypeTags::NumberInt64, collCard}},
+                                collCard));
     }
     return stats;
 }

@@ -35,8 +35,8 @@
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stats/collection_statistics.h"
 
 namespace mongo::cost_based_ranker {
 
@@ -60,7 +60,7 @@ concept UnionType = std::same_as<T, OrNode> || std::same_as<T, MergeSortNode>;
  */
 class CardinalityEstimator {
 public:
-    CardinalityEstimator(const stats::CollectionStatistics& collStats,
+    CardinalityEstimator(const CollectionInfo& collInfo,
                          const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
                          QueryPlanRankerModeEnum rankerMode);
@@ -185,8 +185,8 @@ private:
     // A subsequent conjunction will push again onto this stack.
     std::vector<SelectivityEstimate> _conjSels;
 
-    // Collection statistics contains cached histograms.
-    const stats::CollectionStatistics& _collStats;
+    // Catalog information about the collection including index metadata and cached histograms.
+    const CollectionInfo& _collInfo;
 
     // Sampling estimator used to estimate cardinality using a cache of documents randomly sampled
     // from the collection. We don't own this pointer and it may be null in the case that a sampling
@@ -200,6 +200,11 @@ private:
 
     // The cardinality estimate mode we are using for estimates.
     const QueryPlanRankerModeEnum _rankerMode;
+
+    // Set with the paths we know are multikey which is deduced from the catalog. Note that a field
+    // may be multikey but not reflected in this set because there may not be an index over the
+    // field.
+    StringDataSet _multikeyPaths;
 };
 
 }  // namespace mongo::cost_based_ranker

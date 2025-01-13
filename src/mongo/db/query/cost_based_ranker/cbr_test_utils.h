@@ -35,7 +35,6 @@
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stats/collection_statistics_mock.h"
 
 namespace mongo::cost_based_ranker {
 
@@ -46,6 +45,12 @@ SelectivityEstimate makeSel(double d);
 std::unique_ptr<MatchExpression> parse(const BSONObj& bson);
 
 IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields);
+
+IndexEntry buildMultikeyIndexEntry(const std::vector<std::string>& indexFields,
+                                   std::string multikeyField);
+
+CollectionInfo buildCollectionInfo(const std::vector<IndexEntry>& indexes,
+                                   std::unique_ptr<stats::CollectionStatistics> collStats);
 
 std::unique_ptr<IndexScanNode> makeIndexScan(IndexBounds bounds,
                                              std::vector<std::string> indexFields,
@@ -71,15 +76,14 @@ IndexBounds makeRangeIntervalBounds(const BSONObj& range,
                                     std::string fieldName);
 
 CEResult getPlanCE(const QuerySolution& plan,
-                   stats::CollectionStatisticsMock& stats,
+                   const CollectionInfo& collInfo,
                    QueryPlanRankerModeEnum ceMode);
 
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCard);
 
-CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan,
-                                       stats::CollectionStatisticsMock& stats);
+CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const CollectionInfo& collInfo);
 
-stats::CollectionStatisticsMock makeCollStatsWithHistograms(
+std::unique_ptr<stats::CollectionStatistics> makeCollStatsWithHistograms(
     const std::vector<std::string>& histFields, double collCard);
 
 }  // namespace mongo::cost_based_ranker
