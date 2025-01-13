@@ -298,6 +298,17 @@ TEST_F(GRPCTransportLayerTest, TransportLayerStartsEgressReactor) {
         CommandServiceTestFixtures::makeTLOptions());
 }
 
+TEST_F(GRPCTransportLayerTest, StopAfterSetup) {
+    auto options = CommandServiceTestFixtures::makeTLOptions();
+    options.enableEgress = true;
+    options.enableIngress = true;
+
+    auto tl =
+        std::make_unique<GRPCTransportLayerImpl>(getServiceContext(), std::move(options), nullptr);
+    ASSERT_OK(tl->setup());
+    tl->shutdown();
+}
+
 /**
  * Modifies the `ServiceContext` with `PeriodicRunnerMock`, a custom `PeriodicRunner` that maintains
  * a list of all instances of `PeriodicJob` and allows monitoring their internal state. We use this

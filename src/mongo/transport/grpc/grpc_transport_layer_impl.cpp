@@ -341,6 +341,8 @@ void GRPCTransportLayerImpl::shutdown() {
     }
     if (_client) {
         _client->shutdown();
+    }
+    if (_ioThread.joinable()) {
         LOGV2_DEBUG(9715108, 2, "Stopping default egress gRPC reactor");
         _egressReactor->stop();
         LOGV2_DEBUG(9715109, 2, "Joining the default egress gRPC reactor thread");
