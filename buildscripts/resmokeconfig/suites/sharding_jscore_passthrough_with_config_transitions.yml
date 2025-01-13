@@ -104,6 +104,7 @@ executor:
         await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
       global_vars:
         TestData:
+          runningWithBalancer: true
           shardsAddedRemoved: true
   hooks:
     - class: ContinuousAddRemoveShard
