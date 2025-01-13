@@ -211,6 +211,7 @@ private:
     boost::intrusive_ptr<GranularityRounder> _granularityRounder;
     int _nBuckets;
     long long _nDocuments = 0;
+    long long _nDocPositions = 0;
     BucketDetails _currentBucketDetails;
 };
 
