@@ -74,7 +74,11 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
                 {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
                 {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
             ],
-            reshardingUUID: reshardingUUID
+            reshardingUUID: reshardingUUID,
+            // 'performVerification' defaults to true which is only supported in FCV 'latest' and
+            // this test case downgrades the FCV which causes the reshardCollection command to fail
+            // with an InvalidOptions error right away.
+            performVerification: false,
         },
         () => {
             // Wait for config server to have started resharding before sending setFCV, otherwise

@@ -75,6 +75,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -545,6 +546,22 @@ void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& sh
     }
 }
 
+void validatePerformVerification(boost::optional<bool> performVerification) {
+    if (performVerification.has_value()) {
+        validatePerformVerification(*performVerification);
+    }
+}
+
+void validatePerformVerification(bool performVerification) {
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Cannot specify '"
+                          << CommonReshardingMetadata::kPerformVerificationFieldName
+                          << "' to true when featureFlagReshardingVerification is not enabled",
+            !performVerification ||
+                resharding::gFeatureFlagReshardingVerification.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+}
+
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     OperationContext* opCtx,
     const ConfigsvrReshardCollection& request,
@@ -597,6 +614,14 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setUnique(request.getUnique());
     coordinatorDoc.setCollation(request.getCollation());
     coordinatorDoc.setImplicitlyCreateIndex(request.getImplicitlyCreateIndex());
+
+    auto performVerification = request.getPerformVerification();
+    if (!performVerification.has_value() &&
+        resharding::gFeatureFlagReshardingVerification.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        performVerification = true;
+    }
+    coordinatorDoc.setPerformVerification(performVerification);
 
     coordinatorDoc.setRecipientOplogBatchTaskCount(request.getRecipientOplogBatchTaskCount());
     coordinatorDoc.setRelaxed(request.getRelaxed());

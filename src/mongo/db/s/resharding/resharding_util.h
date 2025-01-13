@@ -423,6 +423,12 @@ boost::optional<Status> coordinatorAbortedError();
 void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& shardKey);
 
 /**
+ * If 'performVerification' is true, asserts that featureFlagReshardingVerification is enabled.
+ */
+void validatePerformVerification(boost::optional<bool> performVerification);
+void validatePerformVerification(bool performVerification);
+
+/**
  * Verifies that for each index spec in sourceIndexSpecs, there is an identical spec in
  * localIndexSpecs. Field order does not matter.
  */

@@ -75,12 +75,14 @@ ShardsvrReshardCollection makeMoveCollectionRequest(
     const NamespaceString& nss,
     const ShardId& destinationShard,
     ProvenanceEnum provenance,
+    const boost::optional<bool>& performVerification = boost::none,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount = boost::none);
 
 ShardsvrReshardCollection makeUnshardCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
     const boost::optional<ShardId>& destinationShard,
+    const boost::optional<bool>& performVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount = boost::none);
 }  // namespace cluster::unsplittable
 

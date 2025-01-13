@@ -200,6 +200,7 @@ public:
             }
             resharding::validateImplicitlyCreateIndex(request().getImplicitlyCreateIndex(),
                                                       request().getKey());
+            resharding::validatePerformVerification(request().getPerformVerification());
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance = ([&]()
