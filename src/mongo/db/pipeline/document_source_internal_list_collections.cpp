@@ -184,7 +184,7 @@ void DocumentSourceInternalListCollections::_buildCollectionsToReplyForDb(
     }
 
     const auto& collectionsList = pExpCtx->mongoProcessInterface->runListCollections(
-        pExpCtx->opCtx, _databases->back(), true /* addPrimaryShard */);
+        pExpCtx->opCtx, db, true /* addPrimaryShard */);
     collectionsToReply.reserve(collectionsList.size());
 
     for (const auto& collObj : collectionsList) {

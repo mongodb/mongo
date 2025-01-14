@@ -445,11 +445,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
-    auto startsWithQueue = liteParsedPipeline.startsWithQueue();
+    auto generatesOwnDataOnce = liteParsedPipeline.generatesOwnDataOnce();
     auto requiresCollationForParsingUnshardedAggregate =
         liteParsedPipeline.requiresCollationForParsingUnshardedAggregate();
     auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
-        : startsWithQueue                     ? PipelineDataSource::kQueue
+        : generatesOwnDataOnce                ? PipelineDataSource::kGeneratesOwnDataOnce
                                               : PipelineDataSource::kNormal;
 
     // If the routing table is not already taken by the higher level, fill it now.
@@ -481,7 +481,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         if (executionNsRoutingInfoStatus.isOK()) {
             cri = executionNsRoutingInfoStatus.getValue();
-        } else if (!((hasChangeStream || startsWithQueue) &&
+        } else if (!((hasChangeStream || generatesOwnDataOnce) &&
                      executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
             // To achieve parity with mongod-style responses, parse and validate the query
             // even though the namespace is not found.

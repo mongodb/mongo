@@ -764,15 +764,15 @@ AggregationTargeter AggregationTargeter::make(
 
     tassert(7972401,
             "Aggregation did not have a routing table and does not feature either a $changeStream "
-            "or a $documents stage",
+            "or a stage marked as `kGeneratesOwnDataOnce`",
             cri || pipelineDataSource == PipelineDataSource::kChangeStream ||
-                pipelineDataSource == PipelineDataSource::kQueue);
+                pipelineDataSource == PipelineDataSource::kGeneratesOwnDataOnce);
     auto pipeline = buildPipelineFn();
     auto policy = pipeline->requiredToRunOnMongos() ? TargetingPolicy::kMongosRequired
                                                     : TargetingPolicy::kAnyShard;
-    if (!cri && pipelineDataSource == PipelineDataSource::kQueue) {
-        // If we don't have a routing table and there is a $documents stage, we must run on
-        // mongos.
+    if (!cri && pipelineDataSource == PipelineDataSource::kGeneratesOwnDataOnce) {
+        // If we don't have a routing table and the fist stage is marked as `kGeneratesOwnDataOnce`,
+        // we must run on mongos.
         policy = TargetingPolicy::kMongosRequired;
     }
     return AggregationTargeter{policy, std::move(pipeline), cri};

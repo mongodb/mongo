@@ -197,6 +197,14 @@ public:
     }
 
     /**
+     * Returns true if this stage is an initial source and should run just once on the entire
+     * cluster.
+     */
+    virtual bool generatesOwnDataOnce() const {
+        return startsWithQueue();
+    }
+
+    /**
      * Returns true if this stage does not require an input source.
      */
     virtual bool isInitialSource() const {

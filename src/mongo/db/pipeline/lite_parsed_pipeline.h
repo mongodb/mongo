@@ -135,6 +135,14 @@ public:
     }
 
     /**
+     * Returns true if the pipeline begins with a stage that generates its own data and should run
+     * once.
+     */
+    bool generatesOwnDataOnce() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->generatesOwnDataOnce();
+    }
+
+    /**
      * Returns true if the pipeline ends with a write stage.
      */
     bool endsWithWriteStage() const {
