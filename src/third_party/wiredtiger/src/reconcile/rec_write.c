@@ -16,7 +16,7 @@ static int __rec_hs_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *);
 static int __rec_root_write(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int __rec_split_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int __rec_split_row_promote(WT_SESSION_IMPL *, WT_RECONCILE *, WT_ITEM *, uint8_t);
-static int __rec_split_write(WT_SESSION_IMPL *, WT_RECONCILE *, WT_REC_CHUNK *, WT_ITEM *, bool);
+static int __rec_split_write(WT_SESSION_IMPL *, WT_RECONCILE *, WTI_REC_CHUNK *, WT_ITEM *, bool);
 static void __rec_write_page_status(WT_SESSION_IMPL *, WT_RECONCILE *);
 static int __rec_write_err(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -1021,7 +1021,7 @@ __wt_split_page_size(int split_pct, uint32_t maxpagesize, uint32_t allocsize)
  *     Initialize a single chunk structure.
  */
 static int
-__rec_split_chunk_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk)
+__rec_split_chunk_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_CHUNK *chunk)
 {
     chunk->recno = WT_RECNO_OOB;
     /* Don't touch the key item memory, that memory is reused. */
@@ -1073,7 +1073,7 @@ __wti_rec_split_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page, u
 
     WT_BM *bm;
     WT_BTREE *btree;
-    WT_REC_CHUNK *chunk;
+    WTI_REC_CHUNK *chunk;
     WT_REF *ref;
     size_t corrected_page_size;
 
@@ -1451,7 +1451,7 @@ int
 __wti_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 {
     WT_BTREE *btree;
-    WT_REC_CHUNK *tmp;
+    WTI_REC_CHUNK *tmp;
     size_t inuse;
 
     btree = S2BT(session);
@@ -1633,7 +1633,7 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
     WT_BTREE *btree;
     WT_PAGE_HEADER *dsk;
-    WT_REC_CHUNK *cur_ptr, *prev_ptr, *tmp;
+    WTI_REC_CHUNK *cur_ptr, *prev_ptr, *tmp;
     size_t combined_size, len_to_move;
     uint8_t *cur_dsk_start;
 
@@ -1817,13 +1817,13 @@ __rec_supd_move(WT_SESSION_IMPL *session, WT_MULTI *multi, WT_SAVE_UPD *supd, ui
  */
 static int
 __rec_split_write_supd(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk, WT_MULTI *multi, bool last_block)
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_CHUNK *chunk, WT_MULTI *multi, bool last_block)
 {
     WT_BTREE *btree;
     WT_DECL_ITEM(key);
     WT_DECL_RET;
     WT_PAGE *page;
-    WT_REC_CHUNK *next;
+    WTI_REC_CHUNK *next;
     WT_SAVE_UPD *supd;
     WT_UPDATE *upd;
     uint32_t i, j;
@@ -1931,7 +1931,7 @@ __rec_set_page_write_gen(WT_BTREE *btree, WT_PAGE_HEADER *dsk)
  *     Initialize a disk page's header.
  */
 static void
-__rec_split_write_header(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk,
+__rec_split_write_header(WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_CHUNK *chunk,
   WT_MULTI *multi, WT_PAGE_HEADER *dsk)
 {
     WT_BTREE *btree;
@@ -2047,7 +2047,7 @@ __rec_compression_adjust(WT_SESSION_IMPL *session, uint32_t max, size_t compress
  *     Write a disk block out for the split helper functions.
  */
 static int
-__rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk,
+__rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_CHUNK *chunk,
   WT_ITEM *compressed_image, bool last_block)
 {
     WT_BTREE *btree;
@@ -2717,7 +2717,7 @@ err:
  *     Store overflow items in the file, returning the address cookie.
  */
 int
-__wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv, uint8_t type,
+__wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_KV *kv, uint8_t type,
   WT_TIME_WINDOW *tw, uint64_t rle)
 {
     WT_BM *bm;

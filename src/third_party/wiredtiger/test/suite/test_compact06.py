@@ -30,7 +30,6 @@ import time
 import wiredtiger
 from compact_util import compact_util
 from wiredtiger import stat
-import errno
 
 # test_compact06.py
 # Test background compaction API usage.
@@ -63,12 +62,9 @@ class test_compact06(compact_util):
 
         # We cannot reconfigure the background server.
         for item in self.configuration_items:
-            self.assertRaisesException(wiredtiger.WiredTigerError, lambda:
-                self.session.compact(None, f'background=true,{item}'))
-            err, sub_level_err, err_msg = self.session.get_last_error()
-            self.assertEqual(err, errno.EINVAL)
-            self.assertEqual(sub_level_err, wiredtiger.WT_BACKGROUND_COMPACT_ALREADY_RUNNING)
-            self.assertEqual(err_msg, "Cannot reconfigure background compaction while it's already running.")
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
+                self.session.compact(None, f'background=true,{item}'),
+                '/Cannot reconfigure background compaction while it\'s already running/')
 
         # Wait for background compaction to start and skip the HS.
         while self.get_bg_compaction_files_skipped() == 0:

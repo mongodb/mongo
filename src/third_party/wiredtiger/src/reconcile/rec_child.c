@@ -14,7 +14,7 @@
  */
 static int
 __rec_child_deleted(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_MODIFY_STATE *cmsp)
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WTI_CHILD_MODIFY_STATE *cmsp)
 {
     WT_PAGE_DELETED *page_del;
     uint8_t prepare_state;
@@ -23,7 +23,7 @@ __rec_child_deleted(
     visible = visible_all = false;
     page_del = ref->page_del;
 
-    cmsp->state = WT_CHILD_IGNORE;
+    cmsp->state = WTI_CHILD_IGNORE;
 
     /*
      * If there's no page-delete structure, the truncate must be globally visible. Discard any
@@ -67,7 +67,7 @@ __rec_child_deleted(
      */
     if (page_del->selected_for_write && !visible_all) {
         cmsp->del = *page_del;
-        cmsp->state = WT_CHILD_PROXY;
+        cmsp->state = WTI_CHILD_PROXY;
         return (0);
     }
 
@@ -96,7 +96,7 @@ __rec_child_deleted(
          */
         if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC | WT_REC_EVICT))
             return (__wt_set_return(session, EBUSY));
-        cmsp->state = WT_CHILD_ORIGINAL;
+        cmsp->state = WTI_CHILD_ORIGINAL;
         r->leave_dirty = true;
         return (0);
     }
@@ -129,7 +129,7 @@ __rec_child_deleted(
           "In progress prepares should never be seen in eviction");
         WT_ASSERT(session, !visible_all);
 
-        cmsp->state = WT_CHILD_ORIGINAL;
+        cmsp->state = WTI_CHILD_ORIGINAL;
         r->leave_dirty = true;
         return (0);
     }
@@ -162,7 +162,7 @@ __rec_child_deleted(
             r->leave_dirty = true;
         }
         cmsp->del = *page_del;
-        cmsp->state = WT_CHILD_PROXY;
+        cmsp->state = WTI_CHILD_PROXY;
         page_del->selected_for_write = true;
         return (0);
     }
@@ -191,7 +191,7 @@ __rec_child_deleted(
  */
 int
 __wti_rec_child_modify(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_MODIFY_STATE *cmsp)
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WTI_CHILD_MODIFY_STATE *cmsp)
 {
     WT_DECL_RET;
     WT_PAGE_MODIFY *mod;
@@ -200,7 +200,7 @@ __wti_rec_child_modify(
     cmsp->hazard = false;
 
     /* Default to using the original child address. */
-    cmsp->state = WT_CHILD_ORIGINAL;
+    cmsp->state = WTI_CHILD_ORIGINAL;
 
     /*
      * This function is called when walking an internal page to decide how to handle child pages
@@ -299,7 +299,7 @@ __wti_rec_child_modify(
              */
             mod = ref->page->modify;
             if (mod != NULL && mod->rec_result != 0) {
-                cmsp->state = WT_CHILD_MODIFIED;
+                cmsp->state = WTI_CHILD_MODIFIED;
                 goto done;
             }
 
@@ -355,7 +355,7 @@ __wti_rec_child_modify(
              * have an address and we ignore it, it's not part of the checkpoint.
              */
             if (ref->addr == NULL)
-                cmsp->state = WT_CHILD_IGNORE;
+                cmsp->state = WTI_CHILD_IGNORE;
             goto done;
 
         case WT_REF_SPLIT:

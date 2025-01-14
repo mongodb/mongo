@@ -34,7 +34,7 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
 
     SECTION("Open a new unbacked file")
     {
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
         testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh, WT_FS_OPEN_CREATE));
 
         // There's no backing file in the source directory, so no extent list to track.
@@ -46,7 +46,7 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
     {
         create_file(source_file.c_str(), 1000);
 
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
         testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh));
 
         // We've created a new file in the destination backed by a file in source.
@@ -64,7 +64,7 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
         // Create a source file of size 110 and open the lr_fh to copy that metadata.
         // This creates a destination file also of size 110.
         create_file(source_file.c_str(), 110);
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
         testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh));
 
         // Replace the source file with a larger file of size 200 and reopen the destination file
@@ -92,7 +92,7 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
         // Create a source file of size 110 and open the lr_fh to copy that metadata.
         // This creates a destination file also of size 110.
         create_file(source_file.c_str(), 110);
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
         testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh));
 
         // Now positive truncate to increase the size of the destination file to be larger than
@@ -113,7 +113,7 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
         testutil_copy(source_file.c_str(), dest_file.c_str());
 
         // Nothing to copy and therefore no extent list.
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
         testutil_check(open_lr_fh(env, dest_file.c_str(), &lr_fh));
         REQUIRE(extent_list_str(lr_fh) == "");
         lr_fh->iface.close(reinterpret_cast<WT_FILE_HANDLE *>(lr_fh), wt_session);
@@ -123,7 +123,7 @@ TEST_CASE("Live Restore Extent Lists: Creation", "[live_restore],[live_restore_e
 #ifndef __APPLE__
     SECTION("Open a backed, partially copied file")
     {
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh;
         char buf[4096];
 
         create_file(source_file.c_str(), 32768);

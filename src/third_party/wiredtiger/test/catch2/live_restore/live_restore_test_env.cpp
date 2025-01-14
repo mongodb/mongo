@@ -38,7 +38,7 @@ live_restore_test_env::live_restore_test_env()
     testutil_recreate_dir(DB_DEST.c_str());
 
     session = conn->create_session();
-    lr_fs = (WT_LIVE_RESTORE_FS *)conn->get_wt_connection_impl()->file_system;
+    lr_fs = (WTI_LIVE_RESTORE_FS *)conn->get_wt_connection_impl()->file_system;
 }
 
 live_restore_test_env::~live_restore_test_env()
@@ -65,7 +65,7 @@ std::string
 live_restore_test_env::tombstone_file_path(const std::string &file_name)
 {
     // Tombstone files only exist in the destination folder.
-    return DB_DEST + "/" + file_name + WT_LIVE_RESTORE_FS_TOMBSTONE_SUFFIX;
+    return DB_DEST + "/" + file_name + WTI_LIVE_RESTORE_FS_TOMBSTONE_SUFFIX;
 }
 
 } // namespace utils.

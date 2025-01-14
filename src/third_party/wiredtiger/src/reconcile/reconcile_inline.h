@@ -243,7 +243,7 @@ __wti_rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t siz
  *     Copy a key/value cell and buffer pair into the new image.
  */
 static WT_INLINE void
-__wti_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv)
+__wti_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_KV *kv)
 {
     size_t len;
     uint8_t *p, *t;
@@ -291,7 +291,7 @@ __rec_auxincr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size
  *     Copy a key/value cell and buffer pair into the new auxiliary image.
  */
 static WT_INLINE void
-__wti_rec_auximage_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t count, WT_REC_KV *kv)
+__wti_rec_auximage_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t count, WTI_REC_KV *kv)
 {
     size_t len;
     uint8_t *p;
@@ -327,7 +327,7 @@ static WT_INLINE void
 __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *addr,
   WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del)
 {
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
     WT_TIME_AGGREGATE *ta;
     u_int cell_type;
 
@@ -407,7 +407,7 @@ __wti_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *
   WT_TIME_WINDOW *tw, uint64_t rle)
 {
     WT_BTREE *btree;
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
 
     btree = S2BT(session);
     val = &r->v;
@@ -440,9 +440,9 @@ __wti_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *
  */
 static WT_INLINE int
 __wti_rec_dict_replace(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_TIME_WINDOW *tw, uint64_t rle, WT_REC_KV *val)
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_TIME_WINDOW *tw, uint64_t rle, WTI_REC_KV *val)
 {
-    WT_REC_DICTIONARY *dp;
+    WTI_REC_DICTIONARY *dp;
     uint64_t offset;
 
     /*
@@ -488,8 +488,8 @@ __wti_rec_dict_replace(
  *     Where possible modify time window values to avoid writing obsolete values to the cell later.
  */
 static WT_INLINE void
-__wti_rec_time_window_clear_obsolete(
-  WT_SESSION_IMPL *session, WT_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, WT_RECONCILE *r)
+__wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT *upd_select,
+  WT_CELL_UNPACK_KV *vpack, WT_RECONCILE *r)
 {
     WT_TIME_WINDOW *tw;
 

@@ -31,7 +31,7 @@ static int
 __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
 {
     WT_UNUSED(ctx);
-    WT_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
+    WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
 
     __wt_spin_lock(session, &server->queue_lock);
     server->threads_working--;
@@ -64,7 +64,7 @@ __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
  *     and is consistent with most WiredTiger free functions.
  */
 static void
-__live_restore_free_work_item(WT_SESSION_IMPL *session, WT_LIVE_RESTORE_WORK_ITEM **work_itemp)
+__live_restore_free_work_item(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_WORK_ITEM **work_itemp)
 {
     __wt_free(session, (*work_itemp)->uri);
     __wt_free(session, *work_itemp);
@@ -81,7 +81,7 @@ __live_restore_free_work_item(WT_SESSION_IMPL *session, WT_LIVE_RESTORE_WORK_ITE
 static void
 __live_restore_work_queue_drain(WT_SESSION_IMPL *session)
 {
-    WT_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
+    WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
 
     /*
      * All contexts that call this function are single threaded however we take the lock as that is
@@ -89,7 +89,7 @@ __live_restore_work_queue_drain(WT_SESSION_IMPL *session)
      */
     __wt_spin_lock(session, &server->queue_lock);
     if (!TAILQ_EMPTY(&server->work_queue)) {
-        WT_LIVE_RESTORE_WORK_ITEM *work_item = NULL, *work_item_tmp = NULL;
+        WTI_LIVE_RESTORE_WORK_ITEM *work_item = NULL, *work_item_tmp = NULL;
         TAILQ_FOREACH_SAFE(work_item, &server->work_queue, q, work_item_tmp)
         {
             TAILQ_REMOVE(&server->work_queue, work_item, q);
@@ -110,7 +110,7 @@ static int
 __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
 {
     WT_DECL_RET;
-    WT_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
+    WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
 
     __wt_spin_lock(session, &server->queue_lock);
     if (TAILQ_EMPTY(&server->work_queue)) {
@@ -120,7 +120,7 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
         __wt_spin_unlock(session, &server->queue_lock);
         return (0);
     }
-    WT_LIVE_RESTORE_WORK_ITEM *work_item = TAILQ_FIRST(&server->work_queue);
+    WTI_LIVE_RESTORE_WORK_ITEM *work_item = TAILQ_FIRST(&server->work_queue);
     WT_ASSERT(session, work_item != NULL);
     TAILQ_REMOVE(&server->work_queue, work_item, q);
     __wt_verbose_debug2(
@@ -178,8 +178,8 @@ __insert_queue_item(WT_SESSION_IMPL *session, char *uri, uint64_t *work_count)
     __wt_verbose_debug2(
       session, WT_VERB_FILEOPS, "Live restore server: Adding %s to the work queue", uri);
 
-    WT_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
-    WT_LIVE_RESTORE_WORK_ITEM *work_item = NULL;
+    WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
+    WTI_LIVE_RESTORE_WORK_ITEM *work_item = NULL;
 
     WT_ERR(__wt_calloc_one(session, &work_item));
     WT_ERR(__wt_strdup(session, uri, &work_item->uri));
@@ -204,7 +204,7 @@ __live_restore_init_work_queue(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn = S2C(session);
     WT_DECL_RET;
-    WT_LIVE_RESTORE_SERVER *server = conn->live_restore_server;
+    WTI_LIVE_RESTORE_SERVER *server = conn->live_restore_server;
 
     /* Initialize the work queue. */
     TAILQ_INIT(&server->work_queue);
@@ -310,7 +310,7 @@ err:
 int
 __wt_live_restore_server_destroy(WT_SESSION_IMPL *session)
 {
-    WT_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
+    WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
 
     /*
      * If we didn't create a live restore file system or the server there is nothing to do, it is

@@ -15,13 +15,13 @@
 using namespace utils;
 
 // Wrapper for fs_open_file. This will also check we get the expected return code.
-static WT_LIVE_RESTORE_FILE_HANDLE *
+static WTI_LIVE_RESTORE_FILE_HANDLE *
 open_file(live_restore_test_env &env, std::string file_name, WT_FS_OPEN_FILE_TYPE file_type,
   int expect_ret = 0, int flags = 0)
 {
     WT_SESSION *wt_session = reinterpret_cast<WT_SESSION *>(env.session);
-    WT_LIVE_RESTORE_FS *lr_fs = env.lr_fs;
-    WT_LIVE_RESTORE_FILE_HANDLE *lr_fh = nullptr;
+    WTI_LIVE_RESTORE_FS *lr_fs = env.lr_fs;
+    WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh = nullptr;
 
     int ret = lr_fs->iface.fs_open_file((WT_FILE_SYSTEM *)lr_fs, wt_session,
       env.dest_file_path(file_name).c_str(), file_type, flags, (WT_FILE_HANDLE **)&lr_fh);
@@ -31,7 +31,7 @@ open_file(live_restore_test_env &env, std::string file_name, WT_FS_OPEN_FILE_TYP
 }
 
 void
-validate_lr_fh(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh, live_restore_test_env &env,
+validate_lr_fh(WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, live_restore_test_env &env,
   std::string &file_name, bool is_directory = false)
 {
     REQUIRE(lr_fh->destination.fh != NULL);
@@ -60,7 +60,7 @@ TEST_CASE("Live Restore fs_open_file", "[live_restore],[live_restore_open_file]"
 
     SECTION("fs_open - File")
     {
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh = nullptr;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh = nullptr;
 
         // If the file doesn't exist return ENOENT.
         lr_fh = open_file(env, file_1, WT_FS_OPEN_FILE_TYPE_REGULAR, ENOENT);
@@ -107,7 +107,7 @@ TEST_CASE("Live Restore fs_open_file", "[live_restore],[live_restore_open_file]"
 
     SECTION("fs_open - Directory")
     {
-        WT_LIVE_RESTORE_FILE_HANDLE *lr_fh = nullptr;
+        WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh = nullptr;
 
         // If the folder doesn't exist return ENOENT.
         lr_fh = open_file(env, subfolder, WT_FS_OPEN_FILE_TYPE_DIRECTORY, ENOENT);

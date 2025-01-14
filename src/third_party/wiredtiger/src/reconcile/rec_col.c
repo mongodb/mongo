@@ -40,7 +40,7 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
             WT_RET(__wti_rec_split(session, r, 0));
         }
         cbulk->entry = 0;
-        cbulk->nrecs = WT_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
+        cbulk->nrecs = WTI_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
     }
     return (0);
 }
@@ -73,7 +73,7 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
      * Also, it should reflect the fact that we've just loaded a batch of stable values.
      */
     WT_TIME_WINDOW_INIT(&tw);
-    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
     return (0);
 }
 
@@ -111,7 +111,7 @@ __wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
     /* Initialize the time aggregate that's going into the parent page. See note above. */
     WT_TIME_WINDOW_INIT(&tw);
-    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
     return (0);
 }
 
@@ -124,7 +124,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
 {
     WT_BTREE *btree;
     WT_RECONCILE *r;
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
     WT_TIME_WINDOW tw;
 
     r = cbulk->reconcile;
@@ -155,7 +155,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
     __wti_rec_image_copy(session, r, val);
 
     /* Initialize the time aggregate that's going into the parent page. See note above. */
-    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
     /* Update the starting record number in case we split. */
     r->recno += cbulk->rle;
@@ -173,7 +173,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_ADDR *addr;
     WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
     uint32_t i;
 
     mod = page->modify;
@@ -195,7 +195,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Copy the value onto the page. */
         __wti_rec_image_copy(session, r, val);
-        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
+        WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
     }
     return (0);
 }
@@ -210,11 +210,11 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
     WT_ADDR *addr;
     WT_BTREE *btree;
     WT_CELL_UNPACK_ADDR *vpack, _vpack;
-    WT_CHILD_MODIFY_STATE cms;
+    WTI_CHILD_MODIFY_STATE cms;
     WT_DECL_RET;
     WT_PAGE *child, *page;
     WT_PAGE_DELETED *page_del;
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
     WT_REF *ref;
     WT_TIME_AGGREGATE ft_ta, ta;
 
@@ -245,22 +245,22 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
         page_del = NULL;
 
         switch (cms.state) {
-        case WT_CHILD_IGNORE:
+        case WTI_CHILD_IGNORE:
             /* Ignored child. */
-            WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+            WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
             continue;
 
-        case WT_CHILD_MODIFIED:
+        case WTI_CHILD_MODIFIED:
             /*
              * Modified child. Empty pages are merged into the parent and discarded.
              */
             switch (child->modify->rec_result) {
             case WT_PM_REC_EMPTY:
-                WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+                WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
                 WT_ERR(__rec_col_merge(session, r, child));
-                WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+                WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_REPLACE:
                 addr = &child->modify->mod_replace;
@@ -269,10 +269,10 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
                 WT_ERR(__wt_illegal_value(session, child->modify->rec_result));
             }
             break;
-        case WT_CHILD_ORIGINAL:
+        case WTI_CHILD_ORIGINAL:
             /* Original child. */
             break;
-        case WT_CHILD_PROXY:
+        case WTI_CHILD_PROXY:
             /* Deleted child where we write a proxy cell. */
             page_del = &cms.del;
             break;
@@ -292,7 +292,8 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
             WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
         } else {
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
-            if (cms.state == WT_CHILD_PROXY || F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
+            if (cms.state == WTI_CHILD_PROXY ||
+              F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
                 /*
                  * Need to build a proxy (page-deleted) cell or rebuild the cell with updated time
                  * info.
@@ -310,7 +311,7 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
         }
         if (page_del != NULL)
             WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
-        WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+        WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
 
         /* Boundary: split or write the page. */
         if (__wti_rec_need_split(r, val->len))
@@ -319,8 +320,8 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
         /* Copy the value (which is in val, val == r->v) onto the page. */
         __wti_rec_image_copy(session, r, val);
         if (page_del != NULL)
-            WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
-        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
+            WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
+        WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
     }
     WT_INTL_FOREACH_END;
 
@@ -328,7 +329,7 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
     return (__wti_rec_split_finish(session, r));
 
 err:
-    WT_CHILD_RELEASE(session, cms.hazard, ref);
+    WTI_CHILD_RELEASE(session, cms.hazard, ref);
     return (ret);
 }
 
@@ -401,7 +402,7 @@ static int
 __rec_col_fix_addtw(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t recno_offset, WT_TIME_WINDOW *tw)
 {
-    WT_REC_KV *key, *val;
+    WTI_REC_KV *key, *val;
     size_t add_len, len;
     uint8_t keyspace[WT_INTPACK64_MAXSIZE], *p;
 
@@ -446,7 +447,7 @@ __rec_col_fix_addtw(
     __wti_rec_auximage_copy(session, r, 0, key);
     __wti_rec_auximage_copy(session, r, 1, val);
 
-    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
 
     /* If we're on key 3 we should have just written at most the 4th time window. */
     WT_ASSERT(session, r->aux_entries <= recno_offset + 1);
@@ -469,7 +470,7 @@ __wti_rec_col_fix(
     WT_INSERT *ins;
     WT_PAGE *page;
     WT_UPDATE *upd;
-    WT_UPDATE_SELECT upd_select;
+    WTI_UPDATE_SELECT upd_select;
     uint64_t curstartrecno, i, origstartrecno, rawbitmapsize, recno;
     uint32_t auxspace, bitmapsize, entry, maxrecs, nrecs, numtws, tw;
     uint8_t val;
@@ -593,7 +594,7 @@ __wti_rec_col_fix(
          * assume elsewhere that any small page might be appended to.
          */
         rawbitmapsize = WT_ALIGN(
-          WT_COL_FIX_ENTRIES_TO_BYTES(btree, salvage->take + salvage->missing), btree->allocsize);
+          WTI_COL_FIX_ENTRIES_TO_BYTES(btree, salvage->take + salvage->missing), btree->allocsize);
 
         /* Salvage is the backup plan: don't let this fail. */
         auxspace *= 2;
@@ -654,7 +655,7 @@ __wti_rec_col_fix(
     }
 
     /* Remember how far we can go before the end of page. */
-    maxrecs = WT_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
+    maxrecs = WTI_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
 
     /*
      * Iterate over the data items on the page. We need to go through both the insert list and the
@@ -870,7 +871,7 @@ __wti_rec_col_fix(
             WT_TIME_WINDOW_INIT(&unpack.tw);
 
             /* Initialize the selected update. */
-            WT_UPDATE_SELECT_INIT(&upd_select);
+            WTI_UPDATE_SELECT_INIT(&upd_select);
         } else {
             /* We shouldn't ever get appends during salvage. */
             WT_ASSERT(session, salvage == NULL);
@@ -948,7 +949,7 @@ __wti_rec_col_fix(
             /* If there are entries we didn't write timestamps for, aggregate a stable timestamp. */
             if (r->aux_entries < r->entries) {
                 WT_TIME_WINDOW_INIT(&unpack.tw);
-                WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
+                WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
             }
 
             /* Make sure the trailing bits in the bitmap get cleared. */
@@ -982,7 +983,7 @@ __wti_rec_col_fix(
      */
     if (r->aux_entries < r->entries || r->entries == 0) {
         WT_TIME_WINDOW_INIT(&unpack.tw);
-        WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
+        WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
     }
 
     /* Make sure the trailing bits in the bitmap get cleared. */
@@ -1111,7 +1112,7 @@ static int
 __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKIE *salvage,
   WT_ITEM *value, WT_TIME_WINDOW *tw, uint64_t rle, bool deleted, bool dictionary, bool *ovfl_usedp)
 {
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
 
     if (ovfl_usedp != NULL)
         *ovfl_usedp = false;
@@ -1171,7 +1172,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
     if (dictionary && !deleted && ovfl_usedp == NULL)
         WT_RET(__wti_rec_dict_replace(session, r, tw, rle, val));
     __wti_rec_image_copy(session, r, val);
-    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
 
     /* Update the starting record number in case we split. */
     r->recno += rle;
@@ -1205,7 +1206,7 @@ __wti_rec_col_var(
     WT_PAGE *page;
     WT_TIME_WINDOW clear_tw, *twp;
     WT_UPDATE *upd;
-    WT_UPDATE_SELECT upd_select;
+    WTI_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
     uint32_t i, size;
     bool deleted, dictionary, orig_deleted, orig_stale, ovfl_used, update_no_copy,

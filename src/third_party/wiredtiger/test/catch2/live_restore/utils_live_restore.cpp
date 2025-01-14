@@ -15,9 +15,9 @@ namespace utils {
  * list with holes at ranges 1 to 10 and 15 to 30 (inclusive).
  */
 std::string
-extent_list_str(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh)
+extent_list_str(WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh)
 {
-    WT_LIVE_RESTORE_HOLE_NODE *ext = lr_fh->destination.hole_list_head;
+    WTI_LIVE_RESTORE_HOLE_NODE *ext = lr_fh->destination.hole_list_head;
 
     std::string str = "";
 
@@ -26,7 +26,7 @@ extent_list_str(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh)
         return "";
 
     while (ext != nullptr) {
-        str += "(" + std::to_string(ext->off) + "-" + std::to_string(WT_EXTENT_END(ext)) + "), ";
+        str += "(" + std::to_string(ext->off) + "-" + std::to_string(WTI_EXTENT_END(ext)) + "), ";
         ext = ext->next;
     }
 
@@ -40,9 +40,9 @@ extent_list_str(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh)
 // the destination folder.
 int
 open_lr_fh(const live_restore_test_env &env, const std::string &dest_file,
-  WT_LIVE_RESTORE_FILE_HANDLE **lr_fhp, int flags)
+  WTI_LIVE_RESTORE_FILE_HANDLE **lr_fhp, int flags)
 {
-    WT_LIVE_RESTORE_FS *lr_fs = env.lr_fs;
+    WTI_LIVE_RESTORE_FS *lr_fs = env.lr_fs;
     WT_SESSION *wt_session = reinterpret_cast<WT_SESSION *>(env.session);
     // Make sure we're always opening the file in the destination directory.
     REQUIRE(strncmp(dest_file.c_str(), env.DB_DEST.c_str(), env.DB_DEST.size()) == 0);
@@ -53,13 +53,13 @@ open_lr_fh(const live_restore_test_env &env, const std::string &dest_file,
 
 /* Verify that all extents in an extent list are in order and don't overlap. */
 bool
-extent_list_in_order(WT_LIVE_RESTORE_FILE_HANDLE *lr_fh)
+extent_list_in_order(WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh)
 {
-    WT_LIVE_RESTORE_HOLE_NODE *node;
+    WTI_LIVE_RESTORE_HOLE_NODE *node;
     node = lr_fh->destination.hole_list_head;
 
     while (node != NULL && node->next != NULL) {
-        if (WT_EXTENT_END(node) >= node->next->off)
+        if (WTI_EXTENT_END(node) >= node->next->off)
             return false;
 
         node = node->next;
