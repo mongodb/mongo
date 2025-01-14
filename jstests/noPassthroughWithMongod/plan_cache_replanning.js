@@ -16,6 +16,11 @@ const isSbePlanCacheEnabled = checkSbeFullFeatureFlagEnabled(db);
 
 let coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 
+function getReplannedMetric() {
+    const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
+    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType].replanned;
+}
+
 function getCachedPlanForQuery(filter) {
     const planCacheKey = getPlanCacheKeyFromShape({query: filter, collection: coll, db: db});
     const matchingCacheEntries = coll.getPlanCache().list([{$match: {planCacheKey: planCacheKey}}]);
@@ -101,22 +106,26 @@ assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
 // The {b: 1} plan is currently in the cache. Run the query which should use the {a: 1} index. The
 // current cache entry will be deactivated, and then the cache entry for the {a: 1} will overwrite
 // it (as active).
+let replannedMetric = getReplannedMetric();
 assert.eq(1, coll.find(aIndexQuery).itcount());
 entry = getCachedPlanForQuery(aIndexQuery);
 assert.eq(entry.isActive, true);
 assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
+assert.eq(replannedMetric + 1, getReplannedMetric());
 
 // Run the query which should use the {b: 1} index.
 assert.eq(1, coll.find(bIndexQuery).itcount());
 entry = getCachedPlanForQuery(bIndexQuery);
 assert.eq(entry.isActive, true);
 assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+assert.eq(replannedMetric + 2, getReplannedMetric());
 
 // The {b: 1} plan is again in the cache. Run the query which should use the {a: 1} index.
 assert.eq(1, coll.find(aIndexQuery).itcount());
 entry = getCachedPlanForQuery(aIndexQuery);
 assert.eq(entry.isActive, true);
 assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
+assert.eq(replannedMetric + 3, getReplannedMetric());
 
 // The {a: 1} plan is back in the cache. Run the query which would perform better on the plan using
 // the {b: 1} index, and ensure that plan gets written to the cache.
@@ -125,6 +134,7 @@ entry = getCachedPlanForQuery(bIndexQuery);
 entryWorks = entry.works;
 assert.eq(entry.isActive, true);
 assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+assert.eq(replannedMetric + 4, getReplannedMetric());
 
 // Now run a plan that will perform poorly with both indices (it will be required to scan 500
 // documents). This will result in replanning (and the cache entry being deactivated). However, the
