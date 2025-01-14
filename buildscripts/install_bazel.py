@@ -33,7 +33,7 @@ def determine_platform():
     elif syst == "Linux":
         pltf = "linux"
     else:
-        raise RuntimeError("Platform cannot be inferred.")
+        return None
     return pltf
 
 
@@ -45,7 +45,7 @@ def determine_architecture():
     elif machine in ("arm", "arm64", "aarch64"):
         arch = "arm64"
     else:
-        raise RuntimeError(f"Detected architecture is not supported: {machine}")
+        return None
 
     return arch
 
@@ -87,8 +87,13 @@ def _verify_s3_hash(s3_path: str, local_path: str) -> None:
 def install_buildozer(download_location: str = "./"):
     operating_system = determine_platform()
     architechture = determine_architecture()
+    if operating_system is None or architechture is None:
+        print("Unsupported OS for buildozer, not installing.")
+        return None
+
     if operating_system == "windows" and architechture == "arm64":
-        raise RuntimeError("There are no published arm windows releases for buildifier.")
+        print("There are no published arm windows releases for buildifier.")
+        return None
 
     extension = ".exe" if operating_system == "windows" else ""
     binary_name = f"buildozer-{operating_system}-{architechture}{extension}"
