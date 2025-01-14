@@ -77,6 +77,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -137,6 +138,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
 MONGO_FAIL_POINT_DEFINE(migrateCommitInvalidChunkQuery);
 MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
+MONGO_FAIL_POINT_DEFINE(hangMergeAllChunksUntilReachingTimeout);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
@@ -1196,7 +1198,8 @@ StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionPlacementVersions
 ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const ShardId& shardId,
-                                                    int maxNumberOfChunksToMerge) {
+                                                    int maxNumberOfChunksToMerge,
+                                                    int maxTimeProcessingChunksMS) {
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -1208,7 +1211,17 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
     const int MAX_RETRIES = 5;
     int nRetries = 0;
 
+    // Store the 'min' field of the first mergeable chunk found. This is to speed up the processing
+    // of the chunks for the succeeding retries.
+    boost::optional<BSONObj> firstMergeableChunkMin;
+
     while (nRetries < MAX_RETRIES) {
+        Timer tElapsed;
+
+        if (MONGO_unlikely(hangMergeAllChunksUntilReachingTimeout.shouldFail())) {
+            sleepFor(Milliseconds(maxTimeProcessingChunksMS + 1));
+        }
+
         // 1. Retrieve the collection entry and the initial version.
         const auto [coll, originalVersion] =
             uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
@@ -1229,6 +1242,16 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
         const auto oldestTimestampSupportedForHistory =
             getOldestTimestampSupportedForSnapshotHistory(opCtx);
 
+        BSONObjBuilder filterBuilder;
+        filterBuilder << ChunkType::collectionUUID << collUuid;
+        filterBuilder << ChunkType::shard(shardId.toString());
+        if (firstMergeableChunkMin) {
+            filterBuilder << ChunkType::min.query("$gte", *firstMergeableChunkMin);
+            firstMergeableChunkMin = boost::none;
+        }
+        filterBuilder << ChunkType::onCurrentShardSince.lt(oldestTimestampSupportedForHistory);
+        filterBuilder << ChunkType::jumbo.ne(true);
+
         // TODO SERVER-78701 scan cursor rather than getting the whole vector of chunks
         const auto chunksBelongingToShard =
             uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
@@ -1236,11 +1259,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                 repl::ReadConcernLevel::kLocalReadConcern,
                                 ChunkType::ConfigNS,
-                                BSON(ChunkType::collectionUUID
-                                     << collUuid << ChunkType::shard(shardId.toString())
-                                     << ChunkType::onCurrentShardSince
-                                     << BSON("$lt" << oldestTimestampSupportedForHistory)
-                                     << ChunkType::jumbo << BSON("$ne" << true)),
+                                filterBuilder.obj(),
                                 BSON(ChunkType::min << 1) /* sort */,
                                 boost::none /* limit */))
                 .docs;
@@ -1268,6 +1287,9 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                     numMergedChunks.first += nChunksInRange;
                     numMergedChunks.second.push_back(nChunksInRange);
                     newChunks->push_back(std::move(newChunk));
+                    if (!firstMergeableChunkMin) {
+                        firstMergeableChunkMin = newChunks->at(0).getMin().copy();
+                    }
                 }
                 nChunksInRange = 0;
                 rangeOnCurrentShardSince = minValidTimestamp;
@@ -1342,7 +1364,21 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                 }
                 nChunksInRange++;
 
-                if (numMergedChunks.first + nChunksInRange == maxNumberOfChunksToMerge) {
+                // Stop looking for additional mergeable chunks if `maxNumberOfChunksToMerge` is
+                // reached.
+                if (numMergedChunks.first + nChunksInRange >= maxNumberOfChunksToMerge) {
+                    break;
+                }
+
+                // Stop looking for additional mergeable chunks if the `maxTimeProcessingChunksMS`
+                // is exceeded. The main reason of this timeout is to reduce the likelihood of
+                // failing on commit because of a concurrent migration.
+                //
+                // Note that we'll only timeout if we've already found mergeable chunks, otherwise
+                // we'll continue looking. Although it'll be more likely to fail on commit due to a
+                // concurrent migration, we'll increase the success rate for the next retry due to
+                // knowing the `firstMergeableChunkMin`.
+                if (!newChunks->empty() && tElapsed.millis() > maxTimeProcessingChunksMS) {
                     break;
                 }
             }

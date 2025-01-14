@@ -348,8 +348,8 @@ public:
     commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const ShardId& shardId,
-                                int maxNumberOfChunksToMerge = INT_MAX);
-
+                                int maxNumberOfChunksToMerge = INT_MAX,
+                                int maxTimeProcessingChunksMS = INT_MAX);
 
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.

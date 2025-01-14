@@ -1682,4 +1682,6 @@ last-lts:
     ticket: SERVER-95807
   - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
     ticket: SERVER-97044
+  - test_file: jstests/sharding/merge_all_chunks_on_shard.js
+    ticket: SERVER-95674
   suites: null

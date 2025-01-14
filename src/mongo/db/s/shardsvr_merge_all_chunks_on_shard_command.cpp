@@ -104,6 +104,8 @@ public:
             configSvrCommitMergeAllChunksOnShard.setShard(request().getShard());
             configSvrCommitMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
                 request().getMaxNumberOfChunksToMerge());
+            configSvrCommitMergeAllChunksOnShard.setMaxTimeProcessingChunksMS(
+                request().getMaxTimeProcessingChunksMS());
 
             auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto swCommandResponse = config->runCommandWithFixedRetryAttempts(
