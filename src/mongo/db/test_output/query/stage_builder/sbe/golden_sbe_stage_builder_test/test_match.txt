@@ -1,0 +1,6 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestMatch
+[3] project [s4 = newBsonObj("a", s3)] 
+[2] filter {false} 
+[1] project [s3 = getField(s2, "a")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : 2}], [{"a" : 2, "b" : 2}], [{"a" : 3, "b" : 2}]]} 

@@ -836,6 +836,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_expression_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_filtern_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_stage_builder_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/search_sbe_stage_builder_test:test_data",
     ],
     tags = [
         "compile_requires_large_memory_gcc",

@@ -71,6 +71,24 @@ using namespace mongo::unittest::match;
  */
 class SbeStageBuilderTestFixture : public sbe::PlanStageTestFixture {
 public:
+    struct BuildPlanStageParam {
+        boost::optional<boost::intrusive_ptr<ExpressionContext>> expCtx;
+        std::unique_ptr<ShardFiltererFactoryInterface> shardFilterInterface;
+        std::unique_ptr<CollatorInterface> collator;
+
+        boost::optional<int64_t> limit;
+        boost::optional<int64_t> skip;
+        mongo::OptionalBool tailable;
+
+        std::unique_ptr<FindCommandRequest> makeFindCmdReq(NamespaceString nss) {
+            auto findCommand = std::make_unique<FindCommandRequest>(nss);
+            findCommand->setLimit(limit);
+            findCommand->setSkip(skip);
+            findCommand->setTailable(tailable);
+            return findCommand;
+        }
+    };
+
     /**
      * Makes a QuerySolution from a QuerySolutionNode.
      */
@@ -93,8 +111,7 @@ public:
     buildPlanStage(std::unique_ptr<QuerySolution> querySolution,
                    MultipleCollectionAccessor& colls,
                    bool hasRecordId,
-                   std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface,
-                   std::unique_ptr<CollatorInterface> collator = nullptr);
+                   BuildPlanStageParam param = {});
 
     std::tuple<sbe::value::SlotVector,
                std::unique_ptr<sbe::PlanStage>,
@@ -108,8 +125,8 @@ public:
         return buildPlanStage(std::move(querySolution),
                               nullColl,
                               hasRecordId,
-                              std::move(shardFiltererFactoryInterface),
-                              std::move(collator));
+                              {.shardFilterInterface = std::move(shardFiltererFactoryInterface),
+                               .collator = std::move(collator)});
     }
 
 protected:
@@ -130,9 +147,14 @@ protected:
     // Random uuid will fail the golden data test, replace it to a constant string.
     std::string replaceUuid(std::string input, UUID uuid);
     void insertDocuments(const std::vector<BSONObj>& docs);
-    void runTest(std::unique_ptr<QuerySolutionNode> root, const mongo::BSONArray& expectedValue);
+    void createCollection(const std::vector<BSONObj>& docs,
+                          boost::optional<BSONObj> indexKeyPattern);
+    void runTest(std::unique_ptr<QuerySolutionNode> root,
+                 const mongo::BSONArray& expectedValue,
+                 BuildPlanStageParam param = {});
 
     std::unique_ptr<GoldenTestContext> _gctx;
+    bool _collInitialized = false;
 };
 
 class GoldenSbeExprBuilderTestFixture : public GoldenSbeStageBuilderTestFixture {

@@ -1,0 +1,5 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestSortCovered
+[3] project [s4 = makeBsonObj(MakeObjSpec([a = Add(0)], Closed, NewObj, 0), null, s2)] 
+[2] sort [s3] [desc] [s2] 9223372036854775807ll 
+[2] project [s3 = (s2 ?: null)] 
+[1] ixseek KS(2B0201) KS(2B06FE) none s1 none none [s2 = 0] @"UUID" @"a_1" true 

@@ -1,0 +1,26 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestCollScanTailable
+[1] union [s10] 
+    branch0 [s2] 
+        [1] cfilter {!(exists(s1))} 
+        [1] scan s2 s3 none none none none none none [] @"UUID" true false 
+    branch1 [s8] 
+        [1] cfilter {exists(s1)} 
+        [1] limitskip none 1ll 
+        [1] nlj inner [] [s7] 
+            left 
+                [1] limit 1ll 
+                [1] union [s7] 
+                    branch0 [s1] 
+                        [1] nlj inner [s1] [s1] 
+                            left 
+                                [1] limit 1ll 
+                                [1] coscan 
+                            right 
+                                [1] seek s1 s4 s5 none none none none none none [] @"UUID" true false 
+                    branch1 [s6] 
+                        [1] project [s6 = fail(136, "CollectionScan died due to failure to restore tailable cursor position.")] 
+                        [1] limit 1ll 
+                        [1] coscan 
+            right 
+                [1] seek s7 s8 s9 none none none none none none [] @"UUID" true false 
+

@@ -1,0 +1,5 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestShardFilter
+[2] filter {shardFilter(s1, newBsonObj("a", (s4 ?: null)))} 
+[1] project [s4 = getField(s3, "a")] 
+[1] project [s3 = getElement(s2, 0)] 
+[1] virtualscan s2 {[[{"a" : 1, "b" : 2}], [{"a" : 2, "b" : 2}], [{"a" : 3, "b" : 2}]]} 
