@@ -90,7 +90,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongod_options["port"] = self.port
 
         if launch_mongot:
-            self.launch_mongot = True
+            self.launch_mongot_bool = True
             self.mongot_port = fixturelib.get_next_port(job_num)
             self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
             # In future architectures, this could change
@@ -98,9 +98,11 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 "mongotHost"
             ]
         else:
-            self.launch_mongot = False
-        # If a suite enables launching mongot, the MongoTFixture will be created in setup_mongot,
-        # which gets called by ReplicaSetFixture::setup().
+            self.launch_mongot_bool = False
+        # If a suite enables launching mongot, the necessary startup options for the MongoTFixture will be created in
+        # setup_mongot_params() which is called by the builders after all other fixture types have been setup (and
+        # therefore all other nodes have been assigned ports, which allows mongot to connect to a given mongod or
+        # mongos. The MongoTFixture is then launched by the MongoDFixture in setup().
         self.mongot = None
 
         self.router_port = None
@@ -117,6 +119,15 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.get_dbpath_prefix(), uuid.uuid4().hex + ".stacktrace"
         )
         self.mongod_options["set_parameters"]["backtraceLogFile"] = backtrace_log_file_name
+
+    def launch_mongot(self):
+        mongot = self.fixturelib.make_fixture(
+            "MongoTFixture", self.logger, self.job_num, mongot_options=self.mongot_options
+        )
+
+        mongot.setup()
+        self.mongot = mongot
+        self.mongot.await_ready()
 
     def setup(self):
         """Set up the mongod."""
@@ -148,6 +159,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             raise self.fixturelib.ServerFailure(msg)
 
         self.mongod = mongod
+        if self.launch_mongot_bool:
+            self.launch_mongot()
 
     def _all_mongo_d_s_t(self):
         """Return the standalone `mongod` `Process` instance."""
@@ -172,23 +185,19 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.logger.info("Waiting to connect to mongod on port %d.", self.port)
         time.sleep(0.1)  # Wait a little bit before trying again.
 
-    def setup_mongot(self):
+    def setup_mongot_params(self, router_endpoint_for_mongot: Optional[int] = None):
         mongot_options = {}
         mongot_options["mongodHostAndPort"] = "localhost:" + str(self.port)
         mongot_options["port"] = self.mongot_port
+
+        if router_endpoint_for_mongot is not None:
+            mongot_options["mongosHostAndPort"] = "localhost:" + str(router_endpoint_for_mongot)
 
         if "keyFile" not in self.mongod_options:
             raise self.fixturelib.ServerFailure("Cannot launch mongot without providing a keyfile")
 
         mongot_options["keyFile"] = self.mongod_options["keyFile"]
-
-        mongot = self.fixturelib.make_fixture(
-            "MongoTFixture", self.logger, self.job_num, mongot_options=mongot_options
-        )
-
-        mongot.setup()
-        self.mongot = mongot
-        self.mongot.await_ready()
+        self.mongot_options = mongot_options
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""

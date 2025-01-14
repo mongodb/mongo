@@ -237,6 +237,10 @@ class ReplSetBuilder(FixtureBuilder):
                     launch_mongot,
                 )
 
+        if launch_mongot:
+            for mongod in replset.nodes:
+                mongod.setup_mongot_params()
+
         return replset
 
     @staticmethod
@@ -496,6 +500,24 @@ class ShardedClusterBuilder(FixtureBuilder):
         for mongos_index in range(num_routers):
             install_router()
 
+        # When a createSearchIndex command is issued, mongot
+        # sends a $listCollections to verify information in the index command.
+        # However, mongot is not necessarily connected to a primary shard, in which case
+        # its colocated mongod will not be able to answer $listCollections on a sharded
+        # view namespace. Instead, mongot routes $listCollections to mongos. Therefore
+        # each MongoTFixture needs to know the port of the MongoSFixture.
+        router_endpoint_for_mongot = sharded_cluster.mongos[-1].port
+
+        if launch_mongot:
+            for shard in sharded_cluster.shards:
+                for node in shard.nodes:
+                    # Having the builders setup the MongoTFixture after all other fixtures have been setup gives us the ability
+                    # to test embedded routers with search features.
+                    node.setup_mongot_params(router_endpoint_for_mongot)
+                # Saving the mongot port to the ReplicaSetFixture allows the ShardedClusterFixture
+                # to spin up a mongos with a connection to the last launched mongot.
+                shard.mongot_port = shard.nodes[-1].mongot_port
+
         return sharded_cluster
 
     @staticmethod
@@ -664,6 +686,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         :param old_bin_version: old bin version
         :param rs_shard_index: replica set shard index
         :param num_rs_nodes_per_shard: the number of nodes in a replica set per shard
+        :param launch_mongot: bool indicating if each shard needs to startup a mongot
         :return: replica set fixture configured as a shard in a sharded cluster
         """
 
