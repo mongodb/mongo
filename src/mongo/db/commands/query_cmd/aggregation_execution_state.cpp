@@ -81,9 +81,19 @@ public:
             _collections.getMainCollection());
     }
 
-    const AutoGetCollectionForReadCommandMaybeLockFree& getCtx() const override {
+    const CollectionPtr& getPrimaryCollection() const override {
         invariant(lockAcquired());
-        return *_ctx;
+        return _ctx->getCollection();
+    }
+
+    query_shape::CollectionType getPrimaryCollectionType() const override {
+        invariant(lockAcquired());
+        return _ctx->getCollectionType();
+    }
+
+    const ViewDefinition* getPrimaryView() const override {
+        invariant(lockAcquired());
+        return _ctx->getView();
     }
 
     void getStatsTrackerIfNeeded(boost::optional<AutoStatsTracker>& statsTracker) const override {
@@ -246,7 +256,15 @@ public:
             CollectionPtr());
     }
 
-    const AutoGetCollectionForReadCommandMaybeLockFree& getCtx() const override {
+    const CollectionPtr& getPrimaryCollection() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    query_shape::CollectionType getPrimaryCollectionType() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    const ViewDefinition* getPrimaryView() const override {
         MONGO_UNREACHABLE;
     }
 
@@ -606,8 +624,8 @@ void AggCatalogState::validate() const {
     if (_aggExState.getRequest().getResumeAfter()) {
         uassert(ErrorCodes::InvalidPipelineOperator,
                 "$_resumeAfter is not supported on view",
-                !getCtx().getView());
-        const auto& collection = getCtx().getCollection();
+                !getPrimaryView());
+        const auto& collection = getPrimaryCollection();
         const bool isClusteredCollection = collection && collection->isClustered();
         uassertStatusOK(query_request_helper::validateResumeInput(
             _aggExState.getOpCtx(),
@@ -650,7 +668,7 @@ query_shape::CollectionType AggCatalogState::determineCollectionType() const {
     if (_aggExState.hasChangeStream()) {
         return query_shape::CollectionType::kChangeStream;
     }
-    return lockAcquired() ? getCtx().getCollectionType() : query_shape::CollectionType::kUnknown;
+    return lockAcquired() ? getPrimaryCollectionType() : query_shape::CollectionType::kUnknown;
 }
 
 std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createDefaultAggCatalogState(

@@ -542,7 +542,7 @@ void executeUntilFirstBatch(const AggExState& aggExState,
         auto exec =
             maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
         const auto& planExplainer = exec->getPlanExplainer();
-        if (const auto& coll = aggCatalogState.getCtx().getCollection()) {
+        if (const auto& coll = aggCatalogState.getPrimaryCollection()) {
             CollectionQueryInfo::get(coll).notifyOfQuery(
                 coll, CurOp::get(aggExState.getOpCtx())->debug());
         }
@@ -782,7 +782,7 @@ Status runAggregateOnView(AggExState& aggExState,
     // Resolve the request's collation and check that the default collation of 'view' is compatible
     // with the operation's collation. The collation resolution and check are both skipped if the
     // request did not specify a collation.
-    const ViewDefinition* view = aggCatalogState->getCtx().getView();
+    const ViewDefinition* view = aggCatalogState->getPrimaryView();
     if (!aggExState.getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
         auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
         if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collatorToUse.get()) &&
@@ -881,8 +881,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Register query stats with the pre-optimized pipeline. Exclude queries against collections
     // with encrypted fields. We still collect query stats on collection-less aggregations.
     bool hasEncryptedFields = aggCatalogState.lockAcquired() &&
-        aggCatalogState.getCtx().getCollection() &&
-        aggCatalogState.getCtx().getCollection()->getCollectionOptions().encryptedFieldConfig;
+        aggCatalogState.getPrimaryCollection() &&
+        aggCatalogState.getPrimaryCollection()->getCollectionOptions().encryptedFieldConfig;
     if (!hasEncryptedFields) {
         // If this is a query over a resolved view, we want to register query stats with the
         // original user-given request and pipeline, rather than the new request generated when
@@ -1035,13 +1035,13 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
     // If this is a view, we must resolve the view, then recursively call runAggregate from
     // runAggregateOnView.
-    if (aggCatalogState->lockAcquired() && aggCatalogState->getCtx().getView()) {
+    if (aggCatalogState->lockAcquired() && aggCatalogState->getPrimaryView()) {
         // We do not need to expand the view pipeline when there is a $collStats stage, as
         // $collStats is supported on a view namespace. For a time-series collection, however,
         // the view is abstracted out for the users, so we needed to resolve the namespace to
         // get the underlying bucket collection.
         bool shouldViewBeExpanded =
-            !aggExState.startsWithCollStats() || aggCatalogState->getCtx().getView()->timeseries();
+            !aggExState.startsWithCollStats() || aggCatalogState->getPrimaryView()->timeseries();
         if (shouldViewBeExpanded) {
             return runAggregateOnView(aggExState, std::move(aggCatalogState), result);
         }

@@ -380,10 +380,17 @@ public:
     virtual bool lockAcquired() const = 0;
 
     /**
-     * Return the catalog context for this pipeline. This will fail an invariant if called for a
+     * Return the primary collection for this pipeline. This will fail an invariant if called for a
      * collectionless pipeline.
      */
-    virtual const AutoGetCollectionForReadCommandMaybeLockFree& getCtx() const = 0;
+    virtual const CollectionPtr& getPrimaryCollection() const = 0;
+
+
+    /**
+     * Return the view on primary namespace for this pipeline. This will fail an invariant if
+     * called for a collectionless pipeline.
+     */
+    virtual const ViewDefinition* getPrimaryView() const = 0;
 
     /**
      * Collectionless pipelines may need an 'AutoStatsTracker' to track stats. This method will
@@ -430,6 +437,12 @@ public:
 
 protected:
     explicit AggCatalogState(const AggExState& aggExState) : _aggExState{aggExState} {}
+
+    /**
+     * Return the primary collection type for this pipeline. This will fail an invariant if called
+     * for a collectionless pipeline.
+     */
+    virtual query_shape::CollectionType getPrimaryCollectionType() const = 0;
 
     // Reference to the aggregation execution state, which is owned by the caller of
     // _runAggregate(). Since AggCatalogState is always allocated from within _runAggregate(),
