@@ -8,16 +8,16 @@ function _getRandomElem(list) {
     return list[Math.floor(Math.random() * list.length)];
 }
 
-function _getShardDescriptors(conn) {
+export function getShardDescriptors(conn) {
     return assert.commandWorked(conn.adminCommand({listShards: 1})).shards;
 }
 
 export function getShardNames(conn) {
-    return _getShardDescriptors(conn).map(shard => shard._id);
+    return getShardDescriptors(conn).map(shard => shard._id);
 }
 
 export function getNumShards(conn) {
-    return _getShardDescriptors(conn).length;
+    return getShardDescriptors(conn).length;
 }
 
 export function getRandomShardName(conn, exclude = []) {

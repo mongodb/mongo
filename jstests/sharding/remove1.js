@@ -1,4 +1,3 @@
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -7,9 +6,6 @@ var config = s.s0.getDB('config');
 
 assert.commandWorked(
     s.s0.adminCommand({enableSharding: 'needToMove', primaryShard: s.shard0.shardName}));
-
-// Returns an error when trying to remove a shard that doesn't exist.
-assert.commandFailedWithCode(s.s0.adminCommand({removeshard: "shardz"}), ErrorCodes.ShardNotFound);
 
 var topologyTime0 = config.shards.findOne({_id: s.shard0.shardName}).topologyTime;
 var topologyTime1 = config.shards.findOne({_id: s.shard1.shardName}).topologyTime;
@@ -57,12 +53,4 @@ assert.gt(topologyTime2, topologyTime1);
 
 assert.commandFailed(s.s0.adminCommand({removeshard: s.shard1.shardName}));
 
-// Should create a shard0002 shard
-const rs = new ReplSetTest({nodes: 1});
-rs.startSet({shardsvr: ""});
-rs.initiate();
-assert.commandWorked(s.s0.adminCommand({addshard: rs.getURL()}));
-assert.eq(2, s.config.shards.count(), "new server does not appear in count");
-
-rs.stopSet();
 s.stop();

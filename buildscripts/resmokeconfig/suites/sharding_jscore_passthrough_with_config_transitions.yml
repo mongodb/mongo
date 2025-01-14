@@ -90,6 +90,7 @@ selector:
     - requires_getmore
     - does_not_support_retryable_writes
     - requires_non_retryable_writes
+    - assumes_stable_shard_list
 
 executor:
   archive:

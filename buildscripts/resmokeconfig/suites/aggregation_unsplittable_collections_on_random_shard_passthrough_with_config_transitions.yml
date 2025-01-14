@@ -112,6 +112,7 @@ selector:
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
     - assumes_no_track_upon_creation
+    - assumes_stable_shard_list
 
 executor:
   archive:

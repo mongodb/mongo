@@ -201,6 +201,7 @@ selector:
 
     # The following tags are excluded specifically for this suite.
     - config_shard_incompatible
+    - assumes_stable_shard_list
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
     # Fast count doesn't filter orphan documents
