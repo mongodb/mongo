@@ -79,9 +79,8 @@ public:
         using namespace sbe::value;
         auto [tag, val] = makeNewArray();
         auto arr = getArrayView(val);
-        (arr->push_back(std::forward<decltype(elements)>(elements).first,
-                        std::forward<decltype(elements)>(elements).second),
-         ...);
+        // Add each {tag, val} pair to the array.
+        (arr->push_back(std::forward<decltype(elements)>(elements)), ...);
         return make<Constant>(tag, val);
     }
 
