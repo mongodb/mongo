@@ -2848,14 +2848,15 @@ intrusive_ptr<Expression> ExpressionFilter::optimize() {
 
 Value ExpressionFilter::serialize(const SerializationOptions& options) const {
     if (_limit) {
-        return Value(DOC(
-            "$filter" << DOC("input" << _children[_kInput]->serialize(options) << "as" << _varName
-                                     << "cond" << _children[_kCond]->serialize(options) << "limit"
-                                     << (_children[*_limit])->serialize(options))));
+        return Value(
+            DOC("$filter" << DOC("input" << _children[_kInput]->serialize(options) << "as"
+                                         << options.serializeIdentifier(_varName) << "cond"
+                                         << _children[_kCond]->serialize(options) << "limit"
+                                         << (_children[*_limit])->serialize(options))));
     }
-    return Value(
-        DOC("$filter" << DOC("input" << _children[_kInput]->serialize(options) << "as" << _varName
-                                     << "cond" << _children[_kCond]->serialize(options))));
+    return Value(DOC("$filter" << DOC("input" << _children[_kInput]->serialize(options) << "as"
+                                              << options.serializeIdentifier(_varName) << "cond"
+                                              << _children[_kCond]->serialize(options))));
 }
 
 Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
@@ -3136,9 +3137,9 @@ intrusive_ptr<Expression> ExpressionMap::optimize() {
 }
 
 Value ExpressionMap::serialize(const SerializationOptions& options) const {
-    return Value(
-        DOC("$map" << DOC("input" << _children[_kInput]->serialize(options) << "as" << _varName
-                                  << "in" << _children[_kEach]->serialize(options))));
+    return Value(DOC("$map" << DOC("input" << _children[_kInput]->serialize(options) << "as"
+                                           << options.serializeIdentifier(_varName) << "in"
+                                           << _children[_kEach]->serialize(options))));
 }
 
 Value ExpressionMap::evaluate(const Document& root, Variables* variables) const {
