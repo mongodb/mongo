@@ -409,7 +409,52 @@ Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables
 
 Value evaluate(const ExpressionObject& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionFieldPath& expr, const Document& root, Variables* variables);
+
+/*
+ * Helper function to evaluate ExpressionFieldPath, used recursively.
+ *
+ * The helper function doesn't just use a loop because of
+ * the possibility that we need to skip over an array.  If the path
+ * is "a.b.c", and a is an array, then we fan out from there, and
+ * traverse "b.c" for each element of a:[...].  This requires that
+ * a be an array of objects in order to navigate more deeply.
+ *
+ * @param fieldPath
+ * @param index current path field index to extract
+ * @param input current document traversed to (not the top-level one)
+ * @returns the field found; could be an array
+ */
+Value evaluatePath(const FieldPath& fieldPath, size_t index, const Document& input);
+
+/*
+ * Helper for evaluatePath to handle Array case
+ */
+Value evaluatePathArray(const FieldPath& fieldPath, size_t index, const Value& input);
+
+inline Value evaluate(const ExpressionFieldPath& expr, const Document& root, Variables* variables) {
+    auto& fieldPath = expr.getFieldPath();
+    auto variable = expr.getVariableId();
+
+    if (fieldPath.getPathLength() == 1) {  // get the whole variable
+        return variables->getValue(variable, root);
+    }
+
+    if (variable == Variables::kRootId) {
+        // ROOT is always a document so use optimized code path
+        return evaluatePath(fieldPath, 1, root);
+    }
+
+    Value var = variables->getValue(variable, root);
+    switch (var.getType()) {
+        case Object:
+            return evaluatePath(fieldPath, 1, var.getDocument());
+        case Array:
+            return evaluatePathArray(fieldPath, 1, var);
+        default:
+            return Value();
+    }
+}
+
 Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionInternalFindAllValuesAtPath& expr,

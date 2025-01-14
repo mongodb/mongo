@@ -61,25 +61,6 @@ Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* 
     return Value(arg.getDocument().toBson().objsize());
 }
 
-namespace {
-
-// Helper for evaluatePath to handle Array case
-Value evaluatePathArray(const FieldPath& fieldPath, size_t index, const Value& input);
-
-/*
-Helper function to evaluate ExpressionFieldPath, used recursively.
-
-The helper function doesn't just use a loop because of
-the possibility that we need to skip over an array.  If the path
-is "a.b.c", and a is an array, then we fan out from there, and
-traverse "b.c" for each element of a:[...].  This requires that
-a be an array of objects in order to navigate more deeply.
-
-@param fieldPath
-@param index current path field index to extract
-@param input current document traversed to (not the top-level one)
-@returns the field found; could be an array
-*/
 Value evaluatePath(const FieldPath& fieldPath, size_t index, const Document& input) {
     // Note this function is very hot so it is important that is is well optimized.
     // In particular, all return paths should support RVO.
@@ -121,32 +102,6 @@ Value evaluatePathArray(const FieldPath& fieldPath, size_t index, const Value& i
     }
 
     return Value(std::move(result));
-}
-
-}  // namespace
-
-Value evaluate(const ExpressionFieldPath& expr, const Document& root, Variables* variables) {
-    auto& fieldPath = expr.getFieldPath();
-    auto variable = expr.getVariableId();
-
-    if (fieldPath.getPathLength() == 1) {  // get the whole variable
-        return variables->getValue(variable, root);
-    }
-
-    if (variable == Variables::kRootId) {
-        // ROOT is always a document so use optimized code path
-        return evaluatePath(fieldPath, 1, root);
-    }
-
-    Value var = variables->getValue(variable, root);
-    switch (var.getType()) {
-        case Object:
-            return evaluatePath(fieldPath, 1, var.getDocument());
-        case Array:
-            return evaluatePathArray(fieldPath, 1, var);
-        default:
-            return Value();
-    }
 }
 
 Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* variables) {
