@@ -74,13 +74,8 @@ struct BucketToReopen {
  * Information of a Bucket that got archived while performing an operation on the BucketCatalog.
  */
 struct ArchivedBucket {
-    ArchivedBucket() = delete;
-    ArchivedBucket(const BucketId& bucketId, const tracked_string& timeField);
-
-    BucketId bucketId;
-    tracked_string timeField;
+    OID oid;
 };
-
 
 /**
  * A light wrapper around a promise type to allow potentially conflicting operations to ensure

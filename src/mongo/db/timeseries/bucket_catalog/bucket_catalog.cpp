@@ -175,10 +175,10 @@ Stripe::Stripe(TrackingContexts& trackingContexts)
       idleBuckets(make_tracked_list<Bucket*>(
           getTrackingContext(trackingContexts, TrackingScope::kIdleBuckets))),
       archivedBuckets(
-          make_tracked_unordered_map<BucketKey::Hash,
-                                     tracked_map<Date_t, ArchivedBucket, std::greater<Date_t>>,
-                                     BucketHasher>(
+          make_tracked_btree_map<ArchivedKey, ArchivedBucket, std::greater<ArchivedKey>>(
               getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
+      collectionTimeFields(make_tracked_unordered_map<UUID, std::tuple<tracked_string, int64_t>>(
+          getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
       outstandingReopeningRequests(
           make_tracked_unordered_map<
               BucketKey,
@@ -662,6 +662,7 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
                             stripe,
                             stripeLock,
                             *bucket,
+                            stats,
                             nullptr,
                             internal::getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
         }
@@ -670,12 +671,13 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
             case RolloverAction::kHardClose:
             case RolloverAction::kSoftClose: {
                 internal::closeOpenBucket(
-                    opCtx, catalog, stripe, stripeLock, *bucket, closedBucket);
+                    opCtx, catalog, stripe, stripeLock, *bucket, stats, closedBucket);
                 break;
             }
             case RolloverAction::kArchive: {
                 ClosedBuckets closedBuckets;
-                internal::archiveBucket(opCtx, catalog, stripe, stripeLock, *bucket, closedBuckets);
+                internal::archiveBucket(
+                    opCtx, catalog, stripe, stripeLock, *bucket, stats, closedBuckets);
                 if (!closedBuckets.empty()) {
                     closedBucket = std::move(closedBuckets[0]);
                 }
@@ -732,15 +734,30 @@ void directWriteFinish(BucketStateRegistry& registry, const BucketId& bucketId) 
     removeDirectWrite(registry, bucketId);
 }
 
-void clear(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs) {
+void drop(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs) {
+    auto stats = internal::releaseExecutionStatsFromBucketCatalog(catalog, clearedCollectionUUIDs);
     clearSetOfBuckets(catalog.bucketStateRegistry, std::move(clearedCollectionUUIDs));
+
+    for (auto&& collStats : stats) {
+        removeCollectionExecutionGauges(catalog.globalExecutionStats, *collStats);
+    }
+}
+
+void drop(BucketCatalog& catalog, const UUID& collectionUUID) {
+    auto stats = internal::releaseExecutionStatsFromBucketCatalog(
+        catalog, std::span<const UUID>(&collectionUUID, 1));
+    clear(catalog, collectionUUID);
+
+    for (auto&& collStats : stats) {
+        removeCollectionExecutionGauges(catalog.globalExecutionStats, *collStats);
+    }
 }
 
 void clear(BucketCatalog& catalog, const UUID& collectionUUID) {
     tracked_vector<UUID> clearedCollectionUUIDs = make_tracked_vector<UUID>(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kBucketStateRegistry));
     clearedCollectionUUIDs.push_back(collectionUUID);
-    clear(catalog, std::move(clearedCollectionUUIDs));
+    clearSetOfBuckets(catalog.bucketStateRegistry, std::move(clearedCollectionUUIDs));
 }
 
 void freeze(BucketCatalog& catalog, const BucketId& bucketId) {
@@ -791,8 +808,10 @@ void appendExecutionStats(const BucketCatalog& catalog,
                           const UUID& collectionUUID,
                           BSONObjBuilder& builder) {
     const shared_tracked_ptr<ExecutionStats> stats =
-        internal::getExecutionStats(catalog, collectionUUID);
-    appendExecutionStatsToBuilder(*stats, builder);
+        internal::getCollectionExecutionStats(catalog, collectionUUID);
+    if (stats) {
+        appendExecutionStatsToBuilder(*stats, builder);
+    }
 }
 
 void reportMeasurementsGroupCommitted(BucketCatalog& catalog,

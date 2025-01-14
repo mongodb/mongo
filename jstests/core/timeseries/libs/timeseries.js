@@ -296,6 +296,14 @@ export var TimeseriesTest = class {
         return (version == TimeseriesTest.BucketVersion.kCompressedSorted ||
                 version == TimeseriesTest.BucketVersion.kCompressedUnsorted);
     }
+
+    // Timeseries stats are not returned if there are no timeseries collection. This is a helper to
+    // handle that case when tests drop their timeseries collections.
+    static getStat(stats, name) {
+        if (stats.hasOwnProperty(name))
+            return stats[name];
+        return 0;
+    }
 };
 
 TimeseriesTest.BucketVersion = {

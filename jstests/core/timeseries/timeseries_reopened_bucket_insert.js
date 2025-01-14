@@ -39,8 +39,9 @@ const checkIfBucketReopened = function(
     measurement, willCreateBucket = false, willReopenBucket = false) {
     let stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
-    const prevBucketCount = stats.timeseries['bucketCount'];
-    const prevExpectedReopenedBuckets = stats.timeseries['numBucketsReopened'];
+    const prevBucketCount = TimeseriesTest.getStat(stats.timeseries, 'bucketCount');
+    const prevExpectedReopenedBuckets =
+        TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened');
 
     const expectedReopenedBuckets =
         (willReopenBucket) ? prevExpectedReopenedBuckets + 1 : prevExpectedReopenedBuckets;
@@ -50,7 +51,8 @@ const checkIfBucketReopened = function(
     stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
     assert.eq(stats.timeseries['bucketCount'], expectedBucketCount);
-    assert.eq(stats.timeseries['numBucketsReopened'], expectedReopenedBuckets);
+    assert.eq(TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened'),
+              expectedReopenedBuckets);
 };
 
 (function expectNoBucketReopening() {

@@ -72,6 +72,7 @@
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
+constexpr StringData kNumActiveBuckets = "numActiveBuckets"_sd;
 constexpr StringData kNumSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
 constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
 constexpr StringData kNumArchivedDueToMemoryThreshold = "numBucketsArchivedDueToMemoryThreshold"_sd;
@@ -91,6 +92,7 @@ protected:
     };
 
     void setUp() override;
+    void tearDown() override;
     virtual void preSetUp();
     virtual std::vector<NamespaceString> getNamespaceStrings();
 
@@ -190,6 +192,32 @@ void BucketCatalogTest::setUp() {
         AutoGetCollection autoColl(_opCtx, ns->makeTimeseriesBucketsNamespace(), MODE_IS);
         *uuid = autoColl.getCollection()->uuid();
     }
+}
+
+void BucketCatalogTest::tearDown() {
+    // Validate that all tracked execution stats adds up to what is being tracked globally.
+    ExecutionStats accumulated;
+    for (auto&& execStats : _bucketCatalog->executionStats) {
+
+        addCollectionExecutionGauges(accumulated, *execStats.second);
+    }
+
+    // Compare as BSON, this allows us to avoid enumerating all the individual stats in this
+    // function and makes it robust to adding further stats in the future.
+    auto execStatsToBSON = [](const ExecutionStats& stats) {
+        BSONObjBuilder builder;
+        appendExecutionStatsToBuilder(stats, builder);
+        return builder.obj();
+    };
+
+    ExecutionStats global;
+
+    // Filter out the guages only
+    addCollectionExecutionGauges(global, _bucketCatalog->globalExecutionStats);
+
+    ASSERT_EQ(0, execStatsToBSON(global).woCompare(execStatsToBSON(accumulated)));
+
+    CatalogTestFixture::tearDown();
 }
 
 BucketCatalogTest::RunBackgroundTaskAndWaitForFailpoint::RunBackgroundTaskAndWaitForFailpoint(
@@ -337,7 +365,10 @@ BucketCatalogTest::_insertOneWithReopeningContextHelper(
 long long BucketCatalogTest::_getExecutionStat(const UUID& uuid, StringData stat) {
     BSONObjBuilder builder;
     appendExecutionStats(*_bucketCatalog, uuid, builder);
-    return builder.obj().getIntField(stat);
+
+    BSONObj obj = builder.obj();
+    BSONElement e = obj.getField(stat);
+    return e.isNumber() ? (int)e.number() : 0;
 }
 
 void BucketCatalogTest::_testMeasurementSchema(
@@ -655,16 +686,38 @@ TEST_F(BucketCatalogTest, NumCommittedMeasurementsAccumulates) {
     // the bucket are committed.
     _insertOneAndCommit(_ns1, _uuid1, 0);
     _insertOneAndCommit(_ns1, _uuid1, 1);
+
+    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
 }
 
 TEST_F(BucketCatalogTest, ClearNamespaceBuckets) {
     _insertOneAndCommit(_ns1, _uuid1, 0);
     _insertOneAndCommit(_ns2, _uuid2, 0);
+    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
+    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
 
+    // Clearing the UUID does not immediately remove tracking from the bucket catalog as this is
+    // async.
     clear(*_bucketCatalog, _uuid1);
+    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
+    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
 
     _insertOneAndCommit(_ns1, _uuid1, 0);
     _insertOneAndCommit(_ns2, _uuid2, 1);
+    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
+    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
+}
+
+TEST_F(BucketCatalogTest, DropNamespaceBuckets) {
+    _insertOneAndCommit(_ns1, _uuid1, 0);
+    _insertOneAndCommit(_ns2, _uuid2, 0);
+    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
+    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
+
+    // Dropping the UUID immediately remove tracking from the bucket catalog.
+    drop(*_bucketCatalog, _uuid1);
+    ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumActiveBuckets));
+    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
 }
 
 TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
@@ -1268,7 +1321,7 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
 
     ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), bucketDoc));
 
-    auto stats = internal::getExecutionStats(*_bucketCatalog, _uuid1);
+    auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailed.load());
 }
 
@@ -1615,7 +1668,7 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
         "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
 
     RAIIServerParameterControllerForTest memoryLimit{
-        "timeseriesIdleBucketExpiryMemoryUsageThreshold", 10000};
+        "timeseriesIdleBucketExpiryMemoryUsageThreshold", 20'000};
 
     // Insert a measurement with a unique meta value, guaranteeing we will open a new bucket but not
     // close an old one except under memory pressure.
@@ -1636,13 +1689,15 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
     };
 
     // Ensure we start out with no buckets archived or closed due to memory pressure.
+    ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumActiveBuckets));
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold));
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold));
 
-    // With a memory limit of 10000 bytes, we should be guaranteed to hit the memory limit with no
-    // more than 1000 buckets since an open bucket takes up at least 10 bytes (in reality,
+    // With a memory limit of 20,000 bytes, we should be guaranteed to hit the memory limit with no
+    // more than 1000 buckets since an open bucket takes up at least 20 bytes (in reality,
     // significantly more, but this is definitely a safe assumption).
-    for (int i = 0; i < 1000; ++i) {
+    int bucketsCreated;
+    for (bucketsCreated = 1; bucketsCreated <= 1000; ++bucketsCreated) {
         [[maybe_unused]] auto closedBuckets = insertDocument();
 
         if (0 < _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold)) {
@@ -1658,15 +1713,18 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
     ASSERT_LT(0, _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold));
     auto numClosedInFirstRound = _getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold);
     ASSERT_LTE(numClosedInFirstRound, _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold));
+    ASSERT_EQ(_getExecutionStat(_uuid1, kNumActiveBuckets), bucketsCreated - numClosedInFirstRound);
 
     // If we continue to open more new buckets with distinct meta values, eventually we'll run out
     // of open buckets to archive and have to start closing archived buckets to relieve memory
-    // pressure. Again, an archived bucket should take up more than 10 bytes in the catalog, so we
+    // pressure. Again, an archived bucket should take up more than 20 bytes in the catalog, so we
     // should be fine with a maximum of 1000 iterations.
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 1; i <= 1000; ++i) {
         auto closedBuckets = insertDocument();
 
         if (numClosedInFirstRound < _getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold)) {
+            ASSERT_EQ(_getExecutionStat(_uuid1, kNumActiveBuckets),
+                      bucketsCreated + i - numClosedInFirstRound - closedBuckets.size());
             ASSERT_FALSE(closedBuckets.empty());
             break;
         }
@@ -1674,6 +1732,92 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
 
     // We should have closed some (additional) buckets by now.
     ASSERT_LT(numClosedInFirstRound, _getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold));
+}
+
+TEST_F(BucketCatalogTest, ExpireBucketsForDroppedCollections) {
+    // ClosedBuckets are not generated when using the always compressed feature.
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", false};
+
+    // Use same stripe so we would clean up buckets from different collections.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+
+    // Insert a measurement with a unique meta value, guaranteeing we will open a new bucket but
+    // not close an old one except under memory pressure.
+    long long meta = 0;
+    auto insertDocument = [&meta, this](NamespaceString& ns, UUID uuid) -> ClosedBuckets {
+        auto result = _insertOneHelper(_opCtx,
+                                       *_bucketCatalog,
+                                       ns,
+                                       uuid,
+                                       BSON(_timeField << Date_t::now() << _metaField << meta++));
+        ASSERT_OK(result.getStatus());
+        auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+        ASSERT(claimWriteBatchCommitRights(*batch));
+        ASSERT_OK(prepareCommit(*_bucketCatalog, ns, batch, _getCollator(ns)));
+        finish(_opCtx, *_bucketCatalog, ns, batch, {});
+
+        return std::move(get<SuccessfulInsertion>(result.getValue()).closedBuckets);
+    };
+
+    {
+        RAIIServerParameterControllerForTest memoryLimit{
+            "timeseriesIdleBucketExpiryMemoryUsageThreshold", 20'000};
+
+        // Ensure we start out with no buckets archived or closed due to memory pressure.
+        ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumActiveBuckets));
+        ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold));
+        ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold));
+
+        // With a memory limit of 20,000 bytes, we should be guaranteed to hit the memory limit with
+        // no more than 1000 buckets since an open bucket takes up at least 20 bytes (in reality,
+        // significantly more, but this is definitely a safe assumption).
+        int bucketsCreated;
+        for (bucketsCreated = 1; bucketsCreated <= 1000; ++bucketsCreated) {
+            [[maybe_unused]] auto closedBuckets = insertDocument(_ns1, _uuid1);
+
+            if (0 < _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold)) {
+                break;
+            }
+        }
+
+        // When we first hit the limit, we should try to archive some buckets prior to closing
+        // anything.
+        ASSERT_LT(0, _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold));
+        auto numClosedInFirstRound = _getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold);
+        ASSERT_LTE(numClosedInFirstRound,
+                   _getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold));
+        ASSERT_EQ(_getExecutionStat(_uuid1, kNumActiveBuckets),
+                  bucketsCreated - numClosedInFirstRound);
+    }
+
+    // Drop the collection for which we have buckets that are both open and archived state. This
+    // should immedietly adjust the stats and globally we now track 0 buckets even though the
+    // buckets are going to be asynchronously cleaned up later.
+    drop(*_bucketCatalog, _uuid1);
+    ASSERT_EQ(_getExecutionStat(_uuid1, kNumActiveBuckets), 0);
+    ASSERT_EQ(_getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold), 0);
+    ASSERT_EQ(_getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold), 0);
+
+    // Set the memory limit very low and allow all buckets to expire. We can then insert one bucket
+    // in a new collection which causes all existing open and archived buckets from the old
+    // collection to close.
+    RAIIServerParameterControllerForTest memoryLimit{
+        "timeseriesIdleBucketExpiryMemoryUsageThreshold", 1};
+
+    RAIIServerParameterControllerForTest maxExpiryPerAttempt{
+        "timeseriesIdleBucketExpiryMaxCountPerAttempt", 1000};
+
+    [[maybe_unused]] auto closedBuckets = insertDocument(_ns2, _uuid2);
+
+    // We should have a single active bucket and no double accounting for the buckets from the old
+    // collection that expired when we inserted above.
+    ASSERT_EQ(_getExecutionStat(_uuid1, kNumActiveBuckets), 0);
+    ASSERT_EQ(_getExecutionStat(_uuid1, kNumArchivedDueToMemoryThreshold), 0);
+    ASSERT_EQ(_getExecutionStat(_uuid1, kNumClosedDueToMemoryThreshold), 0);
+    ASSERT_EQ(_getExecutionStat(_uuid2, kNumActiveBuckets), 1);
+    ASSERT_EQ(_getExecutionStat(_uuid2, kNumArchivedDueToMemoryThreshold), 0);
+    ASSERT_EQ(_getExecutionStat(_uuid2, kNumClosedDueToMemoryThreshold), 0);
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
@@ -2079,14 +2223,10 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
                                  doc["tag"],
                                  options.getMetaField()}};
     auto minTime = roundTimestampToGranularity(doc["time"].Date(), options);
-    BucketId id{_uuid1, OID::gen(), 0};
+    BucketId id{_uuid1, OID::gen(), BucketKey::signature(key.hash)};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id));
-    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
-        minTime,
-        ArchivedBucket{id,
-                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
-                                                              TrackingScope::kArchivedBuckets),
-                                           options.getTimeField().toString())});
+    _bucketCatalog->stripes[0]->archivedBuckets[std::make_tuple(_uuid1, key.hash, minTime)] =
+        ArchivedBucket{id.oid};
 
     // Should try to reopen archived bucket.
     boost::optional<StatusWith<InsertResult>> result1 =
@@ -2121,14 +2261,12 @@ TEST_F(BucketCatalogTest,
                                  doc1["tag"],
                                  options.getMetaField()}};
     auto minTime1 = roundTimestampToGranularity(doc1["time"].Date(), options);
-    BucketId id1{_uuid1, OID::gen(), 0};
+    BucketId id1{_uuid1, OID::gen(), BucketKey::signature(key.hash)};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id1));
-    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
-        minTime1,
-        ArchivedBucket{id1,
-                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
-                                                              TrackingScope::kArchivedBuckets),
-                                           options.getTimeField().toString())});
+    _bucketCatalog->stripes[0]->archivedBuckets[std::make_tuple(_uuid1, key.hash, minTime1)] =
+        ArchivedBucket{
+            id1.oid,
+        };
 
     // Should try to reopen archived bucket.
     boost::optional<StatusWith<InsertResult>> result1 =
@@ -2143,14 +2281,12 @@ TEST_F(BucketCatalogTest,
     // Inject another archived record on the same series, but a different bucket.
     BSONObj doc2 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":"c"})");
     auto minTime2 = roundTimestampToGranularity(doc2["time"].Date(), options);
-    BucketId id2{_uuid1, OID::gen(), 0};
+    BucketId id2{_uuid1, OID::gen(), BucketKey::signature(key.hash)};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id2));
-    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
-        minTime2,
-        ArchivedBucket{id2,
-                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
-                                                              TrackingScope::kArchivedBuckets),
-                                           options.getTimeField().toString())});
+    _bucketCatalog->stripes[0]->archivedBuckets[std::make_tuple(_uuid1, key.hash, minTime2)] =
+        ArchivedBucket{
+            id2.oid,
+        };
 
     // A second attempt should block.
     boost::optional<StatusWith<InsertResult>> result2 =
@@ -2232,6 +2368,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
                                 *sideBucketCatalog,
                                 stripe,
                                 stripeLock,
+                                dummyUUID,
                                 statsController,
                                 closedBuckets);
 
@@ -2256,6 +2393,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
                                 *sideBucketCatalog,
                                 stripe,
                                 stripeLock,
+                                dummyUUID,
                                 statsController,
                                 closedBuckets);
 
