@@ -71,7 +71,7 @@ ExternalDataSourceScopeGuard::ExternalDataSourceScopeGuard(
     dropVcollGuard.dismiss();
 }
 
-void ExternalDataSourceScopeGuard::dropVirtualCollections() noexcept {
+void ExternalDataSourceScopeGuard::dropVirtualCollections() {
     // The move constructor sets '_opCtx' to null when ownership is moved to the other object which
     // means this object must not try to drop collections. There's nothing to drop if '_opCtx' is
     // null.
