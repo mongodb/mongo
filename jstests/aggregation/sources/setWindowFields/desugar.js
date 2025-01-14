@@ -8,6 +8,9 @@
  *   assumes_unsharded_collection,
  *   # We're testing the explain plan, not the query results, so the facet passthrough would fail.
  *   do_not_wrap_aggregations_in_facets,
+ *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
+ *   # $sort stage.
+ *  featureFlagRankFusionBasic,
  * ]
  */
 import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
@@ -51,13 +54,13 @@ assert.eq(desugar({$setWindowFields: {output: {}}}), [
 
 // 'sortBy' becomes an explicit $sort stage.
 assert.eq(desugar({$setWindowFields: {sortBy: {ts: 1}, output: {}}}), [
-    {$sort: {sortKey: {ts: 1}}},
+    {$sort: {sortKey: {ts: 1}, outputSortKeyMetadata: true}},
     {$_internalSetWindowFields: {sortBy: {ts: 1}, output: {}}},
 ]);
 
 // 'partitionBy' a field becomes an explicit $sort stage.
 assert.eq(desugar({$setWindowFields: {partitionBy: "$zip", output: {}}}), [
-    {$sort: {sortKey: {zip: 1}}},
+    {$sort: {sortKey: {zip: 1}, outputSortKeyMetadata: true}},
     {$_internalSetWindowFields: {partitionBy: "$zip", output: {}}},
 ]);
 
@@ -67,7 +70,7 @@ let stages = desugar({$setWindowFields: {partitionBy: {$toLower: "$country"}, ou
 let tmp = extractTmp(stages);
 assert.eq(stages, [
     {$addFields: {[tmp]: {$toLower: ["$country"]}}},
-    {$sort: {sortKey: {[tmp]: 1}}},
+    {$sort: {sortKey: {[tmp]: 1}, outputSortKeyMetadata: true}},
     {$_internalSetWindowFields: {partitionBy: '$' + tmp, output: {}}},
     {$project: {[tmp]: false, _id: true}},
 ]);
@@ -75,7 +78,7 @@ assert.eq(stages, [
 // $sort first by partitionBy, then sortBy, because we sort within each partition.
 assert.eq(
     desugar({$setWindowFields: {partitionBy: "$zip", sortBy: {ts: -1, _id: 1}, output: {}}}), [
-        {$sort: {sortKey: {zip: 1, ts: -1, _id: 1}}},
+        {$sort: {sortKey: {zip: 1, ts: -1, _id: 1}, outputSortKeyMetadata: true}},
         {$_internalSetWindowFields: {partitionBy: "$zip", sortBy: {ts: -1, _id: 1}, output: {}}},
     ]);
 
@@ -85,7 +88,7 @@ stages = desugar({
 tmp = extractTmp(stages);
 assert.eq(stages, [
     {$addFields: {[tmp]: {$toLower: ["$country"]}}},
-    {$sort: {sortKey: {[tmp]: 1, ts: -1, _id: 1}}},
+    {$sort: {sortKey: {[tmp]: 1, ts: -1, _id: 1}, outputSortKeyMetadata: true}},
     {$_internalSetWindowFields: {partitionBy: '$' + tmp, sortBy: {ts: -1, _id: 1}, output: {}}},
     {$project: {[tmp]: false, _id: true}},
 ]);

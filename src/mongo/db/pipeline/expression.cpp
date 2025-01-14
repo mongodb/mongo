@@ -2178,6 +2178,34 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
     return exec::expression::evaluate(*this, root, variables);
 }
 
+/* ------------------------- ExpressionInternalRawSortKey ----------------------------- */
+
+REGISTER_EXPRESSION_CONDITIONALLY(
+    _internalSortKey,
+    ExpressionInternalRawSortKey::parse,
+    AllowedWithApiStrict::kInternal,
+    AllowedWithClientType::kInternal,
+    // No feature flag.
+    boost::none,
+    true);  // The 'condition' is always true - we just wanted to restrict to internal.
+
+intrusive_ptr<Expression> ExpressionInternalRawSortKey::parse(ExpressionContext* const expCtx,
+                                                              BSONElement expr,
+                                                              const VariablesParseState& vpsIn) {
+    uassert(9182101,
+            "No known arguments - must be an empty object",
+            expr.type() == BSONType::Object && expr.Obj().isEmpty());
+    return make_intrusive<ExpressionInternalRawSortKey>(expCtx);
+}
+
+Value ExpressionInternalRawSortKey::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kName, Document{}}});
+}
+
+Value ExpressionInternalRawSortKey::evaluate(const Document& root, Variables* variables) const {
+    return root.metadata().getSortKey();
+}
+
 /* ----------------------- ExpressionMod ---------------------------- */
 
 

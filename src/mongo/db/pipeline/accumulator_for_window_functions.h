@@ -93,6 +93,12 @@ public:
 
 class AccumulatorRankBase : public AccumulatorForWindowFunctions {
 public:
+    // The modern constrcutor. When constructed this way, we'll interpret the input values as
+    // directly comparable sort keys, which is simpler.
+    explicit AccumulatorRankBase(ExpressionContext* expCtx);
+    // Legacy constructor. If constructed this way, we'll interpret the input values as raw inputs
+    // which need to be compared carefully (using the comparator to respect collations, and
+    // traversing arrays, etc.).
     explicit AccumulatorRankBase(ExpressionContext* expCtx, bool isAscending);
     void reset() override;
 
@@ -101,9 +107,11 @@ public:
     }
 
 protected:
+    bool isNewValue(Value thisInput);
+
     long long _lastRank = 0;
     boost::optional<Value> _lastInput = boost::none;
-    SortKeyGenerator _sortKeyGen;
+    boost::optional<SortKeyGenerator> _legacySortKeyGen;
 };
 
 class AccumulatorRank : public AccumulatorRankBase {
@@ -113,9 +121,13 @@ public:
     const char* getOpName() const final {
         return kName.rawData();
     }
+    // Modern constructor.
+    explicit AccumulatorRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
 
+    // Legacy constructor
     explicit AccumulatorRank(ExpressionContext* const expCtx, bool isAscending)
         : AccumulatorRankBase(expCtx, isAscending) {}
+
     void processInternal(const Value& input, bool merging) final;
     void reset() final;
 
@@ -131,6 +143,11 @@ public:
         return kName.rawData();
     }
 
+    // Modern constructor.
+    explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx)
+        : AccumulatorRankBase(expCtx) {}
+
+    // Legacy constructor
     explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx, bool isAscending)
         : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
@@ -144,8 +161,13 @@ public:
         return kName.rawData();
     }
 
+    // Modern constructor.
+    explicit AccumulatorDenseRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
+
+    // Legacy constructor
     explicit AccumulatorDenseRank(ExpressionContext* const expCtx, bool isAscending)
         : AccumulatorRankBase(expCtx, isAscending) {}
+
     void processInternal(const Value& input, bool merging) final;
 };
 

@@ -96,6 +96,10 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
     return projectionStage;
 }
 
+bool isSortStageSbeCompatible(const DocumentSourceSort* sort) {
+    return !sort->shouldSetSortKeyMetadata() && isSortSbeCompatible(sort->getSortKeyPattern());
+}
+
 /**
  * Helper for findSbeCompatibleStagesForPushdown() that creates a
  * 'DocumentSourceInternalReplaceRoot' from 'stage' if 'stage' is a '$replaceRoot' that can be
@@ -203,8 +207,7 @@ bool pushDownPipelineStageIfCompatible(
             return false;
         case DocumentSourceType::kSort:
             if (!allowedStages.sort ||
-                !isSortSbeCompatible(
-                    static_cast<DocumentSourceSort*>(stage.get())->getSortKeyPattern())) {
+                !isSortStageSbeCompatible(static_cast<DocumentSourceSort*>(stage.get()))) {
                 return false;
             }
             stagesForPushdown.emplace_back(std::move(stage));
@@ -536,7 +539,7 @@ bool findSbeCompatibleStagesForPushdown(
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is
         // possible that the merge operation will need a $sortKey field from the sort, and SBE plans
         // do not yet support metadata fields.
-        .sort = meetsRequirements(SbeCompatibility::requiresTrySbe) && !needsMerge,
+        .sort = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         .limitSkip = meetsRequirements(SbeCompatibility::requiresTrySbe),
 

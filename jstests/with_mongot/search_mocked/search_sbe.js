@@ -1,6 +1,6 @@
 /**
  * Tests basic functionality of pushing down $search into SBE.
- * @tags: [featureFlagSbeFull]
+ * @tags: [featureFlagSbeFull, featureFlagRankFusionBasic]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -714,7 +714,7 @@ function testMetaProj(mongotQuery, pipeline) {
                     }
                 }
             }
-        }
+        },
     ];
     const mongotResponseBatch = [
         {
@@ -753,8 +753,8 @@ function testMetaProj(mongotQuery, pipeline) {
 
     const plan = runSearchTest(mongotQuery, pipeline, mongotResponseBatch, expectedDocs);
     assert.eq(2, plan['explainVersion']);
-    // Make sure $setWindowFields is pushed down into SBE.
-    assert.eq(getWinningPlanFromExplain(plan).stage, "WINDOW", plan);
+    // $setWindowFields is *not* expected to be pushed down into SBE, since it uses $rank.
+    assert.neq(getWinningPlanFromExplain(plan).stage, "WINDOW", plan);
 }
 
 mongotmock.stop();

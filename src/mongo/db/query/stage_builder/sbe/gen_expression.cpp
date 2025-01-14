@@ -326,6 +326,7 @@ public:
     void visit(const ExpressionLog10* expr) final {}
     void visit(const ExpressionInternalFLEBetween* expr) final {}
     void visit(const ExpressionInternalFLEEqual* expr) final {}
+    void visit(const ExpressionInternalRawSortKey* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
     void visit(const ExpressionMod* expr) final {}
@@ -503,6 +504,7 @@ public:
     void visit(const ExpressionLog10* expr) final {}
     void visit(const ExpressionInternalFLEBetween* expr) final {}
     void visit(const ExpressionInternalFLEEqual* expr) final {}
+    void visit(const ExpressionInternalRawSortKey* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
     void visit(const ExpressionMod* expr) final {}
@@ -2374,6 +2376,9 @@ public:
     }
     void visit(const ExpressionInternalFLEEqual* expr) final {
         unsupportedExpression("$_internalFleEq");
+    }
+    void visit(const ExpressionInternalRawSortKey* expr) final {
+        unsupportedExpression(ExpressionInternalRawSortKey::kName.rawData());
     }
     void visit(const ExpressionMap* expr) final {
         unsupportedExpression("$map");

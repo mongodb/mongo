@@ -63,6 +63,7 @@
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
@@ -75,6 +76,8 @@ using boost::intrusive_ptr;
 using boost::optional;
 using std::list;
 using SortPatternPart = mongo::SortPattern::SortPatternPart;
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -288,7 +291,11 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     if (!combined.empty()) {
-        result.push_back(DocumentSourceSort::create(expCtx, SortPattern{std::move(combined)}));
+        result.push_back(DocumentSourceSort::create(
+            expCtx,
+            SortPattern{std::move(combined)},
+            // We will rely on this to efficiently compute ranks.
+            {.outputSortKeyMetadata = expCtx->isBasicRankFusionEnabled()}));
     }
 
     // $_internalSetWindowFields

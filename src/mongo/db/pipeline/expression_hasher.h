@@ -100,6 +100,7 @@ public:
         kLog10,
         kInternalFLEBetween,
         kInternalFLEEqual,
+        kInternalRawSortKey,
         kMap,
         kMeta,
         kMod,
@@ -410,6 +411,10 @@ public:
 
     void visit(const ExpressionInternalFLEEqual* expr) final {
         combine(OpType::kInternalFLEEqual);
+    }
+
+    void visit(const ExpressionInternalRawSortKey* expr) final {
+        combine(OpType::kInternalRawSortKey);
     }
 
     void visit(const ExpressionMap* expr) final {

@@ -5,6 +5,9 @@
  *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   requires_pipeline_optimization,
+ *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
+ *   # $sort stage.
+ *   featureFlagRankFusionBasic,
  * ]
  */
 import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
@@ -44,7 +47,9 @@ const explain1 = coll.explain().aggregate([
 // Redundant $sort should be removed.
 assert.eq(1, numberOfStages(explain1, '$sort'), explain1);
 // We keep the more specific sort.
-assert.docEq([{$sort: {sortKey: {a: 1, b: 1}}}], getAggPlanStages(explain1, '$sort'), explain1);
+assert.docEq([{$sort: {sortKey: {a: 1, b: 1}, outputSortKeyMetadata: true}}],
+             getAggPlanStages(explain1, '$sort'),
+             explain1);
 
 const explain2 = coll.explain().aggregate([
     {$_internalInhibitOptimization: {}},
@@ -74,7 +79,9 @@ const explain3 = coll.explain().aggregate([
 // $sort should be swapped with $_internalSetWindowFields, and the extra one removed.
 assert.eq(1, numberOfStages(explain3, '$sort'), explain3);
 // The sort we keep should be the more specific one.
-assert.docEq([{$sort: {sortKey: {a: 1, b: -1}}}], getAggPlanStages(explain3, '$sort'), explain3);
+assert.docEq([{$sort: {sortKey: {a: 1, b: -1}, outputSortKeyMetadata: true}}],
+             getAggPlanStages(explain3, '$sort'),
+             explain3);
 
 const explain4 = coll.explain().aggregate([
     {$_internalInhibitOptimization: {}},
@@ -174,8 +181,9 @@ const explain10 = coll.explain().aggregate([
     {$sort: {a: 1, b: 1}},
 ]);
 assert.eq(1, numberOfStages(explain10, '$sort'), explain10);
-assert.docEq(
-    [{$sort: {sortKey: {a: 1, b: 1, c: 1}}}], getAggPlanStages(explain10, '$sort'), explain10);
+assert.docEq([{$sort: {sortKey: {a: 1, b: 1, c: 1}, outputSortKeyMetadata: true}}],
+             getAggPlanStages(explain10, '$sort'),
+             explain10);
 
 // Multiple compatible sorts are pushed down.
 const explain11 = coll.explain().aggregate([
@@ -191,8 +199,9 @@ const explain11 = coll.explain().aggregate([
     {$sort: {a: 1, b: 1, c: 1}},
 ]);
 assert.eq(1, numberOfStages(explain11, '$sort'), explain11);
-assert.docEq(
-    [{$sort: {sortKey: {a: 1, b: 1, c: 1}}}], getAggPlanStages(explain11, '$sort'), explain11);
+assert.docEq([{$sort: {sortKey: {a: 1, b: 1, c: 1}, outputSortKeyMetadata: true}}],
+             getAggPlanStages(explain11, '$sort'),
+             explain11);
 
 // An incompatible $meta sort should not be dropped or pushed down.
 coll.createIndex({'$**': 'text'});

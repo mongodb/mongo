@@ -436,6 +436,30 @@ public:
 template <typename RankType>
 class ExpressionFromRankAccumulator : public Expression {
 public:
+    static auto createLegacyRankWF(ExpressionContext* expCtx,
+                                   StringData accumulatorName,
+                                   const SortPattern& sortBy,
+                                   WindowBounds bounds) {
+        auto sortPatternPart = sortBy[0];
+        if (sortPatternPart.fieldPath) {
+            auto sortExpression = ExpressionFieldPath::createPathFromString(
+                expCtx, sortPatternPart.fieldPath->fullPath(), expCtx->variablesParseState);
+            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
+                expCtx,
+                accumulatorName.toString(),
+                std::move(sortExpression),
+                sortPatternPart.isAscending,
+                std::move(bounds));
+        } else {
+            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
+                expCtx,
+                accumulatorName.toString(),
+                sortPatternPart.expression,
+                sortPatternPart.isAscending,
+                std::move(bounds));
+        }
+    }
+
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
@@ -457,31 +481,33 @@ public:
                       str::stream() << "Window function found an unknown argument: " << argName);
         }
 
-        // Rank based accumulators use the sort by expression as the input.
+        // TODO SERVER-98562 This 'exactly one element' requirement is outdated (for non-legacy
+        // case), but it needs to be tested.
         uassert(5371602,
                 str::stream() << accumulatorName
                               << " must be specified with a top level sortBy expression with "
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
-        auto sortPatternPart = sortBy.get()[0];
-        if (sortPatternPart.fieldPath) {
-            auto sortExpression = ExpressionFieldPath::createPathFromString(
-                expCtx, sortPatternPart.fieldPath->fullPath(), expCtx->variablesParseState);
+
+        if (expCtx->isBasicRankFusionEnabled()) {
+            // The 'modern' way to do $rank is to just use the sort key. But we only support this on
+            // newer versions, since we need to make sure that the $sort stage is giving us the sort
+            // key.
             return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx,
-                accumulatorName->toString(),
-                std::move(sortExpression),
-                sortPatternPart.isAscending,
-                std::move(bounds));
-        } else {
-            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx,
-                accumulatorName->toString(),
-                sortPatternPart.expression,
-                sortPatternPart.isAscending,
-                std::move(bounds));
+                expCtx, accumulatorName->toString(), std::move(bounds));
         }
+        // TODO SERVER-85426 This whole branch/helper can be deleted.
+        return createLegacyRankWF(expCtx, *accumulatorName, *sortBy, std::move(bounds));
     }
+
+    ExpressionFromRankAccumulator(ExpressionContext* expCtx,
+                                  std::string accumulatorName,
+                                  WindowBounds bounds)
+        : Expression(expCtx,
+                     std::move(accumulatorName),
+                     make_intrusive<ExpressionInternalRawSortKey>(expCtx),
+                     std::move(bounds)),
+          _legacyIsAscending(boost::none) {}
 
     ExpressionFromRankAccumulator(ExpressionContext* expCtx,
                                   std::string accumulatorName,
@@ -489,10 +515,13 @@ public:
                                   bool isAscending,
                                   WindowBounds bounds)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
-          _isAscending(isAscending) {}
+          _legacyIsAscending(isAscending) {}
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return make_intrusive<RankType>(_expCtx, _isAscending);
+        if (_legacyIsAscending.has_value()) {
+            return make_intrusive<RankType>(_expCtx, *_legacyIsAscending);
+        }
+        return make_intrusive<RankType>(_expCtx);
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
@@ -508,7 +537,9 @@ public:
     }
 
 private:
-    bool _isAscending;
+    // In the old way to compute the rank, we need to keep track of whether the requested sort was
+    // ascending or descending.
+    boost::optional<bool> _legacyIsAscending;
 };
 
 class ExpressionExpMovingAvg : public Expression {

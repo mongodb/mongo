@@ -198,8 +198,9 @@ public:
     void visit(const ExpressionConstant*) override {}
     void visit(const ExpressionIfNull*) override {}
     void visit(const ExpressionObject*) override {}
-    void visit(const ExpressionInternalFLEEqual*) override {}
     void visit(const ExpressionInternalFLEBetween*) override {}
+    void visit(const ExpressionInternalFLEEqual*) override {}
+    void visit(const ExpressionInternalRawSortKey*) override {}
     void visit(const ExpressionInternalOwningShard*) override {}
     void visit(const ExpressionInternalIndexKey*) override {}
     void visit(const ExpressionInternalKeyStringValue*) override {}
@@ -221,6 +222,10 @@ public:
 
     void visit(const ExpressionMeta* expr) final {
         _deps->setNeedsMetadata(expr->getMetaType(), true);
+    }
+
+    void visit(const ExpressionInternalRawSortKey* expr) final {
+        _deps->setNeedsMetadata(DocumentMetadataFields::MetaType::kSortKey, true);
     }
 
     void visit(const ExpressionRandom* expr) final {

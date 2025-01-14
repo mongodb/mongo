@@ -894,6 +894,10 @@ public:
         return _featureFlagShardFilteringDistinctScan.get();
     }
 
+    bool isBasicRankFusionEnabled() const {
+        return _featureFlagRankFusionBasic.get();
+    }
+
     bool isFeatureFlagStreamsEnabled() const {
         return _featureFlagStreams.get();
     }
@@ -1095,6 +1099,11 @@ private:
         return feature_flags::gFeatureFlagShardFilteringDistinctScan
             .isEnabledUseLastLTSFCVWhenUninitialized(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }};
+
+    Deferred<bool (*)()> _featureFlagRankFusionBasic{[] {
+        return feature_flags::gFeatureFlagRankFusionBasic.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }};
 
     // Initialized in constructor to avoid including server_feature_flags_gen.h
