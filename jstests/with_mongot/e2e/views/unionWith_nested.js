@@ -2,7 +2,6 @@
  * This file tests nested $unionWith pipelines involving $search operations across views. The
  * purpose is to verify that the nested unions and searches return the correct results across all
  * views.
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

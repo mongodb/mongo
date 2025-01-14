@@ -2,7 +2,6 @@
  * This file tests a $unionWith + $lookup combination across a view and collection respectively. The
  * purpose is to verify that running a $search operation on a $unionWith in such a situation
  * returns the correct results.
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

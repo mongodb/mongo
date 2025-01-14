@@ -5,7 +5,6 @@
  * 1. outer collection and inner view.
  * 2. outer view and inner collection.
  * 3. outer collection and inner view.
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

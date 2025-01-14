@@ -24,8 +24,6 @@ selector:
     - featureFlagRankFusionFull
     - featureFlagSearchHybridScoringFull
     - featureFlagRankFusion
-    # TODO: SERVER-86544 remove feature flag for SPM-3672
-    - featureFlagMongotIndexedViews
     # Transactions are aborted upon fcv upgrade or downgrade.
     - uses_transactions
     # Exclude tests that require a specific fcv.

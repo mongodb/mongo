@@ -831,16 +831,11 @@ public:
         _params.tailableMode = tailableMode;
     }
 
-    boost::optional<NamespaceString> getViewNSForMongotIndexedView() const {
-        return _featureFlagGuardedMongotIndexedViewNs.get();
+    boost::optional<NamespaceString> getViewNS() const {
+        return _params.viewNS;
     }
 
-    bool isFeatureFlagMongotIndexedViewEnabled() const {
-        return feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    }
-
-    void setViewNSForMongotIndexedView(boost::optional<NamespaceString> viewNS) {
+    void setViewNS(boost::optional<NamespaceString> viewNS) {
         _params.viewNS = std::move(viewNS);
     }
 
@@ -1105,14 +1100,6 @@ private:
     // Initialized in constructor to avoid including server_feature_flags_gen.h
     // in this header file.
     Deferred<bool (*)()> _featureFlagStreams;
-
-    DeferredFn<boost::optional<NamespaceString>> _featureFlagGuardedMongotIndexedViewNs{
-        [this]() -> boost::optional<NamespaceString> {
-            if (isFeatureFlagMongotIndexedViewEnabled()) {
-                return _params.viewNS;
-            }
-            return boost::none;
-        }};
 };
 
 class ExpressionContextBuilder {

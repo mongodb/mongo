@@ -51,9 +51,8 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 
     // When search query is being run on a view, we need to store the view pipeline to append to
     // the end of the idLookup's subpipeline.
-    if (expCtx->getViewNSForMongotIndexedView()) {
-        auto resolvedNamespace =
-            expCtx->getResolvedNamespace(*expCtx->getViewNSForMongotIndexedView());
+    if (expCtx->getViewNS()) {
+        auto resolvedNamespace = expCtx->getResolvedNamespace(*expCtx->getViewNS());
         _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
     }
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
@@ -95,9 +94,8 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
         std::vector<BSONObj> pipeline = {
             BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
 
-        if (pExpCtx->getViewNSForMongotIndexedView()) {
-            auto viewPipeline =
-                pExpCtx->getResolvedNamespace(*pExpCtx->getViewNSForMongotIndexedView()).pipeline;
+        if (pExpCtx->getViewNS()) {
+            auto viewPipeline = pExpCtx->getResolvedNamespace(*pExpCtx->getViewNS()).pipeline;
             pipeline.insert(pipeline.end(), viewPipeline.begin(), viewPipeline.end());
         }
         outputSpec["subPipeline"] =
@@ -147,7 +145,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             auto pipeline =
                 Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
 
-            if (pExpCtx->getViewNSForMongotIndexedView()) {
+            if (pExpCtx->getViewNS()) {
                 // When search query is being run on a view, we append the view pipeline to the end
                 // of the idLookup's subpipeline. This allows idLookup to retrieve the
                 // full/unmodified documents (from the _id values returned by mongot), apply the

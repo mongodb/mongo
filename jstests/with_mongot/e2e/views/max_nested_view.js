@@ -3,7 +3,6 @@
  * top view, and validates the execution of $search queries on the top view. Its intention is to
  * ensure that the correct `effectivePipeline` is passed to mongot upon creation of the search
  * index.
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 

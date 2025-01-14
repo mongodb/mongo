@@ -1,7 +1,6 @@
 /**
  * This test seeks to ensure test coverage of the lookup cache codepath for $search subpipelines on
  * views.
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

@@ -1,7 +1,6 @@
 /**
  * This test issues the search index management commands (createSearchIndex, updateSearchIndex) on
  * views.
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";

@@ -263,7 +263,7 @@ void addResolvedNamespaceForSearch(const NamespaceString& origNss,
                                                    resolvedView.getPipeline(),
                                                    uuid,
                                                    true /*involvedNamespaceIsAView*/));
-    expCtx->setViewNSForMongotIndexedView(boost::make_optional(origNss));
+    expCtx->setViewNS(boost::make_optional(origNss));
 }
 
 bool isStoredSource(const Pipeline* pipeline) {
