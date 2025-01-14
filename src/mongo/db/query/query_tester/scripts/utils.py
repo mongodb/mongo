@@ -34,13 +34,12 @@ def construct_filenames(output_prefix: str, suffix: Optional[str] = None) -> Tup
     return pkl_file, json_file
 
 
-def extract_db_and_coll(fail_filepath: Path) -> Tuple[str, str]:
-    """Extracts DB and collection names from a .fail file."""
+def extract_db(fail_filepath: Path) -> str:
+    """Extracts DB name from a .fail file."""
     with fail_filepath.open(encoding="utf-8") as fail_file:
         lines = [line.strip() for line in fail_file if not line.startswith("//")]
         db = lines[1]
-        coll = lines[2].replace(".coll", "").split(" as ")[-1].strip()
-    return db, coll
+    return db
 
 
 def move_file(src: str, dest: str) -> None:
