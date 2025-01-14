@@ -2082,8 +2082,10 @@ if env.TargetOSIs('posix'):
     if env.ToolchainIs('gcc', 'clang'):
         env.Append(
             CCFLAGS_WERROR=["-Werror"],
-            CXXFLAGS_WERROR=["-Werror=unused-result"] if env.ToolchainIs("clang") else [],
-            LINKFLAGS_WERROR=["-Wl,--fatal-warnings"] if not env.TargetOSIs("darwin") else [],
+            CXXFLAGS_WERROR=['-Werror=unused-result'] if env.ToolchainIs('clang') else [],
+            LINKFLAGS_WERROR=[
+                '-Wl,-fatal_warnings' if env.TargetOSIs('darwin') else "-Wl,--fatal-warnings"
+            ],
         )
 elif env.TargetOSIs('windows'):
     env.Append(CCFLAGS_WERROR=["/WX"])
@@ -3187,12 +3189,10 @@ if env.TargetOSIs('posix'):
     # SERVER-9761: Ensure early detection of missing symbols in dependent
     # libraries at program startup. For non-release dynamic builds we disable
     # this behavior in the interest of improved mongod startup times.
-
-    # Xcode15 removed bind_at_load functionality so we cannot have a selection for macosx here
-    # ld: warning: -bind_at_load is deprecated on macOS
-    if has_option("release") or get_option("link-model") != "dynamic":
-        if not env.TargetOSIs("macOS"):
-            env.Append(LINKFLAGS=["-Wl,-z,now"])
+    if has_option('release') or get_option('link-model') != 'dynamic':
+        env.Append(LINKFLAGS=[
+            "-Wl,-bind_at_load" if env.TargetOSIs('macOS') else "-Wl,-z,now",
+        ], )
 
     # We need to use rdynamic for backtraces with glibc unless we have libunwind.
     nordyn = (env.TargetOSIs('darwin') or use_libunwind)
@@ -3820,13 +3820,8 @@ def doConfigure(myenv):
         # As of XCode 9, this flag must be present (it is not enabled
         # by -Wall), in order to enforce that -mXXX-version-min=YYY
         # will enforce that you don't use APIs from ZZZ.
-        if env.TargetOSIs("darwin"):
-            env.AddToCCFLAGSIfSupported("-Wunguarded-availability")
-            env.AddToCCFLAGSIfSupported("-Wno-enum-constexpr-conversion")
-            # TODO SERVER-54659 - ASIO depends on std::result_of which was removed in C++ 20
-            myenv.Append(CPPDEFINES=["ASIO_HAS_STD_INVOKE_RESULT"])
-            # This is needed to compile boost on the newer xcodes
-            myenv.Append(CPPDEFINES=["BOOST_NO_CXX98_FUNCTION_BASE"])
+        if env.TargetOSIs('darwin'):
+            env.AddToCCFLAGSIfSupported('-Wunguarded-availability')
 
     if get_option('runtime-hardening') == "on":
         # Enable 'strong' stack protection preferentially, but fall back to 'all' if it is not

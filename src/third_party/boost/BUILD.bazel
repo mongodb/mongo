@@ -23,12 +23,7 @@ BOOST_LIB_HEADERS = glob([
 
 BOOST_DEFINES = [
     "BOOST_BIND_GLOBAL_PLACEHOLDERS",
-] + select({
-    "@platforms//os:macos": [
-        "BOOST_NO_CXX98_FUNCTION_BASE",
-    ],
-    "//conditions:default": [],
-})
+]
 
 filegroup(
     name = "headers",
