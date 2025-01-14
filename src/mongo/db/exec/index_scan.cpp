@@ -278,7 +278,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-bool IndexScan::isEOF() {
+bool IndexScan::isEOF() const {
     return _commonStats.isEOF;
 }
 

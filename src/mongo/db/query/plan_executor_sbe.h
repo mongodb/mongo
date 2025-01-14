@@ -119,7 +119,7 @@ public:
     ExecState getNext(BSONObj* out, RecordId* dlOut) override;
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) override;
 
-    bool isEOF() override {
+    bool isEOF() const override {
         return isMarkedAsKilled() || (_stash.empty() && _root->getCommonStats()->isEOF);
     }
 
@@ -151,7 +151,7 @@ public:
         return !_killStatus.isOK();
     }
 
-    Status getKillStatus() override {
+    Status getKillStatus() const override {
         invariant(isMarkedAsKilled());
         return _killStatus;
     }

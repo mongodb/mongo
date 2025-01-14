@@ -616,7 +616,7 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
     return numResults;
 }
 
-bool PlanExecutorImpl::isEOF() {
+bool PlanExecutorImpl::isEOF() const {
     invariant(_currentState == kUsable);
     return isMarkedAsKilled() || (_stash.empty() && _root->isEOF());
 }
@@ -773,7 +773,7 @@ void PlanExecutorImpl::stashResult(const BSONObj& obj) {
     _stash.push_front(Document{obj.getOwned()});
 }
 
-Status PlanExecutorImpl::getKillStatus() {
+Status PlanExecutorImpl::getKillStatus() const {
     invariant(isMarkedAsKilled());
     return _killStatus;
 }

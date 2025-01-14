@@ -51,7 +51,7 @@ PlanStage::StageState QueuedDataStage::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-bool QueuedDataStage::isEOF() {
+bool QueuedDataStage::isEOF() const {
     return _members.empty();
 }
 

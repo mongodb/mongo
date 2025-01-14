@@ -134,7 +134,7 @@ public:
         return STAGE_SORT_DEFAULT;
     }
 
-    bool isEOF() final {
+    bool isEOF() const final {
         return _sortExecutor.isEOF();
     }
 
@@ -175,7 +175,7 @@ public:
         return STAGE_SORT_SIMPLE;
     }
 
-    bool isEOF() final {
+    bool isEOF() const final {
         return _sortExecutor.isEOF();
     }
 

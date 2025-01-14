@@ -68,7 +68,7 @@ SpoolStage::SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_pt
     _specificStats.maxDiskUsageBytes = internalQueryMaxSpoolDiskUsageBytes.load();
 }
 
-bool SpoolStage::isEOF() {
+bool SpoolStage::isEOF() const {
     return _spillFileIters.empty() && _nextIndex == static_cast<int>(_buffer.size());
 }
 

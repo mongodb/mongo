@@ -64,7 +64,7 @@ ShardFilterStage::ShardFilterStage(ExpressionContext* expCtx,
 
 ShardFilterStage::~ShardFilterStage() {}
 
-bool ShardFilterStage::isEOF() {
+bool ShardFilterStage::isEOF() const {
     return child()->isEOF();
 }
 

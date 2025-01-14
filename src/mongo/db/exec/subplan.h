@@ -107,7 +107,7 @@ public:
             SubplanStage::canUseSubplanning(query);
     }
 
-    bool isEOF() final;
+    bool isEOF() const final;
     StageState doWork(WorkingSetID* out) final;
 
     StageType stageType() const final {

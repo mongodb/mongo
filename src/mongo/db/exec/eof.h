@@ -50,7 +50,7 @@ public:
 
     ~EOFStage() override;
 
-    bool isEOF() final;
+    bool isEOF() const final;
     StageState doWork(WorkingSetID* out) final;
 
 

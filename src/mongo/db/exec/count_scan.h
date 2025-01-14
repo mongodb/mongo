@@ -110,7 +110,7 @@ public:
               WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
-    bool isEOF() final;
+    bool isEOF() const final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 

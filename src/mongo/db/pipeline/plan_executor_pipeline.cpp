@@ -123,7 +123,7 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document* docOut,
     return PlanExecutor::IS_EOF;
 }
 
-bool PlanExecutorPipeline::isEOF() {
+bool PlanExecutorPipeline::isEOF() const {
     if (!_stash.empty()) {
         return false;
     }

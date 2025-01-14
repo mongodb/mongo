@@ -83,7 +83,7 @@ size_t AndHashStage::getMemUsage() const {
     return _memUsage;
 }
 
-bool AndHashStage::isEOF() {
+bool AndHashStage::isEOF() const {
     // This is empty before calling work() and not-empty after.
     if (_lookAheadResults.empty()) {
         return false;

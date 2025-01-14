@@ -120,7 +120,7 @@ public:
     ExecState getNext(BSONObj* objOut, RecordId* recordIdOut) override;
     ExecState getNextDocument(Document* docOut, RecordId* recordIdOut) override;
 
-    bool isEOF() override;
+    bool isEOF() const override;
 
     // DocumentSource execution is only used for executing aggregation commands, so the interfaces
     // for executing other CRUD operations are not supported.
@@ -151,7 +151,7 @@ public:
         return !_killStatus.isOK();
     }
 
-    Status getKillStatus() override {
+    Status getKillStatus() const override {
         invariant(isMarkedAsKilled());
         return _killStatus;
     }

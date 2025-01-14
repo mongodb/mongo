@@ -313,7 +313,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     return Status::OK();
 }
 
-bool SubplanStage::isEOF() {
+bool SubplanStage::isEOF() const {
     // If we're running we best have a runner.
     invariant(child());
     return child()->isEOF();

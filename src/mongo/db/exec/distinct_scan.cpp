@@ -319,7 +319,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     MONGO_UNREACHABLE_TASSERT(9245303);
 }
 
-bool DistinctScan::isEOF() {
+bool DistinctScan::isEOF() const {
     return _commonStats.isEOF;
 }
 

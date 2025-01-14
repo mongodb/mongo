@@ -160,7 +160,7 @@ TimeseriesModifyStage::~TimeseriesModifyStage() {
     }
 }
 
-bool TimeseriesModifyStage::isEOF() {
+bool TimeseriesModifyStage::isEOF() const {
     if (_isSingletonWrite() && _specificStats.nMeasurementsMatched > 0) {
         // If we have matched any records and this is a singleton write, we can return as long as we
         // don't have a bucket to retry.

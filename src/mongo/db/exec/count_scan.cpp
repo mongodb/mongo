@@ -183,7 +183,7 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-bool CountScan::isEOF() {
+bool CountScan::isEOF() const {
     return _commonStats.isEOF;
 }
 

@@ -290,7 +290,7 @@ struct QueryPlannerParams {
 
     explicit QueryPlannerParams(ArgsForTest&& args) {
         mainCollectionInfo.options = DEFAULT;
-    };
+    }
 
     QueryPlannerParams(const QueryPlannerParams&) = delete;
     QueryPlannerParams& operator=(const QueryPlannerParams& other) = delete;

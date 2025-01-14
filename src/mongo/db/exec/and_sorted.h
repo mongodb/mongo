@@ -58,7 +58,7 @@ public:
     void addChild(std::unique_ptr<PlanStage> child);
 
     StageState doWork(WorkingSetID* out) final;
-    bool isEOF() final;
+    bool isEOF() const final;
 
     StageType stageType() const final {
         return STAGE_AND_SORTED;

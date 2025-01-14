@@ -70,7 +70,7 @@ public:
     size_t getMemUsage() const;
 
     StageState doWork(WorkingSetID* out) final;
-    bool isEOF() final;
+    bool isEOF() const final;
 
     StageType stageType() const final {
         return STAGE_AND_HASH;

@@ -55,7 +55,7 @@ CountStage::CountStage(ExpressionContext* expCtx,
     _children.emplace_back(child);
 }
 
-bool CountStage::isEOF() {
+bool CountStage::isEOF() const {
     if (_limit > 0 && _specificStats.nCounted >= _limit) {
         return true;
     }

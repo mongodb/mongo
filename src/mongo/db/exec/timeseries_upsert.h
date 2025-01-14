@@ -62,7 +62,7 @@ public:
                           std::unique_ptr<MatchExpression> originalPredicate,
                           const UpdateRequest& request);
 
-    bool isEOF() final;
+    bool isEOF() const final;
     PlanStage::StageState doWork(WorkingSetID* id) final;
 
 private:

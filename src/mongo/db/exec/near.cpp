@@ -257,7 +257,7 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     return PlanStage::ADVANCED;
 }
 
-bool NearStage::isEOF() {
+bool NearStage::isEOF() const {
     return SearchState_Finished == _searchState;
 }
 

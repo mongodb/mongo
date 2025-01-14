@@ -65,7 +65,7 @@ void MergeSortStage::addChild(std::unique_ptr<PlanStage> child) {
     _noResultToMerge.push(_children.back().get());
 }
 
-bool MergeSortStage::isEOF() {
+bool MergeSortStage::isEOF() const {
     // If we have no more results to return, and we have no more children that we can call
     // work(...) on to get results, we're done.
     return _merging.empty() && _noResultToMerge.empty();

@@ -57,7 +57,7 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
 
-    bool isEOF() final {
+    bool isEOF() const final {
         return _results.empty();
     }
 

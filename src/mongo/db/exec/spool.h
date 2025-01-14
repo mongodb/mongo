@@ -68,7 +68,7 @@ public:
         return STAGE_SPOOL;
     }
 
-    bool isEOF() final;
+    bool isEOF() const final;
 
     std::unique_ptr<PlanStageStats> getStats() override;
 

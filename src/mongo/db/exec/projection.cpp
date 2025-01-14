@@ -142,7 +142,7 @@ ProjectionStage::ProjectionStage(ExpressionContext* expCtx,
       _projObj{expCtx->getExplain() ? boost::make_optional(projObj.getOwned()) : boost::none},
       _ws{*ws} {}
 
-bool ProjectionStage::isEOF() {
+bool ProjectionStage::isEOF() const {
     return child()->isEOF();
 }
 

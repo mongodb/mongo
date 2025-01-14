@@ -802,7 +802,7 @@ protected:
 
 public:
     ThrowyPlanStage(ExpressionContext* expCtx) : PlanStage("throwy", expCtx) {}
-    bool isEOF() final {
+    bool isEOF() const final {
         return false;
     }
     StageType stageType() const final {

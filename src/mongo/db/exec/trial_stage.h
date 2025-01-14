@@ -90,7 +90,7 @@ public:
         return STAGE_TRIAL;
     }
 
-    bool isEOF() final {
+    bool isEOF() const final {
         return (_specificStats.trialCompleted ? child()->isEOF() : false);
     }
 

@@ -59,7 +59,7 @@ public:
                           WorkingSet* ws,
                           const BSONObj& sortSpecObj);
 
-    bool isEOF() final;
+    bool isEOF() const final;
 
     StageType stageType() const final {
         return STAGE_SORT_KEY_GENERATOR;

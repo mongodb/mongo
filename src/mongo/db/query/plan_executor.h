@@ -379,7 +379,7 @@ public:
      * Tailable cursors are a possible exception to this: they may have further results even if
      * isEOF() returns true.
      */
-    virtual bool isEOF() = 0;
+    virtual bool isEOF() const = 0;
 
     /**
      * If this plan executor was constructed to execute a count implementation, e.g. it was obtained
@@ -483,7 +483,7 @@ public:
     virtual void stashResult(const BSONObj& obj) = 0;
 
     virtual bool isMarkedAsKilled() const = 0;
-    virtual Status getKillStatus() = 0;
+    virtual Status getKillStatus() const = 0;
 
     virtual bool isDisposed() const = 0;
 

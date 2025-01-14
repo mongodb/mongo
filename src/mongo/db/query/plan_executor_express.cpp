@@ -212,9 +212,9 @@ public:
         return state;
     }
 
-    bool isEOF() override {
+    bool isEOF() const override {
         return _plan.exhausted();
-    };
+    }
 
     long long executeCount() override {
         MONGO_UNREACHABLE_TASSERT(8375802);
@@ -256,7 +256,7 @@ public:
         return !_killStatus.isOK();
     }
 
-    Status getKillStatus() override {
+    Status getKillStatus() const override {
         invariant(isMarkedAsKilled());
         return _killStatus;
     }

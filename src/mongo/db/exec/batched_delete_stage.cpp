@@ -193,7 +193,7 @@ BatchedDeleteStage::BatchedDeleteStage(
 
 BatchedDeleteStage::~BatchedDeleteStage() {}
 
-bool BatchedDeleteStage::isEOF() {
+bool BatchedDeleteStage::isEOF() const {
     return _stagedDeletesBuffer.empty() && _passStagingComplete;
 }
 

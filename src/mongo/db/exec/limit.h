@@ -57,7 +57,7 @@ public:
                std::unique_ptr<PlanStage> child);
     ~LimitStage() override;
 
-    bool isEOF() final;
+    bool isEOF() const final;
     StageState doWork(WorkingSetID* out) final;
 
     StageType stageType() const final {

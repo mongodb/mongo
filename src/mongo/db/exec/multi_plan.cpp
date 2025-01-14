@@ -154,7 +154,7 @@ void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
     markShouldCollectTimingInfoOnSubtree(newChild);
 }
 
-bool MultiPlanStage::isEOF() {
+bool MultiPlanStage::isEOF() const {
     // If _bestPlanIdx hasn't been found, can't be at EOF
     if (!bestPlanChosen()) {
         return false;

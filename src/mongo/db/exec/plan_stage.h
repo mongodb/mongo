@@ -241,7 +241,7 @@ public:
     /**
      * Returns true if no more work can be done on the query / out of results.
      */
-    virtual bool isEOF() = 0;
+    virtual bool isEOF() const = 0;
 
     //
     // Yielding and isolation semantics:

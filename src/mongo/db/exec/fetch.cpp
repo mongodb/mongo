@@ -64,7 +64,7 @@ FetchStage::FetchStage(ExpressionContext* expCtx,
 
 FetchStage::~FetchStage() {}
 
-bool FetchStage::isEOF() {
+bool FetchStage::isEOF() const {
     if (WorkingSet::INVALID_ID != _idRetrying) {
         // We have a working set member that we need to retry.
         return false;

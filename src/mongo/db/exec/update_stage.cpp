@@ -389,7 +389,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     return newObj;
 }
 
-bool UpdateStage::isEOF() {
+bool UpdateStage::isEOF() const {
     // We're done updating if either the child has no more results to give us, or we've
     // already gotten a result back and we're not a multi-update.
     return _idRetrying == WorkingSet::INVALID_ID && _idReturning == WorkingSet::INVALID_ID &&

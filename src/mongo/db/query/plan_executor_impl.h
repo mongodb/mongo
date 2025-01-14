@@ -172,7 +172,7 @@ public:
     ExecState getNext(BSONObj* out, RecordId* dlOut) final;
     size_t getNextBatch(size_t batchSize, AppendBSONObjFn append) final;
 
-    bool isEOF() final;
+    bool isEOF() const final;
     long long executeCount() override;
     UpdateResult getUpdateResult() const override;
     long long getDeleteResult() const override;
@@ -185,7 +185,7 @@ public:
         return !_killStatus.isOK();
     }
 
-    Status getKillStatus() final;
+    Status getKillStatus() const final;
     bool isDisposed() const final;
     Timestamp getLatestOplogTimestamp() const final;
     BSONObj getPostBatchResumeToken() const final;

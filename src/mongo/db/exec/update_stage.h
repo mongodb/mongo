@@ -180,7 +180,7 @@ public:
                 CollectionAcquisition collection,
                 PlanStage* child);
 
-    bool isEOF() override;
+    bool isEOF() const override;
     StageState doWork(WorkingSetID* out) override;
 
     StageType stageType() const final {

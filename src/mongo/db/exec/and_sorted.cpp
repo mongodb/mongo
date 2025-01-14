@@ -58,7 +58,7 @@ void AndSortedStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
 }
 
-bool AndSortedStage::isEOF() {
+bool AndSortedStage::isEOF() const {
     return _isEOF;
 }
 

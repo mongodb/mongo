@@ -95,7 +95,7 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-bool MultiIteratorStage::isEOF() {
+bool MultiIteratorStage::isEOF() const {
     return _iterators.empty();
 }
 

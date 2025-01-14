@@ -78,7 +78,7 @@ void TextOrStage::addChildren(Children childrenToAdd) {
                      std::make_move_iterator(childrenToAdd.end()));
 }
 
-bool TextOrStage::isEOF() {
+bool TextOrStage::isEOF() const {
     return _internalState == State::kDone;
 }
 

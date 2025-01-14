@@ -57,7 +57,7 @@ public:
         return STAGE_UNPACK_SAMPLED_TS_BUCKET;
     }
 
-    bool isEOF() final {
+    bool isEOF() const final {
         return !_bucketUnpacker.hasNext() && child()->isEOF();
     }
 

@@ -56,7 +56,7 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
 
-    bool isEOF() final;
+    bool isEOF() const final;
 
     StageType stageType() const final {
         return STAGE_QUEUED_DATA;
