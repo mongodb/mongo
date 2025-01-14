@@ -411,5 +411,27 @@ TEST(CardinalityEstimator, HistogramConjunctionOverMultikey) {
     ASSERT_LT(nonMultikeyEst, multikeyEst);
 }
 
+TEST(CardinalityEstimator, NorEstimatesNegateOr) {
+    // Test relationship between Nor and Or
+    BSONObj norEqualities = fromjson("{$nor: [{a: 5}, {b: 6}]}");
+    BSONObj orEqualities = fromjson("{$or: [{a: 5}, {b: 6}]}");
+    auto norPlan = makeCollScanPlan(parse(norEqualities));
+    auto orPlan = makeCollScanPlan(parse(orEqualities));
+    CardinalityEstimate norEst = getPlanHeuristicCE(*norPlan, 1000);
+    CardinalityEstimate orEst = getPlanHeuristicCE(*orPlan, 1000);
+    ASSERT_EQ(norEst + orEst, makeCard(1000));
+}
+
+TEST(CardinalityEstimator, NorWithEqGreaterEstiamteThanNorWithInequality) {
+    // Test relationship between NOR(a=5,b=6) and NOR(a>5, b=6)
+    BSONObj norEqualities = fromjson("{$nor: [{a: 5}, {b: 6}]}");
+    BSONObj norInequalities = fromjson("{$nor: [{a: {$gt: 5}}, {b: 6}]}");
+    auto eqPlan = makeCollScanPlan(parse(norEqualities));
+    auto inEqPlan = makeCollScanPlan(parse(norInequalities));
+    CardinalityEstimate eqEst = getPlanHeuristicCE(*eqPlan, 1000);
+    CardinalityEstimate inEqEst = getPlanHeuristicCE(*inEqPlan, 1000);
+    ASSERT_GT(eqEst, inEqEst);
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker

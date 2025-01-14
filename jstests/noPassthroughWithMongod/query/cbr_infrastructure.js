@@ -105,6 +105,10 @@ const queries = [
     {a: {$in: []}},
     {a: {$all: []}},
     {a: {$gt: 10}, b: {$in: []}},
+    {$nor: [{a: 1}]},
+    {$nor: [{a: 1}, {b: {$gt: 1000}}]},
+    {$and: [{$nor: [{a: 1}, {a: {$gt: 1000}}]}, {b: {$lt: 100}}]},
+    {$and: [{$or: [{$nor: [{a: {$gt: 100}}, {b: {$gt: 50}}]}, {a: 1}]}, {b: {$lt: 100}}]},
 ];
 
 queries.push({$or: [queries[0], queries[1]]});

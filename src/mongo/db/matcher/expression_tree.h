@@ -107,6 +107,10 @@ public:
         return &_expressions;
     }
 
+    const std::vector<std::unique_ptr<MatchExpression>>& getChildVector() const {
+        return _expressions;
+    }
+
     bool equivalent(const MatchExpression* other) const final;
 
     MatchCategory getCategory() const final {

@@ -97,6 +97,8 @@ private:
     CEResult estimate(const NotMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const AndMatchExpression* node);
     CEResult estimate(const OrMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const NorMatchExpression* node, bool isFilterRoot);
+
     // Estimate all match expressions without children. Notice that there are other such nodes
     // besides LeafMatchExpression subclasses.
     CEResult estimateLeafExpression(const MatchExpression* node, bool isFilterRoot);
@@ -148,6 +150,12 @@ private:
         CardinalityEstimate resultCard = disjSel * inputCard;
         return resultCard;
     }
+
+    /**
+     * Estimate the cardinality of the given vector of MatchExpressions as if they were a
+     * disjunction. This is a helper for the implementations of estimation of $or and $nor.
+     */
+    CEResult estimateDisjunction(const std::vector<std::unique_ptr<MatchExpression>>& disjuncts);
 
     /**
      * Leaf nodes and ORs that are the root of a QSN's filter are atomic from conjunction

@@ -202,6 +202,9 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
         case MatchExpression::OR:
             ceRes = estimate(static_cast<const OrMatchExpression*>(node), isFilterRoot);
             break;
+        case MatchExpression::NOR:
+            ceRes = estimate(static_cast<const NorMatchExpression*>(node), isFilterRoot);
+            break;
         default:
             if (node->numChildren() == 0) {
                 ceRes = estimateLeafExpression(node, isFilterRoot);
@@ -607,23 +610,47 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     return conjCard(selOffset, _inputCard);
 }
 
-CEResult CardinalityEstimator::estimate(const OrMatchExpression* node, bool isFilterRoot) {
-    tassert(9586706, "OrMatchExpression must have children.", node->numChildren() > 0);
+CEResult CardinalityEstimator::estimateDisjunction(
+    const std::vector<std::unique_ptr<MatchExpression>>& disjuncts) {
     std::vector<SelectivityEstimate> disjSels;
     size_t selOffset = _conjSels.size();
-    for (size_t i = 0; i < node->numChildren(); i++) {
-        auto ceRes = estimate(node->getChild(i), false);
+    for (auto&& node : disjuncts) {
+        auto ceRes = estimate(node.get(), false);
         if (!ceRes.isOK()) {
             return ceRes;
         }
         trimSels(selOffset);
         disjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
-    CEResult disjRes{disjCard(_inputCard, disjSels)};
+    return disjCard(_inputCard, disjSels);
+}
+
+CEResult CardinalityEstimator::estimate(const OrMatchExpression* node, bool isFilterRoot) {
+    tassert(9586706, "OrMatchExpression must have children.", node->numChildren() > 0);
+    CEResult disjRes = estimateDisjunction(node->getChildVector());
+    if (!disjRes.isOK()) {
+        return disjRes;
+    }
     if (isFilterRoot) {
         addRootNodeSel(disjRes);
     }
     return disjRes;
+}
+
+CEResult CardinalityEstimator::estimate(const NorMatchExpression* node, bool isFilterRoot) {
+    tassert(9903001, "NorMatchExpression must have children.", node->numChildren() > 0);
+    // Estimate $nor as a logical negation of OR. First we estimate the selectivity of the children
+    // of 'node' as if they were a $or. Then we negate it to get the resuling selectivity of $nor.
+    CEResult disjRes = estimateDisjunction(node->getChildVector());
+    if (!disjRes.isOK()) {
+        return disjRes;
+    }
+    SelectivityEstimate disjSel = disjRes.getValue() / _inputCard;
+    CEResult res = _inputCard * disjSel.negate();
+    if (isFilterRoot) {
+        addRootNodeSel(res);
+    }
+    return res;
 }
 
 /*
