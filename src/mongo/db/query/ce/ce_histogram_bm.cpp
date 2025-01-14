@@ -156,7 +156,8 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
         TypeCombination{{configuration.sbeDataType, 100, configuration.nanProb}}};
 
     std::vector<stats::SBEValue> data;
-    const size_t seed = 1724178214;
+    const size_t seedData = 1724178214;
+    const size_t seedQueries = 2431475868;
     const int numberOfQueries = 100;
 
     auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
@@ -168,7 +169,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
             generateDataUniform(configuration.size,
                                 configuration.dataInterval,
                                 typeCombinationData,
-                                seed,
+                                seedData,
                                 ndv,
                                 data,
                                 configuration.arrayTypeLength);
@@ -178,7 +179,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
             generateDataNormal(configuration.size,
                                configuration.dataInterval,
                                typeCombinationData,
-                               seed,
+                               seedData,
                                ndv,
                                data,
                                configuration.arrayTypeLength);
@@ -188,7 +189,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
             generateDataZipfian(configuration.size,
                                 configuration.dataInterval,
                                 typeCombinationData,
-                                seed,
+                                seedData,
                                 ndv,
                                 data,
                                 configuration.arrayTypeLength);
@@ -209,7 +210,8 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                             configuration.dataInterval,
                                             numberOfQueries,
                                             typeCombinationQuery,
-                                            seed);
+                                            seedData,
+                                            seedQueries);
     tassert(9787300, "queryIntervals should have at least one interval", queryIntervals.size() > 0);
     size_t i = 0;
     for (auto curState : state) {
@@ -220,7 +222,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                                 true /*includeScalar*/,
                                                 ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                                 configuration.useE2EAPI /*useE2EAPI*/,
-                                                seed));
+                                                seedData));
         i = (i + 1) % queryIntervals.size();
     }
     state.SetItemsProcessed(state.iterations());

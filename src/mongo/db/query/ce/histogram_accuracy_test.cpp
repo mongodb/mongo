@@ -75,16 +75,14 @@ int main(int argc, char* argv[]) {
                         {TypeTags::StringBig, 20},
                         {TypeTags::Array, 10}}};
 
-    const std::vector<int> numberOfBuckets{10, 50, 100, 200, 400};
-    const size_t size = 50000;
-    const int numberOfQueries = 1000;
-    const int arrayTypeLength = 10;
+    const std::vector<int> numberOfBuckets{10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240};
+    const size_t size = 100000;
+    const int numberOfQueries = 5000;
+    const int arrayTypeLength = 100;
     bool printResults = true;
-    const size_t seed = 1724178214;
-
-    if (printResults) {
-        printHeader();
-    }
+    const size_t seedData = 17278214;
+    const size_t seedQueriesLow = seedData;
+    const size_t seedQueriesHigh = 1012348998;
 
     auto dataDistributions = {kUniform, kNormal, kZipfian};
     auto queryTypes = {kPoint, kRange};
@@ -110,7 +108,9 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults,
                                              arrayTypeLength);
             }
@@ -133,7 +133,9 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
 
@@ -155,7 +157,9 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
 
@@ -178,7 +182,9 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
 
@@ -200,7 +206,9 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
 
@@ -222,15 +230,17 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
 
             // Query on "StringSmall"
             {
                 const TypeCombination typeCombinationsQueries{{TypeTags::StringSmall, 100}};
-                const std::pair<size_t, size_t> dataInterval({0, 1000});
-                const std::pair<size_t, size_t> queryInterval({0, 1000});
+                const std::pair<size_t, size_t> dataInterval({0, 8});
+                const std::pair<size_t, size_t> queryInterval({0, 8});
 
                 runAccuracyTestConfiguration(dataDistribution,
                                              typeCombinationsData,
@@ -244,15 +254,17 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
 
             // Query on "StringBig"
             {
                 const TypeCombination typeCombinationsQueries{{TypeTags::StringBig, 100}};
-                const std::pair<size_t, size_t> dataInterval({0, 1000});
-                const std::pair<size_t, size_t> queryInterval({0, 1000});
+                const std::pair<size_t, size_t> dataInterval({8, 25});
+                const std::pair<size_t, size_t> queryInterval({8, 25});
 
                 runAccuracyTestConfiguration(dataDistribution,
                                              typeCombinationsData,
@@ -266,7 +278,9 @@ int main(int argc, char* argv[]) {
                                              true /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
 
@@ -290,7 +304,9 @@ int main(int argc, char* argv[]) {
                                              false /*includeScalar*/,
                                              ArrayRangeEstimationAlgo::kConjunctArrayCE,
                                              false /*useE2EAPI*/,
-                                             seed,
+                                             seedData,
+                                             seedQueriesLow,
+                                             seedQueriesHigh,
                                              printResults);
             }
         }

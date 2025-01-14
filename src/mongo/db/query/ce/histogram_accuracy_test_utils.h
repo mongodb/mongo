@@ -52,25 +52,18 @@ enum QueryType { kPoint, kRange };
 
 static constexpr size_t kPredefinedArraySize = 15;
 
+struct QueryInfoAndResults {
+
+    boost::optional<stats::SBEValue> low;
+    boost::optional<stats::SBEValue> high;
+
+    size_t actualCardinality;
+    double estimatedCardinality;
+};
+
 struct ErrorCalculationSummary {
-    // actual returned results.
-    std::vector<std::pair<size_t, EstimationResult>> queryResults;
-
-    // calculated results.
-    std::vector<double> relativeErrors;
-    std::vector<double> qErrors;
-    double relativeErrorAvg;
-    double relativeErrorMax;
-
-    double relativeErrorMedian;
-    double relativeError90thPercentile;
-    double relativeError95thPercentile;
-    double relativeError99thPercentile;
-
-    double qErrorMedian;
-    double qError90thPercentile;
-    double qError95thPercentile;
-    double qError99thPercentile;
+    // query information and results.
+    std::vector<QueryInfoAndResults> queryResults;
 
     // total executed queries.
     size_t executedQueries = 0;
@@ -99,12 +92,7 @@ static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBE
                                                     stats::SBEValue valueToCalculateLow,
                                                     stats::SBEValue valueToCalculateHigh);
 
-static std::pair<boost::optional<double>, boost::optional<double>> computeErrors(
-    size_t actualCard, double estimatedCard);
-
-void printHeader();
-
-void printResult(DataDistributionEnum dataDistribution,
+void printResult(const DataDistributionEnum& dataDistribution,
                  const TypeCombination& typeCombination,
                  int size,
                  int numberOfBuckets,
@@ -113,6 +101,10 @@ void printResult(DataDistributionEnum dataDistribution,
                  QueryType queryType,
                  const std::pair<size_t, size_t>& dataInterval,
                  bool includeScalar,
+                 size_t seedData,
+                 size_t seedQueriesLow,
+                 size_t seedQueriesHigh,
+                 const std::vector<std::pair<TypeTags, sbe::value::Value>>& bounds,
                  ErrorCalculationSummary error);
 
 void generateDataUniform(size_t size,
@@ -156,7 +148,8 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
     const std::pair<size_t, size_t>& interval,
     size_t numberOfQueries,
     const TypeProbability& queryTypeInfo,
-    size_t seed);
+    size_t seedQueriesLow,
+    size_t seedQueriesHigh);
 
 /**
  * Executes a single query estimation based on the specified query type and parameters.
@@ -197,7 +190,8 @@ ErrorCalculationSummary runQueries(size_t size,
                                    bool includeScalar,
                                    ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
                                    bool useE2EAPI,
-                                   size_t seed);
+                                   size_t seedQueriesLow,
+                                   size_t seedQueriesHigh);
 
 bool checkTypeExistence(const TypeProbability& typeCombinationQuery,
                         const TypeCombination& typeCombinationsData);
@@ -214,8 +208,10 @@ void runAccuracyTestConfiguration(DataDistributionEnum dataDistribution,
                                   bool includeScalar,
                                   ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
                                   bool useE2EAPI,
-                                  size_t seed,
+                                  size_t seedData,
+                                  size_t seedQueriesLow,
+                                  size_t seedQueriesHigh,
                                   bool printResults,
-                                  int arrayTypeLength = 1000);
+                                  int arrayTypeLength = 100);
 
 }  // namespace mongo::ce

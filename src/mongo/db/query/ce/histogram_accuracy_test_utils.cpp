@@ -29,33 +29,13 @@
 
 #include <sstream>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
 
 namespace mongo::ce {
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-/**
- * Compute the 50th, 90th, 95th, and 99th percentile values of a given vector.
- * This function creates a copy of the given vector which it sorts and over which it calculates the
- * percentiles.
- */
-std::tuple<double, double, double, double> percentiles(std::vector<double> arr) {
-
-    // Check if the simulation has returned at least one error estimation.
-    if (arr.size() == 0) {
-        return {-1, -1, -1, -1};
-    }
-
-    // Sort array before calculating the cummulative stats.
-    std::sort(arr.begin(), arr.end());
-
-    return {arr[(size_t)(arr.size() * 0.50)],
-            arr[(size_t)(arr.size() * 0.90)],
-            arr[(size_t)(arr.size() * 0.95)],
-            arr[(size_t)(arr.size() * 0.99)]};
-}
 
 size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
                                           stats::SBEValue valueToCalculate,
@@ -129,34 +109,7 @@ static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBE
     return actualCard;
 }
 
-static std::pair<boost::optional<double>, boost::optional<double>> computeErrors(
-    size_t actualCard, double estimatedCard) {
-    double error = estimatedCard - actualCard;
-    boost::optional<double> relError = (actualCard == 0)
-        ? (estimatedCard == 0 ? boost::optional<double>(0.0) : boost::none)
-        : boost::optional<double>(abs(error / actualCard));
-    boost::optional<double> qError =
-        std::max((actualCard != 0.0)          ? boost::optional<double>(estimatedCard / actualCard)
-                     : (estimatedCard == 0.0) ? boost::optional<double>(0.0)
-                                              : boost::none,
-                 (estimatedCard != 0.0)    ? boost::optional<double>(actualCard / estimatedCard)
-                     : (actualCard == 0.0) ? boost::optional<double>(0.0)
-                                           : boost::none);
-    return std::make_pair(qError, relError);
-}
-
-void printHeader() {
-    std::stringstream ss;
-    ss << "Data distribution, Number of histogram buckets, Data type, IncludeScalar, Data size, "
-       << "Query type, Query data type, Number of Queries, "
-       << "Data interval start, Data interval end, "
-       << "relative error (Avg), relative error (Max), relative error "
-          "(Median), relative error (90th), relative error (95%), relative error (99%), Q-Error "
-          "(Median), Q-Error (90%), Q-Error (95%), Q-Error (99%)";
-    LOGV2(8871201, "Accuracy experiment header", ""_attr = ss.str());
-}
-
-void printResult(const DataDistributionEnum dataDistribution,
+void printResult(const DataDistributionEnum& dataDistribution,
                  const TypeCombination& typeCombination,
                  const int size,
                  const int numberOfBuckets,
@@ -165,68 +118,113 @@ void printResult(const DataDistributionEnum dataDistribution,
                  QueryType queryType,
                  const std::pair<size_t, size_t>& dataInterval,
                  bool includeScalar,
+                 const size_t seedData,
+                 const size_t seedQueriesLow,
+                 const size_t seedQueriesHigh,
+                 const std::vector<std::pair<TypeTags, sbe::value::Value>>& bounds,
                  ErrorCalculationSummary error) {
 
-    std::string distribution;
+    BSONObjBuilder builder;
+
     switch (dataDistribution) {
         case kUniform:
-            distribution = "Uniform";
+            builder << "DataDistribution"
+                    << "Uniform";
             break;
         case kNormal:
-            distribution = "Normal";
+            builder << "DataDistribution"
+                    << "Normal";
             break;
         case kZipfian:
-            distribution = "Zipfian";
+            builder << "DataDistribution"
+                    << "Zipfian";
             break;
     }
 
+    builder << "NumberOfHistogramBuckets" << numberOfBuckets;
+
     std::stringstream ss;
-
-    // Distribution
-    ss << distribution << ", ";
-
-    // Number of buckets
-    ss << numberOfBuckets << ", ";
-
-    // Data types
     for (auto type : typeCombination) {
         ss << type.typeTag << "." << type.typeProbability << "." << type.nanProb << " ";
     }
-    ss << ", ";
+    builder << "DataTypes" << ss.str();
+    builder << "IncludeScalar" << includeScalar;
+    builder << "DataSize" << size;
 
-    ss << includeScalar << ", ";
+    std::stringstream ssSeedData, ssSeedQueryLow, ssSeedQueryHigh;
+    ssSeedData << seedData;
+    builder << "DataSeed" << ssSeedData.str();
 
-    // Data size
-    ss << size << ", ";
+    ssSeedQueryLow << seedQueriesLow;
+    builder << "QueriesSeedLow" << ssSeedQueryLow.str();
 
-    // Query data types
-    std::string queryTypeStr;
+    ssSeedQueryHigh << seedQueriesHigh;
+    builder << "QueriesSeedHigh" << ssSeedQueryHigh.str();
+
     switch (queryType) {
         case kPoint:
-            queryTypeStr = "Point";
+            builder << "QueryType"
+                    << "Point";
             break;
         case kRange:
-            queryTypeStr = "Range";
+            builder << "QueryType"
+                    << "Range";
             break;
     }
-    ss << queryTypeStr << ", " << typeCombinationQuery.typeTag << ", ";
 
-    // Number of Queries:
-    ss << numberOfQueries << ", ";
+    std::stringstream ssDataType;
+    ssDataType << typeCombinationQuery.typeTag;
+    builder << "QueryDataType" << ssDataType.str();
 
-    // Data interval
-    ss << dataInterval.first << ", " << dataInterval.second << ", ";
+    builder << "NumberOfQueries" << numberOfQueries;
 
-    // Relative error
-    ss << error.relativeErrorAvg << ", " << error.relativeErrorMax << ", "
-       << error.relativeErrorMedian << ", " << error.relativeError90thPercentile << ", "
-       << error.relativeError95thPercentile << ", " << error.relativeError99thPercentile << ", ";
+    std::vector<std::string> queryValuesLow;
+    std::vector<std::string> queryValuesHigh;
+    std::vector<double> ActualCadinality;
+    std::vector<double> Estimation;
+    for (auto values : error.queryResults) {
+        if (values.low->getTag() == sbe::value::TypeTags::StringBig ||
+            values.low->getTag() == sbe::value::TypeTags::StringSmall) {
+            std::stringstream sslow;
+            sslow << values.low.get().getValue();
+            queryValuesLow.push_back(sslow.str());
+            std::stringstream sshigh;
+            sshigh << values.high.get().getValue();
+            queryValuesHigh.push_back(sshigh.str());
+        } else {
+            std::stringstream sslow;
+            sslow << values.low.get().get();
+            queryValuesLow.push_back(sslow.str());
+            std::stringstream sshigh;
+            sshigh << values.high.get().get();
+            queryValuesHigh.push_back(sshigh.str());
+        }
+        ActualCadinality.push_back(values.actualCardinality);
+        Estimation.push_back(values.estimatedCardinality);
+    }
 
-    // Q-error
-    ss << error.qErrorMedian << ", " << error.qError90thPercentile << ", "
-       << error.qError95thPercentile << ", " << error.qError99thPercentile;
+    std::vector<std::string> bucketBounds;
+    for (const auto& bound : bounds) {
+        if (bound.first == sbe::value::TypeTags::StringBig ||
+            bound.first == sbe::value::TypeTags::StringSmall) {
+            std::stringstream bd;
+            bd << bound.second;
+            bucketBounds.push_back(bd.str());
+        } else {
+            std::stringstream bd;
+            stats::SBEValue val(bound.first, bound.second);
+            bd << val.get();
+            bucketBounds.push_back(bd.str());
+        }
+    }
 
-    LOGV2(8871202, "Accuracy experiment", ""_attr = ss.str());
+    builder << "QueryLow" << queryValuesLow;
+    builder << "QueryHigh" << queryValuesHigh;
+    builder << "HistogramBounds" << bucketBounds;
+    builder << "ActualCadinality" << ActualCadinality;
+    builder << "Estimation" << Estimation;
+
+    LOGV2(8871202, "Accuracy experiment", ""_attr = builder.obj());
 }
 
 
@@ -330,11 +328,6 @@ void generateDataUniform(size_t size,
                          const size_t ndv,
                          std::vector<stats::SBEValue>& data,
                          int arrayLength) {
-
-    // Generator for type selection.
-    std::mt19937 rng(seed);
-    std::uniform_int_distribution<std::mt19937::result_type> distTypes(0, 100);
-
     // Random value generator for actual data in histogram.
     std::mt19937_64 seedArray(42);
     std::mt19937_64 seedDataset(seed);
@@ -356,11 +349,6 @@ void generateDataNormal(size_t size,
                         const size_t ndv,
                         std::vector<stats::SBEValue>& data,
                         int arrayLength) {
-
-    // Generator for type selection.
-    std::mt19937 rng(seed);
-    std::uniform_int_distribution<std::mt19937::result_type> distTypes(0, 100);
-
     // Random value generator for actual data in histogram.
     std::mt19937_64 seedArray(42);
     std::mt19937_64 seedDataset(seed);
@@ -382,11 +370,6 @@ void generateDataZipfian(const size_t size,
                          const size_t ndv,
                          std::vector<stats::SBEValue>& data,
                          int arrayLength) {
-
-    // Generator for type selection.
-    std::mt19937 rng(seed);
-    std::uniform_int_distribution<std::mt19937::result_type> distTypes(0, 100);
-
     // Random value generator for actual data in histogram.
     std::mt19937_64 seedArray(42);
     std::mt19937_64 seedDataset(seed);
@@ -406,7 +389,8 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
     const std::pair<size_t, size_t>& interval,
     size_t numberOfQueries,
     const TypeProbability& queryTypeInfo,
-    const size_t seed) {
+    size_t seedQueriesLow,
+    size_t seedQueriesHigh) {
     std::vector<stats::SBEValue> sbeValLow, sbeValHigh;
     switch (queryType) {
         case kPoint: {
@@ -414,37 +398,41 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
             // re-running values the same values if the number of queries is larger than the size of
             // the interval.
             auto ndv = interval.second - interval.first;
-            generateDataUniform(numberOfQueries, interval, {queryTypeInfo}, seed, ndv, sbeValLow);
+            generateDataUniform(
+                numberOfQueries, interval, {queryTypeInfo}, seedQueriesLow, ndv, sbeValLow);
             break;
         }
         case kRange: {
-            const std::pair<size_t, size_t> intervalLow{
-                interval.first, interval.first + (interval.second - interval.first) / 2};
+            const std::pair<size_t, size_t> intervalLow{interval.first, interval.second};
 
-            const std::pair<size_t, size_t> intervalHigh{
-                interval.first + (interval.second - interval.first) / 2, interval.second};
+            const std::pair<size_t, size_t> intervalHigh{interval.first, interval.second};
 
             // For ndv we set the number of values in the provided data interval. This may lead to
             // re-running values the same values if the number of queries is larger than the size of
             // the interval.
             auto ndv = intervalLow.second - intervalLow.first;
             generateDataUniform(
-                numberOfQueries, intervalLow, {queryTypeInfo}, seed, ndv, sbeValLow);
+                numberOfQueries, intervalLow, {queryTypeInfo}, seedQueriesLow, ndv, sbeValLow);
 
             generateDataUniform(
-                numberOfQueries, intervalHigh, {queryTypeInfo}, seed, ndv, sbeValHigh);
+                numberOfQueries, intervalHigh, {queryTypeInfo}, seedQueriesHigh, ndv, sbeValHigh);
 
-            for (size_t i = 0; i < sbeValLow.size();) {
+            for (size_t i = 0; i < sbeValLow.size(); i++) {
                 if (mongo::stats::compareValues(sbeValLow[i].getTag(),
                                                 sbeValLow[i].getValue(),
                                                 sbeValHigh[i].getTag(),
-                                                sbeValHigh[i].getValue()) >= 0) {
+                                                sbeValHigh[i].getValue()) > 0) {
+                    auto temp = sbeValHigh[i];
+                    sbeValHigh[i] = sbeValLow[i];
+                    sbeValLow[i] = temp;
+                } else if (mongo::stats::compareValues(sbeValLow[i].getTag(),
+                                                       sbeValLow[i].getValue(),
+                                                       sbeValHigh[i].getTag(),
+                                                       sbeValHigh[i].getValue()) == 0) {
                     // Remove elements from both vectors
                     sbeValLow.erase(sbeValLow.begin() + i);
                     sbeValHigh.erase(sbeValHigh.begin() + i);
-                } else {
-                    // Only increment if no removal to avoid skipping elements
-                    ++i;
+                    i--;
                 }
             }
             break;
@@ -516,6 +504,7 @@ EstimationResult runSingleQuery(QueryType queryType,
                                                             ArrayRangeEstimationAlgo::kExactArrayCE)
                         .toDouble();
             } else {
+
                 // Estimate result.
                 estimatedCard = estimateCardinalityRange(*ceHist,
                                                          true /*lowInclusive*/,
@@ -543,24 +532,16 @@ ErrorCalculationSummary runQueries(size_t size,
                                    bool includeScalar,
                                    ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
                                    bool useE2EAPI,
-                                   const size_t seed) {
-    double relativeErrorSum = 0, relativeErrorMax = 0;
+                                   const size_t seedQueriesLow,
+                                   const size_t seedQueriesHigh) {
     ErrorCalculationSummary finalResults;
 
-    auto queryIntervals =
-        generateIntervals(queryType, interval, numberOfQueries, queryTypeInfo, seed);
+    auto queryIntervals = generateIntervals(
+        queryType, interval, numberOfQueries, queryTypeInfo, seedQueriesLow, seedQueriesHigh);
 
-    for (size_t i = 0; i < numberOfQueries; i++) {
+    for (size_t i = 0; i < queryIntervals.size(); i++) {
+
         size_t actualCard;
-        EstimationResult estimatedCard = runSingleQuery(queryType,
-                                                        queryIntervals[i].first,
-                                                        queryIntervals[i].second,
-                                                        ceHist,
-                                                        includeScalar,
-                                                        arrayRangeEstimationAlgo,
-                                                        useE2EAPI,
-                                                        size);
-
         switch (queryType) {
             case kPoint: {
                 // Find actual frequency.
@@ -570,6 +551,13 @@ ErrorCalculationSummary runQueries(size_t size,
                 break;
             }
             case kRange: {
+                if (mongo::stats::compareValues(queryIntervals[i].first.getTag(),
+                                                queryIntervals[i].first.getValue(),
+                                                queryIntervals[i].second.getTag(),
+                                                queryIntervals[i].second.getValue()) >= 0) {
+                    continue;
+                }
+
                 // Find actual frequency.
                 actualCard = calculateFrequencyFromDataVectorRange(
                     data, queryIntervals[i].first, queryIntervals[i].second);
@@ -577,38 +565,33 @@ ErrorCalculationSummary runQueries(size_t size,
             }
         }
 
+        EstimationResult estimatedCard = runSingleQuery(queryType,
+                                                        queryIntervals[i].first,
+                                                        queryIntervals[i].second,
+                                                        ceHist,
+                                                        includeScalar,
+                                                        arrayRangeEstimationAlgo,
+                                                        useE2EAPI,
+                                                        size);
+
         // Store results to final structure.
-        auto errors = computeErrors(actualCard, estimatedCard.card);
+        QueryInfoAndResults queryInfoResults;
+        queryInfoResults.low = queryIntervals[i].first;
+        queryInfoResults.high = queryIntervals[i].second;
 
-        if (errors.first.has_value() && errors.second.has_value()) {
-            finalResults.queryResults.push_back({actualCard, estimatedCard});
+        // We store results to calculate Q-error:
+        // Q-error = max(true/est, est/true)
+        // where "est" is the estimated cardinality and "true" is the true cardinality.
+        // In practice we replace est = max(est, 1) and true = max(est, 1) to avoid divide-by-zero.
+        // Q-error = 1 indicates a perfect prediction.
+        queryInfoResults.actualCardinality = fmax(actualCard, 1.0);
+        queryInfoResults.estimatedCardinality = fmax(estimatedCard.card, 1.0);
 
-            finalResults.qErrors.push_back(abs(errors.first.get()));
-            finalResults.relativeErrors.push_back(abs(errors.second.get()));
-
-            relativeErrorSum += abs(errors.second.get());
-            relativeErrorMax = fmax(relativeErrorMax, abs(errors.second.get()));
-        }
+        finalResults.queryResults.push_back(queryInfoResults);
 
         // Increment the number of executed queries.
         ++finalResults.executedQueries;
     }
-
-    // Store results over the whole dataset to final structure.
-    finalResults.relativeErrorAvg = relativeErrorSum / numberOfQueries;
-    finalResults.relativeErrorMax = relativeErrorMax;
-
-    auto relativeErrorPercentiles = percentiles(finalResults.relativeErrors);
-    finalResults.relativeErrorMedian = std::get<0>(relativeErrorPercentiles);
-    finalResults.relativeError90thPercentile = std::get<1>(relativeErrorPercentiles);
-    finalResults.relativeError95thPercentile = std::get<2>(relativeErrorPercentiles);
-    finalResults.relativeError99thPercentile = std::get<3>(relativeErrorPercentiles);
-
-    auto qErrorPercentiles = percentiles(finalResults.qErrors);
-    finalResults.qErrorMedian = std::get<0>(qErrorPercentiles);
-    finalResults.qError90thPercentile = std::get<1>(qErrorPercentiles);
-    finalResults.qError95thPercentile = std::get<2>(qErrorPercentiles);
-    finalResults.qError99thPercentile = std::get<3>(qErrorPercentiles);
 
     return finalResults;
 }
@@ -643,7 +626,9 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                   bool includeScalar,
                                   ArrayRangeEstimationAlgo arrayRangeEstimationAlgo,
                                   bool useE2EAPI,
-                                  const size_t seed,
+                                  const size_t seedData,
+                                  const size_t seedQueriesLow,
+                                  const size_t seedQueriesHigh,
                                   bool printResults,
                                   int arrayTypeLength) {
 
@@ -657,16 +642,31 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
             // Create one by one the values.
             switch (dataDistribution) {
                 case kUniform:
-                    generateDataUniform(
-                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayTypeLength);
+                    generateDataUniform(size,
+                                        dataInterval,
+                                        typeCombinationData,
+                                        seedData,
+                                        ndv,
+                                        data,
+                                        arrayTypeLength);
                     break;
                 case kNormal:
-                    generateDataNormal(
-                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayTypeLength);
+                    generateDataNormal(size,
+                                       dataInterval,
+                                       typeCombinationData,
+                                       seedData,
+                                       ndv,
+                                       data,
+                                       arrayTypeLength);
                     break;
                 case kZipfian:
-                    generateDataZipfian(
-                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayTypeLength);
+                    generateDataZipfian(size,
+                                        dataInterval,
+                                        typeCombinationData,
+                                        seedData,
+                                        ndv,
+                                        data,
+                                        arrayTypeLength);
                     break;
             }
 
@@ -690,7 +690,8 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                         includeScalar,
                                         arrayRangeEstimationAlgo,
                                         useE2EAPI,
-                                        seed);
+                                        seedQueriesLow,
+                                        seedQueriesHigh);
                 if (printResults) {
                     printResult(dataDistribution,
                                 typeCombinationData,
@@ -701,6 +702,10 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                 queryType,
                                 dataInterval,
                                 includeScalar,
+                                seedData,
+                                seedQueriesLow,
+                                seedQueriesHigh,
+                                ceHist->getScalar().getBounds().values(),
                                 error);
                 }
             }
