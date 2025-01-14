@@ -64,6 +64,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -74,7 +75,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
@@ -1050,9 +1050,9 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
 
 StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
                                                     const CompactOptions& options) {
-    WiredTigerSessionCache* cache =
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getSessionCache();
-    if (cache->isEphemeral()) {
+    WiredTigerConnection* connection =
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getConnection();
+    if (connection->isEphemeral()) {
         return 0;
     }
 
@@ -1492,7 +1492,7 @@ void WiredTigerRecordStore::Oplog::_handleTruncateAfter(WiredTigerRecoveryUnit& 
     // transactions from appearing.
     Timestamp truncTs(lastKeptId.getLong());
 
-    auto conn = ru.getSessionCache()->conn();
+    auto conn = ru.getConnection()->conn();
     auto durableTSConfigString = "durable_timestamp={:x}"_format(truncTs.asULL());
     invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()), session);
 

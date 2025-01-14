@@ -38,10 +38,10 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
@@ -103,8 +103,8 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
                                                  WiredTigerRecoveryUnit& ru,
                                                  const std::string& uri,
                                                  const CompactOptions& options) {
-    WiredTigerSessionCache* cache = ru.getSessionCache();
-    if (cache->isEphemeral()) {
+    WiredTigerConnection* connection = ru.getConnection();
+    if (connection->isEphemeral()) {
         return 0;
     }
 
@@ -168,7 +168,7 @@ void WiredTigerIndexUtil::validateStructure(
     const std::string& uri,
     const boost::optional<std::string>& configurationOverride,
     IndexValidateResults& results) {
-    if (ru.getSessionCache()->isEphemeral()) {
+    if (ru.getConnection()->isEphemeral()) {
         return;
     }
 

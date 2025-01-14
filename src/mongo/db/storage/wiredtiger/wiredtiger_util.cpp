@@ -750,17 +750,17 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
 
     // Try to close as much as possible to avoid EBUSY errors.
     ru.getSession()->closeAllCursors(uri);
-    WiredTigerSessionCache* sessionCache = ru.getSessionCache();
-    sessionCache->closeAllCursors(uri);
+    WiredTigerConnection* connection = ru.getConnection();
+    connection->closeAllCursors(uri);
 
     // Open a new session with custom error handlers.
     const char* sessionConfig = nullptr;
     if (gFeatureFlagPrefetch.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !sessionCache->isEphemeral()) {
+        !connection->isEphemeral()) {
         sessionConfig = "prefetch=(enabled=true)";
     }
-    WT_CONNECTION* conn = ru.getSessionCache()->conn();
+    WT_CONNECTION* conn = ru.getConnection()->conn();
     WiredTigerSession session(conn, &eventHandler, sessionConfig);
 
     const char* verifyConfig =
@@ -860,8 +860,8 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
 
     // Try to close as much as possible to avoid EBUSY errors.
     ru.getSession()->closeAllCursors(uri);
-    WiredTigerSessionCache* sessionCache = ru.getSessionCache();
-    sessionCache->closeAllCursors(uri);
+    WiredTigerConnection* connection = ru.getConnection();
+    connection->closeAllCursors(uri);
 
     // This method uses the WiredTiger config parser to see if the table is in the expected logging
     // state. Only attempt to alter the table when a change is needed. This avoids grabbing heavy
@@ -872,7 +872,7 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     // succeed.
     std::string existingMetadata;
     {
-        auto session = sessionCache->getSession();
+        auto session = connection->getSession();
         existingMetadata = getMetadataCreate(session->getSession(), uri).getValue();
     }
 
@@ -895,10 +895,10 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
         22432, 1, "Changing table logging settings", "uri"_attr = uri, "loggingEnabled"_attr = on);
     // Only alter the metadata once we're sure that we need to change the table settings, since
     // WT_SESSION::alter may return EBUSY and require taking a checkpoint to make progress.
-    auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
+    auto status = connection->getKVEngine()->alterMetadata(uri, setting);
     if (!status.isOK()) {
         // Dump the storage engine's internal state to assist in diagnosis.
-        sessionCache->getKVEngine()->dump();
+        connection->getKVEngine()->dump();
 
         LOGV2_FATAL(50756,
                     "Failed to update log setting",
@@ -918,7 +918,7 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
         return false;
     }
 
-    // Bypass the WiredTigerSessionCache to obtain a session that can be used after it shuts down,
+    // Bypass the WiredTigerConnection to obtain a session that can be used after it shuts down,
     // potentially before the storage engine itself shuts down.
     WiredTigerSession session(permit->conn());
 

@@ -46,7 +46,7 @@ class OperationContext;
 class WiredTigerConfigParser;
 
 class WiredTigerKVEngine;
-class WiredTigerSessionCache;
+class WiredTigerConnection;
 
 /**
  * A wrapper for WT_ITEM to make it more convenient to work with from C++.

@@ -125,7 +125,7 @@ WiredTigerCursor::~WiredTigerCursor() {
 
 WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(WiredTigerRecoveryUnit& ru,
                                                    const std::string& indexUri)
-    : _session(ru.getSessionCache()->getSession()) {
+    : _session(ru.getConnection()->getSession()) {
     // Open cursors can cause bulk open_cursor to fail with EBUSY.
     // TODO any other cases that could cause EBUSY?
     WiredTigerSession* outerSession = ru.getSession();

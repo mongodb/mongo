@@ -84,7 +84,7 @@
 namespace mongo {
 
 class RecoveryUnit;
-class WiredTigerSessionCache;
+class WiredTigerConnection;
 class WiredTigerSizeStorer;
 class WiredTigerOplogData;
 class WiredTigerOplogTruncateMarkers;

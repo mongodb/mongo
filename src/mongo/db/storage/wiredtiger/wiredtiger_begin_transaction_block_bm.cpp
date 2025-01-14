@@ -39,9 +39,9 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util_core.h"
@@ -50,9 +50,9 @@
 namespace mongo {
 namespace {
 
-class WiredTigerConnection {
+class WiredTigerConnectionTest {
 public:
-    WiredTigerConnection(StringData dbpath, StringData extraStrings) : _conn(nullptr) {
+    WiredTigerConnectionTest(StringData dbpath, StringData extraStrings) : _conn(nullptr) {
         std::stringstream ss;
         ss << "create,";
         ss << extraStrings;
@@ -60,7 +60,7 @@ public:
         int ret = wiredtiger_open(dbpath.toString().c_str(), nullptr, config.c_str(), &_conn);
         invariant(wtRCToStatus(ret, nullptr));
     }
-    ~WiredTigerConnection() {
+    ~WiredTigerConnectionTest() {
         _conn->close(_conn, nullptr);
     }
     WT_CONNECTION* getConnection() const {
@@ -74,7 +74,7 @@ private:
 class WiredTigerTestHelper : public ScopedGlobalServiceContextForTest {
 public:
     WiredTigerTestHelper() {
-        _ru = std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, nullptr);
+        _ru = std::make_unique<WiredTigerRecoveryUnit>(&_connection, nullptr);
         _session = _ru->getSession();
         auto wt_session = _session->getSession();
         invariant(
@@ -88,9 +88,9 @@ public:
 
 private:
     unittest::TempDir _dbpath{"wt_test"};
-    WiredTigerConnection _connection{_dbpath.path(), ""};
+    WiredTigerConnectionTest _connectionTest{_dbpath.path(), ""};
     ClockSourceMock _clockSource;
-    WiredTigerSessionCache _sessionCache{_connection.getConnection(), &_clockSource};
+    WiredTigerConnection _connection{_connectionTest.getConnection(), &_clockSource};
     std::unique_ptr<WiredTigerRecoveryUnit> _ru;
 
     WiredTigerSession* _session;

@@ -46,9 +46,9 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/platform/atomic_word.h"
@@ -64,16 +64,16 @@ extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
 
 class WiredTigerRecoveryUnit final : public RecoveryUnit {
 public:
-    WiredTigerRecoveryUnit(WiredTigerSessionCache* sc);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc);
 
     /**
      * It's expected a consumer would want to call the constructor that simply takes a
-     * `WiredTigerSessionCache`. That constructor accesses the `WiredTigerKVEngine` to find the
+     * `WiredTigerConnection`. That constructor accesses the `WiredTigerKVEngine` to find the
      * `WiredTigerOplogManager`. However, unit tests construct `WiredTigerRecoveryUnits` with a
-     * `WiredTigerSessionCache` that do not have a valid `WiredTigerKVEngine`. This constructor is
+     * `WiredTigerConnection` that do not have a valid `WiredTigerKVEngine`. This constructor is
      * expected to only be useful in those cases.
      */
-    WiredTigerRecoveryUnit(WiredTigerSessionCache* sc, WiredTigerOplogManager* oplogManager);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc, WiredTigerOplogManager* oplogManager);
     ~WiredTigerRecoveryUnit() override;
 
     void prepareUnitOfWork() override;
@@ -177,8 +177,8 @@ public:
 
     WiredTigerSession* getSessionNoTxn();
 
-    WiredTigerSessionCache* getSessionCache() {
-        return _sessionCache;
+    WiredTigerConnection* getConnection() {
+        return _connection;
     }
 
     void assertInActiveTxn() const;
@@ -251,7 +251,7 @@ private:
      */
     void _updateMultiTimestampConstraint(Timestamp timestamp);
 
-    WiredTigerSessionCache* _sessionCache;  // not owned
+    WiredTigerConnection* _connection;      // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
     UniqueWiredTigerSession _unique_session;
     WiredTigerSession* _session = nullptr;

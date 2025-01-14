@@ -35,11 +35,11 @@
 #include <wiredtiger.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
@@ -51,21 +51,21 @@
 
 namespace mongo {
 
-WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
-    : WiredTigerSessionCache(engine->getConnection(), engine->getClockSource(), engine) {}
+WiredTigerConnection::WiredTigerConnection(WiredTigerKVEngine* engine)
+    : WiredTigerConnection(engine->getConnection(), engine->getClockSource(), engine) {}
 
-WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn,
-                                               ClockSource* cs,
-                                               WiredTigerKVEngine* engine)
+WiredTigerConnection::WiredTigerConnection(WT_CONNECTION* conn,
+                                           ClockSource* cs,
+                                           WiredTigerKVEngine* engine)
     : _conn(conn), _clockSource(cs), _engine(engine) {
     uassertStatusOK(_compiledConfigurations.compileAll(_conn));
 }
 
-WiredTigerSessionCache::~WiredTigerSessionCache() {
+WiredTigerConnection::~WiredTigerConnection() {
     shuttingDown();
 }
 
-void WiredTigerSessionCache::shuttingDown() {
+void WiredTigerConnection::shuttingDown() {
     // Try to atomically set _shuttingDown flag, but just return if another thread was first.
     if (_shuttingDown.fetchAndBitOr(kShuttingDownMask) & kShuttingDownMask)
         return;
@@ -78,16 +78,16 @@ void WiredTigerSessionCache::shuttingDown() {
     closeAll();
 }
 
-void WiredTigerSessionCache::restart() {
+void WiredTigerConnection::restart() {
     _shuttingDown.fetchAndBitAnd(~kShuttingDownMask);
 }
 
-bool WiredTigerSessionCache::isShuttingDown() {
+bool WiredTigerConnection::isShuttingDown() {
     return _shuttingDown.load() & kShuttingDownMask;
 }
 
-void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(
-    Interruptible& interruptible, std::uint64_t lastCount) {
+void WiredTigerConnection::waitUntilPreparedUnitOfWorkCommitsOrAborts(Interruptible& interruptible,
+                                                                      std::uint64_t lastCount) {
     // It is possible for a prepared transaction to block on bonus eviction inside WiredTiger after
     // it commits or rolls-back, but this delays it from signalling us to wake up. In the very
     // worst case that the only evictable page is the one pinned by our cursor, AND there are no
@@ -104,26 +104,26 @@ void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(
     }
 }
 
-void WiredTigerSessionCache::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
+void WiredTigerConnection::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
     stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
     _prepareCommitOrAbortCounter.fetchAndAdd(1);
     _prepareCommittedOrAbortedCond.notify_all();
 }
 
 
-void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
+void WiredTigerConnection::closeAllCursors(const std::string& uri) {
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
         (*i)->closeAllCursors(uri);
     }
 }
 
-size_t WiredTigerSessionCache::getIdleSessionsCount() {
+size_t WiredTigerConnection::getIdleSessionsCount() {
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     return _sessions.size();
 }
 
-void WiredTigerSessionCache::closeExpiredIdleSessions(int64_t idleTimeMillis) {
+void WiredTigerConnection::closeExpiredIdleSessions(int64_t idleTimeMillis) {
     // Do nothing if session close idle time is set to 0 or less
     if (idleTimeMillis <= 0) {
         return;
@@ -154,7 +154,7 @@ void WiredTigerSessionCache::closeExpiredIdleSessions(int64_t idleTimeMillis) {
     }
 }
 
-void WiredTigerSessionCache::closeAll() {
+void WiredTigerConnection::closeAll() {
     // Increment the epoch as we are now closing all sessions with this epoch.
     SessionCache swap;
 
@@ -169,11 +169,11 @@ void WiredTigerSessionCache::closeAll() {
     }
 }
 
-bool WiredTigerSessionCache::isEphemeral() {
+bool WiredTigerConnection::isEphemeral() {
     return _engine && _engine->isEphemeral();
 }
 
-UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
+UniqueWiredTigerSession WiredTigerConnection::getSession() {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
     invariant(!(_shuttingDown.load() & kShuttingDownMask));
@@ -195,7 +195,7 @@ UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
     return UniqueWiredTigerSession(new WiredTigerSession(_conn, this, _epoch.load()));
 }
 
-void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
+void WiredTigerConnection::releaseSession(WiredTigerSession* session) {
     invariant(session);
 
     BlockShutdown blockShutdown(this);
@@ -246,13 +246,12 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     }
 }
 
-bool WiredTigerSessionCache::isEngineCachingCursors() {
+bool WiredTigerConnection::isEngineCachingCursors() {
     return gWiredTigerCursorCacheSize.load() <= 0;
 }
 
-void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(
-    WiredTigerSession* session) const {
-    session->_cache->releaseSession(session);
+void WiredTigerConnection::WiredTigerSessionDeleter::operator()(WiredTigerSession* session) const {
+    session->_conn->releaseSession(session);
 }
 
 }  // namespace mongo

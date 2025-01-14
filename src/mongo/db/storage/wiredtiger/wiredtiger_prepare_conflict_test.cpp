@@ -36,10 +36,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_metrics.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
@@ -114,12 +114,12 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictOnce) {
 TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictMultipleTimes) {
     auto attempt = 0;
     auto ru = recoveryUnit.get();
-    auto sessionCache = static_cast<WiredTigerRecoveryUnit*>(ru)->getSessionCache();
+    auto connection = static_cast<WiredTigerRecoveryUnit*>(ru)->getConnection();
 
-    auto throwWTPrepareConflictMultipleTimes = [&sessionCache, &attempt]() {
+    auto throwWTPrepareConflictMultipleTimes = [&connection, &attempt]() {
         // Manually increments '_prepareCommitOrAbortCounter' to simulate a unit of work has been
         // committed/aborted to continue retrying.
-        sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
+        connection->notifyPreparedUnitOfWorkHasCommittedOrAborted();
         return attempt++ < 100 ? WT_PREPARE_CONFLICT : 0;
     };
 

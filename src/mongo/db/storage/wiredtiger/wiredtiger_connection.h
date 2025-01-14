@@ -51,16 +51,17 @@ namespace mongo {
 class WiredTigerKVEngine;
 
 /**
- *  This cache implements a shared pool of WiredTiger sessions with the goal to amortize the
- *  cost of session creation and destruction over multiple uses.
+ *  This is a wrapper class for WT_CONNECTION and contains a shared pool of cached WiredTiger
+ * sessions with the goal to amortize the cost of session creation and destruction over multiple
+ * uses.
  */
-class WiredTigerSessionCache {
+class WiredTigerConnection {
 public:
-    WiredTigerSessionCache(WiredTigerKVEngine* engine);
-    WiredTigerSessionCache(WT_CONNECTION* conn,
-                           ClockSource* cs,
-                           WiredTigerKVEngine* engine = nullptr);
-    ~WiredTigerSessionCache();
+    WiredTigerConnection(WiredTigerKVEngine* engine);
+    WiredTigerConnection(WT_CONNECTION* conn,
+                         ClockSource* cs,
+                         WiredTigerKVEngine* engine = nullptr);
+    ~WiredTigerConnection();
 
     /**
      * This deleter automatically releases WiredTigerSession objects when no longer needed.
@@ -70,19 +71,19 @@ public:
         void operator()(WiredTigerSession* session) const;
     };
 
-    // RAII type to block and unblock the WiredTigerSessionCache to shut down.
+    // RAII type to block and unblock the WiredTigerConnection to shut down.
     class BlockShutdown {
     public:
-        BlockShutdown(WiredTigerSessionCache* cache) : _cache(cache) {
-            _cache->_shuttingDown.fetchAndAdd(1);
+        BlockShutdown(WiredTigerConnection* connection) : _conn(connection) {
+            _conn->_shuttingDown.fetchAndAdd(1);
         }
 
         ~BlockShutdown() {
-            _cache->_shuttingDown.fetchAndSubtract(1);
+            _conn->_shuttingDown.fetchAndSubtract(1);
         }
 
     private:
-        WiredTigerSessionCache* _cache;
+        WiredTigerConnection* _conn;
     };
 
     /**
@@ -146,7 +147,7 @@ public:
      * signaled that it has ended.
      * Accepts an Interruptible that will throw an AssertionException when interrupted.
      *
-     * This method is provided in WiredTigerSessionCache and not RecoveryUnit because all recovery
+     * This method is provided in WiredTigerConnection and not RecoveryUnit because all recovery
      * units share the same session cache, and we want a recovery unit on one thread to signal all
      * recovery units waiting for prepare conflicts across all other threads.
      */
@@ -216,10 +217,9 @@ private:
 };
 
 /**
- * A unique handle type for WiredTigerSession pointers obtained from a WiredTigerSessionCache.
+ * A unique handle type for WiredTigerSession pointers obtained from a WiredTigerConnection.
  */
-typedef std::unique_ptr<WiredTigerSession,
-                        typename WiredTigerSessionCache::WiredTigerSessionDeleter>
+typedef std::unique_ptr<WiredTigerSession, typename WiredTigerConnection::WiredTigerSessionDeleter>
     UniqueWiredTigerSession;
 
 static constexpr char kWTRepairMsg[] =

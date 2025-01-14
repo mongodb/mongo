@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-class WiredTigerSessionCache;
+class WiredTigerConnection;
 
 /**
  * This is a structure that caches 1 cursor for each uri.
@@ -60,10 +60,10 @@ public:
      * Creates a new WT session on the specified connection.
      *
      * @param conn WT connection
-     * @param cache The WiredTigerSessionCache that owns this session.
+     * @param connection The WiredTigerConnection that owns this session.
      * @param epoch In which session cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, WiredTigerSessionCache* cache, uint64_t epoch = 0);
+    WiredTigerSession(WT_CONNECTION* conn, WiredTigerConnection* connection, uint64_t epoch = 0);
 
     /**
      * Creates a new WT session on the specified connection.
@@ -196,12 +196,12 @@ private:
         std::string _config;  // Cursor config. Do not serve cursors with different configurations
     };
 
-    friend class WiredTigerSessionCache;
+    friend class WiredTigerConnection;
 
     // The cursor cache is a list of pairs that contain an ID and cursor
     typedef std::list<CachedCursor> CursorCache;
 
-    // Used internally by WiredTigerSessionCache
+    // Used internally by WiredTigerConnection
     uint64_t _getEpoch() const {
         return _epoch;
     }
@@ -212,7 +212,7 @@ private:
     uint64_t _cursorGen;
     int _cursorsOut;
 
-    WiredTigerSessionCache* _cache;                  // not owned
+    WiredTigerConnection* _conn;                     // not owned
     CompiledConfigurationsPerConnection* _compiled;  // not owned
 
     Date_t _idleExpireTime;

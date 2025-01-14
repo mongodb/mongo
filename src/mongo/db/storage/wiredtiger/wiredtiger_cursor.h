@@ -33,8 +33,8 @@
 #include <string>
 #include <wiredtiger.h>
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
 namespace mongo {
 

@@ -51,7 +51,7 @@ public:
 
     /**
      * Clears on exit the WT_SESSION::app_private void*. This allows the WT_SESSION to be safely
-     * returned to the WiredTigerSessionCache.
+     * returned to the WiredTigerConnection.
      */
     ~SessionDataRAII() {
         _session->app_private = nullptr;

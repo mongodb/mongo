@@ -36,7 +36,6 @@
 #include "mongo/db/storage/storage_metrics.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
@@ -112,7 +111,7 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx,
     auto& recoveryUnit = WiredTigerRecoveryUnit::get(ru);
     while (true) {
         attempts++;
-        auto lastCount = recoveryUnit.getSessionCache()->getPrepareCommitOrAbortCount();
+        auto lastCount = recoveryUnit.getConnection()->getPrepareCommitOrAbortCount();
         int ret = WT_READ_CHECK(func());
 
         if (ret != WT_PREPARE_CONFLICT)
@@ -122,8 +121,7 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx,
         wiredTigerPrepareConflictLog(attempts);
 
         // Wait on the session cache to signal that a unit of work has been committed or aborted.
-        recoveryUnit.getSessionCache()->waitUntilPreparedUnitOfWorkCommitsOrAborts(*opCtx,
-                                                                                   lastCount);
+        recoveryUnit.getConnection()->waitUntilPreparedUnitOfWorkCommitsOrAborts(*opCtx, lastCount);
     }
 }
 

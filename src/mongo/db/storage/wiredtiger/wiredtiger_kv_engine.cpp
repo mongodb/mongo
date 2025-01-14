@@ -89,6 +89,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
@@ -100,7 +101,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
@@ -259,8 +259,8 @@ namespace dps = ::mongo::dotted_path_support;
 
 class WiredTigerKVEngine::WiredTigerSessionSweeper : public BackgroundJob {
 public:
-    explicit WiredTigerSessionSweeper(WiredTigerSessionCache* sessionCache)
-        : BackgroundJob(false /* deleteSelf */), _sessionCache(sessionCache) {}
+    explicit WiredTigerSessionSweeper(WiredTigerConnection* connection)
+        : BackgroundJob(false /* deleteSelf */), _connection(connection) {}
 
     string name() const override {
         return "WTIdleSessionSweeper";
@@ -279,8 +279,8 @@ public:
                 _condvar.wait_for(lock, stdx::chrono::seconds(kDebugBuild ? 1 : 10));
             }
 
-            _sessionCache->closeExpiredIdleSessions(gWiredTigerSessionCloseIdleTimeSecs.load() *
-                                                    1000);
+            _connection->closeExpiredIdleSessions(gWiredTigerSessionCloseIdleTimeSecs.load() *
+                                                  1000);
         }
         LOGV2_DEBUG(22304, 1, "stopping {name} thread", "name"_attr = name());
     }
@@ -297,7 +297,7 @@ public:
     }
 
 private:
-    WiredTigerSessionCache* _sessionCache;
+    WiredTigerConnection* _connection;
     AtomicWord<bool> _shuttingDown{false};
 
     stdx::mutex _mutex;  // protects _condvar
@@ -379,7 +379,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "config_base=false,";
     ss << "statistics=(fast),";
 
-    if (!WiredTigerSessionCache::isEngineCachingCursors()) {
+    if (!WiredTigerConnection::isEngineCachingCursors()) {
         ss << "cache_cursors=false,";
     }
 
@@ -535,9 +535,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
     }
 
-    _sessionCache.reset(new WiredTigerSessionCache(this));
+    _connection.reset(new WiredTigerConnection(this));
 
-    _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_sessionCache.get());
+    _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_connection.get());
     _sessionSweeper->go();
 
     // Until the Replication layer installs a real callback, prevent truncating the oplog.
@@ -572,7 +572,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
             setStableTimestamp(_recoveryTimestamp, false);
 
-            _sessionCache->snapshotManager().setLastApplied(_recoveryTimestamp);
+            _connection->snapshotManager().setLastApplied(_recoveryTimestamp);
         }
     }
 
@@ -607,7 +607,7 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
 
     cleanShutdown();
 
-    _sessionCache.reset(nullptr);
+    _connection.reset(nullptr);
 }
 
 void WiredTigerKVEngine::notifyStorageStartupRecoveryComplete() {
@@ -756,7 +756,7 @@ void WiredTigerKVEngine::cleanShutdown() {
                        "Initial Data Timestamp"_attr = Timestamp(_initialDataTimestamp.load()),
                        "Oldest Timestamp"_attr = Timestamp(_oldestTimestamp.load()));
 
-    _sessionCache->shuttingDown();
+    _connection->shuttingDown();
 
     syncSizeInfo(/*syncToDisk=*/true);
 
@@ -835,7 +835,7 @@ Status WiredTigerKVEngine::repairIdent(RecoveryUnit& ru, StringData ident) {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSession();
     string uri = _uri(ident);
     session->closeAllCursors(uri);
-    _sessionCache->closeAllCursors(uri);
+    _connection->closeAllCursors(uri);
     if (isEphemeral()) {
         return Status::OK();
     }
@@ -1011,7 +1011,7 @@ Status WiredTigerKVEngine::beginBackup() {
 }
 
 void WiredTigerKVEngine::endBackup() {
-    if (_sessionCache->isShuttingDown()) {
+    if (_connection->isShuttingDown()) {
         // There could be a race with clean shutdown which unconditionally closes all the sessions.
         _backupSession->dropSessionBeforeDeleting();
     }
@@ -1427,7 +1427,7 @@ void WiredTigerKVEngine::setOldestActiveTransactionTimestampCallback(
 };
 
 RecoveryUnit* WiredTigerKVEngine::newRecoveryUnit() {
-    return new WiredTigerRecoveryUnit(_sessionCache.get());
+    return new WiredTigerRecoveryUnit(_connection.get());
 }
 
 void WiredTigerKVEngine::setRecordStoreExtraOptions(const std::string& options) {
@@ -1865,7 +1865,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(ru);
     wtRu->getSessionNoTxn()->closeAllCursors(uri);
-    _sessionCache->closeAllCursors(uri);
+    _connection->closeAllCursors(uri);
 
     WiredTigerSession session(_conn);
 
@@ -1907,7 +1907,7 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(&ru);
     wtRu->getSessionNoTxn()->closeAllCursors(uri);
-    _sessionCache->closeAllCursors(uri);
+    _connection->closeAllCursors(uri);
 
     WiredTigerSession session(_conn);
 
@@ -2059,13 +2059,13 @@ void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) try {
 }
 
 void WiredTigerKVEngine::checkpoint() {
-    UniqueWiredTigerSession session = _sessionCache->getSession();
+    UniqueWiredTigerSession session = _connection->getSession();
     WT_SESSION* s = session->getSession();
     return _checkpoint(s);
 }
 
 void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {
-    UniqueWiredTigerSession session = _sessionCache->getSession();
+    UniqueWiredTigerSession session = _connection->getSession();
     WT_SESSION* s = session->getSession();
     return _checkpoint(s, useStableTimestamp);
 }
@@ -2427,7 +2427,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(Interruptible
     int ret = 0;
 
     // Shut down the cache before rollback and restart afterwards.
-    _sessionCache->shuttingDown();
+    _connection->shuttingDown();
 
     // The rollback_to_stable operation requires all open cursors to be closed or reset before the
     // call, otherwise EBUSY will be returned. Occasionally, there could be an operation that hasn't
@@ -2465,7 +2465,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(Interruptible
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri);
 
     // SERVER-85167: restart the cache after resetting the size storer.
-    _sessionCache->restart();
+    _connection->restart();
 
     return {stableTimestamp};
 }
@@ -2768,11 +2768,11 @@ void WiredTigerKVEngine::waitUntilDurable(OperationContext* opCtx,
         return;
     }
 
-    WiredTigerSessionCache::BlockShutdown blockShutdown(_sessionCache.get());
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
 
     uassert(ErrorCodes::ShutdownInProgress,
             "Cannot wait for durability because a shutdown is in progress",
-            !_sessionCache->isShuttingDown());
+            !_connection->isShuttingDown());
 
     // Stable checkpoints are only meaningful in a replica set. Replication sets the "stable
     // timestamp". If the stable timestamp is unset, WiredTiger takes a full checkpoint, which is
@@ -2907,7 +2907,7 @@ Status WiredTigerKVEngine::reconfigureLogging() {
 }
 
 StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) const {
-    auto session = _sessionCache->getSession();
+    auto session = _connection->getSession();
 
     auto tableMetadata =
         WiredTigerUtil::getMetadata(session->getSession(), "table:{}"_format(ident));

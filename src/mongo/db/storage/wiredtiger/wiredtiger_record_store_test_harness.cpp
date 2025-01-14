@@ -50,7 +50,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"

@@ -49,9 +49,9 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
@@ -71,11 +71,11 @@ public:
         invariantWTOK(ret, nullptr);
 
         _fastClockSource = std::make_unique<SystemClockSource>();
-        _sessionCache = std::make_unique<WiredTigerSessionCache>(_conn, _fastClockSource.get());
+        _connection = std::make_unique<WiredTigerConnection>(_conn, _fastClockSource.get());
     }
 
     ~WiredTigerIndexHarnessHelper() final {
-        _sessionCache.reset();
+        _connection.reset();
         _conn->close(_conn, nullptr);
     }
 
@@ -170,7 +170,7 @@ public:
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache.get(), nullptr);
+        return std::make_unique<WiredTigerRecoveryUnit>(_connection.get(), nullptr);
     }
 
 private:
@@ -178,7 +178,7 @@ private:
     std::unique_ptr<ClockSource> _fastClockSource;
     std::vector<IndexDescriptor> _descriptors;
     WT_CONNECTION* _conn;
-    std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+    std::unique_ptr<WiredTigerConnection> _connection;
 };
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {

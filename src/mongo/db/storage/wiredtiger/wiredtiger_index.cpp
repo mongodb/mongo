@@ -252,7 +252,7 @@ Status WiredTigerIndex::create(WiredTigerRecoveryUnit& ru,
                                const std::string& uri,
                                const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
-    WiredTigerSession session(ru.getSessionCache()->conn());
+    WiredTigerSession session(ru.getConnection()->conn());
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(
         51780, 1, "create uri: {uri} config: {config}", "uri"_attr = uri, "config"_attr = config);
@@ -260,7 +260,7 @@ Status WiredTigerIndex::create(WiredTigerRecoveryUnit& ru,
 }
 
 Status WiredTigerIndex::Drop(WiredTigerRecoveryUnit& ru, const std::string& uri) {
-    WiredTigerSession session(ru.getSessionCache()->conn());
+    WiredTigerSession session(ru.getConnection()->conn());
     WT_SESSION* s = session.getSession();
 
     return wtRCToStatus(s->drop(s, uri.c_str(), nullptr), s);
@@ -420,7 +420,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     invariant(!shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
     WiredTigerSession session(
         WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
-            ->getSessionCache()
+            ->getConnection()
             ->conn());
 
     // Per the version cursor API:
@@ -486,7 +486,7 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WT_SESSION* s = ru->getSession()->getSession();
 
-    if (ru->getSessionCache()->isEphemeral()) {
+    if (ru->getConnection()->isEphemeral()) {
         return static_cast<long long>(WiredTigerUtil::getEphemeralIdentSize(s, _uri));
     }
     return static_cast<long long>(WiredTigerUtil::getIdentSize(s, _uri));

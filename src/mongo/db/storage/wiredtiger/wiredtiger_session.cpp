@@ -29,9 +29,9 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 
@@ -43,17 +43,17 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn)
     : WiredTigerSession(conn, nullptr, "isolation=snapshot") {}
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
-                                     WiredTigerSessionCache* cache,
+                                     WiredTigerConnection* connection,
                                      uint64_t epoch)
     : _epoch(epoch),
       _session(nullptr),
       _cursorGen(0),
       _cursorsOut(0),
-      _cache(cache),
+      _conn(connection),
       _compiled(nullptr),
       _idleExpireTime(Date_t::min()) {
     invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
-    setCompiledConfigurationsPerConnection(cache->getCompiledConfigurations());
+    setCompiledConfigurationsPerConnection(connection->getCompiledConfigurations());
 }
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
@@ -132,13 +132,13 @@ WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* c
 }
 
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::string config) {
-    // When releasing the cursor, we would want to check if the session cache is already in shutdown
+    // When releasing the cursor, we would want to check if the connection is already in shutdown
     // and prevent the race condition that the shutdown starts after the check.
-    WiredTigerSessionCache::BlockShutdown blockShutdown(_cache);
+    WiredTigerConnection::BlockShutdown blockShutdown(_conn);
 
     // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
     // cursor from an earlier epoch.
-    if (_cache->isShuttingDown() || _getEpoch() < _cache->_epoch.load()) {
+    if (_conn->isShuttingDown() || _getEpoch() < _conn->_epoch.load()) {
         return;
     }
 
