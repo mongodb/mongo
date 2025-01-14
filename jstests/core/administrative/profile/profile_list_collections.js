@@ -38,8 +38,8 @@ const getMoreCollName = cmdRes.cursor.ns.substr(cmdRes.cursor.ns.indexOf(".") + 
 cmdRes = assert.commandWorked(
     testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}));
 
-// A listCollections cursor doesn't really have a namespace to use to record profile entries, so
-// does not get recorded in the profile.
+// We disabled profiling getMore commands that originate from a listCollection command, given that
+// the original command was not profiled either.
 assert.throws(() => getLatestProfilerEntry(testDB, {op: "getmore"}),
               [],
               "Did not expect to find entry for getMore on a listCollections cursor");

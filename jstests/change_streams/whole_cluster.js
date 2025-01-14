@@ -1,6 +1,11 @@
 // Basic tests for $changeStream against all databases in the cluster.
+// @tags: [
+//   requires_profiling,
+//   requires_fcv_81
+// ]
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {
     assertInvalidChangeStreamNss,
     assertValidChangeStreamNss,
@@ -128,4 +133,15 @@ assert.commandWorked(testDb.dropDatabase());
 validUserDBs.forEach(dbName => {
     testDb.getSiblingDB(dbName).dropDatabase();
 });
+
+// Test that getMore commands from the whole-cluster change stream are logged by the profiler.
+if (!FixtureHelpers.isMongos(adminDB)) {
+    assert.commandWorked(adminDB.runCommand({profile: 2}));
+    cst.getNextBatch(cursor);
+    const profileEntry = getLatestProfilerEntry(adminDB, {op: "getmore"});
+    const firstStage = Object.keys(profileEntry.originatingCommand.pipeline[0])[0];
+    assert(["$changeStream", "$_internalChangeStreamOplogMatch"].includes(firstStage),
+           profileEntry);
+}
+
 cst.cleanUp();

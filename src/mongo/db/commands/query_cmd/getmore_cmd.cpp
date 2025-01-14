@@ -638,7 +638,9 @@ public:
                 // collection acquisitions.
                 invariant(!cursorPin->getExecutor()->usesCollectionAcquisitions());
 
-                if (!nss.isCollectionlessCursorNamespace()) {
+                // Profile whole-db/cluster change stream getMore commands.
+                if (!nss.isCollectionlessCursorNamespace() ||
+                    CurOp::get(opCtx)->debug().isChangeStreamQuery) {
                     statsTracker.emplace(opCtx,
                                          nss,
                                          Top::LockType::NotLocked,
