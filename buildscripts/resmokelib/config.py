@@ -115,6 +115,7 @@ DEFAULTS = {
     "stagger_jobs": None,
     "majority_read_concern": "on",
     "enable_enterprise_tests": "on",
+    "enable_evergreen_api_test_selection": False,
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
@@ -342,6 +343,9 @@ EMBEDDED_ROUTER = None
 
 # if set, enables enterprise jstest to automatically be included
 ENABLE_ENTERPRISE_TESTS = None
+
+# if set, enables test selection using the Evergreen API
+ENABLE_EVERGREEN_API_TEST_SELECTION = None
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None

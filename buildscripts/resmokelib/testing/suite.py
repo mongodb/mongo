@@ -125,38 +125,43 @@ class Suite(object):
 
         tests, excluded = _selector.filter_tests(test_kind, selector_config)
 
-        # Do not filter tests from evergreen when running locally.
-        # If there are no tests, return early
-        if not _config.EVERGREEN_TASK_ID or not tests:
-            tests = _selector.group_tests(test_kind, selector_config, tests)
-            return tests, excluded
+        # Apply Evergreen API test selection if:
+        # 1. We have tests to filter
+        # 2. We're running in Evergreen
+        # 3. Test selection is enabled
+        if tests and _config.EVERGREEN_TASK_ID and _config.ENABLE_EVERGREEN_API_TEST_SELECTION:
+            evg_api = evergreen_conn.get_evergreen_api()
+            try:
+                result = evg_api.select_tests(
+                    str(_config.EVERGREEN_PROJECT_NAME),
+                    str(_config.EVERGREEN_VARIANT_NAME),
+                    str(_config.EVERGREEN_REQUESTER),
+                    str(_config.EVERGREEN_TASK_ID),
+                    str(_config.EVERGREEN_TASK_NAME),
+                    tests,
+                )
+            except Exception as ex:
+                print(
+                    "ERROR: failure using the select tests evergreen endpoint with the following arguments:"
+                )
+                print(f"Project name: {str(_config.EVERGREEN_PROJECT_NAME)}")
+                print(f"Variant name: {str(_config.EVERGREEN_VARIANT_NAME)}")
+                print(f"Requester: {str(_config.EVERGREEN_REQUESTER)}")
+                print(f"Task ID: {str(_config.EVERGREEN_TASK_ID)}")
+                print(f"Task name: {str(_config.EVERGREEN_TASK_NAME)}")
+                print(f"Tests: {tests}")
+                raise ex
 
-        evg_api = evergreen_conn.get_evergreen_api()
-        try:
-            result = evg_api.select_tests(
-                str(_config.EVERGREEN_PROJECT_NAME),
-                str(_config.EVERGREEN_VARIANT_NAME),
-                str(_config.EVERGREEN_REQUESTER),
-                str(_config.EVERGREEN_TASK_ID),
-                str(_config.EVERGREEN_TASK_NAME),
-                tests,
+            evergreen_filtered_tests = result["tests"]
+            evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(
+                set(tests)
             )
-        except Exception as ex:
-            print(
-                "ERROR: failure using the select tests evergreen endpoint with the following arguments:"
-            )
-            print(f"Project name: {str(_config.EVERGREEN_PROJECT_NAME)}")
-            print(f"Variant name: {str(_config.EVERGREEN_VARIANT_NAME)}")
-            print(f"Requester: {str(_config.EVERGREEN_REQUESTER)}")
-            print(f"Task ID: {str(_config.EVERGREEN_TASK_ID)}")
-            print(f"Task name: {str(_config.EVERGREEN_TASK_NAME)}")
-            print(f"Tests: {tests}")
-            raise ex
-        evergreen_filtered_tests = result["tests"]
-        evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(set(tests))
-        print(f"Evergreen excluded the following tests: {evergreen_excluded_tests}")
-        excluded.extend(evergreen_excluded_tests)
-        tests = _selector.group_tests(test_kind, selector_config, evergreen_filtered_tests)
+            print(f"Evergreen excluded the following tests: {evergreen_excluded_tests}")
+            excluded.extend(evergreen_excluded_tests)
+            tests = evergreen_filtered_tests
+
+        # Always group tests at the end
+        tests = _selector.group_tests(test_kind, selector_config, tests)
         return tests, excluded
 
     def get_name(self):

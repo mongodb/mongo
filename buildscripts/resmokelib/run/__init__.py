@@ -1651,6 +1651,13 @@ class RunPlugin(PluginInterface):
             help="One or more YAML files that associate tests and tags.",
         )
 
+        parser.add_argument(
+            "--enableEvergreenApiTestSelection",
+            dest="enable_evergreen_api_test_selection",
+            action="store_true",
+            help="Enable test selection using the Evergreen API",
+        )
+
         configure_resmoke.add_otel_args(parser)
 
         mongodb_server_options = parser.add_argument_group(

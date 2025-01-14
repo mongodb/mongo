@@ -96,6 +96,9 @@ parameters:
   - key: evergreen_config_file_path
     value: "etc/evergreen.yml"
     description: "path to this file"
+  - key: enable_evergreen_api_test_selection
+    value: false
+    description: "Enable test selection using Evergreen API"
 
 commit_queue_aliases:
   - variant: "commit-queue"
