@@ -22,7 +22,6 @@ const adminDB = db.getSiblingDB("admin");
 const configDB = db.getSiblingDB("config");
 
 const isBalancerEnabled = TestData.runningWithBalancer;
-const testingReplicaSetEndpoint = TestData.testingReplicaSetEndpoint;
 
 function removeUuidField(listOfCollections) {
     let listResult = listOfCollections.map((entry) => {
@@ -64,18 +63,9 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest,
 
     // Check that all the collections returned by `listCollections` are also returned by
     // `$_internalListCollections`.
-    let internalStageResponseAgainstDbTest;
-    try {
-        internalStageResponseAgainstDbTest =
-            dbTest
-                .aggregate([{$_internalListCollections: {}}, {$match: {ns: {$not: /resharding/}}}])
-                .toArray();
-    } catch (error) {
-        if (!testingReplicaSetEndpoint) {
-            throw error;
-        }
-        internalStageResponseAgainstDbTest = [];
-    }
+    let internalStageResponseAgainstDbTest =
+        dbTest.aggregate([{$_internalListCollections: {}}, {$match: {ns: {$not: /resharding/}}}])
+            .toArray();
     assert.eq(expectedNumOfCollections,
               internalStageResponseAgainstDbTest.length,
               internalStageResponseAgainstDbTest);

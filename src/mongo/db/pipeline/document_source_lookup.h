@@ -200,6 +200,7 @@ public:
         std::vector<BSONObj> pipeline,
         boost::optional<std::pair<std::string, std::string>> localForeignFields,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     /**
      * Builds the BSONObj used to query the foreign collection and wraps it in a $match.
      */

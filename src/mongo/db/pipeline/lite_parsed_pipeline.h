@@ -128,10 +128,11 @@ public:
     }
 
     /**
-     * Returns true if the desugared pipeline begins with a $queue stage.
+     * Returns true if the pipeline begins with a stage that generates its own data and should run
+     * once.
      */
-    bool startsWithQueue() const {
-        return !_stageSpecs.empty() && _stageSpecs.front()->startsWithQueue();
+    bool generatesOwnDataOnce() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->generatesOwnDataOnce();
     }
 
     /**

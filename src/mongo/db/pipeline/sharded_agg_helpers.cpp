@@ -309,7 +309,7 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
                             ->shardRegistry()
                             ->getAllShardIds(expCtx->getOperationContext());
         return {std::make_move_iterator(shardIds.begin()), std::make_move_iterator(shardIds.end())};
-    } else if (pipelineDataSource == PipelineDataSource::kQueue && mergeShardId) {
+    } else if (pipelineDataSource == PipelineDataSource::kGeneratesOwnDataOnce && mergeShardId) {
         return {*mergeShardId};
     }
 
@@ -487,10 +487,10 @@ boost::optional<CollectionRoutingInfo> getCollectionRoutingInfoForTargeting(
     auto executionNsRoutingInfoStatus =
         getExecutionNsRoutingInfo(expCtx->getOperationContext(), expCtx->getNamespaceString());
 
-    // If this is a $changeStream or the desugared pipeline starts with $queue, we swallow
-    // NamespaceNotFound exceptions and continue. Otherwise, uassert on all exceptions here.
+    // If this is a $changeStream or the pipeline starts with a stage that generate its own data, we
+    // swallow NamespaceNotFound exceptions and continue. Otherwise, uassert on all exceptions here.
     if (!((pipelineDataSource == PipelineDataSource::kChangeStream ||
-           pipelineDataSource == PipelineDataSource::kQueue) &&
+           pipelineDataSource == PipelineDataSource::kGeneratesOwnDataOnce) &&
           executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
         uassertStatusOK(executionNsRoutingInfoStatus);
     }
@@ -1496,9 +1496,9 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto startsWithQueue = liteParsedPipeline.startsWithQueue();
+    auto generatesOwnDataOnce = liteParsedPipeline.generatesOwnDataOnce();
     auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
-        : startsWithQueue                     ? PipelineDataSource::kQueue
+        : generatesOwnDataOnce                ? PipelineDataSource::kGeneratesOwnDataOnce
                                               : PipelineDataSource::kNormal;
 
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),
@@ -1554,7 +1554,7 @@ bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pi
     // The following aggregations must be routed to all shards:
     // - Any collectionless aggregation, such as non-localOps $currentOp.
     // - Any aggregation which begins with a $changeStream stage.
-    return pipelineDataSource != PipelineDataSource::kQueue &&
+    return pipelineDataSource != PipelineDataSource::kGeneratesOwnDataOnce &&
         (nss.isCollectionlessAggregateNS() ||
          pipelineDataSource == PipelineDataSource::kChangeStream);
 }
@@ -1674,9 +1674,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto startsWithQueue = liteParsedPipeline.startsWithQueue();
+    auto generatesOwnDataOnce = liteParsedPipeline.generatesOwnDataOnce();
     auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
-        : startsWithQueue                     ? PipelineDataSource::kQueue
+        : generatesOwnDataOnce                ? PipelineDataSource::kGeneratesOwnDataOnce
                                               : PipelineDataSource::kNormal;
 
     // We're not required to read locally, and we need a cursor source. We need to perform routing

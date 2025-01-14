@@ -113,8 +113,8 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
  */
 enum class PipelineDataSource {
     kNormal,
-    kChangeStream,  // Indicates a pipeline has a $changeStream stage.
-    kQueue,         // Indicates the desugared pipeline starts with a $queue stage.
+    kChangeStream,          // Indicates a pipeline has a $changeStream stage.
+    kGeneratesOwnDataOnce,  // Indicates the shards part needs to be executed on a single node.
 };
 
 /**

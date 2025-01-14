@@ -297,6 +297,9 @@ std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     }
     // When we first create a $lookup stage, the input 'pipeline' is unparsed, so we
     // check for the $documents stage itself.
+    //
+    // TODO SERVER-59628 This code should be updated when we enable any valid data source stage on
+    // the $lookup pipelined
     if (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
         pipeline[0].hasField("$search"_sd) ||
         pipeline[0].hasField(DocumentSourceQueue::kStageName)) {
@@ -305,6 +308,9 @@ std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     return {};
 }
 
+// Process and copy the given `pipeline` to the `_resolvedPipeline` attribute and compute where
+// the $match stage is going to be placed, indicated through the `_fieldMatchPipelineIdx`
+// variable.
 void DocumentSourceLookUp::resolvedPipelineHelper(
     NamespaceString fromNs,
     std::vector<BSONObj> pipeline,
@@ -336,15 +342,17 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
 
     if (localForeignFields != boost::none) {
         std::tie(_localField, _foreignField) = *localForeignFields;
-        // Append a BSONObj to '_resolvedPipeline' as a placeholder for the stage corresponding to
-        // the local/foreignField $match. It must next after $documents if present.
+
+        // The $match stage should come after $documents if present.
         auto sourceStages = extractSourceStage(pipeline);
         _resolvedPipeline.insert(_resolvedPipeline.end(), sourceStages.begin(), sourceStages.end());
+
         // Save the correct position of the $match, but wait to insert it until we have finished
         // constructing the pipeline and created the introspection pipeline below.
         _fieldMatchPipelineIdx = _resolvedPipeline.size();
-        // Add the user pipeline to '_resolvedPipeline' after any potential view prefix and
-        // $match
+
+        // Add the rest of the user pipeline to `_resolvedPipeline` after any potential view prefix
+        // and $match.
         _resolvedPipeline.insert(
             _resolvedPipeline.end(), pipeline.begin() + sourceStages.size(), pipeline.end());
 
@@ -353,6 +361,7 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
         // so we enable the cache.
         _cache.emplace(internalDocumentSourceLookupCacheSizeBytes.load());
+
         // Add the user pipeline to '_resolvedPipeline' after any potential view prefix and $match
         _resolvedPipeline.insert(_resolvedPipeline.end(), pipeline.begin(), pipeline.end());
     }

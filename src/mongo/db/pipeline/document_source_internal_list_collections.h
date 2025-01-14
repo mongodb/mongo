@@ -97,6 +97,10 @@ public:
             return true;
         }
 
+        bool generatesOwnDataOnce() const final {
+            return true;
+        }
+
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
             // TODO (SERVER-97061): Update this once we support snapshot read concern on
@@ -127,8 +131,7 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     // TODO (SERVER-97356): Replace with kRunOnceAnyNode
-                                     HostTypeRequirement::kLocalOnly,
+                                     HostTypeRequirement::kRunOnceAnyNode,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
@@ -140,7 +143,7 @@ public:
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        // This stage will run once on the entire cluster since we've set `kLocalOnly` as the
+        // This stage will run once on the entire cluster since we've set `kRunOnceAnyNode` as the
         // `HostTypeRequirement` constraint.
         return boost::none;
     }

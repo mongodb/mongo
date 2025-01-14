@@ -69,10 +69,7 @@ public:
         return true;
     }
 
-    /**
-     * Returns true as the desugared pipeline begins with a $queue stage.
-     */
-    bool startsWithQueue() const final {
+    bool generatesOwnDataOnce() const final {
         return true;
     }
 };
