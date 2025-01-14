@@ -17,9 +17,6 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-// TODO SERVER-88620 Re-enable the check.
-TestData.skipCheckRoutingTableConsistency = true;
-
 const enterAbortFailpointName = "reshardingPauseCoordinatorBeforeStartingErrorFlow";
 const originalReshardingUUID = UUID();
 const newReshardingUUID = UUID();
