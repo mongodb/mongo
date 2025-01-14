@@ -37,5 +37,5 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<bool>
     cpp_varname: "gPinTaskExecCursorConns"
-    default: false
+    default: true 
     redact: false

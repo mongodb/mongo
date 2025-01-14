@@ -28,5 +28,5 @@ executor:
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
           setParameters:
-            pinTaskExecCursorConns: true
+            pinTaskExecCursorConns: false # pinned connection mode is the default
       nodb: ''

@@ -518,7 +518,7 @@ tasks:
       use_large_distro: "true"
 
 - <<: *task_template
-  name: search_pinned_connections_auth
+  name: search_no_pinned_connections_auth
   tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
   commands:
   - func: "do setup"
