@@ -10,24 +10,8 @@ if [ -n "$BUILD_WORKSPACE_DIRECTORY" ]; then
   cd $BUILD_WORKSPACE_DIRECTORY
 fi
 
-if ! command -v shfmt &>/dev/null; then
-  if [[ "$(uname)" == "Linux" ]]; then
-    echo "Could not find the 'shfmt' command"
-    echo ""
-    echo "(if on Ubuntu/Debian) Install via"
-    echo ""
-    echo "    sudo apt-get install shfmt"
-    echo ""
-  elif [[ "$(uname)" == "Darwin" ]]; then
-    echo "Could not find the 'shfmt' command"
-    echo ""
-    echo "Install via"
-    echo ""
-    echo "    brew install shfmt"
-    echo ""
-  else
-    echo "This must be run on a MacOS or Linux system."
-  fi
+if ! command -v $shfmt &>/dev/null; then
+  echo "Could not find shfmt at $shfmt"
   exit 1
 fi
 

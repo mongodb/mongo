@@ -9,21 +9,15 @@ from buildscripts.buildifier import fix_all, lint_all
 
 def run_shellscripts_linters(shellscripts_linters: pathlib.Path, check: bool) -> bool:
     try:
-        env = os.environ.copy()
-        if "CI" in os.environ:
-            env["PATH"] = f"/opt/shfmt/v3.2.4/bin{os.pathsep}{env['PATH']}"
-
         command = [str(shellscripts_linters)]
         if not check:
             print("Running shellscripts formatter")
             command.append("fix")
         else:
             print("Running shellscripts linter")
-        subprocess.run(command, check=True, env=env)
+        repo_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        subprocess.run(command, check=True, env=os.environ, cwd=repo_path)
     except subprocess.CalledProcessError:
-        print("Found shell script formatting errors. Run 'bazel run //:format' to fix")
-        print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
-        print("python buildscripts/install_bazel.py")
         return False
     return True
 
