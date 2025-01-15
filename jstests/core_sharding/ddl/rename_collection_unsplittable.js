@@ -3,7 +3,6 @@
  * @tags: [
  *   # Requires stable collection placement
  *   assumes_balancer_off,
- *   creates_unspittable_collections_on_specific_shards,
  *   # TODO SERVER-97716 Review this exclusion tag
  *   multiversion_incompatible,
  *   requires_2_or_more_shards,

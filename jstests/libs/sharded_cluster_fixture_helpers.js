@@ -48,3 +48,21 @@ export function setupTestDatabase(conn, dbName, optPrimaryShard = null) {
     assert.commandWorked(conn.adminCommand(createCmd));
     return newDb;
 }
+
+// Basic check of the tracking state for a namespace on the sharding catalog.
+export function verifyCollectionTrackingState(
+    conn, nss, expectedToBeTracked, expectedToBeUnsplittable = false) {
+    const configDB = conn.getSiblingDB('config');
+    const matchingCollDocs = configDB.collections.find({_id: nss}).toArray();
+    if (expectedToBeTracked) {
+        assert.eq(1, matchingCollDocs.length);
+        const unsplittable = matchingCollDocs[0].unsplittable ? true : false;
+        assert.eq(expectedToBeUnsplittable, unsplittable);
+        if (expectedToBeUnsplittable) {
+            const numChunks = configDB.chunks.count({uuid: matchingCollDocs[0].uuid});
+            assert.eq(1, numChunks);
+        }
+    } else {
+        assert.eq(0, matchingCollDocs.length);
+    }
+}
