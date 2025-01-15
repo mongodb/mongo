@@ -17,6 +17,9 @@
  *   # TODO SERVER-89764 a concurrent moveCollection during insertion can cause the bucket
  *   # collection to insert more documents then expected by the test.
  *   assumes_balancer_off,
+ *   # On 8.0+ this test makes assertions around the fact that we can reopen compressed buckets,
+ *   # whereas on 7.0 we cannot.
+ *   requires_fcv_80,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
