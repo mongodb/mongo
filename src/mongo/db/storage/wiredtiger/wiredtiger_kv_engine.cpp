@@ -1410,9 +1410,13 @@ void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
     while (true) {
         try {
             return _sizeStorer->flush(sync);
-        } catch (const StorageUnavailableException&) {
+        } catch (const StorageUnavailableException& ex) {
             if (!sync) {
                 // ignore, we'll try again later.
+                LOGV2(7437300,
+                      "Encountered storage unavailable error while flushing collection size info, "
+                      "will retry again later",
+                      "error"_attr = ex.what());
                 return;
             }
         }
