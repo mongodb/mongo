@@ -26,7 +26,7 @@ BAZEL_BINARY=bazel
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
 
-# TODO(SERVER-98912): Remove when bazel test is better integrated with evergreen
+# TODO(SERVER-99431): Remove when bazel test timeouts are under control
 set +e
 
 echo "       bazel coverage ${args} ${target}" >> bazel-invocation.txt

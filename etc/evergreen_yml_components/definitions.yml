@@ -601,6 +601,22 @@ functions:
         - key: gather_code_coverage_results
           value: "true"
 
+  "enable bazel test report creation": &enable_bazel_test_report_creation
+    command: expansions.update
+    display_name: "enable bazel test report creation"
+    params:
+      updates:
+        - key: create_bazel_test_report
+          value: "true"
+
+  "set bazel test silent fail": &set_bazel_test_silent_fail
+    command: expansions.update
+    display_name: "set bazel test silent fail"
+    params:
+      updates:
+        - key: bazel_test_silent_fail
+          value: "--silent-fail"
+
   ### Set expansion macros used in each task.
   "set task expansion macros": &set_task_expansion_macros
     command: expansions.update
@@ -1504,6 +1520,10 @@ functions:
     - *apply_version_expansions
     - *f_expansions_write
     - *set_code_coverage_expansion
+    - *f_expansions_write
+    - *enable_bazel_test_report_creation
+    - *f_expansions_write
+    - *set_bazel_test_silent_fail # TODO SERVER-99431 Remove once bazel coverage timeouts are under control.
     - *f_expansions_write
     - *bazel_coverage_sh
 
@@ -2659,6 +2679,16 @@ functions:
     - *attach_scons_config_logs
     - *attach_scons_cache_logs
     - *attach_scons_stdout_logs
+
+  "create bazel test report":
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/create_bazel_test_report.py"
+        - "bazel-testlogs/"
+        - "${bazel_test_silent_fail}"
 
   "attach report":
     command: attach.results

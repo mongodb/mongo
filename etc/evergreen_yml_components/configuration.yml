@@ -92,6 +92,7 @@ post:
   - func: "attach scons logs"
   - func: "attach local resmoke invocation"
   - func: "attach bazel invocation"
+  - func: "create bazel test report"
   - func: "attach multiversion exclude tags"
   - func: "attach report"
   - func: "attach task errors"
