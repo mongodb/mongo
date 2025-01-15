@@ -38,6 +38,7 @@ struct __wti_live_restore_hole_node {
 struct __wti_live_restore_file_handle {
     WT_FILE_HANDLE iface;
     WT_FILE_HANDLE *source;
+    size_t source_size;
     /* Metadata kept along side a file handle to track holes in the destination file. */
     struct {
         WT_FILE_HANDLE *fh;
@@ -115,6 +116,10 @@ struct __wti_live_restore_server {
     WT_THREAD_GROUP threads;
     wt_shared uint32_t threads_working;
     WT_SPINLOCK queue_lock;
+    WT_TIMER msg_timer;
+    WT_TIMER start_timer;
+    uint64_t msg_count;
+    uint64_t work_count;
     uint64_t work_items_remaining;
 
     TAILQ_HEAD(__wti_live_restore_work_queue, __wti_live_restore_work_item) work_queue;

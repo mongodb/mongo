@@ -71,7 +71,7 @@ arch_doc_pages = [
         ['src/include/dhandle.h', 'src/conn/conn_dhandle.c',
          'src/session/session_dhandle.c']),
     ArchDocPage('arch-eviction',
-        ['WT_EVICT', 'WT_EVICT_ENTRY', 'WT_EVICT_QUEUE'],
+        ['WTI_EVICT_ENTRY', 'WTI_EVICT_QUEUE', 'WT_EVICT'],
         ['src/evict/']),
     ArchDocPage('arch-fast-truncate',
         ['WT_PAGE_DELETED'],

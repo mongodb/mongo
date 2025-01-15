@@ -42,8 +42,12 @@ __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
          * complete.
          */
         if (TAILQ_EMPTY(&server->work_queue)) {
+            uint64_t time_diff_ms;
             WT_STAT_CONN_SET(session, live_restore_state, WT_LIVE_RESTORE_COMPLETE);
-            __wt_verbose_debug1(session, WT_VERB_FILEOPS, "%s", "Live restore finished");
+            __wt_timer_evaluate_ms(session, &server->start_timer, &time_diff_ms);
+            __wt_verbose(session, WT_VERB_LIVE_RESTORE_PROGRESS,
+              "Completed restoring %" PRIu64 " files in %" PRIu64 " seconds",
+              S2C(session)->live_restore_server->work_count, time_diff_ms / WT_THOUSAND);
         }
         /*
          * Future proofing: in general unless the conn is closing the queue must be empty if there
@@ -104,19 +108,20 @@ __live_restore_work_queue_drain(WT_SESSION_IMPL *session)
 /*
  * __live_restore_worker_run --
  *     Entry function for a live restore thread. This is called repeatedly from the thread group
- *     code so it does not need to loop itself.
+ *     code so it does not need to loop itself. Each run will fill the holes for a single file.
  */
 static int
 __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
 {
     WT_DECL_RET;
     WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
+    uint64_t time_diff_ms;
 
     __wt_spin_lock(session, &server->queue_lock);
     if (TAILQ_EMPTY(&server->work_queue)) {
         /* Stop our thread from running. This will call the stop_func and trigger state cleanup. */
         F_CLR(ctx, WT_THREAD_RUN);
-        __wt_verbose_debug1(session, WT_VERB_FILEOPS, "%s", "Live restore worker terminating");
+        __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE, "%s", "Live restore worker terminating");
         __wt_spin_unlock(session, &server->queue_lock);
         return (0);
     }
@@ -124,7 +129,18 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     WT_ASSERT(session, work_item != NULL);
     TAILQ_REMOVE(&server->work_queue, work_item, q);
     __wt_verbose_debug2(
-      session, WT_VERB_FILEOPS, "Live restore worker taking queue item: %s", work_item->uri);
+      session, WT_VERB_LIVE_RESTORE, "Live restore worker taking queue item: %s", work_item->uri);
+    __wt_timer_evaluate_ms(session, &server->msg_timer, &time_diff_ms);
+
+    /* Print out a progress message periodically. */
+    if ((time_diff_ms / (WT_THOUSAND * WT_PROGRESS_MSG_PERIOD)) > server->msg_count) {
+        __wt_verbose(session, WT_VERB_LIVE_RESTORE_PROGRESS,
+          "Live restore has been running for %" PRIu64 " seconds and has %" PRIu64
+          " files of %" PRIu64 " left to process",
+          time_diff_ms / WT_THOUSAND, server->work_items_remaining, server->work_count);
+        server->msg_count = time_diff_ms / (WT_THOUSAND * WT_PROGRESS_MSG_PERIOD);
+    }
+
     __wt_spin_unlock(session, &server->queue_lock);
 
     /*
@@ -152,16 +168,16 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     /* FIXME-WT-13897 Replace this with an API call into the block manager. */
     WT_FILE_HANDLE *fh = bm->block->fh->handle;
 
-    __wt_verbose_debug3(
-      session, WT_VERB_FILEOPS, "Live restore worker: Filling holes in %s", work_item->uri);
+    __wt_verbose_debug2(
+      session, WT_VERB_LIVE_RESTORE, "Live restore worker: Filling holes in %s", work_item->uri);
     ret = __wti_live_restore_fs_fill_holes(fh, wt_session);
-    __wt_verbose_debug3(session, WT_VERB_FILEOPS,
+    __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
       "Live restore worker: Finished finished filling holes in %s", work_item->uri);
 
     /* Free the work item. */
     __live_restore_free_work_item(session, &work_item);
     WT_STAT_CONN_SET(
-      session, live_restore_queue_length, __wt_atomic_sub64(&server->work_items_remaining, 1));
+      session, live_restore_work_remaining, __wt_atomic_sub64(&server->work_items_remaining, 1));
     WT_TRET(cursor->close(cursor));
     return (ret);
 }
@@ -176,7 +192,7 @@ __insert_queue_item(WT_SESSION_IMPL *session, char *uri, uint64_t *work_count)
     WT_DECL_RET;
 
     __wt_verbose_debug2(
-      session, WT_VERB_FILEOPS, "Live restore server: Adding %s to the work queue", uri);
+      session, WT_VERB_LIVE_RESTORE, "Live restore server: Adding %s to the work queue", uri);
 
     WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
     WTI_LIVE_RESTORE_WORK_ITEM *work_item = NULL;
@@ -230,7 +246,8 @@ __live_restore_init_work_queue(WT_SESSION_IMPL *session)
     if (!F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE))
         WT_ERR(__insert_queue_item(session, (char *)("file:" WT_METAFILE), &work_count));
 
-    WT_STAT_CONN_SET(session, live_restore_queue_length, work_count);
+    WT_STAT_CONN_SET(session, live_restore_work_remaining, work_count);
+    __wt_atomic_store64(&conn->live_restore_server->work_count, work_count);
     __wt_atomic_store64(&conn->live_restore_server->work_items_remaining, work_count);
 
     if (0) {
@@ -292,6 +309,11 @@ __wt_live_restore_server_create(WT_SESSION_IMPL *session, const char *cfg[])
      * Furthermore because our threads terminate themselves the scaling logic may not be possible
      * without some adjustments to either the live restore server or the thread group code itself.
      */
+    __wt_timer_start(session, &conn->live_restore_server->msg_timer);
+    conn->live_restore_server->start_timer = conn->live_restore_server->msg_timer;
+    __wt_verbose(session, WT_VERB_LIVE_RESTORE_PROGRESS,
+      "Starting %" PRId64 " threads to restore %" PRIu64 " files", cval.val,
+      conn->live_restore_server->work_count);
     WT_ERR(__wt_thread_group_create(session, &conn->live_restore_server->threads,
       "live_restore_workers", (uint32_t)cval.val, (uint32_t)cval.val, 0,
       __live_restore_worker_check, __live_restore_worker_run, __live_restore_worker_stop));

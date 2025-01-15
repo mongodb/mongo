@@ -223,6 +223,8 @@ extern const char __WT_CONFIG_CHOICE_json[];
 extern const char __WT_CONFIG_CHOICE_key_consistent[];
 extern const char __WT_CONFIG_CHOICE_key_out_of_order[];
 extern const char __WT_CONFIG_CHOICE_last_checkpoint[];
+extern const char __WT_CONFIG_CHOICE_live_restore[];
+extern const char __WT_CONFIG_CHOICE_live_restore_progress[];
 extern const char __WT_CONFIG_CHOICE_log[];
 extern const char __WT_CONFIG_CHOICE_log_validate[];
 extern const char __WT_CONFIG_CHOICE_lower[];

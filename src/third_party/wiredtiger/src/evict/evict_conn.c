@@ -293,8 +293,8 @@ __wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
         WT_RET_MSG(NULL, ret, "Failed to create session for eviction walks");
 
     /* Allocate the LRU eviction queue. */
-    evict->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-    for (i = 0; i < WT_EVICT_QUEUE_MAX; ++i) {
+    evict->evict_slots = WTI_EVICT_WALK_BASE + WTI_EVICT_WALK_INCR;
+    for (i = 0; i < WTI_EVICT_QUEUE_MAX; ++i) {
         WT_RET(__wt_calloc_def(session, evict->evict_slots, &evict->evict_queues[i].evict_queue));
         WT_RET(__wt_spin_init(session, &evict->evict_queues[i].evict_lock, "evict queue"));
     }
@@ -302,7 +302,7 @@ __wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
     /* Ensure there are always non-NULL queues. */
     evict->evict_current_queue = evict->evict_fill_queue = &evict->evict_queues[0];
     evict->evict_other_queue = &evict->evict_queues[1];
-    evict->evict_urgent_queue = &evict->evict_queues[WT_EVICT_URGENT_QUEUE];
+    evict->evict_urgent_queue = &evict->evict_queues[WTI_EVICT_URGENT_QUEUE];
 
     /*
      * We get/set some values in the evict statistics (rather than have two copies), configure them.
@@ -340,7 +340,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
     if (evict->walk_session != NULL)
         WT_TRET(__wt_session_close_internal(evict->walk_session));
 
-    for (i = 0; i < WT_EVICT_QUEUE_MAX; ++i) {
+    for (i = 0; i < WTI_EVICT_QUEUE_MAX; ++i) {
         __wt_spin_destroy(session, &evict->evict_queues[i].evict_lock);
         __wt_free(session, evict->evict_queues[i].evict_queue);
     }

@@ -817,6 +817,8 @@ connection_runtime_config = [
             'handleops',
             'history_store',
             'history_store_activity',
+            'live_restore',
+            'live_restore_progress',
             'log',
             'metadata',
             'mutex',

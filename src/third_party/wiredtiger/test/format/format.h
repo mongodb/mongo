@@ -397,6 +397,7 @@ typedef struct {
     uint64_t last; /* truncate range */
     WT_ITEM *lastkey, _lastkey;
 
+    bool ignore_prepare;   /* read with ignore_prepare */
     bool repeatable_reads; /* if read ops repeatable */
     bool repeatable_wrap;  /* if circular buffer wrapped */
     uint64_t opid;         /* Operation ID */
@@ -468,7 +469,7 @@ void snap_track(TINFO *, thread_op);
 void table_dump_page(WT_SESSION *, const char *, TABLE *, uint64_t, const char *);
 void table_verify(TABLE *, void *);
 void timestamp_init(void);
-uint64_t timestamp_maximum_committed(void);
+uint64_t timestamp_minimum_committed(void);
 void timestamp_once(WT_SESSION *, bool, bool);
 void replay_adjust_key(TINFO *, uint64_t);
 uint64_t replay_commit_ts(TINFO *);

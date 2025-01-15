@@ -79,17 +79,17 @@ struct __wt_evict {
     WT_DATA_HANDLE *walk_tree;     /* LRU walk current tree */
 
     WT_SPINLOCK evict_queue_lock; /* Eviction current queue lock */
-    WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
-    WT_EVICT_QUEUE *evict_current_queue; /* LRU current queue in use */
-    WT_EVICT_QUEUE *evict_fill_queue;    /* LRU next queue to fill.
+    WTI_EVICT_QUEUE evict_queues[WTI_EVICT_QUEUE_MAX];
+    WTI_EVICT_QUEUE *evict_current_queue; /* LRU current queue in use */
+    WTI_EVICT_QUEUE *evict_fill_queue;    /* LRU next queue to fill.
                                             This is usually the same as the
                                             "other" queue but under heavy
                                             load the eviction server will
                                             start filling the current queue
                                             before it switches. */
-    WT_EVICT_QUEUE *evict_other_queue;   /* LRU queue not in use */
-    WT_EVICT_QUEUE *evict_urgent_queue;  /* LRU urgent queue */
-    uint32_t evict_slots;                /* LRU list eviction slots */
+    WTI_EVICT_QUEUE *evict_other_queue;   /* LRU queue not in use */
+    WTI_EVICT_QUEUE *evict_urgent_queue;  /* LRU urgent queue */
+    uint32_t evict_slots;                 /* LRU list eviction slots */
 
 #define WT_EVICT_PRESSURE_THRESHOLD 0.95
 #define WT_EVICT_SCORE_BUMP 10

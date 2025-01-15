@@ -694,7 +694,7 @@ snap_repeat_single(TINFO *tinfo)
     int count;
 
     /* Repeat an operation that's before any running operation. */
-    ts = timestamp_maximum_committed();
+    ts = timestamp_minimum_committed();
 
     /*
      * Start at a random spot in the list of operations and look for a read to retry. Stop when

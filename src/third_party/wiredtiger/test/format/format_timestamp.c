@@ -29,11 +29,11 @@
 #include "format.h"
 
 /*
- * timestamp_maximum_committed --
- *     Return the largest timestamp that's no longer in use.
+ * timestamp_minimum_committed --
+ *     Return the timestamp lesser than the minimum of in-use committed timestamps.
  */
 uint64_t
-timestamp_maximum_committed(void)
+timestamp_minimum_committed(void)
 {
     TINFO **tlp;
     uint64_t commit_ts, ts;
@@ -111,7 +111,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     conn = g.wts_conn;
 
     /* Get the maximum not-in-use timestamp, noting that it may not be set. */
-    oldest_timestamp = stable_timestamp = timestamp_maximum_committed();
+    oldest_timestamp = stable_timestamp = timestamp_minimum_committed();
     if (oldest_timestamp == 0)
         return;
 

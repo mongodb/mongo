@@ -2402,11 +2402,11 @@ struct __wt_connection {
      * "checkpoint"\, \c "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "chunkcache"\, \c
      * "compact"\, \c "compact_progress"\, \c "configuration"\, \c "error_returns"\, \c "eviction"\,
      * \c "fileops"\, \c "generation"\, \c "handleops"\, \c "history_store"\, \c
-     * "history_store_activity"\, \c "log"\, \c "metadata"\, \c "mutex"\, \c "out_of_order"\, \c
-     * "overflow"\, \c "prefetch"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c
-     * "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
-     * "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c
-     * "verify"\, \c "version"\, \c "write"; default \c [].}
+     * "history_store_activity"\, \c "live_restore"\, \c "live_restore_progress"\, \c "log"\, \c
+     * "metadata"\, \c "mutex"\, \c "out_of_order"\, \c "overflow"\, \c "prefetch"\, \c "read"\, \c
+     * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c
+     * "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c
+     * "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
      * @configend
      * @errors
      */
@@ -3316,11 +3316,12 @@ struct __wt_connection {
  * "all"\, \c "api"\, \c "backup"\, \c "block"\, \c "block_cache"\, \c "checkpoint"\, \c
  * "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "chunkcache"\, \c "compact"\, \c
  * "compact_progress"\, \c "configuration"\, \c "error_returns"\, \c "eviction"\, \c "fileops"\, \c
- * "generation"\, \c "handleops"\, \c "history_store"\, \c "history_store_activity"\, \c "log"\, \c
- * "metadata"\, \c "mutex"\, \c "out_of_order"\, \c "overflow"\, \c "prefetch"\, \c "read"\, \c
- * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c
- * "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\,
- * \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
+ * "generation"\, \c "handleops"\, \c "history_store"\, \c "history_store_activity"\, \c
+ * "live_restore"\, \c "live_restore_progress"\, \c "log"\, \c "metadata"\, \c "mutex"\, \c
+ * "out_of_order"\, \c "overflow"\, \c "prefetch"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c
+ * "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\,
+ * \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c
+ * "version"\, \c "write"; default \c [].}
  * @config{verify_metadata, open connection and verify any WiredTiger metadata.  Not supported when
  * opening a connection from a backup.  This API allows verification and detection of corruption in
  * WiredTiger metadata., a boolean flag; default \c false.}
@@ -6452,7 +6453,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * live-restore: the number of files remaining for live restore
  * completion
  */
-#define	WT_STAT_CONN_LIVE_RESTORE_QUEUE_LENGTH		1435
+#define	WT_STAT_CONN_LIVE_RESTORE_WORK_REMAINING	1435
 /*! lock: btree page lock acquisitions */
 #define	WT_STAT_CONN_LOCK_BTREE_PAGE_COUNT		1436
 /*! lock: btree page lock application thread wait time (usecs) */
@@ -8052,6 +8053,8 @@ typedef enum {
     WT_VERB_HANDLEOPS,
     WT_VERB_HS,                   /*!< History store messages. */
     WT_VERB_HS_ACTIVITY,          /*!< History store activity messages. */
+    WT_VERB_LIVE_RESTORE,
+    WT_VERB_LIVE_RESTORE_PROGRESS,
     WT_VERB_LOG,                  /*!< Log messages. */
     WT_VERB_MUTEX,
     WT_VERB_METADATA,             /*!< Metadata messages. */
