@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+import time
 import uuid
 from datetime import datetime
 from glob import glob
@@ -54,6 +55,18 @@ SCons.Node.FS.File.release_target_info = release_target_info_noop
 import psutil
 
 from buildscripts import moduleconfig, utils
+
+if os.environ.get("CI") is None:
+    print("""
+    -------- ANNOUNCEMENT -------- 
+    The SCons interface will soon be deprecated on the master branch, please try
+    your workflow with Bazel directly by visiting https://wiki.corp.mongodb.com/display/HGTC/Building+with+Bazel
+
+    If your workflow does not work with Bazel now, please post in #ask-devprod-build with details.
+    ------------------------------
+    """)
+
+    time.sleep(5)
 
 scons_invocation = "{} {}".format(sys.executable, " ".join(sys.argv))
 print("scons: running with args {}".format(scons_invocation))

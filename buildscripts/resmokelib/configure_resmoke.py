@@ -395,17 +395,21 @@ be invoked as either:
 
     _config.INSTALL_DIR = config.pop("install_dir")
     if values.command == "run" and _config.INSTALL_DIR is None:
-        resmoke_wrappers = _find_resmoke_wrappers()
-        if len(resmoke_wrappers) == 1:
-            _config.INSTALL_DIR = os.path.dirname(resmoke_wrappers[0])
-        elif len(resmoke_wrappers) > 1:
-            err = textwrap.dedent(f"""\
-Multiple testable installations were found, but installDir was not specified.
-You must either call resmoke via one of the following scripts:
-{os.linesep.join(map(shlex.quote, resmoke_wrappers))}
+        bazel_bin_path = os.path.abspath("bazel-bin/install/bin")
+        if os.path.exists(bazel_bin_path):
+            _config.INSTALL_DIR = bazel_bin_path
+        else:
+            resmoke_wrappers = _find_resmoke_wrappers()
+            if len(resmoke_wrappers) == 1:
+                _config.INSTALL_DIR = os.path.dirname(resmoke_wrappers[0])
+            elif len(resmoke_wrappers) > 1:
+                err = textwrap.dedent(f"""\
+    Multiple testable installations were found, but installDir was not specified.
+    You must either call resmoke via one of the following scripts:
+    {os.linesep.join(map(shlex.quote, resmoke_wrappers))}
 
-or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py.""")
-            raise RuntimeError(err)
+    or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py.""")
+                raise RuntimeError(err)
     if _config.INSTALL_DIR is not None:
         # Normalize the path so that on Windows dist-test/bin
         # translates to .\dist-test\bin then absolutify it since the
