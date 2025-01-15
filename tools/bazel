@@ -8,8 +8,9 @@ set -e
 # WARNING : If you run //:compiledb target, you can not print to stdout in this file as it will fail with
 # "Bazel aquery failed." because it is reading this files stdout as aquery output
 
+REPO_ROOT=$(dirname $(dirname $(realpath "$0")))
 bazel_real="$BAZEL_REAL"
-echo $BAZEL_REAL > ".bazel_real"
+echo $BAZEL_REAL > "$REPO_ROOT/.bazel_real"
 bazelrc_xcode_lines=()
 
 
@@ -67,15 +68,14 @@ if [[ $OSTYPE == darwin* ]]; then
   bazelrc_lines+=("common --repo_env=DEVELOPER_DIR=$xcode_path") >&2
 fi
 
-printf '%s\n' "${bazelrc_xcode_lines[@]}" > .bazelrc.xcode
+printf '%s\n' "${bazelrc_xcode_lines[@]}" > $REPO_ROOT/.bazelrc.xcode
 
-echo "common --//bazel/config:running_through_bazelisk" > .bazelrc.bazelisk
+echo "common --//bazel/config:running_through_bazelisk" > $REPO_ROOT/.bazelrc.bazelisk
 
 if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]]; then
     wrapper_start_time="$(date -u +%s.%N)"
 fi
-
-cur_dir="${PWD##*/}" 
+ 
 
 if [[ "$OSTYPE" == "linux"* ]]; then
   os="linux"
@@ -97,17 +97,6 @@ else
   ARCH="x86_64"
 fi
 
-python="bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
-
-wrapper_deps=("retry")
-declare -a wrapper_deps_to_install=()
-declare -a python_path=()
-for dep in ${wrapper_deps[@]}; do
-  python_path+=("bazel-bin/external/poetry/$dep")
-  if [ ! -d bazel-bin/external/poetry/$dep ] || [ ! -d bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin ] ; then
-    wrapper_deps_to_install+=(@poetry//:install_$dep)
-  fi
-done
 
 declare -a cert_locs=()
 cert_locs+=("/etc/ssl/certs/ca-certificates.crt")                # Debian/Ubuntu/Gentoo etc.
@@ -125,9 +114,11 @@ for cert in ${cert_locs[@]}; do
   fi
 done
 
-if [[ ${#wrapper_deps_to_install[@]} != 0 ]]; then
+cur_dir=$(basename $REPO_ROOT)
+python="$REPO_ROOT/bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
+if [ ! -f $python ]; then
   >&2 echo "python prereq missing, using bazel to install python..."
-  >&2 $bazel_real build --config=local $(IFS=  ; echo "${wrapper_deps_to_install[*]}")
+  >&2 $bazel_real build --config=local @py_${os}_${ARCH}//:all
 fi
 
 autocomplete_query=0
@@ -141,8 +132,13 @@ if [[ $* == *"--noblock_for_lock query kind(\".*_test\", //:all)"* ]] || [[ $* =
 fi
 
 rm -f /tmp/mongo_autocomplete_plus_targets
-python="bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
-new_args=$(MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query PYTHONPATH=$(IFS=: ; echo "${python_path[*]}") $python bazel/wrapper_hook.py "$@")
+MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
+
+MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
+MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
+$python $REPO_ROOT/bazel/wrapper_hook.py $bazel_real "$@"
+
+new_args=$(<$MONGO_BAZEL_WRAPPER_ARGS)
 
 if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]] && [[ $autocomplete_query == 0 ]]; then
   wrapper_end_time="$(date -u +%s.%N)"

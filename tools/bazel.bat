@@ -3,40 +3,23 @@ setlocal EnableDelayedExpansion
 
 echo common --//bazel/config:running_through_bazelisk > .bazelrc.bazelisk
 
-for %%I in (.) do set cur_dir=%%~nxI
+set REPO_ROOT=%~dp0\..
 
-set python="bazel-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
+for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
-set "wrapper_deps="
-set "wrapper_deps_to_install="
-set "PYTHONPATH="
+set python="%REPO_ROOT%\bazel-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
 
-set "wrapper_deps=!wrapper_deps! retry"
-REM set "wrapper_deps=!wrapper_deps! example_append"
-set len=0 
-(for %%d in (!wrapper_deps!) do ( 
-    set "PYTHONPATH=%PYTHONPATH%;bazel-bin/external/poetry/%%d"
-    if not exist "bazel-bin\external\poetry/%%d" (
-        set /a len+=1
-        set "wrapper_deps_to_install=!wrapper_deps_to_install! @poetry//:install_%%d"
-    ) else (
-        if not exist "%python%" (
-            set /a len+=1
-            set "wrapper_deps_to_install=!wrapper_deps_to_install! @poetry//:install_%%d"
-        ) 
-    )
-))
-
-if %len% gtr 0 (
+if not exist "%python%" (
     echo python prereq missing, using bazel to install python... 1>&2
-    "%BAZEL_REAL%" build %wrapper_deps_to_install%  1>&2
+    "%BAZEL_REAL%" build --config=local @py_windows_x86_64//:all 1>&2
 )
 SET STARTTIME=%TIME%
 
-set "uniqueFileName=%tmp%\bat~%RANDOM%.tmp"
-%python% bazel/wrapper_hook.py %* > %uniqueFileName%
-for /f "Tokens=* Delims=" %%x in ( %uniqueFileName% ) do set "new_args=!new_args!%%x"
-del %uniqueFileName%
+set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
+echo "" > %MONGO_BAZEL_WRAPPER_ARGS%
+%python% %REPO_ROOT%/bazel/wrapper_hook.py "%BAZEL_REAL%" %*
+for /f "Tokens=* Delims=" %%x in ( %MONGO_BAZEL_WRAPPER_ARGS% ) do set "new_args=!new_args!%%x"
+del %MONGO_BAZEL_WRAPPER_ARGS%
 
 REM Final Calculations
 SET ENDTIME=%TIME%

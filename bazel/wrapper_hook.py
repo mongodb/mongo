@@ -1,16 +1,17 @@
+import hashlib
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
-sys.path.append(".")
+REPO_ROOT = os.path.join(os.path.dirname(__file__), os.path.pardir)
+sys.path.append(REPO_ROOT)
 
-from buildscripts.engflow_auth import setup_auth
-from buildscripts.install_bazel import install_bazel
 
-# do not print to stdout as that is used for arg modifications
-orig_stdout = sys.stdout
+# This script should be careful not to disrupt automatic mechanism which
+# may be expecting certain stdout, always print to stderr.
 sys.stdout = sys.stderr
 
 if (
@@ -37,7 +38,72 @@ class DuplicateSourceNames(Exception):
 wrapper_debug(f"wrapper hook script is using {sys.executable}")
 
 
+def search_for_modules(deps, deps_installed, deps_needed, lockfile_changed=False):
+    bazel_out_dir = os.path.join(REPO_ROOT, "bazel-out")
+    if os.path.exists(bazel_out_dir):
+        for dep in deps:
+            found = False
+            for entry in os.listdir(bazel_out_dir):
+                if os.path.exists(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}"):
+                    if not lockfile_changed:
+                        deps_installed.append(dep)
+                        sys.path.append(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}")
+                        found = True
+                        break
+                    else:
+                        os.chmod(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}", 0o777)
+                        for root, dirs, files in os.walk(
+                            f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}"
+                        ):
+                            for somedir in dirs:
+                                os.chmod(os.path.join(root, somedir), 0o777)
+                            for file in files:
+                                os.chmod(os.path.join(root, file), 0o777)
+                        shutil.rmtree(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}")
+            if not found:
+                deps_needed.append(dep)
+
+
+def install_modules(bazel):
+    need_to_install = False
+    pwd_hash = hashlib.md5(os.path.abspath(REPO_ROOT).encode()).hexdigest()
+    lockfile_hash_file = os.path.join(tempfile.gettempdir(), f"{pwd_hash}_lockfile_hash")
+    with open(os.path.join(REPO_ROOT, "poetry.lock"), "rb") as f:
+        current_hash = hashlib.md5(f.read()).hexdigest()
+
+    old_hash = None
+    if os.path.exists(lockfile_hash_file):
+        with open(lockfile_hash_file) as f:
+            old_hash = f.read()
+    else:
+        with open(lockfile_hash_file, "w") as f:
+            f.write(current_hash)
+
+    deps = ["retry"]
+    deps_installed = []
+    deps_needed = []
+    search_for_modules(deps, deps_installed, deps_needed, lockfile_changed=old_hash != current_hash)
+
+    if deps_needed:
+        need_to_install = True
+
+    if old_hash != current_hash:
+        need_to_install = True
+        deps_needed = deps
+
+    if need_to_install:
+        subprocess.run(
+            [bazel, "build", "--config=local"] + ["@poetry//:install_" + dep for dep in deps_needed]
+        )
+        deps_missing = []
+        search_for_modules(deps_needed, deps_installed, deps_missing)
+        if deps_missing:
+            raise Exception(f"Failed to install python deps {deps_missing}")
+
+
 def get_buildozer_output(autocomplete_query):
+    from buildscripts.install_bazel import install_bazel
+
     buildozer = shutil.which("buildozer")
     if not buildozer:
         buildozer = os.path.expanduser("~/.local/bin/buildozer")
@@ -65,6 +131,8 @@ def get_buildozer_output(autocomplete_query):
 
 def engflow_auth(args):
     start = time.time()
+    from buildscripts.engflow_auth import setup_auth
+
     args_str = " ".join(args)
     if (
         "--config=local" not in args_str
@@ -229,10 +297,18 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     return new_args
 
 
-engflow_auth(sys.argv)
+def main():
+    install_modules(sys.argv[1])
 
-args = test_runner_interface(
-    sys.argv, autocomplete_query=os.environ.get("MONGO_AUTOCOMPLETE_QUERY") == "1"
-)
+    engflow_auth(sys.argv)
 
-print(" ".join(args), file=orig_stdout)
+    args = test_runner_interface(
+        sys.argv[1:], autocomplete_query=os.environ.get("MONGO_AUTOCOMPLETE_QUERY") == "1"
+    )
+    os.chmod(os.environ.get("MONGO_BAZEL_WRAPPER_ARGS"), 0o644)
+    with open(os.environ.get("MONGO_BAZEL_WRAPPER_ARGS"), "w") as f:
+        f.write(" ".join(args))
+
+
+if __name__ == "__main__":
+    main()
