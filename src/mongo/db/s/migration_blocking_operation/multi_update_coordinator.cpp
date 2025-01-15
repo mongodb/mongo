@@ -252,6 +252,10 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_doBlockMigrationsPhase() {
         }
         auto opCtx = factory.makeOperationContext(&cc());
         _externalState->startBlockingMigrations(opCtx.get(), _metadata.getNss(), _metadata.getId());
+        LOGV2_DEBUG(9554705,
+                    1,
+                    "MultiUpdateCoordinator began request for migrations to be blocked",
+                    "id"_attr = _metadata.getId());
     });
 }
 
@@ -328,8 +332,12 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_stopBlockingMigrationsIfNe
                 return;
             }
             auto opCtx = factory.makeOperationContext(&cc());
-            return _externalState->stopBlockingMigrations(
+            _externalState->stopBlockingMigrations(
                 opCtx.get(), _metadata.getNss(), _metadata.getId());
+            LOGV2_DEBUG(9554706,
+                        1,
+                        "MultiUpdateCoordinator ended request for migrations to be blocked",
+                        "id"_attr = _metadata.getId());
         });
 }
 

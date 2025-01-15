@@ -170,6 +170,13 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
     _recoverIfNecessary(lock, opCtx, true);
 
     if (_operations.contains(operationUUID)) {
+        LOGV2_DEBUG(
+            9554700,
+            1,
+            "MigrationBlockingOperationCoordinator ignoring request to begin operation with the "
+            "same UUID as existing operation",
+            "operationId"_attr = operationUUID,
+            "operationCount"_attr = _operations.size());
         return;
     }
 
@@ -198,6 +205,12 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
     }
 
     removeOperationGuard.dismiss();
+
+    LOGV2_DEBUG(9554701,
+                1,
+                "MigrationBlockingOperationCoordinator began new operation",
+                "operationId"_attr = operationUUID,
+                "operationCount"_attr = _operations.size());
 }
 
 void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx,
@@ -209,6 +222,13 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
     _recoverIfNecessary(lock, opCtx, false);
 
     if (!_operations.contains(operationUUID)) {
+        LOGV2_DEBUG(
+            9554702,
+            1,
+            "MigrationBlockingOperationCoordinator ignoring request to end operation that does "
+            "not exist",
+            "operationId"_attr = operationUUID,
+            "operationCount"_attr = _operations.size());
         return;
     }
 
@@ -224,6 +244,12 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
         ensureFulfilledPromise(lock, _beginCleanupPromise);
         getCompletionFuture().get();
         insertOperationGuard.dismiss();
+
+        LOGV2_DEBUG(9554703,
+                    1,
+                    "MigrationBlockingOperationCoordinator ended operation and has cleaned up",
+                    "operationId"_attr = operationUUID,
+                    "operationCount"_attr = _operations.size());
         return;
     }
 
@@ -233,6 +259,12 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
 
     _insertOrUpdateStateDocument(lock, opCtx, std::move(newDoc));
     insertOperationGuard.dismiss();
+
+    LOGV2_DEBUG(9554704,
+                1,
+                "MigrationBlockingOperationCoordinator ended operation",
+                "operationId"_attr = operationUUID,
+                "operationCount"_attr = _operations.size());
 }
 
 void MigrationBlockingOperationCoordinator::_insertOrUpdateStateDocument(

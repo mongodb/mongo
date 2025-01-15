@@ -14,6 +14,9 @@ import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.j
 
 const st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
+st.shard0.getDB("admin").setLogLevel(1);
+st.shard1.getDB("admin").setLogLevel(1);
+
 function assertCoordinatorStillRunningAfterDelay() {
     sleep(5000);
     const configDb = st.rs0.getPrimary().getDB("config");
