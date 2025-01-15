@@ -265,6 +265,7 @@ tasks:
           suite: core
           install_dir: bazel-bin/install/bin
           resmoke_jobs_max: 4 # No cap on number of jobs.
+          exec_timeout_secs: 32400 # 9 hours
 
   - name: hydrate_bazel_profile_fastbuild
     tags:
