@@ -50,11 +50,11 @@ concept HasGetNsString = requires(const T& t) {
     t.getNsString();
 };
 
-// Type requirement 1 for isTimeseriesViewRequest()
 template <typename T>
-concept HasNsGetter = HasGetNamespace<T> || HasGetNsString<T>;
+concept HasGetNamespaceOrUUID = requires(const T& t) {
+    t.getNamespaceOrUUID();
+};
 
-// Type requirement 2 for isTimeseriesViewRequest()
 template <typename T>
 concept HasGetIsTimeseriesNamespace = requires(const T& t) {
     t.getIsTimeseriesNamespace();
@@ -62,7 +62,8 @@ concept HasGetIsTimeseriesNamespace = requires(const T& t) {
 
 // Type requirements for isTimeseriesViewRequest()
 template <typename T>
-concept IsRequestableOnTimeseriesView = HasNsGetter<T> || HasGetIsTimeseriesNamespace<T>;
+concept IsRequestableOnTimeseriesView =
+    HasGetNamespace<T> || HasGetNsString<T> || HasGetNamespaceOrUUID<T>;
 
 /**
  * Returns a pair of (whether 'request' is made on a timeseries view and the timeseries system
@@ -76,20 +77,32 @@ concept IsRequestableOnTimeseriesView = HasNsGetter<T> || HasGetIsTimeseriesName
 template <typename T>
 requires IsRequestableOnTimeseriesView<T> std::pair<bool, NamespaceString> isTimeseriesViewRequest(
     OperationContext* opCtx, const T& request) {
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+
     const auto nss = [&] {
         if constexpr (HasGetNamespace<T>) {
             return request.getNamespace();
-        } else {
+        } else if constexpr (HasGetNsString<T>) {
             return request.getNsString();
+        } else {
+            return catalog->resolveNamespaceStringOrUUID(opCtx, request.getNamespaceOrUUID());
         }
     }();
-    uassert(5916400,
-            "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
-            "system.buckets namespace",
-            !request.getIsTimeseriesNamespace() || nss.isTimeseriesBucketsCollection());
+    if constexpr (HasGetIsTimeseriesNamespace<T>) {
+        uassert(5916400,
+                "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
+                "system.buckets namespace",
+                !request.getIsTimeseriesNamespace() || nss.isTimeseriesBucketsCollection());
+    }
 
-    const auto bucketNss =
-        request.getIsTimeseriesNamespace() ? nss : nss.makeTimeseriesBucketsNamespace();
+    const auto bucketNss = [&] {
+        if constexpr (HasGetIsTimeseriesNamespace<T>) {
+            return request.getIsTimeseriesNamespace() ? nss : nss.makeTimeseriesBucketsNamespace();
+        } else {
+            return nss.makeTimeseriesBucketsNamespace();
+        }
+    }();
 
     // If the buckets collection exists now, the time-series insert path will check for the
     // existence of the buckets collection later on with a lock.
@@ -97,8 +110,6 @@ requires IsRequestableOnTimeseriesView<T> std::pair<bool, NamespaceString> isTim
     // collection does not yet exist, this check may return false unnecessarily. As a result, an
     // insert attempt into the time-series namespace will either succeed or fail, depending on who
     // wins the race.
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
     auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
     if (!coll) {
         return {false, nss};
