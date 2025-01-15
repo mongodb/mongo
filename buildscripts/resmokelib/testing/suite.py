@@ -238,6 +238,9 @@ class Suite(object):
 
     def _get_num_test_runs(self) -> int:
         """Return the number of total test runs."""
+        if self.options.num_repeat_tests_max:
+            return len(self.tests) * self.options.num_repeat_tests_max
+
         return len(self.tests) * self.options.num_repeat_tests
 
     @property

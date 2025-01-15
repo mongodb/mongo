@@ -172,15 +172,15 @@ class Job(object):
 
         while not queue.empty() and not interrupt_flag.is_set():
             queue_elem = queue.get_nowait()
+            queue_elem.job_started()
             test_time_start = self._get_time()
+            test = queue_elem.testcase
+            self._requeue_test(queue, queue_elem, interrupt_flag)
             try:
-                test = queue_elem.testcase
                 self._execute_test(test, hook_failure_flag)
             finally:
                 queue_elem.job_completed(self._get_time() - test_time_start)
                 queue.task_done()
-
-            self._requeue_test(queue, queue_elem, interrupt_flag)
 
         self._run_hooks_after_suite(teardown_flag, hook_failure_flag)
 

@@ -33,6 +33,12 @@ class QueueElem(object):
         self.testcase = testcase
         self.test_config = test_config
 
+    def job_started(self):
+        """
+        Call when an execution has started, update the run statistics.
+        """
+        pass
+
     def job_completed(self, job_time):
         """
         Call when an execution has completed.
@@ -59,13 +65,18 @@ class QueueElemRepeatTime(QueueElem):
         self.repeat_time_elapsed = 0
         self.repeat_num = 0
 
+    def job_started(self):
+        """
+        Call when an execution has started, update the run statistics.
+        """
+        self.repeat_num += 1
+
     def job_completed(self, job_time):
         """
         Call when an execution has completed, update the run statistics.
 
         :param job_time: The amount of time the job ran for.
         """
-        self.repeat_num += 1
         self.repeat_time_elapsed += job_time
 
     def _still_need_minimum_runs(self):
