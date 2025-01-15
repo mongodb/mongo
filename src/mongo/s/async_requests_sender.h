@@ -166,7 +166,7 @@ public:
     /**
      * Returns true if responses for all requests have been returned via next().
      */
-    bool done() noexcept;
+    bool done() const noexcept;
 
     /**
      * Returns the next available response or error.

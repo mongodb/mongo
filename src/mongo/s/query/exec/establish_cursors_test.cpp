@@ -34,9 +34,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <system_error>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -207,6 +205,47 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccess) {
     });
 
     future.default_timed_get();
+}
+
+TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
+
+    AsyncRequestsSender::ShardHostMap designatedHosts;
+    auto shard0Secondary = HostAndPort("SecondaryHostShard0", 12345);
+    _targeters[0]->setConnectionStringReturnValue(
+        ConnectionString::forReplicaSet("shard0_rs"_sd, {kTestShardHosts[0], shard0Secondary}));
+    designatedHosts[kTestShardIds[0]] = shard0Secondary;
+
+    // Intentionally throw an exception during validation.
+    FailPointEnableBlock failPoint("throwDuringCursorResponseValidation");
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false,  // allowPartialResults
+                                       Shard::RetryPolicy::kIdempotent,
+                                       {},  // providedOpKeys
+                                       designatedHosts),
+                      ExceptionFor<ErrorCodes::FailedToParse>);
+    });
+
+    // Remote responds.
+    onCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+        CursorResponse cursorResponse(_nss, CursorId(123), batch);
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    future.default_timed_get();
+
+    // This ensures the fail point has been hit exactly once.
+    failPoint->waitForTimesEntered(failPoint.initialTimesEntered() + 1);
 }
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {

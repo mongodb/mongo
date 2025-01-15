@@ -229,7 +229,7 @@ void AsyncRequestsSender::stopRetrying() noexcept {
     _stopRetrying = true;
 }
 
-bool AsyncRequestsSender::done() noexcept {
+bool AsyncRequestsSender::done() const noexcept {
     return !_remotesLeft;
 }
 

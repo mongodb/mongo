@@ -75,9 +75,25 @@ public:
 
     ~MultiStatementTransactionRequestsSender();
 
-    bool done();
+    bool done() const;
 
+    /**
+     * Fetches the next response and validates it.
+     * Internally calls 'nextResponse()', then 'validateResponse()'. Throws if the response is not
+     * valid.
+     */
     AsyncRequestsSender::Response next(bool forMergeCursors = false);
+
+    /**
+     * Fetches the next response, without validating it.
+     */
+    AsyncRequestsSender::Response nextResponse();
+
+    /**
+     * Validates a received response. Throws if the response is not valid.
+     */
+    void validateResponse(const AsyncRequestsSender::Response& response,
+                          bool forMergeCursors) const;
 
     void stopRetrying();
 

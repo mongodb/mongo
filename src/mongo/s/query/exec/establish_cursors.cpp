@@ -32,6 +32,7 @@
 #include <set>
 #include <string>
 #include <tuple>
+#include <utility>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -70,14 +71,16 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(throwDuringCursorResponseValidation);
 
 namespace {
 
@@ -110,16 +113,11 @@ public:
                       Shard::RetryPolicy retryPolicy);
 
     /**
-     * Wait for a single response via the RequestSender.
-     */
-    void waitForResponse() noexcept;
-
-    /**
      * Wait for all responses via the RequestSender.
      */
-    void waitForResponses() noexcept {
+    void waitForResponses() {
         while (!_ars->done()) {
-            waitForResponse();
+            _waitForResponse();
         }
     }
 
@@ -142,9 +140,14 @@ public:
                                std::set<HostAndPort> remotes) noexcept;
 
 private:
+    /**
+     * Wait for a single response via the RequestSender.
+     */
+    void _waitForResponse();
+
     void _handleFailure(const boost::optional<AsyncRequestsSender::Response>& response,
                         Status status,
-                        bool isInterruption = false) noexcept;
+                        bool isInterruption = false);
     bool _canSkipForPartialResults(const AsyncRequestsSender::Response& response,
                                    const Status& status);
 
@@ -179,6 +182,11 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                                      Shard::RetryPolicy retryPolicy) {
     // Construct the requests
     std::vector<AsyncRequestsSender::Request> requests;
+    requests.reserve(remotes.size());
+
+    // Make sure there is enough room in '_remotesToClean' so that inserting a cursor into the clean
+    // up list later cannot throw an OOM exception.
+    _remotesToClean.reserve(remotes.size());
 
     // TODO SERVER-47261 management of the opKey should move to the ARS.
     for (const auto& remote : remotes) {
@@ -192,6 +200,13 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
             requests.emplace_back(remote.shardId, newCmd.obj());
         }
     }
+
+    tassert(9282602,
+            "Invalid number of objects in CursorEstablisher",
+            requests.size() == remotes.size());
+    tassert(9282603,
+            "Invalid _remotesToClean capacity in CursorEstablisher",
+            _remotesToClean.capacity() == remotes.size());
 
     if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3))) {
         logv2::DynamicAttributes attrs;
@@ -219,14 +234,28 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                  _designatedHostsMap);
 }
 
-void CursorEstablisher::waitForResponse() noexcept {
+void CursorEstablisher::_waitForResponse() {
     boost::optional<AsyncRequestsSender::Response> maybeResponse;
     BSONObj responseData;
     try {
-        // TODO SERVER-92826: This call can throw and skip adding to _remotesToClean below.
-        maybeResponse = _ars->next();
-        if (maybeResponse->shardHostAndPort)
+        // Fetch the next response, without validating it yet.
+        maybeResponse = _ars->nextResponse();
+        uassert(
+            9282600, "Response in CursorEstablisher must have a value", maybeResponse.has_value());
+        if (maybeResponse->shardHostAndPort) {
+            // Add cursor to our cleanup list. This should not throw, as we reserved enough capacity
+            // ahead of time in 'sendRequests()'.
             _remotesToClean.push_back(*maybeResponse->shardHostAndPort);
+        }
+
+        // Intentionally throw a 'FailedToParse' exception here in case the fail point is active.
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Hit failpoint '" << throwDuringCursorResponseValidation.getName()
+                              << "'",
+                !throwDuringCursorResponseValidation.shouldFail());
+
+        // Validate the response. If this throws, we still have the cursor in the cleanup list.
+        _ars->validateResponse(*maybeResponse, false /* forMergeCursors */);
         responseData = uassertStatusOK(std::move(maybeResponse->swResponse)).data;
     } catch (const DBException& ex) {
         _handleFailure(maybeResponse, ex.toStatus(), /* isInterruption */ true);
@@ -304,7 +333,6 @@ void CursorEstablisher::checkForFailedRequests() {
             txnRouter.onViewResolutionError(_opCtx, _nss);
         }
     }
-
     if (_remotesToClean.empty()) {
         // If we don't have any remotes to clean, throw early.
         uassertStatusOK(*_maybeFailure);
@@ -365,7 +393,7 @@ void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption
 void CursorEstablisher::_handleFailure(
     const boost::optional<AsyncRequestsSender::Response>& response,
     Status status,
-    bool isInterruption) noexcept {
+    bool isInterruption) {
     LOGV2_DEBUG(
         8846900, 3, "Experienced a failure while establishing cursors", "error"_attr = status);
     if (_wasInterrupted) {
