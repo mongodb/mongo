@@ -30,6 +30,7 @@
 #include <charconv>
 
 #include "mongo/config.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/transport/grpc/grpc_session.h"
@@ -166,6 +167,8 @@ IngressSession::~IngressSession() {
 
 StatusWith<Message> IngressSession::_readFromStream() noexcept {
     if (auto maybeBuffer = _stream->read()) {
+        networkCounter.hitPhysicalIn(NetworkCounter::ConnectionType::kIngress,
+                                     MsgData::ConstView(maybeBuffer->get()).getLen());
         return Message(std::move(*maybeBuffer));
     }
 
@@ -181,6 +184,7 @@ StatusWith<Message> IngressSession::_readFromStream() noexcept {
 
 Status IngressSession::_writeToStream(Message message) noexcept {
     if (_stream->write(message.sharedBuffer())) {
+        networkCounter.hitPhysicalOut(NetworkCounter::ConnectionType::kIngress, message.size());
         return Status::OK();
     }
 
@@ -275,27 +279,35 @@ Future<Message> EgressSession::_asyncReadFromStream() {
             })
             .then([this, msg = std::move(msg)]() {
                 _updateWireVersion();
+                networkCounter.hitPhysicalIn(NetworkCounter::ConnectionType::kEgress,
+                                             MsgData::ConstView(msg->get()).getLen());
                 return Message(std::move(*msg));
             }));
 }
 
 Future<void> EgressSession::_asyncWriteToStream(Message message) {
+    auto const msgLen = message.size();
     auto pf = makePromiseFuture<void>();
     _stream->write(message.sharedBuffer(),
                    _reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
 
     return _withCancellation<void>(
-        _asyncCancelSource.token(), std::move(pf.future).onError([this](Status s) {
-            // If _stream->write() fails, then the RPC has been terminated and a final
-            // RPC status should be available. Set the termination status to that and
-            // return it here.
-            return asyncFinish().onCompletion([&](Status termStatus) {
-                return termStatus.isOK()
-                    ? Status(ErrorCodes::StreamTerminated,
-                             "Could not write to gRPC client stream: RPC terminated")
-                    : termStatus;
-            });
-        }));
+        _asyncCancelSource.token(),
+        std::move(pf.future)
+            .onError([this](Status s) {
+                // If _stream->write() fails, then the RPC has been terminated and a final
+                // RPC status should be available. Set the termination status to that and
+                // return it here.
+                return asyncFinish().onCompletion([&](Status termStatus) {
+                    return termStatus.isOK()
+                        ? Status(ErrorCodes::StreamTerminated,
+                                 "Could not write to gRPC client stream: RPC terminated")
+                        : termStatus;
+                });
+            })
+            .then([msgLen]() {
+                networkCounter.hitPhysicalOut(NetworkCounter::ConnectionType::kEgress, msgLen);
+            }));
 }
 
 void EgressSession::_cancelAsyncOperations() {

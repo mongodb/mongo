@@ -57,6 +57,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/log.h"
@@ -299,6 +300,8 @@ Future<void> AsyncDBClient::_call(Message request,
                                   int32_t msgId,
                                   const BatonHandle& baton,
                                   const CancellationToken& token) {
+    networkCounter.hitLogicalOut(NetworkCounter::ConnectionType::kEgress, request.size());
+
     auto swm = _compressorManager.compressMessage(request);
     if (!swm.isOK()) {
         return swm.getStatus();
@@ -335,11 +338,14 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
                         "sessionId"_attr = _session->id(),
                         "msgId"_attr = response.header().getId(),
                         "responseTo"_attr = response.header().getResponseToMsgId());
-            if (response.operation() == dbCompressed) {
-                return _compressorManager.decompressMessage(response);
-            } else {
-                return response;
+            StatusWith<Message> swMessage = (response.operation() == dbCompressed)
+                ? _compressorManager.decompressMessage(response)
+                : response;
+            if (swMessage.isOK()) {
+                networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kEgress,
+                                            swMessage.getValue().size());
             }
+            return swMessage;
         });
 }
 

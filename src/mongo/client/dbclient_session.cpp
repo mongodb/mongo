@@ -61,6 +61,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
@@ -529,6 +530,7 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
         OpMsg::appendChecksum(&toSend);
 #endif
     }
+    networkCounter.hitLogicalOut(NetworkCounter::ConnectionType::kEgress, toSend.size());
     auto swm = _compressorManager.compressMessage(toSend);
     uassertStatusOK(swm.getStatus());
 
@@ -560,6 +562,7 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
     if (response.operation() == dbCompressed) {
         response = uassertStatusOK(_compressorManager.decompressMessage(response));
     }
+    networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, response.size());
 
     killSessionOnError.dismiss();
     return response;

@@ -75,9 +75,14 @@ namespace mongo::transport::grpc {
 #define ASSERT_GRPC_STUB_NOT_CONNECTED(stub) \
     ASSERT_EQ(stub.connect(Milliseconds(50)).error_code(), ::grpc::StatusCode::UNAVAILABLE)
 
-inline Message makeUniqueMessage() {
+inline Message makeUniqueMessage(const std::string& body = "") {
     OpMsg msg;
-    msg.body = BSON("id" << UUID::gen().toBSON());
+    mongo::BSONObjBuilder builder;
+    builder.append("id", UUID::gen().toBSON());
+    if (!body.empty()) {
+        builder.append("msg", body);
+    }
+    msg.body = builder.obj();
     auto out = msg.serialize();
     out.header().setId(nextMessageId());
     out.header().setResponseToMsgId(0);

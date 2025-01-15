@@ -194,14 +194,15 @@ extern OpCounters replOpCounters;
 
 class NetworkCounter {
 public:
+    enum class ConnectionType { kIngress = 1, kEgress = 2 };
     // Increment the counters for the number of bytes read directly off the wire
-    void hitPhysicalIn(long long bytes);
-    void hitPhysicalOut(long long bytes);
+    void hitPhysicalIn(ConnectionType connectionType, long long bytes);
+    void hitPhysicalOut(ConnectionType connectionType, long long bytes);
 
     // Increment the counters for the number of bytes passed out of the TransportLayer to the
     // server
-    void hitLogicalIn(long long bytes);
-    void hitLogicalOut(long long bytes);
+    void hitLogicalIn(ConnectionType connectionType, long long bytes);
+    void hitLogicalOut(ConnectionType connectionType, long long bytes);
 
     // Increment the counter for the number of slow dns resolution operations.
     void incrementNumSlowDNSOperations();
@@ -227,8 +228,11 @@ public:
     void append(BSONObjBuilder& b);
 
 private:
-    CacheExclusive<AtomicWord<long long>> _physicalBytesIn{0};
-    CacheExclusive<AtomicWord<long long>> _physicalBytesOut{0};
+    CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesIn{0};
+    CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesOut{0};
+
+    CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesIn{0};
+    CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesOut{0};
 
     // These two counters are always incremented at the same time, so
     // we place them on the same cache line. We use
@@ -240,9 +244,12 @@ private:
         AtomicWord<long long> logicalBytesIn{0};
         AtomicWord<long long> requests{0};
     };
-    CacheCombinedExclusive<Together> _together{};
 
-    CacheExclusive<AtomicWord<long long>> _logicalBytesOut{0};
+    CacheCombinedExclusive<Together> _ingressTogether{};
+    CacheExclusive<AtomicWord<long long>> _ingressLogicalBytesOut{0};
+
+    CacheCombinedExclusive<Together> _egressTogether{};
+    CacheExclusive<AtomicWord<long long>> _egressLogicalBytesOut{0};
 
     CacheExclusive<AtomicWord<long long>> _numSlowDNSOperations{0};
     CacheExclusive<AtomicWord<long long>> _numSlowSSLOperations{0};

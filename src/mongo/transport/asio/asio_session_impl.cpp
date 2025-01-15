@@ -289,9 +289,9 @@ Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHand
     _asyncOpState.start();
     return write(asio::buffer(message.buf(), message.size()), baton)
         .then([this, message /*keep the buffer alive*/]() {
-            if (_isIngressSession) {
-                networkCounter.hitPhysicalOut(message.size());
-            }
+            auto connectionType = _isIngressSession ? NetworkCounter::ConnectionType::kIngress
+                                                    : NetworkCounter::ConnectionType::kEgress;
+            networkCounter.hitPhysicalOut(connectionType, message.size());
         })
         .onCompletion([this](Status status) {
             _asyncOpState.complete();
@@ -527,11 +527,11 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                 return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
             }
 
+            auto connectionType = _isIngressSession ? NetworkCounter::ConnectionType::kIngress
+                                                    : NetworkCounter::ConnectionType::kEgress;
             if (msgLen == kHeaderSize) {
                 // This probably isn't a real case since all (current) messages have bodies.
-                if (_isIngressSession) {
-                    networkCounter.hitPhysicalIn(msgLen);
-                }
+                networkCounter.hitPhysicalIn(connectionType, msgLen);
                 return Future<Message>::makeReady(Message(std::move(headerBuffer)));
             }
 
@@ -540,10 +540,8 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
 
             MsgData::View msgView(buffer.get());
             return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
-                .then([this, buffer = std::move(buffer), msgLen]() mutable {
-                    if (_isIngressSession) {
-                        networkCounter.hitPhysicalIn(msgLen);
-                    }
+                .then([this, buffer = std::move(buffer), connectionType, msgLen]() mutable {
+                    networkCounter.hitPhysicalIn(connectionType, msgLen);
                     return Message(std::move(buffer));
                 });
         })

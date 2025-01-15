@@ -108,60 +108,67 @@ BSONObj OpCounters::getObj() const {
     return b.obj();
 }
 
-void NetworkCounter::hitPhysicalIn(long long bytes) {
+void NetworkCounter::hitPhysicalIn(ConnectionType connectionType, long long bytes) {
     static const int64_t MAX = 1ULL << 60;
+    auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesIn
+                                                           : _egressPhysicalBytesIn;
 
     // don't care about the race as its just a counter
-    const bool overflow = _physicalBytesIn->loadRelaxed() > MAX;
+    const bool overflow = ref->loadRelaxed() > MAX;
 
     if (overflow) {
-        _physicalBytesIn->store(bytes);
+        ref->store(bytes);
     } else {
-        _physicalBytesIn->fetchAndAdd(bytes);
+        ref->fetchAndAdd(bytes);
     }
 }
 
-void NetworkCounter::hitPhysicalOut(long long bytes) {
+void NetworkCounter::hitPhysicalOut(ConnectionType connectionType, long long bytes) {
     static const int64_t MAX = 1ULL << 60;
+    auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesOut
+                                                           : _egressPhysicalBytesOut;
 
     // don't care about the race as its just a counter
-    const bool overflow = _physicalBytesOut->loadRelaxed() > MAX;
+    const bool overflow = ref->loadRelaxed() > MAX;
 
     if (overflow) {
-        _physicalBytesOut->store(bytes);
+        ref->store(bytes);
     } else {
-        _physicalBytesOut->fetchAndAdd(bytes);
+        ref->fetchAndAdd(bytes);
     }
 }
 
-void NetworkCounter::hitLogicalIn(long long bytes) {
+void NetworkCounter::hitLogicalIn(ConnectionType connectionType, long long bytes) {
     static const int64_t MAX = 1ULL << 60;
+    auto& ref = connectionType == ConnectionType::kIngress ? _ingressTogether : _egressTogether;
 
     // don't care about the race as its just a counter
-    const bool overflow = _together->logicalBytesIn.loadRelaxed() > MAX;
+    const bool overflow = ref->logicalBytesIn.loadRelaxed() > MAX;
 
     if (overflow) {
-        _together->logicalBytesIn.store(bytes);
+        ref->logicalBytesIn.store(bytes);
         // The requests field only gets incremented here (and not in hitPhysical) because the
         // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
         // functions would double-count the number of operations.
-        _together->requests.store(1);
+        ref->requests.store(1);
     } else {
-        _together->logicalBytesIn.fetchAndAdd(bytes);
-        _together->requests.fetchAndAdd(1);
+        ref->logicalBytesIn.fetchAndAdd(bytes);
+        ref->requests.fetchAndAdd(1);
     }
 }
 
-void NetworkCounter::hitLogicalOut(long long bytes) {
+void NetworkCounter::hitLogicalOut(ConnectionType connectionType, long long bytes) {
     static const int64_t MAX = 1ULL << 60;
+    auto& ref = connectionType == ConnectionType::kIngress ? _ingressLogicalBytesOut
+                                                           : _egressLogicalBytesOut;
 
     // don't care about the race as its just a counter
-    const bool overflow = _logicalBytesOut->loadRelaxed() > MAX;
+    const bool overflow = ref->loadRelaxed() > MAX;
 
     if (overflow) {
-        _logicalBytesOut->store(bytes);
+        ref->store(bytes);
     } else {
-        _logicalBytesOut->fetchAndAdd(bytes);
+        ref->fetchAndAdd(bytes);
     }
 }
 
@@ -178,13 +185,26 @@ void NetworkCounter::acceptedTFOIngress() {
 }
 
 void NetworkCounter::append(BSONObjBuilder& b) {
-    b.append("bytesIn", static_cast<long long>(_together->logicalBytesIn.loadRelaxed()));
-    b.append("bytesOut", static_cast<long long>(_logicalBytesOut->loadRelaxed()));
-    b.append("physicalBytesIn", static_cast<long long>(_physicalBytesIn->loadRelaxed()));
-    b.append("physicalBytesOut", static_cast<long long>(_physicalBytesOut->loadRelaxed()));
+    b.append("bytesIn", static_cast<long long>(_ingressTogether->logicalBytesIn.loadRelaxed()));
+    b.append("bytesOut", static_cast<long long>(_ingressLogicalBytesOut->loadRelaxed()));
+    b.append("physicalBytesIn", static_cast<long long>(_ingressPhysicalBytesIn->loadRelaxed()));
+    b.append("physicalBytesOut", static_cast<long long>(_ingressPhysicalBytesOut->loadRelaxed()));
+
+    BSONObjBuilder egressBuilder(b.subobjStart("egress"));
+    egressBuilder.append("bytesIn",
+                         static_cast<long long>(_egressTogether->logicalBytesIn.loadRelaxed()));
+    egressBuilder.append("bytesOut", static_cast<long long>(_egressLogicalBytesOut->loadRelaxed()));
+    egressBuilder.append("physicalBytesIn",
+                         static_cast<long long>(_egressPhysicalBytesIn->loadRelaxed()));
+    egressBuilder.append("physicalBytesOut",
+                         static_cast<long long>(_egressPhysicalBytesOut->loadRelaxed()));
+    egressBuilder.append("numRequests",
+                         static_cast<long long>(_egressTogether->requests.loadRelaxed()));
+    egressBuilder.done();
+
     b.append("numSlowDNSOperations", static_cast<long long>(_numSlowDNSOperations->loadRelaxed()));
     b.append("numSlowSSLOperations", static_cast<long long>(_numSlowSSLOperations->loadRelaxed()));
-    b.append("numRequests", static_cast<long long>(_together->requests.loadRelaxed()));
+    b.append("numRequests", static_cast<long long>(_ingressTogether->requests.loadRelaxed()));
 
     BSONObjBuilder tfo;
 #ifdef __linux__

@@ -707,7 +707,7 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
     _work->decompressRequest();
 
-    networkCounter.hitLogicalIn(_work->in().size());
+    networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kIngress, _work->in().size());
 
     // Pass sourced Message to handler to generate response.
     _work->initOperation();
@@ -749,7 +749,7 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     // the dbresponses continue to indicate the exhaust stream should continue.
     _nextWork = work.synthesizeExhaust(response);
 
-    networkCounter.hitLogicalOut(toSink.size());
+    networkCounter.hitLogicalOut(NetworkCounter::ConnectionType::kIngress, toSink.size());
 
     beforeCompressingExhaustResponse.executeIf(
         [&](auto&&) {}, [&](auto&&) { return work.hasCompressorId() && _nextWork; });

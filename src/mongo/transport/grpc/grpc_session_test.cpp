@@ -36,6 +36,7 @@
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
+#include "mongo/transport/test_fixtures.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
@@ -276,6 +277,62 @@ TEST_F(GRPCSessionTest, ReadAndWrite) {
 
     sendMessage(*egressSession, *ingressSession);
     sendMessage(*ingressSession, *egressSession);
+}
+
+TEST_F(GRPCSessionTest, IngressPhysicalMetrics) {
+    auto ingressSession = makeSession<IngressSession>();
+    auto clientSession = makeSession<EgressSession>();
+    ON_BLOCK_EXIT([&] {
+        ingressSession->end();
+        clientSession->end();
+    });
+
+    auto sendMessage = [&](Session& sender, Session& receiver, const Message& msg) {
+        ASSERT_OK(sender.sinkMessage(msg));
+        auto swReceived = receiver.sourceMessage();
+        ASSERT_OK(swReceived.getStatus());
+    };
+
+    auto req = makeUniqueMessage("request");
+    auto resp = makeUniqueMessage("response to the client");
+    auto ingressStats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress);
+
+    sendMessage(*clientSession, *ingressSession, req);
+    sendMessage(*ingressSession, *clientSession, resp);
+
+    auto ingressDiff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress)
+                           .getDifference(ingressStats);
+    ASSERT_EQ(ingressDiff.physicalBytesIn, req.size());
+    ASSERT_EQ(ingressDiff.physicalBytesOut, resp.size());
+    ASSERT_EQ(ingressDiff.numRequests, 0);
+}
+
+TEST_F(GRPCSessionTest, EgressPhysicalMetrics) {
+    auto serverSession = makeSession<IngressSession>();
+    auto egressSession = makeSession<EgressSession>();
+    ON_BLOCK_EXIT([&] {
+        serverSession->end();
+        egressSession->end();
+    });
+
+    auto sendMessage = [&](Session& sender, Session& receiver, const Message& msg) {
+        ASSERT_OK(sender.sinkMessage(msg));
+        auto swReceived = receiver.sourceMessage();
+        ASSERT_OK(swReceived.getStatus());
+    };
+
+    auto req = makeUniqueMessage("request to remote server");
+    auto resp = makeUniqueMessage("response");
+    auto egressStats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kEgress);
+
+    sendMessage(*egressSession, *serverSession, req);
+    sendMessage(*serverSession, *egressSession, resp);
+
+    auto egressDiff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kEgress)
+                          .getDifference(egressStats);
+    ASSERT_EQ(egressDiff.physicalBytesIn, resp.size());
+    ASSERT_EQ(egressDiff.physicalBytesOut, req.size());
+    ASSERT_EQ(egressDiff.numRequests, 0);
 }
 
 enum class Operation { kSink, kSource };

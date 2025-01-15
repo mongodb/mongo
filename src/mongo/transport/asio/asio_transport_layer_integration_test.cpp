@@ -39,10 +39,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/unittest/assert.h"
@@ -620,5 +623,31 @@ TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, AwaitExhaustCommandCan
     ASSERT_EQ(awaitExhaustFuture.getNoThrow(interruptible()), ErrorCodes::CallbackCanceled);
 }
 
+TEST_F(AsyncClientIntegrationTest, EgressNetworkMetrics) {
+    auto client = makeClient();
+    auto req = makeTestRequest(DatabaseName::kAdmin, BSON("echo" << std::string(1 << 10, 'x')));
+    auto const msgLen = static_cast<OpMsgRequest>(req).serialize().size();
+
+    auto caculateResponseMsgSize = [](const BSONObj& responseData) {
+        const int msgHeadSize = sizeof(MSGHEADER::Value);
+        const int opMsgFlagSize = sizeof(uint32_t);
+        const int opMsgSectionFlagSize = sizeof(uint8_t);
+        const int msgCheckSumSize = sizeof(uint32_t);
+        return msgHeadSize + opMsgFlagSize + opMsgSectionFlagSize + responseData.objsize() +
+            msgCheckSumSize;
+    };
+
+    auto stats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kEgress);
+    auto response = client->runCommandRequest(req, baton()).get(interruptible());
+    assertOK(response);
+    auto diff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kEgress)
+                    .getDifference(stats);
+
+    ASSERT_EQ(diff.logicalBytesOut, msgLen);
+    ASSERT_EQ(diff.physicalBytesOut, msgLen + sizeof(uint32_t) /* checksum size */);
+    ASSERT_EQ(diff.logicalBytesIn, caculateResponseMsgSize(response.data));
+    ASSERT_EQ(diff.physicalBytesIn, caculateResponseMsgSize(response.data));
+    ASSERT_EQ(diff.numRequests, 1);
+}
 }  // namespace
 }  // namespace mongo::transport

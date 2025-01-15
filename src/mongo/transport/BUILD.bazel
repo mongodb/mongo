@@ -363,6 +363,8 @@ mongo_cc_unit_test(
 mongo_cc_integration_test(
     name = "transport_integration_test",
     srcs = [
+        "//src/mongo/transport:test_fixtures.h",
+        "//src/mongo/transport:transport_layer_mock.h",
         "//src/mongo/transport/asio:asio_transport_layer_integration_test.cpp",
     ],
     copts = select({
