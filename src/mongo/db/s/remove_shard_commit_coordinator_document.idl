@@ -32,6 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/s/sharding_types.idl"
 
 enums:
     RemoveShardCommitCoordinatorPhase:
@@ -39,6 +40,7 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kJoinMigrationsAndCheckRangeDeletions: "joinMigrationsAndCheckRangeDeletions"
 
 structs:
     RemoveShardCommitCoordinatorDocument:
@@ -48,6 +50,14 @@ structs:
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:
+            shardId:
+                type: shard_id
+                description: "The shard id to be removed."
+            isTransitionToDedicated:
+                type: bool
+                description: >-
+                  True if the command being run is transitionToDedicated, false for normal remove
+                  shard.
             phase:
                 type: RemoveShardCommitCoordinatorPhase
                 description: "Coordinator phase."

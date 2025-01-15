@@ -547,6 +547,28 @@ bool appendToArrayIfRoom(int& offset, BSONArrayBuilder& arrayBuilder, const std:
 
 }  // namespace
 
+namespace topology_change_helpers {
+
+long long getRangeDeletionCount(OperationContext* opCtx) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    return static_cast<long long>(store.count(opCtx, BSONObj()));
+}
+
+void joinMigrations(OperationContext* opCtx) {
+    // Join migrations to make sure there's no ongoing MigrationDestinationManager. New ones
+    // will observe the draining state and abort before performing any work that could re-create
+    // local catalog collections/dbs.
+    DBDirectClient client(opCtx);
+    BSONObj resultInfo;
+    ShardsvrJoinMigrations shardsvrJoinMigrations;
+    shardsvrJoinMigrations.setDbName(DatabaseName::kAdmin);
+    const auto result =
+        client.runCommand(DatabaseName::kAdmin, shardsvrJoinMigrations.toBSON(), resultInfo);
+    uassert(8955101, "Failed to await ongoing migrations before removing catalog shard", result);
+}
+
+}  // namespace topology_change_helpers
+
 StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
     OperationContext* opCtx,
     RemoteCommandTargeter* targeter,
@@ -1665,34 +1687,16 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     if (shardId == ShardId::kConfigServerId) {
-        // Join migrations to make sure there's no ongoing MigrationDestinationManager. New ones
-        // will observe the draining state and abort before performing any work that could re-create
-        // local catalog collections/dbs.
-        {
-            DBDirectClient client(opCtx);
-            BSONObj resultInfo;
-            ShardsvrJoinMigrations shardsvrJoinMigrations;
-            shardsvrJoinMigrations.setDbName(DatabaseName::kAdmin);
-            const auto result = client.runCommand(
-                DatabaseName::kAdmin, shardsvrJoinMigrations.toBSON(), resultInfo);
-            uassert(8955101,
-                    "Failed to await ongoing migrations before removing catalog shard",
-                    result);
-        }
-
+        topology_change_helpers::joinMigrations(opCtx);
         // The config server may be added as a shard again, so we locally drop its drained
         // sharded collections to enable that without user intervention. But we have to wait for
         // the range deleter to quiesce to give queries and stale routers time to discover the
         // migration, to match the usual probabilistic guarantees for migrations.
-        auto pendingRangeDeletions = [opCtx]() {
-            PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-            return static_cast<long long>(store.count(opCtx, BSONObj()));
-        }();
+        auto pendingRangeDeletions = topology_change_helpers::getRangeDeletionCount(opCtx);
         if (pendingRangeDeletions > 0) {
             LOGV2(7564600,
                   "removeShard: waiting for range deletions",
                   "pendingRangeDeletions"_attr = pendingRangeDeletions);
-
             return {RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, pendingRangeDeletions};
         }
     }

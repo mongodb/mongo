@@ -344,8 +344,8 @@ protected:
 
     virtual StringData serializePhase(const Phase& phase) const = 0;
 
-    template <typename Func>
-    auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn) {
+    std::function<void()> _buildPhaseHandler(const Phase& newPhase,
+                                             std::function<void()>&& handlerFn) {
         return [=, this] {
             const auto& currPhase = _doc.getPhase();
 
@@ -359,6 +359,18 @@ protected:
             }
             return handlerFn();
         };
+    }
+
+    std::function<void()> _buildPhaseHandler(const Phase& newPhase,
+                                             std::function<bool()>&& shouldExecute,
+                                             std::function<void()>&& handlerFn) {
+        if (!shouldExecute()) {
+            // Do not execute the phase if the passed in condition is not met.
+            return [] {
+            };
+        }
+
+        return _buildPhaseHandler(newPhase, std::move(handlerFn));
     }
 
     auto _getDoc() const {

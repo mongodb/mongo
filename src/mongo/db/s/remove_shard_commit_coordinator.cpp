@@ -29,17 +29,46 @@
 
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 namespace mongo {
 
 ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([] {
+        .then(_buildPhaseHandler(
+            Phase::kJoinMigrationsAndCheckRangeDeletions,
+            [this, anchor = shared_from_this()] { return _doc.getIsTransitionToDedicated(); },
+            [this, executor = executor, anchor = shared_from_this()] {
+                _joinMigrationsAndCheckRangeDeletions();
+            }))
+        .then([this] {
             uasserted(ErrorCodes::NotImplemented,
                       "The removeShardCommit coordinator is still incomplete.");
         })
         .onError([](const Status& status) { return status; });
+}
+
+void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions() {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    getForwardableOpMetadata().setOn(opCtx);
+
+    topology_change_helpers::joinMigrations(opCtx);
+    // The config server may be added as a shard again, so we locally drop its drained
+    // sharded collections to enable that without user intervention. But we have to wait for
+    // the range deleter to quiesce to give queries and stale routers time to discover the
+    // migration, to match the usual probabilistic guarantees for migrations.
+    auto pendingRangeDeletions = topology_change_helpers::getRangeDeletionCount(opCtx);
+    if (pendingRangeDeletions > 0) {
+        LOGV2(9782400,
+              "removeShard: waiting for range deletions",
+              "pendingRangeDeletions"_attr = pendingRangeDeletions);
+        uasserted(
+            ErrorCodes::ChunkRangeCleanupPending,
+            "Range deletions must complete before transitioning to a dedicated config server.");
+    }
 }
 
 RemoveShardProgress RemoveShardCommitCoordinator::getResult(OperationContext* opCtx) {

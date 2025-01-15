@@ -71,3 +71,14 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+
+    # TODO (SERVER-97828) Remove this test command once the coordinator is integrated into the real
+    # configsvr command.
+    _configsvrRemoveShardCommit:
+        command_name: _configsvrRemoveShardCommit
+        description: "Test command for running the remove shard commit coordinator"
+        cpp_name: ConfigSvrRemoveShardCommit
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false

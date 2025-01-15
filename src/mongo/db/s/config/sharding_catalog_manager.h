@@ -85,6 +85,18 @@
 
 namespace mongo {
 
+// TODO (SERVER-97816): remove these helpers and move the implementations into the add/remove shard
+// coordinators once 9.0 becomes last LTS.
+namespace topology_change_helpers {
+
+// Returns the count of range deletion tasks locally on the config server.
+long long getRangeDeletionCount(OperationContext* opCtx);
+
+// Calls ShardsvrJoinMigrations locally on the config server.
+void joinMigrations(OperationContext* opCtx);
+
+}  // namespace topology_change_helpers
+
 struct RemoveShardProgress {
     /**
      * Used to indicate to the caller of the removeShard method whether draining of chunks for

@@ -264,6 +264,10 @@ const internalCommandsMap = {
         testname: "_configsvrRemoveShard",
         command: {_configsvrRemoveShard: 1, removeShard: shard0name},
     },
+    _configsvrRemoveShardCommit: {
+        testname: "_configsvrRemoveShardCommit",
+        command: {_configsvrRemoveShardCommit: shard0name},
+    },
     _configsvrRemoveShardFromZone: {
         testname: "_configsvrRemoveShardFromZone",
         command: {_configsvrRemoveShardFromZone: 1, removeShard: shard0name, zone: 'z'},

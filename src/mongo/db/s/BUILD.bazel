@@ -358,6 +358,7 @@ idl_generator(
     deps = [
         ":sharding_ddl_coordinator_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s:sharding_types_gen",
     ],
 )
 
@@ -1240,6 +1241,7 @@ mongo_cc_library(
         "//src/mongo/db/s/config:configsvr_move_range_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_chunks_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_shard_command.cpp",
+        "//src/mongo/db/s/config:configsvr_remove_shard_commit_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_shard_from_zone_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_tags_command.cpp",
         "//src/mongo/db/s/config:configsvr_repair_sharded_collection_chunks_history_command.cpp",

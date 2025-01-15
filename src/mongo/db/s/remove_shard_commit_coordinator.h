@@ -62,6 +62,10 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    // Joins migrations on the config server if we are transitioning from dedicated and checks if
+    // there are range deletions to wait for.
+    void _joinMigrationsAndCheckRangeDeletions();
+
     // Set on successful completion of the coordinator.
     boost::optional<RemoveShardProgress> _result;
 };

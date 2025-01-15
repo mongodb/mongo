@@ -119,6 +119,7 @@ let viewsCommandTests = {
     _configsvrRenameCollection: {skip: isAnInternalCommand},
     _configsvrRemoveChunks: {skip: isAnInternalCommand},
     _configsvrRemoveShard: {skip: isAnInternalCommand},
+    _configsvrRemoveShardCommit: {skip: isAnInternalCommand},
     _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
     _configsvrRemoveTags: {skip: isAnInternalCommand},
     _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
