@@ -2,6 +2,8 @@
  * Make sure that $gt and $lt queries return the same results regardless of whether there is a
  * multikey index.
  * @tags: [
+ *     # This test runs too long for Evergreen's 30 min timeout in TSAN builds.
+ *     tsan_incompatible,
  * ]
  */
 
