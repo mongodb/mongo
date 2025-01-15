@@ -187,7 +187,7 @@ void WiredTigerRecoveryUnit::setPrefetching(bool enable) {
     auto session = getSessionNoTxn();
     StringBuilder config;
     config << "prefetch=(enabled=" << (enable ? "true" : "false") << ")";
-    session->reconfigure(config.str(), "prefetch=(enabled=false)");
+    session->modifyConfiguration(config.str(), "prefetch=(enabled=false)");
 }
 
 void WiredTigerRecoveryUnit::assertInActiveTxn() const {
@@ -902,7 +902,7 @@ void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
     _cacheMaxWaitTimeout = timeout;
     auto session = getSessionNoTxn();
 
-    session->reconfigure(
+    session->modifyConfiguration(
         fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
         "cache_max_wait_ms=0");
 }

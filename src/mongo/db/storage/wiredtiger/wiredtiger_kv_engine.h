@@ -612,7 +612,7 @@ private:
      * Returns DataModifiedByRepair if the rebuild was successful, and any other error on failure.
      * This will never return Status::OK().
      */
-    Status _rebuildIdent(WT_SESSION* session, const char* uri);
+    Status _rebuildIdent(WiredTigerSession& session, const char* uri);
 
     bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 

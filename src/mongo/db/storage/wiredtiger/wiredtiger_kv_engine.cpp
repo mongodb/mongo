@@ -827,8 +827,7 @@ void WiredTigerKVEngine::cleanShutdown() {
 }
 
 int64_t WiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, StringData ident) {
-    return WiredTigerUtil::getIdentSize(WiredTigerRecoveryUnit::get(ru).getSession()->getSession(),
-                                        _uri(ident));
+    return WiredTigerUtil::getIdentSize(*WiredTigerRecoveryUnit::get(ru).getSession(), _uri(ident));
 }
 
 Status WiredTigerKVEngine::repairIdent(RecoveryUnit& ru, StringData ident) {
@@ -867,7 +866,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
                       "Data file is missing. Attempting to drop and re-create the collection.",
                       "uri"_attr = uri);
 
-        return _rebuildIdent(session, uri);
+        return _rebuildIdent(sessionWrapper, uri);
     }
 
     LOGV2(22328, "Verify failed. Running a salvage operation.", "uri"_attr = uri);
@@ -889,10 +888,10 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
                   "error"_attr = status);
 
     //  If the data is unsalvageable, we should completely rebuild the ident.
-    return _rebuildIdent(session, uri);
+    return _rebuildIdent(sessionWrapper, uri);
 }
 
-Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
+Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char* uri) {
     invariant(_inRepairMode);
 
     invariant(std::string(uri).find(kTableUriPrefix.rawData()) == 0);
@@ -926,13 +925,13 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
         return status;
     }
 
-    int rc = session->drop(session, uri, nullptr);
+    int rc = session->drop(*session, uri, nullptr);
     // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (rc == EBUSY) {
-        _checkpoint(session);
-        rc = session->drop(session, uri, nullptr);
+        _checkpoint(*session);
+        rc = session->drop(*session, uri, nullptr);
     }
     if (rc != 0) {
         auto status = wtRCToStatus(rc, session);
@@ -943,7 +942,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
         return status;
     }
 
-    rc = session->create(session, uri, swMetadata.getValue().c_str());
+    rc = session->create(*session, uri, swMetadata.getValue().c_str());
     if (rc != 0) {
         auto status = wtRCToStatus(rc, session);
         LOGV2_ERROR(22359,
@@ -1573,7 +1572,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
                   "error"_attr = status.reason());
 
     //  If the data is unsalvageable, we should completely rebuild the ident.
-    return _rebuildIdent(session, _uri(ident).c_str());
+    return _rebuildIdent(sessionWrapper, _uri(ident).c_str());
 #endif
 }
 
@@ -2985,10 +2984,12 @@ Status WiredTigerKVEngine::autoCompact(RecoveryUnit& ru, const AutoCompactOption
         config << "background=false";
     }
 
-    WT_SESSION* s = WiredTigerRecoveryUnit::get(&ru)->getSessionNoTxn()->getSession();
-    int ret = s->compact(s, nullptr, config.str().c_str());
+    WiredTigerSession* s = WiredTigerRecoveryUnit::get(&ru)->getSessionNoTxn();
+    int ret = s->compact(nullptr, config.str().c_str());
     status = wtRCToStatus(
-        ret, s, "Failed to configure auto compact, please double check it is not already enabled.");
+        ret,
+        *s,
+        "Failed to configure auto compact, please double check it is not already enabled.");
     if (!status.isOK())
         LOGV2_ERROR(8704101,
                     "WiredTigerKVEngine::autoCompact() failed",

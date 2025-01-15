@@ -174,11 +174,11 @@ TEST(WiredTigerConnectionTest, resetConfigurationBeforeReleasingSessionToCache) 
 
         WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
         // Set ignore_cache_size to be true
-        session->reconfigure("ignore_cache_size=true", "ignore_cache_size=false");
+        session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
         // Set isolation level to be read-uncommitted (by default it is snapshot)
-        session->reconfigure("isolation=read-uncommitted", "isolation=snapshot");
+        session->modifyConfiguration("isolation=read-uncommitted", "isolation=snapshot");
         // Set cache_cursors to be false
-        session->reconfigure("cache_cursors=false", "cache_cursors=true");
+        session->modifyConfiguration("cache_cursors=false", "cache_cursors=true");
         auto undoConfigStringsSet = session->getUndoConfigStrings();
 
         // Check that all the expected undo config strings are present.
@@ -214,11 +214,11 @@ TEST(WiredTigerConnectionTest, resetConfigurationToDefault) {
 
     WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
     // Set ignore_cache_size to be true
-    session->reconfigure("ignore_cache_size=true", "ignore_cache_size=false");
+    session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
     // Set isolation level to be read-uncommitted (by default it is snapshot)
-    session->reconfigure("isolation=read-uncommitted", "isolation=snapshot");
+    session->modifyConfiguration("isolation=read-uncommitted", "isolation=snapshot");
     // Set cache_cursors to be false
-    session->reconfigure("cache_cursors=false", "cache_cursors=true");
+    session->modifyConfiguration("cache_cursors=false", "cache_cursors=true");
     auto undoConfigStringsSet = session->getUndoConfigStrings();
 
     // Check that all the expected undo config strings are present.
@@ -230,9 +230,9 @@ TEST(WiredTigerConnectionTest, resetConfigurationToDefault) {
 
     // Set all values back to their defaults.
     recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{0});
-    session->reconfigure("ignore_cache_size=false", "ignore_cache_size=false");
-    session->reconfigure("isolation=snapshot", "isolation=snapshot");
-    session->reconfigure("cache_cursors=true", "cache_cursors=true");
+    session->modifyConfiguration("ignore_cache_size=false", "ignore_cache_size=false");
+    session->modifyConfiguration("isolation=snapshot", "isolation=snapshot");
+    session->modifyConfiguration("cache_cursors=true", "cache_cursors=true");
 
     // Check that we do not store any undo config strings.
     ASSERT_EQ(session->getUndoConfigStrings().size(), 0);

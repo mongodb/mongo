@@ -113,11 +113,12 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
     *source = std::string(sourceItem.str, sourceItem.len);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WT_SESSION* session, StringData uri) {
+StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& session,
+                                                          StringData uri) {
     WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor), session);
+    invariantWTOK(session->open_cursor(*session, "metadata:create", nullptr, "", &cursor), session);
     invariant(cursor);
-    ON_BLOCK_EXIT([cursor, session] { invariantWTOK(cursor->close(cursor), session); });
+    ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
 
     return _getMetadata(cursor, uri);
 }
@@ -339,10 +340,19 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
 }
 
 // static
-StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
+StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WiredTigerSession& session,
                                                        const std::string& uri,
                                                        const std::string& config,
                                                        int statisticsKey) {
+    return session.with(
+        [&](WT_SESSION* s) { return getStatisticsValue_DoNotUse(s, uri, config, statisticsKey); });
+}
+
+// static
+StatusWith<int64_t> WiredTigerUtil::getStatisticsValue_DoNotUse(WT_SESSION* session,
+                                                                const std::string& uri,
+                                                                const std::string& config,
+                                                                int statisticsKey) {
     invariant(session);
     WT_CURSOR* cursor = nullptr;
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
@@ -379,7 +389,7 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
     return StatusWith<int64_t>(value);
 }
 
-int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
+int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& uri) {
     StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     const Status& status = result.getStatus();
@@ -393,7 +403,7 @@ int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
     return result.getValue();
 }
 
-int64_t WiredTigerUtil::getEphemeralIdentSize(WT_SESSION* s, const std::string& uri) {
+int64_t WiredTigerUtil::getEphemeralIdentSize(WiredTigerSession& s, const std::string& uri) {
     // For ephemeral case, use cursor statistics
     const auto statsUri = "statistics:" + uri;
 
@@ -424,14 +434,14 @@ int64_t WiredTigerUtil::getEphemeralIdentSize(WT_SESSION* s, const std::string& 
     return numEntries * bytesPerEntry;
 }
 
-int64_t WiredTigerUtil::getIdentReuseSize(WT_SESSION* s, const std::string& uri) {
+int64_t WiredTigerUtil::getIdentReuseSize(WiredTigerSession& s, const std::string& uri) {
     auto result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_REUSE_BYTES);
     uassertStatusOK(result.getStatus());
     return result.getValue();
 }
 
-int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WT_SESSION* s,
+int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WiredTigerSession& s,
                                                              const std::string& uri) {
     auto result =
         WiredTigerUtil::getStatisticsValue(s,
@@ -873,7 +883,7 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     std::string existingMetadata;
     {
         auto session = connection->getSession();
-        existingMetadata = getMetadataCreate(session->getSession(), uri).getValue();
+        existingMetadata = getMetadataCreate(*session, uri).getValue();
     }
 
     {

@@ -545,10 +545,8 @@ int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
         return dataSize();
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
-    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                     "statistics:" + getURI(),
-                                                     "statistics=(size)",
-                                                     WT_STAT_DSRC_BLOCK_SIZE);
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:" + getURI(), "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     uassertStatusOK(result.getStatus());
 
     return result.getValue();
@@ -563,7 +561,7 @@ int64_t WiredTigerRecordStore::Capped::storageSize(RecoveryUnit& ru,
 
 int64_t WiredTigerRecordStore::freeStorageSize(RecoveryUnit& ru) const {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
-    return WiredTigerUtil::getIdentReuseSize(session->getSession(), getURI());
+    return WiredTigerUtil::getIdentReuseSize(*session, getURI());
 }
 
 void WiredTigerRecordStore::_updateLargestRecordId(OperationContext* opCtx, long long largestSeen) {
@@ -1056,9 +1054,8 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
         return 0;
     }
 
-    WT_SESSION* s = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
-                        ->getSession()
-                        ->getSession();
+    WiredTigerSession* s =
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getSession();
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
@@ -1074,7 +1071,7 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
         config << ",free_space_target=" << std::to_string(*options.freeSpaceTargetMB) << "MB";
     }
     const std::string uri(getURI());
-    int ret = s->compact(s, uri.c_str(), config.str().c_str());
+    int ret = s->compact(uri.c_str(), config.str().c_str());
     if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
         return Status(ErrorCodes::Interrupted,
                       str::stream() << "Storage compaction interrupted on " << uri);
@@ -1088,9 +1085,9 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
         return Status(ErrorCodes::Interrupted,
                       str::stream() << "Compaction interrupted on " << getURI());
     }
-    invariantWTOK(ret, s);
+    invariantWTOK(ret, *s);
 
-    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(s, uri) : 0;
+    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(*s, uri) : 0;
 }
 
 void WiredTigerRecordStore::validate(RecoveryUnit& ru,
@@ -1243,7 +1240,6 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
     // Initialize the highest seen RecordId in a session without a read timestamp because that is
     // required by the largest_key API.
     WiredTigerSession sessRaii(_kvEngine->getConnection());
-    auto wtSession = sessRaii.getSession();
 
     if (shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork()) {
         // We must limit the amount of time spent blocked on cache eviction to avoid a deadlock with
@@ -1252,7 +1248,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
         // that transaction to free up cache space. If we do block on cache eviction here, we must
         // consider that the other session owned by this thread may be the one that needs to be
         // rolled back. If this does time out, we will receive a WT_ROLLBACK and throw an error.
-        invariantWTOK(wtSession->reconfigure(wtSession, "cache_max_wait_ms=1000"), wtSession);
+        invariantWTOK(sessRaii.reconfigure("cache_max_wait_ms=1000"), sessRaii);
     }
 
     auto cursor = sessRaii.getNewCursor(_uri);
@@ -1261,7 +1257,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
         // Force the caller to rollback its transaction if we can't make progress with eviction.
         // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
         // a true write conflict.
-        auto rollbackReason = wtSession->get_rollback_reason(wtSession);
+        auto rollbackReason = sessRaii.get_rollback_reason();
         rollbackReason = rollbackReason ? rollbackReason : "undefined";
         throwWriteConflictException(
             fmt::format("Rollback ocurred while performing initial write to '{}'. Reason: '{}'",
@@ -1269,7 +1265,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
                         rollbackReason));
     } else if (ret != WT_NOTFOUND) {
         if (ret == ENOTSUP) {
-            auto creationMetadata = WiredTigerUtil::getMetadataCreate(wtSession, _uri).getValue();
+            auto creationMetadata = WiredTigerUtil::getMetadataCreate(sessRaii, _uri).getValue();
             if (creationMetadata.find("lsm=") != std::string::npos) {
                 LOGV2_FATAL(
                     6627200,
@@ -1279,7 +1275,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
                     "metadata"_attr = redact(creationMetadata));
             }
         }
-        invariantWTOK(ret, wtSession);
+        invariantWTOK(ret, sessRaii);
         return getKey(cursor, _keyFormat);
     }
     // Empty table.

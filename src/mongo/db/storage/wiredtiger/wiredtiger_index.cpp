@@ -484,19 +484,19 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
 
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
-    WT_SESSION* s = ru->getSession()->getSession();
+    WiredTigerSession* s = ru->getSession();
 
     if (ru->getConnection()->isEphemeral()) {
-        return static_cast<long long>(WiredTigerUtil::getEphemeralIdentSize(s, _uri));
+        return static_cast<long long>(WiredTigerUtil::getEphemeralIdentSize(*s, _uri));
     }
-    return static_cast<long long>(WiredTigerUtil::getIdentSize(s, _uri));
+    return static_cast<long long>(WiredTigerUtil::getIdentSize(*s, _uri));
 }
 
 long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx) const {
     auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WiredTigerSession* session = ru->getSessionNoTxn();
 
-    return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
+    return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(*session, _uri));
 }
 
 Status WiredTigerIndex::initAsEmpty() {

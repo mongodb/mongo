@@ -44,6 +44,9 @@
     "transaction is too large and will not fit in the storage engine cache"
 
 namespace mongo {
+
+class WiredTigerSession;
+
 bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, double threshold);
 bool rollbackReasonWasCachePressure(const char* reason);
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
@@ -60,6 +63,7 @@ void throwAppropriateException(bool txnTooLargeEnabled,
                                StringData prefix,
                                int retCode);
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
+Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix);
 
 /**
  * converts wiredtiger return codes to mongodb statuses.
@@ -71,8 +75,23 @@ inline Status wtRCToStatus(int retCode, WT_SESSION* session, const char* prefix 
     return wtRCToStatus_slow(retCode, session, prefix);
 }
 
+inline Status wtRCToStatus(int retCode, WiredTigerSession& session, const char* prefix = nullptr) {
+    if (MONGO_likely(retCode == 0))
+        return Status::OK();
+
+    return wtRCToStatus_slow(retCode, session, prefix);
+}
+
 template <typename ContextExpr>
 Status wtRCToStatus(int retCode, WT_SESSION* session, ContextExpr&& contextExpr) {
+    if (MONGO_likely(retCode == 0))
+        return Status::OK();
+
+    return wtRCToStatus_slow(retCode, session, std::forward<ContextExpr>(contextExpr)());
+}
+
+template <typename ContextExpr>
+Status wtRCToStatus(int retCode, WiredTigerSession& session, ContextExpr&& contextExpr) {
     if (MONGO_likely(retCode == 0))
         return Status::OK();
 

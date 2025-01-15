@@ -108,7 +108,7 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
         return 0;
     }
 
-    WT_SESSION* s = ru.getSession()->getSession();
+    WiredTigerSession* s = ru.getSession();
     ru.abandonSnapshot();
 
     // Set a pointer on the WT_SESSION to the interruptible, so that WT::compact can use a
@@ -123,7 +123,7 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
     if (options.freeSpaceTargetMB) {
         config << ",free_space_target=" + std::to_string(*options.freeSpaceTargetMB) + "MB";
     }
-    int ret = s->compact(s, uri.c_str(), config.str().c_str());
+    int ret = s->compact(uri.c_str(), config.str().c_str());
     if (ret == WT_ERROR && !interruptible.checkForInterruptNoAssert().isOK()) {
         return Status(ErrorCodes::Interrupted,
                       str::stream() << "Storage compaction interrupted on " << uri.c_str());
@@ -139,9 +139,9 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
                                     << " due to cache eviction pressure");
     }
 
-    invariantWTOK(ret, s);
+    invariantWTOK(ret, *s);
 
-    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(s, uri) : 0;
+    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(*s, uri) : 0;
 }
 
 bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,

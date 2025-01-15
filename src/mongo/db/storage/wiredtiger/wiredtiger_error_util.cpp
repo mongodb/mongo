@@ -32,6 +32,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
@@ -46,7 +47,7 @@ namespace {
  * transaction is considered too large.
  */
 bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
-    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue(
+    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
         session, "statistics:session", "", WT_STAT_SESSION_TXN_BYTES_DIRTY);
     if (!txnDirtyBytes.isOK()) {
         tasserted(6190900,
@@ -54,7 +55,7 @@ bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
                                 << txnDirtyBytes.getStatus());
     }
 
-    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue(
+    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
         session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY_LEAF);
     if (!cacheDirtyBytes.isOK()) {
         tasserted(6190901,
@@ -176,6 +177,11 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
 
     // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
     return Status(ErrorCodes::UnknownError, s);
+}
+
+Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix) {
+    return session.with(
+        [&](WT_SESSION* s) { return wtRCToStatus_slow(retCode, session.getSession(), prefix); });
 }
 
 }  // namespace mongo
