@@ -1001,7 +1001,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
         return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
 
-    if (search_helper_bson_obj::isMongotPipeline(currentPipeline)) {
+    if (search_helper_bson_obj::isMongotPipeline(currentPipeline) &&
+        subPipelineExpCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
         return Pipeline::viewPipelineHelperForSearch(
             subPipelineExpCtx, resolvedNs, currentPipeline, opts, originalNs);
     }

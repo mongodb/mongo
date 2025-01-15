@@ -1,5 +1,6 @@
 /**
- * This test ensures we support running $vectorSearch on views
+ * This test ensures we support running $vectorSearch on views.
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {

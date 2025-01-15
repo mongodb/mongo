@@ -313,7 +313,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               docsRequested,
                                               batchSize,
                                               spec.getRequiresSearchSequenceToken(),
-                                              expCtx->getViewNS()),
+                                              expCtx->getViewNSForMongotIndexedView()),
         taskExecutor,
         std::move(getMoreStrategy),
         std::move(yieldPolicy));

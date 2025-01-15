@@ -158,7 +158,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
         return Pipeline::parse(aggExState.getRequest().getPipeline(), expCtx);
     }
 
-    else if (search_helpers::isMongotPipeline(pipeline.get())) {
+    else if (search_helpers::isMongotPipeline(pipeline.get()) &&
+             expCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
         if (search_helpers::isStoredSource(pipeline.get())) {
             // For returnStoredSource queries, the documents returned by mongot already include the
             // fields transformed by the view pipeline. As such, mongod doesn't need to apply the

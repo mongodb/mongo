@@ -2,6 +2,7 @@
  * This test builds a pipeline nearing the BSON size limit and attempts to create search indexes
  * with parameters that would put the request over the limit. This is to ensure that our search
  * index interface correctly catches and returns such errors.
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 

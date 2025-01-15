@@ -146,7 +146,7 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
             _resolvedNamespace ? *_resolvedNamespace : pExpCtx->getNamespaceString(),
             bob.done(),
             *_collectionUUID,
-            pExpCtx->getViewNS());
+            pExpCtx->getViewNSForMongotIndexedView());
 
         /**
          * 'mangeSearchIndex' returns a cursor with the following fields:
