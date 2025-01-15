@@ -722,12 +722,21 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         : key_string::Version::V0;
 }
 
+namespace {
+size_t setCursorKeyValue(WT_CURSOR* cursor,
+                         std::span<const char> key,
+                         std::span<const char> value) {
+    cursor->set_key(cursor, WiredTigerItem(key).get());
+    cursor->set_value(cursor, WiredTigerItem(value).get());
+    return key.size();
+}
+
 /**
  * Base class for WiredTigerIndex bulk builders.
  *
  * Manages the bulk cursor used by bulk builders.
  */
-class WiredTigerIndex::BulkBuilder : public SortedDataBuilderInterface {
+class BulkBuilder : public SortedDataBuilderInterface {
 public:
     BulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx)
         : _idx(idx),
@@ -737,12 +746,13 @@ public:
                   idx->uri()) {}
 
 protected:
-    void setKey(std::span<const char> ptr) {
-        _cursor->set_key(_cursor.get(), WiredTigerItem(ptr).get());
-    }
-
-    void setValue(std::span<const char> ptr) {
-        _cursor->set_value(_cursor.get(), WiredTigerItem(ptr).get());
+    void insert(std::span<const char> key, std::span<const char> value) {
+        auto size = setCursorKeyValue(_cursor.get(), key, value);
+        invariantWTOK(wiredTigerCursorInsert(
+                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                          _cursor.get()),
+                      _cursor->session);
+        _metrics.incrementOneIdxEntryWritten(_idx->uri(), size);
     }
 
     WiredTigerIndex* _idx;
@@ -751,74 +761,39 @@ protected:
     WiredTigerBulkLoadCursor _cursor;
 };
 
-
 /**
  * Bulk builds a non-id index.
  */
-class WiredTigerIndex::StandardBulkBuilder : public BulkBuilder {
+class StandardBulkBuilder : public BulkBuilder {
 public:
     StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx) : BulkBuilder(idx, opCtx) {
         invariant(!_idx->isIdIndex());
     }
 
+    // Standard and unique indexes use the key with the record id appended as the key, and store the
+    // typebits in the value
     void addKey(const key_string::Value& keyString) override {
         dassertRecordIdAtEnd(keyString, _idx->rsKeyFormat());
-
-        setKey(keyString.getView());
-
-        const key_string::TypeBits typeBits = keyString.getTypeBits();
-        if (typeBits.isAllZeros()) {
-            setValue({});
-        } else {
-            setValue(typeBits.getView());
-        }
-
-        invariantWTOK(wiredTigerCursorInsert(
-                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
-                          _cursor.get()),
-                      _cursor->session);
-
-        _metrics.incrementOneIdxEntryWritten(_idx->uri(), keyString.getSize());
+        insert(keyString.getView(), keyString.getTypeBitsView());
     }
 };
 
 /**
  * Bulk builds an id index.
  */
-class WiredTigerIndex::IdBulkBuilder : public BulkBuilder {
+class IdBulkBuilder : public BulkBuilder {
 public:
     IdBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx) : BulkBuilder(idx, opCtx) {
         invariant(_idx->isIdIndex());
     }
 
+    // Id indexes use only the key as the key, and the record id plus typebits go in the value
     void addKey(const key_string::Value& newKeyString) override {
         dassertRecordIdAtEnd(newKeyString, KeyFormat::Long);
-
-        RecordId id;
-        auto withoutRecordId = key_string::withoutRecordIdLongAtEnd(newKeyString.getView(), &id);
-        key_string::TypeBits typeBits = newKeyString.getTypeBits();
-
-        key_string::Builder value(_idx->getKeyStringVersion());
-        value.appendRecordId(id);
-        // When there is only one record, we can omit AllZeros TypeBits. Otherwise they need
-        // to be included.
-        if (!typeBits.isAllZeros()) {
-            value.appendTypeBits(typeBits);
-        }
-
-        setKey(withoutRecordId);
-        setValue(value.getView());
-
-        invariantWTOK(wiredTigerCursorInsert(
-                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
-                          _cursor.get()),
-                      _cursor->session);
-
-        _metrics.incrementOneIdxEntryWritten(_idx->uri(), withoutRecordId.size());
+        insert(newKeyString.getViewWithoutRecordId(), newKeyString.getRecordIdAndTypeBitsView());
     }
 };
 
-namespace {
 /**
  * Implements the basic WT_CURSOR functionality used by both unique and standard indexes.
  */
@@ -1493,25 +1468,14 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIdIndex::_inse
     IncludeDuplicateRecordId includeDuplicateRecordId) {
     invariant(KeyFormat::Long == _rsKeyFormat);
     invariant(!dupsAllowed);
-    RecordId id;
-    auto withoutRecordId = key_string::withoutRecordIdLongAtEnd(keyString.getView(), &id);
-    invariant(id.isValid());
 
-    WiredTigerItem keyItem(withoutRecordId);
-
-    key_string::Builder value(getKeyStringVersion(), id);
-    const key_string::TypeBits typeBits = keyString.getTypeBits();
-    if (!typeBits.isAllZeros())
-        value.appendTypeBits(typeBits);
-
-    WiredTigerItem valueItem(value.getView());
-    setKey(c, keyItem.get());
-    c->set_value(c, valueItem.get());
+    auto size = setCursorKeyValue(
+        c, keyString.getViewWithoutRecordId(), keyString.getRecordIdAndTypeBitsView());
     int ret = WT_OP_CHECK(wiredTigerCursorInsert(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(_uri, keyItem.size());
+    metricsCollector.incrementOneIdxEntryWritten(_uri, size);
 
     if (ret != WT_DUPLICATE_KEY) {
         return wtRCToStatus(ret, c->session, [this]() {
@@ -1539,35 +1503,21 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIdIndex::_inse
 Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
                                                   WT_CURSOR* c,
                                                   const key_string::Value& keyString) {
-    RecordId id;
-    auto withoutRecordId = key_string::withoutRecordIdLongAtEnd(keyString.getView(), &id);
-    invariant(id.isValid());
-
     LOGV2_DEBUG(8596201,
                 1,
                 "Inserting old format key into unique index due to "
                 "WTIndexInsertUniqueKeysInOldFormat failpoint",
                 "key"_attr = keyString.toString(),
-                "recordId"_attr = id.toString(),
                 "indexName"_attr = _indexName,
                 "collectionUUID"_attr = _collectionUUID);
 
-    WiredTigerItem keyItem(withoutRecordId);
-
-    key_string::Builder value(getKeyStringVersion(), id);
-    const key_string::TypeBits typeBits = keyString.getTypeBits();
-    if (!typeBits.isAllZeros()) {
-        value.appendTypeBits(typeBits);
-    }
-
-    WiredTigerItem valueItem(value.getView());
-    setKey(c, keyItem.get());
-    c->set_value(c, valueItem.get());
+    auto size = setCursorKeyValue(
+        c, keyString.getViewWithoutRecordId(), keyString.getRecordIdAndTypeBitsView());
     int ret = WT_OP_CHECK(wiredTigerCursorInsert(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(c->uri, keyItem.size());
+    metricsCollector.incrementOneIdxEntryWritten(c->uri, size);
 
     // We don't expect WT_DUPLICATE_KEY here as we only insert old format keys when dupsAllowed is
     // false. At this point we will have already triggered a write conflict with any concurrent
@@ -1614,21 +1564,14 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_
         return _insertOldFormatKey(opCtx, c, keyString);
     }
 
-    // Now create the table key/value, the actual data record.
-    WiredTigerItem keyItem(keyString.getView());
-
-    const key_string::TypeBits typeBits = keyString.getTypeBits();
-    WiredTigerItem valueItem =
-        typeBits.isAllZeros() ? emptyItem : WiredTigerItem(typeBits.getView());
-    setKey(c, keyItem.get());
-    c->set_value(c, valueItem.get());
+    auto size = setCursorKeyValue(c, keyString.getView(), keyString.getTypeBitsView());
     ret = WT_OP_CHECK(wiredTigerCursorInsert(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     // Account for the actual key insertion, but do not attempt account for the complexity of any
     // previous duplicate key detection, which may perform writes.
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(_uri, keyItem.size());
+    metricsCollector.incrementOneIdxEntryWritten(_uri, size);
 
     // It is possible that this key is already present during a concurrent background index build.
     if (ret != WT_DUPLICATE_KEY) {
@@ -1868,20 +1811,12 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexStandard:
         }
     }
 
-    WiredTigerItem keyItem(keyString.getView());
-
-    const key_string::TypeBits typeBits = keyString.getTypeBits();
-    WiredTigerItem valueItem = typeBits.isAllZeros()
-        ? emptyItem
-        : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
-
-    setKey(c, keyItem.get());
-    c->set_value(c, valueItem.get());
+    auto size = setCursorKeyValue(c, keyString.getView(), keyString.getTypeBitsView());
     ret = WT_OP_CHECK(wiredTigerCursorInsert(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(_uri, keyItem.size());
+    metricsCollector.incrementOneIdxEntryWritten(_uri, size);
 
     // If the record was already in the index, we return OK. This can happen, for example, when
     // building a background index while documents are being written and reindexed.

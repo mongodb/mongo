@@ -549,6 +549,10 @@ public:
     std::span<const char> getTypeBitsView() const {
         return getViewWithTypeBits().subspan(_ksSize);
     }
+    // Get the span containing the record id and typebits
+    std::span<const char> getRecordIdAndTypeBitsView() const {
+        return getViewWithTypeBits().subspan(getSizeWithoutRecordId());
+    }
 
     // Returns the stored TypeBits.
     TypeBits getTypeBits() const {
@@ -571,8 +575,11 @@ public:
     // format takes the following form:
     //   [keystring size][keystring encoding][typebits encoding]
     void serialize(BufBuilder& buf) const {
-        buf.appendNum(_ksSize);                        // Serialize size of Keystring
-        buf.appendBuf(_buffer.get(), _buffer.size());  // Serialize Keystring + Typebits
+        buf.appendNum(_ksSize);                                // Serialize size of Keystring
+        buf.appendBuf(_buffer.get(), _buffer.size());          // Serialize Keystring + Typebits
+        if (_buffer.size() == static_cast<size_t>(_ksSize)) {  // Serialize AllZeroes Typebits
+            buf.appendChar(0);
+        }
     }
 
     /**
@@ -582,6 +589,7 @@ public:
      */
     void serializeWithoutRecordIdLong(BufBuilder& buf) const;
     void serializeWithoutRecordIdStr(BufBuilder& buf) const;
+    void serializeWithoutRecordId(BufBuilder& buf) const;
 
     // Deserialize the Value from a serialized format.
     // The caller must pass an ridFormat the indicates the RecordId encoding format, or boost::none
@@ -735,9 +743,7 @@ public:
         // Create a new buffer that is a concatenation of the KeyString and its TypeBits.
         BufBuilder newBuf(_buffer().len() + _typeBits.getSize());
         newBuf.appendBuf(_buffer().buf(), _buffer().len());
-        if (_typeBits.isAllZeros()) {
-            newBuf.appendChar(0);
-        } else {
+        if (!_typeBits.isAllZeros()) {
             newBuf.appendBuf(_typeBits.getBuffer(), _typeBits.getSize());
         }
         // Note: this variable is needed to make sure that no method is called on 'newBuf'
@@ -992,9 +998,7 @@ protected:
 
         // append the TypeBits.
         int32_t ksSize = _buffer().len();
-        if (_typeBits.isAllZeros()) {
-            _buffer().appendChar(0);
-        } else {
+        if (!_typeBits.isAllZeros()) {
             _buffer().appendBuf(_typeBits.getBuffer(), _typeBits.getSize());
         }
         return ksSize;

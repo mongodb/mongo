@@ -293,10 +293,6 @@ protected:
                                   StringData ident,
                                   const IndexDescriptor* desc);
 
-    class BulkBuilder;
-    class IdBulkBuilder;
-    class StandardBulkBuilder;
-
     /*
      * The data format version is effectively const after the WiredTigerIndex instance is
      * constructed.
