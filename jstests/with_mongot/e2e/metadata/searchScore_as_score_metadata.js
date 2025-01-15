@@ -18,15 +18,27 @@ coll.drop();
 // score (i.e. 'searchScore' / 'vectorSearchScore') value.
 // Takes in the prefix stages of an aggregation pipeline that should generate documents with the
 // legacy and 'score' fields as metadata, as well as the argument name of the legacy metadata.
-function assertScoreMetadataPresentAndEqual(pipelinePrefix, legacyMetadataArg) {
-    let results = coll.aggregate(pipelinePrefix.concat([{
-                          $project: {
-                              [legacyMetadataArg]: {$meta: legacyMetadataArg},
-                              [kScoreMetadataArg]: {$meta: kScoreMetadataArg}
-                          }
-                      }]))
-                      .toArray();
+function assertScoreMetadataPresentAndEqual(
+    {pipelinePrefix, legacyMetadataArg, forceProjectionOnMerger}) {
+    function buildPipeline(projections) {
+        let pipeline = pipelinePrefix;
 
+        if (forceProjectionOnMerger) {
+            // Add a splitPipeline stage so that the $project will stay on the merging shard.
+            pipeline = pipeline.concat([{$_internalSplitPipeline: {}}]);
+        }
+
+        pipeline = pipeline.concat([{$project: projections}]);
+
+        return pipeline;
+    }
+
+    const pipelineWithScoreAndLegacyArg = buildPipeline({
+        [legacyMetadataArg]: {$meta: legacyMetadataArg},
+        [kScoreMetadataArg]: {$meta: kScoreMetadataArg}
+    });
+
+    let results = coll.aggregate(pipelineWithScoreAndLegacyArg).toArray();
     assert.neq(results.length, 0, "results array expected not to be empty");
 
     for (let result of results) {
@@ -36,6 +48,16 @@ function assertScoreMetadataPresentAndEqual(pipelinePrefix, legacyMetadataArg) {
                   result[kScoreMetadataArg],
                   "the legacy metadata value '" + legacyMetadataArg +
                       "' is not equal to the 'score' metadata value");
+    }
+
+    // We should also be able to project $score by itself.
+    const pipelineWithScoreOnly = buildPipeline({[kScoreMetadataArg]: {$meta: kScoreMetadataArg}});
+
+    results = coll.aggregate(pipelineWithScoreOnly).toArray();
+    assert.neq(results.length, 0, "results array expected not to be empty");
+
+    for (let result of results) {
+        assert(result.hasOwnProperty(kScoreMetadataArg));
     }
 }
 
@@ -53,7 +75,16 @@ function assertScoreMetadataPresentAndEqual(pipelinePrefix, legacyMetadataArg) {
 
     const searchQuery = {index: indexName, text: {query: "Men", path: ["title"]}};
 
-    assertScoreMetadataPresentAndEqual([{$search: searchQuery}], kSearchScoreMetadataArg);
+    assertScoreMetadataPresentAndEqual({
+        pipelinePrefix: [{$search: searchQuery}],
+        legacyMetadataArg: kSearchScoreMetadataArg,
+        forceProjectionOnMerger: false
+    });
+    assertScoreMetadataPresentAndEqual({
+        pipelinePrefix: [{$search: searchQuery}],
+        legacyMetadataArg: kSearchScoreMetadataArg,
+        forceProjectionOnMerger: true
+    });
 
     dropSearchIndex(coll, {name: indexName});
 }
@@ -87,8 +118,16 @@ function assertScoreMetadataPresentAndEqual(pipelinePrefix, legacyMetadataArg) {
         limit: 3,
     };
 
-    assertScoreMetadataPresentAndEqual([{$vectorSearch: vectorSearchQuery}],
-                                       kVectorSearchScoreMetadataArg);
+    assertScoreMetadataPresentAndEqual({
+        pipelinePrefix: [{$vectorSearch: vectorSearchQuery}],
+        legacyMetadataArg: kVectorSearchScoreMetadataArg,
+        forceProjectionOnMerger: false
+    });
+    assertScoreMetadataPresentAndEqual({
+        pipelinePrefix: [{$vectorSearch: vectorSearchQuery}],
+        legacyMetadataArg: kVectorSearchScoreMetadataArg,
+        forceProjectionOnMerger: true
+    });
 
     dropSearchIndex(coll, {name: indexName});
 }

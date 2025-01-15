@@ -107,6 +107,10 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        return DepsTracker::State::SEE_NEXT;
+    }
+
 private:
     DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         HostTypeRequirement mergeType,

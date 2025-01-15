@@ -130,6 +130,10 @@ struct DepsTracker {
      */
     static constexpr auto kNoMetadata = QueryMetadataBitSet();
 
+    /**
+     * If left unspecified, default to no metadata being unavailable - i.e., all metadata is
+     * available.
+     */
     DepsTracker(const QueryMetadataBitSet& unavailableMetadata = kNoMetadata)
         : _unavailableMetadata{unavailableMetadata} {}
 

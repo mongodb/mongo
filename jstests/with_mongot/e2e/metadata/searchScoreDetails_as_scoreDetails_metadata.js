@@ -27,24 +27,48 @@ const searchQuery = {
     scoreDetails: true
 };
 
-let results = coll.aggregate([
-                      {$search: searchQuery},
-                      {
-                          $project: {
-                              scoreDetails: {$meta: "scoreDetails"},
-                              searchScoreDetails: {$meta: "searchScoreDetails"}
-                          }
-                      }
-                  ])
-                  .toArray();
-assert.eq(results.length, 2);
+function runTest({forceProjectionOnMerger}) {
+    function buildPipeline(projections) {
+        let pipeline = [{$search: searchQuery}];
 
-// "scoreDetails" and "searchScoreDetails" should have the same contents populated by whatever
-// details were returned from mongot.
-for (let result of results) {
-    assert(result.hasOwnProperty("scoreDetails"));
-    assert(result.hasOwnProperty("searchScoreDetails"));
-    assert.eq(result["scoreDetails"], result["searchScoreDetails"]);
+        if (forceProjectionOnMerger) {
+            // Add a splitPipeline stage so that the $project will stay on the merging shard.
+            pipeline = pipeline.concat([{$_internalSplitPipeline: {}}]);
+        }
+
+        pipeline = pipeline.concat([{$project: projections}]);
+
+        return pipeline;
+    }
+
+    let results = coll.aggregate(buildPipeline({
+                          scoreDetails: {$meta: "scoreDetails"},
+                          searchScoreDetails: {$meta: "searchScoreDetails"}
+                      }))
+                      .toArray();
+    assert.eq(results.length, 2);
+
+    // "scoreDetails" and "searchScoreDetails" should have the same contents populated by whatever
+    // details were returned from mongot.
+    for (let result of results) {
+        assert(result.hasOwnProperty("scoreDetails"));
+        assert(result.hasOwnProperty("searchScoreDetails"));
+        assert.eq(result["scoreDetails"], result["searchScoreDetails"]);
+    }
+
+    // We should also be able to project $scoreDetails by itself.
+    results = coll.aggregate(buildPipeline({
+                      scoreDetails: {$meta: "scoreDetails"},
+                  }))
+                  .toArray();
+    assert.eq(results.length, 2);
+
+    for (let result of results) {
+        assert(result.hasOwnProperty("scoreDetails"));
+    }
 }
+
+runTest({forceProjectionOnMerger: false});
+runTest({forceProjectionOnMerger: true});
 
 dropSearchIndex(coll, {name: indexName});

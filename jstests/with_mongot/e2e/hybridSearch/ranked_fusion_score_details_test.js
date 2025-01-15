@@ -1,5 +1,7 @@
 /*
- * Tests hybrid search $rankFusion score details.
+ * Tests hybrid search $rankFusion score details. This test focuses on ensuring that the structure
+ * and contents of the produced scoreDetails field is correct.
+ *
  * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 
