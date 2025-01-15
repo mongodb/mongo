@@ -73,7 +73,6 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer/balance_stats.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
@@ -81,7 +80,6 @@
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
@@ -154,7 +152,6 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
 MONGO_FAIL_POINT_DEFINE(pauseAfterEngagingCriticalSection);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
-const int kReshardingNumInitialChunksDefault = 90;
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 const WriteConcernOptions kMajorityWriteConcern{
     WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
@@ -1167,209 +1164,6 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     return updatedCoordinatorDoc;
 }
 }  // namespace resharding
-
-ChunkVersion ReshardingCoordinatorExternalState::calculateChunkVersionForInitialChunks(
-    OperationContext* opCtx) {
-    const auto now = VectorClock::get(opCtx)->getTime();
-    const auto timestamp = now.clusterTime().asTimestamp();
-    return ChunkVersion({OID::gen(), timestamp}, {1, 0});
-}
-
-boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalogIndexVersion(
-    OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
-    auto [_, optSii] =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    if (optSii) {
-        VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
-        auto time = vt.clusterTime().asTimestamp();
-        return CollectionIndexes{uuid, time};
-    }
-    return boost::none;
-}
-
-bool ReshardingCoordinatorExternalState::getIsUnsplittable(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
-    auto [cm, _] =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    return cm.isUnsplittable();
-}
-
-boost::optional<CollectionIndexes>
-ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationContext* opCtx,
-                                                                    const NamespaceString& nss) {
-    auto [_, optSii] =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
-    if (optSii) {
-        return optSii->getCollectionIndexes();
-    }
-    return boost::none;
-}
-
-std::vector<DonorShardEntry> constructDonorShardEntries(const std::set<ShardId>& donorShardIds) {
-    std::vector<DonorShardEntry> donorShards;
-    std::transform(donorShardIds.begin(),
-                   donorShardIds.end(),
-                   std::back_inserter(donorShards),
-                   [](const ShardId& shardId) -> DonorShardEntry {
-                       DonorShardContext donorCtx;
-                       donorCtx.setState(DonorStateEnum::kUnused);
-                       return DonorShardEntry{shardId, std::move(donorCtx)};
-                   });
-    return donorShards;
-}
-
-std::vector<RecipientShardEntry> constructRecipientShardEntries(
-    const std::set<ShardId>& recipientShardIds) {
-    std::vector<RecipientShardEntry> recipientShards;
-    std::transform(recipientShardIds.begin(),
-                   recipientShardIds.end(),
-                   std::back_inserter(recipientShards),
-                   [](const ShardId& shardId) -> RecipientShardEntry {
-                       RecipientShardContext recipientCtx;
-                       recipientCtx.setState(RecipientStateEnum::kUnused);
-                       return RecipientShardEntry{shardId, std::move(recipientCtx)};
-                   });
-    return recipientShards;
-}
-
-ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
-ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-
-    const auto cm =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
-            opCtx, coordinatorDoc.getSourceNss()));
-
-    std::set<ShardId> donorShardIds;
-    cm.getAllShardIds(&donorShardIds);
-
-    std::set<ShardId> recipientShardIds;
-    std::vector<ChunkType> initialChunks;
-
-    // The database primary must always be a recipient to ensure it ends up with consistent
-    // collection metadata.
-    const auto dbPrimaryShard = Grid::get(opCtx)
-                                    ->catalogClient()
-                                    ->getDatabase(opCtx,
-                                                  coordinatorDoc.getSourceNss().dbName(),
-                                                  repl::ReadConcernLevel::kMajorityReadConcern)
-                                    .getPrimary();
-
-    recipientShardIds.emplace(dbPrimaryShard);
-
-    if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
-        auto version = calculateChunkVersionForInitialChunks(opCtx);
-
-        // Use the provided shardIds from presetReshardedChunks to construct the
-        // recipient list.
-        for (const auto& reshardedChunk : *chunks) {
-            recipientShardIds.emplace(reshardedChunk.getRecipientShardId());
-
-            initialChunks.emplace_back(coordinatorDoc.getReshardingUUID(),
-                                       ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
-                                       version,
-                                       reshardedChunk.getRecipientShardId());
-            version.incMinor();
-        }
-    } else {
-        int numInitialChunks = coordinatorDoc.getNumInitialChunks()
-            ? *coordinatorDoc.getNumInitialChunks()
-            : kReshardingNumInitialChunksDefault;
-
-        int numSamplesPerChunk = coordinatorDoc.getNumSamplesPerChunk()
-            ? *coordinatorDoc.getNumSamplesPerChunk()
-            : SamplingBasedSplitPolicy::kDefaultSamplesPerChunk;
-
-        ShardKeyPattern shardKey(coordinatorDoc.getReshardingKey());
-        const auto tempNs = coordinatorDoc.getTempReshardingNss();
-
-        boost::optional<std::vector<mongo::TagsType>> parsedZones;
-        auto rawBSONZones = coordinatorDoc.getZones();
-        if (rawBSONZones && rawBSONZones->size() != 0) {
-            parsedZones.emplace();
-            parsedZones->reserve(rawBSONZones->size());
-
-            for (const auto& zone : *rawBSONZones) {
-                ChunkRange range(zone.getMin(), zone.getMax());
-                TagsType tag(
-                    coordinatorDoc.getTempReshardingNss(), zone.getZone().toString(), range);
-
-                parsedZones->push_back(tag);
-            }
-        }
-
-        InitialSplitPolicy::ShardCollectionConfig splitResult;
-
-        // If shardDistribution is specified with min/max, use ShardDistributionSplitPolicy.
-        if (const auto& shardDistribution = coordinatorDoc.getShardDistribution()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, should not have "
-                    "shardDistribution in coordinatorDoc",
-                    resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            uassert(ErrorCodes::InvalidOptions,
-                    "ShardDistribution should not be empty if provided",
-                    shardDistribution->size() > 0);
-            const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
-                                                *donorShardIds.begin()};
-            // If shardDistribution is specified with min/max, create chunks based on the shard
-            // min/max. If not, do sampling based split on limited shards.
-            if ((*shardDistribution)[0].getMin()) {
-                auto initialSplitter = ShardDistributionSplitPolicy::make(
-                    opCtx, shardKey, *shardDistribution, std::move(parsedZones));
-                splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
-            } else {
-                std::vector<ShardId> availableShardIds;
-                for (const auto& shardDist : *shardDistribution) {
-                    availableShardIds.emplace_back(shardDist.getShard());
-                }
-                auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
-                                                                      coordinatorDoc.getSourceNss(),
-                                                                      shardKey,
-                                                                      numInitialChunks,
-                                                                      std::move(parsedZones),
-                                                                      availableShardIds,
-                                                                      numSamplesPerChunk);
-                splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
-            }
-        } else {
-            auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
-                                                                  coordinatorDoc.getSourceNss(),
-                                                                  shardKey,
-                                                                  numInitialChunks,
-                                                                  std::move(parsedZones),
-                                                                  boost::none /*availableShardIds*/,
-                                                                  numSamplesPerChunk);
-            // Note: The resharding initial split policy doesn't care about what is the real
-            // primary shard, so just pass in a random shard.
-            const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
-                                                *donorShardIds.begin()};
-            splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
-        }
-
-        initialChunks = std::move(splitResult.chunks);
-
-        for (const auto& chunk : initialChunks) {
-            recipientShardIds.insert(chunk.getShard());
-        }
-    }
-
-    if (recipientShardIds.size() != 1 || donorShardIds != recipientShardIds) {
-        sharding_ddl_util::assertDataMovementAllowed();
-    }
-
-    return {constructDonorShardEntries(donorShardIds),
-            constructRecipientShardEntries(recipientShardIds),
-            initialChunks};
-}
-
-template <typename CommandType>
-void ReshardingCoordinatorExternalState::sendCommandToShards(
-    OperationContext* opCtx,
-    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-    const std::vector<ShardId>& shardIds) {
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
-}
 
 ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
     ThreadPool::Limits threadPoolLimit;

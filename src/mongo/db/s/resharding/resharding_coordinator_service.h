@@ -47,8 +47,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -118,42 +118,6 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     const ReshardingCoordinatorDocument& coordinatorDoc,
     boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding
-
-class ReshardingCoordinatorExternalState {
-public:
-    struct ParticipantShardsAndChunks {
-        std::vector<DonorShardEntry> donorShards;
-        std::vector<RecipientShardEntry> recipientShards;
-        std::vector<ChunkType> initialChunks;
-    };
-
-    virtual ~ReshardingCoordinatorExternalState() = default;
-
-    virtual ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
-
-    ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
-
-    boost::optional<CollectionIndexes> getCatalogIndexVersion(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              const UUID& uuid);
-
-    bool getIsUnsplittable(OperationContext* opCtx, const NamespaceString& nss);
-
-    boost::optional<CollectionIndexes> getCatalogIndexVersionForCommit(OperationContext* opCtx,
-                                                                       const NamespaceString& nss);
-
-    template <typename CommandType>
-    void sendCommandToShards(OperationContext* opCtx,
-                             std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-                             const std::vector<ShardId>& shardIds);
-};
-
-class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
-public:
-    ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
-};
 
 /**
  * Construct to encapsulate cancellation tokens and related semantics on the ReshardingCoordinator.
