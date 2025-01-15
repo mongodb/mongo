@@ -42,7 +42,6 @@
 #include "mongo/scripting/mozjs/proxyscope.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/interruptible.h"
 
@@ -67,7 +66,12 @@ MozJSProxyScope::MozJSProxyScope(MozJSScriptEngine* engine)
 }
 
 MozJSProxyScope::~MozJSProxyScope() {
-    DESTRUCTOR_GUARD(kill(); shutdownThread(););
+    try {
+        kill();
+        shutdownThread();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 void MozJSProxyScope::init(const BSONObj* data) {

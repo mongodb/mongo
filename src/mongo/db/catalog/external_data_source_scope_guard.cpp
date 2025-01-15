@@ -40,7 +40,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -81,7 +80,7 @@ void ExternalDataSourceScopeGuard::dropVirtualCollections() {
 
     // This function is called in a context of destructor or exception and so guard this against any
     // exceptions.
-    DESTRUCTOR_GUARD({
+    try {
         for (auto&& nss : _toBeDroppedVirtualCollections) {
             DropReply reply;
             auto status =
@@ -93,7 +92,9 @@ void ExternalDataSourceScopeGuard::dropVirtualCollections() {
                 LOGV2_ERROR(6968700, "Failed to drop an external data source", "coll"_attr = nss);
             }
         }
-    });
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 }  // namespace mongo

@@ -376,4 +376,19 @@ std::vector<std::string> ScopedDebugInfoStack::getAll() {
 
     return r;
 }
+
+void reportFailedDestructor(SourceLocation loc) {
+    try {
+        throw;
+    } catch (...) {
+        std::ostringstream oss;
+        globalActiveExceptionWitness().describe(oss);
+        LOGV2_IMPL(4615600,
+                   logv2::LogSeverity::Log(),
+                   {logv2::LogComponent::kDefault},
+                   "Caught exception in destructor",
+                   "exception"_attr = oss.str(),
+                   "function"_attr = loc.function_name());
+    }
+}
 }  // namespace mongo

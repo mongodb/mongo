@@ -45,7 +45,6 @@
 #include "mongo/db/session/session_killer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/destructor_guard.h"
 
 namespace mongo {
 
@@ -93,7 +92,7 @@ SessionKiller::SessionKiller(Service* service, KillFunc killer)
 }
 
 SessionKiller::~SessionKiller() {
-    DESTRUCTOR_GUARD([&] {
+    try {
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             _inShutdown = true;
@@ -101,7 +100,9 @@ SessionKiller::~SessionKiller() {
         _killerCV.notify_one();
         _callerCV.notify_all();
         _thread.join();
-    }());
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 SessionKiller::ReapResult::ReapResult() : result(std::make_shared<boost::optional<Result>>()) {}

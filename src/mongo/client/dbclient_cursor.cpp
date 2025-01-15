@@ -65,7 +65,6 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -438,7 +437,7 @@ DBClientCursor::~DBClientCursor() {
 }
 
 void DBClientCursor::kill() {
-    DESTRUCTOR_GUARD({
+    try {
         if (_cursorId && !globalInShutdownDeprecated()) {
             auto killCursor = [&](auto&& conn) {
                 conn->killCursor(_ns, _cursorId);
@@ -451,7 +450,9 @@ void DBClientCursor::kill() {
                 killCursor(_client);
             }
         }
-    });
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 
     // Mark this cursor as dead since we can't do any getMores.
     _cursorId = 0;

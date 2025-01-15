@@ -59,7 +59,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/lru_cache.h"
@@ -843,7 +842,11 @@ ConnectionPool::SpecificPool::SpecificPool(std::shared_ptr<ConnectionPool> paren
 }
 
 ConnectionPool::SpecificPool::~SpecificPool() {
-    DESTRUCTOR_GUARD(_eventTimer->cancelTimeout();)
+    try {
+        _eventTimer->cancelTimeout();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 
     if (shouldInvariantOnPoolCorrectness()) {
         invariant(_requests.empty());

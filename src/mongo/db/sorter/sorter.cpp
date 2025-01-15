@@ -93,7 +93,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/file.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
@@ -1377,7 +1376,11 @@ inline SorterBase::File::~File() {
         if (!_file.is_open()) {
             return;
         }
-        DESTRUCTOR_GUARD(_file.flush());
+        try {
+            _file.flush();
+        } catch (...) {
+            reportFailedDestructor(MONGO_SOURCE_LOCATION());
+        }
 
         mongo::File fileForFsync;
         fileForFsync.open(_path.string().c_str());
@@ -1389,11 +1392,23 @@ inline SorterBase::File::~File() {
     }
 
     if (_file.is_open()) {
-        DESTRUCTOR_GUARD(_file.exceptions(std::ios::failbit));
-        DESTRUCTOR_GUARD(_file.close());
+        try {
+            _file.exceptions(std::ios::failbit);
+        } catch (...) {
+            reportFailedDestructor(MONGO_SOURCE_LOCATION());
+        }
+        try {
+            _file.close();
+        } catch (...) {
+            reportFailedDestructor(MONGO_SOURCE_LOCATION());
+        }
     }
 
-    DESTRUCTOR_GUARD(boost::filesystem::remove(_path));
+    try {
+        boost::filesystem::remove(_path);
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 inline void SorterBase::File::read(std::streamoff offset, std::streamsize size, void* out) {

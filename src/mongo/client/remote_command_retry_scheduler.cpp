@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
@@ -75,7 +74,12 @@ RemoteCommandRetryScheduler::RemoteCommandRetryScheduler(
 }
 
 RemoteCommandRetryScheduler::~RemoteCommandRetryScheduler() {
-    DESTRUCTOR_GUARD(shutdown(); join(););
+    try {
+        shutdown();
+        join();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 bool RemoteCommandRetryScheduler::isActive() const {

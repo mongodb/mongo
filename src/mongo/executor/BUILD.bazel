@@ -372,7 +372,6 @@ mongo_cc_library(
         "//src/mongo/transport:message_compressor_manager.h",
         "//src/mongo/transport:ssl_connection_context.h",
         "//src/mongo/transport:transport_layer.h",
-        "//src/mongo/util:destructor_guard.h",
         "//src/mongo/util/concurrency:thread_pool_interface.h",
         "//src/mongo/util/net:sock.h",
         "//src/mongo/util/net:ssl_manager.h",

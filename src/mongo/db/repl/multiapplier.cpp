@@ -39,7 +39,6 @@
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 
 namespace mongo {
 namespace repl {
@@ -59,7 +58,12 @@ MultiApplier::MultiApplier(executor::TaskExecutor* executor,
 }
 
 MultiApplier::~MultiApplier() {
-    DESTRUCTOR_GUARD(shutdown(); join(););
+    try {
+        shutdown();
+        join();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 bool MultiApplier::isActive() const {

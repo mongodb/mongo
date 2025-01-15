@@ -944,4 +944,18 @@ inline std::string causedBy(const DBException& e) {
 inline std::string causedBy(const Status& e) {
     return causedBy(e.toString());
 }
+
+/**
+ * Catch and swallow all exceptions, leaving a uniform log message.
+ * Should be used only in destructors, to prevent termination.
+ *
+ * Usage:
+ *     try {
+ *         block
+ *     } catch (...) {
+ *         reportFailedDestructor(MONGO_SOURCE_LOCATION());
+ *     }
+ */
+void reportFailedDestructor(SourceLocation loc);
+
 }  // namespace mongo

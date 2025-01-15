@@ -37,8 +37,7 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/util/assert_util_core.h"
-#include "mongo/util/destructor_guard.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
@@ -50,7 +49,11 @@ namespace executor {
 NetworkInterfaceThreadPool::NetworkInterfaceThreadPool(NetworkInterface* net) : _net(net) {}
 
 NetworkInterfaceThreadPool::~NetworkInterfaceThreadPool() {
-    DESTRUCTOR_GUARD(_dtorImpl());
+    try {
+        _dtorImpl();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 void NetworkInterfaceThreadPool::_dtorImpl() {
