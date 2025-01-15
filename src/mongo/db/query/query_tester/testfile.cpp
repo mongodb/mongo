@@ -538,7 +538,7 @@ bool QueryFile::writeAndValidate(const ModeOption mode,
                                  const ErrorLogLevel errorLogLevel,
                                  const DiffStyle diffStyle) {
     // Set up the text-based diff environment.
-    std::filesystem::create_directories(_actualPath.parent_path());
+    std::filesystem::create_directories(std::filesystem::absolute(_actualPath).parent_path());
     auto actualStream = std::fstream{_actualPath, std::ios::out | std::ios::trunc};
     // Default to kResult for comparisons unless another write out option is specified.
     writeOutAndNumber(actualStream,
