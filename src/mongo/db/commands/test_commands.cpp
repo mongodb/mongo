@@ -459,7 +459,7 @@ public:
             }
             return reply;
 #else
-            tasserted(8387207, "Unsupported OS for sysprofile command");
+            uasserted(8387207, "Unsupported OS for sysprofile command");
 #endif
         }
     };
