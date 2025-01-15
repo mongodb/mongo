@@ -145,6 +145,7 @@ mongo_cc_library(
         "timeseries_commands_conversion_helper.h",
         "timeseries_dotted_path_support.h",
         "timeseries_index_schema_conversion_functions.h",
+        "timeseries_request_util.h",
         "timeseries_update_delete_util.h",
     ],
     deps = [

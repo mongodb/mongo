@@ -129,7 +129,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
-#include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
