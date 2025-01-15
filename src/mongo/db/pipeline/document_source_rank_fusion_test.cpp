@@ -244,6 +244,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
         asOneObj);
 }
 
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineIsNotArray) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    authorMatch: {
+                        $match : { author : "Agatha Christie" }
+                    }
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownFieldInsideInputs) {
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -2900,6 +2918,39 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameEmpty) {
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        15998);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameDuplicated) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    foo: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    bar: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    foo: [
+                        {$sort: {author: 1}}
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9921000);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameStartsWithDollar) {

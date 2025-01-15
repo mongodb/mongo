@@ -485,6 +485,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         uassertStatusOKWithContext(
             FieldPath::validateFieldName(inputName),
             "$rankFusion pipeline names must follow the naming rules of field path expressions.");
+        uassert(
+            9921000,
+            str::stream() << "$rankFusion pipeline names must be unique, but found duplicate name '"
+                          << inputName << "'.",
+            !inputPipelines.contains(inputName));
         inputPipelines[inputName] = std::move(pipeline);
     }
 
