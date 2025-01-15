@@ -57,6 +57,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(setVariableFromSubPipeline,
                                   LiteParsedDocumentSourceDefault::parse,
                                   DocumentSourceSetVariableFromSubPipeline::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(setVariableFromSubPipeline,
+                            DocumentSourceSetVariableFromSubPipeline::id)
 
 Value DocumentSourceSetVariableFromSubPipeline::serialize(const SerializationOptions& opts) const {
     const auto var = "$$" + Variables::getBuiltinVariableName(_variableID);

@@ -157,6 +157,9 @@ REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSort::createFromBson,
                          AllowedWithApiStrict::kAlways);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(sort, DocumentSourceSort::id)
+
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalBoundedSort,
                                        LiteParsedDocumentSourceDefault::parse,
                                        DocumentSourceSort::parseBoundedSort,

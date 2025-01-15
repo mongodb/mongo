@@ -145,8 +145,10 @@ public:
 
     const char* getSourceName() const final;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kLookUp;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     void serializeToArray(std::vector<Value>& array,

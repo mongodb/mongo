@@ -60,8 +60,10 @@ public:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kSampleFromRandomCursor;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

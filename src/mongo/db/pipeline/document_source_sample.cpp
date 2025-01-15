@@ -63,6 +63,7 @@ REGISTER_DOCUMENT_SOURCE(sample,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSample::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(sample, DocumentSourceSample::id)
 
 DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
     if (_size == 0) {

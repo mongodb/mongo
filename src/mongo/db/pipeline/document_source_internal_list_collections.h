@@ -114,8 +114,10 @@ public:
 
     const char* getSourceName() const final;
 
-    DocumentSourceType getType() const final {
-        return DocumentSourceType::kInternalListCollections;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final{};

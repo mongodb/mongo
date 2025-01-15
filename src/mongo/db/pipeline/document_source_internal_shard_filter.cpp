@@ -56,6 +56,8 @@ namespace mongo {
 // DocumentSources.
 //
 
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalShardFilter, DocumentSourceInternalShardFilter::id)
+
 boost::intrusive_ptr<DocumentSourceInternalShardFilter>
 DocumentSourceInternalShardFilter::buildIfNecessary(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {

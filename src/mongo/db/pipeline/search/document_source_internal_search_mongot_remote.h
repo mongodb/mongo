@@ -77,8 +77,10 @@ public:
 
     const char* getSourceName() const override;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kInternalSearchMongotRemote;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {

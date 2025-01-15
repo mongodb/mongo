@@ -84,8 +84,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kSkip;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     /**

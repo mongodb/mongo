@@ -156,8 +156,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kMerge;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     MergeProcessor* getMergeProcessor() {

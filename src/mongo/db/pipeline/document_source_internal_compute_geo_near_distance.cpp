@@ -54,6 +54,8 @@ REGISTER_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalGeoNearDistance::createFromBson,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalComputeGeoNearDistance,
+                            DocumentSourceInternalGeoNearDistance::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

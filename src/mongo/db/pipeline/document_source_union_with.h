@@ -120,8 +120,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kUnionWith;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     GetModPathsReturn getModifiedPaths() const final {

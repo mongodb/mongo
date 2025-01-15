@@ -81,7 +81,12 @@ public:
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
     const char* getSourceName() const final;
-    DocumentSourceType getType() const final;
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

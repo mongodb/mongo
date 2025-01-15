@@ -44,6 +44,9 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+ALLOCATE_DOCUMENT_SOURCE_ID(singleDocumentTransformation,
+                            DocumentSourceSingleDocumentTransformation::id)
+
 DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransformation(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<TransformerInterface> parsedTransform,

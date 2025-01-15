@@ -89,8 +89,10 @@ public:
         return DocumentSourceReshardingOwnershipMatch::kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kReshardingOwnershipMatch;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
 private:

@@ -163,6 +163,7 @@ REGISTER_DOCUMENT_SOURCE(facet,
                          DocumentSourceFacet::LiteParsed::parse,
                          DocumentSourceFacet::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(facet, DocumentSourceFacet::id)
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
     std::vector<FacetPipeline> facetPipelines,

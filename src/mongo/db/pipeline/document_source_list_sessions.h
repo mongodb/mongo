@@ -81,6 +81,12 @@ public:
 
     static constexpr StringData kStageName = "$listSessions"_sd;
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,

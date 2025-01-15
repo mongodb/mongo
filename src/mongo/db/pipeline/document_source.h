@@ -197,81 +197,22 @@ class Document;
                                            boost::none,                            \
                                            ::mongo::getTestCommandsEnabled())
 
-enum class DocumentSourceType {
-    kAnalyzeShardKeyReadWriteDistribution,  // DocumentSourceAnalyzeShardKeyReadWriteDistribution
-    kBackupCursor,                          // DocumentSourceBackupCursor
-    kBackupCursorExtend,                    // DocumentSourceBackupCursorExtend
-    kBackupFile,                            // DocumentSourceBackupFile
-    kBucketAuto,                            // DocumentSourceBucketAuto
-    kChangeStreamSplitLargeEvent,           // DocumentSourceChangeStreamSplitLargeEvent
-    kCollStats,                             // DocumentSourceCollStats
-    kCursor,                                // DocumentSourceCursor
-    kCurrentOp,                             // DocumentSourceCurrentOp
-    kExchange,                              // DocumentSourceExchange
-    kFacet,                                 // DocumentSourceFacet
-    kFeeder,                                // DocumentSourceFeeder
-    kFindAndModifyImageLookup,              // DocumentSourceFindAndModifyImageLookup
-    kGeoNear,                               // DocumentSourceGeoNear
-    kGraphLookup,                           // DocumentSourceGraphLookup
-    kGroup,                                 // DocumentSourceGroup
-    kInternalAllCollectionStats,            // DocumentSourceInternalAllCollectionStats
-    kInternalApplyOplogUpdate,              // DocumentSourceInternalApplyOplogUpdate
-    kInternalChangeStream,                  // DocumentSourceInternalChangeStreamStage
-    kInternalConvertBucketIndexStats,       // DocumentSourceInternalConvertBucketIndexStats
-    kInternalDensify,                       // DocumentSourceInternalDensify
-    kInternalGeoNearDistance,               // DocumentSourceInternalGeoNearDistance
-    kInternalInhibitOptimization,           // DocumentSourceInternalInhibitOptimization
-    kInternalListCollections,               // DocumentSourceInternalListCollections
-    kInternalProjection,                    // DocumentSourceInternalProjection
-    kInternalReplaceRoot,                   // DocumentSourceInternalReplaceRoot
-    kInternalSearchIdLookUp,                // DocumentSourceInternalSearchIdLookUp
-    kInternalSearchMongotRemote,            // DocumentSourceInternalSearchMongotRemote
-    kInternalSetWindowFields,               // DocumentSourceInternalSetWindowFields
-    kInternalShardFilter,                   // DocumentSourceInternalShardFilter
-    kInternalShardServerInfo,               // DocumentSourceInternalShardServerInfo
-    kInternalShredDocuments,                // DocumentSourceInternalShredDocuments
-    kInternalSplitPipeline,                 // DocumentSourceInternalSplitPipeline
-    kInternalUnpackBucket,                  // DocumentSourceInternalUnpackBucket
-    kLimit,                                 // DocumentSourceLimit
-    kListCatalog,                           // DocumentSourceListCatalog
-    kListLocalSessions,                     // DocumentSourceListLocalSessions
-    kListMqlEntities,                       // DocumentSourceListMqlEntities
-    kListSampledQueries,                    // DocumentSourceListSampledQueries
-    kListSearchIndexes,                     // DocumentSourceListSearchIndexes
-    kLookUp,                                // DocumentSourceLookUp
-    kMatch,                                 // DocumentSourceMatch
-    kMerge,                                 // DocumentSourceMerge
-    kMergeCursors,                          // DocumentSourceMergeCursors
-    kMock,                                  // DocumentSourceMock
-    kOperationMetrics,                      // DocumentSourceOperationMetrics
-    kOut,                                   // DocumentSourceOut
-    kPlanCacheStats,                        // DocumentSourcePlanCacheStats
-    kQueue,                                 // DocumentSourceQueue
-    kQueryStats,                            // DocumentSourceQueryStats
-    kRedact,                                // DocumentSourceRedact
-    kRemoteDbCursor,                        // DocumentSourceDbCursor
-    kReshardingIterateTransaction,          // DocumentSourceReshardingIterateTransaction
-    kReshardingAddResumeId,                 // DocumentSourceReshardingAddResumeId
-    kReshardingOwnershipMatch,              // DocumentSourceReshardingOwnershipMatch
-    kSample,                                // DocumentSourceSample
-    kSampleFromRandomCursor,                // DocumentSourceSampleFromRandomCursor
-    kSearch,                                // DocumentSourceSearch
-    kSearchMeta,                            // DocumentSourceSearchMeta
-    kSequentialDocumentCache,               // DocumentSourceSequentialDocumentCache
-    kSetVariableFromSubPipeline,            // DocumentSourceSetVariableFromSubPipeline
-    kSingleDocumentTransformation,          // DocumentSourceSingleDocumentTransformation
-    kSkip,                                  // DocumentSourceSkip
-    kSort,                                  // DocumentSourceSort
-    kStreamingGroup,                        // DocumentSourceStreamingGroup
-    kTeeConsumer,                           // DocumentSourceTeeConsumer
-    kTestOptimizations,                     // DocumentSourceTestOptimizations
-    kUnionWith,                             // DocumentSourceUnionWith
-    kUnwind,                                // DocumentSourceUnwind
-    kValidateStub,                          // DocumentSourceValidateStub
-    kVectorSearch,                          // DocumentSourceVectorSearch
-    kWindowStub,                            // DocumentSourceWindowStub
-    kHttps,                                 // DocumentSourceHttpsStub
-};
+/**
+ * Allocates a new, unique DocumentSource::Id value.
+ * Assigns it to a private variable (in an anonymous namespace) based on the given `name`, and
+ * declares a const reference named `constName` to the private variable.
+ */
+#define ALLOCATE_DOCUMENT_SOURCE_ID(name, constName)                  \
+    namespace {                                                       \
+    DocumentSource::Id _dsid_##name = DocumentSource::kUnallocatedId; \
+    MONGO_INITIALIZER_GENERAL(allocateDocSourceId_##name,             \
+                              ("BeginDocumentSourceIdAllocation"),    \
+                              ("EndDocumentSourceIdAllocation"))      \
+    (InitializerContext*) {                                           \
+        _dsid_##name = DocumentSource::allocateId(#name);             \
+    }                                                                 \
+    }                                                                 \
+    const DocumentSource::Id& constName = _dsid_##name;
 
 class DocumentSource : public RefCountable {
 public:
@@ -292,6 +233,14 @@ public:
     using TransactionRequirement = StageConstraints::TransactionRequirement;
     using LookupRequirement = StageConstraints::LookupRequirement;
     using UnionRequirement = StageConstraints::UnionRequirement;
+
+    /**
+     * Used to identify different DocumentSource sub-classes, without requiring RTTI.
+     */
+    using Id = unsigned long;
+
+    // Using 0 for "unallocated id" makes it easy to check if an Id has been allocated.
+    static constexpr Id kUnallocatedId{0};
 
     struct ParserRegistration {
         DocumentSource::Parser parser;
@@ -560,15 +509,10 @@ public:
     virtual const char* getSourceName() const = 0;
 
     /**
-     * Get the stage's type. This method is useful for cases where we have multiple condition checks
-     * that are based on the stage's type.
-     *
-     * Using dynamic_cast or typeid in an if/else might result in a situation where we have a lot of
-     * type checks-- there will be a type call for every document source type we need to check.
-     * Instead, we can use this method in a switch, which will result in one virtual call for the
-     * type check.
+     * Returns the DocumentSource::Id value of a given stage object.
+     * Each child class should override this and return that class's static `id` value.
      */
-    virtual DocumentSourceType getType() const = 0;
+    virtual Id getId() const = 0;
 
     /**
      * Set the underlying source this source should use to get Documents from. Must not throw
@@ -654,6 +598,14 @@ public:
     static void registerParser(std::string name,
                                SimpleParser simpleParser,
                                boost::optional<FeatureFlag> featureFlag);
+
+    /**
+     * Allocate and return a new, unique DocumentSource::Id value.
+     *
+     * DO NOT call this method directly. Instead, use the ALLOCATE_DOCUMENT_SOURCE_ID macro defined
+     * in this file.
+     */
+    static Id allocateId(StringData name);
 
     /**
      * Returns true if the DocumentSource has a query.

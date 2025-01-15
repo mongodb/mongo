@@ -84,6 +84,7 @@ REGISTER_DOCUMENT_SOURCE(match,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceMatch::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(match, DocumentSourceMatch::id)
 
 DocumentSourceMatch::DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)

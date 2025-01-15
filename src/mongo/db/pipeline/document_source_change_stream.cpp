@@ -83,6 +83,8 @@ REGISTER_DOCUMENT_SOURCE(changeStream,
                          DocumentSourceChangeStream::createFromBson,
                          AllowedWithApiStrict::kConditionally);
 
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamStage, DocumentSourceInternalChangeStreamStage::id)
+
 constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentField;

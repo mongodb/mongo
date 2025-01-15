@@ -119,8 +119,10 @@ public:
 
     const char* getSourceName() const override;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kMatch;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {

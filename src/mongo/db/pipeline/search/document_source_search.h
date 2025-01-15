@@ -77,8 +77,10 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kSearch;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     auto isStoredSource() const {

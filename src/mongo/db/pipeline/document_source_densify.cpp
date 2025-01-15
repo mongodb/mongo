@@ -154,6 +154,7 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalDensify,
                                   LiteParsedDocumentSourceDefault::parse,
                                   DocumentSourceInternalDensify::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalDensify, DocumentSourceInternalDensify::id)
 
 namespace document_source_densify {
 

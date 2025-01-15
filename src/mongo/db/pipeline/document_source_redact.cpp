@@ -67,6 +67,7 @@ REGISTER_DOCUMENT_SOURCE(redact,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceRedact::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(redact, DocumentSourceRedact::id)
 
 const char* DocumentSourceRedact::getSourceName() const {
     return kStageName.rawData();

@@ -70,6 +70,8 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeDocumentSourceCursorLoadBatch);
 
+ALLOCATE_DOCUMENT_SOURCE_ID(cursor, DocumentSourceCursor::id);
+
 using boost::intrusive_ptr;
 using std::string;
 

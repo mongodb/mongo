@@ -47,8 +47,10 @@ public:
 
     const char* getSourceName() const final;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kInternalReplaceRoot;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final{};

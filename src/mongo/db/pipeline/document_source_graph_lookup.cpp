@@ -124,6 +124,7 @@ REGISTER_DOCUMENT_SOURCE(graphLookup,
                          DocumentSourceGraphLookUp::LiteParsed::parse,
                          DocumentSourceGraphLookUp::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(graphLookup, DocumentSourceGraphLookUp::id)
 
 const char* DocumentSourceGraphLookUp::getSourceName() const {
     return kStageName.rawData();

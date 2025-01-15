@@ -115,6 +115,8 @@ REGISTER_DOCUMENT_SOURCE(_internalConvertBucketIndexStats,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalConvertBucketIndexStats::createFromBson,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalConvertBucketIndexStats,
+                            DocumentSourceInternalConvertBucketIndexStats::id)
 
 DocumentSourceInternalConvertBucketIndexStats::DocumentSourceInternalConvertBucketIndexStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -39,6 +39,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+ALLOCATE_DOCUMENT_SOURCE_ID(teeConsumer, DocumentSourceTeeConsumer::id)
+
 DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
                                                      size_t facetId,
                                                      const intrusive_ptr<TeeBuffer>& bufferSource,

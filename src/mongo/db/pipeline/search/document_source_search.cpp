@@ -51,6 +51,8 @@ REGISTER_DOCUMENT_SOURCE(search,
                          DocumentSourceSearch::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 
+ALLOCATE_DOCUMENT_SOURCE_ID(search, DocumentSourceSearch::id)
+
 // $searchBeta is supported as an alias for $search for compatibility with applications that used
 // search during its beta period.
 REGISTER_DOCUMENT_SOURCE(searchBeta,

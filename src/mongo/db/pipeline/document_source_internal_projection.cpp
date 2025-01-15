@@ -32,6 +32,9 @@
 #include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalProjection, DocumentSourceInternalProjection::id)
+
 namespace {
 ProjectionPolicies lookUpPolicies(InternalProjectionPolicyEnum policiesId) {
     switch (policiesId) {

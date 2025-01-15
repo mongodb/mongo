@@ -56,6 +56,7 @@ REGISTER_DOCUMENT_SOURCE(collStats,
                          DocumentSourceCollStats::LiteParsed::parse,
                          DocumentSourceCollStats::createFromBson,
                          AllowedWithApiStrict::kConditionally);
+ALLOCATE_DOCUMENT_SOURCE_ID(collStats, DocumentSourceCollStats::id)
 
 void DocumentSourceCollStats::LiteParsed::assertPermittedInAPIVersion(
     const APIParameters& apiParameters) const {

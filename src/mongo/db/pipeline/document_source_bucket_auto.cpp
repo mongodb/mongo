@@ -62,6 +62,7 @@ REGISTER_DOCUMENT_SOURCE(bucketAuto,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceBucketAuto::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(bucketAuto, DocumentSourceBucketAuto::id)
 
 namespace {
 

@@ -87,8 +87,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kChangeStreamSplitLargeEvent;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
 protected:

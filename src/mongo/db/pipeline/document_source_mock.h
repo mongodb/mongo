@@ -103,8 +103,10 @@ public:
 
     const char* getSourceName() const override;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kMock;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     size_t size() const;

@@ -78,6 +78,7 @@ REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
                          DocumentSourceOut::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(out, DocumentSourceOut::id)
 
 DocumentSourceOut::~DocumentSourceOut() {
     if (_tmpCleanUpState == OutCleanUpProgress::kComplete) {

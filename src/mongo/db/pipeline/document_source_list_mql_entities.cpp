@@ -37,6 +37,7 @@ namespace mongo {
 REGISTER_TEST_DOCUMENT_SOURCE(listMqlEntities,
                               DocumentSourceListMqlEntities::LiteParsed::parse,
                               DocumentSourceListMqlEntities::createFromBson);
+ALLOCATE_DOCUMENT_SOURCE_ID(listMqlEntities, DocumentSourceListMqlEntities::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListMqlEntities::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -89,10 +90,6 @@ StageConstraints DocumentSourceListMqlEntities::constraints(Pipeline::SplitState
 
 const char* DocumentSourceListMqlEntities::getSourceName() const {
     return kStageName.rawData();
-}
-
-DocumentSourceType DocumentSourceListMqlEntities::getType() const {
-    return DocumentSourceType::kListMqlEntities;
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceListMqlEntities::doOptimizeAt(

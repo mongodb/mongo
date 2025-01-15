@@ -67,6 +67,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(searchMeta,
                                        AllowedWithClientType::kAny,
                                        boost::none,
                                        true);
+ALLOCATE_DOCUMENT_SOURCE_ID(searchMeta, DocumentSourceSearchMeta::id)
 
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceSearchMeta::distributedPlanLogic() {

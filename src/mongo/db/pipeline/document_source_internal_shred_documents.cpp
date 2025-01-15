@@ -42,6 +42,7 @@ REGISTER_DOCUMENT_SOURCE(_internalShredDocuments,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalShredDocuments::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalShredDocuments, DocumentSourceInternalShredDocuments::id)
 
 DocumentSourceInternalShredDocuments::DocumentSourceInternalShredDocuments(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)

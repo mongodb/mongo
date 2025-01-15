@@ -62,6 +62,8 @@
 namespace mongo {
 using boost::intrusive_ptr;
 
+ALLOCATE_DOCUMENT_SOURCE_ID(sampleFromRandomCursor, DocumentSourceSampleFromRandomCursor::id)
+
 DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     long long size,

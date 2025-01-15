@@ -69,6 +69,7 @@ REGISTER_DOCUMENT_SOURCE(unionWith,
                          DocumentSourceUnionWith::LiteParsed::parse,
                          DocumentSourceUnionWith::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(unionWith, DocumentSourceUnionWith::id)
 
 namespace {
 std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(

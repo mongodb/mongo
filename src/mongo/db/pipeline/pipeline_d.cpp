@@ -1960,54 +1960,46 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
         auto unpackIter = pipeline->_sources.end();
         for (; !unsupportedStage && iter != pipeline->_sources.end() && !seenSort; ++iter) {
             const auto* source = iter->get();
-            switch (source->getType()) {
-                case DocumentSourceType::kSort:
-                    seenSort = true;
-                    break;
-                case DocumentSourceType::kMatch:
-                    // do nothing
-                    break;
-                case DocumentSourceType::kInternalUnpackBucket: {
-                    const auto* unpack =
-                        static_cast<const DocumentSourceInternalUnpackBucket*>(source);
-                    unpackIter = iter;
-                    tassert(6505001,
-                            str::stream() << "Expected at most one "
-                                          << DocumentSourceInternalUnpackBucket::kStageNameInternal
-                                          << " stage in the pipeline",
-                            !seenUnpack);
-                    seenUnpack = true;
+            auto sourceId = source->getId();
+            if (sourceId == DocumentSourceSort::id) {
+                seenSort = true;
+            } else if (sourceId == DocumentSourceMatch::id) {
+                // do nothing
+            } else if (sourceId == DocumentSourceInternalUnpackBucket::id) {
+                const auto* unpack = static_cast<const DocumentSourceInternalUnpackBucket*>(source);
+                unpackIter = iter;
+                tassert(6505001,
+                        str::stream() << "Expected at most one "
+                                      << DocumentSourceInternalUnpackBucket::kStageNameInternal
+                                      << " stage in the pipeline",
+                        !seenUnpack);
+                seenUnpack = true;
 
-                    // Check that the time field is preserved.
-                    if (!unpack->includeTimeField())
-                        unsupportedStage = true;
-
-                    // If the sort is compound, check that the entire meta field is preserved.
-                    if (sortPattern.size() > 1) {
-                        // - Is there a meta field?
-                        // - Will it be unpacked?
-                        // - Will it be overwritten by 'computedMetaProjFields'?
-                        auto&& unpacker = unpack->bucketUnpacker();
-                        const boost::optional<std::string>& metaField = unpacker.getMetaField();
-                        if (!metaField || !unpack->includeMetaField() ||
-                            unpacker.bucketSpec().fieldIsComputed(*metaField)) {
-                            unsupportedStage = true;
-                        }
-                    }
-                    break;
-                }
-                case DocumentSourceType::kSingleDocumentTransformation: {
-                    auto projection =
-                        static_cast<const DocumentSourceSingleDocumentTransformation*>(source);
-                    auto modPaths = projection->getModifiedPaths();
-                    if (areSortFieldsModifiedByProjection(seenUnpack, sortPattern, modPaths)) {
-                        unsupportedStage = true;
-                    }
-                    break;
-                }
-                default:
+                // Check that the time field is preserved.
+                if (!unpack->includeTimeField())
                     unsupportedStage = true;
-                    break;
+
+                // If the sort is compound, check that the entire meta field is preserved.
+                if (sortPattern.size() > 1) {
+                    // - Is there a meta field?
+                    // - Will it be unpacked?
+                    // - Will it be overwritten by 'computedMetaProjFields'?
+                    auto&& unpacker = unpack->bucketUnpacker();
+                    const boost::optional<std::string>& metaField = unpacker.getMetaField();
+                    if (!metaField || !unpack->includeMetaField() ||
+                        unpacker.bucketSpec().fieldIsComputed(*metaField)) {
+                        unsupportedStage = true;
+                    }
+                }
+            } else if (sourceId == DocumentSourceSingleDocumentTransformation::id) {
+                auto projection =
+                    static_cast<const DocumentSourceSingleDocumentTransformation*>(source);
+                auto modPaths = projection->getModifiedPaths();
+                if (areSortFieldsModifiedByProjection(seenUnpack, sortPattern, modPaths)) {
+                    unsupportedStage = true;
+                }
+            } else {
+                unsupportedStage = true;
             }
         }
         if (!unsupportedStage && seenSort) {

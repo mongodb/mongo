@@ -71,6 +71,7 @@ REGISTER_DOCUMENT_SOURCE(unwind,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceUnwind::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(unwind, DocumentSourceUnwind::id)
 
 const char* DocumentSourceUnwind::getSourceName() const {
     return kStageName.rawData();

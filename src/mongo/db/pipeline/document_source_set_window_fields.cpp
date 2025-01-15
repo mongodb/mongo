@@ -117,6 +117,8 @@ REGISTER_DOCUMENT_SOURCE(_internalSetWindowFields,
                          DocumentSourceInternalSetWindowFields::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalSetWindowFields, DocumentSourceInternalSetWindowFields::id)
+
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(ErrorCodes::FailedToParse,

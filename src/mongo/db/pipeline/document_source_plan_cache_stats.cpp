@@ -48,6 +48,7 @@ REGISTER_DOCUMENT_SOURCE(planCacheStats,
                          DocumentSourcePlanCacheStats::LiteParsed::parse,
                          DocumentSourcePlanCacheStats::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(planCacheStats, DocumentSourcePlanCacheStats::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

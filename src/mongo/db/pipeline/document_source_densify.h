@@ -420,8 +420,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kInternalDensify;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

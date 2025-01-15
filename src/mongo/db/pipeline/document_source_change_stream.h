@@ -408,8 +408,10 @@ public:
 
     virtual Value doSerialize(const SerializationOptions& opts) const = 0;
 
-    DocumentSourceType getType() const final {
-        return DocumentSourceType::kInternalChangeStream;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 };
 

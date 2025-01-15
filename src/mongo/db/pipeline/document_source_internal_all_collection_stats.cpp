@@ -67,6 +67,8 @@ REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
                          DocumentSourceInternalAllCollectionStats::LiteParsed::parse,
                          DocumentSourceInternalAllCollectionStats::createFromBsonInternal,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalAllCollectionStats,
+                            DocumentSourceInternalAllCollectionStats::id)
 
 DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNext() {
     if (!_catalogDocs) {

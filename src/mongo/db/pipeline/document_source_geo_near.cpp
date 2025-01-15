@@ -81,6 +81,7 @@ REGISTER_DOCUMENT_SOURCE(geoNear,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceGeoNear::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(geoNear, DocumentSourceGeoNear::id)
 
 Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
     MutableDocument result;

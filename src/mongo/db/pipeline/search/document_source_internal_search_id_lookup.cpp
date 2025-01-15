@@ -42,6 +42,7 @@ REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalSearchIdLookUp::createFromBson,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchIdLookup, DocumentSourceInternalSearchIdLookUp::id)
 
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& expCtx,

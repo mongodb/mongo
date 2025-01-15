@@ -63,6 +63,7 @@ REGISTER_DOCUMENT_SOURCE(_internalStreamingGroup,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceStreamingGroup::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalStreamingGroup, DocumentSourceStreamingGroup::id)
 
 constexpr StringData DocumentSourceStreamingGroup::kStageName;
 

@@ -104,6 +104,7 @@ REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalUnpackBucket::createFromBsonInternal,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalUnpackBucket, DocumentSourceInternalUnpackBucket::id)
 
 /*
  * $_unpackBucket is an alias of $_internalUnpackBucket. It only exposes the "timeField" and the

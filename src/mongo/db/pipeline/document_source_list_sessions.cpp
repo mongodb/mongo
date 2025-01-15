@@ -53,6 +53,7 @@ REGISTER_DOCUMENT_SOURCE(listSessions,
                          DocumentSourceListSessions::LiteParsed::parse,
                          DocumentSourceListSessions::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(listSessions, DocumentSourceListSessions::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

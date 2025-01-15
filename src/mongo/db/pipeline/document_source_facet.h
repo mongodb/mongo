@@ -133,8 +133,10 @@ public:
         return DocumentSourceFacet::kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kFacet;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     /**

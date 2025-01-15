@@ -77,8 +77,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kInternalSplitPipeline;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

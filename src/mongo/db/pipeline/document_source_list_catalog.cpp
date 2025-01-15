@@ -59,6 +59,7 @@ REGISTER_DOCUMENT_SOURCE(listCatalog,
                          DocumentSourceListCatalog::LiteParsed::parse,
                          DocumentSourceListCatalog::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(listCatalog, DocumentSourceListCatalog::id)
 
 const char* DocumentSourceListCatalog::getSourceName() const {
     return kStageName.rawData();

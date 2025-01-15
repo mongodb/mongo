@@ -59,6 +59,7 @@ REGISTER_DOCUMENT_SOURCE(listSampledQueries,
                          DocumentSourceListSampledQueries::LiteParsed::parse,
                          DocumentSourceListSampledQueries::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(listSampledQueries, DocumentSourceListSampledQueries::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFromBson(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

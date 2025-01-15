@@ -68,6 +68,7 @@ REGISTER_DOCUMENT_SOURCE(_internalListCollections,
                          DocumentSourceInternalListCollections::LiteParsed::parse,
                          DocumentSourceInternalListCollections::createFromBson,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalListCollections, DocumentSourceInternalListCollections::id)
 
 DocumentSource::GetNextResult DocumentSourceInternalListCollections::doGetNext() {
     if (!_databases) {

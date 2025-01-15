@@ -517,6 +517,7 @@ REGISTER_DOCUMENT_SOURCE(lookup,
                          DocumentSourceLookUp::LiteParsed::parse,
                          DocumentSourceLookUp::createFromBson,
                          AllowedWithApiStrict::kConditionally);
+ALLOCATE_DOCUMENT_SOURCE_ID(lookup, DocumentSourceLookUp::id)
 
 const char* DocumentSourceLookUp::getSourceName() const {
     return kStageName.rawData();

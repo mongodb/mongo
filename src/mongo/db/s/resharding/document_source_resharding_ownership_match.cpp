@@ -60,6 +60,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingOwnershipMatch,
                                   LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceReshardingOwnershipMatch::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalReshardingOwnershipMatch,
+                            DocumentSourceReshardingOwnershipMatch::id)
 
 boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch>
 DocumentSourceReshardingOwnershipMatch::create(

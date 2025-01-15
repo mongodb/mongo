@@ -77,8 +77,10 @@ public:
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kSingleDocumentTransformation;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     boost::intrusive_ptr<DocumentSource> optimize() final;

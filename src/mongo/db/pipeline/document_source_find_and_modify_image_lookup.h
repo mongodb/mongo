@@ -90,8 +90,10 @@ public:
         return DocumentSourceFindAndModifyImageLookup::kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kFindAndModifyImageLookup;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
 protected:

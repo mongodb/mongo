@@ -52,6 +52,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(vectorSearch,
                                            DocumentSourceVectorSearch::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagVectorSearchPublicPreview);
+ALLOCATE_DOCUMENT_SOURCE_ID(vectorSearch, DocumentSourceVectorSearch::id)
 
 DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
