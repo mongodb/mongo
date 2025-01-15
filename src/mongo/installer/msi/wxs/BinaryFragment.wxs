@@ -2,6 +2,19 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
 	<Fragment>
     <DirectoryRef Id="BIN">
+      <Component Id="BinPermissions" Guid="69C8C7B2-75F0-4A67-AB2E-CAE6E785d5f5">
+        <CreateFolder>
+          <!-- Sddl generated from "cacls "C:\Program Files\MongoDB\Server\8.1\bin" /S" so non program file installs have the same permissions as program file installs -->
+          <!-- Trusted Installer SID - S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464 -->
+          <!-- Local System SID - SY -->
+          <!-- Builtin Administrator SID - BA -->
+          <!-- Builtin User SID - BU -->
+          <!-- Creator Owner SID - CO -->
+          <!-- App Package SID - AC -->
+          <!-- All Restricted Application Packages SID - S-1-15-2-2 -->
+          <PermissionEx Sddl="D:AI(A;ID;FA;;;S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464)(A;CIIOID;GA;;;S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464)(A;ID;FA;;;SY)(A;OICIIOID;GA;;;SY)(A;ID;FA;;;BA)(A;OICIIOID;GA;;;BA)(A;ID;0x1200a9;;;BU)(A;OICIIOID;GXGR;;;BU)(A;OICIIOID;GA;;;CO)(A;ID;0x1200a9;;;AC)(A;OICIIOID;GXGR;;;AC)(A;ID;0x1200a9;;;S-1-15-2-2)(A;OICIIOID;GXGR;;;S-1-15-2-2)"/>
+        </CreateFolder>
+      </Component>
       <Component Id="InstallCompass" Guid="FDB7B7C4-B78F-4A85-8F98-E8E49F6027B2">
         <File Id="InstallCompassScript" Name="InstallCompass.ps1" Source="$(var.BinarySource)\Install-Compass.ps1" />
       </Component>
