@@ -415,10 +415,14 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
             if (spec->isShardFilteringDistinctScanEnabled) {
                 // Because we push FETCH and SHARD_FILTERING stages into the DISTINCT_SCAN stage
-                // when applicable, we don't see FETCH's docsExamined or SHARD_FILTERING's
-                // chunkSkips in the explain output. We add them to DISTINCT_SCAN's explain here.
+                // when applicable, we don't see FETCH's 'docsExamined' or SHARD_FILTERING's
+                // 'chunkSkips' in the explain output. We also don't see if we were able to skip any
+                // contiguous sequences of orphans ('orphanChunkSkips'). We add them to
+                // DISTINCT_SCAN's explain here.
                 bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
                 bob->appendNumber("chunkSkips", static_cast<long long>(spec->chunkSkips));
+                bob->appendNumber("orphanChunkSkips",
+                                  static_cast<long long>(spec->orphanChunkSkips));
             }
         }
     } else if (STAGE_FETCH == stats.stageType) {

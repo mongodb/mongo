@@ -115,10 +115,7 @@ public:
 
 
         // We prefer queries that don't require a fetch stage.
-        double noFetchBonus = epsilon;
-        if (hasStage(STAGE_FETCH, stats)) {
-            noFetchBonus = 0;
-        }
+        const double noFetchBonus = hasFetch(stats) ? 0 : epsilon;
 
         // In the case of ties, prefer solutions without a blocking sort
         // to solutions with a blocking sort.
@@ -188,6 +185,10 @@ protected:
      * True, if the plan stage stats tree represents a plan stage of the given 'type'.
      */
     virtual bool hasStage(StageType type, const PlanStageStatsType* stats) const = 0;
+
+    virtual bool hasFetch(const PlanStageStatsType* stats) const {
+        return hasStage(STAGE_FETCH, stats);
+    }
 };
 
 /**

@@ -36,10 +36,8 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/plan_ranker_util.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -72,7 +70,7 @@ TEST(PlanRankerTest, NoFetchBonus) {
 
     auto badPlan =
         makeStats("SHARDING_FILTER", STAGE_SHARDING_FILTER, make_unique<ShardingFilterStats>());
-    badPlan->children.emplace_back(makeStats("FETCH", STAGE_FETCH, make_unique<IndexScanStats>()));
+    badPlan->children.emplace_back(makeStats("FETCH", STAGE_FETCH, make_unique<FetchStats>()));
     badPlan->children[0]->children.emplace_back(
         makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>()));
 

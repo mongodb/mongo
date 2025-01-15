@@ -72,6 +72,13 @@ struct SpecificStats {
 
     virtual void acceptVisitor(PlanStatsConstVisitor* visitor) const = 0;
     virtual void acceptVisitor(PlanStatsMutableVisitor* visitor) = 0;
+
+    /**
+     * Subclasses that have the ability to fetch should override this to return 'true'.
+     */
+    virtual bool doesFetch() const {
+        return false;
+    }
 };
 
 // Every stage has CommonStats.
@@ -476,11 +483,18 @@ struct DistinctScanStats : public SpecificStats {
         visitor->visit(this);
     }
 
+    bool doesFetch() const final {
+        return isFetching;
+    }
+
     // How many keys did we look at while distinct-ing?
     size_t keysExamined = 0;
     // The total number of full documents touched by the embedded fetch stage, if one exists.
     size_t docsExamined = 0;
-    // How many chunk skips were performed while distinct-ing?
+    // Tracks how many times we skipped past orphan chunks.
+    size_t orphanChunkSkips = 0;
+    // Tracks the number of time we filtered out an orphan document (symmetric to
+    // 'ShardingFilterStats').
     size_t chunkSkips = 0;
 
     BSONObj keyPattern;
@@ -529,6 +543,10 @@ struct FetchStats : public SpecificStats {
 
     void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
         visitor->visit(this);
+    }
+
+    bool doesFetch() const final {
+        return true;
     }
 
     // Have we seen anything that already had an object?

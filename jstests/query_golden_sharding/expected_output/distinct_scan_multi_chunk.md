@@ -10384,36 +10384,24 @@
 			"rejectedPlans" : [
 				[
 					{
-						"stage" : "PROJECTION_COVERED",
-						"transformBy" : {
-							"_id" : 0,
-							"notShardKey" : 1
-						}
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"notShardKey" : [
 								"[3.0, 3.0]"
-							],
-							"shardKey" : [
-								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "notShardKey_1_shardKey_1",
-						"isFetching" : false,
+						"indexName" : "notShardKey_1",
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : true,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
-							"notShardKey" : 1,
-							"shardKey" : 1
+							"notShardKey" : 1
 						},
 						"multiKeyPaths" : {
-							"notShardKey" : [ ],
-							"shardKey" : [ ]
+							"notShardKey" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}
@@ -10421,24 +10409,36 @@
 			],
 			"winningPlan" : [
 				{
+					"stage" : "PROJECTION_COVERED",
+					"transformBy" : {
+						"_id" : 0,
+						"notShardKey" : 1
+					}
+				},
+				{
 					"direction" : "forward",
 					"indexBounds" : {
 						"notShardKey" : [
 							"[3.0, 3.0]"
+						],
+						"shardKey" : [
+							"[MinKey, MaxKey]"
 						]
 					},
-					"indexName" : "notShardKey_1",
-					"isFetching" : true,
+					"indexName" : "notShardKey_1_shardKey_1",
+					"isFetching" : false,
 					"isMultiKey" : false,
 					"isPartial" : false,
 					"isShardFiltering" : true,
 					"isSparse" : false,
 					"isUnique" : false,
 					"keyPattern" : {
-						"notShardKey" : 1
+						"notShardKey" : 1,
+						"shardKey" : 1
 					},
 					"multiKeyPaths" : {
-						"notShardKey" : [ ]
+						"notShardKey" : [ ],
+						"shardKey" : [ ]
 					},
 					"stage" : "DISTINCT_SCAN"
 				}

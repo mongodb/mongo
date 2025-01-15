@@ -152,6 +152,18 @@ protected:
     }
 
     bool hasStage(StageType type, const PlanStageStats* root) const final {
+        return hasStage(root,
+                        [type](const PlanStageStats& stage) { return stage.stageType == type; });
+    }
+
+    bool hasFetch(const PlanStageStats* root) const final {
+        return hasStage(root, [](const PlanStageStats& stage) {
+            return stage.specific && stage.specific->doesFetch();
+        });
+    }
+
+    bool hasStage(const PlanStageStats* root,
+                  std::function<bool(const PlanStageStats&)> filter) const {
         std::queue<const PlanStageStats*> remaining;
         remaining.push(root);
 
@@ -159,7 +171,7 @@ protected:
             auto stats = remaining.front();
             remaining.pop();
 
-            if (stats->stageType == type) {
+            if (filter(*stats)) {
                 return true;
             }
 

@@ -218,10 +218,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
 
             if (_needsFetch) {
                 const auto fetchRet = doFetch(member, id, out);
-                // We need to increment 'works' to account for the additional work that
-                // comes from performing the fetch within a distinct scan. We also increment
-                // distinct scan's docsExamined as we would in the fetch stage.
-                ++_commonStats.works;
+                // We increment distinct scan's docsExamined as we would in the fetch stage.
                 ++_specificStats.docsExamined;
                 if (fetchRet != PlanStage::ADVANCED) {
                     return fetchRet;
@@ -244,6 +241,9 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                         // We have updated the seek point to skip past the current key (which is an
                         // orphan) to the next owned value of the shard key. Need to seek again.
                         _workingSet->free(id);
+                        // This is a chunk-skip past one or more orphan chunks; increment stats
+                        // counter.
+                        ++_specificStats.orphanChunkSkips;
                         return PlanStage::NEED_TIME;
                     }
                     case mongo::OrphanChunkSkipper::NoMoreOwnedForThisPrefix: {
@@ -261,6 +261,9 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                         // We're done! No more owned chunks remain, as the shard key is a contiguous
                         // prefix of the current index.
                         _workingSet->free(id);
+                        // We also count this as a chunk-skip, since there may have been additional
+                        // orphan values after the previous one (in any case, we end early).
+                        ++_specificStats.orphanChunkSkips;
                         return PlanStage::IS_EOF;
                     }
                     default:
@@ -269,13 +272,8 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             } else if (_shardFilterer) {
                 // We need one last check before we can return the key if we've been initialized
                 // with a shard filter. If this document is an orphan, we need to try the next one;
-                // otherwise, we can proceed with a regular distinct scan. We also need to increment
-                // the 'works' value to account for the extra shard filtering work that is performed
-                // within the distinct scan's work, and distinct scan's 'chunkSkips' to reflect the
-                // work is being done in the embedded SHARD_FILTERING stage.
+                // otherwise, we can proceed with a regular distinct scan.
                 belongs = _shardFilterer->documentBelongsToMe(*member);
-                ++_commonStats.works;
-                ++_specificStats.chunkSkips;
             }
 
             switch (belongs) {
@@ -309,6 +307,9 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                     // can resume seeking to the next distinct value.
                     _needsSequentialScan = true;
                     _workingSet->free(id);
+                    // Similar to shard-filtering, increment the counter for individual orphan docs
+                    // we've filtered out via the shard-filter.
+                    ++_specificStats.chunkSkips;
                     return PlanStage::NEED_TIME;
                 }
                 default:
