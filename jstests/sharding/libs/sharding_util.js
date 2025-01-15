@@ -2,6 +2,8 @@
  * Helpers for creating and accessing sharding metadata.
  */
 
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+
 export function getShards(db) {
     return db.adminCommand({listShards: 1}).shards;
 }
@@ -34,6 +36,18 @@ export function getPrimaryShardNameForDB(db) {
     } else {
         throw Error("Database " + db.getName() + " not found in config.databases.");
     }
+}
+
+export function getShardNamesForCollection(conn, dbName, collName) {
+    const ns = dbName + "." + collName;
+    const config = conn.getDB("config");
+    const collDoc = config.collections.findOne({_id: ns});
+    if (!collDoc) {
+        // This is an untracked unsharded collection.
+        return new Set([getPrimaryShardIdForDatabase(conn, dbName)]);
+    }
+    const chunkDocs = findChunksUtil.findChunksByNs(config, ns);
+    return new Set(chunkDocs.map(doc => doc.shard));
 }
 
 export function getNonPrimaryShardName(db) {

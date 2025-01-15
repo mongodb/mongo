@@ -72,6 +72,10 @@ selector:
     # The test performs these upserts in retryable writes that cause the test to timeout.
     - jstests/core/write/update/upsert_fields.js
 
+    # TODO (SERVER-99458): Investigate why resharding_perform_verification.js is not compatible
+    # with magic_restore_sharding_jscore_passthrough suite
+    - jstests/core_sharding/resharding/resharding_perform_verification.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
