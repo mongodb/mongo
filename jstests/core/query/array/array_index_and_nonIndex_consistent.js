@@ -1,7 +1,11 @@
 /**
  * Make sure that $gt and $lt queries return the same results regardless of whether there is a
  * multikey index.
- * @tags: [ requires_fcv_80 ]
+ * @tags: [
+ *     requires_fcv_80,
+ *     # This test runs too long for Evergreen's 30 min timeout in TSAN builds.
+ *     tsan_incompatible,
+ *  ]
  */
 
 import {arrayDiff, arrayEq} from "jstests/aggregation/extras/utils.js";
