@@ -776,7 +776,7 @@ std::string demangleName(const std::type_info& typeinfo);
  *       }
  *   }
  */
-Status exceptionToStatus() noexcept;
+Status exceptionToStatus();
 
 }  // namespace mongo
 
