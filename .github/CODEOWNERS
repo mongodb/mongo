@@ -478,7 +478,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/httpinterface/**/network_options.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/OWNERS.yml
-/jstests/libs/**/noop_write_commands.js @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/libs/**/write_commands.js @10gen/query-execution-write-exec @svc-auto-approve-bot
 /jstests/libs/**/replsettest.js @10gen/server-replication @svc-auto-approve-bot
 /jstests/libs/**/shardingtest.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/libs/**/*golden_test.js @10gen/query-optimization @svc-auto-approve-bot
