@@ -1021,11 +1021,16 @@ Status runAggregateOnView(OperationContext* opCtx,
         const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedView.getNamespace()};
 
         sharding::router::CollectionRouter router(opCtx->getServiceContext(),
-                                                  resolvedView.getNamespace());
+                                                  resolvedView.getNamespace(),
+                                                  false  // retryOnStaleShard=false
+        );
         status = router.route(
             opCtx,
             "runAggregateOnView",
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
+                // CollectionRouter's retryOnStaleShard=false.
+
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
                 // the underlying collection. Use the same 'placementConflictTime' from the original
                 // request, if present.
