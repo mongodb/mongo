@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 # Whenever Bazel is invoked, it first calls this script setting "BAZEL_REAL" to the path of the real Bazel binary.
 # Use this file as a wrapper for any logic that should run before bazel itself is executed.
 
@@ -76,14 +74,12 @@ if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]]; then
     wrapper_start_time="$(date -u +%s.%N)"
 fi
  
-
 if [[ "$OSTYPE" == "linux"* ]]; then
   os="linux"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
   os="macos"
 else
-  echo "Unsupported OS $OSTYPE"
-  exit 1
+  os="unknown"
 fi
 
 ARCH=$(uname -m)
@@ -119,6 +115,10 @@ python="$REPO_ROOT/bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
 if [ ! -f $python ]; then
   >&2 echo "python prereq missing, using bazel to install python..."
   >&2 $bazel_real build --config=local @py_${os}_${ARCH}//:all
+  if [[ $? != 0 ]]; then
+    >&2 echo "wrapper script failed to install python! falling back to normal bazel call..."
+    exec "$bazel_real" $@
+  fi
 fi
 
 autocomplete_query=0
@@ -137,7 +137,10 @@ MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
 MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
 $python $REPO_ROOT/bazel/wrapper_hook.py $bazel_real "$@"
-
+if [[ $? != 0 ]]; then
+  >&2 echo "wrapper script failed! falling back to normal bazel call..."
+  exec "$bazel_real" $@
+fi
 new_args=$(<$MONGO_BAZEL_WRAPPER_ARGS)
 
 if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]] && [[ $autocomplete_query == 0 ]]; then

@@ -1,5 +1,6 @@
 import hashlib
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -38,30 +39,38 @@ class DuplicateSourceNames(Exception):
 wrapper_debug(f"wrapper hook script is using {sys.executable}")
 
 
-def search_for_modules(deps, deps_installed, deps_needed, lockfile_changed=False):
+def get_deps_dirs(deps):
     bazel_out_dir = os.path.join(REPO_ROOT, "bazel-out")
-    if os.path.exists(bazel_out_dir):
-        for dep in deps:
-            found = False
-            for entry in os.listdir(bazel_out_dir):
-                if os.path.exists(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}"):
-                    if not lockfile_changed:
-                        deps_installed.append(dep)
-                        sys.path.append(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}")
-                        found = True
-                        break
-                    else:
-                        os.chmod(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}", 0o777)
-                        for root, dirs, files in os.walk(
-                            f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}"
-                        ):
-                            for somedir in dirs:
-                                os.chmod(os.path.join(root, somedir), 0o777)
-                            for file in files:
-                                os.chmod(os.path.join(root, file), 0o777)
-                        shutil.rmtree(f"{bazel_out_dir}/{entry}/bin/external/poetry/{dep}")
-            if not found:
-                deps_needed.append(dep)
+    bazel_bin = os.path.join(REPO_ROOT, "bazel-bin")
+    for dep in deps:
+        for child in os.listdir(bazel_out_dir):
+            yield f"{bazel_out_dir}/{child}/bin/external/poetry/{dep}", dep
+        yield f"{bazel_bin}/bin/external/poetry/{dep}", dep
+
+
+def search_for_modules(deps, deps_installed, lockfile_changed=False):
+    deps_not_found = deps.copy()
+    for target_dir, dep in get_deps_dirs(deps):
+        if dep in deps_installed:
+            continue
+
+        if not os.path.exists(target_dir):
+            continue
+
+        if not lockfile_changed:
+            deps_installed.append(dep)
+            deps_not_found.remove(dep)
+            sys.path.append(target_dir)
+        else:
+            os.chmod(target_dir, 0o777)
+            for root, dirs, files in os.walk(target_dir):
+                for somedir in dirs:
+                    os.chmod(os.path.join(root, somedir), 0o777)
+                for file in files:
+                    os.chmod(os.path.join(root, file), 0o777)
+            shutil.rmtree(target_dir)
+
+    return deps_not_found
 
 
 def install_modules(bazel):
@@ -81,8 +90,9 @@ def install_modules(bazel):
 
     deps = ["retry"]
     deps_installed = []
-    deps_needed = []
-    search_for_modules(deps, deps_installed, deps_needed, lockfile_changed=old_hash != current_hash)
+    deps_needed = search_for_modules(
+        deps, deps_installed, lockfile_changed=old_hash != current_hash
+    )
 
     if deps_needed:
         need_to_install = True
@@ -95,8 +105,7 @@ def install_modules(bazel):
         subprocess.run(
             [bazel, "build", "--config=local"] + ["@poetry//:install_" + dep for dep in deps_needed]
         )
-        deps_missing = []
-        search_for_modules(deps_needed, deps_installed, deps_missing)
+        deps_missing = search_for_modules(deps_needed, deps_installed)
         if deps_missing:
             raise Exception(f"Failed to install python deps {deps_missing}")
 
@@ -104,9 +113,10 @@ def install_modules(bazel):
 def get_buildozer_output(autocomplete_query):
     from buildscripts.install_bazel import install_bazel
 
-    buildozer = shutil.which("buildozer")
+    buildozer_name = "buildozer" if not platform.system() == "Windows" else "buildozer.exe"
+    buildozer = shutil.which(buildozer_name)
     if not buildozer:
-        buildozer = os.path.expanduser("~/.local/bin/buildozer")
+        buildozer = os.path.expanduser(f"~/.local/bin/{buildozer_name}")
         if not os.path.exists(buildozer):
             bazel_bin_dir = os.path.expanduser("~/.local/bin")
             if not os.path.exists(bazel_bin_dir):

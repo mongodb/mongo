@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 
 echo common --//bazel/config:running_through_bazelisk > .bazelrc.bazelisk
 
-set REPO_ROOT=%~dp0\..
+set REPO_ROOT=%~dp0..
 
 for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
@@ -12,12 +12,22 @@ set python="%REPO_ROOT%\bazel-%cur_dir%\external\py_windows_x86_64\dist\python.e
 if not exist "%python%" (
     echo python prereq missing, using bazel to install python... 1>&2
     "%BAZEL_REAL%" build --config=local @py_windows_x86_64//:all 1>&2
+    if %ERRORLEVEL% NEQ 0 (
+        echo wrapper script failed to install python! falling back to normal bazel call...
+        "%BAZEL_REAL%" %*
+        exit %ERRORLEVEL%
+    )
 )
 SET STARTTIME=%TIME%
 
 set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
 echo "" > %MONGO_BAZEL_WRAPPER_ARGS%
 %python% %REPO_ROOT%/bazel/wrapper_hook.py "%BAZEL_REAL%" %*
+if %ERRORLEVEL% NEQ 0 (
+    echo wrapper script failed! falling back to normal bazel call...
+    "%BAZEL_REAL%" %*
+    exit %ERRORLEVEL%
+)
 for /f "Tokens=* Delims=" %%x in ( %MONGO_BAZEL_WRAPPER_ARGS% ) do set "new_args=!new_args!%%x"
 del %MONGO_BAZEL_WRAPPER_ARGS%
 

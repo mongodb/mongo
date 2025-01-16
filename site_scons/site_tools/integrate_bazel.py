@@ -412,13 +412,16 @@ def bazel_server_timeout_dumper(jvm_out, proc_pid, project_root):
 
 def bazel_build_subproc_func(**kwargs):
     project_root = os.path.abspath(".")
-    output_base = subprocess.run(
-        [Globals.bazel_executable, "info", "output_base"],
-        capture_output=True,
-        text=True,
-        check=True,
-        env=kwargs["env"],
-    ).stdout.strip()
+    try:
+        output_base = subprocess.run(
+            [Globals.bazel_executable, "info", "output_base"],
+            capture_output=True,
+            text=True,
+            check=True,
+            env=kwargs["env"],
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        output_base = None
 
     if os.environ.get("CI"):
         if os.path.exists(".bazel_real"):
@@ -429,14 +432,15 @@ def bazel_build_subproc_func(**kwargs):
 
     bazel_proc = subprocess.Popen(**kwargs)
 
-    t = threading.Thread(
-        target=bazel_server_timeout_dumper,
-        args=(jvm_out, bazel_proc.pid, project_root),
-    )
+    if output_base:
+        t = threading.Thread(
+            target=bazel_server_timeout_dumper,
+            args=(jvm_out, bazel_proc.pid, project_root),
+        )
 
-    # the bazel calls are wrapped in retries so we can rely on them to restart the attempt.
-    t.daemon = True
-    t.start()
+        # the bazel calls are wrapped in retries so we can rely on them to restart the attempt.
+        t.daemon = True
+        t.start()
 
     return bazel_proc
 
@@ -538,6 +542,17 @@ def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
 
 def run_bazel_command(env, bazel_cmd, tries_so_far=0):
     try:
+        server_pid = subprocess.run(
+            [Globals.bazel_executable, "info", "server_pid"],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ.copy(), **Globals.bazel_env_variables},
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        server_pid = None
+
+    try:
         tty_import_fail = False
         try:
             retry_call(
@@ -565,13 +580,21 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
                 print(
                     "Killing Bazel between retries on Windows to work around file access deadlock"
                 )
-                subprocess.run(
-                    [os.path.abspath(Globals.bazel_executable), "shutdown"],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    env={**os.environ.copy(), **Globals.bazel_env_variables},
-                )
+                try:
+                    subprocess.run(
+                        [os.path.abspath(Globals.bazel_executable), "shutdown"],
+                        check=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        env={**os.environ.copy(), **Globals.bazel_env_variables},
+                    )
+                except subprocess.CalledProcessError:
+                    proc = psutil.Process(server_pid)
+                    if proc.is_running():
+                        proc.terminate()
+                        proc.wait(timeout=10)
+                        proc.kill()
+
             linker_jobs = 4
             sanitizers = env.GetOption("sanitize")
             if sanitizers is not None and "fuzzer" in sanitizers.split(","):
