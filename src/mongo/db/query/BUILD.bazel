@@ -753,6 +753,7 @@ mongo_cc_unit_test(
         "interval_test.cpp",
         "lru_key_value_test.cpp",
         "map_reduce_output_format_test.cpp",
+        "plan_executor_express_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
         "planner_access_test.cpp",
