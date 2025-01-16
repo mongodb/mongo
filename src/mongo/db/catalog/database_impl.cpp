@@ -295,9 +295,14 @@ Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
                 metadata.options.autoIndexId == CollectionOptions::DEFAULT) {
                 // createCollection() may be called before the in-memory fCV parameter is
                 // initialized, so use the unsafe fCV getter here.
-                IndexCatalog* ic = collection->getIndexCatalog();
-                fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
-                    opCtx, !idIndexSpec.isEmpty() ? idIndexSpec : ic->getDefaultIdIndexSpec()));
+
+                // There is no need for Monograph to call this function.
+                // The check for index specification has been done through `prepareSpecForCreate`
+                // during DatabaseImpl::createCollection.
+
+                // IndexCatalog* ic = collection->getIndexCatalog();
+                // fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
+                //     opCtx, !idIndexSpec.isEmpty() ? idIndexSpec : ic->getDefaultIdIndexSpec()));
             } else {
                 // autoIndexId: false is only allowed on unreplicated collections.
                 uassert(50001,

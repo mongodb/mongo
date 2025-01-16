@@ -353,29 +353,29 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
         if (!s.isOK())
             return s;
     }
-// Skip index build
-/*
-    // now going to touch disk
-    IndexBuildBlock indexBuildBlock(opCtx, _collection, spec);
-    status = indexBuildBlock.init();
-    if (!status.isOK())
-        return status;
+    // Skip index build
+    /*
+        // now going to touch disk
+        IndexBuildBlock indexBuildBlock(opCtx, _collection, spec);
+        status = indexBuildBlock.init();
+        if (!status.isOK())
+            return status;
 
-    // sanity checks, etc...
-    IndexCatalogEntry* entry = indexBuildBlock.getEntry();
-    invariant(entry);
-    IndexDescriptor* descriptor = entry->descriptor();
-    invariant(descriptor);
-    invariant(entry == _entries.find(descriptor));
+        // sanity checks, etc...
+        IndexCatalogEntry* entry = indexBuildBlock.getEntry();
+        invariant(entry);
+        IndexDescriptor* descriptor = entry->descriptor();
+        invariant(descriptor);
+        invariant(entry == _entries.find(descriptor));
 
-    status = entry->accessMethod()->initializeAsEmpty(opCtx);
-    if (!status.isOK())
-        return status;
-    indexBuildBlock.success();
+        status = entry->accessMethod()->initializeAsEmpty(opCtx);
+        if (!status.isOK())
+            return status;
+        indexBuildBlock.success();
 
-    // sanity check
-    invariant(_collection->getCatalogEntry()->isIndexReady(opCtx, descriptor->indexName()));
-*/
+        // sanity check
+        invariant(_collection->getCatalogEntry()->isIndexReady(opCtx, descriptor->indexName()));
+    */
     return spec;
 }
 
@@ -771,9 +771,6 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                                        const BSONObj& spec) const {
     const char* name = spec.getStringField("name");
     invariant(name[0]);
-    if (std::string_view{name} == "_id_") {
-        return Status::OK();
-    }
 
     const BSONObj key = spec.getObjectField("key");
     const BSONObj collation = spec.getObjectField("collation");
