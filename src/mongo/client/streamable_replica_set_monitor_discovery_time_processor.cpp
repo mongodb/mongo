@@ -63,7 +63,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProces
               "replicaSet"_attr = newDescription->getSetName(),
               "topologyType"_attr = newDescription->getType(),
               "primary"_attr = newHost,
-              "durationMillis"_attr = _elapsedTime.millis());
+              "durationMillisSinceLastChange"_attr = _elapsedTime.millis());
         _elapsedTime.reset();
     }
 }
