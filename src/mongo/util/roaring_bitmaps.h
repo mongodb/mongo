@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+
 // Prevent macro redefinition warning.
 #ifdef IS_BIG_ENDIAN
 #undef IS_BIG_ENDIAN
@@ -40,10 +42,127 @@
 
 namespace mongo {
 /**
- * Roarinng Bitmaps implementation for 64 bit integers. It uses B-Tree map to store 32-bits roaring
+ * Roaring Bitmaps implementation for 64 bit integers. It uses B-Tree map to store 32-bits roaring
  * bitmaps for memory efficiency.
  */
 class Roaring64BTree {
+private:
+    class Iterator {
+    public:
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = uint64_t;
+        using reference = uint64_t&;
+        using pointer = uint64_t*;
+
+        struct EndTag {};
+
+        Iterator(const Iterator&) = delete;
+        Iterator& operator=(const Iterator&) = delete;
+
+        Iterator(Iterator&&) = default;
+        Iterator& operator=(Iterator&&) = default;
+
+        // Constructor
+        Iterator(const absl::btree_map<uint32_t, roaring::Roaring>* roarings)
+            : _roarings(roarings),
+              _treeIt(_roarings->begin()),
+              _currentRoaring(&_defaultRoaring),
+              _roaringIt(_defaultRoaring.begin()) {
+            // Update _currentRoaring and _roaringIt if there are Roarings in the map.
+            if (!isTreeExhausted()) {
+                _currentRoaring = &_treeIt->second;
+                _roaringIt = _currentRoaring->begin();
+            }
+        }
+
+        Iterator(const absl::btree_map<uint32_t, roaring::Roaring>* roarings, const EndTag&)
+            : _roarings(roarings),
+              _treeIt(_roarings->end()),
+              _currentRoaring(&_defaultRoaring),
+              _roaringIt(_defaultRoaring.end()) {
+            if (!isTreeExhausted()) {
+                _currentRoaring = &_treeIt->second;
+                _roaringIt = _currentRoaring->end();
+            }
+        }
+
+        friend bool operator==(const Iterator& lhs, const Iterator& rhs) {
+            uassert(9774504,
+                    "Comparing iterators from two different Roaring64BTree",
+                    lhs._roarings == rhs._roarings);
+
+            if (lhs.isTreeExhausted() != rhs.isTreeExhausted() ||
+                lhs.isRoaringExhausted() != rhs.isRoaringExhausted()) {
+                return false;
+            }
+
+            if (!lhs.isTreeExhausted() && lhs._treeIt != rhs._treeIt) {
+                return false;
+            }
+
+            if (!lhs.isRoaringExhausted() && lhs._roaringIt != rhs._roaringIt) {
+                return false;
+            }
+            return true;
+        };
+
+        friend bool operator!=(const Iterator& lhs, const Iterator& rhs) {
+            return !(lhs == rhs);
+        }
+
+        // ++it
+        Iterator& operator++() {
+            if (!isRoaringExhausted()) {
+                ++_roaringIt;
+            }
+            if (isRoaringExhausted()) {
+                if (!isTreeExhausted()) {
+                    ++_treeIt;
+                }
+
+                if (!isTreeExhausted()) {
+                    _currentRoaring = &_treeIt->second;
+                    _roaringIt = _currentRoaring->begin();
+                }
+            }
+
+            return *this;
+        };
+
+        value_type operator*() const {
+            return getCurrentValue();
+        }
+
+    private:
+        const absl::btree_map<uint32_t, roaring::Roaring>* _roarings;
+        absl::btree_map<uint32_t, roaring::Roaring>::const_iterator _treeIt;
+
+        // I need this to silence UBSAN.
+        inline static const roaring::Roaring _defaultRoaring{};
+
+        const roaring::Roaring* _currentRoaring;
+        roaring::Roaring::const_iterator _roaringIt;
+
+        bool isTreeExhausted() const {
+            return _treeIt == _roarings->end();
+        }
+
+        bool isRoaringExhausted() const {
+            return _roaringIt == _currentRoaring->end();
+        }
+
+        uint64_t getCurrentValue() const {
+            uassert(9774500, "Dereferencing invalid Roaring64BTree Iterator", !isTreeExhausted());
+            uassert(
+                9774501, "Dereferencing invalid Roaring64BTree Iterator", !isRoaringExhausted());
+
+            uint64_t high_value = (static_cast<uint64_t>(_treeIt->first) << 32);
+            uint64_t low_value = static_cast<uint64_t>(*_roaringIt);
+            return (high_value + low_value);
+        }
+    };
+
 public:
     /**
      * Add the value to the bitmaps. Returns true if a new values was added, false otherwise.
@@ -67,6 +186,18 @@ public:
             ? _roarings.at(highBytes(value)).contains(lowBytes(value))
             : false;
     }
+
+    /* Creates an iterator on the Roaring64BTree. The iterator iterates the elements in the
+     * Roaring64BTree in ascending order.*/
+    Iterator begin() const {
+        return Iterator{&_roarings};
+    }
+
+    Iterator end() const {
+        return Iterator{&_roarings, Iterator::EndTag{}};
+    }
+
+    typedef Iterator const_iterator;
 
 private:
     static constexpr uint32_t highBytes(const uint64_t in) {

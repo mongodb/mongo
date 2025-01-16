@@ -37,11 +37,103 @@
 
 namespace mongo {
 /**
- * A set of unsigned 64 bit integers implemented as  a mixed data structure that uses hash table to
+ * A set of unsigned 64 bit integers implemented as a mixed data structure that uses hash table to
  * store the first `threshold` elements. Once the set's density reaches at least
  * threshold/universeSize, it switches to Roaring Bitmaps.
  */
 class HashRoaringSet {
+private:
+    class Iterator {
+    public:
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = uint64_t;
+        using reference = uint64_t&;
+        using pointer = uint64_t*;
+
+        struct EndTag {};
+
+        Iterator(const Iterator&) = delete;
+        Iterator& operator=(const Iterator&) = delete;
+
+        Iterator(Iterator&&) = default;
+        Iterator& operator=(Iterator&&) = default;
+
+        // Constructor
+        Iterator(const HashRoaringSet* set)
+            : _set(set), _hashIt(_set->_hashTable.begin()), _bitmapIt(_set->_bitmap.begin()) {}
+
+        Iterator(const HashRoaringSet* set, const EndTag&)
+            : _set(set), _hashIt(_set->_hashTable.end()), _bitmapIt(_set->_bitmap.end()) {}
+
+        friend bool operator==(const Iterator& lhs, const Iterator& rhs) {
+            uassert(9774503,
+                    "Comparing iterators from two different HashRoaringSet",
+                    lhs._set == rhs._set);
+
+            if (lhs.isHashSetExhausted() != rhs.isHashSetExhausted() ||
+                lhs.isBitmapExhausted() != rhs.isBitmapExhausted()) {
+                return false;
+            }
+
+            if (!lhs.isHashSetExhausted() && lhs._hashIt != rhs._hashIt) {
+                return false;
+            }
+
+            if (!lhs.isBitmapExhausted() && lhs._bitmapIt != rhs._bitmapIt) {
+                return false;
+            }
+            return true;
+        };
+
+        friend bool operator!=(const Iterator& lhs, const Iterator& rhs) {
+            return !(lhs == rhs);
+        }
+
+        // ++it.
+        Iterator& operator++() {
+            if (!isHashSetExhausted()) {
+                ++_hashIt;
+
+                if (isHashSetExhausted()) {
+                    // We want to return the first value from the roaring set.
+                    return *this;
+                }
+            } else if (!isBitmapExhausted()) {
+                ++_bitmapIt;
+            }
+            return *this;
+        };
+
+        value_type operator*() const {
+            return getCurrentValue();
+        }
+
+    private:
+        bool isHashSetExhausted() const {
+            return _hashIt == _set->_hashTable.end();
+        }
+
+        bool isBitmapExhausted() const {
+            return _bitmapIt == _set->_bitmap.end();
+        }
+
+        uint64_t getCurrentValue() const {
+            if (!isHashSetExhausted()) {
+                return *_hashIt;
+            }
+            if (!isBitmapExhausted()) {
+                return *_bitmapIt;
+            }
+
+            uasserted(9774502, "Dereferencing invalid HashRoaringSet Iterator");
+        }
+
+        const HashRoaringSet* _set;
+        absl::flat_hash_set<uint64_t>::const_iterator _hashIt;
+        Roaring64BTree::const_iterator _bitmapIt;
+    };
+
 public:
     /**
      * Defines the possible states of the set.
@@ -129,6 +221,14 @@ public:
      */
     State getCurrentState() const {
         return _state;
+    }
+
+    Iterator begin() const {
+        return Iterator{this};
+    }
+
+    Iterator end() const {
+        return Iterator{this, Iterator::EndTag{}};
     }
 
 private:
