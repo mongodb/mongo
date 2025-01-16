@@ -1307,6 +1307,12 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 auto uniqueOpCtx = client->makeOperationContext();
                 auto opCtx = uniqueOpCtx.get();
 
+                auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
+                if (backupCursorHooks->isBackupCursorOpen()) {
+                    LOGV2_DEBUG(9810500, 1, "Backup in progress, skipping table drops.");
+                    return;
+                }
+
                 // The TimestampMonitor is an important background cleanup task for the storage
                 // engine and needs to be able to make progress to free up resources.
                 ScopedAdmissionPriority<ExecutionAdmissionContext> immediatePriority(

@@ -541,6 +541,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:index_catalog",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/index_builds:two_phase_index_build_knobs_idl",
+        "//src/mongo/db/storage:backup_cursor_hooks",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
     ],
 )
