@@ -10,6 +10,8 @@
  *   requires_non_retryable_writes,
  *   requires_profiling,
  *   assumes_no_implicit_index_creation,
+ *   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
+ *   run_getLatestProfilerEntry,
  * ]
  */
 

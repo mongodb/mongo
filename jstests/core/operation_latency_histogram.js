@@ -20,6 +20,9 @@
 //   uses_compact,
 //   # Does not support multiplanning, because it stashes documents beyond batch size.
 //   does_not_support_multiplanning_single_solutions,
+//   # The test does not expect concurrent reads against its test collections (e.g. the checks
+//   # aren't expecting concurrent reads but initial sync will be reading those collections).
+//   does_not_support_concurrent_reads,
 // ]
 //
 

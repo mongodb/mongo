@@ -19,6 +19,8 @@
  *     # We need a timeseries collection.
  *     requires_timeseries,
  *     assumes_balancer_off,
+ *     # The test examines the SBE plan cache, which initial sync may change the contents of.
+ *     examines_sbe_cache
  * ]
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";

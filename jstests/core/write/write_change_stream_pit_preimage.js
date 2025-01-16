@@ -8,6 +8,8 @@
 //  requires_getmore,
 //  no_selinux,
 //  incompatible_with_preimages_by_default,
+//  # Change stream pre-images are not cloned during initial sync.
+//  incompatible_with_initial_sync
 // ]
 import {
     ClusteredCollectionUtil

@@ -166,7 +166,13 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
         # Tear down and restart the initial sync node to start initial sync again.
         sync_node.teardown()
 
-        self.logger.info("Starting the initial sync node back up again...")
+        method = random.choice(["logical", "fileCopyBased"])
+        self.logger.info(
+            "Starting the initial sync node back up again with initial sync method {}".format(
+                method
+            )
+        )
+        sync_node.mongod_options["set_parameters"]["initialSyncMethod"] = method
         sync_node.setup()
         self.logger.info(fixture_interface.create_fixture_table(self.fixture))
         sync_node.await_ready()

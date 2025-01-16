@@ -5,15 +5,12 @@ selector:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
-  exclude_files:
-    # Duplicate namespace may cause cloner to try and clone view instead of collection
-    - jstests/core/views/duplicate_ns.js
-    # Change stream pre-images are not cloned during initial sync.
-    - jstests/core/**/write_change_stream_pit_preimage.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - incompatible_with_initial_sync
+    # Tests that use fsyncLock which will fail if FCBIS has a backup cursor open.
+    - requires_fsync
     # Tests that query the system.profile collection cannot run in this suite since an initial sync
     # may insert unexpected operations into the profile collection.
     - queries_system_profile_collection
@@ -28,12 +25,15 @@ run_hook_interval: &run_hook_interval 20
 executor:
   archive:
     hooks:
-      - IntermediateInitialSync
+      - BackgroundInitialSync
   config:
     shell_options:
       eval: "globalThis.testingReplication = true;"
+      global_vars:
+        TestData:
+          isRunningInitialSync: true
   hooks:
-    - class: IntermediateInitialSync
+    - class: BackgroundInitialSync
       n: *run_hook_interval
     - class: CleanEveryN
       n: *run_hook_interval
@@ -46,6 +46,3 @@ executor:
         initialSyncOplogFetcherBatchSize: 10
     num_nodes: 2
     start_initial_sync_node: True
-    replset_config_options:
-      settings:
-        chainingAllowed: False

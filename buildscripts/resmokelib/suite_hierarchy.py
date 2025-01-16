@@ -80,6 +80,21 @@ SUITE_HIERARCHY = {
     "concurrency_replication": {},
     "concurrency_sharded_initial_sync": {"concurrency_sharded_causal_consistency": {}},
     # JScore passthrough suites
+    "replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough": {
+        # The reconfig stepdown suite is not considered a superset of replica_sets_reconfig_jscore_passthrough suite because the stepdown suite uses retryable writes whereas the vanilla suite does not. Therefore the commands being sent to the server are fundamentally different.
+        "replica_sets_reconfig_jscore_stepdown_passthrough": {},
+        "replica_sets_reconfig_kill_primary_jscore_passthrough": {},
+    },
+    "replica_sets_multi_stmt_txn_kill_stepdown_terminate_jscore_passthrough": {
+        "replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough": {},
+        "replica_sets_multi_stmt_txn_stepdown_jscore_passthrough": {},
+        "replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough": {},
+        "replica_sets_multi_stmt_txn_jscore_passthrough": {},
+    },
+    "replica_sets_initsync_logical_fcbis_jscore_passthrough": {
+        "replica_sets_fcbis_jscore_passthrough": {},
+        "replica_sets_initsync_jscore_passthrough": {},
+    },
 }
 
 

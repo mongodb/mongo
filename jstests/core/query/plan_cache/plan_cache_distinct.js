@@ -16,6 +16,8 @@
  *   requires_fcv_81,
  *   featureFlagShardFilteringDistinctScan,
  *   requires_getmore,
+ *   # The test examines the SBE plan cache, which initial sync may change the contents of.
+ *   examines_sbe_cache
  * ]
  */
 

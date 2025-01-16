@@ -80,7 +80,7 @@
             TestData:
               overrideRetryAttempts: 6
 
-- name: replcia_sets_reconfig_shell_options_TestData
+- name: replica_sets_reconfig_shell_options_TestData
   value:
     executor:
       config:

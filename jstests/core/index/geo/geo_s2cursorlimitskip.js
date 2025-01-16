@@ -11,6 +11,9 @@
 //   requires_capped,
 //   requires_getmore,
 //   requires_profiling,
+//   # The test does not expect concurrent reads against its test collections (e.g. the checks
+//   # aren't expecting concurrent reads but initial sync will be reading those collections).
+//   does_not_support_concurrent_reads
 // ]
 
 var testDB = db.getSiblingDB("geo_s2cursorlimitskip");

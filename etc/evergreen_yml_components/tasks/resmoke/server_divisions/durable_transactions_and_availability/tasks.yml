@@ -1118,6 +1118,21 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: replica_sets_initsync_logical_fcbis_jscore_passthrough_gen
+    # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "incompatible_debug_mode",
+        "replica_sets",
+        "san",
+        "large",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: replica_sets_initsync_lagged_sync_source_jscore_passthrough_gen
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:
@@ -1334,6 +1349,22 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: replica_sets_multi_stmt_txn_kill_stepdown_terminate_jscore_passthrough_gen
+    # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "incompatible_debug_mode",
+        "replica_sets",
+        "non_maj_read",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:
@@ -1349,8 +1380,8 @@ tasks:
         vars:
           use_large_distro: "true"
 
-  - <<: *task_template
-    name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
+  - <<: *gen_task_template
+    name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough_gen
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -1361,8 +1392,11 @@ tasks:
         "non_maj_read",
       ]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+      # - func: "do setup"
+      # - func: "run tests"
 
   - <<: *gen_task_template
     name: replica_sets_multiversion_gen
@@ -1399,6 +1433,12 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_repl", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough_gen
     tags: ["assigned_to_jira_team_server_repl", "default"]
     commands:
       - func: "generate resmoke tasks"

@@ -19,6 +19,8 @@
  *   # versions.
  *   requires_fcv_72,
  *   multiversion_incompatible,
+ *   # The test examines the SBE plan cache, which initial sync may change the contents of.
+ *   examines_sbe_cache,
  *   requires_getmore,
  * ]
  */
