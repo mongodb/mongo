@@ -33,7 +33,7 @@ and x86-64. More detailed platform instructions can be found below.
 ```bash
 git clean -fdx # USE WITH CAUTION! Delete every untracked file including .gitignored files (this is basically everything)
 # Close and reopen your terminal to clear out any problems from your old environment
-python3 --version # Should be >=3.10. If it is not, follow [online instructions](https://www.python.org/downloads/) to install python.
+python3 --version # Should be 3.10. If it is not, follow [online instructions](https://www.python.org/downloads/) to install python 3.10.
 python3 -m venv python3-venv --prompt mongo # Create a virtual environment. "python3-venv" is non standard but it is kept since it is assumed elsewhere in our code.
 source python3-venv/bin/activate # You should see a (mongo) appear in your terminal
 which python3 # This should point to the python in python3-venv
@@ -50,12 +50,11 @@ ninja -f opt.ninja -j 200 install-devcore
 
 ## Python Prerequisites
 
-In order to build MongoDB, Python 3.10+ is required, and several Python
-modules must be installed. Python 3 is included in macOS 10.15 and later.
-For earlier macOS versions, Python 3 can be installed using Homebrew or
-MacPorts or similar.
+In order to build MongoDB, Python 3.10 is required. Newer and older versions of Python are untested
+and are known to cause build failures. Python 3.10 can be installed using Homebrew, MacPorts or
+similar.
 
-MongoDB manages our python dependencies with poetry.
+Several Python modules must be installed and these Python dependencies are managed with Poetry.
 You can see other install instructions for poetry by reading this [install guide](https://python-poetry.org/).
 
 Installing the requirements inside a python3 based virtualenv
