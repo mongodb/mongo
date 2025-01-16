@@ -39,6 +39,21 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     // Trigger the secondary to step up.
     rst.stepUp(newPrimary);
 
+    // Wait for secondary to catch up to the new primary.
+    rst.awaitReplication();
+
+    // Wait until the new primary perceives that the secondary has written the new primary entry.
+    // This implies that it successfully received the corresponding updatePosition from the
+    // secondary and eliminates the race condition where the new primary will use it to update
+    // its snapshot instead of the new write later on in the test.
+    const res = newPrimary.adminCommand({replSetGetStatus: 1});
+    const newPrimaryWrittenOptime = res.optimes.writtenOpTime;
+    const secondaryWrittenOpTime = res.members[1].optimeWritten;
+
+    assert.soon(() => {
+        return bsonWoCompare(newPrimaryWrittenOptime, secondaryWrittenOpTime) === 0;
+    });
+
     // Start a new read. The read should block until we have a committed snapshot available that
     // reflects the "new primary" entry.
     function parallelFunc(host, dbName, collectionName) {
