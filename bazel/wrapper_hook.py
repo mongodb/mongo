@@ -50,7 +50,9 @@ def get_deps_dirs(deps):
 
 def search_for_modules(deps, deps_installed, lockfile_changed=False):
     deps_not_found = deps.copy()
+    wrapper_debug(f"deps_installed: {deps_installed}")
     for target_dir, dep in get_deps_dirs(deps):
+        wrapper_debug(f"checking for {dep} in target_dir: {target_dir}")
         if dep in deps_installed:
             continue
 
@@ -58,9 +60,13 @@ def search_for_modules(deps, deps_installed, lockfile_changed=False):
             continue
 
         if not lockfile_changed:
-            deps_installed.append(dep)
-            deps_not_found.remove(dep)
-            sys.path.append(target_dir)
+            for entry in os.listdir(target_dir):
+                if entry.endswith(".dist-info"):
+                    wrapper_debug(f"found: {target_dir}")
+                    deps_installed.append(dep)
+                    deps_not_found.remove(dep)
+                    sys.path.append(target_dir)
+                    break
         else:
             os.chmod(target_dir, 0o777)
             for root, dirs, files in os.walk(target_dir):
@@ -69,7 +75,7 @@ def search_for_modules(deps, deps_installed, lockfile_changed=False):
                 for file in files:
                     os.chmod(os.path.join(root, file), 0o777)
             shutil.rmtree(target_dir)
-
+    wrapper_debug(f"deps_not_found: {deps_not_found}")
     return deps_not_found
 
 
