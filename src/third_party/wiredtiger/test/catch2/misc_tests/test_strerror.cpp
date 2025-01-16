@@ -23,8 +23,8 @@ TEST_CASE("Test generation of sub-level error codes when strerror is called", "[
     {
         std::vector<std::pair<int, std::string>> errors = {
           {WT_NONE, "WT_NONE: No additional context"},
-          {WT_COMPACTION_ALREADY_RUNNING,
-            "WT_COMPACTION_ALREADY_RUNNING: Compaction is already running"},
+          {WT_BACKGROUND_COMPACT_ALREADY_RUNNING,
+            "WT_BACKGROUND_COMPACT_ALREADY_RUNNING: Background compaction is already running"},
           {WT_SESSION_MAX, "WT_SESSION_MAX: Max capacity of configured sessions reached"},
           {WT_CACHE_OVERFLOW, "WT_CACHE_OVERFLOW: Cache capacity has overflown"},
           {WT_WRITE_CONFLICT, "WT_WRITE_CONFLICT: Write conflict between concurrent operations"},
