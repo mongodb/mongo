@@ -8,6 +8,7 @@
 # are specific to Antithesis testing with External SUTs
 
 from buildscripts.resmokelib import logging
+from buildscripts.resmokelib.utils.dictionary import set_dict_value
 
 INCOMPATIBLE_HOOKS = [
     "CleanEveryN",
@@ -34,21 +35,27 @@ def make_hooks_compatible(suite):
         "The `AntithesisLogging` hook is automatically added for external suites."
     )
     if suite.get("executor", {}).get("hooks", None):
-        # it's either a list of strings, or a list of dicts, each with key 'class'
-        if isinstance(suite["executor"]["hooks"][0], str):
-            suite["executor"]["hooks"] = ["AntithesisLogging"] + [
-                hook for hook in suite["executor"]["hooks"] if hook not in INCOMPATIBLE_HOOKS
-            ]
-        elif isinstance(suite["executor"]["hooks"][0], dict):
-            suite["executor"]["hooks"] = [{"class": "AntithesisLogging"}] + [
-                hook
-                for hook in suite["executor"]["hooks"]
-                if hook["class"] not in INCOMPATIBLE_HOOKS
-            ]
-        else:
-            raise RuntimeError(
-                f'Unknown structure in hook. Please reach out in #server-testing: {suite["executor"]["hooks"][0]}'
-            )
+        # it's a list of dicts, each with key 'class'
+        converted_hooks = [{"class": "AntithesisLogging"}]
+        for hook in suite["executor"]["hooks"]:
+            assert isinstance(
+                hook, dict
+            ), f"Unknown structure in hook. Please reach out in #server-testing: {hook}"
+
+            name = hook["class"]
+            if name in INCOMPATIBLE_HOOKS:
+                continue
+
+            if name == "ValidateCollections":
+                set_dict_value(
+                    hook,
+                    ["shell_options", "global_vars", "TestData", "skipEnforceFastCountOnValidate"],
+                    True,
+                )
+
+            converted_hooks.append(hook)
+
+        suite["executor"]["hooks"] = converted_hooks
 
 
 def update_test_data(suite):

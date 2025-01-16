@@ -92,7 +92,7 @@ def set_dict_value(dict1, path, value):
     current_object = dict1
 
     for key in path[:-1]:
-        if key not in path:
+        if key not in current_object:
             current_object[key] = {}
 
         current_object = current_object[key]
