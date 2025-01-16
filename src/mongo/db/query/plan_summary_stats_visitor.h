@@ -87,6 +87,10 @@ public:
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceIdLookupStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceGraphLookupStats> stats) final {
+        _summary.usedDisk |= stats->spills > 0;
+        accumulate(stats->planSummaryStats);
+    }
 
 private:
     /**

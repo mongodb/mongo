@@ -376,6 +376,7 @@ SortCounters sortCounters;
 ValidatorCounters validatorCounters;
 GroupCounters groupCounters;
 SetWindowFieldsCounters setWindowFieldsCounters;
+GraphLookupCounters graphLookupCounters;
 PlanCacheCounters planCacheCounters;
 FastPathQueryCounters fastPathQueryCounters;
 

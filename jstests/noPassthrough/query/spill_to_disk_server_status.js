@@ -12,6 +12,7 @@ import {
     getWinningPlanFromExplain
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -25,28 +26,22 @@ const isSbeEnabled = checkSbeFullyEnabled(db);
 
 // Set up relevant query knobs so that the query will spill for every document.
 // No batching in document source cursor
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalDocumentSourceCursorInitialBatchSize: 1}));
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
+assert.commandWorked(setParameter(db, "internalDocumentSourceCursorInitialBatchSize", 1));
+assert.commandWorked(setParameter(db, "internalDocumentSourceCursorBatchSizeBytes", 1));
 // Spilling memory threshold for $sort
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1}));
+assert.commandWorked(setParameter(db, "internalQueryMaxBlockingSortMemoryUsageBytes", 1));
 // Spilling memory threshold for $group
+assert.commandWorked(setParameter(db, "internalDocumentSourceGroupMaxMemoryBytes", 1));
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 1}));
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1}));
+    setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1));
 // Spilling memory threshold for $setWindowFields
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: isSbeEnabled ? 129 : 232
-}));
+assert.commandWorked(setParameter(
+    db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", isSbeEnabled ? 129 : 232));
 // Spilling memory threshold for $lookup
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
-}));
+assert.commandWorked(setParameter(
+    db, "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 1));
+// Spilling memory threshold for $graphLookup
+assert.commandWorked(setParameter(db, "internalDocumentSourceGraphLookupMaxMemoryBytes", 1));
 
 const nDocs = 10;
 for (let i = 0; i < nDocs; i++) {
@@ -65,6 +60,15 @@ const stages = {
         }
     },
     lookup: {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "c"}},
+    graphLookup: {
+        $graphLookup: {
+            from: foreignCollName,
+            startWith: "$_id",
+            connectToField: "_id",
+            connectFromField: "_id",
+            as: "c",
+        }
+    }
 };
 
 function getServerStatusSpillingMetrics(serverStatus, stageName) {
@@ -92,11 +96,18 @@ function getServerStatusSpillingMetrics(serverStatus, stageName) {
             spills: lookupMetrics.hashLookupSpillToDisk,
             spilledBytes: lookupMetrics.hashLookupSpillToDiskBytes,
         };
+    } else if (stageName === "$graphLookup") {
+        const graphLookupMetrics = serverStatus.metrics.query.graphLookup;
+        return {
+            spills: graphLookupMetrics.spills,
+            spilledBytes: graphLookupMetrics.spilledBytes,
+        };
+    } else {
+        return {
+            spills: 0,
+            spilledBytes: 0,
+        };
     }
-    return {
-        spills: 0,
-        spilledBytes: 0,
-    };
 }
 
 function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillingMetrics}) {
@@ -166,6 +177,11 @@ if (isSbeEnabled) {
         expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 790},
     });
 }
+testSpillingMetrics({
+    stage: stages['graphLookup'],
+    expectedSpillingMetrics: {spills: 30, spilledBytes: 1680},
+    expectedSbeSpillingMetrics: {spills: 30, spilledBytes: 1680}
+});
 
 /*
  * Tests that query fails when attempting to spill with insufficient disk space

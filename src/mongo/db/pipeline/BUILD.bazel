@@ -1487,6 +1487,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/process_interface:mongod_process_interfaces",
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
         "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
+        "//src/mongo/db/pipeline/spilling:spilling_test_utils",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/search:mongot_cursor",

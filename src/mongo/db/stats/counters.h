@@ -557,6 +557,34 @@ public:
 };
 extern SetWindowFieldsCounters setWindowFieldsCounters;
 
+/** Counters tracking graphLookup stats. */
+class GraphLookupCounters {
+public:
+    GraphLookupCounters() = default;
+    GraphLookupCounters(GraphLookupCounters&) = delete;
+    GraphLookupCounters& operator=(const GraphLookupCounters&) = delete;
+
+    void incrementPerSpilling(int64_t spills,
+                              int64_t spilledBytes,
+                              int64_t spilledRecords,
+                              int64_t spilledDataStorageSize) {
+        graphLookupSpills.incrementRelaxed(spills);
+        graphLookupSpilledBytes.incrementRelaxed(spilledBytes);
+        graphLookupSpilledRecords.incrementRelaxed(spilledRecords);
+        graphLookupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
+    }
+
+    Counter64& graphLookupSpills = *MetricBuilder<Counter64>{"query.graphLookup.spills"};
+    // The spilled storage size after compression might be different from the bytes spilled.
+    Counter64& graphLookupSpilledBytes =
+        *MetricBuilder<Counter64>{"query.graphLookup.spilledBytes"};
+    Counter64& graphLookupSpilledRecords =
+        *MetricBuilder<Counter64>{"query.graphLookup.spilledRecords"};
+    Counter64& graphLookupSpilledDataStorageSize =
+        *MetricBuilder<Counter64>{"query.graphLookup.spilledDataStorageSize"};
+};
+extern GraphLookupCounters graphLookupCounters;
+
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.
  */

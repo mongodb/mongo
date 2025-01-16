@@ -171,7 +171,11 @@ auto SpillableDocumentMap::IteratorImpl<IsConst>::operator++() -> IteratorImpl& 
     } else if (!diskExhausted()) {
         _diskDocuments.pop_front();
         if (_diskDocuments.empty()) {
-            readNextBatchFromDisk();
+            if (_diskItExhausted) {
+                _diskIt.reset();
+            } else {
+                readNextBatchFromDisk();
+            }
         }
     }
     return *this;

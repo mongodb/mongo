@@ -318,21 +318,20 @@ pipeline = {
     };
 assertErrorCode(local, pipeline, [16608, ErrorCodes.BadValue], "division by zero in $expr");
 
-// $graphLookup can only consume at most 100MB of memory.
+// $graphLookup can only consume at most 100MB of memory without spilling.
 foreign.drop();
 
-// Here, the visited set exceeds 100MB.
-var bulk = foreign.initializeUnorderedBulkOp();
+const string7MB = new Array(7 * 1024 * 1024).join(' ');
+const string14MB = string7MB + string7MB;
 
+// Here, the visited set exceeds 100MB.
 var initial = [];
 for (var i = 0; i < 8; i++) {
     var obj = {_id: i};
-
-    obj['longString'] = new Array(14 * 1024 * 1024).join('x');
+    obj['longString'] = string14MB;
     initial.push(i);
-    bulk.insert(obj);
+    assert.commandWorked(foreign.insertOne(obj));
 }
-assert.commandWorked(bulk.execute());
 
 pipeline = {
         $graphLookup: {
@@ -343,19 +342,21 @@ pipeline = {
             as: "graph"
         }
     };
-assertErrorCode(local, pipeline, 40099, "maximum memory usage reached");
+assertErrorCode(local,
+                pipeline,
+                ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit and can't spill to disk",
+                {allowDiskUse: false});
 
-// Here, the visited set should grow to approximately 90 MB, and the frontier should push memory
+// Here, the visited set should grow to approximately 90 MB, and the queue should push memory
 // usage over 100MB.
 foreign.drop();
 
-bulk = foreign.initializeUnorderedBulkOp();
 for (let i = 0; i < 14; i++) {
     let obj = {from: 0, to: 1};
-    obj['s'] = new Array(7 * 1024 * 1024).join(' ');
-    bulk.insert(obj);
+    obj['s'] = string7MB;
+    assert.commandWorked(foreign.insertOne(obj));
 }
-assert.commandWorked(bulk.execute());
 
 pipeline = {
         $graphLookup: {
@@ -366,18 +367,19 @@ pipeline = {
             as: "out"
         }
     };
-assertErrorCode(local, pipeline, 40099, "maximum memory usage reached");
+assertErrorCode(local,
+                pipeline,
+                ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit and can't spill to disk",
+                {allowDiskUse: false});
 
 // Here, we test that the cache keeps memory usage under 100MB, and does not cause an error.
 foreign.drop();
-
-bulk = foreign.initializeUnorderedBulkOp();
 for (let i = 0; i < 13; i++) {
     let obj = {from: 0, to: 1};
-    obj['s'] = new Array(7 * 1024 * 1024).join(' ');
-    bulk.insert(obj);
+    obj['s'] = string7MB;
+    assert.commandWorked(foreign.insertOne(obj));
 }
-assert.commandWorked(bulk.execute());
 
 var res = local
                 .aggregate({

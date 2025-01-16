@@ -565,7 +565,7 @@ server_parameters:
 
   internalDocumentSourceGraphLookupMaxMemoryBytes:
     description: "Maximum size of the data that the $graphLookup aggregation stage will cache
-    in-memory before failing."
+    in-memory before spilling."
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceGraphLookupMaxMemoryBytes"
     cpp_vartype: AtomicWord<long long>

@@ -1375,4 +1375,38 @@ struct DocumentSourceIdLookupStats : public SpecificStats {
     // Tracks the cumulative summary stats for the idLookup sub-pipeline.
     PlanSummaryStats planSummaryStats;
 };
+
+struct DocumentSourceGraphLookupStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const override {
+        return std::make_unique<DocumentSourceGraphLookupStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    // The peak amount of RAM used by the stage during execution.
+    uint64_t maxMemoryUsageBytes = 0;
+    // The number of times the stage spilled.
+    uint64_t spills = 0;
+    // The size, in bytes, of the memory released with spilling.
+    uint64_t spilledBytes = 0;
+    // The size, in bytes, of disk space used for spilling.
+    uint64_t spilledDataStorageSize = 0;
+    // The total number of records spillied.
+    uint64_t spilledRecords = 0;
+
+    // Tracks the summary stats in aggregate across all executions of the subpipeline.
+    PlanSummaryStats planSummaryStats;
+};
+
 }  // namespace mongo
