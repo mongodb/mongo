@@ -421,7 +421,7 @@ def bazel_build_subproc_func(**kwargs):
             env=kwargs["env"],
         ).stdout.strip()
     except subprocess.CalledProcessError:
-        output_base = None
+        output_base = ""
 
     if os.environ.get("CI"):
         if os.path.exists(".bazel_real"):
@@ -584,16 +584,25 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
                     subprocess.run(
                         [os.path.abspath(Globals.bazel_executable), "shutdown"],
                         check=True,
+                        text=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         env={**os.environ.copy(), **Globals.bazel_env_variables},
                     )
-                except subprocess.CalledProcessError:
-                    proc = psutil.Process(server_pid)
-                    if proc.is_running():
-                        proc.terminate()
-                        proc.wait(timeout=10)
-                        proc.kill()
+                except subprocess.CalledProcessError as exc:
+                    print(exc.stdout)
+                    print(exc.stderr)
+                    try:
+                        if psutil.pid_exists(int(server_pid)):
+                            proc = psutil.Process(int(server_pid))
+                            if proc.is_running():
+                                proc.terminate()
+                                proc.wait(timeout=10)
+                                proc.kill()
+                    except Exception as kill_exc:
+                        print("Tried to force kill server, but something happened:")
+                        print(kill_exc)
+                        print("Optimistically continuing anyways...")
 
             linker_jobs = 4
             sanitizers = env.GetOption("sanitize")
