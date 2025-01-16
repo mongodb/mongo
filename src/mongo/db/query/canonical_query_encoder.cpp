@@ -710,6 +710,36 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
     }
 }
 
+/**
+ * Encodes relevant CanonicalDistinct properties into cache key, notably distinct key and sort
+ * requirement. Projection spec is not encoded because it depends on the distinct key and filter
+ * which are already encoded.
+ */
+void encodeKeyForDistinct(const boost::optional<CanonicalDistinct>& distinct,
+                          StringBuilder* keyBuilder,
+                          bool isShardFilteringDistinctScanEnabled) {
+    // Ensure the delimiter is always included in the encoded plan cache key, regardless of the
+    // feature gate state. This avoids inconsistencies in plan cache keys across different FCVs
+    // during upgrades or downgrades.
+    *keyBuilder << kEncodeSectionDelimiter;
+    if (!isShardFilteringDistinctScanEnabled || !distinct.has_value()) {
+        return;
+    }
+    encodeUserString(distinct->getKey(), keyBuilder);
+    *keyBuilder << distinct->isDistinctScanDirectionFlipped();
+    if (distinct->getSortRequirement()) {
+        const auto& sortPattern = distinct->getSortRequirement().get();
+        auto delimiter = "";
+        for (const auto& part : sortPattern) {
+            if (part.fieldPath) {
+                *keyBuilder << delimiter << (part.isAscending ? "a" : "d");
+                encodeUserString(part.fieldPath->fullPath(), keyBuilder);
+                delimiter = ",";
+            }
+        }
+    }
+}
+
 void encodeKeyForPipelineStage(DocumentSource* docSource,
                                std::vector<Value>& serializedArray,
                                BufBuilder* bufBuilder) {
@@ -1269,6 +1299,10 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
     encodeKeyForProj(cq.getProj(), &keyBuilder);
     encodeCollation(cq.getCollator(), &keyBuilder);
+    encodeKeyForDistinct(cq.getDistinct(),
+                         &keyBuilder,
+                         cq.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled());
+
 
     // The apiStrict flag can cause the query to see different set of indexes. For example, all
     // sparse indexes will be ignored with apiStrict is used.
