@@ -114,7 +114,7 @@ executor:
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
-          overrideRetryAttempts: 3
+          overrideRetryAttempts: 6
           sessionOptions:
             readConcern:
               level: "majority"
