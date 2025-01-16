@@ -1838,22 +1838,23 @@ void ExecCommandDatabase::_initiateCommand() {
             if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern) {
                 OperationShardingState::get(opCtx).setTreatAsFromRouter();
             } else {
+                const auto invocationNss = _invocation->ns();
+                OperationShardingState::setShardRole(
+                    opCtx, invocationNss, shardVersion, databaseVersion);
+
                 // If a timeseries collection is sharded, only the buckets collection would be
                 // sharded. We expect all versioned commands to be sent over 'system.buckets'
                 // namespace. But it is possible that a stale mongos may send the request over a
                 // view namespace. In this case, we initialize the 'OperationShardingState' with
-                // buckets namespace.
+                // both the invocation and buckets namespaces.
                 // TODO: SERVER-80719 revisit this.
-                const auto invocationNss = _invocation->ns();
                 auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
-                // Hold reference to the catalog for collection lookup without locks to be safe.
                 auto catalog = CollectionCatalog::get(opCtx);
                 auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-                auto namespaceForSharding =
-                    (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
 
-                OperationShardingState::setShardRole(
-                    opCtx, namespaceForSharding, shardVersion, databaseVersion);
+                if (coll && coll->getTimeseriesOptions()) {
+                    OperationShardingState::setShardRole(opCtx, bucketNss, shardVersion, {});
+                }
             }
         }
     }

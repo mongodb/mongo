@@ -56,10 +56,6 @@ selector:
     - jstests/core_sharding/move_collection/move_collection_basic.js
     - jstests/core_sharding/move_collection/move_collection_capped_collection.js
 
-    # TODO SERVER-98386: re-enable this test once stale routing information does not miss documents
-    # after re-creating timeseries collections.
-    - jstests/core/timeseries/query/timeseries_union_with.js
-
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

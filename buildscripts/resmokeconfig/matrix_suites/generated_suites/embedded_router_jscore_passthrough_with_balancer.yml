@@ -71,7 +71,6 @@ selector:
     - jstests/core/index/index_stats.js
     - jstests/core/timeseries/query/timeseries_predicates.js
     - jstests/core/index/geo/geo_update_btree.js
-    - jstests/core/timeseries/query/timeseries_union_with.js
     - jstests/core/**/*[aA]uth*.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
