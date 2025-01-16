@@ -658,22 +658,16 @@ void rebuildOptionsWithGranularityFromConfigServer(OperationContext* opCtx,
     }
 }
 
-// Gets commit or error results from processed batches. Aborts unprocessed batches upon errors.
-template <typename ErrorGenerator>
-void getTimeseriesBatchResultsBase(OperationContext* opCtx,
-                                   const TimeseriesBatches& batches,
-                                   int64_t start,
-                                   int64_t indexOfLastProcessedBatch,
-                                   bool canContinue,
-                                   std::vector<mongo::write_ops::WriteError>* errors,
-                                   boost::optional<repl::OpTime>* opTime,
-                                   boost::optional<OID>* electionId,
-                                   std::vector<size_t>* docsToRetry) {
+// Aborts unprocessed batches, sets each user insert's error if there is any, and populates the list
+// of documents to retry.
+void processBatchResults(OperationContext* opCtx,
+                         const TimeseriesBatches& batches,
+                         std::vector<mongo::write_ops::WriteError>* errors,
+                         std::vector<size_t>* docsToRetry) {
     boost::optional<mongo::write_ops::WriteError> lastError;
     if (!errors->empty()) {
         lastError = errors->back();
     }
-    invariant(indexOfLastProcessedBatch == (int64_t)batches.size() || lastError);
 
     for (int64_t itr = 0, size = batches.size(); itr < size; ++itr) {
         const auto& [batch, index] = batches[itr];
@@ -682,73 +676,30 @@ void getTimeseriesBatchResultsBase(OperationContext* opCtx,
         }
 
         // If there are any unprocessed batches, we mark them as error with the last known error.
-        if (itr > indexOfLastProcessedBatch && !bucket_catalog::isWriteBatchFinished(*batch)) {
+        if (!bucket_catalog::isWriteBatchFinished(*batch)) {
             auto& bucketCatalog =
                 bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
             abort(bucketCatalog, batch, lastError->getStatus());
-            errors->emplace_back(start + index, lastError->getStatus());
+            errors->emplace_back(index, lastError->getStatus());
             continue;
         }
 
-        auto swCommitInfo = bucket_catalog::getWriteBatchResult(*batch);
-        if (swCommitInfo.getStatus() == ErrorCodes::TimeseriesBucketCleared) {
-            invariant(docsToRetry, "the 'docsToRetry' cannot be null");
+        auto batchStatus = bucket_catalog::getWriteBatchResult(*batch).getStatus();
+        if (batchStatus == ErrorCodes::TimeseriesBucketCleared) {
             docsToRetry->push_back(index);
             continue;
         }
-        if (swCommitInfo.getStatus() == ErrorCodes::WriteConflict ||
-            swCommitInfo.getStatus() == ErrorCodes::TemporarilyUnavailable) {
+        if (batchStatus == ErrorCodes::WriteConflict ||
+            batchStatus == ErrorCodes::TemporarilyUnavailable) {
             docsToRetry->push_back(index);
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             continue;
         }
-        if (auto error =
-                ErrorGenerator{}(opCtx, swCommitInfo.getStatus(), start + index, errors->size())) {
+        if (auto error = write_ops_exec::generateError(opCtx, batchStatus, index, errors->size())) {
             errors->emplace_back(std::move(*error));
             continue;
         }
-
-        const auto& commitInfo = swCommitInfo.getValue();
-        if (commitInfo.opTime) {
-            *opTime = std::max(opTime->value_or(repl::OpTime()), *commitInfo.opTime);
-        }
-        if (commitInfo.electionId) {
-            *electionId = std::max(electionId->value_or(OID()), *commitInfo.electionId);
-        }
     }
-
-    // If we cannot continue the request, we should convert all the 'docsToRetry' into an
-    // error.
-    if (!canContinue && docsToRetry) {
-        for (auto&& index : *docsToRetry) {
-            errors->emplace_back(start + index, lastError->getStatus());
-        }
-        docsToRetry->clear();
-    }
-}
-
-void getTimeseriesBatchResults(OperationContext* opCtx,
-                               const TimeseriesBatches& batches,
-                               int64_t start,
-                               int64_t indexOfLastProcessedBatch,
-                               bool canContinue,
-                               std::vector<mongo::write_ops::WriteError>* errors,
-                               boost::optional<repl::OpTime>* opTime,
-                               boost::optional<OID>* electionId,
-                               std::vector<size_t>* docsToRetry = nullptr) {
-    auto errorGenerator =
-        [](OperationContext* opCtx, const Status& status, int index, size_t numErrors) {
-            return write_ops_exec::generateError(opCtx, status, index, numErrors);
-        };
-    getTimeseriesBatchResultsBase<decltype(errorGenerator)>(opCtx,
-                                                            batches,
-                                                            start,
-                                                            indexOfLastProcessedBatch,
-                                                            canContinue,
-                                                            errors,
-                                                            opTime,
-                                                            electionId,
-                                                            docsToRetry);
 }
 
 /**
@@ -769,7 +720,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     auto bucketsNs = write_ops_utils::makeTimeseriesBucketsNamespace(ns(request));
 
-    // Explicitly hold a refrence to the CollectionCatalog, such that the corresponding
+    // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
     // Collection instances remain valid, and the collator is not invalidated.
     auto catalog = CollectionCatalog::get(opCtx);
     const Collection* bucketsColl = nullptr;
@@ -881,32 +832,14 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     boost::optional<UUID> bucketsCollUUID =
         bucketsColl ? boost::make_optional(bucketsColl->uuid()) : boost::none;
 
-    try {
-        if (!indices.empty()) {
-            std::for_each(indices.begin(), indices.end(), insertOrErrorFn);
-        } else {
-            for (size_t i = 0; i < numDocs; i++) {
-                if (!insertOrErrorFn(i) && request.getOrdered()) {
-                    return {bucketsCollUUID, std::move(batches), std::move(stmtIds), i};
-                }
+    if (!indices.empty()) {
+        std::for_each(indices.begin(), indices.end(), insertOrErrorFn);
+    } else {
+        for (size_t i = 0; i < numDocs; i++) {
+            if (!insertOrErrorFn(i) && request.getOrdered()) {
+                return {bucketsCollUUID, std::move(batches), std::move(stmtIds), i};
             }
         }
-    } catch (const DBException& ex) {
-        // Exception insert into bucket catalog, append error and wait for all batches that we've
-        // already managed to write into to commit or abort. We need to wait here as pointers to
-        // memory owned by this command is stored in the WriteBatch(es). This ensures that no other
-        // thread may try to access this memory after this command has been torn down due to the
-        // exception.
-
-        boost::optional<repl::OpTime> opTime;
-        boost::optional<OID> electionId;
-        std::vector<size_t> docsToRetry;
-        errors->emplace_back(
-            *write_ops_exec::generateError(opCtx, ex.toStatus(), 0, errors->size()));
-
-        getTimeseriesBatchResults(
-            opCtx, batches, 0, -1, false, errors, &opTime, &electionId, &docsToRetry);
-        throw;
     }
 
     return {bucketsCollUUID, std::move(batches), std::move(stmtIds), request.getDocuments().size()};
@@ -932,8 +865,6 @@ bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
             opCtx, request, batches, std::move(stmtIds), opTime, electionId)) {
         return false;
     }
-
-    getTimeseriesBatchResults(opCtx, batches, 0, batches.size(), true, errors, opTime, electionId);
 
     return true;
 }
@@ -977,7 +908,7 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     UUID collectionUUID = *optUuid;
     size_t itr = 0;
     stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
-    for (; itr < batches.size(); ++itr) {
+    for (; itr < batches.size() && canContinue; ++itr) {
         auto& [batch, index] = batches[itr];
         if (!processedBatches.contains(batch.get())) {
             processedBatches.insert(batch.get());
@@ -1011,30 +942,21 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
 
                 errors->emplace_back(*write_ops_exec::generateError(
                     opCtx, ex.toStatus(), start + index, errors->size()));
-            } catch (const DBException& ex) {
-                // Exception during commit, append error and wait for all our batches to commit or
-                // abort. We need to wait here as pointers to memory owned by this command is stored
-                // in the WriteBatch(es). This ensures that no other thread may try to access this
-                // memory after this command has been torn down due to the exception.
-                errors->emplace_back(*write_ops_exec::generateError(
-                    opCtx, ex.toStatus(), start + index, errors->size()));
-                getTimeseriesBatchResults(
-                    opCtx, batches, 0, itr, canContinue, errors, opTime, electionId, &docsToRetry);
-                throw;
             }
 
             batch.reset();
-            if (!canContinue) {
-                break;
-            }
         }
     }
 
-    getTimeseriesBatchResults(
-        opCtx, batches, 0, itr, canContinue, errors, opTime, electionId, &docsToRetry);
-    tassert(6023101,
-            "the 'docsToRetry' cannot exist when the request cannot be continued",
-            canContinue || docsToRetry.empty());
+    processBatchResults(opCtx, batches, errors, &docsToRetry);
+    // If we cannot continue the request, we should convert all the 'docsToRetry' into an error.
+    if (!canContinue) {
+        invariant(!errors->empty());
+        for (auto&& index : docsToRetry) {
+            errors->emplace_back(index, errors->back().getStatus());
+        }
+        docsToRetry.clear();
+    }
     return docsToRetry;
 }
 
