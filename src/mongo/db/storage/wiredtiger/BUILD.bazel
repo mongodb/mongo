@@ -212,6 +212,7 @@ mongo_cc_unit_test(
         "wiredtiger_kv_engine_test.cpp",
         "wiredtiger_prepare_conflict_test.cpp",
         "wiredtiger_recovery_unit_test.cpp",
+        "wiredtiger_session_test.cpp",
         "wiredtiger_size_storer_test.cpp",
         "wiredtiger_stats_test.cpp",
         "wiredtiger_util_test.cpp",
@@ -220,6 +221,7 @@ mongo_cc_unit_test(
     deps = [
         ":storage_wiredtiger",
         ":storage_wiredtiger_core",
+        ":wiredtiger_record_store_test_harness",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db:snapshot_window_options",
         "//src/mongo/db/auth:authmocks",

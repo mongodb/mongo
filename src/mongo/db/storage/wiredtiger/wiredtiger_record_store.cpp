@@ -592,7 +592,7 @@ void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordI
     auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
 
     WiredTigerCursor cursor(wtRu, _uri, _tableId, true);
-    cursor.assertInActiveTxn();
+    wtRu.assertInActiveTxn();
     WT_CURSOR* c = cursor.get();
     CursorKey key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
@@ -660,7 +660,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
 
     WiredTigerCursor curwrap(wtRu, _uri, _tableId, _overwrite);
-    curwrap.assertInActiveTxn();
+    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
@@ -765,7 +765,7 @@ Status WiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
     invariant(wtRu.inUnitOfWork());
 
     WiredTigerCursor curwrap(wtRu, _uri, _tableId, true);
-    curwrap.assertInActiveTxn();
+    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
     auto key = makeCursorKey(id, _keyFormat);
@@ -873,7 +873,7 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContex
 
     auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
     WiredTigerCursor curwrap(wtRu, _uri, _tableId, true);
-    curwrap.assertInActiveTxn();
+    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
     CursorKey key = makeCursorKey(id, _keyFormat);
@@ -1639,7 +1639,7 @@ Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
     auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
 
     WiredTigerCursor curwrap(wtRu, _uri, _tableId, _overwrite);
-    curwrap.assertInActiveTxn();
+    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 

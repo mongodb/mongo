@@ -303,12 +303,10 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
 
     LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
 
-    WiredTigerCursor curwrap(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-        _uri,
-        _tableId,
-        false);
-    curwrap.assertInActiveTxn();
+    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+
+    WiredTigerCursor curwrap(wtRu, _uri, _tableId, false);
+    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 
     return _insert(
@@ -320,12 +318,10 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
                               bool dupsAllowed) {
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
-    WiredTigerCursor curwrap(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-        _uri,
-        _tableId,
-        false);
-    curwrap.assertInActiveTxn();
+    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+
+    WiredTigerCursor curwrap(wtRu, _uri, _tableId, false);
+    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 

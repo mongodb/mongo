@@ -49,10 +49,16 @@ public:
      * already exists, and update/remove operations will not return error if the record does not
      * exist.
      */
-    WiredTigerCursor(WiredTigerRecoveryUnit&,
+    WiredTigerCursor(WiredTigerRecoveryUnit& ru,
                      const std::string& uri,
                      uint64_t tableID,
                      bool allowOverwrite);
+
+    // Prevent duplication of the logical owned-ness of the cursors via move or copy.
+    WiredTigerCursor(WiredTigerCursor&&) = delete;
+    WiredTigerCursor(const WiredTigerCursor&) = delete;
+    WiredTigerCursor& operator=(WiredTigerCursor&&) = delete;
+    WiredTigerCursor& operator=(const WiredTigerCursor&) = delete;
 
     ~WiredTigerCursor();
 
@@ -68,10 +74,6 @@ public:
         return _session;
     }
 
-    void assertInActiveTxn() const {
-        _ru->assertInActiveTxn();
-    }
-
     /**
      *  Returns the checkpoint ID for checkpoint cursors, otherwise 0.
      */
@@ -81,7 +83,6 @@ public:
 
 protected:
     uint64_t _tableID;
-    WiredTigerRecoveryUnit* _ru;
     WiredTigerSession* _session;
     std::string _config;
     bool _isCheckpoint;

@@ -54,18 +54,17 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
                                    uint64_t tableID,
                                    bool allowOverwrite) {
     _tableID = tableID;
-    _ru = &ru;
-    _session = _ru->getSession();
+    _session = ru.getSession();
     _isCheckpoint =
-        (_ru->getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+        (ru.getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 
     // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
     const char* configStr = nullptr;
 
     // If we have uncommon cursor options, use a costlier string builder.
-    if (_ru->getReadOnce() || _isCheckpoint) {
+    if (ru.getReadOnce() || _isCheckpoint) {
         str::stream builder;
-        if (_ru->getReadOnce()) {
+        if (ru.getReadOnce()) {
             builder << "read_once=true,";
         }
 
