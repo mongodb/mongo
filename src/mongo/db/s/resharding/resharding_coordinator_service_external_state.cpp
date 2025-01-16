@@ -29,7 +29,11 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/resharding/recipient_resume_document_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -67,6 +71,103 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
                        return RecipientShardEntry{shardId, std::move(recipientCtx)};
                    });
     return recipientShards;
+}
+
+/**
+ * Returns a map from each the donor shard id to the number of documents to copy from that donor
+ * shard based on the metrics in the coordinator document.
+ */
+std::map<ShardId, int64_t> getDocumentsToCopy(OperationContext* opCtx,
+                                              const ReshardingCoordinatorDocument& coordinatorDoc) {
+    std::map<ShardId, int64_t> docsToCopy;
+    // This is used for logging.
+    BSONObjBuilder reportBuilder;
+
+    for (const auto& donorEntry : coordinatorDoc.getDonorShards()) {
+        uassert(9929907,
+                str::stream() << "Expected the coordinator document to have the "
+                                 "number of documents to copy from the donor shard '"
+                              << donorEntry.getId() << "'",
+                donorEntry.getDocumentsToCopy());
+
+        docsToCopy[donorEntry.getId()] = *donorEntry.getDocumentsToCopy();
+        reportBuilder.append(donorEntry.getId(), *donorEntry.getDocumentsToCopy());
+    }
+
+    LOGV2(9929908,
+          "Fetched cloning metrics for donor shards",
+          "documentsToCopy"_attr = reportBuilder.obj());
+
+    return docsToCopy;
+}
+
+/**
+ * Returns a map from each donor shard id to the number of documents copied from that donor shard
+ * based on the metrics in the recipient collection cloner resume data documents.
+ */
+std::map<ShardId, int64_t> getDocumentsCopied(OperationContext* opCtx,
+                                              const UUID& reshardingUUID,
+                                              const std::vector<ShardId>& recipientShardIds) {
+    std::map<ShardId, int64_t> docsCopied;
+
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(
+        BSON("$match" << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
+                               ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
+                              << reshardingUUID.toBSON())));
+    AggregateCommandRequest aggRequest(NamespaceString::kRecipientReshardingResumeDataNamespace,
+                                       pipeline);
+
+    for (const auto& recipientShardId : recipientShardIds) {
+        auto recipientShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
+        auto numResumeDataDocs = 0;
+        // This is used for logging.
+        BSONObjBuilder reportBuilder;
+
+        uassertStatusOK(recipientShard->runAggregation(
+            opCtx,
+            aggRequest,
+            [&](const std::vector<BSONObj>& docs, const boost::optional<BSONObj>&) -> bool {
+                numResumeDataDocs += docs.size();
+
+                for (const auto& doc : docs) {
+                    auto parsedDoc = ReshardingRecipientResumeData::parse(
+                        IDLParserContext("getDocumentsCopied"), doc);
+                    auto donorShardId = parsedDoc.getId().getShardId();
+
+                    uassert(9929909,
+                            str::stream()
+                                << "Expected the recipient collection cloner resume data document "
+                                   "for the donor shard '"
+                                << donorShardId << "' to have the number of documents copied",
+                            parsedDoc.getDocumentsCopied());
+
+                    if (docsCopied.find(donorShardId) == docsCopied.end()) {
+                        docsCopied.emplace(donorShardId, 0);
+                    }
+                    docsCopied[donorShardId] += *parsedDoc.getDocumentsCopied();
+                    reportBuilder.append(donorShardId, *parsedDoc.getDocumentsCopied());
+                }
+                return true;
+            }));
+
+        if (numResumeDataDocs == 0) {
+            LOGV2_WARNING(9929910,
+                          "Could not find the collection cloner resume data documents on a "
+                          "recipient shard. This is expected when there are no documents for this "
+                          "recipient to copy.",
+                          "reshardingUUID"_attr = reshardingUUID,
+                          "shardId"_attr = recipientShardId);
+        }
+
+        LOGV2(9929911,
+              "Fetched cloning metrics for recipient shard",
+              "shardId"_attr = recipientShardId,
+              "documentsCopied"_attr = reportBuilder.obj());
+    }
+
+    return docsCopied;
 }
 
 }  // namespace
@@ -237,6 +338,88 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     return {constructDonorShardEntries(donorShardIds),
             constructRecipientShardEntries(recipientShardIds),
             initialChunks};
+}
+
+void ReshardingCoordinatorExternalState::verifyClonedCollection(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    LOGV2(9929900,
+          "Start verifying the temporary resharding collection after cloning",
+          "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
+
+    auto docsToCopy = getDocumentsToCopy(opCtx, coordinatorDoc);
+
+    auto recipientShardIds =
+        resharding::extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards());
+    auto docsCopied =
+        getDocumentsCopied(opCtx, coordinatorDoc.getReshardingUUID(), recipientShardIds);
+
+    for (auto donorIter = docsToCopy.begin(); donorIter != docsToCopy.end(); ++donorIter) {
+        auto donorShardId = donorIter->first;
+        auto donorDocsToCopy = donorIter->second;
+        auto donorDocsCopied =
+            (docsCopied.find(donorShardId) != docsCopied.end()) ? docsCopied[donorShardId] : 0;
+
+        uassert(9929901,
+                str::stream() << "The number of documents to copy from the donor shard '"
+                              << donorShardId.toString() << " is " << donorDocsToCopy
+                              << "' but the number of documents copied is " << donorDocsCopied,
+                donorDocsToCopy == donorDocsCopied);
+    }
+
+    for (auto donorIter = docsCopied.begin(); donorIter != docsCopied.end(); ++donorIter) {
+        auto donorShardId = donorIter->first;
+        auto donorDocsCopied = donorIter->second;
+
+        uassert(9929902,
+                str::stream() << donorDocsCopied << " documents were copied from the shard '"
+                              << donorShardId.toString()
+                              << "' which is not expected to be a donor shard ",
+                docsToCopy.find(donorShardId) != docsToCopy.end());
+    }
+
+    LOGV2(9929912,
+          "Finished verifying the temporary resharding collection after cloning",
+          "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
+}
+
+void ReshardingCoordinatorExternalState::verifyFinalCollection(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    LOGV2(9929903,
+          "Start verifying the temporary resharding collection after reaching strict consistency",
+          "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
+
+    int64_t numDocsOriginal = 0;
+    for (const auto& donorEntry : coordinatorDoc.getDonorShards()) {
+        uassert(9929904,
+                str::stream() << "Expected the coordinator document to have the "
+                                 "final number of documents on the donor shard '"
+                              << donorEntry.getId() << "'",
+                donorEntry.getDocumentsFinal());
+        numDocsOriginal += *donorEntry.getDocumentsFinal();
+    }
+
+    int64_t numDocsTemporary = 0;
+    for (const auto& recipientEntry : coordinatorDoc.getRecipientShards()) {
+        auto mutableState = recipientEntry.getMutableState();
+        uassert(9929905,
+                str::stream() << "Expected the coordinator document to have the "
+                                 "final number of documents on the recipient shard '"
+                              << recipientEntry.getId() << "'",
+                mutableState.getTotalNumDocuments());
+        numDocsTemporary += *mutableState.getTotalNumDocuments();
+    }
+
+    uassert(
+        9929906,
+        str::stream() << "The number of documents in the original collection is " << numDocsOriginal
+                      << "but the number of documents in the resharding temporary collection is "
+                      << numDocsTemporary,
+        numDocsOriginal == numDocsTemporary);
+
+    LOGV2(
+        9929913,
+        "Finished verifying the temporary resharding collection after reaching strict consistency",
+        "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
 }
 
 }  // namespace mongo

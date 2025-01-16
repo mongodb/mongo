@@ -1580,6 +1580,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/config:sharding_catalog_manager_split_chunk_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_commit_monitor_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_observer_test.cpp",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_test.cpp",
         "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",

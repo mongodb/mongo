@@ -80,6 +80,23 @@ public:
                              const std::vector<ShardId>& shardIds) {
         sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
     }
+
+    /**
+     * To be called before transitioning to the "applying" state to verify the temporary collection
+     * after cloning by asserting that:
+     * - The total number of documents to copy is equal to the total number of documents copied.
+     * - The number of documents to copy from each donor is equal to the total number of documents
+     *   copied from that donor across all the recipients.
+     */
+    void verifyClonedCollection(OperationContext* opCtx,
+                                const ReshardingCoordinatorDocument& coordinatorDoc);
+
+    /**
+     * To be called before transitioning to the "committing" state to verify the temporary
+     * collection after reaching strict consistency by asserting on the number of the documents.
+     */
+    void verifyFinalCollection(OperationContext* opCtx,
+                               const ReshardingCoordinatorDocument& coordinatorDoc);
 };
 
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
