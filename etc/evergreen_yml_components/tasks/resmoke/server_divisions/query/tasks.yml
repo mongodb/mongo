@@ -1747,15 +1747,15 @@ tasks:
 
   # TODO: SERVER-98733: Uncomment the 3 tasks below once stable test corpus is on repos.
   # - <<: *task_template
-  #   name: query_tester_generated_test_1
+  #   name: query_correctness_generated_test_1
   #   patch_only: true # TODO: SERVER-98733 - Remove to run on waterfall.
-  #   tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+  #   tags: ["assigned_to_jira_team_server_query_optimization", "experimental", "query_correctness"]
   #   commands:
   #     - func: "do setup"
   #       vars:
   #         # Set this variable to true so that we clone the mongo git repo, including the
   #         # .gitattributes file that provides hunk header overrides when running git diff in the
-  #         # query_tester_generated_test task. This will trigger the "conditionally clone repo"
+  #         # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
   #         # function during "do setup."
   #         clone_repo_for_test: true
   #     - func: "setup query_tester test repos"
@@ -1764,19 +1764,19 @@ tasks:
   #         repo_name: "query-correctness-tests"
   #     - func: "run tests"
   #       vars:
-  #         suite: query_tester_generated_test
+  #         suite: query_correctness_generated_test
   #         should_shuffle: false
   #
   # - <<: *task_template
-  #   name: query_tester_generated_test_2
+  #   name: query_correctness_generated_test_2
   #   patch_only: true # TODO: SERVER-98733 - Remove to run on waterfall.
-  #   tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+  #   tags: ["assigned_to_jira_team_server_query_optimization", "experimental", "query_correctness"]
   #   commands:
   #     - func: "do setup"
   #       vars:
   #         # Set this variable to true so that we clone the mongo git repo, including the
   #         # .gitattributes file that provides hunk header overrides when running git diff in the
-  #         # query_tester_generated_test task. This will trigger the "conditionally clone repo"
+  #         # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
   #         # function during "do setup."
   #         clone_repo_for_test: true
   #     - func: "setup query_tester test repos"
@@ -1785,19 +1785,19 @@ tasks:
   #         repo_name: "query-correctness-tests-1"
   #     - func: "run tests"
   #       vars:
-  #         suite: query_tester_generated_test
+  #         suite: query_correctness_generated_test
   #         should_shuffle: false
   #
   # - <<: *task_template
-  #   name: query_tester_generated_test_3
+  #   name: query_correctness_generated_test_3
   #   patch_only: true # TODO: SERVER-98733 - Remove to run on waterfall.
-  #   tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+  #   tags: ["assigned_to_jira_team_server_query_optimization", "experimental", "query_correctness"]
   #   commands:
   #     - func: "do setup"
   #       vars:
   #         # Set this variable to true so that we clone the mongo git repo, including the
   #         # .gitattributes file that provides hunk header overrides when running git diff in the
-  #         # query_tester_generated_test task. This will trigger the "conditionally clone repo"
+  #         # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
   #         # function during "do setup."
   #         clone_repo_for_test: true
   #     - func: "setup query_tester test repos"
@@ -1806,7 +1806,7 @@ tasks:
   #         repo_name: "query-correctness-tests-2"
   #     - func: "run tests"
   #       vars:
-  #         suite: query_tester_generated_test
+  #         suite: query_correctness_generated_test
   #         should_shuffle: false
 
   ################################################

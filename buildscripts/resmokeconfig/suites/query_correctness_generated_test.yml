@@ -1,6 +1,6 @@
 test_kind: query_tester_server_test
 description: |
-  This suite will run generated tests on the mongo server using QueryTester's mongotest binary.
+  This suite runs generated tests on the mongo server using QueryTester's mongotest binary.
 
 selector:
   roots:

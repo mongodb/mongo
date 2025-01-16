@@ -288,7 +288,7 @@ buildvariants:
       - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2-arm64-atlas-latest-large
-      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
       - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2-arm64-atlas-latest-large
@@ -337,7 +337,40 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
         --excludeWithAnyTags=resource_intensive
-    tasks: *query-alias-task-list
+    # This set of tasks includes everything from the query-alias-task-list YAML anchor,
+    # along with the additional query_correctness_generated_test tasks (.query_correctness).
+    tasks:
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks !.blocked_in_query_alias
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: burn_in_tests_gen
+        depends_on:
+          - name: version_burn_in_gen
+            variant: generate-tasks-for-version
+            omit_generated_tasks: true
+          - name: archive_dist_test
+            variant: *amazon_linux2_arm64_static_compile_variant_name
+      - name: .query_correctness
+      - name: check_feature_flag_tags
+      - name: check_for_todos
+      - name: check_for_legacy_command_types
+      - name: test_api_version_compatibility
+      - name: replica_sets_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: sharded_collections_jscore_passthrough_gen
+      - name: noPassthrough_gen
+      - name: noPassthroughWithMongod_gen
+      - name: initial_sync_fuzzer_sanity_patch
+      - name: rollback_fuzzer_sanity_patch
 
   - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2-arm64-all-feature-flags-required-query-patch-only
