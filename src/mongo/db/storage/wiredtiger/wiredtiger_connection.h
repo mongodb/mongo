@@ -57,6 +57,8 @@ class WiredTigerKVEngine;
  */
 class WiredTigerConnection {
 public:
+    using SessionId = int64_t;  // TODO SERVER-99352 use WiredTiger session id.
+
     WiredTigerConnection(WiredTigerKVEngine* engine);
     WiredTigerConnection(WT_CONNECTION* conn,
                          ClockSource* cs,
@@ -183,7 +185,26 @@ public:
         return &_compiledConfigurations;
     }
 
+    WiredTigerSession* getSessionById(const SessionId& id);
+
 private:
+    // TODO SERVER-99353 hook up the session registry.
+    // Session registry.
+    struct RegistryPartition {
+        stdx::mutex mtx;
+        stdx::unordered_map<SessionId, WiredTigerSession*> map;
+    };
+
+    void _addSession(const SessionId& id, WiredTigerSession* session);
+
+    bool _removeSession(const SessionId& id);
+
+    /**
+     * Returns a session to the cache for later reuse. If closeAll was called between getting this
+     * session and releasing it, the session is directly released. This method is thread safe.
+     */
+    void _releaseSession(WiredTigerSession* session);
+
     friend class WiredTigerSession;
     WT_CONNECTION* _conn;             // not owned
     ClockSource* const _clockSource;  // not owned
@@ -209,11 +230,8 @@ private:
     stdx::condition_variable _prepareCommittedOrAbortedCond;
     AtomicWord<std::uint64_t> _prepareCommitOrAbortCounter{0};
 
-    /**
-     * Returns a session to the cache for later reuse. If closeAll was called between getting this
-     * session and releasing it, the session is directly released. This method is thread safe.
-     */
-    void releaseSession(WiredTigerSession* session);
+    typedef std::vector<RegistryPartition> SessionRegistry;
+    SessionRegistry _registry;
 };
 
 /**

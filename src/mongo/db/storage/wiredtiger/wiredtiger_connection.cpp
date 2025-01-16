@@ -44,6 +44,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -51,13 +52,19 @@
 
 namespace mongo {
 
+namespace {
+
+const size_t numRegistryPartitions = 2 * ProcessInfo::getNumLogicalCores();
+
+}  // namespace
+
 WiredTigerConnection::WiredTigerConnection(WiredTigerKVEngine* engine)
     : WiredTigerConnection(engine->getConnection(), engine->getClockSource(), engine) {}
 
 WiredTigerConnection::WiredTigerConnection(WT_CONNECTION* conn,
                                            ClockSource* cs,
                                            WiredTigerKVEngine* engine)
-    : _conn(conn), _clockSource(cs), _engine(engine) {
+    : _conn(conn), _clockSource(cs), _engine(engine), _registry(numRegistryPartitions) {
     uassertStatusOK(_compiledConfigurations.compileAll(_conn));
 }
 
@@ -195,7 +202,7 @@ UniqueWiredTigerSession WiredTigerConnection::getSession() {
     return UniqueWiredTigerSession(new WiredTigerSession(_conn, this, _epoch.load()));
 }
 
-void WiredTigerConnection::releaseSession(WiredTigerSession* session) {
+void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
     invariant(session);
 
     BlockShutdown blockShutdown(this);
@@ -251,7 +258,25 @@ bool WiredTigerConnection::isEngineCachingCursors() {
 }
 
 void WiredTigerConnection::WiredTigerSessionDeleter::operator()(WiredTigerSession* session) const {
-    session->_conn->releaseSession(session);
+    session->_conn->_releaseSession(session);
+}
+
+WiredTigerSession* WiredTigerConnection::getSessionById(const SessionId& id) {
+    RegistryPartition& partition = _registry[id % numRegistryPartitions];
+    stdx::lock_guard<stdx::mutex> lock(partition.mtx);
+    return partition.map[id];
+}
+
+void WiredTigerConnection::_addSession(const SessionId& id, WiredTigerSession* session) {
+    RegistryPartition& partition = _registry[id % numRegistryPartitions];
+    stdx::lock_guard<stdx::mutex> lock(partition.mtx);
+    invariant(partition.map.insert({id, session}).second);
+}
+
+bool WiredTigerConnection::_removeSession(const SessionId& id) {
+    RegistryPartition& partition = _registry[id % numRegistryPartitions];
+    stdx::lock_guard<stdx::mutex> lock(partition.mtx);
+    return partition.map.erase(id);
 }
 
 }  // namespace mongo
