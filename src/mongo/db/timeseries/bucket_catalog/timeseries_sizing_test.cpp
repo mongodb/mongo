@@ -40,7 +40,7 @@ namespace mongo::timeseries::bucket_catalog {
  * 9.0: WRITING-27603
  */
 namespace {
-static constexpr uint64_t kExpectedOpenBucketSize = 872;
+static constexpr uint64_t kExpectedOpenBucketSize = 824;
 static constexpr uint64_t kExpectedArchivedBucketSize = 52;
 static constexpr uint64_t kExpectedSchemaSizePerElement = 110;
 static constexpr uint64_t kExpectedMinMaxSizePerElement = 216;

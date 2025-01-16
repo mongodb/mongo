@@ -507,15 +507,6 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     // Initialize the remaining member variables from the bucket document.
     bucket->size = bucketDoc.objsize();
 
-    // Populate the top-level data field names.
-    const BSONObj& dataObj = bucketDoc.getObjectField(kBucketDataFieldName);
-    for (const BSONElement& dataElem : dataObj) {
-        bucket->fieldNames.emplace(tracking::make_string(
-            getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
-            dataElem.fieldName(),
-            dataElem.fieldNameSize() - 1));
-    }
-
     auto swMinMax = generateMinMaxFromBucketDoc(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kSummaries),
         bucketDoc,
@@ -534,7 +525,9 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     }
     bucket->schema = std::move(swSchema.getValue());
 
+    // Populate the top-level data field names.
     uint32_t numMeasurements = 0;
+    const BSONObj& dataObj = bucketDoc.getObjectField(kBucketDataFieldName);
     const BSONElement timeColumnElem = dataObj.getField(options.getTimeField());
 
     if (isCompressed && timeColumnElem.type() == BSONType::BinData) {

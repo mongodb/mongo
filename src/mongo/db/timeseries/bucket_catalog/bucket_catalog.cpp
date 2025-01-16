@@ -78,12 +78,11 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
             it->first,
             it->second);
         bucket.uncommittedFieldNames.erase(fieldName);
-        if (bucket.fieldNames.contains(fieldName)) {
+        if (bucket.measurementMap.containsField(it->first)) {
             batch.newFieldNamesToBeInserted.erase(it++);
             continue;
         }
 
-        bucket.fieldNames.emplace(fieldName);
         ++it;
     }
 

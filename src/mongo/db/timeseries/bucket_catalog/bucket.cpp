@@ -71,8 +71,6 @@ Bucket::Bucket(TrackingContexts& trackingContexts,
           tf.data(),
           tf.size())),
       key(std::move(k)),
-      fieldNames(tracking::makeStringSet(
-          getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
       uncommittedFieldNames(tracking::makeStringSet(
           getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById))),
       batches(tracking::make_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(
@@ -128,7 +126,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts& trackingContexts,
 
         auto hashedKey = tracking::StringSet::hasher().hashed_key(
             getTrackingContext(trackingContexts, TrackingScope::kOpenBucketsById), fieldName);
-        if (!bucket.fieldNames.contains(hashedKey)) {
+        if (!bucket.measurementMap.containsField(fieldName)) {
             // Record the new field name only if it hasn't been committed yet. There could
             // be concurrent batches writing to this bucket with the same new field name,
             // but they're not guaranteed to commit successfully.
