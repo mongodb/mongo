@@ -103,6 +103,13 @@ mongo_install(
 )
 
 mongo_install(
+    name = "mongotest",
+    srcs = [
+        "//src/mongo/db/query/query_tester:mongotest",
+    ],
+)
+
+mongo_install(
     name = "dist-test",
     srcs = [
         "//src/mongo/db:mongod",
