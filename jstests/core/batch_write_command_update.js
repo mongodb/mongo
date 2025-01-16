@@ -235,7 +235,8 @@ assert.eq(1, coll.count());
 
 //
 // Large batch above the size threshold should fail to update
-coll.remove({});
+// To speed up the reset process, use the DROP command instead of deleting records one by one.
+coll.drop(); // coll.remove({});
 coll.insert({a: 0});
 batch = [];
 for (var i = 0; i < maxWriteBatchSize + 1; ++i) {

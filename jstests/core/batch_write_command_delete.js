@@ -143,7 +143,8 @@ assert.eq(0, coll.count());
 
 //
 // Large batch above the size threshold should fail to delete
-coll.remove({});
+// To speed up the reset process, use the DROP command instead of deleting records one by one.
+coll.drop(); // coll.remove({});
 batch = [];
 var insertBatch = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
