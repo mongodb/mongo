@@ -1070,33 +1070,6 @@ tasks:
             - "buildscripts/pyrightlint.py"
             - "lint-all"
 
-  - name: lint_shellscripts
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "development_critical_single_variant",
-        "lint",
-      ]
-    commands:
-      - command: timeout.update
-        params:
-          # 20 mins
-          exec_timeout_secs: 1200
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - command: subprocess.exec
-        type: test
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/lint_shellscripts.sh"
-
   - name: lint_yaml
     tags:
       [
