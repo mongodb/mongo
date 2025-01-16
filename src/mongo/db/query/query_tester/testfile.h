@@ -84,6 +84,7 @@ public:
                          bool dropData,
                          bool loadData,
                          bool createAllIndices,
+                         bool ignoreIndexFailures,
                          const std::set<CollectionSpec>& prevFileCollections) const;
 
     void assertTestNumExists(size_t testNum) const;

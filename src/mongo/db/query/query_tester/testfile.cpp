@@ -102,7 +102,8 @@ void readAndBuildOrSkipIndexes(DBClientConnection* const conn,
                                const std::string& dbName,
                                const std::string& collName,
                                std::fstream& fs,
-                               const bool createAllIndices) {
+                               const bool createAllIndices,
+                               const bool ignoreIndexFailures) {
     verifyFileStreamGood(
         fs, std::filesystem::path{collName}, std::string{"Stream not ready to read indexes"});
     auto lineFromFile = std::string{};
@@ -134,7 +135,26 @@ void readAndBuildOrSkipIndexes(DBClientConnection* const conn,
             }
 
             indexBob.append("name", mongo::str::stream{} << "index_" << indexNum);
-            indexBuilder.append(indexBob.done());
+
+            // Ignore index failures means we need to create the indices one at a time.
+            if (ignoreIndexFailures) {
+                auto localBob = BSONObjBuilder{};
+                localBob.append("createIndexes", collName);
+                auto localIndexBuilder = BSONArrayBuilder{};
+                localIndexBuilder.append(indexBob.done());
+                localBob.append("indexes", localIndexBuilder.arr());
+                const auto cmd = localBob.done();
+                try {
+                    runCommandAssertOK(conn, cmd, dbName);
+                } catch (const AssertionException& ex) {
+                    std::cerr << ex.reason() << std::endl;
+                }
+
+                // Reset the flag so that we don't try to create an empty index list at the end.
+                hasIndicesToCreate = false;
+            } else {
+                indexBuilder.append(indexBob.done());
+            }
         }
     }
 
@@ -191,11 +211,13 @@ bool readAndLoadCollFile(DBClientConnection* const conn,
                          const std::string& dbName,
                          const std::string& collName,
                          const std::filesystem::path& filePath,
-                         const bool createAllIndices) {
+                         const bool createAllIndices,
+                         const bool ignoreIndexFailures) {
     auto collFile = std::fstream{filePath};
     verifyFileStreamGood(collFile, filePath, "Failed to open file");
     // Read in indexes.
-    readAndBuildOrSkipIndexes(conn, dbName, collName, collFile, createAllIndices);
+    readAndBuildOrSkipIndexes(
+        conn, dbName, collName, collFile, createAllIndices, ignoreIndexFailures);
     for (auto needMore = readAndInsertNextBatch(conn, dbName, collName, collFile);
          needMore && !collFile.eof();
          needMore = readAndInsertNextBatch(conn, dbName, collName, collFile)) {
@@ -238,6 +260,7 @@ void QueryFile::loadCollections(DBClientConnection* const conn,
                                 const bool dropData,
                                 const bool loadData,
                                 const bool createAllIndices,
+                                const bool ignoreIndexFailures,
                                 const std::set<CollectionSpec>& prevFileCollections) const {
     if (dropData) {
         dropStaleCollections(conn, prevFileCollections);
@@ -277,8 +300,12 @@ void QueryFile::loadCollections(DBClientConnection* const conn,
         for (const auto& collSpec : _collectionsNeeded) {
             if (prevFileCollections.find(collSpec) == prevFileCollections.end()) {
                 // Only load a collection if it wasn't marked as loaded by the previous file.
-                readAndLoadCollFile(
-                    conn, _databaseNeeded, collSpec.collName, collSpec.filePath, createAllIndices);
+                readAndLoadCollFile(conn,
+                                    _databaseNeeded,
+                                    collSpec.collName,
+                                    collSpec.filePath,
+                                    createAllIndices,
+                                    ignoreIndexFailures);
             }
         }
     }
@@ -377,8 +404,7 @@ void QueryFile::parseFeatureFileToBson(const std::filesystem::path& queryFeature
 void QueryFile::printFailedTestFileHeader() const {
     std::cout << applyRed() << "------------------------------------------------------------"
               << applyReset() << std::endl
-              << applyCyan() << "FAIL: " << getBaseNameFromFilePath(_filePath) << applyReset()
-              << std::endl;
+              << applyCyan() << "FAIL: " << _filePath.string() << applyReset() << std::endl;
 }
 
 void QueryFile::printAndExtractFailedQueries(const std::set<size_t>& failedTestNums) const {
@@ -458,10 +484,8 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
             } else {
                 partialTestRun = true;
             }
-        } catch (AssertionException& ex) {
-            fs.close();
-            ex.addContext(str::stream{} << "Failed to read test number " << _tests.size());
-            throw;
+        } catch (const AssertionException& ex) {
+            std::cerr << _filePath.string() << std::endl << ex.reason() << std::endl;
         }
     }
     // Close the file.
@@ -486,8 +510,16 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
 void QueryFile::runTestFile(DBClientConnection* conn, const ModeOption mode) {
     _testsRun = 0;
     for (auto& test : _tests) {
-        test.runTestAndRecord(conn, mode);
-        ++_testsRun;
+        // Skip tests that have already been failed during input/parsing.
+        if (test.hasErrored()) {
+            continue;
+        }
+        try {
+            test.runTestAndRecord(conn, mode);
+            ++_testsRun;
+        } catch (const AssertionException& ex) {
+            std::cerr << std::endl << _filePath.string() << std::endl << ex.reason() << std::endl;
+        }
     }
 }
 
@@ -555,9 +587,9 @@ bool QueryFile::writeAndValidate(const ModeOption mode,
             writeOutOpts == WriteOutOptions::kOnelineResult;
         uassert(9670450,
                 "Must have run query file before writing out result file",
-                !includeResults || _testsRun == _tests.size());
+                !includeResults || _testsRun == _tests.size() || _testsRun > 0);
         moveResultsFile(_actualPath, _filePath, writeOutOpts);
-        return true;
+        return _testsRun == _tests.size();
     }
 }
 
@@ -568,10 +600,13 @@ bool QueryFile::writeOutAndNumber(std::fstream& fs, const WriteOutOptions opt) {
 
     // Write out each test.
     for (const auto& test : _tests) {
-        // Newline before each test write-out.
-        fs << std::endl;
         _testNumToQuery[test.getTestNum()] = test.getTestLine();
-        test.writeToStream(fs, opt);
+        // Skip writeout if the test did not execute successfully.
+        if (!test.hasErrored()) {
+            // Newline before each test write-out.
+            fs << std::endl;
+            test.writeToStream(fs, opt);
+        }
     }
 
     return true;

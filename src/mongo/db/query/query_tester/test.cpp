@@ -93,6 +93,10 @@ size_t Test::getTestNum() const {
     return _testNum;
 }
 
+bool Test::hasErrored() const {
+    return _errored;
+}
+
 std::vector<std::string> Test::normalize(const std::vector<BSONObj>& objs,
                                          const NormalizationOptsSet opts) {
     const auto numResults = objs.size();
@@ -297,13 +301,62 @@ Test Test::parseTest(std::fstream& fs,
     }
 }
 
+void Test::parseTestQueryLine() {
+    // First word is test type.
+    const auto endTestType = _testLine.find(' ');
+    _testType = parseResultType(_testLine.substr(0, endTestType));
+
+    auto queryline = _testLine.substr(endTestType + 1, _testLine.size());
+
+    // If we are running with no optimizations we need to block lowering to find from agg.
+    if (_optimizationsOff) {
+        const auto containsTextOrGeo =
+            std::regex("\\$(text|geoIntersects|geoWithin|near|nearSphere|geoNear|documents)");
+        auto match = std::smatch{};
+
+        // Some operators require indexes and can't be run with inhibit optimizations.
+        if (!std::regex_search(queryline, match, containsTextOrGeo)) {
+            const auto pipelineStart = std::regex("pipeline\"?[ \t]*:[ \t]*\\[");
+            const auto stopOptimization = "{\"$_internalInhibitOptimization\": {}},";
+            auto last = size_t{0};
+            auto ss = std::stringstream{};
+
+            for (auto itr = std::sregex_iterator(queryline.begin(), queryline.end(), pipelineStart);
+                 itr != std::sregex_iterator();
+                 ++itr) {
+                ss << queryline.substr(last, itr->position() + itr->length() - last)
+                   << stopOptimization;
+                last = itr->position() + itr->length();
+            }
+
+            ss << queryline.substr(last, queryline.length() - last);
+            queryline = ss.str();
+        }
+    }
+
+    // The rest of the string is the query.
+    try {
+        _query = fromFuzzerJson(queryline);
+    } catch (AssertionException& ex) {
+        _errored = true;
+        ex.addContext(str::stream{} << "Failed to read test number " << _testNum);
+        throw;
+    }
+}
+
 void Test::runTestAndRecord(DBClientConnection* const conn, const ModeOption mode) {
-    // Populate _normalizedResult so that git diff operates on normalized result sets.
-    _normalizedResult = normalize(mode == ModeOption::Normalize
-                                      ? _expectedResult
-                                      // Run test
-                                      : getAllResults(conn, runCommand(conn, _db, _query)),
-                                  _testType);
+    try {
+        // Populate _normalizedResult so that git diff operates on normalized result sets.
+        _normalizedResult = normalize(mode == ModeOption::Normalize
+                                          ? _expectedResult
+                                          // Run test
+                                          : getAllResults(conn, runCommand(conn, _db, _query)),
+                                      _testType);
+    } catch (AssertionException& ex) {
+        _errored = true;
+        ex.addContext(str::stream{} << "Error when executing query " << _testNum);
+        throw;
+    }
 }
 
 void Test::setDB(const std::string& db) {
@@ -379,42 +432,5 @@ void Test::writeToStream(std::fstream& fs, const WriteOutOptions resultOpt) cons
     for (const auto& comment : _comments.postTest) {
         fs << comment << std::endl;
     }
-}
-
-void Test::parseTestQueryLine() {
-    // First word is test type.
-    const auto endTestType = _testLine.find(' ');
-    _testType = parseResultType(_testLine.substr(0, endTestType));
-
-    auto queryline = _testLine.substr(endTestType + 1, _testLine.size());
-
-    // If we are running with no optimizations we need to block lowering to find from agg.
-    if (_optimizationsOff) {
-        const auto containsTextOrGeo =
-            std::regex("\\$(text|geoIntersects|geoWithin|near|nearSphere|geoNear|documents)");
-        auto match = std::smatch{};
-
-        // Some operators require indexes and can't be run with inhibit optimizations.
-        if (!std::regex_search(queryline, match, containsTextOrGeo)) {
-            const auto pipelineStart = std::regex("pipeline\"?[ \t]*:[ \t]*\\[");
-            const auto stopOptimization = "{\"$_internalInhibitOptimization\": {}},";
-            auto last = size_t{0};
-            auto ss = std::stringstream{};
-
-            for (auto itr = std::sregex_iterator(queryline.begin(), queryline.end(), pipelineStart);
-                 itr != std::sregex_iterator();
-                 ++itr) {
-                ss << queryline.substr(last, itr->position() + itr->length() - last)
-                   << stopOptimization;
-                last = itr->position() + itr->length();
-            }
-
-            ss << queryline.substr(last, queryline.length() - last);
-            queryline = ss.str();
-        }
-    }
-
-    // The rest of the string is the query.
-    _query = fromFuzzerJson(queryline);
 }
 }  // namespace mongo::query_tester

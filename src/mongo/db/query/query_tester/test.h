@@ -72,6 +72,8 @@ public:
 
     size_t getTestNum() const;
 
+    bool hasErrored() const;
+
     /**
      * Compute the normalized version of the input set.
      */
@@ -113,11 +115,12 @@ private:
         std::vector<std::string> postQuery;
         std::vector<std::string> postTest;
     } _comments;
-    std::vector<BSONObj> _expectedResult;
-    std::vector<std::string> _normalizedResult;
-    NormalizationOptsSet _testType;
-    BSONObj _query;
-    std::string _db;
+    std::vector<BSONObj> _expectedResult = {};
+    std::vector<std::string> _normalizedResult = {};
+    NormalizationOptsSet _testType = {};
+    BSONObj _query = {};
+    bool _errored = false;
+    std::string _db = {};
 };
 
 }  // namespace mongo::query_tester
