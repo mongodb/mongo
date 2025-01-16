@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "audit_client_attrs.*":
+    approvers:
+      - 10gen/server-security
   - "audit_user_attrs.h":
     approvers:
       - 10gen/server-security

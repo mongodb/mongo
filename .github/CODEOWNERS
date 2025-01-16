@@ -1877,6 +1877,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/rpc/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/rpc/metadata/OWNERS.yml
+/src/mongo/rpc/metadata/**/audit_client_attrs.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/rpc/metadata/**/audit_user_attrs.h @10gen/server-security @svc-auto-approve-bot
 /src/mongo/rpc/metadata/**/impersonated_user_metadata.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/rpc/metadata/**/security_token* @10gen/server-security @svc-auto-approve-bot

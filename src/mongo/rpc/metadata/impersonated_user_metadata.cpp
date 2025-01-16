@@ -67,7 +67,7 @@ boost::optional<AuditUserAttrs> AuditUserAttrs::get(OperationContext* opCtx) {
 }
 
 void AuditUserAttrs::set(OperationContext* opCtx, AuditUserAttrs auditUserAttrs) {
-    auditUserAttrsDecoration(opCtx) = std::move(auditUserAttrs);
+    *auditUserAttrsDecoration(opCtx) = std::move(auditUserAttrs);
 }
 
 boost::optional<ImpersonatedUserMetadata> getImpersonatedUserMetadata(OperationContext* opCtx) {
