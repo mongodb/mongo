@@ -1692,7 +1692,9 @@ def generate(env: SCons.Environment.Environment) -> None:
         )
     except subprocess.CalledProcessError as ex:
         print("ERROR: bazel thin targets query failed:")
-        print(ex)
+        print(ex.cmd)
+        print(ex.stdout)
+        print(ex.stderr)
         print("Please ask about this in #ask-devprod-build slack channel.")
         sys.exit(1)
 
