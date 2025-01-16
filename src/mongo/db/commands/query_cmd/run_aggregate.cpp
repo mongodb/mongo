@@ -397,7 +397,7 @@ bool getFirstBatch(const AggExState& aggExState,
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
                           "stats"_attr = redact(stats),
-                          "cmd"_attr = *aggExState.getDeferredCmd());
+                          "cmd"_attr = redact(*aggExState.getDeferredCmd()));
 
             exception.addContext("PlanExecutor error during aggregation");
             throw;
