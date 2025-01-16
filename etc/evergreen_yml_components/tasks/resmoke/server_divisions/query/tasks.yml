@@ -389,6 +389,9 @@ tasks:
           # 'numPipelines' as an argument in the yaml here, but it works as part of the
           # 'jstestfuzz_vars' argument string. If a future reader better understands this evergreen
           # integration, please update this comment and/or move numPipelines to a yaml arg here.
+          #
+          # Generating the tests can use a large amount of memory, so we use a large distro.
+          use_large_distro: "true"
           num_files: 70
           num_tasks: 20
           jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=750
