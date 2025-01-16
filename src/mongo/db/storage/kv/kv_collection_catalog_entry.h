@@ -97,9 +97,9 @@ public:
         return _recordStore.get();
     }
 
-     RecordStore* getRecordStore() const override {
-        return _recordStore.get();
-    }
+    //  RecordStore* getRecordStore() const override {
+    //     return _recordStore.get();
+    // }
 
 
 protected:

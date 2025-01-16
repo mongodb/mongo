@@ -371,7 +371,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 
         for (auto& ns : collections) {
             NamespaceString nss{std::move(ns)};
-            _createCollectionHandler(opCtx, nss, true);
+            _createCollectionHandler(opCtx, nss, false);
         }
     }
 
@@ -800,7 +800,7 @@ Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const Namespace
         }
         return found;
     } else {
-        return _createCollectionHandler(opCtx, nss, true);
+        return _createCollectionHandler(opCtx, nss, false);
     }
 }
 
@@ -1497,7 +1497,7 @@ DatabaseImpl::CollectionMapView& DatabaseImpl::collections(OperationContext* opC
     for (auto& collectionName : collectionInStorageEngine) {
         NamespaceString nss{std::move(collectionName)};
         MONGO_LOG(1) << "nss: " << nss;
-        _createCollectionHandler(opCtx, nss, true, BSONObj{}, true);
+        _createCollectionHandler(opCtx, nss, false, BSONObj{}, true);
     }
 
     return _collectionsView;

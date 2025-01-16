@@ -145,8 +145,8 @@ public:
              repl::ReplicationCoordinator::modeNone) &&
             (dbname == NamespaceString::kLocalDb)) {
             uasserted(ErrorCodes::IllegalOperation,
-                      str::stream() << "Cannot drop '" << dbname
-                                    << "' database while replication is active");
+                      str::stream()
+                          << "Cannot drop '" << dbname << "' database while replication is active");
         }
         BSONElement e = cmdObj.firstElement();
         int p = (int)e.number();
@@ -199,6 +199,11 @@ public:
                    const BSONObj& cmdObj,
                    string& errmsg,
                    BSONObjBuilder& result) {
+        errmsg =
+            "Unsupported feature. The Monograph storage engine does not require manual database "
+            "repair.";
+        return false;
+
         BSONElement e = cmdObj.firstElement();
         if (e.numberInt() != 1) {
             errmsg = "bad option";
@@ -365,13 +370,13 @@ public:
         if (auto idIndexElem = cmdObj["idIndex"]) {
             if (cmdObj["viewOn"]) {
                 uasserted(ErrorCodes::InvalidOptions,
-                          str::stream() << "'idIndex' is not allowed with 'viewOn': "
-                                        << idIndexElem);
+                          str::stream()
+                              << "'idIndex' is not allowed with 'viewOn': " << idIndexElem);
             }
             if (cmdObj["autoIndexId"]) {
                 uasserted(ErrorCodes::InvalidOptions,
-                          str::stream() << "'idIndex' is not allowed with 'autoIndexId': "
-                                        << idIndexElem);
+                          str::stream()
+                              << "'idIndex' is not allowed with 'autoIndexId': " << idIndexElem);
             }
 
             if (idIndexElem.type() != BSONType::Object) {
@@ -391,8 +396,8 @@ public:
             if (auto collationElem = cmdObj["collation"]) {
                 if (collationElem.type() != BSONType::Object) {
                     uasserted(ErrorCodes::TypeMismatch,
-                              str::stream() << "'collation' has to be a document: "
-                                            << collationElem);
+                              str::stream()
+                                  << "'collation' has to be a document: " << collationElem);
                 }
                 auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(collationElem.Obj());

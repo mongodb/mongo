@@ -78,7 +78,7 @@ public:
 
     virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const;
 
-    virtual RecordStore* getRecordStore() {
+    virtual RecordStore* getRecordStore() override {
         return nullptr;
     }
 
