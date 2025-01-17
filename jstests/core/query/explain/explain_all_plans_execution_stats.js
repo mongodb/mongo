@@ -6,10 +6,12 @@
 // ]
 //
 import {getExecutionStats} from "jstests/libs/analyze_plan.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 if (checkSbeRestrictedOrFullyEnabled(db)) {
     const coll = db.test;
+    assertDropCollection(coll.getDB(), coll.getName());
     assert.commandWorked(coll.createIndex({"a": 1}));
     assert.commandWorked(coll.createIndex({"b": 1}));
     assert.commandWorked(coll.insertMany([{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 1}, {a: 2, b: 2}]));
