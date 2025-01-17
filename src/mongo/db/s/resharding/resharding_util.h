@@ -467,5 +467,16 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     const NamespaceString& nss,
     const bool& setProvenance);
 
+inline Status validateReshardBlockingWritesO2FieldType(const std::string& value) {
+
+    if (value != kReshardFinalOpLogType) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Expected the oplog type to be '" << kReshardFinalOpLogType
+                              << "'"};
+    }
+
+    return Status::OK();
+}
+
 }  // namespace resharding
 }  // namespace mongo

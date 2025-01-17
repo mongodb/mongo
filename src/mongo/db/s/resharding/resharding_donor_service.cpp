@@ -809,6 +809,12 @@ void ReshardingDonorService::DonorStateMachine::
         auto rawOpCtx = opCtx.get();
 
         auto generateOplogEntry = [&](ShardId destinedRecipient) {
+            ReshardBlockingWritesChangeEventO2Field changeEvent{
+                _metadata.getSourceNss(),
+                _metadata.getReshardingUUID(),
+                resharding::kReshardFinalOpLogType.toString(),
+            };
+
             repl::MutableOplogEntry oplog;
             oplog.setNss(_metadata.getSourceNss());
             oplog.setOpType(repl::OpTypeEnum::kNoop);
@@ -819,8 +825,8 @@ void ReshardingDonorService::DonorStateMachine::
                          "Writes to {} are temporarily blocked for resharding.",
                          NamespaceStringUtil::serialize(_metadata.getSourceNss(),
                                                         SerializationContext::stateDefault()))));
-            oplog.setObject2(BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
-                                         << _metadata.getReshardingUUID()));
+            oplog.setObject2(changeEvent.toBSON());
+            oplog.setFromMigrate(true);
             oplog.setOpTime(OplogSlot());
             oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
             return oplog;

@@ -188,6 +188,7 @@ const BSONObj kChangeStreamPredicate = fromjson(R"({
             { "$or": [
                 { "o2.refineCollectionShardKey": { "$exists": true } },
                 { "o2.reshardBegin": { "$exists": true } },
+                { "o2.reshardBlockingWrites": { "$exists": true } },
                 { "o2.reshardCollection": { "$exists": true } },
                 { "o2.reshardDoneCatchUp": { "$exists": true } },
                 { "o2.shardCollection": { "$exists": true } }

@@ -1386,6 +1386,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
                                           true,  // fromMigrate
                                           o2Field.toBSON());
 
+    // TODO (SERVER-86688): Remove showExpandedEvents: true filter from $changeStream.
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true, showExpandedEvents: true}}");
 
     const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
@@ -1403,6 +1404,39 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
     checkTransformation(reshardingBegin, expectedReshardingBegin, spec);
 }
 
+TEST_F(ChangeStreamStageTest, TransformReshardBlockingWrites) {
+    auto uuid = UUID::gen();
+    auto reshardingUuid = UUID::gen();
+
+    ReshardBlockingWritesChangeEventO2Field o2Field{
+        nss, reshardingUuid, resharding::kReshardFinalOpLogType.toString()};
+    auto reshardingBlockingWrites = makeOplogEntry(OpTypeEnum::kNoop,
+                                                   nss,
+                                                   BSONObj(),
+                                                   uuid,
+                                                   true,  // fromMigrate
+                                                   o2Field.toBSON());
+
+    // TODO (SERVER-86688): Remove showExpandedEvents: true filter from $changeStream.
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true, showExpandedEvents: true}}");
+
+    const auto opDesc =
+        D{{"reshardingUUID", reshardingUuid}, {"type", resharding::kReshardFinalOpLogType}};
+
+    Document expectedReshardingBlockingWrites{
+        {DSChangeStream::kReshardingUuidField, reshardingUuid},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, uuid, opDesc, DSChangeStream::kReshardBlockingWritesOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardBlockingWritesOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, uuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+    };
+    checkTransformation(reshardingBlockingWrites, expectedReshardingBlockingWrites, spec);
+}
+
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
@@ -1416,6 +1450,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
                                              true,  // fromMigrate
                                              o2Field.toBSON());
 
+    // TODO (SERVER-86688): Remove showExpandedEvents: true filter from $changeStream.
     auto spec = fromjson(
         "{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true, "
         "showExpandedEvents: true}}");
