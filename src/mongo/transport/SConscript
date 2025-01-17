@@ -27,7 +27,7 @@ env.CppUnitTest(
 )
 
 env.CppIntegrationTest(
-    target="transport_integration_test",
+    target="asio_transport_integration_test",
     source=[],
     LIBDEPS=[],
 )

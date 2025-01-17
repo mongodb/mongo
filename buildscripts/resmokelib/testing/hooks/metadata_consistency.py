@@ -25,7 +25,7 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
         # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
         "build/install/bin/executor_integration_test",
         "build/install/bin/rpc_integration_test",
-        "build/install/bin/transport_integration_test",
+        "build/install/bin/asio_transport_integration_test",
         # Skip tests that update the internalDocumentSourceGroupMaxMemoryBytes parameter and make
         # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
         "jstests/aggregation/sources/unionWith/unionWith.js",
