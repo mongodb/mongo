@@ -19,6 +19,9 @@
  *   cannot_run_during_upgrade_downgrade,
  *   # Does not support multiplanning, because it stashes documents beyond batch size.
  *   does_not_support_multiplanning_single_solutions,
+ *   # The test explicitly tests with batchSize equal to 1 and the config fuzzer changes batchSize
+ *   # that can cause a mimatch between results.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 
@@ -76,7 +79,7 @@ const testFindCmd = function() {
     assert.commandWorked(db.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
 
     jsTestLog(
-        "[Find] resumeAfter should successfully resume with a resume token pointing to a deleted recordId.");
+        "[Find] resumeAfter should successfully resume with a resume token pointing to a valid recordId.");
     res = assert.commandWorked(db.runCommand({
         find: collName,
         hint: {$natural: 1},
