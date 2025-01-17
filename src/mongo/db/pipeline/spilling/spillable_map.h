@@ -192,6 +192,20 @@ public:
         return ConstIterator{this, ConstIterator::EndTag{}};
     }
 
+    /**
+     * If the element that it is pointing to is stored in memory, removes it.
+     * Advances the iterator to the next element. Illegal to call on end().
+     */
+    void eraseIfInMemoryAndAdvance(Iterator& it) {
+        if (it.memoryExhausted()) {
+            ++it;
+        } else {
+            auto itToErase = it._memIt;
+            ++it;
+            _memMap.erase(itToErase);
+        }
+    }
+
 private:
     void initDiskMap();
     RecordId computeKey(const Value& id) const;

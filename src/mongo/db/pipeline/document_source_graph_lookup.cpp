@@ -162,10 +162,10 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::doGetNext() {
     uassertTotalSize();
     std::vector<Value> results;
     results.reserve(_visited.size());
-    for (auto& doc : _visited) {
-        totalSize += doc.getApproximateSize();
+    for (auto it = _visited.begin(); it != _visited.end(); _visited.eraseIfInMemoryAndAdvance(it)) {
+        totalSize += it->getApproximateSize();
         uassertTotalSize();
-        results.emplace_back(std::move(doc));
+        results.emplace_back(std::move(*it));
     }
     _visited.clear();
 
@@ -222,7 +222,7 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNextUnwound() {
                 unwound.setNestedField(*indexPath, Value(_outputIndex));
                 ++_outputIndex;
             }
-            ++_unwindIterator;
+            _visited.eraseIfInMemoryAndAdvance(_unwindIterator);
         }
 
         return unwound.freeze();
