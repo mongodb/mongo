@@ -474,18 +474,32 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
     parseHeader(fs);
 
     // The rest of the file is tests.
-    bool partialTestRun = false;
-    for (size_t testNum = 0; !fs.eof(); ++testNum) {
+    auto partialTestRun = false;
+    auto nextTestNum = size_t{0};
+    while (!fs.eof()) {
+        auto currByteOffset = fs.tellg();
         try {
-            auto test = Test::parseTest(fs, mode, _optimizationsOff, testNum);
+            auto test = Test::parseTest(fs, mode, _optimizationsOff, nextTestNum);
+            // The test number (localTestNum) from the file may differ from the expected sequence
+            // (nextTestNum).
+            auto localTestNum = test.getTestNum();
             test.setDB(_databaseNeeded);
-            if (testNum >= startRange && testNum <= endRange) {
+            if (localTestNum >= startRange && localTestNum <= endRange) {
                 _tests.push_back(test);
             } else {
                 partialTestRun = true;
             }
-        } catch (const AssertionException& ex) {
-            std::cerr << _filePath.string() << std::endl << ex.reason() << std::endl;
+            nextTestNum = localTestNum + 1;
+        } catch (AssertionException& ex) {
+            // To see which lines failed, run "tail -c +<byte-offset> <full-path-to-test>"
+            ex.addContext(str::stream{} << "Failed to read test at byte " << currByteOffset);
+            if (ex.code() == 9948600) {
+                // Fail the entire testfile if we hit an invalid localTestNum that violates the
+                // monotonically increasing expectation.
+                throw;
+            } else {
+                std::cerr << _filePath.string() << std::endl << ex.reason() << std::endl;
+            }
         }
     }
     // Close the file.

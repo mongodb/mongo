@@ -1,0 +1,9 @@
+dupe_test_nums
+dupe_test_nums
+test.coll as fuzzer_coll
+
+0
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$match: {}}], cursor: {}}
+
+0
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$match: {}}], cursor: {}}

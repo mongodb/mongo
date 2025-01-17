@@ -186,7 +186,7 @@ NormalizationOptsSet Test::parseResultType(const std::string& type) {
 Test Test::parseTest(std::fstream& fs,
                      const ModeOption mode,
                      const bool optimizationsOff,
-                     const size_t testNum) {
+                     const size_t nextTestNum) {
     auto lineFromFile = std::string{};
     tassert(9670404,
             "Expected file to be open and ready for reading, but it wasn't",
@@ -195,17 +195,18 @@ Test Test::parseTest(std::fstream& fs,
     auto preQueryComments = std::vector<std::string>{};
     auto postQueryComments = std::vector<std::string>{};
     auto postTestComments = std::vector<std::string>{};
+    auto localTestNum = nextTestNum;
 
-    const auto [testLine, testName] = [&fs, &preQueryComments, &lineFromFile, &testNum]()
+    const auto [testLine,
+                testName] = [&fs, &preQueryComments, &lineFromFile, &nextTestNum, &localTestNum]()
         -> std::tuple<std::string, boost::optional<std::string>> {
         // First line can either be "# NAME" or test. Comments are skipped.
         if (isTestLine(lineFromFile)) {
             return {lineFromFile, boost::none};
         } else {
-            auto testN = size_t{};
             auto testName = boost::optional<std::string>{};
             auto iss = std::istringstream{lineFromFile};
-            iss >> testN;
+            iss >> localTestNum;
             if (iss.eof()) {
                 testName = boost::none;
             } else {
@@ -214,15 +215,16 @@ Test Test::parseTest(std::fstream& fs,
                 testName = testNameString;
             }
             uassert(9670451, "Non-test line should be either a '#' or a '# NAME'", iss.eof());
-            uassert(9670440,
-                    str::stream{} << "Expected test number (" << testNum
-                                  << ") and read test number (" << testN << ") do not match.",
-                    testN == testNum);
+            uassert(9948600,
+                    str::stream{} << "testNum must be written in monotonically increasing order. "
+                                     "Expected to be at least "
+                                  << nextTestNum << ", but got " << localTestNum,
+                    localTestNum >= nextTestNum);
             // The first token should be a number. For now ignore and assume it lines
             // up with the number passed in. firstLine.front();
             preQueryComments = readLine(fs, lineFromFile);
             uassert(9670423,
-                    str::stream{} << "Expected test line for test #" << testNum << " but got "
+                    str::stream{} << "Expected test line for test #" << localTestNum << " but got "
                                   << lineFromFile,
                     isTestLine(lineFromFile));
             return {lineFromFile, testName};
@@ -267,20 +269,20 @@ Test Test::parseTest(std::fstream& fs,
             }
         }
         uassert(9670406,
-                str::stream{} << "Expected results but found none for testNum " << testNum,
+                str::stream{} << "Expected results but found none for testNum " << localTestNum,
                 !expectedResult.empty());
 
         if (intraResultSetCommentLineCount > 0) {
             std::cout << applyBrown() << "Warning: we ignored " << intraResultSetCommentLineCount
                       << " lines of intra-result set comments for test "
                       // Print test name or a backspace.
-                      << testNum << " " << testName.value_or("\b") << "." << applyReset()
+                      << localTestNum << " " << testName.value_or("\b") << "." << applyReset()
                       << std::endl;
         }
 
         return Test(testLine,
                     optimizationsOff,
-                    testNum,
+                    localTestNum,
                     testName,
                     std::move(preTestComments),
                     std::move(preQueryComments),
@@ -292,7 +294,7 @@ Test Test::parseTest(std::fstream& fs,
         postQueryComments = readAndAssertNewline(fs, "End of single test without results");
         return Test(testLine,
                     optimizationsOff,
-                    testNum,
+                    localTestNum,
                     testName,
                     std::move(preTestComments),
                     std::move(preQueryComments),

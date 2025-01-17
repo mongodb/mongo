@@ -83,7 +83,8 @@ public:
 
     /**
      * Parses a single test definition. This includes the number and name line, the comment line(s)
-     * and the actual test command.
+     * and the actual test command. nextTestNum = prevTestNum + 1, and will be overriden if a user
+     * specifies a different testNum so long as it's greater than the previous.
      * Expects the file stream to be open and allow reading.
     <----- Test Format ----->
     <testNumber> <testName>
@@ -92,7 +93,7 @@ public:
     <result if result file>
     <----- End Test Format ----->
      */
-    static Test parseTest(std::fstream&, ModeOption, bool optimizationsOff, size_t testNum);
+    static Test parseTest(std::fstream&, ModeOption, bool optimizationsOff, size_t nextTestNum);
 
     /**
      * Runs the test and records the result returned by the server.
