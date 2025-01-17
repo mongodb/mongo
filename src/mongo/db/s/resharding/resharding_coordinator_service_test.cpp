@@ -144,6 +144,33 @@ private:
 class ReshardingCoordinatorServiceTest : service_context_test::WithSetupTransportLayer,
                                          public ConfigServerTestFixture {
 public:
+    struct ReshardingOptions {
+        const std::vector<ShardId> donorShardIds;
+        const std::vector<ShardId> recipientShardIds;
+        const std::set<ShardId> recipientShardIdsNoInitialChunks;
+        bool performVerification;
+
+        ReshardingOptions(std::vector<ShardId> donorShardIds_,
+                          std::vector<ShardId> recipientShardIds_,
+                          std::set<ShardId> recipientShardIdsNoInitialChunks_ = {},
+                          bool performVerification_ = true)
+            : donorShardIds(donorShardIds_),
+              recipientShardIds(recipientShardIds_),
+              recipientShardIdsNoInitialChunks(recipientShardIdsNoInitialChunks_),
+              performVerification(performVerification_) {
+            ASSERT_GT(donorShardIds.size(), 0);
+            ASSERT_GT(recipientShardIds.size(), 0);
+            ASSERT_GT(recipientShardIds.size(), recipientShardIdsNoInitialChunks.size());
+        };
+    };
+
+    ReshardingOptions makeDefaultReshardingOptions() {
+        // Make the resharding operation have all shards as the donors and recipients.
+        auto donorShardIds = getShardIds();
+        auto recipientShardIds = getShardIds();
+        return {donorShardIds, recipientShardIds};
+    }
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) {
         return std::make_unique<ReshardingCoordinatorServiceForTest>(serviceContext);
     }
@@ -212,30 +239,28 @@ public:
         return _controller.get();
     }
 
-    ReshardingCoordinatorDocument makeCoordinatorDoc(
-        CoordinatorStateEnum state,
-        UUID reshardingUUID,
-        NamespaceString originalNss,
-        NamespaceString tempNss,
-        const ShardKeyPattern& newShardKey,
-        const std::vector<ShardId>& donorShardIds,
-        const std::vector<ShardId>& recipientShardIds,
-        boost::optional<Timestamp> fetchTimestamp = boost::none) {
+    ReshardingCoordinatorDocument makeCoordinatorDoc(CoordinatorStateEnum state,
+                                                     UUID reshardingUUID,
+                                                     NamespaceString originalNss,
+                                                     NamespaceString tempNss,
+                                                     const ShardKeyPattern& newShardKey,
+                                                     const ReshardingOptions& reshardingOptions) {
         CommonReshardingMetadata meta(
             reshardingUUID, originalNss, UUID::gen(), tempNss, newShardKey.toBSON());
+        meta.setPerformVerification(reshardingOptions.performVerification);
         meta.setStartTime(getServiceContext()->getFastClockSource()->now());
 
         std::vector<DonorShardEntry> donorShards;
-        std::transform(donorShardIds.begin(),
-                       donorShardIds.end(),
+        std::transform(reshardingOptions.donorShardIds.begin(),
+                       reshardingOptions.donorShardIds.end(),
                        std::back_inserter(donorShards),
                        [](auto shardId) {
                            return DonorShardEntry{shardId, {}};
                        });
 
         std::vector<RecipientShardEntry> recipientShards;
-        std::transform(recipientShardIds.begin(),
-                       recipientShardIds.end(),
+        std::transform(reshardingOptions.recipientShardIds.begin(),
+                       reshardingOptions.recipientShardIds.end(),
                        std::back_inserter(recipientShards),
                        [](auto shardId) {
                            return RecipientShardEntry{shardId, {}};
@@ -451,20 +476,9 @@ public:
     }
 
     ReshardingCoordinatorDocument insertStateAndCatalogEntries(
-        CoordinatorStateEnum state,
-        OID epoch,
-        const std::vector<ShardId>& donorShardIds,
-        const std::vector<ShardId>& recipientShardIds,
-        const boost::optional<Timestamp>& fetchTimestamp = boost::none) {
-        return insertStateAndCatalogEntries(state,
-                                            epoch,
-                                            _reshardingUUID,
-                                            _originalNss,
-                                            _tempNss,
-                                            _newShardKey,
-                                            donorShardIds,
-                                            recipientShardIds,
-                                            fetchTimestamp);
+        CoordinatorStateEnum state, OID epoch, const ReshardingOptions& reshardingOptions) {
+        return insertStateAndCatalogEntries(
+            state, epoch, _reshardingUUID, _originalNss, _tempNss, _newShardKey, reshardingOptions);
     }
 
     ReshardingCoordinatorDocument insertStateAndCatalogEntries(
@@ -474,20 +488,12 @@ public:
         NamespaceString originalNss,
         NamespaceString tempNss,
         const ShardKeyPattern& newShardKey,
-        const std::vector<ShardId>& donorShardIds,
-        const std::vector<ShardId>& recipientShardIds,
-        const boost::optional<Timestamp>& fetchTimestamp = boost::none) {
+        const ReshardingOptions& reshardingOptions) {
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
 
-        auto coordinatorDoc = makeCoordinatorDoc(state,
-                                                 reshardingUUID,
-                                                 originalNss,
-                                                 tempNss,
-                                                 newShardKey,
-                                                 donorShardIds,
-                                                 recipientShardIds,
-                                                 fetchTimestamp);
+        auto coordinatorDoc = makeCoordinatorDoc(
+            state, reshardingUUID, originalNss, tempNss, newShardKey, reshardingOptions);
 
         TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
         reshardingFields.setState(coordinatorDoc.getState());
@@ -633,50 +639,35 @@ public:
         NamespaceString tempNss,
         const ShardKeyPattern& newShardKey,
         UUID originalUUID,
-        const ShardKeyPattern& oldShardKey) {
-        auto donorShardIds = getShardIds();
-        auto recipientShardIds = getShardIds();
-        return initializeAndGetCoordinator(reshardingUUID,
-                                           originalNss,
-                                           tempNss,
-                                           newShardKey,
-                                           originalUUID,
-                                           oldShardKey,
-                                           donorShardIds,
-                                           recipientShardIds);
-    }
-
-    std::shared_ptr<ReshardingCoordinator> initializeAndGetCoordinator(
-        UUID reshardingUUID,
-        NamespaceString originalNss,
-        NamespaceString tempNss,
-        const ShardKeyPattern& newShardKey,
-        UUID originalUUID,
         const ShardKeyPattern& oldShardKey,
-        const std::vector<ShardId>& donorShardIds,
-        const std::vector<ShardId>& recipientShardIds,
-        const std::set<ShardId>& recipientShardIdsNoInitialChunks = {},
-        const boost::optional<Timestamp>& fetchTimestamp = boost::none) {
+        boost::optional<ReshardingOptions> reshardingOptions = boost::none) {
+        if (!reshardingOptions) {
+            reshardingOptions.emplace(makeDefaultReshardingOptions());
+        }
+
         auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused,
                                                 _originalEpoch,
                                                 reshardingUUID,
                                                 originalNss,
                                                 tempNss,
                                                 newShardKey,
-                                                donorShardIds,
-                                                recipientShardIds,
-                                                fetchTimestamp);
+                                                *reshardingOptions);
         auto opCtx = operationContext();
 
-        makeAndInsertChunksForDonorShard(
-            originalUUID, _originalEpoch, _originalTimestamp, oldShardKey, donorShardIds);
+        makeAndInsertChunksForDonorShard(originalUUID,
+                                         _originalEpoch,
+                                         _originalTimestamp,
+                                         oldShardKey,
+                                         reshardingOptions->donorShardIds);
 
         std::vector<ShardId> recipientShardIdsForInitialChunks;
-        std::copy_if(
-            recipientShardIds.begin(),
-            recipientShardIds.end(),
-            std::back_inserter(recipientShardIdsForInitialChunks),
-            [&](auto shardId) { return !recipientShardIdsNoInitialChunks.contains(shardId); });
+        std::copy_if(reshardingOptions->recipientShardIds.begin(),
+                     reshardingOptions->recipientShardIds.end(),
+                     std::back_inserter(recipientShardIdsForInitialChunks),
+                     [&](auto shardId) {
+                         return !reshardingOptions->recipientShardIdsNoInitialChunks.contains(
+                             shardId);
+                     });
 
         auto initialChunks = makeChunks(reshardingUUID,
                                         _tempEpoch,
@@ -708,9 +699,7 @@ public:
                                                           CoordinatorStateEnum::kApplying,
                                                           CoordinatorStateEnum::kBlockingWrites,
                                                           CoordinatorStateEnum::kCommitting},
-        const boost::optional<std::vector<ShardId>> donorShardIds = boost::none,
-        const boost::optional<std::vector<ShardId>> recipientShardIds = boost::none,
-        const std::set<ShardId> recipientShardIdsNoInitialChunks = {}) {
+        boost::optional<ReshardingOptions> reshardingOptions = boost::none) {
         auto runFunctionForState = [&](CoordinatorStateEnum state) {
             auto it = transitionFunctions.find(state);
             if (it == transitionFunctions.end()) {
@@ -725,16 +714,13 @@ public:
         }
 
         auto opCtx = operationContext();
-        auto coordinator =
-            initializeAndGetCoordinator(_reshardingUUID,
-                                        _originalNss,
-                                        _tempNss,
-                                        _newShardKey,
-                                        _originalUUID,
-                                        _oldShardKey,
-                                        donorShardIds ? *donorShardIds : getShardIds(),
-                                        recipientShardIds ? *recipientShardIds : getShardIds(),
-                                        recipientShardIdsNoInitialChunks);
+        auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                       _originalNss,
+                                                       _tempNss,
+                                                       _newShardKey,
+                                                       _originalUUID,
+                                                       _oldShardKey,
+                                                       reshardingOptions);
 
         for (const auto state : states) {
             stateTransitionsGuard->wait(state);
@@ -766,12 +752,9 @@ public:
         coordinator->getCompletionFuture().get(opCtx);
     }
 
-    void runReshardingToCompletionAssertToCopyMetrics(
-        const std::vector<ShardId>& donorShardIds,
-        const std::vector<ShardId>& recipientShardIds,
-        const std::set<ShardId>& recipientShardIdsNoInitialChunks) {
-        long numRecipientsToClone =
-            recipientShardIds.size() - recipientShardIdsNoInitialChunks.size();
+    void runReshardingToCompletionAssertToCopyMetrics(const ReshardingOptions& reshardingOptions) {
+        long numRecipientsToClone = reshardingOptions.recipientShardIds.size() -
+            reshardingOptions.recipientShardIdsNoInitialChunks.size();
         long expectedApproxBytesToClone = totalApproxBytesToClone / numRecipientsToClone;
         long expectedApproxDocumentsToClone = totalApproxDocumentsToClone / numRecipientsToClone;
 
@@ -801,12 +784,8 @@ public:
                        CoordinatorStateEnum::kApplying,
                        CoordinatorStateEnum::kBlockingWrites,
                        CoordinatorStateEnum::kCommitting};
-        runReshardingToCompletion(transitionFunctions,
-                                  nullptr /* stateTransitionsGuard */,
-                                  states,
-                                  donorShardIds,
-                                  recipientShardIds,
-                                  recipientShardIdsNoInitialChunks);
+        runReshardingToCompletion(
+            transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
     }
 
     repl::PrimaryOnlyService* _service = nullptr;
@@ -902,16 +881,21 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
         globalFailPointRegistry().find("pauseAfterInsertCoordinatorDoc");
     auto timesEnteredFailPoint = pauseAfterInsertCoordinatorDoc->setMode(FailPoint::alwaysOn, 0);
 
-    auto donorShardIds = getShardIds();
-    auto recipientShardIds = getShardIds();
+    auto reshardingOptions = makeDefaultReshardingOptions();
     auto doc = insertStateAndCatalogEntries(
-        CoordinatorStateEnum::kUnused, _originalEpoch, donorShardIds, recipientShardIds);
+        CoordinatorStateEnum::kUnused, _originalEpoch, reshardingOptions);
 
-    makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _originalTimestamp, _oldShardKey, donorShardIds);
+    makeAndInsertChunksForDonorShard(_originalUUID,
+                                     _originalEpoch,
+                                     _originalTimestamp,
+                                     _oldShardKey,
+                                     reshardingOptions.donorShardIds);
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _tempTimestamp, _newShardKey, recipientShardIds);
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    reshardingOptions.recipientShardIds);
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {
@@ -963,16 +947,21 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         CoordinatorStateEnum::kCommitting};
     PauseDuringStateTransitions stateTransitionsGuard{controller(), coordinatorStates};
 
-    auto donorShardIds = getShardIds();
-    auto recipientShardIds = getShardIds();
+    auto reshardingOptions = makeDefaultReshardingOptions();
     auto doc = insertStateAndCatalogEntries(
-        CoordinatorStateEnum::kUnused, _originalEpoch, donorShardIds, recipientShardIds);
+        CoordinatorStateEnum::kUnused, _originalEpoch, reshardingOptions);
     auto opCtx = operationContext();
-    makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _originalTimestamp, _oldShardKey, donorShardIds);
+    makeAndInsertChunksForDonorShard(_originalUUID,
+                                     _originalEpoch,
+                                     _originalTimestamp,
+                                     _oldShardKey,
+                                     reshardingOptions.donorShardIds);
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _tempTimestamp, _newShardKey, recipientShardIds);
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    reshardingOptions.recipientShardIds);
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {
@@ -1125,16 +1114,21 @@ TEST_F(ReshardingCoordinatorServiceTest, ReportForCurrentOpAfterCompletion) {
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNotAllowed) {
-    auto donorShardIds = getShardIds();
-    auto recipientShardIds = getShardIds();
+    auto reshardingOptions = makeDefaultReshardingOptions();
     auto doc = insertStateAndCatalogEntries(
-        CoordinatorStateEnum::kUnused, _originalEpoch, donorShardIds, recipientShardIds);
+        CoordinatorStateEnum::kUnused, _originalEpoch, reshardingOptions);
     auto opCtx = operationContext();
-    makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _originalTimestamp, _oldShardKey, donorShardIds);
+    makeAndInsertChunksForDonorShard(_originalUUID,
+                                     _originalEpoch,
+                                     _originalTimestamp,
+                                     _oldShardKey,
+                                     reshardingOptions.donorShardIds);
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _tempTimestamp, _newShardKey, recipientShardIds);
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    reshardingOptions.recipientShardIds);
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {
@@ -1316,16 +1310,20 @@ TEST_F(ReshardingCoordinatorServiceTest, ZeroNumRecipientShardsNoInitialChunks) 
     auto donorShardIds = getShardIds();
     auto recipientShardIds = getShardIds();
     std::set<ShardId> recipientShardIdsNoInitialChunks = {};
-    runReshardingToCompletionAssertToCopyMetrics(
-        donorShardIds, recipientShardIds, recipientShardIdsNoInitialChunks);
+    auto reshardingOptions =
+        ReshardingOptions(donorShardIds, recipientShardIds, recipientShardIdsNoInitialChunks);
+
+    runReshardingToCompletionAssertToCopyMetrics(reshardingOptions);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, NonZeroNumRecipientShardsNoInitialChunks) {
     auto donorShardIds = getShardIds();
     auto recipientShardIds = getShardIds();
     std::set<ShardId> recipientShardIdsNoInitialChunks = {shardId0};
-    runReshardingToCompletionAssertToCopyMetrics(
-        donorShardIds, recipientShardIds, recipientShardIdsNoInitialChunks);
+    auto reshardingOptions =
+        ReshardingOptions(donorShardIds, recipientShardIds, recipientShardIdsNoInitialChunks);
+
+    runReshardingToCompletionAssertToCopyMetrics(reshardingOptions);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, CoordinatorHonorsCriticalSectionTimeoutAfterStepUp) {
@@ -1341,14 +1339,14 @@ TEST_F(ReshardingCoordinatorServiceTest, CoordinatorHonorsCriticalSectionTimeout
 
     auto opCtx = operationContext();
 
+    auto reshardingOptions = makeDefaultReshardingOptions();
     auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
                                                    _originalNss,
                                                    _tempNss,
                                                    _newShardKey,
                                                    _originalUUID,
                                                    _oldShardKey,
-                                                   getShardIds(),
-                                                   getShardIds());
+                                                   reshardingOptions);
     auto instanceId =
         BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << _reshardingUUID);
 
