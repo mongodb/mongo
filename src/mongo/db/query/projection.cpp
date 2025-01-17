@@ -337,5 +337,51 @@ bool Projection::isFieldRetainedExactly(StringData path) const {
 
     return false;
 }
+
+namespace {
+
+struct MetaFieldData {
+    std::vector<FieldPath> metaPaths;
+};
+
+using MetaFieldVisitorContext = PathTrackingVisitorContext<MetaFieldData>;
+
+/**
+ * Visitor which produces a list of paths where $meta expressions are.
+ */
+class MetaFieldVisitor final : public ProjectionASTConstVisitor {
+public:
+    MetaFieldVisitor(MetaFieldVisitorContext* context) : _context(context) {}
+
+    void visit(const ExpressionASTNode* node) final {
+        const auto* metaExpr = dynamic_cast<const ExpressionMeta*>(node->expressionRaw());
+        if (!metaExpr || metaExpr->getMetaType() != DocumentMetadataFields::MetaType::kSortKey) {
+            return;
+        }
+
+        _context->data().metaPaths.push_back(_context->fullPath());
+    }
+
+    void visit(const ProjectionPositionalASTNode* node) final {}
+    void visit(const ProjectionSliceASTNode* node) final {}
+    void visit(const ProjectionElemMatchASTNode* node) final {}
+    void visit(const BooleanConstantASTNode* node) final {}
+    void visit(const ProjectionPathASTNode* node) final {}
+    void visit(const MatchExpressionASTNode* node) final {}
+
+private:
+    MetaFieldVisitorContext* _context;
+};
+}  // namespace
+
+std::vector<FieldPath> Projection::extractSortKeyMetaFields() const {
+    MetaFieldVisitorContext ctx;
+    MetaFieldVisitor visitor(&ctx);
+    PathTrackingConstWalker<MetaFieldData> walker{&ctx, {&visitor}, {}};
+    tree_walker::walk<true, ASTNode>(root(), &walker);
+
+    return std::move(ctx.data().metaPaths);
+}
+
 }  // namespace projection_ast
 }  // namespace mongo

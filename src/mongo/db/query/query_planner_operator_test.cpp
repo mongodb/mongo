@@ -1568,5 +1568,41 @@ TEST_F(QueryPlannerTest, ProjectionDoesNotSwapBeforeSortWithLimit) {
         "{cscan: {dir: 1}}}}}}");
 }
 
+TEST_F(QueryPlannerTest, PlanWithReturnKey) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', projection: {_id: 0, a: 1,  b: 1}, sort: {a: 1}, returnKey: true}"));
+
+    assertNumSolutions(2U);
+
+    for (auto&& soln : solns) {
+        ASSERT_TRUE(soln->root()->getType() == STAGE_RETURN_KEY);
+    }
+}
+
+TEST_F(QueryPlannerTest, PlanWithReturnKeyAndMetaProjectionSortKey) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', projection: {b: {$meta: 'sortKey'}}, sort: {a: 1}, returnKey: true}"));
+
+    assertNumSolutions(2U);
+
+    for (auto&& soln : solns) {
+        ASSERT_TRUE(soln->root()->getType() == STAGE_RETURN_KEY);
+    }
+}
+
+TEST_F(QueryPlannerTest, PlanWithReturnKeyAndMetaProjectionIndexKey) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', projection: {b: {$meta: 'indexKey'}}, sort: {a: 1}, returnKey: true}"));
+
+    assertNumSolutions(2U);
+
+    for (auto&& soln : solns) {
+        ASSERT_TRUE(soln->root()->getType() == STAGE_RETURN_KEY);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

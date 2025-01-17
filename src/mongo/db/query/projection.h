@@ -179,6 +179,14 @@ public:
      */
     void optimize();
 
+    /**
+     * Extracts all field names for the sortKey meta-projection and stores them in the returned
+     * array. Returns an empty array if there were no sortKey meta-projection specified in the
+     * given projection. For example, given a projection {a: 1, b: {$meta: "sortKey"},
+     * c: {$meta: "sortKey"}}, the returned vector will contain two elements ["b", "c"].
+     */
+    std::vector<FieldPath> extractSortKeyMetaFields() const;
+
 private:
     ProjectionPathASTNode _root;
     ProjectType _type;

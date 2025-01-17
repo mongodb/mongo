@@ -225,42 +225,6 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
         hintObj, clusteredIndexSpec.getName().value(), clusteredIndexSpec.getKey());
 }
 
-/**
- * Returns the dependencies for the CanonicalQuery, split by those needed to answer the filter,
- * and those needed for "everything else", e.g. project, sort and shard filter.
- */
-std::pair<DepsTracker /* filter */, DepsTracker /* other */> computeDeps(
-    const QueryPlannerParams& params, const CanonicalQuery& query) {
-    DepsTracker filterDeps;
-    match_expression::addDependencies(query.getPrimaryMatchExpression(), &filterDeps);
-    DepsTracker outputDeps;
-    if ((!query.getProj() || query.getProj()->requiresDocument()) && !query.isCountLike()) {
-        outputDeps.needWholeDocument = true;
-        return {std::move(filterDeps), std::move(outputDeps)};
-    }
-    if (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        for (auto&& field : params.shardKey) {
-            outputDeps.fields.emplace(field.fieldNameStringData());
-        }
-    }
-    if (query.isCountLike()) {
-        // If this is a count, we won't have required projections, but may still need to output the
-        // shard filter.
-        return {std::move(filterDeps), std::move(outputDeps)};
-    }
-
-    const auto& reqFields = query.getProj()->getRequiredFields();
-    outputDeps.fields.insert(reqFields.begin(), reqFields.end());
-
-    if (auto sortPattern = query.getSortPattern()) {
-        sortPattern->addDependencies(&outputDeps);
-    }
-    // There's no known way a sort would depend on the whole document, and we already verified
-    // that the projection doesn't depend on the whole document.
-    tassert(6430503, "Unexpectedly required entire object", !outputDeps.needWholeDocument);
-    return {std::move(filterDeps), std::move(outputDeps)};
-}
-
 bool isSolutionBoundedCollscan(const QuerySolution* querySoln) {
     auto [node, count] = querySoln->getFirstNodeByType(StageType::STAGE_COLLSCAN);
     if (node) {
@@ -341,18 +305,6 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
 }  // namespace
 
 using std::unique_ptr;
-
-// Copied verbatim from db/index.h
-static bool isIdIndex(const BSONObj& pattern) {
-    BSONObjIterator i(pattern);
-    BSONElement e = i.next();
-    //_id index must have form exactly {_id : 1} or {_id : -1}.
-    // Allows an index of form {_id : "hashed"} to exist but
-    // do not consider it to be the primary _id index
-    if (!(strcmp(e.fieldName(), "_id") == 0 && (e.numberInt() == 1 || e.numberInt() == -1)))
-        return false;
-    return i.next().eoo();
-}
 
 static bool is2DIndex(const BSONObj& pattern) {
     BSONObjIterator it(pattern);

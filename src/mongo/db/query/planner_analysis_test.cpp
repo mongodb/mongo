@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
@@ -366,4 +367,47 @@ TEST_F(QueryPlannerTest, ExprOnFetchDoesNotIncludeImpreciseFilter) {
         "      bounds: {a: [[1,1,true,true]]}}}}}");
 }
 
+TEST(QueryPlannerAnalysis, TurnIndexScanIntoCount) {
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+
+    OrderedIntervalList a{"a"};
+    a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    node->bounds.fields.push_back(a);
+
+    QuerySolution qs;
+    qs.setRoot(std::move(node));
+    ASSERT_TRUE(QueryPlannerAnalysis::turnIxscanIntoCount(&qs));
+}
+
+TEST(QueryPlannerAnalysis, TurnIndexScanAndFetchIntoCount) {
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    OrderedIntervalList a{"a"};
+    a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    node->bounds.fields.push_back(a);
+
+    QuerySolution qs;
+    qs.setRoot(std::make_unique<FetchNode>(std::move(node)));
+    ASSERT_TRUE(QueryPlannerAnalysis::turnIxscanIntoCount(&qs));
+}
+
+TEST(QueryPlannerAnalysis, CannotTurnIndexScanAndFetchIntoCount) {
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    OrderedIntervalList a{"a"};
+    a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    node->bounds.fields.push_back(a);
+
+    // Add fetch node with filter.
+    auto fetch = std::make_unique<FetchNode>(std::move(node));
+    auto operand = BSON("$lt" << 100);
+    std::unique_ptr<LTMatchExpression> expPtr =
+        std::make_unique<LTMatchExpression>("a"_sd, operand["$lt"]);
+    fetch->filter = std::move(expPtr);
+
+    QuerySolution qs;
+    qs.setRoot(std::move(fetch));
+    ASSERT_FALSE(QueryPlannerAnalysis::turnIxscanIntoCount(&qs));
+}
 }  // namespace

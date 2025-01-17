@@ -71,8 +71,7 @@ IdHackPlanner::IdHackPlanner(PlannerData plannerData, const IndexDescriptor* des
         // returnKey.
         stage = std::make_unique<ReturnKeyStage>(
             cq()->getExpCtxRaw(),
-            cqProjection ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*cqProjection)
-                         : std::vector<FieldPath>{},
+            cqProjection ? cqProjection->extractSortKeyMetaFields() : std::vector<FieldPath>{},
             ws(),
             std::move(stage));
     } else if (cqProjection) {
