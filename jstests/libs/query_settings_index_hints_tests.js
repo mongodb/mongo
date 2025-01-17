@@ -72,7 +72,7 @@ export class QuerySettingsIndexHintsTests {
             // TODO SERVER-90880: We can relax this check when we cache single-solution plans in the
             // classic cache with SBE.
             // TODO SERVER-13341: Relax this check to include the case where classic is being used.
-            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(db)) &&
+            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(this.db)) &&
             // Express or IDHACK optimized queries are not cached.
             !isIdhackQuery &&
             // Min/max queries are not cached.
