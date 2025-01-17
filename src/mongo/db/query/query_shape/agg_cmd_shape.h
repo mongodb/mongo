@@ -34,7 +34,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
+#include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 
 namespace mongo::query_shape {
@@ -51,15 +51,19 @@ namespace mongo::query_shape {
 struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
     AggCmdShapeComponents(const AggregateCommandRequest&,
                           stdx::unordered_set<NamespaceString> involvedNamespaces,
-                          std::vector<BSONObj> shapifiedPipeline);
+                          std::vector<BSONObj> shapifiedPipeline,
+                          LetShapeComponent let);
 
     AggCmdShapeComponents(OptionalBool allowDiskUse,
                           stdx::unordered_set<NamespaceString> involvedNamespaces,
-                          std::vector<BSONObj> shapifiedPipeline);
+                          std::vector<BSONObj> shapifiedPipeline,
+                          LetShapeComponent let);
 
     size_t size() const final;
 
-    void appendTo(BSONObjBuilder&) const;
+    void appendTo(BSONObjBuilder&,
+                  const SerializationOptions&,
+                  const boost::intrusive_ptr<ExpressionContext>&) const;
 
     void HashValue(absl::HashState state) const final;
 
@@ -69,6 +73,8 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
 
     // The representative query shape of the pipeline.
     std::vector<BSONObj> representativePipeline;
+
+    LetShapeComponent let;
 };
 
 /**
@@ -77,7 +83,7 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
  * SerializationOptions. Mostly this involves correctly setting up an ExpressionContext to re-parse
  * the request if needed.
  */
-class AggCmdShape : public CmdWithLetShape {
+class AggCmdShape : public Shape {
 public:
     AggCmdShape(const AggregateCommandRequest&,
                 NamespaceString origNss,
@@ -85,19 +91,24 @@ public:
                 const Pipeline&,
                 const boost::intrusive_ptr<ExpressionContext>&);
 
-    void appendLetCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                             const boost::intrusive_ptr<ExpressionContext>&,
-                                             const SerializationOptions&) const final;
+    const CmdSpecificShapeComponents& specificComponents() const final;
+
     size_t extraSize() const final;
+
+protected:
+    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
+                                          OperationContext*,
+                                          const SerializationOptions&) const final;
 
 private:
     AggCmdShapeComponents _components;
+
     // Flag to denote if the query was run in a router-role context. Needed to rebuild the "dummy"
     // expression context for re-parsing.
     bool _inRouter;
 };
 static_assert(sizeof(AggCmdShape) <=
-                  sizeof(CmdWithLetShape) + sizeof(AggCmdShapeComponents) + 8 /* bool and padding*/,
+                  sizeof(Shape) + sizeof(AggCmdShapeComponents) + 8 /* bool and padding */,
               "If the class' members have changed, this assert and the extraSize() calculation may "
               "need to be updated with a new value.");
 }  // namespace mongo::query_shape

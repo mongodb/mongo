@@ -29,7 +29,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
+#include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -40,38 +40,23 @@ namespace {
 static const NamespaceString kDefaultTestNss =
     NamespaceString::createNamespaceString_forTest("testDB.testColl");
 
-class CmdWithLetShapeTest : public unittest::Test {};
-
-struct DummyInnerComponent : public CmdSpecificShapeComponents {
-    DummyInnerComponent(){};
-    void HashValue(absl::HashState state) const override {}
-    size_t size() const final {
-        return sizeof(*this);
-    }
-};
-
-TEST_F(CmdWithLetShapeTest, SizeOfLetShapeComponent) {
+TEST(CmdWithLetShapeTest, SizeOfLetShapeComponent) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto let = fromjson(R"({x: 4, y: "str"})");
-    auto innerComponents = std::make_unique<DummyInnerComponent>();
-    auto components = std::make_unique<LetShapeComponent>(let, expCtx, *innerComponents);
+    auto components = std::make_unique<LetShapeComponent>(let, expCtx);
 
     const auto minimumSize = sizeof(CmdSpecificShapeComponents) + sizeof(BSONObj) + sizeof(bool) +
-        sizeof(void*) /*CmdSpecificShapeComponents&*/ +
-        static_cast<size_t>(components->shapifiedLet.objsize()) +
-        components->unownedInnerComponents.size();
+        static_cast<size_t>(components->shapifiedLet.objsize());
 
     ASSERT_GTE(components->size(), minimumSize);
     ASSERT_LTE(components->size(), minimumSize + 8 /*padding*/);
 }
 
-TEST_F(CmdWithLetShapeTest, SizeOfComponentWithAndWithoutLet) {
+TEST(CmdWithLetShapeTest, SizeOfComponentWithAndWithoutLet) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto let = fromjson(R"({x: 4, y: "str"})");
-    auto innerComponents = std::make_unique<DummyInnerComponent>();
-    auto componentsWithLet = std::make_unique<LetShapeComponent>(let, expCtx, *innerComponents);
-    auto componentsWithNoLet =
-        std::make_unique<LetShapeComponent>(boost::none, expCtx, *innerComponents);
+    auto componentsWithLet = std::make_unique<LetShapeComponent>(let, expCtx);
+    auto componentsWithNoLet = std::make_unique<LetShapeComponent>(boost::none, expCtx);
 
     ASSERT_LT(componentsWithNoLet->size(), componentsWithLet->size());
 }

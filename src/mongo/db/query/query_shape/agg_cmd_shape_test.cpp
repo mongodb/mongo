@@ -30,7 +30,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
-#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
+#include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -84,6 +84,7 @@ public:
                                              *parsedPipeline,
                                              _expCtx);
     }
+
     std::unique_ptr<AggCmdShapeComponents> makeShapeComponentsFromPipeline(
         std::vector<StringData> stagesJson, OptionalBool allowDiskUse = {}) {
         auto aggRequest = makeAggregateCommandRequest(std::move(stagesJson));
@@ -93,7 +94,8 @@ public:
             *aggRequest,
             stdx::unordered_set<NamespaceString>{kDefaultTestNss},
             parsedPipeline->serializeToBson(
-                SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+                SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+            LetShapeComponent(aggRequest->getLet(), _expCtx));
     }
 
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
@@ -238,9 +240,11 @@ TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeComponents) {
     const auto pipelineSize = shape_helpers::containerSize(aggComponents->representativePipeline);
     const auto involvedNamespacesSize = sizeof(kDefaultTestNss) +
         kDefaultTestNss.size();  // kDefaultTestNss is the only value in the unordered set.
+    const auto letSize = aggComponents->let.size();
 
     ASSERT_EQ(aggComponents->size(),
-              sizeof(AggCmdShapeComponents) + pipelineSize + involvedNamespacesSize);
+              sizeof(AggCmdShapeComponents) + pipelineSize + involvedNamespacesSize + letSize -
+                  sizeof(LetShapeComponent));
 }
 
 TEST_F(AggCmdShapeTest, EquivalentAggCmdShapeComponentSizes) {

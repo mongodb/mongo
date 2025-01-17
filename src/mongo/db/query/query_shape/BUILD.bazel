@@ -46,8 +46,8 @@ mongo_cc_library(
     ],
     hdrs = [
         "agg_cmd_shape.h",
-        "cmd_with_let_shape.h",
         "find_cmd_shape.h",
+        "let_shape_component.h",
         "query_shape.h",
         "shape_helpers.h",
         "//src/mongo/db/pipeline:aggregate_command_gen",

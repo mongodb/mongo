@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
+#include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
@@ -55,11 +55,13 @@ struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
     /**
      * Appends using the SerializationOptions given in the constructor.
      */
-    void appendTo(BSONObjBuilder&) const;
+    void appendTo(BSONObjBuilder&,
+                  const SerializationOptions&,
+                  const boost::intrusive_ptr<ExpressionContext>&) const;
 
     size_t size() const final {
         return sizeof(FindCmdShapeComponents) + filter.objsize() + projection.objsize() +
-            sort.objsize() + min.objsize() + max.objsize();
+            sort.objsize() + min.objsize() + max.objsize() + let.size() - sizeof(LetShapeComponent);
     }
 
     BSONObj filter;
@@ -76,6 +78,8 @@ struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
     OptionalBool awaitData;
     OptionalBool mirrored;
     OptionalBool oplogReplay;
+
+    LetShapeComponent let;
 
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
     // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
@@ -101,10 +105,12 @@ struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
     uint32_t optionalArgumentsEncoding() const;
 };
 
-class FindCmdShape final : public CmdWithLetShape {
+class FindCmdShape final : public Shape {
 public:
     FindCmdShape(const ParsedFindCommand& findRequest,
                  const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    const CmdSpecificShapeComponents& specificComponents() const final;
 
     /**
      * Assembles a parseable FindCommandRequest representing this shape - some of the pieces are
@@ -112,15 +118,16 @@ public:
      */
     std::unique_ptr<FindCommandRequest> toFindCommandRequest() const;
 
-    FindCmdShapeComponents components;
-
     QueryShapeHash sha256Hash(OperationContext*,
                               const SerializationContext& serializationContext) const override;
 
 protected:
-    void appendLetCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             const SerializationOptions& opts) const final;
+    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
+                                          OperationContext*,
+                                          const SerializationOptions&) const final;
+
+private:
+    FindCmdShapeComponents _components;
 };
 
 template <typename H>
@@ -128,8 +135,7 @@ H AbslHashValue(H h, const FindCmdShapeComponents::HasField& hasField) {
     return H::combine(
         std::move(h), hasField.projection, hasField.sort, hasField.limit, hasField.skip);
 }
-static_assert(sizeof(FindCmdShape) == sizeof(CmdWithLetShape) + sizeof(FindCmdShapeComponents),
+static_assert(sizeof(FindCmdShape) == sizeof(Shape) + sizeof(FindCmdShapeComponents),
               "If the class' members have changed, this assert and the extraSize() calculation may "
               "need to be updated with a new value.");
-
 }  // namespace mongo::query_shape

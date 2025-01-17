@@ -2444,7 +2444,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:name_expression.cpp",
         "//src/mongo/db/pipeline:variables.cpp",
         "//src/mongo/db/query/fle:implicit_validator.cpp",
-        "//src/mongo/db/query/query_shape:cmd_with_let_shape.cpp",
+        "//src/mongo/db/query/query_shape:let_shape_component.cpp",
     ],
     hdrs = [
         "//src/mongo/bson:unordered_fields_bsonelement_comparator.h",
@@ -2531,7 +2531,7 @@ mongo_cc_library(
         "//src/mongo/db/query:expression_walker.h",
         "//src/mongo/db/query:substr_utils.h",
         "//src/mongo/db/query/fle:implicit_validator.h",
-        "//src/mongo/db/query/query_shape:cmd_with_let_shape.h",
+        "//src/mongo/db/query/query_shape:let_shape_component.h",
     ],
     deps = [
         ":common",

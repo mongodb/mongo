@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
+#include "mongo/db/query/query_shape/let_shape_component.h"
 
 namespace mongo::query_shape {
 
@@ -37,7 +37,7 @@ BSONObj extractLetShape(BSONObj letSpec,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (letSpec.isEmpty()) {
         // Fast path for the common case.
-        return letSpec;
+        return BSONObj();
     }
 
     BSONObjBuilder bob;
@@ -59,49 +59,30 @@ auto representativeLetShape(boost::optional<BSONObj> let,
 }  // namespace
 
 LetShapeComponent::LetShapeComponent(boost::optional<BSONObj> let,
-                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     const CmdSpecificShapeComponents& unownedInnerComponents_)
-    : shapifiedLet(representativeLetShape(let, expCtx)),
-      hasLet(bool(let)),
-      unownedInnerComponents(unownedInnerComponents_) {}
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : shapifiedLet(representativeLetShape(let, expCtx)), hasLet(bool(let)) {}
 
 void LetShapeComponent::HashValue(absl::HashState state) const {
-    state = absl::HashState::combine(
-        std::move(state), hasLet, simpleHash(shapifiedLet), unownedInnerComponents);
+    state = absl::HashState::combine(std::move(state), hasLet, simpleHash(shapifiedLet));
 }
 
 size_t LetShapeComponent::size() const {
-    return sizeof(LetShapeComponent) + shapifiedLet.objsize() + unownedInnerComponents.size();
+    return sizeof(LetShapeComponent) + shapifiedLet.objsize();
 }
 
-void LetShapeComponent::addLetBson(BSONObjBuilder& bob,
-                                   const SerializationOptions& opts,
-                                   const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    if (hasLet) {
-        auto shapeToAppend = shapifiedLet;
-        if (opts != SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
-            // We have the representative query cached/stored here, but the caller is asking for a
-            // different format, so we must re-compute.
-            shapeToAppend = extractLetShape(shapifiedLet, opts, expCtx);
-        }
-        bob.append(FindCommandRequest::kLetFieldName, shapeToAppend);
+void LetShapeComponent::appendTo(BSONObjBuilder& bob,
+                                 const SerializationOptions& opts,
+                                 const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    if (!hasLet) {
+        return;
     }
+
+    auto shapeToAppend = shapifiedLet;
+    if (opts != SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+        // We have the representative query cached/stored here, but the caller is asking for a
+        // different format, so we must re-compute.
+        shapeToAppend = extractLetShape(shapifiedLet, opts, expCtx);
+    }
+    bob.append(FindCommandRequest::kLetFieldName, shapeToAppend);
 }
-
-void CmdWithLetShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                       OperationContext* opCtx,
-                                                       const SerializationOptions& opts) const {
-    auto expCtx =
-        ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUUID, _let.shapifiedLet);
-    _let.addLetBson(bob, opts, expCtx);
-    appendLetCmdSpecificShapeComponents(bob, expCtx, opts);
-}
-
-CmdWithLetShape::CmdWithLetShape(boost::optional<BSONObj> let,
-                                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 const CmdSpecificShapeComponents& unownedInnerComponents,
-                                 NamespaceStringOrUUID nssOrUUID,
-                                 BSONObj collation)
-    : Shape(nssOrUUID, collation), _let(let, expCtx, unownedInnerComponents) {}
-
 }  // namespace mongo::query_shape

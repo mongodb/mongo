@@ -88,13 +88,17 @@ FindCmdShapeComponents::FindCmdShapeComponents(
       awaitData(request.findCommandRequest->getAwaitData()),
       mirrored(request.findCommandRequest->getMirrored()),
       oplogReplay(request.findCommandRequest->getOplogReplay()),
+      let(request.findCommandRequest->getLet(), expCtx),
       hasField{.projection = request.proj.has_value(),
                .sort = request.sort.has_value(),
                .limit = request.findCommandRequest->getLimit().has_value(),
                .skip = request.findCommandRequest->getSkip().has_value()},
       serializationOpts(opts) {}
 
-void FindCmdShapeComponents::appendTo(BSONObjBuilder& bob) const {
+void FindCmdShapeComponents::appendTo(BSONObjBuilder& bob,
+                                      const SerializationOptions& opts,
+                                      const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    let.appendTo(bob, opts, expCtx);
 
     bob.append("command", "find");
 
@@ -148,6 +152,7 @@ void FindCmdShapeComponents::HashValue(absl::HashState state) const {
                              awaitData,
                              mirrored,
                              oplogReplay,
+                             let,
                              hasField);
 }
 
@@ -173,45 +178,49 @@ uint32_t FindCmdShapeComponents::optionalArgumentsEncoding() const {
     return res;
 }
 
+const CmdSpecificShapeComponents& FindCmdShape::specificComponents() const {
+    return _components;
+}
+
 std::unique_ptr<FindCommandRequest> FindCmdShape::toFindCommandRequest() const {
     auto fcr = std::make_unique<FindCommandRequest>(nssOrUUID);
 
-    fcr->setFilter(components.filter);
-    if (components.hasField.projection)
-        fcr->setProjection(components.projection);
-    if (components.hasField.sort)
-        fcr->setSort(components.sort);
+    fcr->setFilter(_components.filter);
+    if (_components.hasField.projection)
+        fcr->setProjection(_components.projection);
+    if (_components.hasField.sort)
+        fcr->setSort(_components.sort);
 
-    fcr->setMin(components.min);
-    fcr->setMax(components.max);
+    fcr->setMin(_components.min);
+    fcr->setMax(_components.max);
 
     // Doesn't matter what value to use for limit and skip in the context of a shape.
-    if (components.hasField.limit)
+    if (_components.hasField.limit)
         fcr->setLimit(1ll);
-    if (components.hasField.skip)
+    if (_components.hasField.skip)
         fcr->setSkip(1ll);
 
     // All the booleans.
-    if (components.singleBatch.has_value())
-        fcr->setSingleBatch(bool(components.singleBatch));
-    if (components.allowDiskUse.has_value())
-        fcr->setAllowDiskUse(bool(components.allowDiskUse));
-    if (components.returnKey.has_value())
-        fcr->setReturnKey(bool(components.returnKey));
-    if (components.showRecordId.has_value())
-        fcr->setShowRecordId(bool(components.showRecordId));
-    if (components.tailable.has_value())
-        fcr->setTailable(bool(components.tailable));
-    if (components.awaitData.has_value())
-        fcr->setAwaitData(bool(components.awaitData));
-    if (components.mirrored.has_value())
-        fcr->setMirrored(bool(components.mirrored));
-    if (components.oplogReplay.has_value())
-        fcr->setOplogReplay(bool(components.oplogReplay));
+    if (_components.singleBatch.has_value())
+        fcr->setSingleBatch(bool(_components.singleBatch));
+    if (_components.allowDiskUse.has_value())
+        fcr->setAllowDiskUse(bool(_components.allowDiskUse));
+    if (_components.returnKey.has_value())
+        fcr->setReturnKey(bool(_components.returnKey));
+    if (_components.showRecordId.has_value())
+        fcr->setShowRecordId(bool(_components.showRecordId));
+    if (_components.tailable.has_value())
+        fcr->setTailable(bool(_components.tailable));
+    if (_components.awaitData.has_value())
+        fcr->setAwaitData(bool(_components.awaitData));
+    if (_components.mirrored.has_value())
+        fcr->setMirrored(bool(_components.mirrored));
+    if (_components.oplogReplay.has_value())
+        fcr->setOplogReplay(bool(_components.oplogReplay));
 
     // Common shape components.
-    if (_let.hasLet)
-        fcr->setLet(_let.shapifiedLet);
+    if (_components.let.hasLet)
+        fcr->setLet(_components.let.shapifiedLet);
     if (!collation.isEmpty())
         fcr->setCollation(collation);
 
@@ -221,32 +230,31 @@ std::unique_ptr<FindCommandRequest> FindCmdShape::toFindCommandRequest() const {
 
 FindCmdShape::FindCmdShape(const ParsedFindCommand& findRequest,
                            const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : CmdWithLetShape(findRequest.findCommandRequest->getLet(),
-                      expCtx,
-                      components,
-                      findRequest.findCommandRequest->getNamespaceOrUUID(),
-                      findRequest.findCommandRequest->getCollation()),
-      components(findRequest, expCtx) {}
+    : Shape(findRequest.findCommandRequest->getNamespaceOrUUID(),
+            findRequest.findCommandRequest->getCollation()),
+      _components(findRequest, expCtx) {}
 
-void FindCmdShape::appendLetCmdSpecificShapeComponents(
-    BSONObjBuilder& bob,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const SerializationOptions& opts) const {
+void FindCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
+                                                    OperationContext* opCtx,
+                                                    const SerializationOptions& opts) const {
+    auto expCtx = ExpressionContext::makeBlankExpressionContext(
+        opCtx, nssOrUUID, _components.let.shapifiedLet);
     if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // Fast path: we already have this.
-        return components.appendTo(bob);
-    } else {
-        // Slow path: we need to re-parse from our representative shapes.
-        auto request = uassertStatusOKWithContext(
-            parsed_find_command::parse(
-                expCtx,
-                {.findCommand = toFindCommandRequest(),
-                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}),
-            "Could not re-parse a representative query shape");
-
-        // This constructor will shapify according to the options.
-        FindCmdShapeComponents{*request, expCtx, opts}.appendTo(bob);
+        _components.appendTo(bob, opts, expCtx);
+        return;
     }
+
+    // Slow path: we need to re-parse from our representative shapes.
+    auto request = uassertStatusOKWithContext(
+        parsed_find_command::parse(
+            expCtx,
+            {.findCommand = toFindCommandRequest(),
+             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}),
+        "Could not re-parse a representative query shape");
+
+    // This constructor will shapify according to the options.
+    FindCmdShapeComponents{*request, expCtx, opts}.appendTo(bob, opts, expCtx);
 }
 
 QueryShapeHash FindCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {
@@ -259,19 +267,20 @@ QueryShapeHash FindCmdShape::sha256Hash(OperationContext*, const SerializationCo
 
     // Append bits corresponding to the optional command parameter values and a one bit indicator
     // whether the command specification includes a namespace or a UUID of a collection.
-    findCommandShapeBuffer.appendNum(components.optionalArgumentsEncoding() << 1 |
+    findCommandShapeBuffer.appendNum(_components.optionalArgumentsEncoding() << 1 |
                                      (nssOrUUID.isNamespaceString() ? 1 : 0));
     auto nssDataRange = nssOrUUID.asDataRange();
     findCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
-    findCommandShapeBuffer.appendBuf(components.min.objdata(), components.min.objsize());
-    findCommandShapeBuffer.appendBuf(components.max.objdata(), components.max.objsize());
-    findCommandShapeBuffer.appendBuf(components.sort.objdata(), components.sort.objsize());
+    findCommandShapeBuffer.appendBuf(_components.min.objdata(), _components.min.objsize());
+    findCommandShapeBuffer.appendBuf(_components.max.objdata(), _components.max.objsize());
+    findCommandShapeBuffer.appendBuf(_components.sort.objdata(), _components.sort.objsize());
     findCommandShapeBuffer.appendBuf(collation.objdata(), collation.objsize());
-    findCommandShapeBuffer.appendBuf(_let.shapifiedLet.objdata(), _let.shapifiedLet.objsize());
+    findCommandShapeBuffer.appendBuf(_components.let.shapifiedLet.objdata(),
+                                     _components.let.shapifiedLet.objsize());
     return SHA256Block::computeHash(
         {ConstDataRange{findCommandShapeBuffer.buf(),
                         static_cast<std::size_t>(findCommandShapeBuffer.len())},
-         components.filter.asDataRange(),
-         components.projection.asDataRange()});
+         _components.filter.asDataRange(),
+         _components.projection.asDataRange()});
 }
 }  // namespace mongo::query_shape
