@@ -1701,6 +1701,27 @@ tasks:
             EVERGREEN_TASK_ID: ${task_id}
           args:
             - "./src/evergreen/run_upload_lock_push.sh"
+      #Trace artifacts (binaries, cryptd, debug, MSI) using Papertrail
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            IS_RELEASE: ${is_release}
+          args:
+            - "./src/evergreen/papertrail_generate_expansions.sh"
+      - command: expansions.update
+        params:
+          file: src/papertrail-expansions.yml
+      - func: "f_expansions_write"
+      - command: papertrail.trace
+        params:
+          key_id: ${papertrail_key_id}
+          secret_key: ${papertrail_secret_key}
+          product: ${product_for_papertrail}
+          version: ${release_version}
+          filenames:
+            - "src/mongodb-${push_name}-${push_arch}*"
+            - "src/mongodb-cryptd-${push_name}-${push_arch}*"
 
   - name: crypt_push
     run_on: rhel8.7-small
@@ -1817,6 +1838,27 @@ tasks:
           content_type: text/plain
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           skip_existing: ${is_release}
+      #Trace artifacts (crypt) using Papertrail
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            IS_RELEASE: ${is_release}
+          args:
+            - "./src/evergreen/papertrail_generate_expansions.sh"
+      - command: expansions.update
+        params:
+          file: src/papertrail-expansions.yml
+      - func: "f_expansions_write"
+      - command: papertrail.trace
+        params:
+          key_id: ${papertrail_key_id}
+          secret_key: ${papertrail_secret_key}
+          product: ${product_for_papertrail}
+          version: ${release_version}
+          filenames:
+            - "src/mongo_crypt_shared_v1-${push_name}-${push_arch}*"
+
   # Test a compilation without extra args from evergreen to simulate local dev compilation.
   - name: scons_dev_compile_smoke_test
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
