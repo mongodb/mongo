@@ -19,16 +19,6 @@ const primaryDb = primary.getDB('test');
 const coll = primaryDb[jsTestName()];
 const viewName = coll.getName();
 const viewNs = coll.getFullName();
-
-// Disable test if fail point is missing (running in multiversion suite)
-const failpoint = 'failTimeseriesViewCreation';
-if (primaryDb.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: {ns: viewNs}})
-        .ok === 0) {
-    jsTestLog("Skipping test because the " + failpoint + " fail point is missing");
-    quit();
-}
-assert.commandWorked(primaryDb.adminCommand({configureFailPoint: failpoint, mode: "off"}));
-
 const bucketsColl = primaryDb.getCollection('system.buckets.' + coll.getName());
 const bucketsCollName = bucketsColl.getName();
 const timeFieldName = 'time';
@@ -49,6 +39,7 @@ assert.eq(primaryDb.getCollectionNames().findIndex(c => c == viewName), -1);
 assert.eq(primaryDb.getCollectionNames().findIndex(c => c == bucketsCollName), -1);
 
 // Enable failpoint to allow bucket collection to be created but fail creation of view definition
+const failpoint = 'failTimeseriesViewCreation';
 assert.commandWorked(
     primaryDb.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: {ns: viewNs}}));
 assert.commandFailed(primaryDb.createCollection(
