@@ -156,7 +156,7 @@ functions:
           bash src/evergreen/restore_git_history_and_tags.sh
 
           cd src
-          git reset --hard ${revision}
+          git reset --hard ${github_commit}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
