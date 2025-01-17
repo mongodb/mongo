@@ -292,6 +292,7 @@ buildvariants:
       - amazon2-latest-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
 
   - name: amazon2-arm64-compile
     display_name: "* Compile Amazon Linux 2 arm64 for sys-perf"
@@ -310,6 +311,7 @@ buildvariants:
       - amazon2-arm64-latest-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
 
   - name: amazon2023-arm64-compile
     display_name: "* Compile Amazon Linux 2023 arm64 for sys-perf"
@@ -328,6 +330,7 @@ buildvariants:
       - amazon2023.3-arm64-large
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
 
   - name: amazon2-arm64-compile-pgo
     display_name: "* Compile Amazon Linux 2 arm64 PGO for sys-perf"
@@ -352,6 +355,7 @@ buildvariants:
       - amazon2-arm64-latest-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
 
   - name: amazon2-arm64-compile-bolt
     display_name: "* Compile Amazon Linux 2 arm64 BOLT for sys-perf"
@@ -375,6 +379,7 @@ buildvariants:
       - amazon2-arm64-latest-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
 
   - name: amazon2-arm64-mongocrypt-shlib-compile
     display_name: "* Compile mongo_crypt_v1.so Amazon Linux 2 arm64 for sys-perf"
@@ -421,3 +426,4 @@ buildvariants:
       - amazon2-latest-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data

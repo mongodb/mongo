@@ -4,7 +4,6 @@ exec_timeout_secs: &exec_timeout_secs 36000
 timeout_secs: &timeout_secs 7200
 
 include:
-  - filename: etc/evergreen_yml_components/definitions.yml
   ### lint_yaml trim start ###
   #
   # The lines below are trimmed by yamllinters.sh so that `evergreen evaluate` works on this file.
@@ -133,195 +132,6 @@ functions:
         display_name: PGO profile data - Execution ${execution}
         optional: true
 
-  ###
-  # Package the supplementary DSI data (mongo tools, feature flag list,
-  # server params list, jstests, and buildscripts)
-  download mongo tools:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-          set -o errexit
-
-          arch=$(uname -m)
-          case $arch in
-            "x86_64")
-              if [ -f /etc/os-release ]; then
-                . /etc/os-release
-                if [ "$ID" == "amzn" ]; then
-                  case $VERSION_ID in
-                    "2")
-                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-x86_64-100.9.4.tgz"
-                      ;;
-                    "2023")
-                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-x86_64-100.9.4.tgz"
-                      ;;
-                    *)
-                      echo "Unsupported Amazon Linux version: $VERSION_ID"
-                      exit 1
-                      ;;
-                  esac
-                else
-                  echo "Unsupported Linux distribution: $ID"
-                  exit 1
-                fi
-              else
-                echo "Unable to determine Linux distribution"
-                exit 1
-              fi
-              ;;
-            "aarch64")
-              if [ -f /etc/os-release ]; then
-                . /etc/os-release
-                if [ "$ID" == "amzn" ]; then
-                  case $VERSION_ID in
-                    "2")
-                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2-aarch64-100.9.4.tgz"
-                      ;;
-                    "2023")
-                      binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon2023-aarch64-100.9.4.tgz"
-                      ;;
-                    *)
-                      echo "Unsupported Amazon Linux version: $VERSION_ID"
-                      exit 1
-                      ;;
-                  esac
-                else
-                  echo "Unsupported Linux distribution: $ID"
-                  exit 1
-                fi
-              else
-                echo "Unable to determine Linux distribution"
-                exit 1
-              fi
-              ;;
-            *)
-              echo "Unsupported architecture: $arch"
-              exit 1
-              ;;
-          esac
-
-          echo "Downloading and installing MongoDB tools..."
-          mkdir -p mongodb/
-          wget "$binary_url" -O mongo-tools.tar.gz
-          tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
-          echo "MongoDB tools installed successfully!"
-  generate atlas info:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          uarch=$(uname -p)
-          os=$(uname -r)
-          json="{ \"version\": \"${version}\", \"gitVersion\": \"${revision}\", \"uarch\": \"$uarch\", \"os\": \"$os\" }"
-          echo $json | jq '.' > mongodb/atlas_info.json
-  generate feature flag list:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          pushd ..
-          . src/evergreen/prelude.sh
-          activate_venv
-          popd
-
-          python ./buildscripts/idl/gen_all_feature_flag_list.py
-          mkdir -p mongodb/feature_flags
-          cp ./all_feature_flags.txt mongodb/feature_flags
-  generate server params list:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          pushd ..
-          . src/evergreen/prelude.sh
-          activate_venv
-          popd
-
-          python ./buildscripts/idl/gen_all_server_params_list.py
-          mkdir -p mongodb/server_params
-          cp ./all_server_params.txt mongodb/server_params
-  copy jstests:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          mkdir -p mongodb/jstests/hooks
-          if [ -d jstests/hooks ]
-          then
-            echo "Fetching JS test DB correctness checks from directory jstests"
-            cp -a jstests/* mongodb/jstests
-
-            echo "Now adding our own special run_validate_collections.js wrapper"
-            mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
-
-            cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
-            print("NOTE: run_validate_collections.js will skip the oplog!");
-            TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
-            await import("jstests/hooks/run_validate_collections.actual.js");
-          EOF
-          fi
-  copy buildscripts:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          mkdir -p mongodb/buildscripts
-          cp -a buildscripts/* mongodb/buildscripts
-  package supplementary data:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          if [ -z "${build_patch_id}" ] || [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
-            tar czf supplementary-data.tgz mongodb
-          else
-            # Evergreen does not handle nested escaped expansions well
-            reuse_compile_from="${reuse_compile_from}"
-            build_patch_id="${build_patch_id}"
-            version_to_reuse_from=$(if [ -n "${build_patch_id}" ]; then echo "${build_patch_id}"; else echo "${reuse_compile_from}"; fi)
-
-            curl -o supplementary-data.tgz https://s3.amazonaws.com/mciuploads/${project}/${compile_variant}/$${version_to_reuse_from}/dsi/supplementary-data.tgz
-          fi
-  upload supplementary data:
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/supplementary-data.tgz
-        remote_file: ${project}/${compile_variant}/${version_id}/dsi/supplementary-data.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/x-gzip
-        display_name: supplementary-data.tgz
-
-  f_schedule_compile:
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: ./dsi/run-dsi selftest scripts/schedule_compile.py
-        include_expansions_in_env:
-          - version_id
-          - evergreen_api_user
-          - evergreen_api_key
-          - compile_variant
-          - compile_task_name
-          - binary_artifact_name
-          - reuse_compile_from
-          - compile_project
-
 tasks:
   - name: schedule_compile
     commands:
@@ -333,7 +143,20 @@ tasks:
         params:
           directory: src
           clone_depth: 1000
-      - func: f_schedule_compile
+      - command: shell.exec
+        params:
+          working_dir: src
+          script: ./dsi/run-dsi selftest scripts/schedule_compile.py
+          include_expansions_in_env:
+            - version_id
+            - evergreen_api_user
+            - evergreen_api_key
+            - compile_variant
+            - compile_task_name
+            - binary_artifact_name
+            - reuse_compile_from
+            - compile_project
+            - schedule_supplementary_data
       - command: s3.put
         params:
           aws_key: ${aws_key}
@@ -344,27 +167,17 @@ tasks:
           permissions: public-read
           content_type: text/plain
           display_name: binary-url.txt
-  - name: package_supplementary_data
-    commands:
-      - command: manifest.load
-      - func: "git get shallow project"
-      - func: "f_expansions_write"
-      - func: "restore git history and tags"
-      - func: "add git tag"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - func: "generate version expansions"
-      - func: "apply version expansions"
-      - func: "download mongo tools"
-      - func: "generate feature flag list"
-      - func: "generate atlas info"
-      - func: "generate server params list"
-      - func: "copy jstests"
-      - func: "copy buildscripts"
-      - func: "package supplementary data"
-      - func: "upload supplementary data"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/supplementary-url.txt
+          remote_file: ${project}/${version_id}/binary-urls/${compile_variant}-supplementary-url.txt
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: supplementary-url.txt
+          optional: true
 
 buildvariants:
   - name: schedule-compile-amazon2-arm64
@@ -373,13 +186,13 @@ buildvariants:
       compile_variant: amazon2-arm64-compile
       compile_task_name: archive_dist_test
       binary_artifact_name: Binaries
+      schedule_supplementary_data: true
       skip_post_run: true
     modules: *modules
     run_on:
       - amazon2-arm64-latest-small
     tasks:
       - name: schedule_compile
-      - name: package_supplementary_data
 
   - name: schedule-compile-amazon2023-arm64
     display_name: "* Schedule Compile for Amazon Linux 2023 arm64"
@@ -387,13 +200,13 @@ buildvariants:
       compile_variant: amazon2023-arm64-compile
       compile_task_name: archive_dist_test
       binary_artifact_name: Binaries
+      schedule_supplementary_data: true
       skip_post_run: true
     modules: *modules
     run_on:
       - amazon2023-arm64-latest-small
     tasks:
       - name: schedule_compile
-      - name: package_supplementary_data
 
   - name: schedule-compile-amazon2-x86
     display_name: "* Schedule Compile for Amazon Linux 2 x86"
@@ -401,13 +214,13 @@ buildvariants:
       compile_variant: amazon2-x86-compile
       compile_task_name: archive_dist_test
       binary_artifact_name: Binaries
+      schedule_supplementary_data: true
       skip_post_run: true
     modules: *modules
     run_on:
       - amazon2-latest-small
     tasks:
       - name: schedule_compile
-      - name: package_supplementary_data
 
   - name: schedule-compile-amazon2-arm64-pgo
     display_name: "* Schedule Compile for Amazon Linux 2 arm64 PGO"
@@ -415,13 +228,13 @@ buildvariants:
       compile_variant: amazon2-arm64-compile-pgo
       compile_task_name: archive_dist_test
       binary_artifact_name: Binaries
+      schedule_supplementary_data: true
       skip_post_run: true
     modules: *modules
     run_on:
       - amazon2-arm64-latest-small
     tasks:
       - name: schedule_compile
-      - name: package_supplementary_data
 
   - name: schedule-compile-amazon2-arm64-bolt
     display_name: "* Schedule Compile for Amazon Linux 2 arm64 BOLT"
@@ -429,13 +242,13 @@ buildvariants:
       compile_variant: amazon2-arm64-compile-bolt
       compile_task_name: archive_dist_test
       binary_artifact_name: Binaries
+      schedule_supplementary_data: true
       skip_post_run: true
     modules: *modules
     run_on:
       - amazon2-arm64-latest-small
     tasks:
       - name: schedule_compile
-      - name: package_supplementary_data
 
   - name: schedule-compile-amazon2-arm64-mongocrypt-shlib
     display_name: "* Schedule mongo_crypt_v1.so Compile for Amazon Linux 2 arm64"
@@ -443,6 +256,7 @@ buildvariants:
       compile_variant: amazon2-arm64-mongocrypt-shlib-compile
       compile_task_name: crypt_create_lib
       binary_artifact_name: Mongo crypt Library
+      schedule_supplementary_data: false
       skip_post_run: true
     modules: *modules
     run_on:
@@ -456,10 +270,10 @@ buildvariants:
       compile_variant: amazon2-x86-streams-compile
       compile_task_name: archive_dist_test
       binary_artifact_name: Binaries
+      schedule_supplementary_data: true
       skip_post_run: true
     modules: *modules
     run_on:
       - amazon2-arm64-latest-small
     tasks:
       - name: schedule_compile
-      - name: package_supplementary_data

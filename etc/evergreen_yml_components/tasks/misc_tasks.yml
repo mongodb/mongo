@@ -1664,3 +1664,24 @@ tasks:
           permissions: public-read
           content_type: text/plain
           display_name: bazel
+
+  # Package the supplementary DSI data (mongo tools, feature flag list,
+  # server params list, jstests, and buildscripts).
+  - name: package_supplementary_data
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    tags: ["assigned_to_jira_team_devprod_performance_analysis", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get and apply version expansions"
+      - func: "gen supplementary data"
+      - func: "upload supplementary data"

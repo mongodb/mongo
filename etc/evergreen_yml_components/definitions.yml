@@ -3056,3 +3056,22 @@ functions:
           - "evergreen/activate_task.py"
           - "${task_to_activate}"
           - "${skip_for_patch_author}"
+
+  "gen supplementary data":
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/gen_supplementary_data.sh"
+
+  "upload supplementary data":
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/supplementary-data.tgz
+        remote_file: ${project}/${compile_variant}/${version_id}/dsi/supplementary-data.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/x-gzip
+        display_name: supplementary-data.tgz
