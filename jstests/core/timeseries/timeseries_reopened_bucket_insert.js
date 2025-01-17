@@ -313,11 +313,11 @@ const checkIfBucketReopened = function(
         "control": {
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
                 "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
                 "time": ISODate("2024-10-04T10:14:00Z")
             },
             "count": 1,
