@@ -80,6 +80,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_api.h"
@@ -809,8 +810,7 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
     for (auto& payload : serverPayload) {
         payload.counts.clear();
 
-        const bool isRangePayload = payload.payload.getEdgeTokenSet().has_value();
-        if (isRangePayload) {
+        if (payload.isRangePayload()) {
             const auto& edgeTokenSet = payload.payload.getEdgeTokenSet().get();
 
             std::vector<FLEEdgePrfBlock> tokens;
@@ -824,6 +824,14 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
             }
 
             tokensSets.emplace_back(tokens);
+        } else if (payload.isTextSearchPayload()) {
+            uassert(9783803,
+                    "Cannot insert an encrypted field with text search query type unless "
+                    "featureFlagQETextSearchPreview is enabled",
+                    gFeatureFlagQETextSearchPreview.isEnabledUseLastLTSFCVWhenUninitialized(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            // TODO: SERVER-97841 implement text search inserts
+            uasserted(9783804, "Cannot insert an encrypted field with text search query yet");
         } else {
             FLEEdgePrfBlock block;
             block.esc = payload.payload.getEscDerivedToken().asPrfBlock();

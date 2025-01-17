@@ -1291,12 +1291,22 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
 
     auto bsonType = static_cast<BSONType>(payloadInfo.payload.getType());
 
+    uassert(9783801,
+            "Queryable Encryption insert/update payload cannot have token sets for both range and "
+            "text search types",
+            !(payloadInfo.isRangePayload() && payloadInfo.isTextSearchPayload()));
+
     if (payloadInfo.isRangePayload()) {
         uassert(6775305,
                 str::stream() << "Type '" << typeName(bsonType)
                               << "' is not a valid type for Queryable Encryption Range",
                 isValidBSONType(payloadInfo.payload.getType()) &&
                     isFLE2RangeIndexedSupportedType(bsonType));
+    } else if (payloadInfo.isTextSearchPayload()) {
+        uassert(9783802,
+                str::stream() << "Type '" << typeName(bsonType)
+                              << "' is not a valid type for Queryable Encryption Text Search",
+                isValidBSONType(payloadInfo.payload.getType()) && bsonType == BSONType::String);
     } else {
         uassert(6373504,
                 str::stream() << "Type '" << typeName(bsonType)

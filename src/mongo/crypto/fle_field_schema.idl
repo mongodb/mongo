@@ -211,6 +211,111 @@ structs:
             type: EncryptedStateCollectionTokensV2
             cpp_name: encryptedTokens
 
+    TextExactTokenSet:
+        description: "Holder for tokens required for exact match text search"
+        strict: true
+        fields:
+          d:
+            description: "EDC derived from data & contention factor token"
+            type: EDCTextExactDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESC derived from data & contention factor token"
+            type: ESCTextExactDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: escDerivedToken
+          l:
+            description: "server derived from data token"
+            type: ServerTextExactDerivedFromDataToken
+            cpp_name: serverDerivedFromDataToken
+          p:
+            description: "encrypted token for compaction"
+            type: EncryptedStateCollectionTokensV2
+            cpp_name: encryptedTokens
+
+    TextSubstringTokenSet:
+        description: "Holder for tokens required for substring text search"
+        strict: true
+        fields:
+          d:
+            description: "EDC derived from data & contention factor token"
+            type: EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESC derived from data & contention factor token"
+            type: ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: escDerivedToken
+          l:
+            description: "server derived from data token"
+            type: ServerTextSubstringDerivedFromDataToken
+            cpp_name: serverDerivedFromDataToken
+          p:
+            description: "encrypted token for compaction"
+            type: EncryptedStateCollectionTokensV2
+            cpp_name: encryptedTokens
+
+    TextSuffixTokenSet:
+        description: "Holder for tokens required for suffix text search"
+        strict: true
+        fields:
+          d:
+            description: "EDC derived from data & contention factor token"
+            type: EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESC derived from data & contention factor token"
+            type: ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: escDerivedToken
+          l:
+            description: "server derived from data token"
+            type: ServerTextSuffixDerivedFromDataToken
+            cpp_name: serverDerivedFromDataToken
+          p:
+            description: "encrypted token for compaction"
+            type: EncryptedStateCollectionTokensV2
+            cpp_name: encryptedTokens
+
+    TextPrefixTokenSet:
+        description: "Holder for tokens required for prefix text search"
+        strict: true
+        fields:
+          d:
+            description: "EDC derived from data & contention factor token"
+            type: EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESC derived from data & contention factor token"
+            type: ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken
+            cpp_name: escDerivedToken
+          l:
+            description: "server derived from data token"
+            type: ServerTextPrefixDerivedFromDataToken
+            cpp_name: serverDerivedFromDataToken
+          p:
+            description: "encrypted token for compaction"
+            type: EncryptedStateCollectionTokensV2
+            cpp_name: encryptedTokens
+
+    TextSearchTokenSets:
+        description: "Holder for tokens of text search indexed encrypted fields"
+        strict: true
+        fields:
+          e:
+            description: "Holds tokens for exact string search"
+            type: TextExactTokenSet
+            cpp_name: exactTokenSet
+          s:
+            description: "Holds tokens for substring search"
+            type: array<TextSubstringTokenSet>
+            cpp_name: substringTokenSets
+          u:
+            description: "Holds tokens for suffix search"
+            type: array<TextSuffixTokenSet>
+            cpp_name: suffixTokenSets
+          p:
+            description: "Holds tokens for prefix search"
+            type: array<TextPrefixTokenSet>
+            cpp_name: prefixTokenSets
+
     FLE2InsertUpdatePayloadV2:
         description: "Payload of an indexed field to insert or update. Version 2"
         strict: true
@@ -256,6 +361,11 @@ structs:
             description: "Array of Edges"
             type: array<EdgeTokenSetV2>
             cpp_name: edgeTokenSet
+            optional: true
+          b:
+            description: "Contains tokens for encrypted text search"
+            type: TextSearchTokenSets
+            cpp_name: textSearchTokenSets
             optional: true
           sp:
             description: "Queryable Encryption range hypergraph sparsity factor"

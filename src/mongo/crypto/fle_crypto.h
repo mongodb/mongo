@@ -838,6 +838,10 @@ struct EDCServerPayloadInfo {
         return payload.getEdgeTokenSet().has_value();
     }
 
+    bool isTextSearchPayload() const {
+        return payload.getTextSearchTokenSets().has_value();
+    }
+
     FLE2InsertUpdatePayloadV2 payload;
     std::string fieldPathName;
     std::vector<uint64_t> counts;
