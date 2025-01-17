@@ -29,6 +29,7 @@
 
 #include "mongo/transport/asio/asio_transport_layer.h"
 
+#include <csignal>
 #include <exception>
 #include <fstream>
 #include <queue>
@@ -1695,6 +1696,62 @@ TEST_F(EgressAsioNetworkingBatonTest, AsyncOpsMakeProgressWhenSessionAddedToDeta
     // `asyncOpMutex`) and is blocked by `fp`. Once we return from this function, that thread is
     // unblocked and will run `Baton::addSession` on a detached baton.
     opCtx.reset();
+}
+
+extern "C" void noopSignalHandler(int signalNum, siginfo_t*, void*) {}
+
+class NetworkOperationTest : public AsioNetworkingBatonTest {
+public:
+    void setUp() override {
+        AsioNetworkingBatonTest::setUp();
+
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(sa));
+        sigemptyset(&sa.sa_mask);
+        sa.sa_sigaction = noopSignalHandler;
+        sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+        invariant(sigaction(SIGRTMIN, &sa, _oldHandler) == 0);
+    }
+
+    void tearDown() override {
+        invariant(sigaction(SIGRTMIN, _oldHandler, nullptr) == 0);
+        AsioNetworkingBatonTest::tearDown();
+    }
+
+private:
+    struct sigaction* _oldHandler;
+};
+
+/**
+ * Creates a connection and interrupts the server side while it awaits the second half of a message.
+ * The expected behavior for the server thread is to continue picking up data from the wire after
+ * receiving the interruption.
+ */
+TEST_F(NetworkOperationTest, InterruptDuringRead) {
+    connection().wait();
+
+    auto pf = makePromiseFuture<Message>();
+    test::JoinThread serverThread([&] { pf.promise.setFrom(client().session()->sourceMessage()); });
+
+    auto msg = [] {
+        OpMsgRequest request;
+        request.body = BSON("ping" << 1 << "$db"
+                                   << "admin");
+        auto msg = request.serialize();
+        msg.header().setResponseToMsgId(0);
+        return msg;
+    }();
+
+    const auto kChunkSize = msg.size() / 2;
+    connection().socket().send(msg.buf(), kChunkSize, "sending the first batch");
+    // Wait before signaling to make it more likely for the server thread to be waiting for the next
+    // batch while receiving the interruption signal.
+    sleepFor(Milliseconds(10));
+    pthread_kill(serverThread.native_handle(), SIGRTMIN);
+    connection().socket().send(msg.buf() + kChunkSize, msg.size() - kChunkSize, "sending the rest");
+
+    auto received = pf.future.get();
+    ASSERT_EQ(received.opMsgDebugString(), msg.opMsgDebugString());
 }
 
 #endif  // __linux__
