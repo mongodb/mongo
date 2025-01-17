@@ -103,6 +103,17 @@ assert.commandWorked(db.adminCommand({enableSharding: kDbName}));
     // fail with InvalidOptions
     assert.commandFailedWithCode(db.adminCommand({shardCollection: 'local.foo', key: {_id: 1}}),
                                  ErrorCodes.InvalidOptions);
+
+    // session collection is the only collection in config that can be sharded.
+    if (
+        // If we are running in suites with authentication this will fail with
+        // ErrorCodes.Unauthorized
+        !TestData.auth &&
+        // TODO SERVER-98119: sharding system collection can fail in suite with config transition
+        !TestData.shardsAddedRemoved) {
+        assert.commandWorked(
+            db.adminCommand({shardCollection: "config.system.sessions", key: {_id: 1}}));
+    }
 }
 
 jsTestLog('shardCollection may only be run against admin database.');

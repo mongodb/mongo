@@ -46,8 +46,7 @@ selector:
     - jstests/sharding/large_chunk.js
     - jstests/sharding/query/limit_push.js
     - jstests/sharding/merge_with_drop_shard.js
-    - jstests/sharding/merge_with_move_primary.js
-    - jstests/sharding/movePrimary1.js
+    - jstests/sharding/query/out_merge/merge_with_move_primary.js
     - jstests/sharding/names.js
     - jstests/sharding/prefix_shard_key.js
     - jstests/sharding/query/query_config.js
@@ -78,7 +77,6 @@ selector:
     - jstests/sharding/parallel.js
     - jstests/sharding/migrateBig.js
     - jstests/sharding/sharding_rs1.js
-    - jstests/sharding/move_primary_fails_without_database_version.js
     # Calls the config server primary directly (not through mongos)
     - jstests/sharding/analyze_shard_key/configure_query_analyzer_basic.js
     - jstests/sharding/analyze_shard_key/invalid_config_docs.js
@@ -154,19 +152,13 @@ selector:
     - jstests/sharding/migration_waits_for_majority_commit.js
     # listCollections is not retryable
     - jstests/sharding/sessions_collection_auto_healing.js
-    # shardCollection is not retryable
-    - jstests/sharding/shard_collection_config_db.js
     # creates collection, does movePrimary, then shards the collection and moves a chunk to the old
     # primary (SERVER-31909)
     - jstests/sharding/mongos_validate_writes.js
     # Test expects a specific chunk distribution after shardCollection and it can be broken when
     # a step down occurs.
     - jstests/sharding/query/regex_targeting.js
-    # Calls movePrimary after data has been inserted into an unsharded collection, so will fail if
-    # a stepdown causes the command to be sent again.
-    - jstests/sharding/move_primary_clone.js
     - jstests/sharding/mongos_validate_writes.js
-    - jstests/sharding/movePrimary1.js
     # Asserts that the _flushDatabaseCacheUpdates at the end of _configsvrCreateDatabase is sent, but
     # it may not be sent if the config server primary steps down just before sending it.
     - jstests/sharding/database_versioning_all_commands.js
@@ -212,7 +204,6 @@ selector:
 
     # SERVER-48537 addShard is not idempotent for retries
     - jstests/sharding/conversion_of_replica_set_to_sharded_cluster.js
-    - jstests/sharding/move_primary_with_writes.js
 
     # Expects same CSRS primary and shard primary throughout the test
     - jstests/sharding/query/api_version/api_params_nontransaction_sharded.js

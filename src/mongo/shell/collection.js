@@ -959,7 +959,12 @@ DBCollection.prototype.convertToCapped = function(bytes) {
     return this._dbCommand({convertToCapped: this._shortName, size: bytes});
 };
 
-DBCollection.prototype.exists = function() {
+/*
+ * Returns metadata for the collection using listCollections.
+ *
+ * If the collection does not exists return null.
+ */
+DBCollection.prototype.getMetadata = function() {
     var res = this._db.runCommand("listCollections", {filter: {name: this._shortName}});
     if (res.ok) {
         const cursor = new DBCommandCursor(this._db, res);
@@ -971,9 +976,21 @@ DBCollection.prototype.exists = function() {
     throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
 };
 
+DBCollection.prototype.exists = function() {
+    return this.getMetadata();
+};
+
 DBCollection.prototype.isCapped = function() {
-    var e = this.exists();
-    return (e && e.options && e.options.capped) ? true : false;
+    const m = this.getMetadata();
+    return (m && m.options && m.options.capped) ? true : false;
+};
+
+DBCollection.prototype.getUUID = function() {
+    const m = this.getMetadata();
+    if (!m) {
+        throw Error(`Collection '${this}' does not exist.`);
+    }
+    return m.info.uuid;
 };
 
 //

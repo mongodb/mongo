@@ -175,7 +175,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*unshard*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*move*primary* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/jstests/**/*movePrimary* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/**/*refine_collection_shard_key* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/**/*dbcheck* @10gen/server-dbcheck @svc-auto-approve-bot
 

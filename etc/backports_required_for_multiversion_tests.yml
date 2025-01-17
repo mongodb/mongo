@@ -665,7 +665,7 @@ last-lts:
       ticket: SERVER-93099
     - test_file: jstests/core/index/index_creation_on_different_collations.js
       ticket: SERVER-93112
-    - test_file: jstests/sharding/write_with_movePartition.js
+    - test_file: jstests/sharding/query/out_merge/out_with_move_primary.js
       ticket: SERVER-92690
     - test_file: jstests/core/index/geo/geonear_key.js
       ticket: SERVER-92843

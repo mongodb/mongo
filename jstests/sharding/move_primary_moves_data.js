@@ -55,8 +55,4 @@ assert.eq(3, fromShard.getDB("test1").foo.count(), "from doesn't have data after
 assert.eq(0, toShard.getDB("test1").foo.count(), "to has data after move back");
 assert.eq(1, s.s.getDB("test1").view.count(), "count on view incorrect after move back");
 
-assert.commandFailedWithCode(s.s0.adminCommand({movePrimary: 'test1', to: 'dontexist'}),
-                             ErrorCodes.ShardNotFound,
-                             'attempting to use non-existent shard as primary should fail');
-
 s.stop();
