@@ -573,8 +573,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -587,8 +585,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -601,8 +597,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -616,8 +610,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -630,8 +622,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -702,8 +692,6 @@ tasks:
         "change_streams",
         "secondary_reads",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -735,8 +723,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -750,8 +736,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -765,8 +749,6 @@ tasks:
         "change_streams",
         "secondary_reads",
       ]
-    depends_on:
-      - name: change_streams_secondary_reads_sharded_collections
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -779,8 +761,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -794,8 +774,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -809,8 +787,6 @@ tasks:
         "change_streams",
         "secondary_reads",
       ]
-    depends_on:
-      - name: change_streams_secondary_reads_sharded_collections
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -824,8 +800,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
