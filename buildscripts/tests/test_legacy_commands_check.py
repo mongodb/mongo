@@ -22,7 +22,7 @@ class TestCheckFileForLegacyType(unittest.TestCase):
     def test_command(self):
         content = """ 
         line 0
-        class AddShardCmd : public Command
+        class AddShardCmd : public Command {
         """
         self.assertEqual(check_file_for_legacy_type(create_file_iterator(content)), True)
 
@@ -54,6 +54,15 @@ class TestCheckFileForLegacyType(unittest.TestCase):
         """
         self.assertEqual(check_file_for_legacy_type(create_file_iterator(content)), True)
 
+    def test_generic_command_inherited(self):
+        # This might appear in non-legacy command types and should not be mistake for a Command type
+
+        content = """ 
+        line 0
+        public Command
+        """
+        self.assertEqual(check_file_for_legacy_type(create_file_iterator(content)), False)
+
     def test_kCommand(self):
         # This log statement appears in many Command files for logging purposes and should not be
         # mistaken for a Command type
@@ -61,5 +70,23 @@ class TestCheckFileForLegacyType(unittest.TestCase):
         content = """ 
         line 0
         #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+        """
+        self.assertEqual(check_file_for_legacy_type(create_file_iterator(content)), False)
+
+    def test_command_invocation(self):
+        # This class is not a Command type and should not be mistaken for a Command type
+
+        content = """ 
+        line 0
+        class AddShardCmd : public CommandInvocation
+        """
+        self.assertEqual(check_file_for_legacy_type(create_file_iterator(content)), False)
+
+    def test_command_invocation_hooks(self):
+        # This class is not a Command type and should not be mistaken for a Command type
+
+        content = """ 
+        line 0
+        class AddShardCmd : public CommandInvocationHooks
         """
         self.assertEqual(check_file_for_legacy_type(create_file_iterator(content)), False)

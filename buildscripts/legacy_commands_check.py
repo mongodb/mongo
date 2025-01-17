@@ -14,7 +14,7 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts.linter.filediff import gather_changed_files_for_lint
 
 LEGACY_TYPES = [
-    "public Command",
+    "public Command {",
     "public BasicCommandWithReplyBuilderInterface",
     "public BasicCommand",
     "public BasicCommandWithRequestParser",
