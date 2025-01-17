@@ -1,8 +1,8 @@
 # This suite defines the jstest portion of the server programmability smoke tests.
 # Running the full set, including both C++ unit tests and jstests can be accomplished by running
 # the following commands:
-# ninja [ninja-args] prove-server-programmability
-# python buildscripts/run_smoke_tests.py --suites=server_programmability
+# bazel test --test_tag_filters=server-programmability //...
+# bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=server_programmability
 
 suites:
   core:
