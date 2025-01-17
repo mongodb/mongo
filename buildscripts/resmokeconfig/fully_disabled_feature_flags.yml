@@ -16,3 +16,4 @@
 - featureFlagSearchInSbe
 - featureFlagEgressGrpcForSearch
 - featureFlagTrackUnshardedCollectionsUponCreation
+- featureFlagTSBucketingParametersUnchanged
