@@ -626,6 +626,12 @@ public:
      */
     void cancelElection_forTest();
 
+
+    /**
+     * Returns a pointer to the topology coordinator used by this replication coordinator.
+     */
+    TopologyCoordinator* getTopologyCoordinator_forTest();
+
     /**
      * Runs the repl set initiate internal function.
      */

@@ -212,7 +212,7 @@ protected:
      * Gets the topology coordinator used by the replication coordinator under test.
      */
     TopologyCoordinator& getTopoCoord() {
-        return *_topo;
+        return *_repl->getTopologyCoordinator_forTest();
     }
 
     /**
@@ -363,8 +363,6 @@ protected:
 
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
-    // Owned by ReplicationCoordinatorImpl
-    TopologyCoordinator* _topo = nullptr;
     // Owned by executor
     executor::NetworkInterfaceMock* _net = nullptr;
     // Owned by ReplicationCoordinatorImpl

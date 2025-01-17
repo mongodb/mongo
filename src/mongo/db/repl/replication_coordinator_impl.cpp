@@ -5625,6 +5625,10 @@ void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
     }
 }
 
+TopologyCoordinator* ReplicationCoordinatorImpl::getTopologyCoordinator_forTest() {
+    return _topCoord.get();
+}
+
 CallbackHandle ReplicationCoordinatorImpl::_scheduleWorkAt(Date_t when, CallbackFn work) {
     auto cbh =
         _replExecutor->scheduleWorkAt(when, [work = std::move(work)](const CallbackArgs& args) {

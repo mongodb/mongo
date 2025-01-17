@@ -173,7 +173,6 @@ void ReplCoordTest::init() {
 
     TopologyCoordinator::Options settings;
     auto topo = std::make_unique<TopologyCoordinator>(settings);
-    _topo = topo.get();
     auto net = std::make_unique<NetworkInterfaceMock>();
     _net = net.get();
     auto externalState = std::make_unique<ReplicationCoordinatorExternalStateMock>();
@@ -227,7 +226,7 @@ void ReplCoordTest::start() {
     _repl->startup(opCtx.get(), StorageEngine::LastShutdownState::kClean);
     _repl->waitForStartUpComplete_forTest();
     // _rsConfig should be written down at this point, so populate _memberData accordingly.
-    _topo->populateAllMembersConfigVersionAndTerm_forTest();
+    _repl->getTopologyCoordinator_forTest()->populateAllMembersConfigVersionAndTerm_forTest();
     _callShutdown = true;
 }
 
