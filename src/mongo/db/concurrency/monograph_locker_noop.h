@@ -100,16 +100,14 @@ public:
     }
 
     LockResult lockGlobal(OperationContext* opCtx, LockMode mode) override {
-        // MONGO_UNREACHABLE;
         return lockGlobalBegin(opCtx, mode, Date_t{});
     }
 
     LockResult lockGlobal(LockMode mode) override {
-        // MONGO_UNREACHABLE;
         return lockGlobal(nullptr, mode);
     }
 
-    LockResult lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
+    LockResult lockBegin(OperationContext* opCtx, const ResourceId& resId, LockMode mode) {
         if (resId == resourceIdGlobalForMonograph) {
             _recursiveCount++;
             if (!isModeCovered(mode, _globalLockMode)) {
@@ -128,24 +126,20 @@ public:
     }
 
     LockResult lockGlobalBegin(LockMode mode, Date_t deadline) override {
-        // MONGO_UNREACHABLE;
         return lockGlobalBegin(nullptr, mode, deadline);
     }
 
     LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline) override {
-        // MONGO_UNREACHABLE;
         return LockResult::LOCK_OK;
     }
 
     LockResult lockGlobalComplete(Date_t deadline) override {
-        // MONGO_UNREACHABLE;
         return LockResult::LOCK_OK;
     }
 
     void lockMMAPV1Flush() override {}
 
     bool unlockGlobal() override {
-        // MONGO_UNREACHABLE;
         unlock(resourceIdGlobalForMonograph);
         return true;
     }
@@ -163,7 +157,6 @@ public:
     }
 
     bool inAWriteUnitOfWork() const override {
-        // MONGO_UNREACHABLE;
         return _wuowNestingLevel > 0;
     }
 
@@ -196,7 +189,6 @@ public:
     }
 
     LockMode getLockMode(ResourceId resId) const override {
-        // MONGO_UNREACHABLE;
         if (resId == resourceIdGlobalForMonograph) {
             return _globalLockMode;
         } else {
@@ -239,26 +231,64 @@ public:
         return boost::none;
     }
 
+    // Refer to LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock
     bool saveLockStateAndUnlock(LockSnapshot* stateOut) override {
-        // MONGO_UNREACHABLE;
         stateOut->locks.clear();
         stateOut->globalMode = LockMode::MODE_NONE;
 
-        OneLock info{ResourceId(), _globalLockMode};
-        stateOut->locks.emplace_back(std::move(info));
-        _globalLockMode = LockMode::MODE_NONE;
+        // If there's no global lock there isn't really anything to do.
+        if (_globalLockMode == LockMode::MODE_NONE) {
+            return false;
+        }
+        // If the global lock has been acquired more than once, we're probably somewhere in a
+        // DBDirectClient call.  It's not safe to release and reacquire locks -- the context using
+        // the DBDirectClient is probably not prepared for lock release.
+        if (_recursiveCount > 1) {
+            return false;
+        }
+
+        stateOut->globalMode = _globalLockMode;
+        unlock(resourceIdGlobalForMonograph);
+        _recursiveCount = 0;
+
+        for (auto it = _lockMap.begin(); it != _lockMap.end();) {
+            const ResourceId resId = it->first;
+            const ResourceType resType = resId.getType();
+            const LockMode mode = it->second;
+            if (resType == RESOURCE_MUTEX) {
+                it++;
+                continue;
+            }
+
+            // We should never have to save and restore metadata locks.
+            invariant(RESOURCE_DATABASE == resId.getType() ||
+                      RESOURCE_COLLECTION == resId.getType() ||
+                      (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)));
+
+            OneLock info;
+            info.resourceId = resId;
+            info.mode = mode;
+
+            stateOut->locks.push_back(std::move(info));
+            it = _lockMap.erase(it);
+        }
+        invariant(!isLocked());
+
+        // Sort locks by ResourceId. They'll later be acquired in this canonical locking order.
+        std::sort(stateOut->locks.begin(), stateOut->locks.end());
+
         return true;
     }
 
+    // Refer to LockerImpl<IsForMMAPV1>::restoreLockState
     void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) override {
-        // MONGO_UNREACHABLE;
-        for (const auto& info : stateToRestore.locks) {
-            _globalLockMode = info.mode;
+        invariant(LOCK_OK == lockGlobal(opCtx, stateToRestore.globalMode));
+        for (const auto& lockState : stateToRestore.locks) {
+            invariant(LOCK_OK == lock(lockState.resourceId, lockState.mode, Date_t{}, false));
         }
     }
 
     void restoreLockState(const LockSnapshot& stateToRestore) override {
-        // MONGO_UNREACHABLE;
         restoreLockState(nullptr, stateToRestore);
     }
 
@@ -279,7 +309,6 @@ public:
     }
 
     bool isR() const override {
-        // MONGO_UNREACHABLE;
         return _globalLockMode == LockMode::MODE_S;
     }
 

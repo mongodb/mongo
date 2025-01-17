@@ -62,9 +62,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::string;
 using std::endl;
+using std::string;
+using std::unique_ptr;
 
 MONGO_FAIL_POINT_DEFINE(crashAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
@@ -338,6 +338,9 @@ void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& do
 }
 
 Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
+    // This is currently a no-op, as index building is handled by Monograph.
+    return Status::OK();
+
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
 
     // Refrain from persisting any multikey updates as a result from building the index. Instead,
