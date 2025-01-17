@@ -25,7 +25,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "unwind_i.h"
-#include "offsets.h"
+#include "ucontext_i.h"
 #include <signal.h>
 #include <limits.h>
 
@@ -70,7 +70,7 @@ trace_cache_free (void *arg)
   }
   tls_cache_destroyed = 1;
   tls_cache = NULL;
-  munmap (cache->frames, (1u << cache->log_size) * sizeof(unw_tdep_frame_t));
+  mi_munmap (cache->frames, (1u << cache->log_size) * sizeof(unw_tdep_frame_t));
   mempool_free (&trace_cache_pool, cache);
   Debug(5, "freed cache %p\n", cache);
 }
@@ -152,7 +152,7 @@ trace_cache_expand (unw_trace_cache_t *cache)
   }
 
   Debug(5, "expanded cache from 2^%lu to 2^%lu buckets\n", cache->log_size, new_log_size);
-  munmap(cache->frames, old_size * sizeof(unw_tdep_frame_t));
+  mi_munmap(cache->frames, old_size * sizeof(unw_tdep_frame_t));
   cache->frames = new_frames;
   cache->log_size = new_log_size;
   cache->used = 0;
@@ -407,7 +407,7 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
   int depth = 0;
   int ret;
 
-  /* Check input parametres. */
+  /* Check input parameters. */
   if (unlikely(! cursor || ! buffer || ! size || (maxdepth = *size) <= 0))
     return -UNW_EINVAL;
 
@@ -483,13 +483,20 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
       /* Advance standard traceable frame. */
       cfa = (f->cfa_reg_sp ? sp : fp) + f->cfa_reg_offset;
       if (likely(f->lr_cfa_offset != -1))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa + f->lr_cfa_offset, pc);
+        {
+          ACCESS_MEM_FAST(ret, c->validate, d, cfa + f->lr_cfa_offset, pc);
+        }
       else if (lr != 0)
-      {
-        /* Use the saved link register as the new pc. */
-        pc = lr;
-        lr = 0;
-      }
+        {
+          /* Use the saved link register as the new pc. */
+          pc = lr;
+          lr = 0;
+        }
+      else
+        {
+          /* Cached frame has no LR and neither do we. */
+          return -UNW_ESTOPUNWIND;
+        }
       if (likely(ret >= 0) && likely(f->fp_cfa_offset != -1))
         ACCESS_MEM_FAST(ret, c->validate, d, cfa + f->fp_cfa_offset, fp);
 
@@ -503,15 +510,15 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
     case UNW_AARCH64_FRAME_SIGRETURN:
       cfa = cfa + f->cfa_reg_offset; /* cfa now points to ucontext_t.  */
 
-      ACCESS_MEM_FAST(ret, c->validate, d, cfa + LINUX_SC_PC_OFF, pc);
+      ACCESS_MEM_FAST(ret, c->validate, d, cfa + SC_PC_OFF, pc);
       if (likely(ret >= 0))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa + LINUX_SC_X29_OFF, fp);
+        ACCESS_MEM_FAST(ret, c->validate, d, cfa + SC_X29_OFF, fp);
       if (likely(ret >= 0))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa + LINUX_SC_SP_OFF, sp);
+        ACCESS_MEM_FAST(ret, c->validate, d, cfa + SC_SP_OFF, sp);
       /* Save the link register here in case we end up in a function that
          doesn't save the link register in the prologue, e.g. kill. */
       if (likely(ret >= 0))
-        ACCESS_MEM_FAST(ret, c->validate, d, cfa + LINUX_SC_X30_OFF, lr);
+        ACCESS_MEM_FAST(ret, c->validate, d, cfa + SC_X30_OFF, lr);
 
       /* Resume stack at signal restoration point. The stack is not
          necessarily continuous here, especially with sigaltstack(). */

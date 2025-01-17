@@ -54,6 +54,9 @@ struct unw_addr_space
     mips_abi_t abi;
     unsigned int addr_size;
 
+#ifndef UNW_REMOTE_ONLY
+    unw_iterate_phdr_func_t iterate_phdr_function;
+#endif
     unw_caching_policy_t caching_policy;
     _Atomic uint32_t cache_generation;
     unw_word_t dyn_generation;          /* see dyn-common.h */

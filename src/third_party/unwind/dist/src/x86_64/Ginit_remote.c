@@ -30,7 +30,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "unwind_i.h"
 
 int
-unw_init_remote (unw_cursor_t *cursor, unw_addr_space_t as, void *as_arg)
+unw_init_remote (unw_cursor_t *cursor UNUSED, unw_addr_space_t as UNUSED, void *as_arg UNUSED)
 {
 #ifdef UNW_LOCAL_ONLY
   return -UNW_EINVAL;

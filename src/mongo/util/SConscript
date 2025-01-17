@@ -974,6 +974,7 @@ if use_libunwind:
             'stacktrace_libunwind_test',
         ],
         source=[
+            'stacktrace_libunwind_deadlock_test.cpp',
             'stacktrace_libunwind_test_functions.cpp',
             'stacktrace_libunwind_test.cpp',
         ],

@@ -41,7 +41,7 @@ long unwi_debug_level;
 #endif /* UNW_DEBUG */
 long unw_page_size;
 static void
-unw_init_page_size ()
+unw_init_page_size (void)
 {
   errno = 0;
   long result = sysconf (_SC_PAGESIZE);

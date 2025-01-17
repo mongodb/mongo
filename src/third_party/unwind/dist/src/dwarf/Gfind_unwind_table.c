@@ -36,12 +36,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define to_unw_word(p) ((unw_word_t) (uintptr_t) (p))
 
 int
-dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
-                         char *path, unw_word_t segbase, unw_word_t mapoff,
-                         unw_word_t ip)
+dwarf_find_unwind_table (struct elf_dyn_info *edi,
+						 unw_addr_space_t     as UNUSED,
+                         const char          *path UNUSED,
+                         unw_word_t           segbase,
+                         unw_word_t           mapoff,
+                         unw_word_t           ip UNUSED)
 {
   Elf_W(Phdr) *phdr, *ptxt = NULL, *peh_hdr = NULL, *pdyn = NULL;
-  unw_word_t addr, eh_frame_start, fde_count, load_base;
+  unw_word_t addr, eh_frame_start, fde_count, loadoff, load_base;
   unw_word_t max_load_addr = 0;
   unw_word_t start_ip = to_unw_word (-1);
   unw_word_t end_ip = 0;
@@ -50,7 +53,7 @@ dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
   unw_accessors_t *a;
   Elf_W(Ehdr) *ehdr;
 #if UNW_TARGET_ARM
-  const Elf_W(Phdr) *parm_exidx = NULL;
+  const Elf_W(Phdr) *param_exidx = NULL;
 #endif
   int i, ret, found = 0;
 
@@ -73,7 +76,7 @@ dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
           if (phdr[i].p_vaddr + phdr[i].p_memsz > end_ip)
             end_ip = phdr[i].p_vaddr + phdr[i].p_memsz;
 
-          if (phdr[i].p_offset == mapoff)
+          if ((phdr[i].p_flags & PF_X) == PF_X)
             ptxt = phdr + i;
           if ((uintptr_t) edi->ei.image + phdr->p_filesz > max_load_addr)
             max_load_addr = (uintptr_t) edi->ei.image + phdr->p_filesz;
@@ -92,7 +95,7 @@ dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
 
 #if UNW_TARGET_ARM
         case PT_ARM_EXIDX:
-          parm_exidx = phdr + i;
+          param_exidx = phdr + i;
           break;
 #endif
 
@@ -104,7 +107,8 @@ dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
   if (!ptxt)
     return 0;
 
-  load_base = segbase - ptxt->p_vaddr;
+  loadoff = mapoff + (ptxt->p_vaddr - ptxt->p_offset);
+  load_base = segbase - loadoff;
   start_ip += load_base;
   end_ip += load_base;
 
@@ -112,7 +116,7 @@ dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
     {
       if (pdyn)
         {
-          /* For dynamicly linked executables and shared libraries,
+          /* For dynamically linked executables and shared libraries,
              DT_PLTGOT is the value that data-relative addresses are
              relative to for that object.  We call this the "gp".  */
                 Elf_W(Dyn) *dyn = (Elf_W(Dyn) *)(pdyn->p_offset
@@ -212,14 +216,14 @@ dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
     }
 
 #if UNW_TARGET_ARM
-  if (parm_exidx)
+  if (param_exidx)
     {
       edi->di_arm.format = UNW_INFO_FORMAT_ARM_EXIDX;
       edi->di_arm.start_ip = start_ip;
       edi->di_arm.end_ip = end_ip;
       edi->di_arm.u.rti.name_ptr = to_unw_word (path);
-      edi->di_arm.u.rti.table_data = load_base + parm_exidx->p_vaddr;
-      edi->di_arm.u.rti.table_len = parm_exidx->p_memsz;
+      edi->di_arm.u.rti.table_data = load_base + param_exidx->p_vaddr;
+      edi->di_arm.u.rti.table_len = param_exidx->p_memsz;
       found = 1;
     }
 #endif

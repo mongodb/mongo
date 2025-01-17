@@ -2,6 +2,7 @@
    Copyright (C) 2001-2004 Hewlett-Packard Co
         Contributed by David Mosberger-Tang <davidm@hpl.hp.com>
    Copyright (C) 2013 Linaro Limited
+   Copyright 2022 Blackberry Limited
 
 This file is part of libunwind.
 
@@ -35,6 +36,7 @@ extern "C" {
 #include <stddef.h>
 #include <ucontext.h>
 #include <stdalign.h>
+#include <stdint.h>
 
 #ifndef UNW_EMPTY_STRUCT
 #  define UNW_EMPTY_STRUCT uint8_t unused;
@@ -61,6 +63,8 @@ typedef uint64_t unw_word_t;
 typedef int64_t unw_sword_t;
 
 typedef long double unw_tdep_fpreg_t;
+
+#define UNW_WORD_MAX UINT64_MAX
 
 typedef struct
   {
@@ -119,6 +123,12 @@ typedef enum
     UNW_AARCH64_PC,
     UNW_AARCH64_PSTATE,
 
+    /* Pseudo-register */
+    UNW_AARCH64_RA_SIGN_STATE = 34,
+
+    /* SVE Vector Granule pseudo register */
+    UNW_AARCH64_VG = 46,
+
     /* 128-bit FP/Advanced SIMD registers.  */
     UNW_AARCH64_V0 = 64,
     UNW_AARCH64_V1,
@@ -164,7 +174,7 @@ typedef enum
 
     UNW_TDEP_IP = UNW_AARCH64_X30,
     UNW_TDEP_SP = UNW_AARCH64_SP,
-    UNW_TDEP_EH = UNW_AARCH64_X0,
+    UNW_TDEP_EH = UNW_AARCH64_X0
 
   }
 aarch64_regnum_t;
@@ -228,9 +238,17 @@ typedef ucontext_t unw_tdep_context_t;
 #include "libunwind-common.h"
 #include "libunwind-dynamic.h"
 
+#if defined(__FreeBSD__)
+# define UNW_BASE register uint64_t unw_base __asm__ ("x0") = (uint64_t) unw_ctx->uc_mcontext.mc_gpregs.gp_x;
+#elif defined(__QNX__)
+# define UNW_BASE register uint64_t unw_base __asm__ ("x0") = (uint64_t) unw_ctx->uc_mcontext.cpu.gpr;
+#else
+# define UNW_BASE register uint64_t unw_base __asm__ ("x0") = (uint64_t) unw_ctx->uc_mcontext.regs;
+#endif
+
 #define unw_tdep_getcontext(uc) ({					\
   unw_tdep_context_t *unw_ctx = (uc);					\
-  register uint64_t unw_base __asm__ ("x0") = (uint64_t) unw_ctx->uc_mcontext.regs; \
+  UNW_BASE \
   __asm__ __volatile__ (					        \
      "stp x0, x1, [%[base], #0]\n" \
      "stp x2, x3, [%[base], #16]\n" \
@@ -239,7 +257,7 @@ typedef ucontext_t unw_tdep_context_t;
      "stp x8, x9, [%[base], #64]\n" \
      "stp x10, x11, [%[base], #80]\n" \
      "stp x12, x13, [%[base], #96]\n" \
-     "stp x14, x13, [%[base], #112]\n" \
+     "stp x14, x15, [%[base], #112]\n" \
      "stp x16, x17, [%[base], #128]\n" \
      "stp x18, x19, [%[base], #144]\n" \
      "stp x20, x21, [%[base], #160]\n" \

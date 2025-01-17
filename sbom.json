@@ -846,7 +846,7 @@
         "name": "Organization: github"
       },
       "name": "libunwind/libunwind",
-      "version": "v1.6.2",
+      "version": "v1.8.1",
       "licenses": [
         {
           "license": {
@@ -854,11 +854,23 @@
           }
         }
       ],
-      "purl": "pkg:github/libunwind/libunwind@v1.6.2",
+      "purl": "pkg:github/libunwind/libunwind@v1.8.1",
       "properties": [
         {
           "name": "internal:team_responsible",
           "value": "Server Programmability"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "http://www.github.com/libunwind/libunwind"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/unwind/scripts/import.sh"
         }
       ],
       "type": "library",

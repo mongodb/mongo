@@ -50,6 +50,126 @@ typedef struct
   /* many more fields here, but they are unused by this code */
 } stack_frame_t;
 
+//! Recognise PLT entries
+/*! For example:
+   0x000000001000d1f0 <+0>:     18 00 41 f8     std     r2,24(r1)
+   0x000000001000d1f4 <+4>:     30 87 82 e9     ld      r12,-30928(r2)
+   0x000000001000d1f8 <+8>:     a6 03 89 7d     mtctr   r12
+   0x000000001000d1fc <+12>:    20 04 80 4e     bctr
+
+  \note The current implementation only supports little endian modes.
+*/
+static int
+is_plt_entry (struct dwarf_cursor *c)
+{
+  unw_word_t w0, w1;
+  unw_accessors_t *a;
+
+  if (c->as->big_endian)
+    {
+      return 0;
+    }
+
+  /*
+    A PLT (Procedure Linkage Table) is used by the dynamic linker to map the
+    relative address of a position independent function call onto the real
+    address of the function. If we attempt to unwind from any instruction
+    inside the PLT, and the PLT is missing DWARF unwind information, then
+    conventional unwinding will fail because although the function has been
+    "called" we have not yet entered the prologue and set-up the stack frame.
+
+    This code looks to see if the instruction is anywhere within a "recognised"
+    PLT entry (note that the IP could be anywhere within the PLT, so we have to
+    examine nearby instructions).
+  */
+
+  struct instruction_entry
+    {
+      uint32_t pattern;
+      uint32_t mask;
+    } instructions[4] =
+    {
+      // ppc64le
+      {0xf8410018,0xffffffff},
+      {0xe9820000,0xffff0000},
+      {0x7d8903a6,0xffffffff},
+      {0x4e800420,0xffffffff},
+    };
+
+  a = unw_get_accessors (c->as);
+
+  if( (*a->access_mem) (c->as, c->ip, &w0, 0, c->as_arg) < 0 )
+    {
+      return 0;
+    }
+
+  /*
+    NB: the following code is endian sensitive!
+
+    The current implementation is for little-endian modes, big-endian modes
+    will see the first instruction in the high bits of w0, and the second
+    instruction in the low bits of w0. Some tweaks will be needed to read from
+    the correct part of the word to support big endian modes.
+  */
+  if(( w0      & instructions[0].mask) == instructions[0].pattern &&
+     ((w0>>32) & instructions[1].mask) == instructions[1].pattern)
+  {
+    if( (*a->access_mem) (c->as, c->ip+8, &w1, 0, c->as_arg) >= 0 &&
+        ( w1      & instructions[2].mask) == instructions[2].pattern &&
+        ((w1>>32) & instructions[3].mask) == instructions[3].pattern )
+      {
+        return 1;
+      }
+    else
+      {
+        return 0;
+      }
+  }
+  else if(( w0 & instructions[2].mask) == instructions[2].pattern &&
+     ((w0>>32) & instructions[3].mask) == instructions[3].pattern)
+  {
+    w1 = w0;
+    if( (*a->access_mem) (c->as, c->ip-8, &w0, 0, c->as_arg) >= 0 &&
+        ( w0      & instructions[0].mask) == instructions[0].pattern &&
+        ((w0>>32) & instructions[1].mask) == instructions[1].pattern )
+      {
+        return 1;
+      }
+    else
+      {
+        return 0;
+      }
+  }
+  else if(( w0 & instructions[1].mask) == instructions[1].pattern &&
+     ((w0>>32) & instructions[2].mask) == instructions[2].pattern)
+  {
+    if( (*a->access_mem) (c->as, c->ip-4, &w0, 0, c->as_arg) < 0 ||
+        (*a->access_mem) (c->as, c->ip+4, &w1, 0, c->as_arg) < 0 )
+    {
+      return 0;
+    }
+  }
+  else if( (w0 & instructions[3].mask) == instructions[3].pattern )
+  {
+    if( (*a->access_mem) (c->as, c->ip-12, &w0, 0, c->as_arg) < 0 ||
+        (*a->access_mem) (c->as, c->ip-4, &w1, 0, c->as_arg) < 0 )
+    {
+      return 0;
+    }
+  }
+
+  if(( w0      & instructions[0].mask) == instructions[0].pattern &&
+     ((w0>>32) & instructions[1].mask) == instructions[1].pattern &&
+     ( w1      & instructions[2].mask) == instructions[2].pattern &&
+     ((w1>>32) & instructions[3].mask) == instructions[3].pattern )
+    {
+      return 1;
+    }
+  else
+    {
+      return 0;
+    }
+}
 
 int
 unw_step (unw_cursor_t * cursor)
@@ -59,12 +179,15 @@ unw_step (unw_cursor_t * cursor)
   unw_word_t back_chain_offset, lr_save_offset, v_regs_ptr;
   struct dwarf_loc back_chain_loc, lr_save_loc, sp_loc, ip_loc, v_regs_loc;
   int ret, i;
+  int validate = c->dwarf.as->validate;
 
   Debug (1, "(cursor=%p, ip=0x%016lx)\n", c, (unsigned long) c->dwarf.ip);
 
   /* Try DWARF-based unwinding... */
 
+  c->dwarf.as->validate = 1;
   ret = dwarf_step (&c->dwarf);
+  c->dwarf.as->validate = validate;
 
   if (ret < 0 && ret != -UNW_ENOINFO)
     {
@@ -76,49 +199,97 @@ unw_step (unw_cursor_t * cursor)
     {
       if (likely (unw_is_signal_frame (cursor) <= 0))
         {
-          /* DWARF unwinding failed.  As of 09/26/2006, gcc in 64-bit mode
-             produces the mandatory level of traceback record in the code, but
-             I get the impression that this is transitory, that eventually gcc
-             will not produce any traceback records at all.  So, for now, we
-             won't bother to try to find and use these records.
-
-             We can, however, attempt to unwind the frame by using the callback
-             chain.  This is very crude, however, and won't be able to unwind
-             any registers besides the IP, SP, and LR . */
-
-          back_chain_offset = ((void *) &dummy.back_chain - (void *) &dummy);
-          lr_save_offset = ((void *) &dummy.lr_save - (void *) &dummy);
-
-          back_chain_loc = DWARF_LOC (c->dwarf.cfa + back_chain_offset, 0);
-
-          if ((ret =
-               dwarf_get (&c->dwarf, back_chain_loc, &c->dwarf.cfa)) < 0)
+          /* DWARF failed. */
+          if (is_plt_entry (&c->dwarf))
             {
-              Debug (2,
-                 "Unable to retrieve CFA from back chain in stack frame - %d\n",
-                 ret);
-              return ret;
+              Debug (2, "found plt entry\n");
+
+              /*
+                Fallback mode that uses the link register. This is important
+                for cases where a function without unwind information has been
+                called, but not yet set-up its stack frame (basically PLT calls).
+
+                In this case we can't trust c->dwarf.cfa (the stack frame)
+                because it will currently point to the caller's stack frame -
+                but we can use the current value of the link register to get
+                back to the caller. We then have to hope that libunwind manages
+                to resume unwinding properly from the caller IP.
+              */
+              c->dwarf.loc[UNW_PPC64_NIP] = c->dwarf.loc[UNW_PPC64_LR];
+              c->dwarf.loc[UNW_PPC64_LR] = DWARF_NULL_LOC;
+              if (!DWARF_IS_NULL_LOC (c->dwarf.loc[UNW_PPC64_NIP]))
+                {
+                  ret = dwarf_get (&c->dwarf, c->dwarf.loc[UNW_PPC64_NIP], &c->dwarf.ip);
+                  if (ret < 0)
+                    {
+                      Debug (2, "failed to get pc from link register: %d\n", ret);
+                      return ret;
+                    }
+                  Debug (2, "link register = 0x%016lx\n", c->dwarf.ip);
+                  ret = 1;
+                }
+              else
+                {
+                  Debug (2, "link register was not saved\n");
+                  c->dwarf.ip = 0;
+                }
             }
-          if (c->dwarf.cfa == 0)
-            /* Unless the cursor or stack is corrupt or uninitialized we've most
-               likely hit the top of the stack */
-            return 0;
-
-          lr_save_loc = DWARF_LOC (c->dwarf.cfa + lr_save_offset, 0);
-
-          if ((ret = dwarf_get (&c->dwarf, lr_save_loc, &c->dwarf.ip)) < 0)
+          else
             {
-              Debug (2,
-                 "Unable to retrieve IP from lr save in stack frame - %d\n",
-                 ret);
-              return ret;
+              /*
+                Fallback mode that uses a conventional stack unwinding. This is
+                important for functions without proper DWARF unwind information,
+                in particular without this fallback the clone() function will not
+                unwind properly.
+
+                We do the unwind by first looking for the caller stack pointer
+                saved in the current stack frame. This will point to the caller's
+                'linkage area'. If the caller stack pointer is null, we assume we
+                have reached the top of the stack.
+
+                The address 24(SP) (where SP is the caller stack pointer) contains
+                the saved 'link register', the link register is effectively the
+                return address for the called function - so we can use the link
+                register to get an IP inside the calling function.
+
+                Note: there is no requirement for leaf functions to save the
+                stack pointer or link register, I'm not entirely sure why
+                libunwind doesn't handle this case.
+              */
+              Debug (2, "fallback\n");
+
+              back_chain_offset = ((void *) &dummy.back_chain - (void *) &dummy);
+              lr_save_offset = ((void *) &dummy.lr_save - (void *) &dummy);
+
+              back_chain_loc = DWARF_LOC (c->dwarf.cfa + back_chain_offset, 0);
+
+              if ((ret =
+                   dwarf_get (&c->dwarf, back_chain_loc, &c->dwarf.cfa)) < 0)
+                {
+                  Debug (2,
+                     "Unable to retrieve CFA from back chain in stack frame - %d\n",
+                     ret);
+                  return ret;
+                }
+              if (c->dwarf.cfa == 0)
+                /* Unless the cursor or stack is corrupt or uninitialized we've most
+                   likely hit the top of the stack */
+                return 0;
+
+              lr_save_loc = DWARF_LOC (c->dwarf.cfa + lr_save_offset, 0);
+
+              if ((ret = dwarf_get (&c->dwarf, lr_save_loc, &c->dwarf.ip)) < 0)
+                {
+                  Debug (2,
+                     "Unable to retrieve IP from lr save in stack frame - %d\n",
+                     ret);
+                  return ret;
+                }
+              ret = 1;
+              /* Mark all registers unsaved */
+              for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
+                c->dwarf.loc[i] = DWARF_NULL_LOC;
             }
-
-          /* Mark all registers unsaved */
-          for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
-            c->dwarf.loc[i] = DWARF_NULL_LOC;
-
-          ret = 1;
         }
       else
         {

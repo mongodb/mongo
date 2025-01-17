@@ -35,14 +35,7 @@ _UCD_destroy (struct UCD_info *ui)
 
   invalidate_edi (&ui->edi);
 
-  unsigned i;
-  for (i = 0; i < ui->phdrs_count; i++)
-    {
-      struct coredump_phdr *phdr = &ui->phdrs[i];
-      free(phdr->backing_filename);
-      if (phdr->backing_fd >= 0)
-        close(phdr->backing_fd);
-    }
+  ucd_file_table_dispose(&ui->ucd_file_table);
 
   free(ui->phdrs);
   free(ui->note_phdr);

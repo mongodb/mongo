@@ -59,6 +59,8 @@ extern int aarch64_local_resume (unw_addr_space_t as, unw_cursor_t *cursor,
   } while (0)
 #endif
 
+#if defined(__linux__)
 #define GET_FPCTX(uc) ((unw_fpsimd_context_t *)(&uc->uc_mcontext.__reserved))
+#endif
 
 #endif /* unwind_i_h */

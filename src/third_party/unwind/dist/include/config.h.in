@@ -21,6 +21,9 @@
 /* Define to 1 if you have the <asm/ptrace_offsets.h> header file. */
 #undef HAVE_ASM_PTRACE_OFFSETS_H
 
+/* Define to 1 if you have the <asm/vsyscall.h> header file. */
+#undef HAVE_ASM_VSYSCALL_H
+
 /* Define to 1 if you have the <byteswap.h> header file. */
 #undef HAVE_BYTESWAP_H
 
@@ -92,6 +95,9 @@
 /* Define to 1 if you have the `dl_phdr_removals_counter' function. */
 #undef HAVE_DL_PHDR_REMOVALS_COUNTER
 
+/* Define to 1 if the system has the type `elf_fpregset_t'. */
+#undef HAVE_ELF_FPREGSET_T
+
 /* Define to 1 if you have the <elf.h> header file. */
 #undef HAVE_ELF_H
 
@@ -100,6 +106,9 @@
 
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
+
+/* Define to 1 if you have the `execvpe' function. */
+#undef HAVE_EXECVPE
 
 /* Define to 1 if you have the `getunwind' function. */
 #undef HAVE_GETUNWIND
@@ -110,17 +119,11 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
-/* Define to 1 if you have the `uca' library (-luca). */
-#undef HAVE_LIBUCA
-
 /* Define to 1 if you have the <link.h> header file. */
 #undef HAVE_LINK_H
 
 /* Define if you have liblzma */
 #undef HAVE_LZMA
-
-/* Define to 1 if you have the <memory.h> header file. */
-#undef HAVE_MEMORY_H
 
 /* Define to 1 if you have the `mincore' function. */
 #undef HAVE_MINCORE
@@ -128,11 +131,20 @@
 /* Define to 1 if you have the `pipe2' function. */
 #undef HAVE_PIPE2
 
+/* Define to 1 if the system has the type `procfs_status'. */
+#undef HAVE_PROCFS_STATUS
+
+/* Define to 1 if you have the `sigaltstack' function. */
+#undef HAVE_SIGALTSTACK
+
 /* Define to 1 if you have the <signal.h> header file. */
 #undef HAVE_SIGNAL_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdio.h> header file. */
+#undef HAVE_STDIO_H
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
@@ -227,7 +239,9 @@
 /* The size of `off_t', as computed by sizeof. */
 #undef SIZEOF_OFF_T
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 #undef STDC_HEADERS
 
 /* Version number of package */

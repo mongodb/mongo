@@ -88,6 +88,7 @@ _Ux86_64_getcontext:
 	movw %gs, UC_MCONTEXT_GS(%rdi)
 #endif
 	movq $UC_MCONTEXT_MC_LEN_VAL, UC_MCONTEXT_MC_LEN(%rdi)
+#elif defined(__QNX__)
 #else
 #error Port me
 #endif

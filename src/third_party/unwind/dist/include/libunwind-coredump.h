@@ -62,6 +62,8 @@ extern int _UCD_access_fpreg (unw_addr_space_t, unw_regnum_t, unw_fpreg_t *,
                               int, void *);
 extern int _UCD_get_proc_name (unw_addr_space_t, unw_word_t, char *, size_t,
                                unw_word_t *, void *);
+extern int _UCD_get_elf_filename (unw_addr_space_t, unw_word_t, char *, size_t,
+                                  unw_word_t *, void *);
 extern int _UCD_resume (unw_addr_space_t, unw_cursor_t *, void *);
 extern unw_accessors_t _UCD_accessors;
 

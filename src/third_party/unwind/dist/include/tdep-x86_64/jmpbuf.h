@@ -37,8 +37,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #define JB_SP           2
 #define JB_RP           0
+#ifdef __amd64__
+#define JB_MASK_SAVED   11
+#else
 /* Pretend the ip cannot be 0 and mask is always saved */
 #define JB_MASK_SAVED   0
+#endif
 #define JB_MASK         9
+#define	_JB_STK_SHIFT	8
 
 #endif

@@ -60,6 +60,7 @@ unwind_common_sources = [
     'dwarf/Lfde.c',
     'dwarf/Lfind_proc_info-lsb.c',
     'dwarf/Lfind_unwind_table.c',
+    'dwarf/Lget_proc_info_in_range.c',
     'dwarf/Lparser.c',
     'dwarf/Lpe.c',
     "dl-iterate-phdr.c",
@@ -70,10 +71,12 @@ unwind_common_sources = [
     'mi/dyn-register.c',
     'mi/flush_cache.c',
     'mi/init.c',
+    'mi/Laddress_validator.c',
     'mi/Ldestroy_addr_space.c',
     'mi/Ldyn-extract.c',
     'mi/Lfind_dynamic_proc_info.c',
     'mi/Lget_accessors.c',
+    'mi/Lget_elf_filename.c',
     'mi/Lget_fpreg.c',
     'mi/Lget_proc_info_by_ip.c',
     'mi/Lget_proc_name.c',
@@ -82,6 +85,7 @@ unwind_common_sources = [
     'mi/Lset_cache_size.c',
     'mi/Lset_caching_policy.c',
     'mi/Lset_fpreg.c',
+    'mi/Lset_iterate_phdr_function.c',
     'mi/Lset_reg.c',
     'mi/mempool.c',
     'mi/strerror.c',
@@ -115,6 +119,7 @@ if env['TARGET_ARCH'] == 'x86_64':
     ]
 elif env['TARGET_ARCH'] == 'aarch64':
     unwind_platform_sources += [
+        "${UNWIND_TARGET_ARCH}/Los-${TARGET_OS}.c",
         "${UNWIND_TARGET_ARCH}/Lis_signal_frame.c",
         "${UNWIND_TARGET_ARCH}/Lstash_frame.c",
         "${UNWIND_TARGET_ARCH}/Ltrace.c",

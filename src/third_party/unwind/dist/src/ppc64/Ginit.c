@@ -135,14 +135,20 @@ static int
 access_mem (unw_addr_space_t as, unw_word_t addr, unw_word_t *val, int write,
             void *arg)
 {
+  if (unlikely (as->validate) && unlikely (!unw_address_is_valid (addr, sizeof(unw_word_t))))
+    {
+      Debug (16, "mem[%#010lx] invalid\n", (long)addr);
+      return -1;
+    }
+
   if (write)
     {
       Debug (12, "mem[%lx] <- %lx\n", addr, *val);
-      *(unw_word_t *) addr = *val;
+      memcpy ((void *) addr, val, sizeof(unw_word_t));
     }
   else
     {
-      *val = *(unw_word_t *) addr;
+      memcpy (val, (void *) addr, sizeof(unw_word_t));
       Debug (12, "mem[%lx] -> %lx\n", addr, *val);
     }
   return 0;
@@ -166,12 +172,12 @@ access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
 
   if (write)
     {
-      *(unw_word_t *) addr = *val;
+      memcpy ((void *) addr, val, sizeof(unw_word_t));
       Debug (12, "%s <- %lx\n", unw_regname (reg), *val);
     }
   else
     {
-      *val = *(unw_word_t *) addr;
+      memcpy (val, (void *) addr, sizeof(unw_word_t));
       Debug (12, "%s -> %lx\n", unw_regname (reg), *val);
     }
   return 0;
@@ -223,6 +229,14 @@ get_static_proc_name (unw_addr_space_t as, unw_word_t ip,
   return _Uelf64_get_proc_name (as, getpid (), ip, buf, buf_len, offp);
 }
 
+static int
+get_static_elf_filename (unw_addr_space_t as, unw_word_t ip,
+                         char *buf, size_t buf_len, unw_word_t *offp,
+                         void *arg)
+{
+  return _Uelf64_get_elf_filename (as, getpid (), ip, buf, buf_len, offp);
+}
+
 HIDDEN void
 ppc64_local_addr_space_init (void)
 {
@@ -233,6 +247,11 @@ ppc64_local_addr_space_init (void)
 #else
   local_addr_space.abi = UNW_PPC64_ABI_ELFv1;
 #endif
+#ifndef UNW_REMOTE_ONLY
+# if defined(HAVE_DL_ITERATE_PHDR)
+  local_addr_space.iterate_phdr_function = dl_iterate_phdr;
+# endif
+#endif
   local_addr_space.caching_policy = UNWI_DEFAULT_CACHING_POLICY;
   local_addr_space.acc.find_proc_info = dwarf_find_proc_info;
   local_addr_space.acc.put_unwind_info = put_unwind_info;
@@ -242,6 +261,7 @@ ppc64_local_addr_space_init (void)
   local_addr_space.acc.access_fpreg = access_fpreg;
   local_addr_space.acc.resume = ppc64_local_resume;
   local_addr_space.acc.get_proc_name = get_static_proc_name;
+  local_addr_space.acc.get_elf_filename = get_static_elf_filename;
   unw_flush_cache (&local_addr_space, 0, 0);
 }
 

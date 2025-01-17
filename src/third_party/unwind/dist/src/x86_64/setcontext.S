@@ -54,6 +54,7 @@ _Ux86_64_setcontext:
 	jne 1f
 	fxrstor UC_MCONTEXT_FPSTATE(%rdi)
 1:
+#elif defined (__QNX__)
 #else
 #error Port me
 #endif

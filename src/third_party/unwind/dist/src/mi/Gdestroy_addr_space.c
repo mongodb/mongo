@@ -26,7 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "libunwind_i.h"
 
 void
-unw_destroy_addr_space (unw_addr_space_t as)
+unw_destroy_addr_space (unw_addr_space_t as UNUSED)
 {
 #ifndef UNW_LOCAL_ONLY
 # if UNW_DEBUG

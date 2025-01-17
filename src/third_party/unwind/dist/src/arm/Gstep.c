@@ -94,6 +94,8 @@ unw_step (unw_cursor_t *cursor)
   struct cursor *c = (struct cursor *) cursor;
   int ret = -UNW_EUNSPEC;
   int has_stopunwind = 0;
+  int validate = c->validate;
+  c->validate = 1;
 
   Debug (1, "(cursor=%p)\n", c);
 
@@ -107,9 +109,15 @@ unw_step (unw_cursor_t *cursor)
       ret = arm_exidx_step (c);
       Debug(1, "arm_exidx_step()=%d\n", ret);
       if (ret > 0)
-        return 1;
+        {
+          c->validate = validate;
+          return 1;
+        }
       if (ret == 0)
-        return ret;
+        {
+          c->validate = validate;
+          return ret;
+        }
       if (ret == -UNW_ESTOPUNWIND)
         has_stopunwind = 1;
     }
@@ -125,16 +133,21 @@ unw_step (unw_cursor_t *cursor)
       Debug(1, "dwarf_step()=%d\n", ret);
 
       if (likely (ret > 0))
-        return 1;
+        {
+          c->validate = validate;
+          return 1;
+        }
 
       if (ret < 0 && ret != -UNW_ENOINFO)
         {
           Debug (2, "returning %d\n", ret);
+          c->validate = validate;
           return ret;
         }
     }
 #endif /* CONFIG_DEBUG_FRAME */
 
+  c->validate = validate;
   // Before trying the fallback, if any unwind info tell us to stop, do that.
   if (has_stopunwind)
     return -UNW_ESTOPUNWIND;
