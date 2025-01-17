@@ -40,6 +40,9 @@ filters:
   - ".prettierrc":
     approvers:
       - 10gen/devprod-correctness
+  - "/BUILD.bazel":
+    approvers:
+      - 10gen/devprod-build
   - "copy.bara.sky":
     approvers:
       - IamXander
