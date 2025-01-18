@@ -672,7 +672,7 @@
         "name": "Organization: github"
       },
       "name": "grpc",
-      "version": "1.59.2",
+      "version": "1.59.5",
       "licenses": [
         {
           "license": {
@@ -680,7 +680,7 @@
           }
         }
       ],
-      "purl": "pkg:github/grpc/grpc@v1.59.2",
+      "purl": "pkg:github/grpc/grpc@v1.59.5",
       "properties": [
         {
           "name": "internal:team_responsible",

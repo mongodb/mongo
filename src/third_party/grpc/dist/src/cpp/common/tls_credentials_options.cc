@@ -20,12 +20,14 @@
 #include <string>
 #include <utility>
 
+#include <grpc/grpc_crl_provider.h>
 #include <grpc/grpc_security.h>
 #include <grpc/grpc_security_constants.h>
 #include <grpc/support/log.h>
 #include <grpcpp/security/tls_certificate_provider.h>
 #include <grpcpp/security/tls_certificate_verifier.h>
 #include <grpcpp/security/tls_credentials_options.h>
+#include <grpcpp/security/tls_crl_provider.h>
 
 namespace grpc {
 namespace experimental {
@@ -41,6 +43,12 @@ void TlsCredentialsOptions::set_certificate_provider(
     grpc_tls_credentials_options_set_certificate_provider(
         c_credentials_options_, certificate_provider_->c_provider());
   }
+}
+
+void TlsCredentialsOptions::set_crl_provider(
+    std::shared_ptr<CrlProvider> crl_provider) {
+  grpc_tls_credentials_options_set_crl_provider(c_credentials_options_,
+                                                std::move(crl_provider));
 }
 
 void TlsCredentialsOptions::watch_root_certs() {
@@ -82,6 +90,18 @@ void TlsCredentialsOptions::set_certificate_verifier(
     grpc_tls_credentials_options_set_certificate_verifier(
         c_credentials_options_, certificate_verifier_->c_verifier());
   }
+}
+
+void TlsCredentialsOptions::set_min_tls_version(grpc_tls_version tls_version) {
+  grpc_tls_credentials_options* options = c_credentials_options();
+  GPR_ASSERT(options != nullptr);
+  grpc_tls_credentials_options_set_min_tls_version(options, tls_version);
+}
+
+void TlsCredentialsOptions::set_max_tls_version(grpc_tls_version tls_version) {
+  grpc_tls_credentials_options* options = c_credentials_options();
+  GPR_ASSERT(options != nullptr);
+  grpc_tls_credentials_options_set_max_tls_version(options, tls_version);
 }
 
 void TlsCredentialsOptions::set_check_call_host(bool check_call_host) {

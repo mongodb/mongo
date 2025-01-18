@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=grpc
-REVISION="v1.59.2"
-VERSION="1.59.2"
+REVISION="v1.59.5"
+VERSION="1.59.5"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/grpc
 if [[ -d $DEST_DIR/dist ]]; then

@@ -28,6 +28,7 @@
 #include <grpc/support/log.h>
 #include <grpcpp/security/tls_certificate_provider.h>
 #include <grpcpp/security/tls_certificate_verifier.h>
+#include <grpcpp/security/tls_crl_provider.h>
 #include <grpcpp/support/config.h>
 
 namespace grpc {
@@ -103,6 +104,17 @@ class TlsCredentialsOptions {
   // enforce the CRL files on all TLS handshakes. Only supported for OpenSSL
   // version > 1.1.
   void set_crl_directory(const std::string& path);
+
+  void set_crl_provider(std::shared_ptr<CrlProvider> crl_provider);
+
+  // Sets the minimum TLS version that will be negotiated during the TLS
+  // handshake. If not set, the underlying SSL library will use TLS v1.2.
+  // @param tls_version: The minimum TLS version.
+  void set_min_tls_version(grpc_tls_version tls_version);
+  // Sets the maximum TLS version that will be negotiated during the TLS
+  // handshake. If not set, the underlying SSL library will use TLS v1.3.
+  // @param tls_version: The maximum TLS version.
+  void set_max_tls_version(grpc_tls_version tls_version);
 
   // ----- Getters for member fields ----
   // Get the internal c options. This function shall be used only internally.
