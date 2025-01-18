@@ -4207,6 +4207,53 @@ Value ExpressionRandom::serialize(const SerializationOptions& options) const {
     return Value(DOC(getOpName() << Document()));
 }
 
+/* -------------------------- ExpressionCurrentDate ------------------------------ */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(currentDate,
+                                      ExpressionCurrentDate::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagCurrentDate);
+
+ExpressionCurrentDate::ExpressionCurrentDate(ExpressionContext* const expCtx) : Expression(expCtx) {
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+}
+
+intrusive_ptr<Expression> ExpressionCurrentDate::parse(ExpressionContext* const expCtx,
+                                                       BSONElement exprElement,
+                                                       const VariablesParseState& vps) {
+    uassert(9428200,
+            "$currentDate not allowed inside collection validators",
+            !expCtx->getIsParsingCollectionValidator());
+
+    uassert(
+        9428201, "$currentDate does not currently accept arguments", exprElement.Obj().isEmpty());
+
+    return new ExpressionCurrentDate(expCtx);
+}
+
+const char* ExpressionCurrentDate::getOpName() const {
+    return "$currentDate";
+}
+
+MONGO_FAIL_POINT_DEFINE(sleepBeforeCurrentDateEvaluation);
+
+Value ExpressionCurrentDate::evaluate(const Document& root, Variables* variables) const {
+    if (MONGO_unlikely(sleepBeforeCurrentDateEvaluation.shouldFail())) {
+        sleepBeforeCurrentDateEvaluation.execute(
+            [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+    }
+
+    return Value(Date_t::now());
+}
+
+intrusive_ptr<Expression> ExpressionCurrentDate::optimize() {
+    return intrusive_ptr<Expression>(this);
+}
+
+Value ExpressionCurrentDate::serialize(const SerializationOptions& options) const {
+    return Value(DOC(getOpName() << Document()));
+}
+
 /* ------------------------- ExpressionToHashedIndexKey -------------------------- */
 REGISTER_STABLE_EXPRESSION(toHashedIndexKey, ExpressionToHashedIndexKey::parse);
 

@@ -206,3 +206,9 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
+    featureFlagCurrentDate:
+      description: "Feature flag to enable $currentDate expression"
+      cpp_varname: gFeatureFlagCurrentDate
+      default: false
+      shouldBeFCVGated: true
+

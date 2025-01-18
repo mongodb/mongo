@@ -4074,6 +4074,35 @@ private:
     explicit ExpressionRandom(ExpressionContext* expCtx);
 };
 
+/**
+ * Returns current wall clock time.
+ */
+class ExpressionCurrentDate final : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+private:
+    explicit ExpressionCurrentDate(ExpressionContext* expCtx);
+};
+
 class ExpressionToHashedIndexKey : public Expression {
 public:
     ExpressionToHashedIndexKey(ExpressionContext* const expCtx,

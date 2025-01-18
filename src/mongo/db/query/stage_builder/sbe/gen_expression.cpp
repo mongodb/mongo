@@ -420,6 +420,7 @@ public:
     void visit(const ExpressionInternalFindElemMatch* expr) final {}
     void visit(const ExpressionFunction* expr) final {}
     void visit(const ExpressionRandom* expr) final {}
+    void visit(const ExpressionCurrentDate* expr) final {}
     void visit(const ExpressionToHashedIndexKey* expr) final {}
     void visit(const ExpressionDateAdd* expr) final {}
     void visit(const ExpressionDateSubtract* expr) final {}
@@ -598,6 +599,7 @@ public:
     void visit(const ExpressionInternalFindElemMatch* expr) final {}
     void visit(const ExpressionFunction* expr) final {}
     void visit(const ExpressionRandom* expr) final {}
+    void visit(const ExpressionCurrentDate* expr) final {}
     void visit(const ExpressionToHashedIndexKey* expr) final {}
     void visit(const ExpressionDateAdd* expr) final {}
     void visit(const ExpressionDateSubtract* expr) final {}
@@ -3570,6 +3572,11 @@ public:
             5155201, "$rand does not currently accept arguments", expr->getChildren().size() == 0);
         auto expression = makeABTFunction("rand");
         pushABT(std::move(expression));
+    }
+
+    void visit(const ExpressionCurrentDate* expr) final {
+        // TODO(SERVER-99405): Support $currentDate in SBE.
+        unsupportedExpression("$currentDate");
     }
 
     void visit(const ExpressionToHashedIndexKey* expr) final {

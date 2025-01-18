@@ -146,6 +146,7 @@ public:
     void visit(const ExpressionRegexFind*) override {}
     void visit(const ExpressionRegexFindAll*) override {}
     void visit(const ExpressionRegexMatch*) override {}
+    void visit(const ExpressionCurrentDate*) override {}
     void visit(const ExpressionCosine*) override {}
     void visit(const ExpressionSine*) override {}
     void visit(const ExpressionTangent*) override {}

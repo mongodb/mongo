@@ -111,6 +111,7 @@ class ExpressionSlice;
 class ExpressionIsArray;
 class ExpressionInternalFindAllValuesAtPath;
 class ExpressionRandom;
+class ExpressionCurrentDate;
 class ExpressionRound;
 class ExpressionSecond;
 class ExpressionSplit;
@@ -293,6 +294,7 @@ public:
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFindAllValuesAtPath>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRandom>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCurrentDate>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRound>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSplit>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSqrt>) = 0;
@@ -558,6 +560,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionInternalFindElemMatch*) override {}
     void visit(const ExpressionFunction*) override {}
     void visit(const ExpressionRandom*) override {}
+    void visit(const ExpressionCurrentDate*) override {}
     void visit(const ExpressionToHashedIndexKey*) override {}
     void visit(const ExpressionDateAdd*) override {}
     void visit(const ExpressionDateSubtract*) override {}

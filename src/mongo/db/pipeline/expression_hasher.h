@@ -203,6 +203,7 @@ public:
         kInternalOwningShard,
         kInternalIndexKey,
         kInternalKeyStringValue,
+        kCurrentDate,
     };
 
     explicit ExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
@@ -516,6 +517,10 @@ public:
 
     void visit(const ExpressionRandom* expr) final {
         combine(OpType::kRandom);
+    }
+
+    void visit(const ExpressionCurrentDate* expr) final {
+        combine(OpType::kCurrentDate);
     }
 
     void visit(const ExpressionRound* expr) final {
