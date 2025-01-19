@@ -1025,6 +1025,9 @@ wiredtiger_open_live_restore_configuration = [
     behavior of WiredTiger when live restoring from a backup.''', type='category', subconfig = [
         Config('enabled', 'false', r'''whether live restore is enabled or not.''', type='boolean'),
         Config('path', '', r'''the path to the backup that will be restored from.'''),
+        Config('read_size', '1MB', r'''
+            the read size for data migration, in bytes, must be a power of two. This setting is a
+            best effort. It does not force every read to be this size.''', min='512B', max='16MB'),
         Config('threads_max', '8', r'''
             maximum number of threads WiredTiger will start to migrate data from the backup to the
             running WiredTiger database. Each worker thread uses a session handle from the

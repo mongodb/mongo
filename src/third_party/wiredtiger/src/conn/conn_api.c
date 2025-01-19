@@ -3129,6 +3129,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_logmgr_config(session, cfg, false));
     WT_ERR(__conn_version_verify(session));
 
+#ifndef _MSC_VER
+    /*
+     * Recovery replays the log files to rebuild the metadata file that live restore depends on,
+     * because of this we copy them across prior to recovery commencing. This also helps ensure that
+     * the system is in a valid state for the log subsystem as it does some less common file
+     * manipulations.
+     */
+    if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+        WT_ERR(__wt_live_restore_setup_recovery(session));
+#endif
+
     /*
      * Configuration completed; optionally write a base configuration file.
      */

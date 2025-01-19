@@ -296,8 +296,6 @@ extern int __wti_log_allocfile(WT_SESSION_IMPL *session, uint32_t lognum, const 
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_log_close(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_log_extract_lognum(WT_SESSION_IMPL *session, const char *name, uint32_t *id)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_log_fill(WT_SESSION_IMPL *session, WTI_MYSLOT *myslot, bool force, WT_ITEM *record,
   WT_LSN *lsnp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_log_force_write(WT_SESSION_IMPL *session, bool retry, bool *did_work)

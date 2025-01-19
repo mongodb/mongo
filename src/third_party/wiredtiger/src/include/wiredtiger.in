@@ -3159,10 +3159,14 @@ struct __wt_connection {
  * boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to the backup
  * that will be restored from., a string; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * threads_max, maximum number of threads WiredTiger will start to migrate data from the backup to
- * the running WiredTiger database.  Each worker thread uses a session handle from the configured
- * session_max., an integer between \c 0 and \c 12; default \c 8.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_size,
+ * the read size for data migration\, in bytes\, must be a power of two.  This setting is a best
+ * effort.  It does not force every read to be this size., an integer between \c 512B and \c 16MB;
+ * default \c 1MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
+ * WiredTiger will start to migrate data from the backup to the running WiredTiger database.  Each
+ * worker thread uses a session handle from the configured session_max., an integer between \c 0 and
+ * \c 12; default \c 8.}
  * @config{ ),,}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from the configured
  * session_max., a set of related configuration options defined as follows.}

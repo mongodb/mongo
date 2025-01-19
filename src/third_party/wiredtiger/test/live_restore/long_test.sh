@@ -10,5 +10,7 @@ run_test "-i 30 -l 2 -o 20000 -c 20"
 # exiting, but it will not apply crud operations after startup.
 run_test "-i 2 -l 2 -b -t 1"
 
-# 3 iterations with 200K operations"
-run_test "-i 3 -l 2 -o 200000 -t 12"
+# 5 iterations with 200K operations dying at some point. Followed by an single 200K operation
+# iteration after performing recovery
+run_test "-i 5 -l 2 -o 200000 -t 12 -d"
+run_test "-i 1 -l 2 -r -o 200000 -t 12"
