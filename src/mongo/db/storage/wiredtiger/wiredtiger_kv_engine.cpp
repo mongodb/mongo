@@ -585,7 +585,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     _sizeStorerUri = _uri("sizeStorer");
     WiredTigerSession session(_conn);
-    if (repair && _hasUri(session.getSession(), _sizeStorerUri)) {
+    if (repair && _hasUri(session, _sizeStorerUri)) {
         LOGV2(22316, "Repairing size cache");
 
         auto status = _salvageIfNeeded(_sizeStorerUri.c_str());
@@ -844,16 +844,15 @@ Status WiredTigerKVEngine::repairIdent(RecoveryUnit& ru, StringData ident) {
 
 Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     // Using a side session to avoid transactional issues
-    WiredTigerSession sessionWrapper(_conn);
-    WT_SESSION* session = sessionWrapper.getSession();
+    WiredTigerSession session(_conn);
 
-    int rc = (session->verify)(session, uri, nullptr);
+    int rc = session.verify(uri, nullptr);
     // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (rc == EBUSY) {
         _checkpoint(session);
-        rc = (session->verify)(session, uri, nullptr);
+        rc = session.verify(uri, nullptr);
     }
 
     if (rc == 0) {
@@ -866,15 +865,15 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
                       "Data file is missing. Attempting to drop and re-create the collection.",
                       "uri"_attr = uri);
 
-        return _rebuildIdent(sessionWrapper, uri);
+        return _rebuildIdent(session, uri);
     }
 
     LOGV2(22328, "Verify failed. Running a salvage operation.", "uri"_attr = uri);
-    rc = session->salvage(session, uri, nullptr);
+    rc = session.salvage(uri, nullptr);
     // Same reasoning for handling EBUSY errors as above.
     if (rc == EBUSY) {
         _checkpoint(session);
-        rc = session->salvage(session, uri, nullptr);
+        rc = session.salvage(uri, nullptr);
     }
     auto status = wtRCToStatus(rc, session, "Salvage failed:");
     if (status.isOK()) {
@@ -888,7 +887,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
                   "error"_attr = status);
 
     //  If the data is unsalvageable, we should completely rebuild the ident.
-    return _rebuildIdent(sessionWrapper, uri);
+    return _rebuildIdent(session, uri);
 }
 
 Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char* uri) {
@@ -925,13 +924,13 @@ Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char*
         return status;
     }
 
-    int rc = session->drop(*session, uri, nullptr);
+    int rc = session.drop(uri, nullptr);
     // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (rc == EBUSY) {
-        _checkpoint(*session);
-        rc = session->drop(*session, uri, nullptr);
+        _checkpoint(session);
+        rc = session.drop(uri, nullptr);
     }
     if (rc != 0) {
         auto status = wtRCToStatus(rc, session);
@@ -942,7 +941,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char*
         return status;
     }
 
-    rc = session->create(*session, uri, swMetadata.getValue().c_str());
+    rc = session.create(uri, swMetadata.getValue().c_str());
     if (rc != 0) {
         auto status = wtRCToStatus(rc, session);
         LOGV2_ERROR(22359,
@@ -1841,23 +1840,20 @@ void WiredTigerKVEngine::alterIdentMetadata(RecoveryUnit& ru,
 Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
     // Use a dedicated session in an alter operation to avoid transaction issues.
     WiredTigerSession session(_conn);
-    auto sessionPtr = session.getSession();
 
     auto uriNullTerminated = uri.toString();
     auto configNullTerminated = config.toString();
 
-    auto ret =
-        sessionPtr->alter(sessionPtr, uriNullTerminated.c_str(), configNullTerminated.c_str());
+    auto ret = session.alter(uriNullTerminated.c_str(), configNullTerminated.c_str());
     // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (ret == EBUSY) {
-        _checkpoint(sessionPtr);
-        ret =
-            sessionPtr->alter(sessionPtr, uriNullTerminated.c_str(), configNullTerminated.c_str());
+        _checkpoint(session);
+        ret = session.alter(uriNullTerminated.c_str(), configNullTerminated.c_str());
     }
 
-    return wtRCToStatus(ret, sessionPtr);
+    return wtRCToStatus(ret, session);
 }
 
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
@@ -1953,15 +1949,15 @@ bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
     return true;
 }
 
-void WiredTigerKVEngine::_checkpoint(WT_SESSION* session, bool useTimestamp) {
+void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session, bool useTimestamp) {
     _currentCheckpointIteration.fetchAndAdd(1);
     int wtRet;
     size_t attempt = 0;
     while (true) {
         if (useTimestamp) {
-            wtRet = session->checkpoint(session, "use_timestamp=true");
+            wtRet = session.checkpoint("use_timestamp=true");
         } else {
-            wtRet = session->checkpoint(session, "use_timestamp=false");
+            wtRet = session.checkpoint("use_timestamp=false");
         }
         if (EBUSY == wtRet) {
             logAndBackoff(9787200,
@@ -1982,7 +1978,7 @@ void WiredTigerKVEngine::_checkpoint(WT_SESSION* session, bool useTimestamp) {
                        "checkpointIteration"_attr = checkpointedIteration);
 }
 
-void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) try {
+void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session) try {
     // Ephemeral WiredTiger instances cannot do a checkpoint to disk as there is no disk backing
     // the data.
     if (_ephemeral) {
@@ -2063,25 +2059,23 @@ void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) try {
 
 void WiredTigerKVEngine::checkpoint() {
     UniqueWiredTigerSession session = _connection->getSession();
-    WT_SESSION* s = session->getSession();
-    return _checkpoint(s);
+    return _checkpoint(*session);
 }
 
 void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {
     UniqueWiredTigerSession session = _connection->getSession();
-    WT_SESSION* s = session->getSession();
-    return _checkpoint(s, useStableTimestamp);
+    return _checkpoint(*session, useStableTimestamp);
 }
 
 bool WiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
-    return _hasUri(WiredTigerRecoveryUnit::get(ru).getSession()->getSession(), _uri(ident));
+    return _hasUri(*WiredTigerRecoveryUnit::get(ru).getSession(), _uri(ident));
 }
 
-bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) const {
+bool WiredTigerKVEngine::_hasUri(WiredTigerSession& session, const std::string& uri) const {
     // can't use WiredTigerCursor since this is called from constructor.
     WT_CURSOR* c = nullptr;
     // No need for a metadata:create cursor, since it gathers extra information and is slower.
-    int ret = session->open_cursor(session, "metadata:", nullptr, nullptr, &c);
+    int ret = session.open_cursor("metadata:", nullptr, nullptr, &c);
     if (ret == ENOENT)
         return false;
     invariantWTOK(ret, session);
@@ -2912,14 +2906,12 @@ Status WiredTigerKVEngine::reconfigureLogging() {
 StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) const {
     auto session = _connection->getSession();
 
-    auto tableMetadata =
-        WiredTigerUtil::getMetadata(session->getSession(), "table:{}"_format(ident));
+    auto tableMetadata = WiredTigerUtil::getMetadata(*session, "table:{}"_format(ident));
     if (!tableMetadata.isOK()) {
         return tableMetadata.getStatus();
     }
 
-    auto fileMetadata =
-        WiredTigerUtil::getMetadata(session->getSession(), "file:{}.wt"_format(ident));
+    auto fileMetadata = WiredTigerUtil::getMetadata(*session, "file:{}.wt"_format(ident));
     if (!fileMetadata.isOK()) {
         return fileMetadata.getStatus();
     }

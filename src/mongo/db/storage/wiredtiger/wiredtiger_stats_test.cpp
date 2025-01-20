@@ -82,10 +82,8 @@ protected:
         ASSERT_WT_OK(
             wiredtiger_open(_path.path().c_str(), nullptr, "create,statistics=(fast),", &_conn));
         _session = std::make_unique<WiredTigerSession>(_conn);
-        ASSERT_WT_OK(
-            (*_session)->create(_session->getSession(),
-                                _uri.c_str(),
-                                "type=file,key_format=q,value_format=u,log=(enabled=false)"));
+        ASSERT_WT_OK(_session->create(_uri.c_str(),
+                                      "type=file,key_format=q,value_format=u,log=(enabled=false)"));
     }
 
     void closeConnection() {
@@ -115,11 +113,10 @@ protected:
      * Writes at the specified key to WT.
      */
     void writeAtKey(const std::string& data, int64_t key) {
-        ASSERT_WT_OK((*_session)->begin_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->begin_transaction(nullptr));
 
         WT_CURSOR* cursor;
-        ASSERT_WT_OK((*_session)->open_cursor(
-            _session->getSession(), _uri.c_str(), nullptr, nullptr, &cursor));
+        ASSERT_WT_OK(_session->open_cursor(_uri.c_str(), nullptr, nullptr, &cursor));
 
         cursor->set_key(cursor, key);
 
@@ -128,21 +125,20 @@ protected:
 
         ASSERT_WT_OK(cursor->insert(cursor));
         ASSERT_WT_OK(cursor->close(cursor));
-        ASSERT_WT_OK((*_session)->commit_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->commit_transaction(nullptr));
 
         // Without a checkpoint, an operation is not guaranteed to write to disk.
-        ASSERT_WT_OK((*_session)->checkpoint(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->checkpoint(nullptr));
     }
 
     /**
      * Reads at the specified key from WT.
      */
     void readAtKey(int64_t key) {
-        ASSERT_WT_OK((*_session)->begin_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->begin_transaction(nullptr));
 
         WT_CURSOR* cursor;
-        ASSERT_WT_OK((*_session)->open_cursor(
-            _session->getSession(), _uri.c_str(), nullptr, nullptr, &cursor));
+        ASSERT_WT_OK(_session->open_cursor(_uri.c_str(), nullptr, nullptr, &cursor));
 
         cursor->set_key(cursor, key);
         ASSERT_WT_OK(cursor->search(cursor));
@@ -151,7 +147,7 @@ protected:
         ASSERT_WT_OK(cursor->get_value(cursor, &value));
 
         ASSERT_WT_OK(cursor->close(cursor));
-        ASSERT_WT_OK((*_session)->commit_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->commit_transaction(nullptr));
     }
 
     /**
@@ -190,8 +186,7 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
 
     {
         BSONObjBuilder bob;
-        ASSERT_OK(
-            WiredTigerUtil::exportTableToBSON(_session->getSession(), "statistics:", "", bob));
+        ASSERT_OK(WiredTigerUtil::exportTableToBSON(*_session, "statistics:", "", bob));
         LOGV2(9032000, "Connection statistics", "stats"_attr = bob.obj());
     }
 

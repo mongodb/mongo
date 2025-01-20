@@ -58,8 +58,7 @@ WiredTigerStats::WiredTigerStats(WiredTigerSession& session) {
     WT_CURSOR* c;
     uassert(ErrorCodes::CursorNotFound,
             "Unable to open statistics cursor",
-            !session->open_cursor(
-                session.getSession(), "statistics:session", nullptr, "statistics=(fast)", &c));
+            !session.open_cursor("statistics:session", nullptr, "statistics=(fast)", &c));
 
     ScopeGuard guard{[c] {
         c->close(c);

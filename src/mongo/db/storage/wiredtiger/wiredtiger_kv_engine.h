@@ -585,9 +585,9 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
-    void _checkpoint(WT_SESSION* session);
+    void _checkpoint(WiredTigerSession& session);
 
-    void _checkpoint(WT_SESSION* session, bool useTimestamp);
+    void _checkpoint(WiredTigerSession& session, bool useTimestamp);
 
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
@@ -614,7 +614,7 @@ private:
      */
     Status _rebuildIdent(WiredTigerSession& session, const char* uri);
 
-    bool _hasUri(WT_SESSION* session, const std::string& uri) const;
+    bool _hasUri(WiredTigerSession& session, const std::string& uri) const;
 
     std::string _uri(StringData ident) const;
 

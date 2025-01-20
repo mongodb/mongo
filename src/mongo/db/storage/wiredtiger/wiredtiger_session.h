@@ -82,12 +82,6 @@ public:
     WT_SESSION* getSession() const {
         return _session;
     }
-    WT_SESSION* operator*() const {
-        return _session;
-    }
-    WT_SESSION* operator->() const {
-        return _session;
-    }
 
     // Safe accessor for the internal session
     template <typename Functor>
@@ -103,9 +97,19 @@ public:
         return _session->name(_session, std::forward<Args>(args)...); \
     }
 
+    WRAPPED_WT_SESSION_METHOD(alter)
+    WRAPPED_WT_SESSION_METHOD(begin_transaction)
+    WRAPPED_WT_SESSION_METHOD(checkpoint)
+    WRAPPED_WT_SESSION_METHOD(commit_transaction)
     WRAPPED_WT_SESSION_METHOD(compact)
+    WRAPPED_WT_SESSION_METHOD(create)
+    WRAPPED_WT_SESSION_METHOD(drop)
     WRAPPED_WT_SESSION_METHOD(get_rollback_reason)
+    WRAPPED_WT_SESSION_METHOD(open_cursor)
+    WRAPPED_WT_SESSION_METHOD(prepare_transaction)
     WRAPPED_WT_SESSION_METHOD(reconfigure)
+    WRAPPED_WT_SESSION_METHOD(salvage)
+    WRAPPED_WT_SESSION_METHOD(verify)
 #undef WRAPPED_WT_SESSION_METHOD
 
     /**

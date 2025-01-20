@@ -116,7 +116,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
 StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& session,
                                                           StringData uri) {
     WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(*session, "metadata:create", nullptr, "", &cursor), session);
+    invariantWTOK(session.open_cursor("metadata:create", nullptr, "", &cursor), session);
     invariant(cursor);
     ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
 
@@ -145,11 +145,11 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit
     return _getMetadata(cursor, uri);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadata(WT_SESSION* session, StringData uri) {
+StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
     WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:", nullptr, "", &cursor), session);
+    invariantWTOK(session.open_cursor("metadata:", nullptr, "", &cursor), session);
     invariant(cursor);
-    ON_BLOCK_EXIT([cursor, session] { invariantWTOK(cursor->close(cursor), session); });
+    ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
 
     return _getMetadata(cursor, uri);
 }
@@ -776,7 +776,7 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
     const char* verifyConfig =
         configurationOverride.has_value() ? configurationOverride->c_str() : nullptr;
     // Do the verify. Weird parens prevent treating "verify" as a macro.
-    return (session->verify)(*session, uri.c_str(), verifyConfig);
+    return session.verify(uri.c_str(), verifyConfig);
 }
 
 void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
@@ -936,7 +936,7 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
     std::vector<std::string> fieldsToIgnore = {"LSM"};
 
     Status status = WiredTigerUtil::exportTableToBSON(
-        session.getSession(), "statistics:", "statistics=(fast)", bob, fieldsToIgnore);
+        session, "statistics:", "statistics=(fast)", bob, fieldsToIgnore);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));
@@ -945,24 +945,23 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
     return true;
 }
 
-Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
+Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder& bob) {
     return exportTableToBSON(session, uri, config, bob, {});
 }
 
-Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
+Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder& bob,
                                          const std::vector<std::string>& filter) {
-    invariant(session);
     WT_CURSOR* cursor = nullptr;
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
 
     // Attempt to open a statistics cursor on the provided URI.
-    int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &cursor);
+    int ret = session.open_cursor(uri.c_str(), nullptr, cursorConfig, &cursor);
     if (ret != 0) {
         return Status(ErrorCodes::CursorNotFound,
                       str::stream() << "unable to open cursor at URI " << uri

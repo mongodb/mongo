@@ -389,7 +389,7 @@ TEST_F(WiredTigerUtilTest, ParseCompactMessages) {
     // Perform simple WiredTiger operations while capturing the generated logs.
     const std::string uri = "table:ev_compact";
     startCapturingLogMessages();
-    ASSERT_OK(wtRCToStatus(wtSession->create(*wtSession, uri.c_str(), nullptr), *wtSession));
+    ASSERT_OK(wtRCToStatus(wtSession.create(uri.c_str(), nullptr), wtSession));
     ASSERT_OK(wtRCToStatus(wtSession.compact(uri.c_str(), nullptr), wtSession));
     stopCapturingLogMessages();
 
@@ -555,19 +555,18 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateBounded) {
     WiredTigerSession session2 = harnessHelper.openSession();
 
     const std::string uri = "table:test";
-    ASSERT_OK(wtRCToStatus(session1->create(*session1, uri.c_str(), "key_format=S,value_format=S"),
-                           *session1));
+    ASSERT_OK(wtRCToStatus(session1.create(uri.c_str(), "key_format=S,value_format=S"), session1));
     WT_CURSOR* cursor1;
-    ASSERT_EQ(0, session1->begin_transaction(*session1, "ignore_prepare=false"));
-    ASSERT_EQ(0, session1->open_cursor(*session1, uri.c_str(), nullptr, nullptr, &cursor1));
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor1));
     cursor1->set_key(cursor1, "abc");
     cursor1->set_value(cursor1, "test");
     ASSERT_EQ(0, cursor1->insert(cursor1));
-    session1->prepare_transaction(*session1, "prepare_timestamp=1");
+    session1.prepare_transaction("prepare_timestamp=1");
 
     WT_CURSOR* cursor2;
-    ASSERT_EQ(0, session2->begin_transaction(*session2, "ignore_prepare=false"));
-    ASSERT_EQ(0, session2->open_cursor(*session2, uri.c_str(), nullptr, nullptr, &cursor2));
+    ASSERT_EQ(0, session2.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session2.open_cursor(uri.c_str(), nullptr, nullptr, &cursor2));
 
     cursor2->set_key(cursor2, "abc");
     cursor2->bound(cursor2, "bound=lower");
@@ -575,7 +574,7 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateBounded) {
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
 
-    session1->commit_transaction(*session1, "durable_timestamp=1,commit_timestamp=1");
+    session1.commit_transaction("durable_timestamp=1,commit_timestamp=1");
     ASSERT_EQ(0, cursor2->next(cursor2));
 }
 
@@ -588,26 +587,25 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateNoBound) {
     WiredTigerSession session2 = harnessHelper.openSession();
 
     const std::string uri = "table:test";
-    ASSERT_OK(wtRCToStatus(session1->create(*session1, uri.c_str(), "key_format=S,value_format=S"),
-                           *session1));
+    ASSERT_OK(wtRCToStatus(session1.create(uri.c_str(), "key_format=S,value_format=S"), session1));
     WT_CURSOR* cursor1;
-    ASSERT_EQ(0, session1->begin_transaction(*session1, "ignore_prepare=false"));
-    ASSERT_EQ(0, session1->open_cursor(*session1, uri.c_str(), nullptr, nullptr, &cursor1));
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor1));
     cursor1->set_key(cursor1, "abc");
     cursor1->set_value(cursor1, "test");
     ASSERT_EQ(0, cursor1->insert(cursor1));
-    session1->prepare_transaction(*session1, "prepare_timestamp=1");
+    session1.prepare_transaction("prepare_timestamp=1");
 
     WT_CURSOR* cursor2;
-    ASSERT_EQ(0, session2->begin_transaction(*session2, "ignore_prepare=false"));
-    ASSERT_EQ(0, session2->open_cursor(*session2, uri.c_str(), nullptr, nullptr, &cursor2));
+    ASSERT_EQ(0, session2.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session2.open_cursor(uri.c_str(), nullptr, nullptr, &cursor2));
 
     // Continuously return WT_PREPARE_CONFLICT
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
 
-    session1->commit_transaction(*session1, "durable_timestamp=1,commit_timestamp=1");
+    session1.commit_transaction("durable_timestamp=1,commit_timestamp=1");
     ASSERT_EQ(0, cursor2->next(cursor2));
 }
 

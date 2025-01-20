@@ -115,11 +115,11 @@ public:
      *
      * A filter can be specified to skip desired fields.
      */
-    static Status exportTableToBSON(WT_SESSION* s,
+    static Status exportTableToBSON(WiredTigerSession& session,
                                     const std::string& uri,
                                     const std::string& config,
                                     BSONObjBuilder& bob);
-    static Status exportTableToBSON(WT_SESSION* s,
+    static Status exportTableToBSON(WiredTigerSession& session,
                                     const std::string& uri,
                                     const std::string& config,
                                     BSONObjBuilder& bob,
@@ -178,7 +178,7 @@ public:
      * or session.
      */
     static StatusWith<std::string> getMetadata(WiredTigerRecoveryUnit&, StringData uri);
-    static StatusWith<std::string> getMetadata(WT_SESSION* session, StringData uri);
+    static StatusWith<std::string> getMetadata(WiredTigerSession& session, StringData uri);
 
     /**
      * Reads app_metadata for collection/index at URI as a BSON document.
