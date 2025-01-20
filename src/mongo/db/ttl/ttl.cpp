@@ -817,7 +817,7 @@ void TTLMonitor::doStepUpFixes(OperationContext* opCtx) {
 
                 // At this point we need to look closer at the current version of the index
                 // spec, and hold the lock to prevent concurrent collMod.
-                const auto coll = acquireCollection(
+                auto coll = acquireCollection(
                     opCtx,
                     CollectionAcquisitionRequest::fromOpCtx(
                         opCtx, *nss, AcquisitionPrerequisites::OperationType::kWrite),

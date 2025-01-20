@@ -319,16 +319,12 @@ public:
         return _resolvedNss;
     }
 
-    /**
-     * Returns a writable Collection copy that will be returned by current and future calls to this
-     * function as well as getCollection(). Any previous Collection pointers that were returned may
-     * be invalidated.
-     *
-     * Must be in an active WriteUnitOfWork
-     */
-    Collection* getWritableCollection(OperationContext* opCtx);
-
 protected:
+    // TODO SERVER-99582: Using the CollectionWriter updates the AutoGetCollection object to point
+    // to the new writable instance. We should ideally remove this if we can guarantee this is no
+    // longer necessary in order to bring parity with CollectionAcquisition.
+    friend class CollectionWriter;
+
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeColl,
@@ -345,9 +341,6 @@ protected:
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
     // the same as the input namespace string
     NamespaceString _resolvedNss;
-
-    // Populated if getWritableCollection() is called.
-    Collection* _writableColl = nullptr;
 };
 
 class CollectionAcquisition;

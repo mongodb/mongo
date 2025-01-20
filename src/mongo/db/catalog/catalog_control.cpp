@@ -72,75 +72,84 @@
 
 namespace mongo {
 namespace catalog {
-namespace {
-void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
-                                                  StorageEngine* storageEngine,
-                                                  const PreviousCatalogState& previousCatalogState,
-                                                  Timestamp stableTimestamp) {
+// Class since it accesses the internal
+// CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite method. This is possible because
+// this class is actually a friend class with a forward declaration in collection_catalog.h. Note
+// that this class is not exposed to the public and can only be used in this file.
+class CatalogControlUtils {
+public:
+    static void reopenAllDatabasesAndReloadCollectionCatalog(
+        OperationContext* opCtx,
+        StorageEngine* storageEngine,
+        const PreviousCatalogState& previousCatalogState,
+        Timestamp stableTimestamp) {
 
-    // Open all databases and repopulate the CollectionCatalog.
-    LOGV2(20276, "openCatalog: reopening all databases");
+        // Open all databases and repopulate the CollectionCatalog.
+        LOGV2(20276, "openCatalog: reopening all databases");
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        std::vector<DatabaseName> databasesToOpen = storageEngine->listDatabases();
+        for (auto&& dbName : databasesToOpen) {
+            LOGV2_FOR_RECOVERY(
+                23992, 1, "openCatalog: dbholder reopening database", logAttrs(dbName));
+            auto db = databaseHolder->openDb(opCtx, dbName);
+            invariant(
+                db, str::stream() << "failed to reopen database " << dbName.toStringForErrorMsg());
+            for (auto&& collNss :
+                 CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName)) {
+                // Note that the collection name already includes the database component.
+                auto collection =
+                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
+                        opCtx, collNss);
+                invariant(collection,
+                          str::stream() << "failed to get valid collection pointer for namespace "
+                                        << collNss.toStringForErrorMsg());
 
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    std::vector<DatabaseName> databasesToOpen = storageEngine->listDatabases();
-    for (auto&& dbName : databasesToOpen) {
-        LOGV2_FOR_RECOVERY(23992, 1, "openCatalog: dbholder reopening database", logAttrs(dbName));
-        auto db = databaseHolder->openDb(opCtx, dbName);
-        invariant(db,
-                  str::stream() << "failed to reopen database " << dbName.toStringForErrorMsg());
-        for (auto&& collNss :
-             CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName)) {
-            // Note that the collection name already includes the database component.
-            auto collection =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
-                                                                                           collNss);
-            invariant(collection,
-                      str::stream() << "failed to get valid collection pointer for namespace "
-                                    << collNss.toStringForErrorMsg());
+                if (auto it = previousCatalogState.minValidTimestampMap.find(collection->uuid());
+                    it != previousCatalogState.minValidTimestampMap.end()) {
+                    // After rolling back to a stable timestamp T, the minimum valid timestamp for
+                    // each collection must be reset to (at least) its value at T. When the min
+                    // valid timestamp is clamped to the stable timestamp we may end up with a
+                    // pessimistic minimum valid timestamp set where the last DDL operation occured
+                    // earlier. This is fine as this is just an optimization when to avoid reading
+                    // the catalog from WT.
+                    auto minValid = std::min(stableTimestamp, it->second);
 
-            if (auto it = previousCatalogState.minValidTimestampMap.find(collection->uuid());
-                it != previousCatalogState.minValidTimestampMap.end()) {
-                // After rolling back to a stable timestamp T, the minimum valid timestamp for each
-                // collection must be reset to (at least) its value at T. When the min valid
-                // timestamp is clamped to the stable timestamp we may end up with a pessimistic
-                // minimum valid timestamp set where the last DDL operation occured earlier. This is
-                // fine as this is just an optimization when to avoid reading the catalog from WT.
-                auto minValid = std::min(stableTimestamp, it->second);
-
-                collection->setMinimumValidSnapshot(minValid);
-            }
-
-            if (collection->getTimeseriesOptions()) {
-                bool extendedRangeSetting;
-                if (auto it = previousCatalogState.requiresTimestampExtendedRangeSupportMap.find(
-                        collection->uuid());
-                    it != previousCatalogState.requiresTimestampExtendedRangeSupportMap.end()) {
-                    extendedRangeSetting = it->second;
-                } else {
-                    extendedRangeSetting =
-                        timeseries::collectionMayRequireExtendedRangeSupport(opCtx, *collection);
+                    collection->setMinimumValidSnapshot(minValid);
                 }
 
-                if (extendedRangeSetting) {
-                    collection->setRequiresTimeseriesExtendedRangeSupport(opCtx);
-                }
-            }
+                if (collection->getTimeseriesOptions()) {
+                    bool extendedRangeSetting;
+                    if (auto it =
+                            previousCatalogState.requiresTimestampExtendedRangeSupportMap.find(
+                                collection->uuid());
+                        it != previousCatalogState.requiresTimestampExtendedRangeSupportMap.end()) {
+                        extendedRangeSetting = it->second;
+                    } else {
+                        extendedRangeSetting = timeseries::collectionMayRequireExtendedRangeSupport(
+                            opCtx, *collection);
+                    }
 
-            // If this is the oplog collection, re-establish the replication system's cached pointer
-            // to the oplog.
-            if (collNss.isOplog()) {
-                LOGV2(20277, "openCatalog: updating cached oplog pointer");
-                repl::establishOplogRecordStoreForLogging(opCtx, collection->getRecordStore());
+                    if (extendedRangeSetting) {
+                        collection->setRequiresTimeseriesExtendedRangeSupport(opCtx);
+                    }
+                }
+
+                // If this is the oplog collection, re-establish the replication system's cached
+                // pointer to the oplog.
+                if (collNss.isOplog()) {
+                    LOGV2(20277, "openCatalog: updating cached oplog pointer");
+                    repl::establishOplogRecordStoreForLogging(opCtx, collection->getRecordStore());
+                }
             }
         }
-    }
 
-    // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
-    // catalog. Clear the pre-closing state.
-    CollectionCatalog::write(opCtx, [](CollectionCatalog& catalog) { catalog.onOpenCatalog(); });
-    LOGV2(20278, "openCatalog: finished reloading collection catalog");
-}
-}  // namespace
+        // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
+        // catalog. Clear the pre-closing state.
+        CollectionCatalog::write(opCtx,
+                                 [&](CollectionCatalog& catalog) { catalog.onOpenCatalog(); });
+        LOGV2(20278, "openCatalog: finished reloading collection catalog");
+    }
+};
 
 PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
@@ -238,7 +247,7 @@ void openCatalog(OperationContext* opCtx,
     IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
         opCtx, reconcileResult.indexBuildsToRestart, reconcileResult.indexBuildsToResume);
 
-    reopenAllDatabasesAndReloadCollectionCatalog(
+    CatalogControlUtils::reopenAllDatabasesAndReloadCollectionCatalog(
         opCtx, storageEngine, previousCatalogState, stableTimestamp);
 }
 
@@ -246,7 +255,7 @@ void openCatalog(OperationContext* opCtx,
 void openCatalogAfterStorageChange(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    reopenAllDatabasesAndReloadCollectionCatalog(opCtx, storageEngine, {}, {});
+    CatalogControlUtils::reopenAllDatabasesAndReloadCollectionCatalog(opCtx, storageEngine, {}, {});
 }
 
 }  // namespace catalog

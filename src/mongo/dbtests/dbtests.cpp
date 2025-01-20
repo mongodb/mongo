@@ -130,8 +130,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         WriteUnitOfWork wunit(opCtx);
-        auto coll =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
+        CollectionWriter writer{opCtx, nss};
+        auto coll = writer.getWritableCollection(opCtx);
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);

@@ -205,12 +205,13 @@ void DbCheckTest::dropIndex(OperationContext* opCtx, const std::string& indexNam
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto writableCollection = collection.getWritableCollection(opCtx);
+    CollectionWriter collWriter{opCtx, collection};
+    auto writableCollection = collWriter.getWritableCollection(opCtx);
     auto writableEntry =
         writableCollection->getIndexCatalog()->getWritableEntryByName(opCtx, indexName);
     ASSERT(writableEntry);
     ASSERT_OK(writableCollection->getIndexCatalog()->dropIndexEntry(
-        opCtx, collection.getWritableCollection(opCtx), writableEntry));
+        opCtx, writableCollection, writableEntry));
 
     ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
         repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));

@@ -854,9 +854,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         }
         if (indexesToDrop.size() > 0) {
             WriteUnitOfWork wuow(opCtx);
-            auto collection =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                    opCtx, entry.nss);
+            CollectionWriter writer{opCtx, entry.nss};
+            auto collection = writer.getWritableCollection(opCtx);
             invariant(collection->getCatalogId() == entry.catalogId);
             collection->replaceMetadata(opCtx, std::move(md));
             wuow.commit();
@@ -970,9 +969,9 @@ Status StorageEngineImpl::_dropCollections(OperationContext* opCtx,
                                            const std::string& collectionNamePrefix) {
     Status firstError = Status::OK();
     WriteUnitOfWork wuow(opCtx);
-    auto collectionCatalog = CollectionCatalog::get(opCtx);
     for (auto& uuid : toDrop) {
-        auto coll = collectionCatalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
+        CollectionWriter writer{opCtx, uuid};
+        auto coll = writer.getWritableCollection(opCtx);
         if (coll->ns().coll().startsWith(collectionNamePrefix)) {
             // Drop all indexes in the collection.
             coll->getIndexCatalog()->dropAllIndexes(
